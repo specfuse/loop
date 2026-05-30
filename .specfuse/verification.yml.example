@@ -1,0 +1,33 @@
+# .specfuse/verification.yml
+#
+# Verification gates for THIS repository, grouped into sets selected by work-unit
+# type (see GATES_FOR_TYPE in loop.py and the verification skill). The driver runs
+# these itself as the exit oracle. {feature_dir} is substituted with the active
+# feature's folder path at run time.
+#
+# Keep the `code` set in lock-step with your GitHub branch-protection checks — if
+# they drift, an agent can pass locally and still be unmergeable.
+
+code:
+  - name: tests
+    command: "pytest -q"
+  - name: coverage
+    command: "coverage report --fail-under=90"
+  - name: warnings
+    command: "python -W error -c 'pass'"     # replace with your build's -Werror equivalent
+  - name: lint
+    command: "ruff check ."
+  - name: security
+    command: "bandit -r src -ll"             # or your OWASP-aligned scanner
+
+# Reflective units (retrospective, lessons, docs): the artifact exists / something
+# changed. Tighten as you like.
+doc:
+  - name: artifact-changed
+    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
+
+# plan-next: structural integrity of what it drafted. The linter is the real check;
+# a malformed next-gate draft fails here, where you are already reviewing.
+plannext:
+  - name: plan-lint
+    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"

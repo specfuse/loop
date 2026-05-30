@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "specfuse-loop"
+version = "0.2.0"
+description = "Local-first executor for the Specfuse Plan + Work Unit gate-cycle methodology."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Specfuse contributors" },
+]
+keywords = ["specfuse", "agents", "planning", "ralph", "gate-cycle"]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development",
+]
+dependencies = [
+  "PyYAML>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/specfuse/loop"
+Source = "https://github.com/specfuse/loop"
+
+# The loop driver and linter are invoked as scripts from a target repo's
+# .specfuse/scripts/ directory rather than installed as console entry points.
+# This file exists to declare the runtime dependency (PyYAML) cleanly.
+[tool.setuptools]
+py-modules = []
