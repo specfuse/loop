@@ -257,6 +257,20 @@ def git(*args: str) -> str:
                           check=True).stdout.strip()
 
 
+def require_git_ready() -> None:
+    """Driver squashes per WU on top of HEAD, so the repo needs an initial commit."""
+    in_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
+                             capture_output=True, text=True)
+    if in_repo.returncode != 0:
+        sys.exit("Not a git repository. Run `git init` from the repo root first.")
+    has_head = subprocess.run(["git", "rev-parse", "HEAD"],
+                              capture_output=True, text=True)
+    if has_head.returncode != 0:
+        sys.exit("Git repository has no commits yet. The driver squashes per work "
+                 "unit on top of HEAD; create an initial commit first "
+                 "(e.g., `git commit --allow-empty -m 'init'`).")
+
+
 def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
     if git("rev-parse", "HEAD") != head_before:
         git("reset", "--soft", head_before)  # fold away any commits the agent made
@@ -337,6 +351,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
     if gate is None:
         print(f"{feature_id}: all gates passed — feature complete.")
         return 0
+
+    if not dry_run:
+        require_git_ready()
 
     units = [load_wu(feature_dir, ref) for ref in gate.refs]
     print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
