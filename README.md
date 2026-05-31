@@ -61,9 +61,8 @@ In a target single-repo project:
 # from the specfuse-loop checkout
 ./init.sh /path/to/your-project
 
-# then, in your project
+# then, in your project — no install step; the loop is stdlib-only
 cd /path/to/your-project
-pip install pyyaml
 $EDITOR .specfuse/verification.yml      # match the `code` gates to your stack
 # author your first feature folder under .specfuse/features/ from .specfuse/templates/
 python .specfuse/scripts/loop.py --dry-run
@@ -75,7 +74,6 @@ This repository is also a **self-demonstrating reference installation**: its own
 (`features/FEAT-2026-0001-health-endpoint/`). From the repo root you can run:
 
 ```bash
-pip install pyyaml
 python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0001-health-endpoint
 python .specfuse/scripts/loop.py --dry-run
 ```

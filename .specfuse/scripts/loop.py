@@ -48,10 +48,12 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    sys.exit("This driver needs PyYAML.  Install it with:  pip install pyyaml")
+# The strict mini-YAML reader lives alongside this script; add its dir to
+# sys.path so this script remains zero-install (stdlib only). The reader
+# implements exactly the documented subset the loop authors with; see
+# `_miniyaml.py` for the grammar and the fail-loud rejections.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _miniyaml  # noqa: E402
 
 SPECFUSE_DIR = Path(".specfuse")
 FEATURES_DIR = SPECFUSE_DIR / "features"
@@ -117,7 +119,7 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     j = 1
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
-    fm = yaml.safe_load("\n".join(lines[1:j])) or {}
+    fm = _miniyaml.parse("\n".join(lines[1:j])) or {}
     body = "\n".join(lines[j + 1 :])
     return fm, body
 
@@ -176,7 +178,7 @@ def load_graph(feature_dir: Path) -> tuple[dict, list[GateNode]]:
     m = re.search(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL)
     if not m:
         sys.exit("PLAN.md has no ```yaml graph block.")
-    graph = yaml.safe_load(m.group(1)) or {}
+    graph = _miniyaml.parse(m.group(1)) or {}
     gates: list[GateNode] = []
     for g in graph.get("gates", []):
         gate_file = feature_dir / g["file"]
@@ -328,8 +330,8 @@ def parse_result_block(stdout: str) -> dict | None:
         return None
     body = matches[-1].group(1)  # LAST result block — agents may discuss before it
     try:
-        parsed = yaml.safe_load(body)
-    except yaml.YAMLError:
+        parsed = _miniyaml.parse(body)
+    except _miniyaml.MiniYAMLError:
         return None
     return parsed if isinstance(parsed, dict) else None
 
@@ -351,7 +353,7 @@ def agent_reported_blocked(stdout: str) -> tuple[bool, str | None]:
 def load_verification() -> dict:
     if not VERIFICATION_PATH.exists():
         return {}
-    return yaml.safe_load(VERIFICATION_PATH.read_text()) or {}
+    return _miniyaml.parse(VERIFICATION_PATH.read_text()) or {}
 
 
 def verify(wu: WorkUnit, feature_dir: Path,

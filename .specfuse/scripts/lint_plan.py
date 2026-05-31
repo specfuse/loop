@@ -32,10 +32,9 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    sys.exit("This linter needs PyYAML.  Install it with:  pip install pyyaml")
+# Strict mini-YAML reader (alongside this script) — keeps the linter zero-install.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _miniyaml  # noqa: E402
 
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
@@ -63,7 +62,7 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     j = 1
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
-    return yaml.safe_load("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
+    return _miniyaml.parse("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
 
 
 def lint(feature_dir: Path) -> list[str]:
@@ -80,7 +79,7 @@ def lint(feature_dir: Path) -> list[str]:
     m = re.search(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL)
     if not m:
         return errs + ["PLAN.md has no ```yaml graph block"]
-    graph = yaml.safe_load(m.group(1)) or {}
+    graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
     all_ids = {wu["id"] for g in gates for wu in (g.get("work_units") or [])}
 

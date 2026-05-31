@@ -33,3 +33,7 @@ def load_loop():
 
 def load_lint():
     return load_module(".specfuse/scripts/lint_plan.py", "lint_plan_under_test")
+
+
+def load_miniyaml():
+    return load_module(".specfuse/scripts/_miniyaml.py", "miniyaml_under_test")

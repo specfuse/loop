@@ -64,10 +64,13 @@ echo "Scaffolded Specfuse Loop into $DEST"
 echo
 echo "Next:"
 echo "  1. cd $TARGET"
-echo "  2. pip install pyyaml"
-echo "  3. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
-echo "  4. author your first feature folder under .specfuse/features/ from .specfuse/templates/"
-echo "  5. python .specfuse/scripts/loop.py --dry-run"
+echo "  2. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
+echo "  3. author your first feature folder under .specfuse/features/ from .specfuse/templates/"
+echo "  4. python .specfuse/scripts/loop.py --dry-run"
+echo
+echo "The loop driver and linter have no runtime dependencies — stock Python 3"
+echo "is all you need. (You'll need whatever tools your gates in verification.yml"
+echo "call, of course — pytest, ruff, etc. — installed however your stack does it.)"
 echo
 echo "Optional — to auto-draft .specfuse/verification.yml from this repo's CI and"
 echo "tooling for your review (instead of editing the example by hand in step 3):"

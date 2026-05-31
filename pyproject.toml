@@ -23,15 +23,18 @@ classifiers = [
   "Intended Audience :: Developers",
   "Topic :: Software Development",
 ]
-dependencies = [
-  "PyYAML>=6.0",
-]
+# The loop driver and linter have no runtime dependencies — YAML parsing is
+# done by .specfuse/scripts/_miniyaml.py against the documented subset, using
+# only the Python 3 standard library.
+dependencies = []
 
 # Dev tooling for this repo's own `code` gates (see .specfuse/verification.yml
-# and scripts/smoke-test.sh). The loop driver's runtime needs only PyYAML;
+# and scripts/smoke-test.sh). PyYAML is dev-only: the equivalence tests for
+# _miniyaml compare its output against yaml.safe_load on every real file.
 # ruff/bandit/coverage are for the reference implementation's own gates.
 [project.optional-dependencies]
 dev = [
+  "PyYAML>=6.0",
   "ruff>=0.6",
   "bandit>=1.7",
   "coverage>=7.0",

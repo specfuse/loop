@@ -1,1 +1,4 @@
-PyYAML>=6.0
+# The loop driver and linter have NO runtime dependencies — they parse the
+# documented YAML subset with .specfuse/scripts/_miniyaml.py (stdlib only).
+# This file is intentionally empty; `pip install -r requirements.txt` is a
+# no-op. Kept as a marker / habit-friendly path.
