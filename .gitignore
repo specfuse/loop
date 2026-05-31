@@ -6,6 +6,9 @@ venv/
 *.egg-info/
 build/
 dist/
+.coverage
+.coverage.*
+htmlcov/
 
 # Editor / OS noise
 .DS_Store

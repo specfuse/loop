@@ -1,0 +1,56 @@
+# .specfuse/verification.yml — THIS repo's own gates.
+#
+# Wired so the reference implementation practices the methodology it ships.
+# Authored by hand (deliberately; the derive-verification skill flagged four
+# gaps in a prior dogfood — see the commit that introduced this file).
+#
+# CI (.github/workflows/ci.yml) runs the same commands as scripts/smoke-test.sh,
+# which runs the same commands declared below. If you change one, change all
+# three — drift defeats the verification-as-oracle property.
+#
+# AUTHORING RULE: gate commands are self-contained. No `--no-build`,
+# `--no-restore`, or any "skip-build" flag — see
+# .specfuse/skills/verification/SKILL.md "the stale-artifact trap."
+
+code:
+  - name: tests
+    command: "python3 -m unittest discover -s tests -v"
+
+  - name: lint
+    command: "ruff check .specfuse/scripts tests scripts"
+
+  - name: security
+    # -ll = report only medium+ severity. The one high-severity finding
+    # (shell=True in verify()'s gate-command runner) is suppressed with a
+    # narrow `# nosec B602` and a reason — gate commands are user-authored
+    # config that requires shell parsing by design. See loop.py.
+    command: "bandit -r .specfuse/scripts -ll"
+
+  - name: coverage
+    # --fail-under=35 is the loop repo's own floor — BELOW the methodology's
+    # ≥ 90% default. Measured 45% TOTAL today (loop.py 36%, lint_plan.py 71%);
+    # 35 is a deliberate margin below the current floor so a small refactor
+    # doesn't trip the gate. The driver's run-loop, git-surgery, dispatch,
+    # and squash paths are intentionally pending real-run (generator-driven)
+    # validation before they get unit tests — the test suite covers the
+    # parse/decide/verify core, not the orchestration. Raise this floor
+    # toward 90 once those run-loop tests land.
+    command: "coverage run --source=.specfuse/scripts -m unittest discover -s tests && coverage report --fail-under=35"
+
+  # warnings: CONSCIOUSLY DROPPED.
+  # Python has no compiler-warnings analogue; this gate assumes a compiled
+  # stack (warnings-as-errors at build time) and is N/A for a pure-Python
+  # project. Forcing `python -W error` would conflate runtime warnings with
+  # compiler warnings — symmetry-chasing the methodology cautions against.
+  # When this repo grows a compiled extension, restore the gate.
+
+# Reflective units (retrospective, lessons, docs): the artifact exists / something
+# changed. Carried through from verification.yml.example.
+doc:
+  - name: artifact-changed
+    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
+
+# plan-next: structural integrity of what it drafted. Carried through.
+plannext:
+  - name: plan-lint
+    command: "python3 .specfuse/scripts/lint_plan.py {feature_dir}"

@@ -1,7 +1,11 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# Minimal CI: run the repo's smoke test (lint + driver dry-run) on push and PR.
+# CI: run the repo's scaffold smoke-test PLUS the methodology `code` gates
+# (tests, lint, security, coverage) on push and PR. The script does both —
+# this workflow just sets up Python and invokes it. The gate commands here
+# are intentionally the same ones declared in .specfuse/verification.yml
+# and run by scripts/smoke-test.sh; keep all three in sync.
 
 name: ci
 
@@ -21,5 +25,10 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run smoke test
+      - name: Install runtime + dev tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev]'
+
+      - name: Run scaffold smoke-test + code gates
         run: ./scripts/smoke-test.sh

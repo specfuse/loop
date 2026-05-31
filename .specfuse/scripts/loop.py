@@ -377,7 +377,13 @@ def verify(wu: WorkUnit, feature_dir: Path,
     results, ok_all = [], True
     for gate in gate_set:
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
-        proc = subprocess.run(command, shell=True, capture_output=True, text=True)
+        # shell=True is intentional: gate commands are authored by the user in
+        # verification.yml and routinely use shell features (pipes, &&, glob,
+        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
+        # is the project's own config, not untrusted external data.
+        proc = subprocess.run(  # nosec B602
+            command, shell=True, capture_output=True, text=True,
+        )
         ok = proc.returncode == 0
         ok_all = ok_all and ok
         tail = (proc.stdout + proc.stderr).strip().splitlines()[-15:]
