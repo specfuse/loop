@@ -7,6 +7,13 @@
 #
 # Keep the `code` set in lock-step with your GitHub branch-protection checks — if
 # they drift, an agent can pass locally and still be unmergeable.
+#
+# AUTHORING RULE: gate commands SHOULD be self-contained. Avoid `--no-build`,
+# `--no-restore`, or any equivalent "skip-build" flag — those make the gate run
+# against whatever binaries are on disk, and stale artifacts can make a gate pass
+# falsely. If a build step is genuinely required before tests are runnable, fold
+# it into the command as a pipeline (e.g. `dotnet build && dotnet test --no-build`)
+# so the build is part of the gate.
 
 code:
   - name: tests

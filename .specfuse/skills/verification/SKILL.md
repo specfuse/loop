@@ -57,26 +57,32 @@ has valid frontmatter and the five mandatory sections, every dependency edge
 resolves, and the closing sequence is present and ordered. A malformed draft must
 fail here — at the human's review point — not three gates later mid-dispatch.
 
-## Pre-gate build step (the stale-artifact trap)
+## The stale-artifact trap (a verification.yml authoring rule)
 
-If any gate command in your set embeds `--no-build`, `--no-restore`, or the
-equivalent "skip-build" flag for the repo's stack, run the stack's standard
-restore-and-build sequence once before the gate sequence begins. The pre-step does
-not appear in the RESULT block's evidence; it is a prerequisite, not a gate.
+Gate commands declared in `.specfuse/verification.yml` **should be self-contained**.
+Avoid `--no-build`, `--no-restore`, or any equivalent "skip-build" flag that makes
+a gate command silently run against whatever binaries are already on disk.
 
-The failure mode this prevents is the **stale-artifact trap**: a gate command that
-embeds `--no-build` silently runs against whatever binaries are already on disk. On a
-fresh checkout — or after you have added new test files, renamed a symbol, or edited
-a header — the pre-existing `bin/` and `obj/` (or stack-equivalent) artifacts are out
-of sync with the current source. A `tests` gate using `--no-build` against stale
-artifacts can pass while new tests are never actually executed, or fail for reasons
-unrelated to the change under test. Either outcome corrodes the trust model the gate
-set exists to uphold.
+The failure mode this guidance prevents is the **stale-artifact trap**: a gate
+that embeds `--no-build` runs against pre-existing `bin/`, `obj/`, or
+stack-equivalent artifacts that may be out of sync with the current source — after
+a fresh checkout, after new test files have been added, after a symbol rename. A
+`tests` gate using `--no-build` against stale artifacts can pass while new tests
+are never actually executed, or fail for reasons unrelated to the change under
+test. Either outcome corrodes the trust model the gate set exists to uphold.
 
-If the pre-build itself fails, treat it as a correctable-local failure (read the
-error, fix the cause, re-run the full pre-step plus gate sequence). Do not skip the
-pre-step to "see what the gates say" — what they say is meaningless when the inputs
-are wrong.
+The driver runs gate commands directly and is intentionally dumb about stacks — it
+does not run a per-stack pre-build step. The mitigation is in the
+`verification.yml` author's hands: declare gates that build/restore as part of
+their own invocation (e.g. `dotnet test` without `--no-build`, `pytest` without a
+separate `pip install` step) so the gate is correct regardless of what artifacts
+the disk already holds.
+
+If a stack genuinely requires a build step before tests are runnable, fold it into
+the `tests` gate's command (e.g. `dotnet build && dotnet test --no-build` as a
+single shell pipeline) so the build always precedes the gate and the inputs are
+always fresh. The pre-build is part of the gate, not a thing the agent is
+expected to know to run.
 
 ## How to run and interpret
 

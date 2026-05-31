@@ -43,6 +43,12 @@ VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next"
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
+# Correlation-ID pattern — canonical, mirroring `.specfuse/rules/correlation-ids.md`.
+# Admits FEAT-YYYY-NNNN (feature-level), FEAT-YYYY-NNNN/TNN (substantive WUs), and
+# FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN) (closing-sequence WUs).
+CORRELATION_ID_RE = re.compile(
+    r"^FEAT-\d{4}-\d{4}(/(T\d{2}|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?$"
+)
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the
 # template but not hard-required here.
 REQUIRED_SECTIONS = ["Context", "Acceptance criteria", "Do not touch",
@@ -92,6 +98,9 @@ def lint(feature_dir: Path) -> list[str]:
             if not wid or not wfile:
                 errs.append(f"gate {gnum}: work unit missing id/file: {ref}")
                 continue
+            if not CORRELATION_ID_RE.match(wid):
+                errs.append(f"gate {gnum}: malformed correlation id '{wid}' — "
+                            f"must match {CORRELATION_ID_RE.pattern}")
             for dep in ref.get("depends_on") or []:
                 if dep not in all_ids:
                     errs.append(f"gate {gnum}: {wid} depends on unknown WU '{dep}'")
@@ -100,8 +109,14 @@ def lint(feature_dir: Path) -> list[str]:
                 errs.append(f"gate {gnum}: {wid} -> file not found: {wfile}")
                 continue
             wfm, wbody = read_frontmatter(wpath)
-            if wfm.get("id") != wid:
-                errs.append(f"{wfile}: frontmatter id '{wfm.get('id')}' != graph id '{wid}'")
+            fm_id = wfm.get("id")
+            if fm_id != wid:
+                errs.append(f"{wfile}: frontmatter id '{fm_id}' != graph id '{wid}'")
+            # Only flag the frontmatter id separately when it disagrees with the graph
+            # id (otherwise the graph-id check above already covers it).
+            if fm_id and fm_id != wid and not CORRELATION_ID_RE.match(fm_id):
+                errs.append(f"{wfile}: malformed frontmatter id '{fm_id}' — "
+                            f"must match {CORRELATION_ID_RE.pattern}")
             if wfm.get("type") not in VALID_TYPES:
                 errs.append(f"{wfile}: invalid type '{wfm.get('type')}'")
             if not wfm.get("model"):

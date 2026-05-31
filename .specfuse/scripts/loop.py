@@ -295,14 +295,57 @@ report honestly.
 """
 
 
-def dispatch(wu: WorkUnit, failure_note: str | None) -> None:
+def dispatch(wu: WorkUnit, failure_note: str | None) -> str:
+    """Run a fresh agent session for this WU. Returns the session's stdout so the
+    driver can parse the trailing RESULT block."""
     prompt = PROMPT_PREAMBLE + "\n\n" + wu.body
     if failure_note:
         prompt += ("\n\n## Previous attempt failed verification\n"
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
                    "do not repeat the same approach.\n\n" + failure_note)
     cmd = [p.replace("{model}", wu.model) for p in CLAUDE_CMD]
-    subprocess.run(cmd, input=prompt, capture_output=True, text=True)
+    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
+    return proc.stdout or ""
+
+
+RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
+
+
+def parse_result_block(stdout: str) -> dict | None:
+    """Return the parsed final ```result``` block from stdout, or None.
+
+    The result-contract rule (`.specfuse/rules/result-contract.md`) requires the
+    agent to end its turn with a single fenced `result` block. Be forgiving:
+    agents may discuss before it, may emit other fenced blocks elsewhere, may
+    produce malformed YAML. Any of those returns None and the caller falls back
+    to verify() as the exit oracle. Crashing the loop on a garbled agent output
+    would defeat the purpose of having a separate oracle in the first place.
+    """
+    if not stdout:
+        return None
+    matches = list(RESULT_BLOCK_RE.finditer(stdout))
+    if not matches:
+        return None
+    body = matches[-1].group(1)  # LAST result block — agents may discuss before it
+    try:
+        parsed = yaml.safe_load(body)
+    except yaml.YAMLError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def agent_reported_blocked(stdout: str) -> tuple[bool, str | None]:
+    """Did the agent explicitly emit `status: blocked` in its RESULT block?
+
+    Returns (True, blocked_reason) only when a well-formed block names
+    `status: blocked`. Missing block, malformed block, or any other status
+    falls through to (False, None) — the driver then runs verify() as usual.
+    """
+    parsed = parse_result_block(stdout)
+    if not parsed or parsed.get("status") != "blocked":
+        return False, None
+    reason = parsed.get("blocked_reason")
+    return True, (str(reason) if reason is not None else None)
 
 
 def load_verification() -> dict:
@@ -311,12 +354,26 @@ def load_verification() -> dict:
     return yaml.safe_load(VERIFICATION_PATH.read_text()) or {}
 
 
-def verify(wu: WorkUnit, feature_dir: Path) -> tuple[bool, str]:
-    """Driver runs the gates itself — the exit oracle. Agent self-report is advisory."""
-    cfg = load_verification()
-    gate_set = cfg.get(GATES_FOR_TYPE.get(wu.type, "code"), [])
+def verify(wu: WorkUnit, feature_dir: Path,
+           cfg: dict | None = None) -> tuple[bool, str]:
+    """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
+
+    Empty or missing gate set for the WU's type is a CONFIGURATION failure (not a
+    pass): a misconfigured verification.yml must not silently let work through.
+    The failure message names the configuration cause so a human reading the log
+    knows to fix verification.yml, not the work unit. `cfg` is injectable for
+    testing; in production it is read from VERIFICATION_PATH.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    set_name = GATES_FOR_TYPE.get(wu.type, "code")
+    gate_set = cfg.get(set_name) or []
     if not gate_set:
-        return True, "_No gates configured for this type; treated as pass._"
+        return False, (
+            f"CONFIGURATION ERROR: no '{set_name}' gates configured in "
+            f".specfuse/verification.yml for work-unit type '{wu.type}'. "
+            f"This is not a work-unit failure — fix verification.yml and re-run."
+        )
     results, ok_all = [], True
     for gate in gate_set:
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
@@ -327,6 +384,37 @@ def verify(wu: WorkUnit, feature_dir: Path) -> tuple[bool, str]:
         results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
                        f"```\n$ {command}\n" + "\n".join(tail) + "\n```")
     return ok_all, "\n\n".join(results)
+
+
+def execute_unit_attempt(
+    wu: WorkUnit,
+    feature_dir: Path,
+    failure_note: str | None,
+    *,
+    dispatch_fn=None,
+    verify_fn=None,
+) -> tuple[str, object]:
+    """One dispatch + parse + (if not blocked) verify cycle.
+
+    Factored out of run() so the parse-and-decision logic is unit-testable
+    without spawning a real agent — pass stub callables for dispatch_fn and
+    verify_fn from a test.
+
+    Returns one of:
+      ("blocked", blocked_reason_or_None) — agent explicitly emitted status:blocked
+      ("passed",  evidence_str)           — verify() passed
+      ("failed",  evidence_str)           — verify() failed
+    """
+    if dispatch_fn is None:
+        dispatch_fn = dispatch
+    if verify_fn is None:
+        verify_fn = verify
+    stdout = dispatch_fn(wu, failure_note)
+    is_blocked, reason = agent_reported_blocked(stdout or "")
+    if is_blocked:
+        return "blocked", reason
+    passed, evidence = verify_fn(wu, feature_dir)
+    return ("passed" if passed else "failed"), evidence
 
 
 # --------------------------------------------------------------------------- #
@@ -395,9 +483,24 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             for attempt in range(1, MAX_ATTEMPTS + 1):
                 backend.set_wu(wu, "attempts", attempt)
                 print(f"   attempt {attempt}/{MAX_ATTEMPTS} — fresh session")
-                dispatch(wu, failure_note)
-                passed, evidence = verify(wu, feature_dir)
-                if passed:
+                outcome, payload = execute_unit_attempt(wu, feature_dir, failure_note)
+
+                if outcome == "blocked":
+                    # Agent reported status: blocked. Honor it immediately — do NOT
+                    # spend further attempts retrying what the agent says it can't do.
+                    backend.set_wu(wu, "status", "blocked_human")
+                    log_event(events_path, "human_escalation", wu.wu_id, {
+                        "reason": "agent_reported_blocked",
+                        "blocked_reason": payload,
+                        "attempts": attempt,
+                    })
+                    git("reset", "--hard", head_before)
+                    print(f"   BLOCKED by agent — "
+                          f"{payload or '(no reason given)'}")
+                    blocked = True
+                    break
+
+                if outcome == "passed":
                     sha = squash_commit(wu, head_before)
                     backend.set_wu(wu, "status", DONE)
                     log_event(events_path, "task_completed", wu.wu_id,
@@ -405,6 +508,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     done_ids.add(wu.wu_id)
                     print(f"   PASS — committed {sha}")
                     break
+
+                # outcome == "failed": evidence in payload, retry within budget.
+                evidence = payload
                 note = work_dir / wu.wu_id.replace("/", "_") / f"attempt-{attempt}.md"
                 note.parent.mkdir(parents=True, exist_ok=True)
                 note.write_text(evidence)
@@ -412,6 +518,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 git("reset", "--hard", head_before)
                 print(f"   FAIL — evidence in {note}")
             else:
+                # for-else: ran out of attempts without break = spinning.
                 backend.set_wu(wu, "status", "blocked_human")
                 log_event(events_path, "human_escalation", wu.wu_id,
                           {"reason": "spinning detected", "attempts": MAX_ATTEMPTS})

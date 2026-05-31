@@ -33,5 +33,8 @@ echo "==> Linting bundled example feature"
 echo "==> Dry-running the loop driver"
 "$PYTHON" .specfuse/scripts/loop.py --dry-run
 
+echo "==> Running unit tests"
+"$PYTHON" -m unittest discover -s tests -v
+
 echo
 echo "smoke test: OK"
