@@ -331,7 +331,20 @@ def parse_result_block(stdout: str) -> dict | None:
     body = matches[-1].group(1)  # LAST result block — agents may discuss before it
     try:
         parsed = _miniyaml.parse(body)
-    except _miniyaml.MiniYAMLError:
+    except Exception:  # noqa: BLE001 - intentional: see comment below
+        # Broad catch is deliberate AND scoped to this site only. The agent's
+        # stdout is the least-trusted input in the system (free-form LLM text
+        # supposedly ending in a fenced result block); the forgiving contract
+        # here is "anything malformed degrades to verify() decides, never
+        # crashes the driver." A MiniYAMLError covers documented-subset
+        # violations, but the parser is hand-rolled and could in principle
+        # raise IndexError/ValueError/etc. on a sufficiently weird input —
+        # those must also degrade, not crash a real driver run.
+        # Every OTHER _miniyaml.parse site (read_frontmatter, load_graph,
+        # load_verification, and the linter) reads operator-authored config
+        # and intentionally keeps the strict MiniYAMLError-only handling so
+        # malformed config files fail loudly, per verify()'s fail-closed
+        # philosophy. Do not broaden those.
         return None
     return parsed if isinstance(parsed, dict) else None
 

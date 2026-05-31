@@ -328,6 +328,15 @@ def _parse_scalar(text: str, lineno: int) -> Any:
         raise MiniYAMLError(
             f"line {lineno}: literal/folded block scalars unsupported")
     if text.startswith("{"):
+        # Positional rule (LOAD-BEARING — do not tighten without thought):
+        # `{` is a fail-loud trigger ONLY when it starts the scalar — i.e. the
+        # value begins with `{`, which would be the start of a flow mapping.
+        # Braces appearing INSIDE a bare scalar are kept as ordinary content,
+        # because real agent result summaries routinely contain prose with
+        # braces (e.g. `summary: added GET /health returning {status, version}`),
+        # and matching PyYAML on that case is pinned by the equivalence tests.
+        # Tightening this to "any `{` anywhere rejects" would crash the
+        # forgiving result-block parse path on real agent output.
         raise MiniYAMLError(
             f"line {lineno}: flow mappings unsupported — use a block mapping")
     if text in _FORBIDDEN_NULLS:

@@ -149,6 +149,55 @@ class TestAgentReportedBlocked(unittest.TestCase):
         self.assertIsNone(reason)
 
 
+class TestParseResultBlockForgivesAnyParserError(unittest.TestCase):
+    """parse_result_block must NOT crash on arbitrary parser exceptions.
+
+    MiniYAMLError covers documented-subset violations, but the parser is
+    hand-rolled and could in principle raise something else (IndexError,
+    ValueError, etc.) on a sufficiently weird agent input. The forgiving
+    contract is that ANY parser failure on this least-trusted input
+    degrades to `verify() decides`, not a driver crash.
+    """
+
+    def test_non_miniyaml_exception_is_swallowed_to_None(self):
+        # Inject a generic exception type from the parser to prove the catch
+        # is broad, not MiniYAMLError-specific.
+        stdout = "blah blah\n```result\nstatus: complete\n```\n"
+        original = loop._miniyaml.parse
+        loop._miniyaml.parse = lambda body: (_ for _ in ()).throw(
+            ValueError("simulated arbitrary parser failure"))
+        try:
+            self.assertIsNone(loop.parse_result_block(stdout))
+        finally:
+            loop._miniyaml.parse = original
+
+    def test_indexerror_from_parser_is_swallowed(self):
+        # Same shape with a different exception type — proves broadness, not
+        # an accidental tuple-of-types catch.
+        stdout = "noise\n```result\nstatus: complete\n```\n"
+        original = loop._miniyaml.parse
+        loop._miniyaml.parse = lambda body: (_ for _ in ()).throw(
+            IndexError("simulated index bug"))
+        try:
+            self.assertIsNone(loop.parse_result_block(stdout))
+        finally:
+            loop._miniyaml.parse = original
+
+    def test_agent_reported_blocked_also_swallows_non_miniyaml(self):
+        # The decision wrapper builds on parse_result_block; the forgiveness
+        # should propagate — neither layer crashes on a parser bug.
+        stdout = "anything\n```result\nstatus: blocked\n```\n"
+        original = loop._miniyaml.parse
+        loop._miniyaml.parse = lambda body: (_ for _ in ()).throw(
+            RuntimeError("simulated parser bug"))
+        try:
+            is_blocked, reason = loop.agent_reported_blocked(stdout)
+            self.assertFalse(is_blocked)
+            self.assertIsNone(reason)
+        finally:
+            loop._miniyaml.parse = original
+
+
 class TestExecuteUnitAttemptShortCircuits(unittest.TestCase):
     """Integration: when the agent emits status: blocked, execute_unit_attempt
     must NOT call verify(). This is what guarantees 'no further attempts.'"""
