@@ -68,3 +68,8 @@ echo "  2. pip install pyyaml"
 echo "  3. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
 echo "  4. author your first feature folder under .specfuse/features/ from .specfuse/templates/"
 echo "  5. python .specfuse/scripts/loop.py --dry-run"
+echo
+echo "Optional — to auto-draft .specfuse/verification.yml from this repo's CI and"
+echo "tooling for your review (instead of editing the example by hand in step 3):"
+echo "    claude -p < .specfuse/skills/derive-verification/PROMPT.md"
+echo "The skill drafts; it does not write the file. Review and copy yourself."
