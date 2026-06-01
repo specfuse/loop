@@ -11,6 +11,14 @@ the user alone can answer**. The output is always *proposed*; the user reviews
 it before it lands at `.specfuse/verification.yml`. Posture mirrors `plan-next`:
 draft, then arm.
 
+**Run interactively.** The skill's whole value is conducting the batched
+question round in §3 (coverage threshold, canonical test command, which gates
+to add/drop), so it needs a user it can ask. The non-interactive `[gap]`
+fallback documented below is a degraded mode for when no human is available
+(CI, dispatched session, no stdin) — not the intended path. Invoking via
+`claude -p < PROMPT.md` consumes stdin and silently degrades to gap-mode;
+use an interactive `claude` session and ask it to run this skill instead.
+
 The companion `PROMPT.md` is what the user pipes to `claude -p`. This SKILL.md
 is the method that prompt operationalizes — read it as the contract.
 

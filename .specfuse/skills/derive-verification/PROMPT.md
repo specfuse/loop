@@ -1,11 +1,16 @@
 <!--
-PROMPT.md — the directly-pipeable instruction for the derive-verification skill.
+PROMPT.md — the agent instruction for the derive-verification skill.
 
-Run from the target repo root:
+INTENDED USE: run interactively. Start `claude` in the target repo root and
+ask it to run the derive-verification skill, or paste this prompt's body into
+the session. The skill's whole value is conducting the batched question
+round (coverage threshold, canonical test command, which gates to add/drop);
+piping this file via `claude -p < PROMPT.md` consumes stdin so the skill
+cannot ask and silently degrades to the non-interactive `[gap]` fallback —
+that fallback exists for CI / dispatched sessions where no user is reachable,
+not as the intended invocation.
 
-    claude -p < .specfuse/skills/derive-verification/PROMPT.md
-
-This is the agent instruction; the method it operationalizes is documented in
+This prompt operationalizes the method documented in
 .specfuse/skills/derive-verification/SKILL.md. Read both before changing either.
 -->
 
