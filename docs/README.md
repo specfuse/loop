@@ -31,3 +31,10 @@ the shared-vocabulary rules ported from the orchestrator surface.
 - [`security-boundaries.md`](../.specfuse/rules/security-boundaries.md) — the
   posture for secrets, privileged access, authenticated tooling, and log
   hygiene.
+
+## Authoring craft (under `.specfuse/skills/`)
+
+- [`authoring-work-units/SKILL.md`](../.specfuse/skills/authoring-work-units/SKILL.md)
+  — how to fill the five-section WU contract well. Six evidence-backed
+  rules, each tied to a failure mode observed in a real run; shared
+  methodology craft (works for loop and orchestrator), v0.1.
