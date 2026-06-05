@@ -38,3 +38,8 @@ the shared-vocabulary rules ported from the orchestrator surface.
   — how to fill the five-section WU contract well. Six evidence-backed
   rules, each tied to a failure mode observed in a real run; shared
   methodology craft (works for loop and orchestrator), v0.1.
+- [`feature-conversion/SKILL.md`](../.specfuse/skills/feature-conversion/SKILL.md)
+  — bring an existing feature folder into conformance with the current
+  scaffold's structural contract. Interactive, lint-driven, propose-and-
+  confirm per error; the second half of the `--upgrade` story when
+  `init.sh --upgrade`'s feature-health report flags a `FAIL`. v0.1.

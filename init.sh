@@ -199,6 +199,46 @@ else
     fi
   fi
   echo
+
+  # --- feature health report ---------------------------------------------- #
+  # Lint every existing feature folder against the new scaffold's structural
+  # contract (the linter that --upgrade is bringing in). Useful both live
+  # ("which features still pass post-upgrade?") and dry-run ("which features
+  # WOULD break if I upgrade?") — we run the SOURCE linter against the
+  # destination's features in both cases, so the answer doesn't depend on
+  # whether the overlay has happened yet.
+  shopt -s nullglob
+  feature_dirs=("$DEST"/features/*/)
+  shopt -u nullglob
+  if [[ ${#feature_dirs[@]} -gt 0 ]]; then
+    echo "Feature health (each feature lint-checked against the new scaffold):"
+    any_failed=0
+    for f in "${feature_dirs[@]}"; do
+      name=$(basename "$f")
+      if [[ ! -f "$f/PLAN.md" ]]; then
+        echo "  SKIP $name  (no PLAN.md — not a feature folder)"
+        continue
+      fi
+      if output=$(python3 "$SRC_DIR/scripts/lint_plan.py" "$f" 2>&1); then
+        echo "  OK   $name"
+      else
+        echo "  FAIL $name"
+        echo "$output" | sed 's/^/       /'
+        any_failed=1
+      fi
+    done
+    if [[ $any_failed -eq 1 ]]; then
+      echo
+      echo "One or more features failed structural lint against the new scaffold."
+      echo "To review the diagnostics and apply per-error edits interactively,"
+      echo "run the feature-conversion skill in a Claude session:"
+      echo "    claude"
+      echo "    > run the feature-conversion skill against <feature-folder>"
+      echo "The skill drafts edits per lint error and asks before writing — see"
+      echo "    .specfuse/skills/feature-conversion/SKILL.md"
+    fi
+    echo
+  fi
 fi
 
 # --- gitignore guard (both modes) ---------------------------------------- #
