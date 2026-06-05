@@ -59,7 +59,7 @@ the symbols it introduces, the files in `generated_surfaces` /
 > reviewers waving through subjective criteria that hide unmet
 > requirements.
 
-## 3. Do not touch — name real paths, not platitudes
+## 3. Do not touch — name real paths, AND name what the WU produces
 
 Generic `"don't touch other files"` is one an agent will cross. List the
 actual boundaries this WU might brush against:
@@ -74,9 +74,21 @@ actual boundaries this WU might brush against:
   `git`. State this even when it feels redundant; without it, an agent
   helpfully runs `git add` and corrupts the driver's bookkeeping.
 
+**Companion rule — name what the WU is expected to produce.** The
+boundaries above are one half; the other half is naming the files this WU
+should *author*. The Acceptance criteria section (§2) should list the
+specific paths the WU is responsible for (e.g. `.github/workflows/cd.yml`
+and the CI section of `CLAUDE.md`). A reviewer should be able to point at
+every changed file in the squash commit and find it in either the WU's
+produces-list or the gate's verification output. Without an explicit
+produces-list, an agent can "helpfully" do work that belongs to a later
+WU in the same gate (observed: a T01 that wrote CLAUDE.md doc updates
+that were T92's job), and the verification gates don't object.
+
 > *Prevents:* an agent reaching into a generated directory because "don't
-> touch other files" didn't sound like *this*; and side commits the
-> driver's squash can't reconcile.
+> touch other files" didn't sound like *this*; side commits the driver's
+> squash can't reconcile; and silent over-reach where a WU does adjacent
+> work that should have belonged to a sibling WU.
 
 ## 4. Verification — name the gates the driver will actually run
 
@@ -145,6 +157,42 @@ small-enough to fit.
 
 ---
 
+## 7. The hygiene-WU pattern — fix pre-existing blockers in their own unit
+
+A substantive WU sometimes discovers that its verification can't pass
+because of a pre-existing bug in a path its **Do not touch** rule
+forbids (a shared module, a dependency version, a config file owned
+elsewhere). Observed: a `terraform validate` gate failing on an
+`automatic_upgrade_channel`-vs-`automatic_channel_upgrade` mismatch in a
+shared module that the WU was correctly forbidden from editing.
+
+The right move is to insert a **hygiene WU** earlier in the gate (or as
+a precursor gate) scoped to that fix alone:
+
+- **One narrow acceptance criterion** — e.g. `"modules/aks/cluster.tf
+  uses the azurerm-3.x attribute name automatic_channel_upgrade"`. The
+  hygiene WU's "produces" list names only the broken file.
+- **Pass on its own verification** before the blocked WU runs again.
+  The blocked WU then re-runs unmodified; its scope and "Do not touch"
+  bounds are intact.
+- **Never the wrong responses:** do NOT loosen the blocked WU's "Do
+  not touch" to permit the cross-cutting fix (muddies its boundary);
+  do NOT fix it manually out-of-loop and pretend the gate ran clean
+  (silent drift between the methodology's recorded history and git).
+
+The hygiene WU is methodology-honest: every state change goes through
+the loop, every commit traces to a WU, every fix has its own evidence
+trail. The cost is one more WU; the benefit is the gate cycle stays
+trustworthy.
+
+> *Prevents:* the temptation to either widen the blocked WU's scope
+> (eroding the per-WU contract) or silently fix out-of-band (eroding
+> the audit trail). Both undermine the same invariant — that every
+> committed state change traces to a WU that was dispatched, verified,
+> and committed by the loop.
+
+---
+
 ## This skill distills `.specfuse/LEARNINGS.md`
 
 When a gate's `lessons` work unit surfaces a new authoring rule — one that
@@ -156,6 +204,9 @@ the next edit.
 
 ## Version
 
-**v0.1.** Six rules, one per spot a real run has tripped on (single-gate
-runs to date). Expected to grow as multi-gate runs surface authoring
-lessons that don't fit the per-WU frame.
+**v0.2.** Seven rules. v0.1 had six; v0.2 (this) added the produces-
+list companion in §3 and the hygiene-WU pattern in §7, both surfaced
+by the first live multi-WU gate run on an infra repo. Expected to keep
+growing — each multi-gate or multi-feature run that surfaces a rule
+that would change how a future WU is written or executed graduates
+here from LEARNINGS.md.
