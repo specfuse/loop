@@ -92,6 +92,48 @@ class TestLintCorrelationId(unittest.TestCase):
             self.assertIn("G1-retro", joined)
 
 
+class TestHygieneIdAdmitted(unittest.TestCase):
+    """The hygiene-WU ID convention (T<NN>H, T<NN>H1, T<NN>H2) must validate.
+
+    Direct regex test — no fixture mutation needed since the rule is a
+    pattern admission, not a structural change.
+    """
+
+    def test_T02H_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T02H"))
+
+    def test_T02H1_T02H2_validate(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T02H1"))
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T02H2"))
+
+    def test_substantive_still_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T07"))
+
+    def test_closing_sequence_still_validates(self):
+        for tail in ("G1-RETRO", "G1-LESSONS", "G2-DOCS", "G3-PLAN"):
+            with self.subTest(tail=tail):
+                self.assertIsNotNone(
+                    lint_plan.CORRELATION_ID_RE.match(f"FEAT-2026-0042/{tail}"))
+
+    def test_feature_level_still_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042"))
+
+    def test_single_digit_hygiene_still_rejected(self):
+        # T2H is malformed for the same reason T2 is — substantive ordinals are
+        # zero-padded to 2 digits.
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T2H"))
+
+    def test_lowercase_h_rejected(self):
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T02h"))
+
+
 class TestLintCliContract(unittest.TestCase):
     """One subprocess test preserving the CLI exit-code contract.
 

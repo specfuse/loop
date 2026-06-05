@@ -157,7 +157,7 @@ small-enough to fit.
 
 ---
 
-## 7. The hygiene-WU pattern — fix pre-existing blockers in their own unit
+## 7. Hygiene work units — when a blocked WU points outside its scope
 
 A substantive WU sometimes discovers that its verification can't pass
 because of a pre-existing bug in a path its **Do not touch** rule
@@ -169,12 +169,29 @@ shared module that the WU was correctly forbidden from editing.
 The right move is to insert a **hygiene WU** earlier in the gate (or as
 a precursor gate) scoped to that fix alone:
 
+- **ID convention.** The hygiene WU's ID is the target substantive
+  WU's ordinal followed by `H` — e.g. `FEAT-YYYY-NNNN/T02H` is "the
+  hygiene WU for T02." Multiple hygiene WUs for the same target use
+  `T02H1`, `T02H2`. See
+  [`../../rules/correlation-ids.md`](../../rules/correlation-ids.md)
+  for the canonical pattern; the linter (`lint_plan.py`) enforces it.
 - **One narrow acceptance criterion** — e.g. `"modules/aks/cluster.tf
   uses the azurerm-3.x attribute name automatic_channel_upgrade"`. The
   hygiene WU's "produces" list names only the broken file.
 - **Pass on its own verification** before the blocked WU runs again.
   The blocked WU then re-runs unmodified; its scope and "Do not touch"
   bounds are intact.
+- **PLAN.md wiring.** Insert the hygiene WU's row into the gate's
+  `work_units` graph BEFORE the target substantive WU. Update the
+  target's `depends_on` to include the hygiene WU's ID. Flip the
+  target's `status` from `blocked_human` back to `pending` so the
+  loop will re-dispatch it after the hygiene WU passes.
+- **Evidence requirement.** The hygiene WU's **Context** section
+  must quote the blocked WU's `human_escalation` event from
+  `events.jsonl` verbatim — the timestamp, the reason, and the
+  agent's blocked_reason text. That's the trace from "this fix
+  exists because of that block." Without it, a hygiene WU looks
+  indistinguishable from speculative pre-emptive work.
 - **Never the wrong responses:** do NOT loosen the blocked WU's "Do
   not touch" to permit the cross-cutting fix (muddies its boundary);
   do NOT fix it manually out-of-loop and pretend the gate ran clean
@@ -204,9 +221,14 @@ the next edit.
 
 ## Version
 
-**v0.2.** Seven rules. v0.1 had six; v0.2 (this) added the produces-
-list companion in §3 and the hygiene-WU pattern in §7, both surfaced
-by the first live multi-WU gate run on an infra repo. Expected to keep
+**v0.3.** Seven rules. v0.2 added the produces-list companion in §3
+and the hygiene-WU pattern in §7. v0.3 (this) tightened §7 with the
+canonical `T<NN>H` ID convention (the previous draft left the ID
+shape vague; a live insert had to rename `T1H` to `T04` because the
+linter regex didn't admit it), the explicit PLAN.md wiring step
+(insert + retarget depends_on + flip target status), and the
+evidence-from-events-log requirement that grounds the hygiene WU's
+Context in a specific human_escalation entry. Expected to keep
 growing — each multi-gate or multi-feature run that surfaces a rule
 that would change how a future WU is written or executed graduates
 here from LEARNINGS.md.

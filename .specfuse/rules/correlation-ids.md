@@ -23,14 +23,42 @@ Two shapes, and only two:
     unique within the feature. Example: `FEAT-2026-0042/T07`.
   - Closing-sequence units use `G<n>-<NAME>` — `G`, the gate number, a hyphen, and
     one of `RETRO`, `LESSONS`, `DOCS`, `PLAN`. Example: `FEAT-2026-0042/G1-RETRO`.
+  - **Hygiene units** use `TNNH[N…]` — the *target* substantive WU's ordinal
+    followed by a literal `H`, optionally suffixed with an ordinal when more
+    than one hygiene WU precedes the same target. Example: `FEAT-2026-0042/T07H`
+    (the hygiene WU for T07) and `FEAT-2026-0042/T07H1` / `T07H2` (two hygiene
+    WUs preceding T07). See the "Hygiene units" subsection below for the
+    semantic constraints; see `.specfuse/skills/authoring-work-units/SKILL.md`
+    §7 for when to author one.
 
 The combined pattern accepted across feature and task IDs is:
 
 ```
-^FEAT-\d{4}-\d{4}(/(T\d{2}|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?$
+^FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?$
 ```
 
 A string that does not match is malformed.
+
+### Hygiene units
+
+A hygiene WU is a narrow precursor authored when a substantive WU blocks on a
+pre-existing bug in a path its **Do not touch** rule forbids. Its ID's numeric
+part is the **target** substantive WU's ordinal — `T02H` means "the hygiene WU
+for T02", not "the hygiene WU number 2." This preserves the substantive WU's
+number as a sort key and visually signals which cross-cutting fix this is.
+
+- Single hygiene WU per target: `T<NN>H`. Example: `T02H`.
+- Multiple hygiene WUs for the same target: `T<NN>H1`, `T<NN>H2`, … Example:
+  `T02H1` and `T02H2` if T02 needs two unrelated pre-existing fixes.
+- Hygiene WUs are full work units — they appear in the PLAN graph, are
+  dispatched and verified by the loop, and produce their own squashed commit.
+  Their type is typically `implementation`. The target WU's `depends_on`
+  is updated to include the hygiene WU's ID.
+
+The forward-only convention: a hygiene WU authored as `T<NN>H` need not be
+renumbered later if the substantive WU graph shifts; the linkage by target
+number is informational, not load-bearing in the graph (the load-bearing
+relationship is `depends_on`).
 
 ## Where correlation IDs must appear
 
