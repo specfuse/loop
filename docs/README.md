@@ -43,3 +43,9 @@ the shared-vocabulary rules ported from the orchestrator surface.
   scaffold's structural contract. Interactive, lint-driven, propose-and-
   confirm per error; the second half of the `--upgrade` story when
   `init.sh --upgrade`'s feature-health report flags a `FAIL`. v0.1.
+- [`draft-feature/SKILL.md`](../.specfuse/skills/draft-feature/SKILL.md)
+  — interactively draft a feature for a major initiative: read roadmap +
+  LEARNINGS + exemplars + project, ask framing questions wearing
+  multiple hats, propose the gate skeleton and gate 1's WUs, write only
+  on accept, then lint. Delegates per-WU craft to authoring-work-units.
+  v0.1.
