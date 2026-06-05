@@ -235,9 +235,11 @@ class Backend:
 # --------------------------------------------------------------------------- #
 
 
-def log_event(events_path: Path, event_type: str, correlation_id: str,
-              payload: dict) -> None:
-    entry = {
+def build_event(event_type: str, correlation_id: str, payload: dict) -> dict:
+    """Build a single event record. Pure — no I/O. Buffered in memory during a
+    WU's lifecycle and flushed to disk at outcome time so a `git reset --hard`
+    between attempts doesn't silently lose events that were appended."""
+    return {
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
         "correlation_id": correlation_id,
         "event_type": event_type,
@@ -245,8 +247,15 @@ def log_event(events_path: Path, event_type: str, correlation_id: str,
         "source_version": DRIVER_VERSION,
         "payload": payload,
     }
+
+
+def flush_events(events_path: Path, events: list) -> None:
+    """Append a batch of buffered events to the JSONL log."""
+    if not events:
+        return
     with events_path.open("a") as fh:
-        fh.write(json.dumps(entry) + "\n")
+        for evt in events:
+            fh.write(json.dumps(evt) + "\n")
 
 
 # --------------------------------------------------------------------------- #
@@ -271,6 +280,61 @@ def require_git_ready() -> None:
         sys.exit("Git repository has no commits yet. The driver squashes per work "
                  "unit on top of HEAD; create an initial commit first "
                  "(e.g., `git commit --allow-empty -m 'init'`).")
+
+
+def ensure_feature_branch(feat_fm: dict) -> None:
+    """Ensure HEAD is on the feature's declared branch, creating it if needed.
+
+    The methodology assigns each feature its own branch (PLAN.md frontmatter's
+    `branch` field). Without this, per-WU squash commits land on whatever
+    branch the user happened to be on, violating per-feature isolation.
+
+    Idempotent: no-op if already on the declared branch. If the branch
+    doesn't exist locally, creates it from the current HEAD (`git checkout -B`).
+    """
+    branch = feat_fm.get("branch")
+    if not branch:
+        return  # not declared — defensive (lint_plan normally requires it)
+    current = subprocess.run(
+        ["git", "branch", "--show-current"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    if current == branch:
+        return
+    exists = subprocess.run(
+        ["git", "rev-parse", "--verify", branch],
+        capture_output=True, text=True,
+    ).returncode == 0
+    if exists:
+        git("checkout", branch)
+        print(f"Switched to feature branch '{branch}' (was on '{current}').")
+    else:
+        git("checkout", "-B", branch)
+        print(f"Created feature branch '{branch}' from '{current}'.")
+
+
+def commit_bookkeeping(paths: list, message: str) -> str | None:
+    """Stage specific paths and create a chore(loop) bookkeeping commit.
+
+    Used for state we want durable that is NOT part of a WU's squash commit:
+    the WU's `blocked_human` status flip, the events.jsonl append for that
+    block, the gate's `awaiting_review` status flip, and (on spinning) the
+    per-attempt failure notes flushed out of memory.
+
+    The bug this exists to prevent: writes to the working tree don't survive
+    a subsequent `git reset --hard`. Status flips written but not committed
+    silently revert. Anything that should persist must be committed.
+
+    No-op if nothing to commit (path missing or no diff).
+    """
+    existing = [str(p) for p in paths if Path(p).exists()]
+    if not existing:
+        return None
+    git("add", *existing)
+    if not git("status", "--porcelain"):
+        return None  # all paths were already in their committed state
+    subprocess.run(["git", "commit", "-m", message], check=True, capture_output=True)
+    return git("rev-parse", "HEAD")
 
 
 def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
@@ -463,6 +527,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
 
     if not dry_run:
         require_git_ready()
+        ensure_feature_branch(feat_fm)
 
     units = [load_wu(feature_dir, ref) for ref in gate.refs]
     print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
@@ -497,8 +562,15 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
 
             head_before = git("rev-parse", "HEAD")
             backend.set_wu(wu, "status", "in_progress")
-            log_event(events_path, "task_started", wu.wu_id,
-                      {"type": wu.type, "model": wu.model})
+            # Events and per-attempt notes are buffered in memory during the
+            # WU's lifecycle and flushed at outcome time. This prevents the
+            # `git reset --hard` between failed attempts from silently
+            # wiping appended events / status flips — anything that should
+            # be durable is either committed in the squash (PASS) or in a
+            # bookkeeping commit (BLOCKED/SPINNING).
+            wu_events = [build_event("task_started", wu.wu_id,
+                                     {"type": wu.type, "model": wu.model})]
+            attempt_notes: list[tuple[int, str]] = []
 
             failure_note = None
             for attempt in range(1, MAX_ATTEMPTS + 1):
@@ -507,42 +579,71 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 outcome, payload = execute_unit_attempt(wu, feature_dir, failure_note)
 
                 if outcome == "blocked":
-                    # Agent reported status: blocked. Honor it immediately — do NOT
-                    # spend further attempts retrying what the agent says it can't do.
+                    # Reset agent work first; THEN write our bookkeeping; THEN
+                    # commit it. Doing the flip before the reset would let the
+                    # reset wipe the flip — the silent-state-loss bug.
+                    git("reset", "--hard", head_before)
                     backend.set_wu(wu, "status", "blocked_human")
-                    log_event(events_path, "human_escalation", wu.wu_id, {
+                    wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": "agent_reported_blocked",
                         "blocked_reason": payload,
                         "attempts": attempt,
-                    })
-                    git("reset", "--hard", head_before)
+                    }))
+                    flush_events(events_path, wu_events)
+                    commit_bookkeeping(
+                        [wu.file, events_path],
+                        f"chore(loop): {wu.wu_id} blocked_human "
+                        f"(agent-reported)\n\nFeature: {wu.wu_id}",
+                    )
                     print(f"   BLOCKED by agent — "
                           f"{payload or '(no reason given)'}")
                     blocked = True
                     break
 
                 if outcome == "passed":
-                    sha = squash_commit(wu, head_before)
+                    # Flip status to DONE BEFORE the squash so the flip is
+                    # included in the commit content — survives the next WU's
+                    # reset. Then flush events so they ride in the same commit.
                     backend.set_wu(wu, "status", DONE)
-                    log_event(events_path, "task_completed", wu.wu_id,
-                              {"attempts": attempt, "commit": sha})
+                    wu_events.append(build_event("task_completed", wu.wu_id,
+                                                 {"attempts": attempt}))
+                    flush_events(events_path, wu_events)
+                    sha = squash_commit(wu, head_before)
                     done_ids.add(wu.wu_id)
                     print(f"   PASS — committed {sha}")
                     break
 
                 # outcome == "failed": evidence in payload, retry within budget.
-                evidence = payload
-                note = work_dir / wu.wu_id.replace("/", "_") / f"attempt-{attempt}.md"
-                note.parent.mkdir(parents=True, exist_ok=True)
-                note.write_text(evidence)
-                failure_note = evidence
+                # Per-attempt notes are buffered (not written to disk) so they
+                # ride with the spinning-escalation commit if we exhaust
+                # attempts; on eventual PASS they're discarded as scratch.
+                attempt_notes.append((attempt, payload))
+                failure_note = payload
                 git("reset", "--hard", head_before)
-                print(f"   FAIL — evidence in {note}")
+                print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
             else:
                 # for-else: ran out of attempts without break = spinning.
+                # The reset has already happened in the failed branch above.
+                # Flush attempt notes to disk for human inspection, mark the
+                # WU blocked_human, then commit all of it.
+                wu_key = wu.wu_id.replace("/", "_")
+                note_paths = []
+                for atmpt, evidence in attempt_notes:
+                    p = work_dir / wu_key / f"attempt-{atmpt}.md"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text(evidence)
+                    note_paths.append(p)
                 backend.set_wu(wu, "status", "blocked_human")
-                log_event(events_path, "human_escalation", wu.wu_id,
-                          {"reason": "spinning detected", "attempts": MAX_ATTEMPTS})
+                wu_events.append(build_event("human_escalation", wu.wu_id, {
+                    "reason": "spinning_detected",
+                    "attempts": MAX_ATTEMPTS,
+                }))
+                flush_events(events_path, wu_events)
+                commit_bookkeeping(
+                    [wu.file, events_path, *note_paths],
+                    f"chore(loop): {wu.wu_id} blocked_human "
+                    f"(spinning, {MAX_ATTEMPTS} attempts)\n\nFeature: {wu.wu_id}",
+                )
                 print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — escalated")
                 blocked = True
 
@@ -554,7 +655,12 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         return 0
 
     backend.set_gate(gate, "awaiting_review")
-    log_event(events_path, "gate_reached", feature_id, {"gate": gate.number})
+    flush_events(events_path,
+                 [build_event("gate_reached", feature_id, {"gate": gate.number})])
+    commit_bookkeeping(
+        [gate.file, events_path],
+        f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
+    )
     review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
     print(f"\nGate {gate.number} complete (retro, lessons, docs, plan-next).")
     print(f"The next gate has been drafted. Read {review.name} for the planner's "

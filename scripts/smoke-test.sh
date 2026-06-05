@@ -40,7 +40,9 @@ echo "==> [scaffold] Dry-running the loop driver"
 # These mirror .specfuse/verification.yml `code` set verbatim. Keep in sync.
 
 echo "==> [gate: tests] unittest"
-"$PYTHON" -m unittest discover -s tests -v
+# -b buffers stdout/stderr per test so the integration tests' verbose
+# driver output doesn't dominate the CI log (it's only printed on failure).
+"$PYTHON" -m unittest discover -s tests -v -b
 
 echo "==> [gate: lint] ruff"
 ruff check .specfuse/scripts tests scripts
@@ -48,9 +50,9 @@ ruff check .specfuse/scripts tests scripts
 echo "==> [gate: security] bandit"
 bandit -r .specfuse/scripts -ll
 
-echo "==> [gate: coverage] coverage --fail-under=50"
+echo "==> [gate: coverage] coverage --fail-under=70"
 coverage run --source=.specfuse/scripts -m unittest discover -s tests \
-  && coverage report --fail-under=50
+  && coverage report --fail-under=70
 
 echo
 echo "smoke test: OK"
