@@ -14,6 +14,8 @@ htmlcov/
 .DS_Store
 *.swp
 *~
+.idea/
+.vscode/
 
 # Runtime state produced by the loop inside a target project's .specfuse/
 # (these are illustrative; the canonical patterns also live in the scaffold)
