@@ -49,3 +49,8 @@ the shared-vocabulary rules ported from the orchestrator surface.
   multiple hats, propose the gate skeleton and gate 1's WUs, write only
   on accept, then lint. Delegates per-WU craft to authoring-work-units.
   v0.1.
+- [`pick-feature/SKILL.md`](../.specfuse/skills/pick-feature/SKILL.md)
+  — read the roadmap and LEARNINGS, surface 2–3 candidates for the
+  next pull with hat-based trade-offs, recommend one — but never
+  decide. Read-only; respects active features. Hands off to
+  draft-feature once chosen. v0.1.
