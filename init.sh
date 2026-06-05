@@ -124,6 +124,121 @@ overlay_item() {
   fi
 }
 
+# Claude Code wiring: make the loop's scaffold-shipped skills discoverable,
+# import the binding rules into session context, and allowlist the loop
+# scripts so dispatch isn't gated on per-invocation permission prompts.
+#
+# Claude Code only auto-discovers skills directly under `.claude/skills/`
+# (not arbitrary subdirs), so we bridge with relative symlinks from there
+# into `.specfuse/skills/`. Binding rules under `.specfuse/rules/` are
+# imported into `.claude/CLAUDE.md` via Claude Code's `@path` syntax so
+# they load at session start.
+#
+# Idempotent and conservative: existing user files are NEVER overwritten;
+# we create-if-missing, and if a file already exists without our additions
+# we print a paste-in snippet rather than mutate it. Honors $DRY_RUN.
+wire_claude_code() {
+  local claude_dir="$TARGET/.claude"
+  local rel_claude="${claude_dir#$TARGET/}"  # ".claude" for printing
+
+  # --- 1. symlinks for skill discovery ---
+  local linked=0 already=0
+  local want=()
+  for d in "$DEST/skills"/*/; do
+    [[ -d "$d" ]] || continue
+    local name=$(basename "$d")
+    local link="$claude_dir/skills/$name"
+    if [[ -e "$link" || -L "$link" ]]; then
+      already=$((already + 1))
+    else
+      want+=("$name")
+      linked=$((linked + 1))
+    fi
+  done
+  if [[ $DRY_RUN -eq 1 ]]; then
+    if [[ $linked -gt 0 ]]; then
+      echo "  would link $linked skill(s) into $rel_claude/skills/:"
+      for n in "${want[@]}"; do
+        echo "    $rel_claude/skills/$n -> ../../.specfuse/skills/$n"
+      done
+    fi
+    [[ $already -gt 0 ]] && echo "  $rel_claude/skills/: $already already present (left alone)"
+  else
+    mkdir -p "$claude_dir/skills"
+    if [[ $linked -gt 0 ]]; then
+      for n in "${want[@]}"; do
+        ln -s "../../.specfuse/skills/$n" "$claude_dir/skills/$n"
+      done
+      echo "Claude Code skills: linked $linked into $rel_claude/skills/."
+    elif [[ $already -gt 0 ]]; then
+      echo "Claude Code skills: $rel_claude/skills/ already has all $already (left alone)."
+    fi
+  fi
+
+  # --- 2. CLAUDE.md — @import binding rules ---
+  local claude_md="$claude_dir/CLAUDE.md"
+  local rel_md="$rel_claude/CLAUDE.md"
+  local rules_block='## Specfuse binding rules (read before any work-unit dispatch)
+@.specfuse/rules/result-contract.md
+@.specfuse/rules/correlation-ids.md
+@.specfuse/rules/never-touch.md
+@.specfuse/rules/security-boundaries.md'
+  if [[ ! -f "$claude_md" ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  would create $rel_md with the binding-rules @import block"
+    else
+      mkdir -p "$claude_dir"
+      printf '# Project notes\n\n%s\n' "$rules_block" > "$claude_md"
+      echo "Claude Code rules: created $rel_md with the binding-rules @import block."
+    fi
+  elif grep -q '@\.specfuse/rules/' "$claude_md" 2>/dev/null; then
+    [[ $DRY_RUN -eq 1 ]] && echo "  $rel_md already imports the binding rules" \
+                         || echo "Claude Code rules: $rel_md already imports the binding rules — left alone."
+  else
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  $rel_md exists but doesn't import the binding rules (would print paste-in snippet)"
+    else
+      echo "Claude Code rules: $rel_md exists but doesn't import the binding rules."
+      echo "  Append this block to wire them up:"
+      printf '%s\n' "$rules_block" | sed 's/^/    /'
+    fi
+  fi
+
+  # --- 3. settings.json — permissions allowlist ---
+  local settings="$claude_dir/settings.json"
+  local rel_settings="$rel_claude/settings.json"
+  if [[ ! -f "$settings" ]]; then
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  would create $rel_settings with the loop-script allowlist"
+    else
+      mkdir -p "$claude_dir"
+      cat > "$settings" <<'EOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 .specfuse/scripts/loop.py:*)",
+      "Bash(python3 .specfuse/scripts/lint_plan.py:*)"
+    ]
+  }
+}
+EOF
+      echo "Claude Code permissions: created $rel_settings with the loop-script allowlist."
+    fi
+  elif grep -q '\.specfuse/scripts/loop\.py' "$settings" 2>/dev/null; then
+    [[ $DRY_RUN -eq 1 ]] && echo "  $rel_settings already allows the loop scripts" \
+                         || echo "Claude Code permissions: $rel_settings already allows the loop scripts — left alone."
+  else
+    if [[ $DRY_RUN -eq 1 ]]; then
+      echo "  $rel_settings exists but doesn't allow the loop scripts (would print paste-in snippet)"
+    else
+      echo "Claude Code permissions: $rel_settings exists but doesn't allow the loop scripts."
+      echo "  Add these to its permissions.allow array:"
+      echo '    "Bash(python3 .specfuse/scripts/loop.py:*)",'
+      echo '    "Bash(python3 .specfuse/scripts/lint_plan.py:*)"'
+    fi
+  fi
+}
+
 # --- INIT mode ------------------------------------------------------------ #
 
 if [[ $UPGRADE -eq 0 ]]; then
@@ -150,6 +265,8 @@ if [[ $UPGRADE -eq 0 ]]; then
   mkdir -p "$DEST/features"
 
   echo "Scaffolded Specfuse Loop into $DEST"
+  echo
+  wire_claude_code
   echo
 
 # --- UPGRADE mode --------------------------------------------------------- #
@@ -198,6 +315,14 @@ else
       echo "with git before the next upgrade."
     fi
   fi
+  echo
+
+  # Claude Code wiring — symlinks, CLAUDE.md, settings allowlist.
+  # In dry-run, this lists what would change without writing.
+  if [[ $DRY_RUN -eq 1 ]]; then
+    echo "Claude Code wiring (would happen):"
+  fi
+  wire_claude_code
   echo
 
   # --- feature health report ---------------------------------------------- #
