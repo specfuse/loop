@@ -25,9 +25,12 @@ on both surfaces.
   work units followed by a mandatory closing sequence and a human review-and-arm
   checkpoint. Gates are numbered within a feature.
 - **Work unit (WU)** — a single, self-contained unit of work identified by a
-  task-level correlation ID `FEAT-YYYY-NNNN/TNN`. A WU is crafted to be completed
-  in one focused agent session. It carries its own prompt and is the contract
-  between the planner and the executor.
+  task-level correlation ID `FEAT-YYYY-NNNN/TNN` for substantive units,
+  `FEAT-YYYY-NNNN/TNNH[N…]` for hygiene units that precede a target substantive
+  unit, or `FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN)` for the closing
+  sequence. A WU is crafted to be completed in one focused agent session.
+  It carries its own prompt and is the contract between the planner and the
+  executor.
 
 The correlation ID threads the entire lifecycle — it appears in the feature
 folder name, the WU file, every event-log entry, the branch, the commit trailer
