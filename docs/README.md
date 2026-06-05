@@ -51,6 +51,11 @@ the shared-vocabulary rules ported from the orchestrator surface.
   v0.1.
 - [`pick-feature/SKILL.md`](../.specfuse/skills/pick-feature/SKILL.md)
   — read the roadmap and LEARNINGS, surface 2–3 candidates for the
-  next pull with hat-based trade-offs, recommend one — but never
-  decide. Read-only; respects active features. Hands off to
-  draft-feature once chosen. v0.1.
+  next pull with hat-based trade-offs, recommend one — and on your
+  pick flip status to `active` and print the next command. Hands off
+  to draft-feature once chosen. v0.1.
+- [`gate-status/SKILL.md`](../.specfuse/skills/gate-status/SKILL.md)
+  — "where do we stand?" after the loop halts on a blocked WU. Reads
+  PLAN, GATEs, WU frontmatter, events.jsonl, and per-attempt notes;
+  synthesizes per-blocked-WU diagnosis: what's blocked, likely root
+  cause, options, recommended action. Read-only. v0.1.
