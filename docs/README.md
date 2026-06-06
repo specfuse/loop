@@ -59,3 +59,8 @@ the shared-vocabulary rules ported from the orchestrator surface.
   PLAN, GATEs, WU frontmatter, events.jsonl, and per-attempt notes;
   synthesizes per-blocked-WU diagnosis: what's blocked, likely root
   cause, options, recommended action. Read-only. v0.1.
+- [`arm-gate/SKILL.md`](../.specfuse/skills/arm-gate/SKILL.md)
+  — at a gate boundary (driver halted with `awaiting_review` and
+  next gate's WUs in `draft`), walk each draft accept/revise/reject,
+  flip statuses, mark completed gate `passed`, print resume command.
+  Per-draft decision required; no batch-accept. v0.1.
