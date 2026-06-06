@@ -136,6 +136,41 @@ class TestUnsupportedConstructsFailLoudly(unittest.TestCase):
         self._expect_error("foo: 1\nfoo: 2\n", "duplicate key")
 
 
+class TestFloatScalarSupport(unittest.TestCase):
+    """v0.2 added positive-float support for `cost_usd`-style fields the
+    driver writes to WU frontmatter. Strict — no signed, leading dot,
+    trailing dot, scientific notation."""
+
+    def test_basic_floats_parse(self):
+        for text, expected in (
+            ("x: 0.5", 0.5),
+            ("x: 1.25", 1.25),
+            ("x: 10.0125", 10.0125),
+            ("x: 0.0", 0.0),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(miniyaml.parse(text)["x"], expected)
+
+    def test_ints_still_parse_as_ints(self):
+        self.assertIsInstance(miniyaml.parse("x: 5")["x"], int)
+        self.assertIsInstance(miniyaml.parse("x: 0")["x"], int)
+
+    def test_leading_dot_is_bare_string_not_float(self):
+        # `.5` is not a documented float form — falls through to bare string.
+        self.assertEqual(miniyaml.parse("x: .5")["x"], ".5")
+
+    def test_trailing_dot_is_bare_string(self):
+        self.assertEqual(miniyaml.parse("x: 5.")["x"], "5.")
+
+    def test_scientific_notation_is_bare_string(self):
+        self.assertEqual(miniyaml.parse("x: 1.5e3")["x"], "1.5e3")
+
+    def test_negative_float_rejected_via_quotation_check(self):
+        # `-` doesn't trigger a special reject branch; falls through to bare
+        # string with the minus sign preserved.
+        self.assertEqual(miniyaml.parse("x: -1.5")["x"], "-1.5")
+
+
 class TestUsefulMessageIncludesLineNumber(unittest.TestCase):
     """Errors must always cite a line number — without one, a malformed file is
     hard to fix. This is part of the fail-loud contract."""

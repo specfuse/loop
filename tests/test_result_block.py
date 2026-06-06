@@ -213,7 +213,7 @@ class TestExecuteUnitAttemptShortCircuits(unittest.TestCase):
 
     def test_blocked_stdout_skips_verify(self):
         wu = make_wu()
-        outcome, payload = loop.execute_unit_attempt(
+        outcome, payload, _usage = loop.execute_unit_attempt(
             wu, Path("/tmp/feat"), None,
             dispatch_fn=lambda w, n: BLOCKED_STDOUT,
             verify_fn=self.fake_verify,
@@ -225,7 +225,7 @@ class TestExecuteUnitAttemptShortCircuits(unittest.TestCase):
 
     def test_complete_stdout_calls_verify(self):
         wu = make_wu()
-        outcome, payload = loop.execute_unit_attempt(
+        outcome, payload, _usage = loop.execute_unit_attempt(
             wu, Path("/tmp/feat"), None,
             dispatch_fn=lambda w, n: COMPLETE_STDOUT,
             verify_fn=self.fake_verify,
@@ -241,7 +241,7 @@ class TestExecuteUnitAttemptShortCircuits(unittest.TestCase):
         def failing_verify(w, fd, *a, **kw):
             self.verify_calls += 1
             return False, "(simulated gate failure)"
-        outcome, payload = loop.execute_unit_attempt(
+        outcome, payload, _usage = loop.execute_unit_attempt(
             wu, Path("/tmp/feat"), None,
             dispatch_fn=lambda w, n: NO_BLOCK_STDOUT,
             verify_fn=failing_verify,
@@ -253,7 +253,7 @@ class TestExecuteUnitAttemptShortCircuits(unittest.TestCase):
 
     def test_malformed_block_falls_through_to_verify(self):
         wu = make_wu()
-        outcome, payload = loop.execute_unit_attempt(
+        outcome, payload, _usage = loop.execute_unit_attempt(
             wu, Path("/tmp/feat"), None,
             dispatch_fn=lambda w, n: MALFORMED_BLOCK_STDOUT,
             verify_fn=self.fake_verify,

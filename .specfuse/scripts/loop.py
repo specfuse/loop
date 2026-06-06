@@ -313,6 +313,17 @@ def ensure_feature_branch(feat_fm: dict) -> None:
         print(f"Created feature branch '{branch}' from '{current}'.")
 
 
+def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
+    """Write cumulative cost/token fields to the WU's frontmatter at outcome
+    time. No-op if no usage was captured (cost_usd is 0 and no tokens)."""
+    if cum_usage.get("cost_usd", 0) <= 0 and not cum_usage.get("input_tokens") \
+            and not cum_usage.get("output_tokens"):
+        return
+    backend.set_wu(wu, "cost_usd", round(cum_usage["cost_usd"], 6))
+    backend.set_wu(wu, "input_tokens", cum_usage["input_tokens"])
+    backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
+
+
 def commit_bookkeeping(paths: list, message: str) -> str | None:
     """Stage specific paths and create a chore(loop) bookkeeping commit.
 
@@ -361,17 +372,58 @@ report honestly.
 """
 
 
-def dispatch(wu: WorkUnit, failure_note: str | None) -> str:
-    """Run a fresh agent session for this WU. Returns the session's stdout so the
-    driver can parse the trailing RESULT block."""
+def dispatch(wu: WorkUnit, failure_note: str | None,
+             cost_tracking: bool = True) -> tuple[str, dict | None]:
+    """Run a fresh agent session for this WU.
+
+    When `cost_tracking` is True (default), requests JSON output from
+    `claude -p` so the cost / token-usage block can be extracted. Returns
+    (result_text, usage_dict_or_None). On any JSON parse failure or
+    unexpected shape, usage is None — the result_text is still returned so
+    the RESULT-block parser and verify() can do their normal work.
+    """
     prompt = PROMPT_PREAMBLE + "\n\n" + wu.body
     if failure_note:
         prompt += ("\n\n## Previous attempt failed verification\n"
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
                    "do not repeat the same approach.\n\n" + failure_note)
     cmd = [p.replace("{model}", wu.model) for p in CLAUDE_CMD]
+    if cost_tracking:
+        cmd += ["--output-format", "json"]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
-    return proc.stdout or ""
+    raw = proc.stdout or ""
+    if not cost_tracking:
+        return raw, None
+    return parse_claude_json_output(raw)
+
+
+def parse_claude_json_output(raw: str) -> tuple[str, dict | None]:
+    """Parse Claude CLI's `--output-format=json` envelope.
+
+    Tolerant: any shape drift returns (raw, None) so the caller falls back
+    to text-mode RESULT-block parsing. Extracts `total_cost_usd`,
+    `input_tokens`, `output_tokens`, and cache-token counts when present.
+    """
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return raw, None
+    if not isinstance(data, dict):
+        return raw, None
+    result_text = data.get("result", "")
+    if not isinstance(result_text, str):
+        result_text = raw
+    usage: dict = {}
+    cost = data.get("total_cost_usd")
+    if isinstance(cost, (int, float)):
+        usage["cost_usd"] = float(cost)
+    u = data.get("usage")
+    if isinstance(u, dict):
+        for key in ("input_tokens", "output_tokens",
+                    "cache_read_input_tokens", "cache_creation_input_tokens"):
+            if isinstance(u.get(key), int):
+                usage[key] = u[key]
+    return result_text, (usage if usage else None)
 
 
 RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
@@ -478,28 +530,41 @@ def execute_unit_attempt(
     *,
     dispatch_fn=None,
     verify_fn=None,
-) -> tuple[str, object]:
+    cost_tracking: bool = True,
+) -> tuple[str, object, dict | None]:
     """One dispatch + parse + (if not blocked) verify cycle.
 
     Factored out of run() so the parse-and-decision logic is unit-testable
     without spawning a real agent — pass stub callables for dispatch_fn and
     verify_fn from a test.
 
-    Returns one of:
-      ("blocked", blocked_reason_or_None) — agent explicitly emitted status:blocked
-      ("passed",  evidence_str)           — verify() passed
-      ("failed",  evidence_str)           — verify() failed
+    Returns (outcome, payload, usage) where outcome is one of:
+      "blocked" — agent explicitly emitted status: blocked
+      "passed"  — verify() passed
+      "failed"  — verify() failed
+
+    `usage` is the per-attempt cost/token dict from the agent dispatch when
+    `cost_tracking` is True and the agent returned a parseable usage block;
+    None otherwise (or when the dispatch_fn stub returns a plain string).
+
+    Backward-compatible dispatch_fn contract: stubs may return either a
+    plain `str` (treated as text-only, usage=None) or `(str, dict|None)`.
     """
-    if dispatch_fn is None:
-        dispatch_fn = dispatch
     if verify_fn is None:
         verify_fn = verify
-    stdout = dispatch_fn(wu, failure_note)
+    if dispatch_fn is None:
+        result = dispatch(wu, failure_note, cost_tracking)
+    else:
+        result = dispatch_fn(wu, failure_note)
+    if isinstance(result, tuple):
+        stdout, usage = result
+    else:
+        stdout, usage = result, None
     is_blocked, reason = agent_reported_blocked(stdout or "")
     if is_blocked:
-        return "blocked", reason
+        return "blocked", reason, usage
     passed, evidence = verify_fn(wu, feature_dir)
-    return ("passed" if passed else "failed"), evidence
+    return ("passed" if passed else "failed"), evidence, usage
 
 
 # --------------------------------------------------------------------------- #
@@ -528,6 +593,14 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
     if not dry_run:
         require_git_ready()
         ensure_feature_branch(feat_fm)
+
+    # Per-project cost-tracking toggle (top-level key in verification.yml,
+    # default True). When True, the driver records cumulative cost / tokens
+    # on each WU's frontmatter at outcome time and a per-attempt breakdown
+    # in events.jsonl; when False the driver passes plain text mode to
+    # `claude -p` and writes no cost fields.
+    cfg = load_verification()
+    cost_tracking = cfg.get("cost_tracking", True) is not False
 
     units = [load_wu(feature_dir, ref) for ref in gate.refs]
     print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
@@ -571,12 +644,23 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             wu_events = [build_event("task_started", wu.wu_id,
                                      {"type": wu.type, "model": wu.model})]
             attempt_notes: list[tuple[int, str]] = []
+            # Cost accumulators: per-attempt list goes to events.jsonl,
+            # cumulative sum to WU frontmatter at outcome time.
+            attempts_usage: list[dict] = []
+            cum_usage = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0}
 
             failure_note = None
             for attempt in range(1, MAX_ATTEMPTS + 1):
                 backend.set_wu(wu, "attempts", attempt)
                 print(f"   attempt {attempt}/{MAX_ATTEMPTS} — fresh session")
-                outcome, payload = execute_unit_attempt(wu, feature_dir, failure_note)
+                outcome, payload, usage = execute_unit_attempt(
+                    wu, feature_dir, failure_note, cost_tracking=cost_tracking,
+                )
+                if usage:
+                    attempts_usage.append({"attempt": attempt, **usage})
+                    cum_usage["cost_usd"] += float(usage.get("cost_usd", 0.0))
+                    cum_usage["input_tokens"] += int(usage.get("input_tokens", 0))
+                    cum_usage["output_tokens"] += int(usage.get("output_tokens", 0))
 
                 if outcome == "blocked":
                     # Reset agent work first; THEN write our bookkeeping; THEN
@@ -584,10 +668,12 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     # reset wipe the flip — the silent-state-loss bug.
                     git("reset", "--hard", head_before)
                     backend.set_wu(wu, "status", "blocked_human")
+                    write_cost_to_wu(backend, wu, cum_usage)
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": "agent_reported_blocked",
                         "blocked_reason": payload,
                         "attempts": attempt,
+                        "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
                     commit_bookkeeping(
@@ -605,8 +691,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     # included in the commit content — survives the next WU's
                     # reset. Then flush events so they ride in the same commit.
                     backend.set_wu(wu, "status", DONE)
-                    wu_events.append(build_event("task_completed", wu.wu_id,
-                                                 {"attempts": attempt}))
+                    write_cost_to_wu(backend, wu, cum_usage)
+                    wu_events.append(build_event("task_completed", wu.wu_id, {
+                        "attempts": attempt,
+                        "attempts_usage": attempts_usage,
+                    }))
                     flush_events(events_path, wu_events)
                     sha = squash_commit(wu, head_before)
                     done_ids.add(wu.wu_id)
@@ -634,9 +723,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     p.write_text(evidence)
                     note_paths.append(p)
                 backend.set_wu(wu, "status", "blocked_human")
+                write_cost_to_wu(backend, wu, cum_usage)
                 wu_events.append(build_event("human_escalation", wu.wu_id, {
                     "reason": "spinning_detected",
                     "attempts": MAX_ATTEMPTS,
+                    "attempts_usage": attempts_usage,
                 }))
                 flush_events(events_path, wu_events)
                 commit_bookkeeping(

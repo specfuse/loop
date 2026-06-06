@@ -28,6 +28,12 @@ Frontmatter notes (single-repo):
   them today.
 - `attempts` — incremented by the driver per fresh dispatch (max 3 before
   escalation). Authors leave it at `0`; the driver owns the counter.
+- `cost_usd`, `input_tokens`, `output_tokens` — written by the driver at
+  outcome time (PASS / BLOCKED / SPINNING) when cost tracking is enabled
+  in `.specfuse/verification.yml` (top-level `cost_tracking: true`,
+  default). Cumulative across the run's attempts on this WU. Authors
+  leave them off; the driver owns them. Per-attempt breakdown lives in
+  `events.jsonl`'s outcome event payload.
 - `generated_surfaces` — OPTIONAL. Lists paths inside this repo to generated
   files (`_generated/`, `gen-src/`, or the repo's declared equivalent) that
   this unit's acceptance depends on existing and behaving correctly. Empty list
