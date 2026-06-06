@@ -44,6 +44,10 @@ on a missing gate set — silent misparses are worse than crashes.
       - **double-quoted strings** — `"..."`, supporting only `\\` and `\"`
         escapes. Any other escape is an error.
       - **integers** — `0` or a positive decimal (no sign, no leading zeros).
+      - **floats** — positive decimal with required fractional part
+        (`0.5`, `1.25`, `10.0125`). No sign, no leading dot, no trailing
+        dot, no scientific notation. Used for things like `cost_usd`
+        fields that the driver writes to WU frontmatter.
       - **booleans** — exact lowercase `true` / `false` only. `True`, `yes`,
         `on`, etc. are errors.
       - **empty value** — a key followed by `:` with nothing after is `None`.
@@ -91,6 +95,10 @@ class MiniYAMLError(Exception):
 _KEY_VALUE_RE = re.compile(r"^([^:\s][^:]*?)\s*:(?:\s+(.*))?$")
 _VALID_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*$")
 _INT_RE = re.compile(r"^(0|[1-9]\d*)$")
+# Positive decimal with required fractional part. Rejects: signed, leading
+# dot, trailing dot, leading-zero non-zero integer part, scientific notation.
+# Matches: 0.5, 1.5, 10.0125, 0.0
+_FLOAT_RE = re.compile(r"^(0|[1-9]\d*)\.\d+$")
 
 _FORBIDDEN_BOOLS = {
     "True", "False",
@@ -356,6 +364,8 @@ def _parse_scalar(text: str, lineno: int) -> Any:
         return False
     if _INT_RE.match(text):
         return int(text)
+    if _FLOAT_RE.match(text):
+        return float(text)
     return text
 
 

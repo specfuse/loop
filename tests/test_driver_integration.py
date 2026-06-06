@@ -193,7 +193,7 @@ class TestBug1StatusFlipSurvivesReset(unittest.TestCase):
                                   ])
 
             # Stub dispatch: T01 returns a benign stdout; T02 emits status: blocked.
-            def fake_dispatch(wu, failure_note):
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
                 if wu.wu_id.endswith("/T02"):
                     return ("```result\nstatus: blocked\n"
                             "blocked_reason: simulated agent block\n```\n")
@@ -225,7 +225,7 @@ class TestBug1StatusFlipSurvivesReset(unittest.TestCase):
                                       ("FEAT-2026-9002/T02", "implementation", "pending"),
                                   ])
 
-            def fake_dispatch(wu, failure_note):
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
                 if wu.wu_id.endswith("/T02"):
                     return ("```result\nstatus: blocked\n"
                             "blocked_reason: simulated\n```\n")
@@ -256,7 +256,7 @@ class TestBug1StatusFlipSurvivesReset(unittest.TestCase):
                                       ("FEAT-2026-9003/T01", "implementation", "pending"),
                                   ])
 
-            self._patch("dispatch", lambda wu, fn:
+            self._patch("dispatch", lambda wu, fn, ct=True:
                         "```result\nstatus: blocked\nblocked_reason: stub\n```\n")
             self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
             loop.run(None, dry_run=False)
@@ -297,7 +297,7 @@ class TestBug2FeatureBranchCheckout(unittest.TestCase):
                                   ])
             self.assertEqual(_git(root, "branch", "--show-current"), "main")
 
-            self._patch("dispatch", lambda wu, fn: "(stub)\n")
+            self._patch("dispatch", lambda wu, fn, ct=True: "(stub)\n")
             self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
             loop.run(None, dry_run=False)
 
@@ -312,7 +312,7 @@ class TestBug2FeatureBranchCheckout(unittest.TestCase):
                                       ("FEAT-2026-9102/T01", "implementation", "pending"),
                                   ])
 
-            self._patch("dispatch", lambda wu, fn: "(stub)\n")
+            self._patch("dispatch", lambda wu, fn, ct=True: "(stub)\n")
             self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
             loop.run(None, dry_run=False)
 
@@ -335,7 +335,7 @@ class TestBug2FeatureBranchCheckout(unittest.TestCase):
             subprocess.run(["git", "-C", str(root), "checkout", "-q", "-B",
                             "feat/already"], check=True)
 
-            self._patch("dispatch", lambda wu, fn: "(stub)\n")
+            self._patch("dispatch", lambda wu, fn, ct=True: "(stub)\n")
             self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
             rc = loop.run(None, dry_run=False)
             self.assertEqual(rc, 0)
