@@ -17,6 +17,12 @@ htmlcov/
 .idea/
 .vscode/
 
+# Per-user agent / skill installs that aren't part of the loop's own scaffold
+.agents/
+skills-lock.json
+.claude/skills/caveman*
+.claude/skills/cavecrew
+
 # Runtime state produced by the loop inside a target project's .specfuse/
 # (these are illustrative; the canonical patterns also live in the scaffold)
 .specfuse/**/work/
