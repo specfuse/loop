@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/G2-RETRO
 type: retrospective
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.635232
+input_tokens: 14
+output_tokens: 15463
 ---
 
 # Gate 2 retrospective
