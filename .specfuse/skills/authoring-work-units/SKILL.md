@@ -239,6 +239,68 @@ fails only at live/integration time.
 
 ---
 
+## 9. Verification — add symbol-existence checks when the WU requires new functions
+
+The `code` gate (`python3 -m unittest discover`) passes when no new tests are
+registered and existing tests make no assertion about absent symbols. An agent
+can claim `complete` without having written any production code; the driver
+commits only the WU-status flip; gate verification passes on the unchanged
+codebase. Observed in `FEAT-2026-0007/T04`: all required functions absent from
+`loop.py`; gate passed; gap invisible until integration time.
+
+- For every WU that requires a new importable function, constant, or class, add an
+  **explicit existence check** to the WU's own Verification section — not just "run
+  the code gate." Canonical form: `python3 -c "from module import symbol_name"`.
+  Use `grep -c "^def symbol_name" target.py` when import would trigger side-effects.
+- Add a **completeness escalation trigger** alongside any correctness trigger:
+  `"If [required_function / required_file] is absent from the files you edited,
+  emit status: blocked — do not claim complete."` This fires before the RESULT
+  block is written, not after the driver re-runs gates and finds nothing.
+
+> *Prevents:* a WU that passes all code gates on the unchanged codebase because
+> the required test file was never written and the required functions were never
+> defined — the exact failure mode in `FEAT-2026-0007/T04` (retry escalation
+> ladder declared complete with zero production code committed).
+
+---
+
+## Haiku — when (and when not)
+
+`model: haiku` is opt-in only — never a default in `MODEL_BY_TYPE`. Use it
+when cost matters more than depth **and** the task fits the narrow profile below.
+
+**Recommended for:**
+- `docs` WUs that reconcile a small, bounded set of changes (≤ 2 files,
+  no cross-WU reasoning, purely mechanical reformatting or appending).
+- `lessons` WUs that append ≤ 5 self-contained entries from the retrospective
+  (pattern-matched synthesis; no forward-design reasoning).
+
+**Discouraged for:**
+- `implementation` — multi-file edits require cross-file reasoning that
+  regresses on Haiku (observed: symbols introduced in file A not referenced
+  correctly in file B without a full-context pass).
+- `plan-next` and `close` — forward design, cross-WU coordination, and
+  terminal feature-arc verdicts require the full reasoning budget; Haiku
+  consistently misses implicit constraints.
+- `retrospective` for a gate with > 3 substantive WUs — synthesising cost
+  tables, failure traces, and lessons-to-graduate across many WUs requires
+  deep context.
+
+**Rationale.** Gate-1 closing WUs on this feature ran at ~$0.20 / 90 s on
+Sonnet at `low` effort (see `RETROSPECTIVE.md` cost table). Haiku 4.5 would
+compress these further — appropriate only when the task is purely additive
+and volume is small. Multi-file forward design or cross-WU reasoning regresses:
+Haiku's smaller context window and weaker planning capability produce
+incomplete or inconsistent artifacts at gate scale.
+
+**Override mechanic.** Set `model: haiku` explicitly in the WU's frontmatter
+to opt in. There is no way to make Haiku the default for a type; the override
+is always per-WU and always deliberate. See `.specfuse/templates/WU.template.md`
+frontmatter notes for the full `model:` and `effort:` field contract, including
+the type-keyed defaults in `MODEL_BY_TYPE` and `EFFORT_BY_TYPE`.
+
+---
+
 ## This skill distills `.specfuse/LEARNINGS.md`
 
 When a gate's `lessons` work unit surfaces a new authoring rule — one that
@@ -250,19 +312,24 @@ the next edit.
 
 ## Version
 
-**v0.4.** Eight rules. v0.4 (this) added §8 (verify cross-surface
-contract values against the authoritative source rather than inventing
-them; carry a "Cross-repo contracts" table in every plan-next gate
-review) — graduated from `[FEAT-2026-0003/G3-LESSONS]` after a draft
-invented GitHub report-back labels that diverged from the orchestrator's
-canonical `state:*` scheme. v0.2 added the produces-list companion in §3
-and the hygiene-WU pattern in §7. v0.3 tightened §7 with the
-canonical `T<NN>H` ID convention (the previous draft left the ID
-shape vague; a live insert had to rename `T1H` to `T04` because the
-linter regex didn't admit it), the explicit PLAN.md wiring step
-(insert + retarget depends_on + flip target status), and the
-evidence-from-events-log requirement that grounds the hygiene WU's
-Context in a specific human_escalation entry. Expected to keep
-growing — each multi-gate or multi-feature run that surfaces a rule
-that would change how a future WU is written or executed graduates
-here from LEARNINGS.md.
+**v0.7.** Added cross-reference in the Haiku section to `WU.template.md`
+frontmatter notes for the full `model:` / `effort:` field contract and
+type-keyed defaults. v0.6 added the `## Haiku — when (and when not)`
+section — graduated from `[FEAT-2026-0007/T06]` after the
+defaults-by-WU-type policy established that Haiku is opt-in only and
+recommended solely for small `docs`/`lessons` WUs. v0.5 added
+§9 (explicit symbol-existence checks and completeness escalation triggers
+in the Verification section when a WU requires new importable functions
+or constants) — graduated from `[FEAT-2026-0007/G1-LESSONS]` after the
+retry escalation ladder (T04) was declared complete with zero production
+code committed and the `code` gate passed on the unchanged codebase.
+v0.4 added §8 (verify cross-surface contract values against the
+authoritative source rather than inventing them; carry a "Cross-repo
+contracts" table in every plan-next gate review) — graduated from
+`[FEAT-2026-0003/G3-LESSONS]`. v0.2 added the produces-list companion
+in §3 and the hygiene-WU pattern in §7. v0.3 tightened §7 with the
+canonical `T<NN>H` ID convention, the explicit PLAN.md wiring step, and
+the evidence-from-events-log requirement. Expected to keep growing —
+each multi-gate or multi-feature run that surfaces a rule that would
+change how a future WU is written or executed graduates here from
+LEARNINGS.md.

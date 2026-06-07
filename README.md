@@ -141,6 +141,17 @@ any git mutation; a contending driver exits non-zero immediately; the lock
 auto-releases on process exit including SIGKILL. `init.sh` adds the targeted
 gitignore line to every repo it initializes. Closing sequence in progress.
 
+`FEAT-2026-0007` (dispatch cost controls) gate 1 substantive WUs are done.
+Delivered: model-family aliases (`sonnet`/`opus`/`haiku` resolve to the latest
+model at dispatch), per-WU `effort:` tier wired to `claude -p --effort`, tier-gated
+caveman terseness directive (active when effort is `low` or `medium`), and
+failure-note size cap (200-line / 8000-char head+tail truncation). One gap: the
+retry escalation ladder (T04) was marked complete but no production code was
+written — `effort_for_attempt` / `terseness_for_attempt` are absent from `loop.py`.
+The T04 gap is documented in `RETROSPECTIVE.md` and produced two new
+`[FEAT-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`. Gate 1 closing sequence
+in progress; gate 2 WUs drafted by G1-PLAN.
+
 ## License
 
 Apache License 2.0. See [`LICENSE`](LICENSE).

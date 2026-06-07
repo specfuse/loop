@@ -363,3 +363,73 @@ promoted here.
   criteria — specifically which fields will be absent from the implementing WU's
   own `events.jsonl` entry — so a reviewer reading the log doesn't flag the
   absence as a correctness bug.
+
+- [FEAT-2026-0007/G1-LESSONS] The `code` gate (`python3 -m unittest discover`)
+  passes when no new tests are registered — it cannot detect that required new
+  symbols, files, or functions were never written. T04 declared `status: complete`,
+  the driver committed only the WU status flip, and verification passed on the
+  unchanged codebase because the existing tests made no assertion about the absent
+  functions. Rule: any WU that requires new importable symbols must include an
+  explicit existence check in its own Verification section — not just "run the
+  code gate." The canonical form is `python3 -c "from module import symbol_name"`
+  for functions, or `python3 -c "from module import CONSTANT_NAME"` for constants;
+  a `grep -c "^def symbol_name"` on the target file is an acceptable alternative
+  when the import would trigger side-effects. Without this, an agent can claim
+  complete without having written any production code and pass driver verification.
+
+- [FEAT-2026-0007/G1-LESSONS] Escalation triggers guard against wrong changes
+  but not against absent changes. T04's trigger read "stop if changing
+  `dispatch()`'s signature breaks T02 or T03 tests" — a correct wrong-change
+  guard. Its mirror was missing: "stop if the required functions are absent from
+  your edits." Rule: every implementation WU that requires new named symbols must
+  include a completeness escalation trigger alongside any correctness trigger. The
+  canonical form is: "If [required_function_name] / [required_file] is absent
+  from the files you edited, emit `status: blocked` — do not claim complete." The
+  driver's verification cannot substitute for this because it runs gates against
+  the post-commit tree; a completeness gap that passes the gates is invisible to
+  the driver and only becomes visible at integration time.
+
+- [FEAT-2026-0007/G1-LESSONS] When WU N produces a constant, directive, or prose
+  artifact that WU N+1 must extend or specialize (e.g., T03 produced the
+  `CAVEMAN_DIRECTIVE` body; T04 needed a "softer" variant of it), WU N's spec
+  must either specify the content or include a note: "the exact text will be
+  inferred by WU N+1 from this WU's output." Without that note, WU N+1's author
+  has no spec anchor and the agent must infer the upstream content from the commit
+  diff — which is correct in context but makes the dependency invisible to future
+  readers. Rule: when a chain of WUs progressively refines a shared artifact,
+  document the inheritance relationship explicitly in each WU's Context section so
+  the dependency is auditable without reading commit history.
+
+- [FEAT-2026-0007/G2-LESSONS] A WU session that bills 0 input/output tokens has
+  produced nothing — but the driver currently commits it as `done` because the
+  WU frontmatter status flip is the only staged change, and the code gate passes
+  on the unchanged codebase. T08H (a hygiene WU with three explicit safeguards)
+  repeated T04's exact failure via this path: 0 tokens, 225 s elapsed, status
+  flipped to done, no symbols written. Rule: the driver must treat a 0-token WU
+  session as a failed attempt, not a completed one. Until the driver enforces
+  this, plan-next WUs should add a sentinel AC: "events.jsonl must show
+  `input_tokens > 0` for this WU; if it does not, re-dispatch from scratch."
+
+- [FEAT-2026-0007/G2-LESSONS] Agent-side safeguards (smoke-import checks in AC,
+  completeness escalation triggers) are bypassed when the agent session crashes
+  or produces 0 tokens before reaching those checks. T08H carried AC 9 (explicit
+  smoke-import check) and two escalation triggers — none fired because the session
+  generated no output at all. The G1-LESSONS entries on smoke checks and
+  completeness triggers remain necessary; they are not sufficient. Rule: for any
+  WU that re-lands symbols that previously failed silently (a hygiene WU),
+  include a plan-next note requesting a driver-side pre-dependency-unlock check:
+  run the WU's declared smoke-import command from the Verification section before
+  advancing the dependency frontier. Agent-side guards catch reasoning failures;
+  driver-side checks catch session crashes.
+
+- [FEAT-2026-0007/G2-LESSONS] A gate that introduces a new enforcement mechanism
+  (budget brake, slot cap, rate limiter) cannot exercise that mechanism against
+  itself — the GATE.md for the implementing gate is authored before the code
+  lands, and setting a budget against a gate mid-flight is undefined. T07
+  introduced `cost_budget_usd` and the brake was never fired in Gate 2 because
+  GATE-02.md had no budget field. Rule: when a plan-next WU details a gate whose
+  substantive WUs include a new enforcement mechanism, add a note to the gate
+  review document: "set `cost_budget_usd` (or equivalent) in GATE-N+1.md before
+  arming the next gate to exercise this mechanism for the first time." The
+  implementing gate's own GATE.md is intentionally left without a budget; the
+  first exercise belongs to the successor.
