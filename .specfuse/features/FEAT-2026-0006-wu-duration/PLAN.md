@@ -5,7 +5,7 @@ slug: wu-duration
 branch: feat/FEAT-2026-0006-wu-duration
 roadmap_goal: The loop records each work unit's wall-clock execution time alongside the cost it already captures.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: WU execution-time tracking
