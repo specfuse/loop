@@ -2,8 +2,12 @@
 id: FEAT-2026-0007/T05
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 186.293
+cost_usd: 0.589728
+input_tokens: 27
+output_tokens: 9237
 ---
 
 # Cap failure-note size piped into retry attempts

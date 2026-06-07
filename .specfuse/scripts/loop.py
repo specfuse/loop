@@ -426,6 +426,34 @@ report honestly.
 """
 
 
+def truncate_failure_note(note: str, max_lines: int = 200,
+                          max_chars: int = 8000) -> str:
+    """Return note unchanged when within limits; otherwise head+marker+tail.
+
+    Splits budget 50/50 by line count, clamped by char budget too. Marker is
+    plain ASCII with no triple-backtick so RESULT-block parsing is unaffected.
+    """
+    if len(note) <= max_chars and note.count("\n") < max_lines:
+        return note
+    lines = note.splitlines()
+    n = len(lines)
+    line_budget = min(max_lines, n - 1)
+    head_count = line_budget // 2
+    tail_count = line_budget - head_count
+    half_char_budget = max_chars // 2
+    while head_count > 0 and sum(len(ln) + 1 for ln in lines[:head_count]) > half_char_budget:
+        head_count -= 1
+    while tail_count > 0 and sum(len(ln) + 1 for ln in lines[n - tail_count:]) > half_char_budget:
+        tail_count -= 1
+    head_lines = lines[:head_count]
+    tail_lines = lines[n - tail_count:] if tail_count > 0 else []
+    elided_lines = n - head_count - tail_count
+    elided_chars = len(note) - sum(len(ln) + 1 for ln in head_lines) \
+                             - sum(len(ln) + 1 for ln in tail_lines)
+    marker = f"\n... [{elided_lines} lines / {elided_chars} chars elided] ...\n"
+    return "\n".join(head_lines) + marker + "\n".join(tail_lines)
+
+
 def dispatch(wu: WorkUnit, failure_note: str | None,
              cost_tracking: bool = True) -> tuple[str, dict | None]:
     """Run a fresh agent session for this WU.
@@ -440,7 +468,8 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
     if failure_note:
         prompt += ("\n\n## Previous attempt failed verification\n"
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
-                   "do not repeat the same approach.\n\n" + failure_note)
+                   "do not repeat the same approach.\n\n"
+                   + truncate_failure_note(failure_note))
     cmd = [p.replace("{model}", wu.model) for p in CLAUDE_CMD]
     if cost_tracking:
         cmd += ["--output-format", "json"]
