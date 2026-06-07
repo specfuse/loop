@@ -72,6 +72,9 @@ GATES_FOR_TYPE = {
     "lessons": "doc",
     "docs": "doc",
     "plan-next": "plannext",
+    # `close` collapses the four closing ceremonies into one session (single-gate only).
+    # Reuses the `plannext` gate set: lint_plan.py verifies structural integrity post-close.
+    "close": "plannext",
 }
 
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next

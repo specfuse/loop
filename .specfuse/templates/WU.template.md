@@ -1,6 +1,6 @@
 ---
 id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN) for closing
-type: implementation       # implementation | retrospective | lessons | docs | plan-next
+type: implementation       # implementation | retrospective | lessons | docs | plan-next | close
 model: claude-opus-4-7     # opus for foundational/forward-design; sonnet for mechanical/synthesis
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
@@ -16,8 +16,14 @@ Frontmatter notes (single-repo):
   rejected.
 - `type` — drives which gate set in `.specfuse/verification.yml` the driver runs
   (`implementation` → `code`; `retrospective`/`lessons`/`docs` → `doc`;
-  `plan-next` → `plannext`). Same concept as the orchestrator's `task_type`,
-  kept under the loop's existing field name.
+  `plan-next` → `plannext`; `close` → `plannext`). Same concept as the
+  orchestrator's `task_type`, kept under the loop's existing field name.
+  `close` is a single-gate-only alternative to the four-WU closing sequence: it
+  collapses retrospective + lessons + docs + terminal verdict into one session.
+  One `close` WU must produce `RETROSPECTIVE.md`, append durable entries to
+  `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal feature-arc
+  verdict. Only valid when the feature has exactly one gate; multi-gate features
+  must use the `[retrospective, lessons, docs, plan-next]` sequence.
 - `model` — the Claude model the driver dispatches this unit with. Foundational
   / forward-design units (notably `plan-next`) take Opus; mechanical and
   synthesis units take Sonnet.

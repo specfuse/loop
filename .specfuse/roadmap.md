@@ -21,6 +21,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
+| FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -137,12 +138,37 @@ met in one attempt ($0.89, ~5 min). GATE-01 status: `passed`.
 
 **Status: active.** Single-gate feature; closing sequence in progress.
 
+## FEAT-2026-0005 — Combined close for single-gate features
+
+**Why.** The four closing ceremonies (retrospective → lessons → docs → plan-next)
+cost four dispatches — including an Opus `plan-next` — even on a one-WU feature
+where `plan-next` is terminal boilerplate with no next gate to forward-design.
+
+**Gate 1 (passed).** A new `close` WU type collapses all four closing ceremonies
+into one session, accepted by `lint_plan.py` and `loop.py` only for single-gate
+features (multi-gate features keep the four-WU sequence, where forward-design
+`plan-next` earns its cost). The linter enforces the single-gate constraint and
+rejects `close` on any feature with two or more gates. `loop.py` maps `close` to
+the `plannext` verification gate set (structural lint on the feature post-close),
+and treats a passing `close` WU as completing the gate. `CORRELATION_ID_RE` gained
+a `CLOSE` segment so `G1-CLOSE`-style correlation IDs pass validation. Three tests
+cover: lint accepts single-gate close, rejects multi-gate close, and still passes
+the four-WU sequence (regression). All acceptance criteria met in one attempt
+($1.23, ~7 min). GATE-01 status: `passed`.
+
+This feature itself closes with the four-WU sequence — the `close` type does not
+exist when this feature's driver loads `loop.py`. FEAT-2026-0006 is the first
+feature to use the new `close` WU.
+
+**Status: active.** Single-gate feature; closing sequence in progress.
+
 ## Notes
 
 - Correlation IDs are allocated here, sequentially per year: `FEAT-YYYY-NNNN`.
-  Work units take `FEAT-YYYY-NNNN/TNN` for substantive units and
-  `FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN)` for closing-sequence units
-  — see `.specfuse/rules/correlation-ids.md`.
+  Work units take `FEAT-YYYY-NNNN/TNN` for substantive units,
+  `FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN)` for the four-WU closing
+  sequence, and `FEAT-YYYY-NNNN/G<n>-CLOSE` for the single-gate `close`
+  alternative — see `.specfuse/rules/correlation-ids.md`.
 - The feature folder name carries the full ID plus a slug, so it greps,
   sorts, and threads cleanly.
 - **Read `.specfuse/LEARNINGS.md` before detailing a new feature.** It is
