@@ -654,6 +654,60 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
     return unchanged
 
 
+# Smoke-import runner (FEAT-2026-0008/T03). The conservative pattern matches
+# ONLY a `python3 -c "from X import Y"` line. The agent-authored WU body may
+# declare an existence check naming new symbols this WU just minted; the
+# driver runs each match after a successful verify() + squash and rolls back
+# the squash if any smoke import raises. Free-form `python3 -c` lines are
+# NOT executed — running arbitrary agent-authored Python in the driver
+# process would be a security regression (see WU escalation trigger 2).
+SMOKE_IMPORT_RE = re.compile(
+    r'''^\s*python3?\s+-c\s+(["'])from\s+\S+\s+import\s+\S+\1\s*$'''
+)
+
+
+def extract_smoke_imports(wu_body: str) -> list[str]:
+    """Return WU-body lines matching the conservative import-smoke pattern.
+
+    Each returned element is the full command string ready for
+    `subprocess.run(shell=True, ...)`. Order preserved. Lines that look
+    similar but do not match — `python -c "import X"`, `python -c
+    "print(...)"`, prose — are skipped.
+    """
+    out: list[str] = []
+    for line in wu_body.splitlines():
+        if SMOKE_IMPORT_RE.match(line):
+            out.append(line.strip())
+    return out
+
+
+def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
+    """Run each smoke-import command in `cwd` in declared order.
+
+    Returns `(True, "")` if every command exits 0. On the first non-zero
+    exit, returns `(False, summary)` where `summary` names the failing
+    command and its stderr — short, suitable for an event payload and a
+    retry failure_note. Subsequent commands are not run; one failure is
+    enough to fail the attempt.
+
+    Inherits the driver's PATH so the active venv's `python3` resolves
+    (the methodology requires the driver to be invoked from within an
+    active venv per `[loop-driver-operation]`).
+    """
+    for cmd in commands:
+        proc = subprocess.run(  # nosec B602
+            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
+        )
+        if proc.returncode != 0:
+            summary = (
+                f"smoke import failed (exit {proc.returncode}):\n"
+                f"  $ {cmd}\n"
+                f"stderr:\n{proc.stderr.strip()}"
+            )
+            return False, summary
+    return True, ""
+
+
 def is_zero_token_attempt(usage: dict | None) -> bool:
     """Did the dispatched session bill zero input tokens?
 
@@ -1040,15 +1094,43 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 if outcome == "passed":
                     # Flip status to DONE BEFORE the squash so the flip is
                     # included in the commit content — survives the next WU's
-                    # reset. Then flush events so they ride in the same commit.
+                    # reset.
                     backend.set_wu(wu, "status", DONE)
                     write_cost_to_wu(backend, wu, cum_usage)
+                    sha = squash_commit(wu, head_before)
+                    # Smoke-import runner (FEAT-2026-0008/T03): after a
+                    # successful verify() AND squash, run each
+                    # `python3 -c "from X import Y"` line declared in the WU
+                    # body. A non-zero exit fails the attempt — the squash
+                    # is rolled back via `git reset --hard head_before` so
+                    # the verify-passing-but-smoke-failing tree does not
+                    # remain in history. Rollback FIRST (before event log
+                    # and before the next attempt iterates) per WU
+                    # escalation trigger 3.
+                    smoke_cmds = extract_smoke_imports(wu.body)
+                    if smoke_cmds:
+                        smoke_ok, smoke_summary = run_smoke_imports(
+                            smoke_cmds, Path("."),
+                        )
+                        if not smoke_ok:
+                            git("reset", "--hard", head_before)
+                            wu_events.append(build_event(
+                                "attempt_outcome", wu.wu_id, {
+                                    "outcome": "smoke_import_failed",
+                                    "attempt": attempt,
+                                    "summary": smoke_summary,
+                                },
+                            ))
+                            attempt_notes.append((attempt, smoke_summary))
+                            failure_note = smoke_summary
+                            print(f"   SMOKE FAIL attempt "
+                                  f"{attempt}/{MAX_ATTEMPTS}")
+                            continue
                     wu_events.append(build_event("task_completed", wu.wu_id, {
                         "attempts": attempt,
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
-                    sha = squash_commit(wu, head_before)
                     done_ids.add(wu.wu_id)
                     print(f"   PASS — committed {sha}")
                     break
