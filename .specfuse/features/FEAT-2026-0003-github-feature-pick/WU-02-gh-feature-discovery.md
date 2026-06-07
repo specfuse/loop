@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/T02
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.676032
+input_tokens: 19
+output_tokens: 15485
 ---
 
 # GitHub feature discovery — list specfuse:feature issues as loop-feature candidates
