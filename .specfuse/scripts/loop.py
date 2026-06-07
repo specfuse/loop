@@ -229,6 +229,20 @@ class Backend:
         write_frontmatter_field(gate.file, "status", status)
         gate.status = status
 
+    def on_feature_start(self, feature_id: str, feat_fm: dict) -> None:
+        """Called once per run(), before any dispatch, even on no-op polls."""
+
+    def on_gate_passed(self, feature_id: str, gate_number: int) -> None:
+        """Called after a gate's WUs are all done and the gate flips to awaiting_review."""
+
+    def on_feature_complete(self, feature_id: str) -> None:
+        """Called when all gates are passed and the feature is fully complete."""
+
+
+def make_backend(feat_fm: dict) -> Backend:
+    """Factory — returns a plain Backend today; T06 adds GitHubBackend selection."""
+    return Backend()
+
 
 # --------------------------------------------------------------------------- #
 # Event log (per feature)                                                      #
@@ -583,11 +597,13 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
     feature_id = feat_fm.get("feature_id", feature_dir.name)
     events_path = feature_dir / "events.jsonl"
     work_dir = feature_dir / "work"
-    backend = Backend()
+    backend = make_backend(feat_fm)
+    backend.on_feature_start(feature_id, feat_fm)
 
     gate = next((g for g in gates if g.status != "passed"), None)
     if gate is None:
         print(f"{feature_id}: all gates passed — feature complete.")
+        backend.on_feature_complete(feature_id)
         return 0
 
     if not dry_run:
@@ -746,6 +762,8 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         return 0
 
     backend.set_gate(gate, "awaiting_review")
+    # on_gate_passed fires here: WUs all done, gate now awaiting human review
+    backend.on_gate_passed(feature_id, gate.number)
     flush_events(events_path,
                  [build_event("gate_reached", feature_id, {"gate": gate.number})])
     commit_bookkeeping(

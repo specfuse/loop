@@ -2,7 +2,11 @@
 id: FEAT-2026-0003/T05
 type: implementation
 model: claude-sonnet-4-6
-status: pending
+status: done
+attempts: 1
+cost_usd: 0.650889
+input_tokens: 23
+output_tokens: 11256
 ---
 
 # Widen the Backend seam with feature/gate lifecycle hooks
