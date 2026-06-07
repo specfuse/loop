@@ -3,7 +3,7 @@ id: FEAT-2026-0007/G2-RETRO
 type: retrospective
 model: claude-sonnet-4-6
 effort: low
-status: draft
+status: pending
 attempts: 0
 ---
 

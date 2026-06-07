@@ -73,6 +73,25 @@ VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 # the loop passes the value verbatim — no expansion here.
 MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 
+# Defaults applied by load_wu when `model` or `effort` are absent from WU frontmatter.
+# A WU that declares either field explicitly overrides these. Keys cover every VALID_TYPES value.
+MODEL_BY_TYPE = {
+    "implementation": "sonnet",
+    "retrospective":  "sonnet",
+    "lessons":        "sonnet",
+    "docs":           "sonnet",
+    "plan-next":      "opus",
+    "close":          "opus",
+}
+EFFORT_BY_TYPE = {
+    "implementation": "medium",
+    "retrospective":  "low",
+    "lessons":        "low",
+    "docs":           "low",
+    "plan-next":      "high",
+    "close":          "high",
+}
+
 # Which verification gate set (a key in verification.yml) applies to each WU type.
 GATES_FOR_TYPE = {
     "implementation": "code",
@@ -211,18 +230,24 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     path = feature_dir / ref["file"]
     fm, body = read_frontmatter(path)
     title_m = re.search(r"^#\s+(.*)$", body, re.MULTILINE)
-    effort = fm.get("effort", "medium")
-    if effort not in VALID_EFFORT:
+    wu_type = fm.get("type", "implementation")
+    effort = fm.get("effort")
+    if effort is None:
+        effort = EFFORT_BY_TYPE.get(wu_type, "medium")
+    elif effort not in VALID_EFFORT:
         raise ValueError(
             f"{path}: invalid effort '{effort}' — must be one of "
             f"{sorted(VALID_EFFORT)}"
         )
+    wu_model = fm.get("model")
+    if wu_model is None:
+        wu_model = MODEL_BY_TYPE.get(wu_type, "claude-sonnet-4-6")
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
         depends_on=list(ref.get("depends_on", []) or []),
-        type=fm.get("type", "implementation"),
-        model=fm.get("model", "claude-sonnet-4-6"),
+        type=wu_type,
+        model=wu_model,
         effort=effort,
         status=fm.get("status", "pending"),
         attempts=int(fm.get("attempts", 0)),

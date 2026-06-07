@@ -1,8 +1,8 @@
 ---
 id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN) for closing
 type: implementation       # implementation | retrospective | lessons | docs | plan-next | close
-model: claude-opus-4-7     # opus for foundational/forward-design; sonnet for mechanical/synthesis
-effort: medium             # low | medium | high | xhigh | max — passed to claude -p --effort; default medium
+# model: <override>        # optional — defaults per MODEL_BY_TYPE[type] in loop.py; aliases: sonnet | opus | haiku
+# effort: <override>       # optional — defaults per EFFORT_BY_TYPE[type] in loop.py; low | medium | high | xhigh | max
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
 generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
@@ -25,19 +25,19 @@ Frontmatter notes (single-repo):
   `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal feature-arc
   verdict. Only valid when the feature has exactly one gate; multi-gate features
   must use the `[retrospective, lessons, docs, plan-next]` sequence.
-- `model` — the Claude model the driver dispatches this unit with. Foundational
-  / forward-design units (notably `plan-next`) take Opus; mechanical and
-  synthesis units take Sonnet. Three family aliases are accepted: `sonnet`,
-  `opus`, `haiku` — each resolves to the latest model in that family at
-  dispatch time (CLI-side, not loop-side). Full model IDs
-  (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`) pin a specific release.
+- `model` — OPTIONAL. The Claude model the driver dispatches this unit with.
+  When absent, defaults to `MODEL_BY_TYPE[type]` in `loop.py` (`sonnet` for
+  implementation/retrospective/lessons/docs; `opus` for plan-next/close). Three
+  family aliases are accepted: `sonnet`, `opus`, `haiku` — each resolves to
+  the latest model in that family at dispatch time (CLI-side, not loop-side).
+  Full model IDs (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`) pin a specific
+  release. Omit to accept the type-keyed default; set only to override.
 - `effort` — OPTIONAL. Controls the thinking budget passed to `claude -p`
   via `--effort`. Five levels: `low`, `medium`, `high`, `xhigh`, `max`.
-  Default is `medium` when the field is absent. Use `high` or above for
-  units with substantial design work; `low` for purely mechanical edits.
-  Omitting the field is valid; the driver applies `medium` automatically.
-  `low`/`medium` also enable a terseness directive in the dispatched session;
-  `high`+ leave it off.
+  When absent, defaults to `EFFORT_BY_TYPE[type]` in `loop.py` (`medium` for
+  implementation; `low` for retrospective/lessons/docs; `high` for
+  plan-next/close). `low`/`medium` also enable a terseness directive in the
+  dispatched session; `high`+ leave it off.
 - `status` — the unit's lifecycle position. `draft` is what `plan-next` writes
   for the next gate's units; the human arms them by flipping to `pending`. The
   driver writes `in_progress`, `done`, and `blocked_human`. Other values are

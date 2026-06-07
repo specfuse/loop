@@ -264,6 +264,41 @@ codebase. Observed in `FEAT-2026-0007/T04`: all required functions absent from
 
 ---
 
+## Haiku — when (and when not)
+
+`model: haiku` is opt-in only — never a default in `MODEL_BY_TYPE`. Use it
+when cost matters more than depth **and** the task fits the narrow profile below.
+
+**Recommended for:**
+- `docs` WUs that reconcile a small, bounded set of changes (≤ 2 files,
+  no cross-WU reasoning, purely mechanical reformatting or appending).
+- `lessons` WUs that append ≤ 5 self-contained entries from the retrospective
+  (pattern-matched synthesis; no forward-design reasoning).
+
+**Discouraged for:**
+- `implementation` — multi-file edits require cross-file reasoning that
+  regresses on Haiku (observed: symbols introduced in file A not referenced
+  correctly in file B without a full-context pass).
+- `plan-next` and `close` — forward design, cross-WU coordination, and
+  terminal feature-arc verdicts require the full reasoning budget; Haiku
+  consistently misses implicit constraints.
+- `retrospective` for a gate with > 3 substantive WUs — synthesising cost
+  tables, failure traces, and lessons-to-graduate across many WUs requires
+  deep context.
+
+**Rationale.** Gate-1 closing WUs on this feature ran at ~$0.20 / 90 s on
+Sonnet at `low` effort (see `RETROSPECTIVE.md` cost table). Haiku 4.5 would
+compress these further — appropriate only when the task is purely additive
+and volume is small. Multi-file forward design or cross-WU reasoning regresses:
+Haiku's smaller context window and weaker planning capability produce
+incomplete or inconsistent artifacts at gate scale.
+
+**Override mechanic.** Set `model: haiku` explicitly in the WU's frontmatter
+to opt in. There is no way to make Haiku the default for a type; the override
+is always per-WU and always deliberate.
+
+---
+
 ## This skill distills `.specfuse/LEARNINGS.md`
 
 When a gate's `lessons` work unit surfaces a new authoring rule — one that
@@ -275,18 +310,22 @@ the next edit.
 
 ## Version
 
-**v0.5.** Nine rules. v0.5 (this) added §9 (explicit symbol-existence
-checks and completeness escalation triggers in the Verification section
-when a WU requires new importable functions or constants) — graduated
-from `[FEAT-2026-0007/G1-LESSONS]` after the retry escalation ladder
-(T04) was declared complete with zero production code committed and the
-`code` gate passed on the unchanged codebase. v0.4 added §8 (verify
-cross-surface contract values against the authoritative source rather
-than inventing them; carry a "Cross-repo contracts" table in every
-plan-next gate review) — graduated from `[FEAT-2026-0003/G3-LESSONS]`.
-v0.2 added the produces-list companion in §3 and the hygiene-WU pattern
-in §7. v0.3 tightened §7 with the canonical `T<NN>H` ID convention, the
-explicit PLAN.md wiring step, and the evidence-from-events-log
-requirement. Expected to keep growing — each multi-gate or multi-feature
-run that surfaces a rule that would change how a future WU is written or
-executed graduates here from LEARNINGS.md.
+**v0.6.** Nine rules + Haiku guidance. v0.6 (this) added the `## Haiku —
+when (and when not)` section — graduated from `[FEAT-2026-0007/T06]`
+after the defaults-by-WU-type policy established that Haiku is opt-in
+only and recommended solely for small `docs`/`lessons` WUs. v0.5 added
+§9 (explicit symbol-existence checks and completeness escalation triggers
+in the Verification section when a WU requires new importable functions
+or constants) — graduated from `[FEAT-2026-0007/G1-LESSONS]` after the
+retry escalation ladder (T04) was declared complete with zero production
+code committed and the `code` gate passed on the unchanged codebase.
+v0.4 added §8 (verify cross-surface contract values against the
+authoritative source rather than inventing them; carry a "Cross-repo
+contracts" table in every plan-next gate review) — graduated from
+`[FEAT-2026-0003/G3-LESSONS]`. v0.2 added the produces-list companion
+in §3 and the hygiene-WU pattern in §7. v0.3 tightened §7 with the
+canonical `T<NN>H` ID convention, the explicit PLAN.md wiring step, and
+the evidence-from-events-log requirement. Expected to keep growing —
+each multi-gate or multi-feature run that surfaces a rule that would
+change how a future WU is written or executed graduates here from
+LEARNINGS.md.

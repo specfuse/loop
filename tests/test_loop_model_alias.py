@@ -61,10 +61,11 @@ class TestLoadWuModelAlias(unittest.TestCase):
         wu = self._load("claude-sonnet-4-6")
         self.assertEqual(wu.model, "claude-sonnet-4-6")
 
-    def test_default_model_unchanged(self):
-        """load_wu default when model key absent is still claude-sonnet-4-6."""
+    def test_default_model_follows_type_policy(self):
+        """load_wu default when model key absent follows MODEL_BY_TYPE.
+        type:implementation defaults to 'sonnet' (updated by FEAT-2026-0007/T06)."""
         with tempfile.TemporaryDirectory() as tmp:
-            path = tmp / "WU-T01.md" if isinstance(tmp, Path) else Path(tmp) / "WU-T01.md"
+            path = Path(tmp) / "WU-T01.md"
             path.write_text(
                 "---\nid: FEAT-2026-9999/T01\ntype: implementation\n"
                 "status: pending\nattempts: 0\n---\n\n# Test unit\n"
@@ -72,7 +73,7 @@ class TestLoadWuModelAlias(unittest.TestCase):
             ref = {"id": "FEAT-2026-9999/T01", "file": "WU-T01.md",
                    "depends_on": []}
             wu = loop.load_wu(Path(tmp), ref)
-            self.assertEqual(wu.model, "claude-sonnet-4-6")
+            self.assertEqual(wu.model, "sonnet")
 
 
 class TestDispatchReceivesAliasVerbatim(unittest.TestCase):

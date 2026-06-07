@@ -3,8 +3,12 @@ id: FEAT-2026-0007/T06
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: draft
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 518.545
+cost_usd: 1.53756
+input_tokens: 32
+output_tokens: 28367
 ---
 
 # Defaults-by-WU-type policy (with Haiku guidance)

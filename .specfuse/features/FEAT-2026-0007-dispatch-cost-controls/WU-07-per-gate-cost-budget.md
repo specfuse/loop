@@ -3,7 +3,7 @@ id: FEAT-2026-0007/T07
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: draft
+status: pending
 attempts: 0
 ---
 

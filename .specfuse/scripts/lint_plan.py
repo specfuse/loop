@@ -129,14 +129,19 @@ def lint(feature_dir: Path) -> list[str]:
                             f"must match {CORRELATION_ID_RE.pattern}")
             if wfm.get("type") not in VALID_TYPES:
                 errs.append(f"{wfile}: invalid type '{wfm.get('type')}'")
-            _model = wfm.get("model", "")
-            if not _model:
-                errs.append(f"{wfile}: missing model")
-            elif _model not in MODEL_ALIASES and not FULL_MODEL_ID_RE.match(_model):
-                errs.append(
-                    f"{wfile}: invalid model '{_model}' — must be a family alias "
-                    f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
-                )
+            if "model" in wfm:
+                _model = wfm["model"]
+                if not _model:
+                    errs.append(
+                        f"{wfile}: model present but has no value — must be a family alias "
+                        f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
+                    )
+                elif _model not in MODEL_ALIASES and not FULL_MODEL_ID_RE.match(_model):
+                    errs.append(
+                        f"{wfile}: invalid model '{_model}' — must be a family alias "
+                        f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
+                    )
+            # model absent: valid — load_wu applies MODEL_BY_TYPE[type] at dispatch time
             if wfm.get("status") not in VALID_STATUS:
                 errs.append(f"{wfile}: invalid status '{wfm.get('status')}'")
             _effort = wfm.get("effort")
