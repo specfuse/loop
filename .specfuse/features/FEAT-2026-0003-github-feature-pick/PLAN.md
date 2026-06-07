@@ -123,7 +123,22 @@ gates:
         depends_on: [FEAT-2026-0003/G3-DOCS]
   - gate: 4
     file: GATE-04.md
-    work_units: []
+    work_units:
+      - id: FEAT-2026-0003/T08
+        file: WU-08-lint-atx-headings.md
+        depends_on: []
+      - id: FEAT-2026-0003/G4-RETRO
+        file: WU-102-gate-4-retrospective.md
+        depends_on: [FEAT-2026-0003/T08]
+      - id: FEAT-2026-0003/G4-LESSONS
+        file: WU-103-gate-4-lessons.md
+        depends_on: [FEAT-2026-0003/G4-RETRO]
+      - id: FEAT-2026-0003/G4-DOCS
+        file: WU-104-gate-4-docs.md
+        depends_on: [FEAT-2026-0003/G4-LESSONS]
+      - id: FEAT-2026-0003/G4-PLAN
+        file: WU-105-gate-4-plan-next.md
+        depends_on: [FEAT-2026-0003/G4-DOCS]
 ```
 
 ## Notes
