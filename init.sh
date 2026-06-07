@@ -129,7 +129,7 @@ overlay_item() {
 # Reads globals: $TARGET, $SRC_DIR, $DEST.
 seed_verification_yml() {
   CI_CHECK_PATH=""
-  for candidate in ci-check.sh script/ci-check.sh scripts/ci-check.sh; do
+  for candidate in ci-check.sh ci-checks.sh script/ci-check.sh script/ci-checks.sh scripts/ci-check.sh scripts/ci-checks.sh; do
     if [[ -f "$TARGET/$candidate" ]]; then
       CI_CHECK_PATH="$candidate"
       break
