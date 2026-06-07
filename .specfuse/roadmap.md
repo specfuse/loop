@@ -21,6 +21,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
+| FEAT-2026-0005 | Combined close for single-gate features     | active   | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
