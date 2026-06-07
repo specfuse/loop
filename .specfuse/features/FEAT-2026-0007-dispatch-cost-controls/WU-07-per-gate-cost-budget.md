@@ -3,8 +3,12 @@ id: FEAT-2026-0007/T07
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 384.022
+cost_usd: 3.609375
+input_tokens: 50
+output_tokens: 20461
 ---
 
 # Per-gate cost budget with `blocked_human` halt

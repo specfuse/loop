@@ -1,6 +1,11 @@
 ---
 gate: 1
 status: open        # open | awaiting_review | passed
+# cost_budget_usd: 5.0   # optional cumulative-cost ceiling (USD).
+# When the sum of `cost_usd` across this gate's done WUs reaches the ceiling,
+# the loop halts to `awaiting_review` between WUs — the mid-WU then runs to
+# completion; the halt fires before the next WU's dispatch. Mirrors the
+# MAX_ATTEMPTS brake, per-gate instead of per-WU.
 ---
 
 # Gate 1 — <name of the milestone this gate proves>

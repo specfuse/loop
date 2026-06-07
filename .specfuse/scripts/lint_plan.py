@@ -97,6 +97,23 @@ def lint(feature_dir: Path) -> list[str]:
     for g in gates:
         gnum = g.get("gate", "?")
         units = g.get("work_units") or []
+
+        # GATE.md cost_budget_usd: optional, must be numeric when present.
+        # Validated independently of work-unit presence so a drafted-but-empty
+        # gate can still declare a budget for its eventual WUs.
+        gate_file_rel = g.get("file")
+        if gate_file_rel:
+            gate_path = feature_dir / gate_file_rel
+            if gate_path.exists():
+                gfm, _ = read_frontmatter(gate_path)
+                if "cost_budget_usd" in gfm:
+                    val = gfm["cost_budget_usd"]
+                    if isinstance(val, bool) or not isinstance(val, (int, float)):
+                        errs.append(
+                            f"{gate_file_rel}: cost_budget_usd must be numeric "
+                            f"(int or float), got {val!r}"
+                        )
+
         # An un-drafted future gate (empty) is fine — it just hasn't been planned yet.
         if not units:
             continue
