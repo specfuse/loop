@@ -944,7 +944,17 @@ sets, and the handoff brief.
 
 ---
 
-## Roadmap-goal verdict — NOT MET; gate 4 follows
+## Roadmap-goal verdict — MET after gate 4
+
+> **Update (2026-06-07, G4-PLAN).** This verdict was originally written by
+> `G3-PLAN` as "NOT MET; gate 4 follows" — see the original analysis below.
+> With gate 4 (T08) complete, the adopted folder now lints clean and all four
+> mechanisms are proven. The verdict updates to **MET after gate 4**. The
+> `## Gate 4 closure` note at the end of this file is the canonical closure
+> record; the analysis under this heading is retained as the gate-3-time
+> reasoning, not the current state.
+
+### Original gate-3-close analysis (retained for trace)
 
 PLAN.md `roadmap_goal`: *"The loop can pick a feature from a target repo's
 GitHub issues (specfuse:feature) and grind it through its gate cycle,
@@ -1299,3 +1309,143 @@ The feature-arc retrospective (written by G3-PLAN) declared the roadmap goal
 proven against real GitHub infrastructure. The single bounded gap (ATX-heading
 format) is closed.
 
+---
+
+# Gate 4 closure — FEAT-2026-0003
+
+Author: `FEAT-2026-0003/G4-PLAN` (Opus), terminal-case branch A.
+Date: 2026-06-07.
+
+---
+
+## Roadmap-goal verdict — MET
+
+PLAN.md `roadmap_goal`: *"The loop can pick a feature from a target repo's
+GitHub issues (specfuse:feature) and grind it through its gate cycle,
+alongside today's locally-authored features."*
+
+All four mechanisms that compose the goal are now proven live against
+`RestoManagerApp/Backend#287` (`INIT-2026-0001/F06`):
+
+| Mechanism | Status | Evidence |
+|---|---|---|
+| Pick (discovery) | ✓ | Gate 3 smoke — 13 candidates enumerated, #287 row parsed correctly (`SMOKE-INIT-2026-0001-F06.md` §Discovery) |
+| Adopt (scaffold) | ✓ | Gate 3 smoke — `INIT-2026-0001-F06-conform-publishroster-to-validated-spec/` written, body embedded, slug encoding worked (`SMOKE-INIT-2026-0001-F06.md` §Adopt) |
+| Report back | ✓ | Gate 3 smoke — `state:ready → in-progress → done → ready` fired exactly against the live GitHub API, fully reverted, no residue (`SMOKE-INIT-2026-0001-F06.md` §Label transitions) |
+| **Grind (lint-clean)** | **✓** | **Gate 4 T08 — `lint_plan.py` ATX-heading widening landed in commit `c19870e`; the already-adopted `INIT-2026-0001-F06-…` folder now exits lint 0 (T08 AC 3, verified by the driver as a precondition for `status: complete`)** |
+
+The pipeline is whole. The capability demonstrably picks an
+orchestrator-dispatched feature, scaffolds it into a dispatchable folder,
+emits the lifecycle signals the orchestrator observes, and lints clean so
+the loop's normal grind can take over from there.
+
+---
+
+## Why this is closure, not "close enough"
+
+The gate-3 arc retrospective made the contrary case explicit: a capability
+that demos in three steps and stalls on the fourth contradicts its own
+roadmap statement. Gate 4 closed the fourth step at the narrowest possible
+scope — one regex constant in `lint_plan.py`, three test cases, a re-lint
+of the already-adopted folder. No new architecture, no new seams, no
+cross-repo coordination. The fix landed in 2m54s and 7,826 output tokens
+(the smallest substantive WU in this feature).
+
+The proof stayed contiguous: the smoke that produced the finding, the
+adopted folder it was verified against, and the linter fix all live on
+one branch under one PR sequence. Splitting into `FEAT-2026-0004` would
+have re-discovered the same finding from scratch and severed the
+"this regex caused that lint failure, and this fix resolves it" trace.
+The escalation path G3-PLAN reserved was taken honestly: the evidence
+demanded it, and the scope test passed decisively.
+
+---
+
+## Gate-5 escalation explicitly rejected
+
+Per `WU-105-gate-4-plan-next.md`'s decision rule, a fifth gate would
+require the roadmap goal to remain unmet AND a bounded gate-5 scope to be
+identifiable. Neither condition holds:
+
+- **The goal is met.** The four-mechanism table above cites concrete
+  evidence for each mechanism. No mechanism is partial; no smoke step is
+  outstanding; no adopted-folder lint failure remains.
+- **No bounded gate-5 scope is identifiable.** `GATE-04-REVIEW.md` Q3
+  named case-insensitive section matching as a *potential* future widening
+  but explicitly deferred it out of scope — and no evidence from T08's
+  execution demands it now. The minor observation in the gate-4
+  retrospective (`#+` vs the bounded `#{1,6}` for full CommonMark
+  compliance) is similarly a tightening, not a gap; no real WU body
+  exercises that boundary.
+
+A second consecutive escalation gate would corrode the methodology's
+"feature ends" contract more than gate 4 did. Gate 4 was the exception
+the contract permits; a fifth gate without fresh evidence would normalise
+escalation as the default close-out, which the methodology cautions
+against in the WU-105 prompt itself.
+
+The closing-WU numbering convention from gate-1 LEARNINGS (90+ range so
+closing WUs sort last) is preserved: this WU is `G4-PLAN` (WU-105). No
+follow-on closing-WU range was needed.
+
+---
+
+## What carries forward — to roadmap, not to gate 5
+
+The work that remains lives outside this feature's boundary and belongs to
+the roadmap, not to a fifth gate:
+
+1. **CommonMark-strict ATX (`#{1,6}` vs `#+`)** — observed but not
+   demanded. If a future feature exercises ATX heading depths beyond `######`
+   in WU bodies, tighten the bound. Until then, the union pattern is correct
+   for every issue body the loop will see in practice.
+2. **Case-insensitive section names** — deferred at gate 4 arming time
+   (`GATE-04-REVIEW.md` Q3). If a future orchestrator template emits
+   lowercase headings, address there. No current evidence demands it.
+3. **Skill linter for SKILL.md artifacts** — flagged at gate 2 (`T04`
+   verification only checks code gates). A separate roadmap item if skill
+   quality becomes a consistency problem; not load-bearing for this
+   feature's roadmap goal.
+4. **`adopt_feature.py`'s `_closing_wu()` placeholder bodies** — flagged at
+   gate 2 (G2-RETRO). Adopted features inherit weak closing-WU ACs that
+   G1-PLAN-equivalent has to refine. Cross-cutting improvement, not a
+   gate-4-arc concern.
+
+None of these is a roadmap-goal blocker. All four are quality-of-life or
+forward-design improvements appropriate to roadmap discussion, not to a
+gate-5 extension of this feature.
+
+---
+
+## Methodology takeaway from this arc
+
+The first multi-gate dogfood of the loop proved three things end-to-end:
+
+1. **`plan-next` forward-design works at gate scope.** G1-PLAN drafted gate 2,
+   G2-PLAN drafted gate 3, G3-PLAN drafted gate 4 (terminal-case branch B,
+   the escalation path), and G4-PLAN (this WU) closes the arc. Each gate
+   delivered against the prior gate's plan-next draft with concrete
+   review-document edits flowing into WU ACs (`Q4 → T03 AC 8e`,
+   `Flagged 2 → T06 AC 3`, `Flagged 3 → T05's loop.py:590-591 anchor`).
+2. **The cross-repo verification rule from
+   `[FEAT-2026-0003/G3-LESSONS/multi-gate]` worked prospectively on its
+   first use.** `GATE-04-REVIEW.md`'s Cross-repo contracts table named two
+   UNCHECKED values; the human checked them against the orchestrator's
+   `shared/templates/work-unit-issue.md` before arming; T08 was dispatched
+   with a correct linter target.
+3. **Right-sized gates can be one-WU gates.** Gate 4's single-substantive-WU
+   shape was correct because the scope was genuinely narrow. The methodology
+   does not require artificial inflation to match prior-gate structure.
+
+The feature is ready for closure.
+
+---
+
+## Closure declaration
+
+- **Roadmap goal:** MET.
+- **All four pipeline mechanisms:** proven against real infrastructure.
+- **PLAN.md gates graph:** unchanged (no gate 5 appended).
+- **GATE-05.md / GATE-05-REVIEW.md:** not written (no escalation).
+- **Status:** ready for the human-driven feature-close step (PR review,
+  merge, roadmap-row flip from `active` → `done`).
