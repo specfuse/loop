@@ -23,6 +23,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
+| FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -187,6 +188,70 @@ ceremony worked correctly.
 **Status: done.** `roadmap_goal` met — the loop records each work unit's wall-clock
 execution time alongside the cost it already captures. See
 `RETROSPECTIVE.md §Feature-arc retrospective`.
+
+## FEAT-2026-0007 — Dispatch cost controls
+
+**Why.** Per-WU dispatch cost was growing with no lever to control it. Three
+mechanisms were missing: model-family aliasing (so WU specs don't pin model
+versions), effort-tier control (so cheap work doesn't burn expensive thinking
+budget), and a retry ladder that escalates compute rather than repeating the same
+failed attempt.
+
+**Gate 1 (closing).** Substantive delivery:
+
+- **T01** — Model family aliases: `sonnet`/`opus`/`haiku` in WU frontmatter resolve
+  at dispatch to the latest model in that family; full model IDs still accepted to
+  pin a specific release.
+- **T02** — `effort:` field (`low`/`medium`/`high`/`xhigh`/`max`) wired to
+  `claude -p --effort`; default `medium` when field is absent. `WU.template.md`
+  documents the field as author-controlled.
+- **T03** — Tier-gated caveman preamble: `low`/`medium` effort WUs receive a
+  terseness directive in the dispatched session; `high`+ do not.
+- **T05** — Failure-note size cap: 200 lines / 8000 characters with head+tail
+  truncation and a plain-ASCII truncation marker.
+
+**T04 gap.** The retry escalation ladder (T04) was declared complete and driver
+verification passed, but no production code was written. Required symbols
+(`EFFORT_LADDER`, `effort_for_attempt`, `terseness_for_attempt`) are absent from
+`loop.py`. The `code` gate passed because no new tests were registered and existing
+tests make no assertion about absent functions. This failure mode is documented in
+`RETROSPECTIVE.md`; two `[FEAT-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`
+cover the completeness-guard and function-existence verification gaps. T04's
+implementation was deferred to Gate 2 (T08H).
+
+**Gate 2 (closing sequence in progress).** Substantive delivery:
+
+- **T06** — Defaults-by-WU-type policy: `MODEL_BY_TYPE` and `EFFORT_BY_TYPE`
+  tables in `loop.py` give every WU type a model and effort default; `model:` and
+  `effort:` frontmatter fields become optional overrides rather than required
+  fields. `lint_plan.py` updated to accept absent `model:`. `WU.template.md`
+  frontmatter comments updated. Haiku guidance added to
+  `.specfuse/skills/authoring-work-units/SKILL.md`. Landed in one attempt.
+- **T07** — Per-gate cost budget: `cost_budget_usd` in `GATE-NN.md` sets a
+  cumulative cost ceiling; `gate_budget_usd` / `gate_spent_usd` helpers in
+  `loop.py`; halt-between-WUs semantics (current WU runs to terminal outcome,
+  brake fires before the next dispatch — including closing-sequence WUs).
+  `GATE.template.md` documents the field. Landed in one attempt.
+
+**T08H / T08 gap.** T08H (re-land T04's retry-ladder code) and T08 (telemetry:
+`resolved_model`, `cache_hit_rate`, `gate_summary`) both repeated T04's failure
+mode: each session billed 0 input/output tokens, the driver committed only the WU
+frontmatter status flip, and `status: done` advanced the dependency frontier
+despite no symbols landing. After Gate 2: `EFFORT_LADDER`, `effort_for_attempt`,
+`terseness_for_attempt`, `cache_hit_rate`, and `gate_summary` are absent from
+`loop.py`. The retry escalation ladder and gate-level telemetry are undelivered.
+Two `[FEAT-2026-0007/G2-LESSONS]` entries in `LEARNINGS.md` cover the 0-token
+session gap and the limit of agent-side safeguards.
+
+**Status: done.** Four `roadmap_goal` levers (model alias, effort tier, terseness,
+per-gate budget) all landed and importable; type-default policy layered on top.
+T04 retry ladder and T08 telemetry deferred — three reland attempts (T04, T08H, T08)
+all silently no-op'd via the same 0-token-session failure path. The fix is
+driver-side (refuse-commit on 0 tokens / empty diff / failed smoke-import), not
+spec-side, so it belongs in a successor feature rather than a Gate 3. **Strongly
+recommended next feature: FEAT-2026-0008 "Driver completeness-guard."** See
+`RETROSPECTIVE.md §Feature-arc verdict` for the full terminal rationale and the
+G4-LESSONS three-test analysis.
 
 ## Notes
 

@@ -1,0 +1,34 @@
+---
+id: FEAT-2026-0007/G1-LESSONS
+type: lessons
+model: claude-sonnet-4-6
+status: done
+attempts: 1
+duration_seconds: 90.843
+cost_usd: 0.202246
+input_tokens: 8
+output_tokens: 3300
+---
+
+# Gate 1 lessons learned
+
+**Objective.** Promote the generalizable subset of the retrospective into durable
+entries appended to `.specfuse/LEARNINGS.md` (the root, cross-feature file).
+
+**Context.** Read this feature's `RETROSPECTIVE.md`. `LEARNINGS.md` is read at planning
+time for every future feature — this is the pump that turns one feature's experience
+into better plans for the next. Append only; de-duplicate against existing entries.
+
+**Acceptance criteria.** New entries appended to the root `LEARNINGS.md`, each phrased
+as a reusable rule that would change how a future WU is written or executed (e.g.
+"effort field defaults should be declared by WU type, not assumed at dispatch time"),
+tagged with this gate's ID. Feature-specific observations stay in `RETROSPECTIVE.md`
+and are NOT promoted.
+
+**Do not touch.** Source code, existing LEARNINGS.md entries (append only), the
+retrospective.
+
+**Verification.** The `doc` gates.
+
+**Escalation triggers.** If nothing generalizes beyond this feature, append nothing and
+say why in the RESULT block. Promoting noise is worse than promoting nothing.
