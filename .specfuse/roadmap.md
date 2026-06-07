@@ -217,10 +217,34 @@ verification passed, but no production code was written. Required symbols
 tests make no assertion about absent functions. This failure mode is documented in
 `RETROSPECTIVE.md`; two `[FEAT-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`
 cover the completeness-guard and function-existence verification gaps. T04's
-implementation is a gate 2 prerequisite.
+implementation was deferred to Gate 2 (T08H).
 
-**Status: active.** Gate 1 substantive WUs done (T04 implementation absent — see
-above); closing sequence in progress. Gate 2 WUs drafted by G1-PLAN.
+**Gate 2 (closing sequence in progress).** Substantive delivery:
+
+- **T06** — Defaults-by-WU-type policy: `MODEL_BY_TYPE` and `EFFORT_BY_TYPE`
+  tables in `loop.py` give every WU type a model and effort default; `model:` and
+  `effort:` frontmatter fields become optional overrides rather than required
+  fields. `lint_plan.py` updated to accept absent `model:`. `WU.template.md`
+  frontmatter comments updated. Haiku guidance added to
+  `.specfuse/skills/authoring-work-units/SKILL.md`. Landed in one attempt.
+- **T07** — Per-gate cost budget: `cost_budget_usd` in `GATE-NN.md` sets a
+  cumulative cost ceiling; `gate_budget_usd` / `gate_spent_usd` helpers in
+  `loop.py`; halt-between-WUs semantics (current WU runs to terminal outcome,
+  brake fires before the next dispatch — including closing-sequence WUs).
+  `GATE.template.md` documents the field. Landed in one attempt.
+
+**T08H / T08 gap.** T08H (re-land T04's retry-ladder code) and T08 (telemetry:
+`resolved_model`, `cache_hit_rate`, `gate_summary`) both repeated T04's failure
+mode: each session billed 0 input/output tokens, the driver committed only the WU
+frontmatter status flip, and `status: done` advanced the dependency frontier
+despite no symbols landing. After Gate 2: `EFFORT_LADDER`, `effort_for_attempt`,
+`terseness_for_attempt`, `cache_hit_rate`, and `gate_summary` are absent from
+`loop.py`. The retry escalation ladder and gate-level telemetry are undelivered.
+Two `[FEAT-2026-0007/G2-LESSONS]` entries in `LEARNINGS.md` cover the 0-token
+session gap and the limit of agent-side safeguards.
+
+**Status: active.** Gate 2 substantive WUs done (T08H / T08 implementation absent
+— see above); closing sequence in progress (G2-DOCS → G2-PLAN).
 
 ## Notes
 

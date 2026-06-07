@@ -295,7 +295,9 @@ incomplete or inconsistent artifacts at gate scale.
 
 **Override mechanic.** Set `model: haiku` explicitly in the WU's frontmatter
 to opt in. There is no way to make Haiku the default for a type; the override
-is always per-WU and always deliberate.
+is always per-WU and always deliberate. See `.specfuse/templates/WU.template.md`
+frontmatter notes for the full `model:` and `effort:` field contract, including
+the type-keyed defaults in `MODEL_BY_TYPE` and `EFFORT_BY_TYPE`.
 
 ---
 
@@ -310,10 +312,12 @@ the next edit.
 
 ## Version
 
-**v0.6.** Nine rules + Haiku guidance. v0.6 (this) added the `## Haiku —
-when (and when not)` section — graduated from `[FEAT-2026-0007/T06]`
-after the defaults-by-WU-type policy established that Haiku is opt-in
-only and recommended solely for small `docs`/`lessons` WUs. v0.5 added
+**v0.7.** Added cross-reference in the Haiku section to `WU.template.md`
+frontmatter notes for the full `model:` / `effort:` field contract and
+type-keyed defaults. v0.6 added the `## Haiku — when (and when not)`
+section — graduated from `[FEAT-2026-0007/T06]` after the
+defaults-by-WU-type policy established that Haiku is opt-in only and
+recommended solely for small `docs`/`lessons` WUs. v0.5 added
 §9 (explicit symbol-existence checks and completeness escalation triggers
 in the Verification section when a WU requires new importable functions
 or constants) — graduated from `[FEAT-2026-0007/G1-LESSONS]` after the

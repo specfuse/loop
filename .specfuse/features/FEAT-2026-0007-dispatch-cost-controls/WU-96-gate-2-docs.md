@@ -3,8 +3,12 @@ id: FEAT-2026-0007/G2-DOCS
 type: docs
 model: claude-sonnet-4-6
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 345.756
+cost_usd: 1.06882
+input_tokens: 31
+output_tokens: 16339
 ---
 
 # Gate 2 documentation update
