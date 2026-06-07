@@ -36,6 +36,8 @@ Frontmatter notes (single-repo):
   Default is `medium` when the field is absent. Use `high` or above for
   units with substantial design work; `low` for purely mechanical edits.
   Omitting the field is valid; the driver applies `medium` automatically.
+  `low`/`medium` also enable a terseness directive in the dispatched session;
+  `high`+ leave it off.
 - `status` — the unit's lifecycle position. `draft` is what `plan-next` writes
   for the next gate's units; the human arms them by flipping to `pending`. The
   driver writes `in_progress`, `done`, and `blocked_human`. Other values are

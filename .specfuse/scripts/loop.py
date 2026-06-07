@@ -435,6 +435,18 @@ and bookkeeping. Edit files only. End your turn with the RESULT block defined in
 report honestly.
 """
 
+CAVEMAN_DIRECTIVE = """\
+## Output terseness directive
+Drop articles (a/an/the), filler words (just/really/basically/actually/simply), \
+pleasantries (sure/certainly/of course/happy to), and hedging. \
+Avoid prose narration between tool calls. \
+Omit any end-of-turn summary. \
+Write code blocks and the fenced RESULT block normally — do not abbreviate them. \
+Quote error strings exactly as they appear.
+"""
+
+_CAVEMAN_EFFORT = frozenset({"low", "medium"})
+
 
 def truncate_failure_note(note: str, max_lines: int = 200,
                           max_chars: int = 8000) -> str:
@@ -474,7 +486,9 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
     unexpected shape, usage is None — the result_text is still returned so
     the RESULT-block parser and verify() can do their normal work.
     """
-    prompt = PROMPT_PREAMBLE + "\n\n" + wu.body
+    preamble = (PROMPT_PREAMBLE + "\n\n" + CAVEMAN_DIRECTIVE
+                if wu.effort in _CAVEMAN_EFFORT else PROMPT_PREAMBLE)
+    prompt = preamble + "\n\n" + wu.body
     if failure_note:
         prompt += ("\n\n## Previous attempt failed verification\n"
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
