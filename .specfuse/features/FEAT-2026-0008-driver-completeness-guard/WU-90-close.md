@@ -3,8 +3,12 @@ id: FEAT-2026-0008/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 206.449
+cost_usd: 1.456551
+input_tokens: 31
+output_tokens: 10326
 ---
 
 # Gate 1 close — combined closing ceremony
