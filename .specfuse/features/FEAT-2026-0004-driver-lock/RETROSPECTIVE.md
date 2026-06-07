@@ -128,3 +128,58 @@ express. The current `run()` structure avoids that trap; a future refactor of
 - The WU spec's explicit escalation trigger ("if ordering requires a larger
   refactor, block") was load-bearing: it named the risk precisely enough that the
   agent could confirm it did not fire rather than quietly working around it.
+
+---
+
+## Feature-arc retrospective — FEAT-2026-0004
+
+**Roadmap goal.** *"A second loop driver launched against the same working tree
+exits cleanly instead of racing the first and corrupting state."*
+
+**Verdict: met.** The feature is ready for closure.
+
+### Evidence
+
+1. **Lock enforced at the right site.** `loop.py`'s `run()` calls
+   `acquire_tree_lock()` before `require_git_ready()` and
+   `ensure_feature_branch()` — the first two git-mutating calls. A non-blocking
+   `fcntl.flock(LOCK_EX | LOCK_NB)` on `.specfuse/.loop.lock` raises
+   `BlockingIOError` on contention; the driver prints the contention message to
+   stderr and exits non-zero without touching git or any WU/GATE file. The fd is
+   held in a `run()`-local variable so the kernel auto-releases on process exit,
+   including SIGKILL — no stale-lock cleanup path required.
+
+2. **Contention test passes.** `tests/test_driver_lock.py` covers both contract
+   properties without subprocess dispatch:
+   `test_second_acquire_raises_while_first_held` (exclusion) and
+   `test_second_acquire_succeeds_after_first_released` (release on fd close,
+   simulating process exit).
+
+3. **Lock file gitignored — both surfaces.** This repo's root `.gitignore` line
+   29 contains `.specfuse/.loop.lock`. `init.sh` (lines 391+) idempotently
+   appends the same line to every target repo's `.gitignore` via `grep -qxF
+   "$line" "$file" || echo "$line" >> "$file"` — runs in both INIT and UPGRADE
+   modes, no duplicates on re-run, no over-ignoring of the rest of `.specfuse/`.
+
+4. **`--dry-run` exemption documented.** A one-line comment at the acquire site
+   states that dry-run performs no mutation and inspecting a tree while a real
+   run is active must stay allowed.
+
+### Why no gate 2
+
+Branch B was considered and rejected. The flock approach proved sufficient: the
+two-test contract pass, the WU completed in a single attempt, and no escalation
+trigger fired. The one bounded follow-up that could justify a gate 2 — a portable
+fallback for non-POSIX hosts (Windows) — is out of scope for this feature: the
+WU spec named that as a hard `status: blocked` trigger, not a same-feature
+extension, and the loop's host requirements remain POSIX-only. If Windows
+support is later required, it should be a fresh feature (pidfile + liveness
+check has its own design trade-offs and reintroduces the stale-lock handling
+this design deliberately avoids — categorically a new unit, not a gate
+appendix).
+
+### Closure
+
+PLAN.md's `gates:` graph is unchanged. No `GATE-02.md` or `GATE-02-REVIEW.md`
+was written. The feature is ready for closure on the merits of T01 alone — the
+smallest viable form for a single-fix feature.

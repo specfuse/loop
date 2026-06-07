@@ -2,8 +2,11 @@
 id: FEAT-2026-0004/G1-PLAN
 type: plan-next
 model: claude-opus-4-7
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.936692
+input_tokens: 24
+output_tokens: 4480
 ---
 
 # Gate 1 plan-next — terminal case (single-gate feature closure)
