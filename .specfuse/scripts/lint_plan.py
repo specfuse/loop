@@ -50,6 +50,10 @@ _CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
 #   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 #   Orchestrated:    INIT-YYYY-NNNN/F<NN>, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 # A bare INIT-YYYY-NNNN (no /FNN segment) is NOT a loop feature ID.
+MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
+FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
+
 CORRELATION_ID_RE = re.compile(
     r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|"
     r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$"
@@ -93,6 +97,23 @@ def lint(feature_dir: Path) -> list[str]:
     for g in gates:
         gnum = g.get("gate", "?")
         units = g.get("work_units") or []
+
+        # GATE.md cost_budget_usd: optional, must be numeric when present.
+        # Validated independently of work-unit presence so a drafted-but-empty
+        # gate can still declare a budget for its eventual WUs.
+        gate_file_rel = g.get("file")
+        if gate_file_rel:
+            gate_path = feature_dir / gate_file_rel
+            if gate_path.exists():
+                gfm, _ = read_frontmatter(gate_path)
+                if "cost_budget_usd" in gfm:
+                    val = gfm["cost_budget_usd"]
+                    if isinstance(val, bool) or not isinstance(val, (int, float)):
+                        errs.append(
+                            f"{gate_file_rel}: cost_budget_usd must be numeric "
+                            f"(int or float), got {val!r}"
+                        )
+
         # An un-drafted future gate (empty) is fine — it just hasn't been planned yet.
         if not units:
             continue
@@ -125,10 +146,27 @@ def lint(feature_dir: Path) -> list[str]:
                             f"must match {CORRELATION_ID_RE.pattern}")
             if wfm.get("type") not in VALID_TYPES:
                 errs.append(f"{wfile}: invalid type '{wfm.get('type')}'")
-            if not wfm.get("model"):
-                errs.append(f"{wfile}: missing model")
+            if "model" in wfm:
+                _model = wfm["model"]
+                if not _model:
+                    errs.append(
+                        f"{wfile}: model present but has no value — must be a family alias "
+                        f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
+                    )
+                elif _model not in MODEL_ALIASES and not FULL_MODEL_ID_RE.match(_model):
+                    errs.append(
+                        f"{wfile}: invalid model '{_model}' — must be a family alias "
+                        f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
+                    )
+            # model absent: valid — load_wu applies MODEL_BY_TYPE[type] at dispatch time
             if wfm.get("status") not in VALID_STATUS:
                 errs.append(f"{wfile}: invalid status '{wfm.get('status')}'")
+            _effort = wfm.get("effort")
+            if _effort is not None and _effort not in VALID_EFFORT:
+                errs.append(
+                    f"{wfile}: invalid effort '{_effort}' — must be one of "
+                    f"{sorted(VALID_EFFORT)}"
+                )
             types_in_order.append(wfm.get("type"))
 
             # Dispatchable WUs must have the five mandatory prompt sections.

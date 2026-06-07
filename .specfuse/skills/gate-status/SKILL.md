@@ -53,7 +53,10 @@ For the active feature folder `.specfuse/features/FEAT-YYYY-NNNN-<slug>/`:
 
 - **`PLAN.md`** — feature frontmatter + gates graph. Determines the
   current gate (first one whose `status != passed`).
-- **`GATE-NN.md`** — current gate's status (`open`, `awaiting_review`).
+- **`GATE-NN.md`** — current gate's status (`open`, `awaiting_review`)
+  and optional `cost_budget_usd` field. If `cost_budget_usd` is set,
+  compare it against the sum of `cost_usd` across the gate's `done`
+  WUs to surface budget headroom or overshoot.
 - **WU files** under the gate's `work_units` graph — frontmatter
   `status`, `attempts`, and bodies. Group by status:
   `done`, `in_progress`, `blocked_human`, `pending`, `ready`, `draft`.
@@ -61,6 +64,9 @@ For the active feature folder `.specfuse/features/FEAT-YYYY-NNNN-<slug>/`:
   `human_escalation` / `gate_reached` entries. The
   `human_escalation` entries carry `reason` and `blocked_reason` for
   the blocked WUs (post the Bug 1 fix in bcc9bee, these are durable).
+  A `human_escalation` with `reason: gate_budget_exceeded` means the
+  driver halted the gate to `awaiting_review` before the named WU's
+  dispatch because the cumulative cost reached `cost_budget_usd`.
 - **`work/<WU>/attempt-*.md`** — verify-output evidence for failed
   attempts on spinning-escalated WUs (also durable post-bcc9bee).
 
@@ -184,10 +190,8 @@ WUs have non-pending statuses).
 
 ## Version
 
-**v0.1.** The root-cause categories in §4 (pre-existing out-of-scope,
-missing dependency, spec ambiguity, verification unsuitable, genuine
-WU bug) and the option set (hygiene WU, widen scope, fix out-of-loop,
-rewrite criteria, abandon, add new WU) are the entire diagnosis
-vocabulary today. Expected to grow once more live blocks surface
-categories or options this skill missed. Shared methodology craft
-(loop is near-term author, like the addendum).
+**v0.2.** Added budget-brake fields to §2: `cost_budget_usd` in GATE
+files and the `gate_budget_exceeded` escalation event in `events.jsonl`
+(landed in `FEAT-2026-0007/T07`). v0.1 established root-cause categories
+and option set. Shared methodology craft (loop is near-term author, like
+the addendum).

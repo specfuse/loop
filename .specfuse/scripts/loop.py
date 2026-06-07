@@ -63,8 +63,34 @@ VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
 DRIVER_VERSION = "0.2.0"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
 
-# How to launch a fresh agent. {model} is filled per WU; the prompt is piped on stdin.
-CLAUDE_CMD = ["claude", "-p", "--model", "{model}"]
+# How to launch a fresh agent. {model} and {effort} are filled per WU; prompt is piped on stdin.
+CLAUDE_CMD = ["claude", "-p", "--model", "{model}", "--effort", "{effort}"]
+
+VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
+
+# Family aliases accepted in WU frontmatter's `model:` field.
+# The CLI resolves them to the latest concrete model at dispatch time;
+# the loop passes the value verbatim — no expansion here.
+MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+
+# Defaults applied by load_wu when `model` or `effort` are absent from WU frontmatter.
+# A WU that declares either field explicitly overrides these. Keys cover every VALID_TYPES value.
+MODEL_BY_TYPE = {
+    "implementation": "sonnet",
+    "retrospective":  "sonnet",
+    "lessons":        "sonnet",
+    "docs":           "sonnet",
+    "plan-next":      "opus",
+    "close":          "opus",
+}
+EFFORT_BY_TYPE = {
+    "implementation": "medium",
+    "retrospective":  "low",
+    "lessons":        "low",
+    "docs":           "low",
+    "plan-next":      "high",
+    "close":          "high",
+}
 
 # Which verification gate set (a key in verification.yml) applies to each WU type.
 GATES_FOR_TYPE = {
@@ -99,6 +125,7 @@ class WorkUnit:
     attempts: int
     title: str
     body: str                  # the prompt handed to the session
+    effort: str = "medium"     # low|medium|high|xhigh|max — passed as --effort to claude -p
 
 
 @dataclass
@@ -203,12 +230,25 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     path = feature_dir / ref["file"]
     fm, body = read_frontmatter(path)
     title_m = re.search(r"^#\s+(.*)$", body, re.MULTILINE)
+    wu_type = fm.get("type", "implementation")
+    effort = fm.get("effort")
+    if effort is None:
+        effort = EFFORT_BY_TYPE.get(wu_type, "medium")
+    elif effort not in VALID_EFFORT:
+        raise ValueError(
+            f"{path}: invalid effort '{effort}' — must be one of "
+            f"{sorted(VALID_EFFORT)}"
+        )
+    wu_model = fm.get("model")
+    if wu_model is None:
+        wu_model = MODEL_BY_TYPE.get(wu_type, "claude-sonnet-4-6")
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
         depends_on=list(ref.get("depends_on", []) or []),
-        type=fm.get("type", "implementation"),
-        model=fm.get("model", "claude-sonnet-4-6"),
+        type=wu_type,
+        model=wu_model,
+        effort=effort,
         status=fm.get("status", "pending"),
         attempts=int(fm.get("attempts", 0)),
         title=title_m.group(1).strip() if title_m else ref["id"],
@@ -373,6 +413,66 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
 
 
+def gate_budget_usd(gate_file: Path) -> float | None:
+    """Return the optional cumulative-cost ceiling declared on a GATE.md.
+
+    Reads `cost_budget_usd` from the GATE file's frontmatter. Returns the float
+    when set, None when the field is absent. A present-but-non-numeric value is
+    a configuration error and raises ValueError naming the gate file — the
+    fail-loud posture matches verify()'s missing-gate-set treatment.
+    """
+    fm, _ = read_frontmatter(gate_file)
+    if "cost_budget_usd" not in fm:
+        return None
+    val = fm["cost_budget_usd"]
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(
+            f"{gate_file}: cost_budget_usd must be numeric, got {val!r}"
+        )
+    return float(val)
+
+
+def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
+    """Sum cost_usd across the gate's done WUs (closing-sequence included).
+
+    Reads each WU file's frontmatter from `gate["work_units"]` and adds
+    `cost_usd` when the WU's status is "done". WUs whose frontmatter omits
+    cost_usd — cost tracking off, or the attempt didn't record a cost —
+    contribute 0.0. `plan` is the feature frontmatter dict and is accepted for
+    signature symmetry with the broader gate-budget helpers; the spent total
+    is derived from WU files alone.
+    """
+    del plan  # signature symmetry — sum is derived from WU files only
+    total = 0.0
+    for ref in gate.get("work_units") or []:
+        wu_file = ref.get("file")
+        if not wu_file:
+            continue
+        wu_path = feature_dir / wu_file
+        if not wu_path.exists():
+            continue
+        fm, _ = read_frontmatter(wu_path)
+        if fm.get("status") != "done":
+            continue
+        cost = fm.get("cost_usd")
+        if isinstance(cost, bool):
+            continue
+        if isinstance(cost, (int, float)):
+            total += float(cost)
+    return total
+
+
+def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
+    """Run-loop predicate: should the per-gate budget brake fire before the
+    next WU dispatch? True when a budget is declared and the gate's spent
+    total has reached or exceeded it. False otherwise (including no budget)."""
+    gate_file = feature_dir / gate["file"]
+    budget = gate_budget_usd(gate_file)
+    if budget is None:
+        return False
+    return gate_spent_usd(plan, gate, feature_dir) >= budget
+
+
 def commit_bookkeeping(paths: list, message: str) -> str | None:
     """Stage specific paths and create a chore(loop) bookkeeping commit.
 
@@ -420,6 +520,46 @@ and bookkeeping. Edit files only. End your turn with the RESULT block defined in
 report honestly.
 """
 
+CAVEMAN_DIRECTIVE = """\
+## Output terseness directive
+Drop articles (a/an/the), filler words (just/really/basically/actually/simply), \
+pleasantries (sure/certainly/of course/happy to), and hedging. \
+Avoid prose narration between tool calls. \
+Omit any end-of-turn summary. \
+Write code blocks and the fenced RESULT block normally — do not abbreviate them. \
+Quote error strings exactly as they appear.
+"""
+
+_CAVEMAN_EFFORT = frozenset({"low", "medium"})
+
+
+def truncate_failure_note(note: str, max_lines: int = 200,
+                          max_chars: int = 8000) -> str:
+    """Return note unchanged when within limits; otherwise head+marker+tail.
+
+    Splits budget 50/50 by line count, clamped by char budget too. Marker is
+    plain ASCII with no triple-backtick so RESULT-block parsing is unaffected.
+    """
+    if len(note) <= max_chars and note.count("\n") < max_lines:
+        return note
+    lines = note.splitlines()
+    n = len(lines)
+    line_budget = min(max_lines, n - 1)
+    head_count = line_budget // 2
+    tail_count = line_budget - head_count
+    half_char_budget = max_chars // 2
+    while head_count > 0 and sum(len(ln) + 1 for ln in lines[:head_count]) > half_char_budget:
+        head_count -= 1
+    while tail_count > 0 and sum(len(ln) + 1 for ln in lines[n - tail_count:]) > half_char_budget:
+        tail_count -= 1
+    head_lines = lines[:head_count]
+    tail_lines = lines[n - tail_count:] if tail_count > 0 else []
+    elided_lines = n - head_count - tail_count
+    elided_chars = len(note) - sum(len(ln) + 1 for ln in head_lines) \
+                             - sum(len(ln) + 1 for ln in tail_lines)
+    marker = f"\n... [{elided_lines} lines / {elided_chars} chars elided] ...\n"
+    return "\n".join(head_lines) + marker + "\n".join(tail_lines)
+
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
              cost_tracking: bool = True) -> tuple[str, dict | None]:
@@ -431,12 +571,16 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
     unexpected shape, usage is None — the result_text is still returned so
     the RESULT-block parser and verify() can do their normal work.
     """
-    prompt = PROMPT_PREAMBLE + "\n\n" + wu.body
+    preamble = (PROMPT_PREAMBLE + "\n\n" + CAVEMAN_DIRECTIVE
+                if wu.effort in _CAVEMAN_EFFORT else PROMPT_PREAMBLE)
+    prompt = preamble + "\n\n" + wu.body
     if failure_note:
         prompt += ("\n\n## Previous attempt failed verification\n"
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
-                   "do not repeat the same approach.\n\n" + failure_note)
-    cmd = [p.replace("{model}", wu.model) for p in CLAUDE_CMD]
+                   "do not repeat the same approach.\n\n"
+                   + truncate_failure_note(failure_note))
+    cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
+           for p in CLAUDE_CMD]
     if cost_tracking:
         cmd += ["--output-format", "json"]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
@@ -687,6 +831,36 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         if not pending:
             break
         for wu in pending:  # sequential v1; the frontier is independent -> fan-out later
+            # Per-gate cost budget brake — halt-between-WUs.
+            # Mirrors MAX_ATTEMPTS' shape (a brake, not an estimator). Fires
+            # before the next WU's set_wu(in_progress) so an in-progress WU
+            # always runs to a terminal outcome (squash contract intact).
+            # Skipped when the gate is already awaiting_review: the closing
+            # sequence already flipped the gate; the reviewer will observe the
+            # overshoot via the spent vs budget numbers in the next review.
+            if not dry_run and gate.status != "awaiting_review":
+                gate_dict = {"file": gate.file.name, "work_units": gate.refs}
+                if _should_halt_for_budget(feat_fm, gate_dict, feature_dir):
+                    budget = gate_budget_usd(gate.file)
+                    spent = gate_spent_usd(feat_fm, gate_dict, feature_dir)
+                    backend.set_gate(gate, "awaiting_review")
+                    flush_events(events_path, [build_event(
+                        "human_escalation", feature_id, {
+                            "reason": "gate_budget_exceeded",
+                            "budget_usd": budget,
+                            "spent_usd": round(spent, 6),
+                            "next_wu_id": wu.wu_id,
+                        })])
+                    commit_bookkeeping(
+                        [gate.file, events_path],
+                        f"chore(loop): gate {gate.number} budget exceeded "
+                        f"— awaiting_review\n\nFeature: {feature_id}",
+                    )
+                    print(f"\nGate {gate.number} budget exceeded: spent "
+                          f"${spent:.4f} >= budget ${budget:.4f}. "
+                          f"Halted before {wu.wu_id}.")
+                    return 1
+
             print(f"\n-- {wu.wu_id} [{wu.type}] model={wu.model}")
             if dry_run:
                 print("   (dry run — would dispatch)")
