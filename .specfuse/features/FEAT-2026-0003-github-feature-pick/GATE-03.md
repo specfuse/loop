@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: open
+status: awaiting_review
 ---
 
 # Gate 3 — Report back + end-to-end smoke
