@@ -8,9 +8,8 @@
 > **This supersedes the earlier Model-A proposal** (an earlier revision of this file that
 > proposed folding gate identification / `plan-next` / per-gate `plan_review` into the PM agent as
 > a `v1.7.0` behavioral change). That fold-in was **not adopted**; the PM does not gain gate
-> machinery. See [`gate-placement-proposal.md`](../../RestoManagerApp/orchestrator/docs/gate-placement-proposal.md)
-> (Model A vs B, decision criteria) and [`naming-convention.md`](../../RestoManagerApp/orchestrator/docs/naming-convention.md)
-> for the canonical contracts.
+> machinery. See the orchestrator repo's `docs/gate-placement-proposal.md` (Model A vs B, decision
+> criteria) and `docs/naming-convention.md` for the canonical contracts.
 
 ---
 
