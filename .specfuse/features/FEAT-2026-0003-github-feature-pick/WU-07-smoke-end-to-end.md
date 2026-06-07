@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/T07
 type: implementation
 model: claude-sonnet-4-6
-status: blocked_human
+status: done
 ---
 
 # Live end-to-end smoke — adopt INIT-2026-0001/F06 and observe label transitions
