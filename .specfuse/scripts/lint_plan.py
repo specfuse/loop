@@ -38,18 +38,21 @@ import _miniyaml  # noqa: E402
 
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
-VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next"}
+VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close"}
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
+# All WU types that count as closing work — the four-WU sequence members
+# plus the single-session `close` alternative (single-gate features only).
+_CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
 # Correlation-ID pattern — canonical, mirroring `.specfuse/rules/correlation-ids.md`.
 # Two namespaces:
 #   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 #   Orchestrated:    INIT-YYYY-NNNN/F<NN>, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 # A bare INIT-YYYY-NNNN (no /FNN segment) is NOT a loop feature ID.
 CORRELATION_ID_RE = re.compile(
-    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?|"
-    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?)$"
+    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|"
+    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$"
 )
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the
 # template but not hard-required here.
@@ -85,6 +88,7 @@ def lint(feature_dir: Path) -> list[str]:
     graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
     all_ids = {wu["id"] for g in gates for wu in (g.get("work_units") or [])}
+    nonempty_gates_count = sum(1 for g in gates if g.get("work_units"))
 
     for g in gates:
         gnum = g.get("gate", "?")
@@ -134,11 +138,21 @@ def lint(feature_dir: Path) -> list[str]:
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
 
-        # Closing sequence present and in order at the tail of the gate.
-        closing_found = [t for t in types_in_order if t in CLOSING_SEQUENCE]
-        if closing_found != CLOSING_SEQUENCE:
-            errs.append(f"gate {gnum}: closing sequence must be exactly "
-                        f"{CLOSING_SEQUENCE} in order; found {closing_found}")
+        # Closing: either the four-WU sequence or a single `close` WU (single-gate only).
+        closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]
+        if closing_found == ["close"]:
+            if nonempty_gates_count != 1:
+                errs.append(
+                    f"gate {gnum}: `close` WU is only valid in single-gate features "
+                    f"({nonempty_gates_count} non-empty gates found); "
+                    f"multi-gate features must use {CLOSING_SEQUENCE}"
+                )
+        elif closing_found != CLOSING_SEQUENCE:
+            errs.append(
+                f"gate {gnum}: closing sequence must be exactly "
+                f"{CLOSING_SEQUENCE} in order (or a single `close` WU for "
+                f"single-gate features); found {closing_found}"
+            )
 
     return errs
 

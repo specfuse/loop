@@ -24,7 +24,9 @@ Two namespaces, four canonical shapes:
   - Substantive units use `TNN` — `T` followed by a zero-padded two-digit ordinal,
     unique within the feature. Example: `FEAT-2026-0042/T07`.
   - Closing-sequence units use `G<n>-<NAME>` — `G`, the gate number, a hyphen, and
-    one of `RETRO`, `LESSONS`, `DOCS`, `PLAN`. Example: `FEAT-2026-0042/G1-RETRO`.
+    one of `RETRO`, `LESSONS`, `DOCS`, `PLAN` (four-WU closing sequence) or `CLOSE`
+    (single-gate `close` alternative). Example: `FEAT-2026-0042/G1-RETRO`;
+    `FEAT-2026-0042/G1-CLOSE` for a single-gate feature using the `close` type.
   - **Hygiene units** use `TNNH[N…]` — the *target* substantive WU's ordinal
     followed by a literal `H`, optionally suffixed with an ordinal when more
     than one hygiene WU precedes the same target. Example: `FEAT-2026-0042/T07H`
@@ -56,7 +58,7 @@ Collisions between the two namespaces are structurally impossible.
 The combined pattern accepted across all shapes is:
 
 ```
-^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?)$
+^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$
 ```
 
 A string that does not match is malformed.
@@ -121,10 +123,13 @@ year starts fresh at `0001`.
 **Task-level.** Within a feature, substantive units start at `T01` and increment by
 one. Padding is always two digits, which caps a feature at `T99`; that ceiling is
 unlikely to bind, and if it does, raise an escalation rather than invent a new
-format. Closing-sequence IDs are mechanical: `G<gate>-RETRO`, `G<gate>-LESSONS`,
-`G<gate>-DOCS`, `G<gate>-PLAN`, one of each per gate, in that order. The session
-running `plan-next` mints the next gate's substantive IDs as drafts; the human
-arms them.
+format. Closing-sequence IDs are mechanical. For the four-WU sequence: `G<gate>-RETRO`,
+`G<gate>-LESSONS`, `G<gate>-DOCS`, `G<gate>-PLAN`, one of each per gate, in that
+order. For the single-gate `close` alternative: a single `G<gate>-CLOSE` ID
+replaces all four. The session running `plan-next` mints the next gate's
+substantive IDs as drafts; the human arms them. When adding a new closing WU
+type to `lint_plan.py`, also add its `<NAME>` segment to `CORRELATION_ID_RE` so
+the new IDs pass validation.
 
 Do not reuse an ordinal even after a unit is abandoned. Once an ID has appeared in
 the event log, it is spent. Reusing it would make history ambiguous.
@@ -145,8 +150,9 @@ The seventh substantive unit in that feature's gate 1:
 - Commit trailer on the squashed commit: `Feature: FEAT-2026-0042/T07`
 - Event entries: `correlation_id: FEAT-2026-0042/T07`
 
-Gate 1's closing sequence: `FEAT-2026-0042/G1-RETRO`, `G1-LESSONS`, `G1-DOCS`,
-`G1-PLAN`, in that fixed order.
+Gate 1's closing sequence (four-WU form): `FEAT-2026-0042/G1-RETRO`,
+`G1-LESSONS`, `G1-DOCS`, `G1-PLAN`, in that fixed order. For a single-gate
+feature using the `close` alternative: `FEAT-2026-0042/G1-CLOSE` alone.
 
 ## Failure modes
 

@@ -314,3 +314,41 @@ promoted here.
   structural claim — name the specific site, the condition, and what a
   violating scenario looks like — so the agent can report "trigger checked,
   did not fire" rather than omitting the check entirely.
+
+- [FEAT-2026-0005/G1-LESSONS] Closing-ceremony weight should scale with
+  feature size. The four-WU closing sequence (RETRO → LESSONS → DOCS → PLAN)
+  is the right default for multi-gate features, where each gate accumulates
+  enough state to justify independent retrospective and planning steps. A
+  single-gate feature produces a thin closing sequence that costs more in
+  ceremony overhead than it yields in structured value. Rule: when a feature
+  is scoped to a single gate from the start, use the `close` WU type to
+  collapse the closing sequence into one dispatch. This is not a shortcut —
+  the `close` WU still requires the full set of closing artifacts
+  (RETROSPECTIVE.md, LEARNINGS.md entries, docs/roadmap reconciliation,
+  terminal verdict); it eliminates the four-way dispatch overhead, not the
+  obligations.
+
+- [FEAT-2026-0005/G1-LESSONS] When a WU adds a new named type to a
+  validation or dispatch system (a WU type, a gate category, a CLI command),
+  the WU's acceptance criteria must explicitly require updating every regex,
+  constant, or enum that references the full set of valid names. Missing one
+  produces a silent correctness gap: the new type works at execution time but
+  fails any validation path that checks names by pattern. T01 added the
+  `close` WU type; the agent correctly updated `CORRELATION_ID_RE` to include
+  the `CLOSE` segment — but this was inferred, not required by the WU AC.
+  Rule: before dispatching a WU that introduces a new named type, enumerate
+  all regex/enum/constant sites that list type names explicitly and add each
+  as a falsifiable AC (e.g. "CORRELATION_ID_RE includes CLOSE segment").
+
+- [FEAT-2026-0005/G1-LESSONS] The two-case linter-guard test pattern
+  ([FEAT-2026-0003/G2-LESSONS]: accept valid, reject malformed) needs a third
+  case when the change modifies a guard that previously accepted an existing
+  class of artifacts: a regression test on a pre-existing valid fixture.
+  Without it, a conditional branch added to handle the new case can
+  accidentally shadow or break the original acceptance path. T01's third test
+  (`test_four_wu_closing_sequence_still_passes`) used the live
+  `FEAT-2026-0001-health-endpoint` fixture and confirmed that four-WU features
+  still lint cleanly after the `close` branch was added. Rule: when a WU
+  modifies a validation guard that previously accepted a class of inputs, add
+  "regression on existing valid fixture" as an explicit AC — name a specific
+  existing fixture and assert the linter still exits 0 on it.
