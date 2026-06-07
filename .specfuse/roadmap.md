@@ -22,6 +22,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
+| FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -160,7 +161,32 @@ This feature itself closes with the four-WU sequence — the `close` type does n
 exist when this feature's driver loads `loop.py`. FEAT-2026-0006 is the first
 feature to use the new `close` WU.
 
-**Status: active.** Single-gate feature; closing sequence in progress.
+**Status: done.** Single-gate feature. FEAT-2026-0006 is the first feature to use
+the new `close` WU.
+
+## FEAT-2026-0006 — WU execution-time tracking
+
+**Why.** The loop already captured cost per WU; wall-clock execution time was missing.
+Adding duration alongside cost gives operators a complete picture of WU weight (both
+money and time) in `events.jsonl` and the WU frontmatter.
+
+**Gate 1 (passed).** `loop.py` measures each attempt's wall-clock time with
+`time.monotonic()` (start at dispatch, stop after verification) and records
+`duration_seconds` per-attempt in `events.jsonl`'s `attempts_usage` list. Cumulative
+`duration_seconds` (rounded to 3 decimals) is written to the WU's frontmatter at
+outcome time (PASS / BLOCKED / SPINNING), independent of the `cost_tracking` setting.
+`WU.template.md` documents the field as driver-owned. Tests cover per-attempt capture,
+cumulative summing across a failed-then-passed sequence, frontmatter write, and
+`cost_tracking: false` independence. All acceptance criteria met in one attempt (~$1.00,
+~5 min). GATE-01 status: `passed`.
+
+This feature is also the first live use of FEAT-2026-0005's `close` WU type —
+closing in a single dispatch rather than the four-WU sequence. The combined close
+ceremony worked correctly.
+
+**Status: done.** `roadmap_goal` met — the loop records each work unit's wall-clock
+execution time alongside the cost it already captures. See
+`RETROSPECTIVE.md §Feature-arc retrospective`.
 
 ## Notes
 
