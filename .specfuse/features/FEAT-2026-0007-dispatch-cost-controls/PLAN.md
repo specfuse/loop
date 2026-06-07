@@ -84,7 +84,36 @@ gates:
         depends_on: [FEAT-2026-0007/G1-DOCS]
   - gate: 2
     file: GATE-02.md
-    work_units: []     # drafted by Gate 1's plan-next from Gate 1 telemetry
+    work_units:
+      - id: FEAT-2026-0007/T06
+        file: WU-06-defaults-by-wu-type.md
+        depends_on: []
+      - id: FEAT-2026-0007/T07
+        file: WU-07-per-gate-cost-budget.md
+        depends_on: []
+      - id: FEAT-2026-0007/T08H
+        file: WU-08H-relan-retry-ladder.md
+        depends_on: []
+      - id: FEAT-2026-0007/T08
+        file: WU-08-telemetry-extension.md
+        depends_on: [FEAT-2026-0007/T06, FEAT-2026-0007/T08H]
+      # --- mandatory closing sequence ---
+      - id: FEAT-2026-0007/G2-RETRO
+        file: WU-94-gate-2-retrospective.md
+        depends_on:
+          - FEAT-2026-0007/T06
+          - FEAT-2026-0007/T07
+          - FEAT-2026-0007/T08H
+          - FEAT-2026-0007/T08
+      - id: FEAT-2026-0007/G2-LESSONS
+        file: WU-95-gate-2-lessons.md
+        depends_on: [FEAT-2026-0007/G2-RETRO]
+      - id: FEAT-2026-0007/G2-DOCS
+        file: WU-96-gate-2-docs.md
+        depends_on: [FEAT-2026-0007/G2-LESSONS]
+      - id: FEAT-2026-0007/G2-PLAN
+        file: WU-97-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0007/G2-DOCS]
 ```
 
 ## Notes

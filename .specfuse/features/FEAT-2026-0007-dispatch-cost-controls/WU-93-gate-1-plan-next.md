@@ -2,8 +2,12 @@
 id: FEAT-2026-0007/G1-PLAN
 type: plan-next
 model: claude-opus-4-7
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 477.568
+cost_usd: 2.444873
+input_tokens: 30
+output_tokens: 30401
 ---
 
 # Plan the next gate
