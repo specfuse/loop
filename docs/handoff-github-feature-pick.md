@@ -53,9 +53,9 @@ initiative      orchestrator top; cross-repo            INIT-YYYY-NNNN
 
 ## 3. What to build
 
-**Delivery status (as of gate 3):** All four steps shipped. Step 3 uses the existing
-loop unchanged. Step 4 delivered in gate 3 — see §3.4 for as-built details and the
-one outstanding finding (lint-format gap) blocking a fully clean end-to-end grind.
+**Delivery status (as of gate 4):** All four steps shipped and all four pipeline
+mechanisms proven live. Step 3 uses the existing loop unchanged. Step 4 delivered in
+gate 3; lint-format gap resolved in gate 4 — see §3.4 for as-built details.
 
 A GitHub feature-pick capability for the loop. Behaviorally:
 
@@ -129,21 +129,20 @@ A GitHub feature-pick capability for the loop. Behaviorally:
    | Discovery (`gh_features.py RestoManagerApp/Backend`) | **PASS** — 13 candidates; `#287` parsed correctly |
    | Adopt (`adopt_feature.py RestoManagerApp/Backend 287`) | **PASS** — folder + encoding + body embed worked |
    | Report-back (label transitions against live `#287`) | **PASS** — `state:ready → in-progress → done`; fully restored |
-   | Adopted-folder lint (`lint_plan.py`) | **FINDING** — see below |
+   | Adopted-folder lint (`lint_plan.py`) | **PASS** (gate 4) — ATX-heading fix shipped |
 
-   **Outstanding finding — lint-format gap:** `#287`'s body contains all five mandatory
-   sections but uses `## ATX` Markdown headings (`## Context`, `## Acceptance criteria`,
-   …). The loop's `lint_plan.py` section detector matches `^(\**)<section>` (bold or plain
-   text) and does **not** recognise `## ATX` headings. An issue body embedded verbatim by
-   `adopt_feature.py` therefore fails the linter despite being structurally complete. This
-   blocks a clean end-to-end grind for any adopted feature whose body uses ATX headings.
+   **Gate-4 resolution — lint-format gap closed:** `#287`'s body contains all five
+   mandatory sections as `## ATX` Markdown headings (`## Context`, `## Acceptance
+   criteria`, …). The loop's `lint_plan.py` section detector previously matched only
+   `^(\**)<section>` (bold or plain text). Gate 4 (T08) broadened the pattern to a
+   union `^(?:#+\s*|\**)` that accepts both ATX headings and bold-preamble. An issue
+   body embedded verbatim by `adopt_feature.py` now lints clean. Existing bold-headed
+   WU bodies remain clean (regression guard). Fix option 1 was implemented: broadening
+   `lint_plan.py` (loop-side, smallest blast radius). The adopted
+   `INIT-2026-0001-F06-…` folder exits `lint_plan.py` with status 0.
 
-   **Fix options** (tracked for follow-on; decision by G3-PLAN):
-   1. **Broaden `lint_plan.py`** to accept ATX headings — smallest, loop-side, recommended.
-   2. **Normalize headings in `adopt_feature.py`** when embedding (`## X` → `**X.**`).
-   3. **Fix the orchestrator issue-body template** to emit bold sections (cross-surface).
-
-   Evidence: `SMOKE-INIT-2026-0001-F06.md` (smoke journal) and `RETROSPECTIVE.md §T07`.
+   Evidence: `SMOKE-INIT-2026-0001-F06.md` (smoke journal), `RETROSPECTIVE.md §T08`,
+   and commit `c19870e`.
 
 ### Decisions already locked (don't re-litigate)
 - **Uniform:** every dispatched unit IS a loop feature; small ones are trivially single-gate /

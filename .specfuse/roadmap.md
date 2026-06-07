@@ -19,7 +19,7 @@ installation a target project copies via `init.sh`.
 | Feature ID     | Title                                       | Status   | Folder |
 |----------------|---------------------------------------------|----------|--------|
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
-| FEAT-2026-0003 | GitHub feature-pick for the loop            | active   | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
+| FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -98,15 +98,19 @@ canonical `state:ready → state:in-progress → state:done` scheme, factory sel
 `source_issue_url` is present in PLAN.md frontmatter (T06); live smoke of `INIT-2026-0001/F06`
 (`RestoManagerApp/Backend#287`) run out-of-loop by human operator — discovery, adopt, and
 report-back all PASS, `#287` fully restored post-smoke (T07). **Finding:** the adopted folder
-fails `lint_plan.py` because orchestrator issue bodies use `## ATX` headings; the linter only
-recognises `**bold**`/plain. This blocks a clean end-to-end grind. Fix deferred to a follow-on
-(gate 4 or `FEAT-2026-0004`). GATE-03 status: `passed`.
+failed `lint_plan.py` because orchestrator issue bodies use `## ATX` headings; the linter only
+recognised `**bold**`/plain. Fix delivered in gate 4. GATE-03 status: `passed`.
 
-**Status: active.** Gates 1, 2, and 3 done. Feature remains `active`: the lint-format gap
-surfaced in T07's smoke (`## ATX` headings not recognised by `lint_plan.py`) blocks a fully
-clean end-to-end grind. The roadmap goal ("pick a feature and grind it through the gate cycle")
-is partially met — discovery, adopt, and report-back are proven live; the grind path requires
-the lint fix first. See `RETROSPECTIVE.md §Multi-gate proof` and `SMOKE-INIT-2026-0001-F06.md`.
+**Gate 4 (passed).** ATX-heading linter fix: broadened `lint_plan.py`'s mandatory-section
+detector to a union pattern (`^(?:#+\s*|\**)`) that accepts both Markdown ATX headings
+(`## Context`) and the existing bold-preamble (`**Context.**`) form (T08). The adopted
+`INIT-2026-0001-F06-…` folder now passes `lint_plan.py` exit-0, and existing bold-headed WU
+bodies remain clean (regression guard). GATE-04 status: `passed`.
+
+**Status: done.** All four gates passed. All four pipeline mechanisms — discover, adopt,
+report-back, lint-clean grind — are proven live against `RestoManagerApp/Backend#287`. The
+`roadmap_goal` is met. See `RETROSPECTIVE.md §Feature-arc retrospective` and
+`SMOKE-INIT-2026-0001-F06.md`.
 
 ## Notes
 
