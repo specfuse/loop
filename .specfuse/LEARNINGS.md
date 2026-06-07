@@ -399,3 +399,37 @@ promoted here.
   readers. Rule: when a chain of WUs progressively refines a shared artifact,
   document the inheritance relationship explicitly in each WU's Context section so
   the dependency is auditable without reading commit history.
+
+- [FEAT-2026-0007/G2-LESSONS] A WU session that bills 0 input/output tokens has
+  produced nothing — but the driver currently commits it as `done` because the
+  WU frontmatter status flip is the only staged change, and the code gate passes
+  on the unchanged codebase. T08H (a hygiene WU with three explicit safeguards)
+  repeated T04's exact failure via this path: 0 tokens, 225 s elapsed, status
+  flipped to done, no symbols written. Rule: the driver must treat a 0-token WU
+  session as a failed attempt, not a completed one. Until the driver enforces
+  this, plan-next WUs should add a sentinel AC: "events.jsonl must show
+  `input_tokens > 0` for this WU; if it does not, re-dispatch from scratch."
+
+- [FEAT-2026-0007/G2-LESSONS] Agent-side safeguards (smoke-import checks in AC,
+  completeness escalation triggers) are bypassed when the agent session crashes
+  or produces 0 tokens before reaching those checks. T08H carried AC 9 (explicit
+  smoke-import check) and two escalation triggers — none fired because the session
+  generated no output at all. The G1-LESSONS entries on smoke checks and
+  completeness triggers remain necessary; they are not sufficient. Rule: for any
+  WU that re-lands symbols that previously failed silently (a hygiene WU),
+  include a plan-next note requesting a driver-side pre-dependency-unlock check:
+  run the WU's declared smoke-import command from the Verification section before
+  advancing the dependency frontier. Agent-side guards catch reasoning failures;
+  driver-side checks catch session crashes.
+
+- [FEAT-2026-0007/G2-LESSONS] A gate that introduces a new enforcement mechanism
+  (budget brake, slot cap, rate limiter) cannot exercise that mechanism against
+  itself — the GATE.md for the implementing gate is authored before the code
+  lands, and setting a budget against a gate mid-flight is undefined. T07
+  introduced `cost_budget_usd` and the brake was never fired in Gate 2 because
+  GATE-02.md had no budget field. Rule: when a plan-next WU details a gate whose
+  substantive WUs include a new enforcement mechanism, add a note to the gate
+  review document: "set `cost_budget_usd` (or equivalent) in GATE-N+1.md before
+  arming the next gate to exercise this mechanism for the first time." The
+  implementing gate's own GATE.md is intentionally left without a budget; the
+  first exercise belongs to the successor.
