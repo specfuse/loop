@@ -2,8 +2,11 @@
 id: FEAT-2026-0006/G1-CLOSE
 type: close
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.54782
+input_tokens: 1194
+output_tokens: 10418
 ---
 
 # Gate 1 close — combined closing ceremony
