@@ -5,7 +5,7 @@ slug: driver-lock
 branch: feat/FEAT-2026-0004-driver-lock
 roadmap_goal: A second loop driver launched against the same working tree exits cleanly instead of racing the first and corrupting state.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: Single-driver working-tree lock
