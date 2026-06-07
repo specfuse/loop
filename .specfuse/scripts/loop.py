@@ -46,6 +46,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -357,8 +358,13 @@ def acquire_tree_lock(specfuse_dir: Path):
 
 
 def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
-    """Write cumulative cost/token fields to the WU's frontmatter at outcome
-    time. No-op if no usage was captured (cost_usd is 0 and no tokens)."""
+    """Write cumulative cost/token/duration fields to the WU's frontmatter at
+    outcome time. duration_seconds is always written when present; cost/token
+    fields are written only when a positive cost_usd or non-zero token counts
+    were captured."""
+    if "duration_seconds" in cum_usage:
+        backend.set_wu(wu, "duration_seconds",
+                       round(cum_usage["duration_seconds"], 3))
     if cum_usage.get("cost_usd", 0) <= 0 and not cum_usage.get("input_tokens") \
             and not cum_usage.get("output_tokens"):
         return
@@ -702,20 +708,28 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             # Cost accumulators: per-attempt list goes to events.jsonl,
             # cumulative sum to WU frontmatter at outcome time.
             attempts_usage: list[dict] = []
-            cum_usage = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0}
+            cum_usage = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0,
+                         "duration_seconds": 0.0}
 
             failure_note = None
             for attempt in range(1, MAX_ATTEMPTS + 1):
                 backend.set_wu(wu, "attempts", attempt)
                 print(f"   attempt {attempt}/{MAX_ATTEMPTS} — fresh session")
+                t0 = time.monotonic()
                 outcome, payload, usage = execute_unit_attempt(
                     wu, feature_dir, failure_note, cost_tracking=cost_tracking,
                 )
+                duration = round(time.monotonic() - t0, 3)
+                attempt_record: dict = {"attempt": attempt,
+                                        "duration_seconds": duration}
                 if usage:
-                    attempts_usage.append({"attempt": attempt, **usage})
+                    attempt_record.update(usage)
                     cum_usage["cost_usd"] += float(usage.get("cost_usd", 0.0))
                     cum_usage["input_tokens"] += int(usage.get("input_tokens", 0))
                     cum_usage["output_tokens"] += int(usage.get("output_tokens", 0))
+                attempts_usage.append(attempt_record)
+                cum_usage["duration_seconds"] = round(
+                    cum_usage["duration_seconds"] + duration, 3)
 
                 if outcome == "blocked":
                     # Reset agent work first; THEN write our bookkeeping; THEN
