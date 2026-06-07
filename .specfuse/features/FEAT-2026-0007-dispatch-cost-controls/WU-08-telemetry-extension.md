@@ -3,8 +3,12 @@ id: FEAT-2026-0007/T08
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 79.699
+cost_usd: 0.280266
+input_tokens: 14
+output_tokens: 3257
 ---
 
 # Telemetry extension: `resolved_model`, cache hit rate, gate summary
