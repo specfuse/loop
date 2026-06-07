@@ -24,7 +24,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
-| FEAT-2026-0008 | Driver completeness-guard                   | planned  | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
+| FEAT-2026-0008 | Driver completeness-guard                   | active   | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 

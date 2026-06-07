@@ -5,7 +5,7 @@ slug: driver-completeness-guard
 branch: feat/FEAT-2026-0008-driver-completeness-guard
 roadmap_goal: The driver refuses to commit a WU as `done` when the dispatched session produced no real work, so hollow passes (status-flip-only commits) cannot land.
 autonomy_default: review
-status: planned
+status: active
 ---
 
 # Plan: Driver completeness-guard
