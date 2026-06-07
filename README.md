@@ -76,6 +76,12 @@ python .specfuse/scripts/loop.py --dry-run
 python .specfuse/scripts/loop.py
 ```
 
+> **One driver per working tree.** The driver holds an exclusive advisory lock on
+> `.specfuse/.loop.lock` for the duration of a run; a second driver targeting the
+> same checkout exits immediately with a clear error message. To run two features
+> in parallel, use separate `git worktree` checkouts — each gets its own lock.
+> `--dry-run` is exempt and may run alongside a live driver.
+
 This repository is also a **self-demonstrating reference installation**: its own
 `.specfuse/` contains a worked example feature
 (`features/FEAT-2026-0001-health-endpoint/`). From the repo root you can run:
@@ -108,7 +114,7 @@ specfuse-loop/
 ## Status
 
 Early. The driver, linter, parsing, dependency ordering, draft/arm gating, and
-verification wiring are tested. All three gates of `FEAT-2026-0003` (the loop's
+verification wiring are tested. All four gates of `FEAT-2026-0003` (the loop's
 first real multi-gate feature) have passed:
 
 - **Gate 1 (read path):** `plan-next` drafts a gate you would actually arm — both
@@ -120,14 +126,20 @@ first real multi-gate feature) have passed:
   transitions `state:ready → state:in-progress → state:done` on the GitHub issue as
   the loop grinds; `make_backend(feat_fm)` selects it automatically for adopted
   features. Live smoke of `INIT-2026-0001/F06` (`RestoManagerApp/Backend#287`):
-  discovery, adopt, and report-back all PASS; issue fully restored post-smoke. **One
-  outstanding finding:** adopted folders fail `lint_plan.py` because orchestrator issue
-  bodies use `## ATX` headings while the linter expects `**bold**`/plain — a follow-on
-  fix (`FEAT-2026-0004` or gate 4) will broaden the section detector.
+  discovery, adopt, and report-back all PASS; issue fully restored post-smoke.
+- **Gate 4 (lint fix):** `lint_plan.py`'s mandatory-section detector broadened to a
+  union pattern accepting both ATX headings (`## Context`) and the existing
+  bold-preamble (`**Context.**`) form; adopted orchestrator-issue folders now pass
+  the linter without breaking existing WU bodies.
 
 The multi-gate forward-design model (each gate's `plan-next` drafts the next) is
-proven across three gates; treat the methodology contracts as still-moving until
-more features confirm them.
+proven across four gates.
+
+`FEAT-2026-0004` (single-driver working-tree lock) gate 1 has passed: `loop.py`
+acquires a non-blocking exclusive `fcntl.flock` on `.specfuse/.loop.lock` before
+any git mutation; a contending driver exits non-zero immediately; the lock
+auto-releases on process exit including SIGKILL. `init.sh` adds the targeted
+gitignore line to every repo it initializes. Closing sequence in progress.
 
 ## License
 
