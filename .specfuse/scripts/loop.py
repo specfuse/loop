@@ -240,7 +240,13 @@ class Backend:
 
 
 def make_backend(feat_fm: dict) -> Backend:
-    """Factory — returns a plain Backend today; T06 adds GitHubBackend selection."""
+    """Factory: returns GitHubBackend when source_issue_url is a GitHub issue URL."""
+    source_url = feat_fm.get("source_issue_url", "") or ""
+    # Pattern: https://github.com/<owner>/<repo>/issues/<number>
+    _m = re.match(r"^https://github\.com/([^/]+/[^/]+)/issues/(\d+)$", source_url)
+    if _m:
+        from gh_backend import GitHubBackend  # noqa: E402
+        return GitHubBackend(repo=_m.group(1), issue_number=int(_m.group(2)))
     return Backend()
 
 
