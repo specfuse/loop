@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/G1-LESSONS
 type: lessons
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.170521
+input_tokens: 7
+output_tokens: 3792
 ---
 
 # Gate 1 lessons learned

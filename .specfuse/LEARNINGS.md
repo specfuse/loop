@@ -63,3 +63,44 @@ promoted here.
   scratch files written during a failed attempt won't persist into the next
   attempt's prompt unless the agent explicitly buffers them in the prompt-
   facing failure note that the driver hands to the next attempt.
+
+- [FEAT-2026-0003/G1-LESSONS] State the exact expected file count in the
+  Do-not-touch section (e.g. "exactly three files: X, Y, Z"). An agent that
+  touches one extra file to be helpful does so because the WU did not
+  explicitly forbid it — a numeric bound closes that door without ambiguity.
+  Both T01 (3 files) and T02 (2 new files) finished in one attempt with no
+  scope drift; attribute at least part of that to the explicit count. Rule:
+  every WU's Do-not-touch must name specific paths AND state the total count
+  of files expected to change, so a reviewer reading the diff has a
+  falsifiable scope claim.
+
+- [FEAT-2026-0003/G1-LESSONS] When a WU defines a CLI surface or invokes an
+  external command that returns structured data, the AC must specify three
+  things: (1) the exact fields/keys to request or parse, (2) the output
+  field delimiter (tab, space, comma), and (3) how to render an absent or
+  None optional field (empty string, `-`, or another sentinel). Omitting
+  any of these forces the agent to make a reasonable-but-breaking choice the
+  next consumer inherits silently. T02's CLI printed the Python string
+  `"None"` for a missing `task_type` because the WU said what to print but
+  not how to render absence. A parser expecting an empty field gets the
+  literal four-character string instead.
+
+- [FEAT-2026-0003/G1-LESSONS] Cut gates along the offline/live boundary:
+  a gate whose entire scope can be unit-tested without external systems
+  (network, live auth, real API) can be verified deterministically and
+  atomically by the driver. Live integration belongs in a dedicated later
+  gate. The benefit is not just CI speed — it is that the offline gate's
+  verification is free of flakiness, reproducible across machines, and
+  never blocked by token/quota limits. Rule: when detailing a new gate, ask
+  "can every WU in this gate be tested without a network call?" If yes, mark
+  it offline-first in the PLAN and keep live-integration WUs out of scope
+  for that gate.
+
+- [FEAT-2026-0003/G1-LESSONS] Closing-WU numbering conventions (e.g.
+  "90+ range so they sort last") must live in a binding rule or the
+  `draft-feature` template, not in a PLAN.md comment. A comment in one
+  feature's PLAN is invisible to the next feature's author and produces
+  inconsistent scaffolding. Rule: any implicit scaffold convention that
+  future `draft-feature` runs must reproduce — WU numbering, section
+  ordering, required closing sequence — belongs in `.specfuse/rules/` or
+  the WU authoring guide, and the linter should enforce it if feasible.
