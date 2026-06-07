@@ -90,7 +90,28 @@ gates:
         depends_on: [FEAT-2026-0003/G2-DOCS]
   - gate: 3
     file: GATE-03.md
-    work_units: []     # drafted by gate 2's plan-next
+    work_units:
+      - id: FEAT-2026-0003/T05
+        file: WU-05-backend-lifecycle-hooks.md
+        depends_on: []
+      - id: FEAT-2026-0003/T06
+        file: WU-06-github-backend.md
+        depends_on: [FEAT-2026-0003/T05]
+      - id: FEAT-2026-0003/T07
+        file: WU-07-smoke-end-to-end.md
+        depends_on: [FEAT-2026-0003/T06]
+      - id: FEAT-2026-0003/G3-RETRO
+        file: WU-98-gate-3-retrospective.md
+        depends_on: [FEAT-2026-0003/T05, FEAT-2026-0003/T06, FEAT-2026-0003/T07]
+      - id: FEAT-2026-0003/G3-LESSONS
+        file: WU-99-gate-3-lessons.md
+        depends_on: [FEAT-2026-0003/G3-RETRO]
+      - id: FEAT-2026-0003/G3-DOCS
+        file: WU-100-gate-3-docs.md
+        depends_on: [FEAT-2026-0003/G3-LESSONS]
+      - id: FEAT-2026-0003/G3-PLAN
+        file: WU-101-gate-3-plan-next.md
+        depends_on: [FEAT-2026-0003/G3-DOCS]
 ```
 
 ## Notes
