@@ -235,3 +235,32 @@ promoted here.
   source the human must read before arming. The gate is not armed until
   every item in that section is checked and its entry updated with the
   verified value.
+
+- [FEAT-2026-0003/G4-LESSONS] When a terminal-case plan-next WU evaluates
+  branch-B (extend with an escalation gate) vs opening a new feature, three
+  tests must all pass before gate extension is chosen: (1) **Scope** — the
+  fix fits in hours of work, not a feature's worth; a single WU completing
+  in minutes is well within the threshold. (2) **Contiguous proof** — the
+  smoke evidence, the artifact under fix, and the proposed fix all live on
+  the active branch already; a new feature would re-discover the same
+  evidence from scratch. (3) **Disciplined trigger** — the escalation fired
+  on live, concrete evidence (a specific, reproducible failure against a real
+  artifact), not on speculative risk. If all three pass, extend with a gate.
+  If any fails — scope grows to weeks, evidence requires a fresh branch, or
+  the finding is theoretical — open a new feature instead. Appending gates
+  on weak evidence or large scope corrodes the "feature ends" contract and
+  trains future plan-next WUs to treat gate extension as a low-cost default.
+  T08 closed gate 4 in 2m54s at 7,826 output tokens; the entire fix was
+  one regex + three test cases. That scope is the bar.
+
+- [FEAT-2026-0003/G4-LESSONS] A gate's substantive WU count should match
+  its actual scope, not be inflated to match a prior gate's shape. Gate 4
+  closed the roadmap goal with one substantive WU — the smallest in the
+  feature — plus the standard four-WU closing sequence. No extra WUs were
+  added for structural symmetry with gate 3's three-WU split. The four-WU
+  closing sequence (RETRO → LESSONS → DOCS → PLAN) is fixed scaffolding and
+  applies at every gate regardless of size; what varies is the gate's
+  substantive WU list. Rule: when sizing a gate — especially an escalation
+  gate appended at a terminal case — let the work drive the WU count. A
+  single-WU gate on a genuinely bounded fix is correct methodology, not an
+  indication the gate was rushed or under-designed.
