@@ -35,6 +35,9 @@ isolated behind a seam (see the end of this file).
   scripts/
     loop.py                   # the driver
     lint_plan.py              # structural validator (also plan-next's verification gate)
+    gh_features.py            # list a repo's open specfuse:feature issues as candidates
+    adopt_feature.py          # scaffold a feature folder from a picked GitHub issue
+    gh_backend.py             # GitHubBackend(Backend): state:* label transitions for adopted features
   templates/
     PLAN.template.md  GATE.template.md  WU.template.md
 ```
@@ -55,8 +58,9 @@ pip install pyyaml
 ```
 
 Author a feature folder from the templates (the included `FEAT-2026-0001-health-endpoint`
-is a worked example you can copy and adapt). Then create the feature branch named in
-PLAN.md's frontmatter.
+is a worked example you can copy and adapt), or adopt one from a GitHub `specfuse:feature`
+issue via the `/adopt-feature` skill or `python .specfuse/scripts/adopt_feature.py <repo>
+<issue-number>`. Then create the feature branch named in PLAN.md's frontmatter.
 
 ## The lifecycle
 
@@ -119,11 +123,13 @@ logic. Three things are environment-specific and swap at fold-in:
 
 | Concern        | Single-repo (here)                 | Orchestrator (multi-repo)              |
 |----------------|------------------------------------|----------------------------------------|
-| State backend  | status in WU / GATE file frontmatter | GitHub issue labels + feature registry |
+| State backend  | status in WU / GATE file frontmatter; `GitHubBackend` for adopted features (issue labels) | GitHub issue labels + feature registry |
 | Dispatch       | `loop.py` shells out directly       | inbox files + polling loop             |
 | Branch / merge | one branch, squash per WU           | branch + PR per task, merge watcher    |
 
 The state backend is behind the `Backend` class in `loop.py` — subclass it to write issue
-labels and nothing above it changes. The branch/merge strategy genuinely differs (a
-multi-repo feature cannot be one branch), so it is meant to differ — don't force
-portability there.
+labels and nothing above it changes. `GitHubBackend` (`gh_backend.py`) does this for adopted
+features: `make_backend(feat_fm)` selects `GitHubBackend` when `source_issue_url` is present
+in PLAN.md frontmatter, and transitions `state:ready → state:in-progress → state:done` on the
+GitHub issue as the loop grinds. The branch/merge strategy genuinely differs (a multi-repo
+feature cannot be one branch), so it is meant to differ — don't force portability there.

@@ -1,6 +1,6 @@
 ---
 name: authoring-work-units
-description: How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Lean v0.1; six evidence-backed rules, one per spot a real run has tripped on.
+description: How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Lean; eight evidence-backed rules, one per spot a real run has tripped on.
 ---
 
 # Authoring a work unit
@@ -210,6 +210,35 @@ trustworthy.
 
 ---
 
+## 8. Cross-surface contract values — verify against the source, never invent
+
+When an acceptance criterion names a value that lives in **another system** —
+a GitHub label name, an API field name, an event-schema key, a shared protocol
+constant, a branch/trailer format — that value must be **verified against the
+authoritative source before the gate is armed**, not invented from the feature's
+own internal conventions. An invented value is a silent correctness risk: it
+looks right to the author, satisfies the WU's own AC, passes offline tests, and
+fails only at live/integration time.
+
+- For every AC that references an external system's vocabulary, write a **pre-arm
+  check line** into the WU spec: `verify <value> against <authoritative source>
+  before locking this AC`. The gate review document lists these open
+  verifications; the gate is not armed until each is checked.
+- This blind spot is **systematic in `plan-next` drafts**, not random — a planner
+  drafting a downstream gate will confidently invent plausible, internally
+  consistent cross-repo values it cannot see. So every `plan-next` gate review
+  should carry a **"Cross-repo contracts" table**: each invented value alongside
+  its authoritative source and a checked/unchecked status.
+
+> *Prevents:* the failure observed in `[FEAT-2026-0003/G3-LESSONS]` — a draft
+> invented the report-back labels `loop:in-progress`/`loop:complete`; the correct
+> values were the orchestrator's canonical `state:in-progress`/`state:done`
+> (`naming-convention.md §5.1` + `labels.md`). Caught at gate-3 arming by reading
+> the source; had it shipped, every adopted feature would have reported state on
+> a label namespace the orchestrator's poller never queries.
+
+---
+
 ## This skill distills `.specfuse/LEARNINGS.md`
 
 When a gate's `lessons` work unit surfaces a new authoring rule — one that
@@ -221,8 +250,13 @@ the next edit.
 
 ## Version
 
-**v0.3.** Seven rules. v0.2 added the produces-list companion in §3
-and the hygiene-WU pattern in §7. v0.3 (this) tightened §7 with the
+**v0.4.** Eight rules. v0.4 (this) added §8 (verify cross-surface
+contract values against the authoritative source rather than inventing
+them; carry a "Cross-repo contracts" table in every plan-next gate
+review) — graduated from `[FEAT-2026-0003/G3-LESSONS]` after a draft
+invented GitHub report-back labels that diverged from the orchestrator's
+canonical `state:*` scheme. v0.2 added the produces-list companion in §3
+and the hygiene-WU pattern in §7. v0.3 tightened §7 with the
 canonical `T<NN>H` ID convention (the previous draft left the ID
 shape vague; a live insert had to rename `T1H` to `T04` because the
 linter regex didn't admit it), the explicit PLAN.md wiring step

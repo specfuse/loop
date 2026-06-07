@@ -134,6 +134,52 @@ class TestHygieneIdAdmitted(unittest.TestCase):
             lint_plan.CORRELATION_ID_RE.match("FEAT-2026-0042/T02h"))
 
 
+class TestOrchestratedIdAdmitted(unittest.TestCase):
+    """Orchestrated INIT-YYYY-NNNN/FNN[/TNN] IDs must validate.
+
+    Direct regex tests — no fixture mutation needed since this is a pattern
+    admission change, not a structural one.
+    """
+
+    def test_orchestrated_feature_level_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature"))
+
+    def test_orchestrated_task_substantive_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature/T01"))
+
+    def test_orchestrated_task_hygiene_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature/T02H"))
+
+    def test_orchestrated_task_hygiene_ordinal_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature/T02H1"))
+
+    def test_orchestrated_task_closing_validates(self):
+        self.assertIsNotNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature/G1-RETRO"))
+
+    def test_single_digit_feature_ordinal_rejected(self):
+        # F6 is malformed — feature ordinals are zero-padded to 2 digits.
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("example-init/F6"))
+
+    def test_single_digit_task_ordinal_rejected(self):
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("example-feature/T1"))
+
+    def test_lowercase_feature_ordinal_rejected(self):
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("example-init/f06"))
+
+    def test_bare_initiative_id_rejected(self):
+        # INIT-YYYY-NNNN with no /FNN is an initiative ID, not a loop feature ID.
+        self.assertIsNone(
+            lint_plan.CORRELATION_ID_RE.match("example-init"))
+
+
 class TestLintCliContract(unittest.TestCase):
     """One subprocess test preserving the CLI exit-code contract.
 
