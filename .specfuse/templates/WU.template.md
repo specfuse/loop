@@ -40,6 +40,12 @@ Frontmatter notes (single-repo):
   default). Cumulative across the run's attempts on this WU. Authors
   leave them off; the driver owns them. Per-attempt breakdown lives in
   `events.jsonl`'s outcome event payload.
+- `duration_seconds` — written by the driver at outcome time (PASS /
+  BLOCKED / SPINNING), always, regardless of the `cost_tracking` setting.
+  Wall-clock seconds (monotonic, rounded to 3 decimals) summed across all
+  attempts on this WU. Authors leave it off; the driver owns it.
+  Per-attempt duration also appears in `events.jsonl`'s outcome event
+  payload, in the `attempts_usage` list alongside cost/token fields.
 - `generated_surfaces` — OPTIONAL. Lists paths inside this repo to generated
   files (`_generated/`, `gen-src/`, or the repo's declared equivalent) that
   this unit's acceptance depends on existing and behaving correctly. Empty list

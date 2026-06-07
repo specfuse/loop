@@ -209,9 +209,13 @@ class TestCostTrackingIntegration(unittest.TestCase):
                          if e["event_type"] == "task_completed"
                          and e["correlation_id"] == "FEAT-2026-9202/T01"]
             self.assertEqual(len(completed), 1)
-            # attempts_usage is always present in the payload but empty when
-            # no usage was captured.
-            self.assertEqual(completed[0]["payload"]["attempts_usage"], [])
+            au = completed[0]["payload"]["attempts_usage"]
+            # duration_seconds is always recorded (independent of cost_tracking);
+            # cost/token fields are absent when cost_tracking is False.
+            self.assertEqual(len(au), 1)
+            self.assertIn("duration_seconds", au[0])
+            self.assertNotIn("cost_usd", au[0])
+            self.assertNotIn("input_tokens", au[0])
 
     def test_default_is_enabled_when_key_absent(self):
         """No cost_tracking key in verification.yml → defaults to enabled."""

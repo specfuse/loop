@@ -352,3 +352,14 @@ promoted here.
   modifies a validation guard that previously accepted a class of inputs, add
   "regression on existing valid fixture" as an explicit AC — name a specific
   existing fixture and assert the linter still exits 0 on it.
+
+- [FEAT-2026-0006/G1-CLOSE] When a WU implements new per-attempt instrumentation
+  fields in the driver (e.g. `duration_seconds`, a future memory counter), that
+  WU's own event record will lack those fields — the driver dispatching the
+  implementing WU runs old code, before the commit lands. This bootstrap gap is
+  structural and expected: the first WU tracked by the new field is the one
+  dispatched after the implementing WU's commit. Rule: WU specs that add new
+  driver-owned tracking fields should note the bootstrap gap in the Acceptance
+  criteria — specifically which fields will be absent from the implementing WU's
+  own `events.jsonl` entry — so a reviewer reading the log doesn't flag the
+  absence as a correctness bug.
