@@ -2,8 +2,12 @@
 id: FEAT-2026-0007/G1-DOCS
 type: docs
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 238.752
+cost_usd: 0.690253
+input_tokens: 20
+output_tokens: 11742
 ---
 
 # Gate 1 documentation update

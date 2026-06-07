@@ -239,6 +239,31 @@ fails only at live/integration time.
 
 ---
 
+## 9. Verification — add symbol-existence checks when the WU requires new functions
+
+The `code` gate (`python3 -m unittest discover`) passes when no new tests are
+registered and existing tests make no assertion about absent symbols. An agent
+can claim `complete` without having written any production code; the driver
+commits only the WU-status flip; gate verification passes on the unchanged
+codebase. Observed in `FEAT-2026-0007/T04`: all required functions absent from
+`loop.py`; gate passed; gap invisible until integration time.
+
+- For every WU that requires a new importable function, constant, or class, add an
+  **explicit existence check** to the WU's own Verification section — not just "run
+  the code gate." Canonical form: `python3 -c "from module import symbol_name"`.
+  Use `grep -c "^def symbol_name" target.py` when import would trigger side-effects.
+- Add a **completeness escalation trigger** alongside any correctness trigger:
+  `"If [required_function / required_file] is absent from the files you edited,
+  emit status: blocked — do not claim complete."` This fires before the RESULT
+  block is written, not after the driver re-runs gates and finds nothing.
+
+> *Prevents:* a WU that passes all code gates on the unchanged codebase because
+> the required test file was never written and the required functions were never
+> defined — the exact failure mode in `FEAT-2026-0007/T04` (retry escalation
+> ladder declared complete with zero production code committed).
+
+---
+
 ## This skill distills `.specfuse/LEARNINGS.md`
 
 When a gate's `lessons` work unit surfaces a new authoring rule — one that
@@ -250,19 +275,18 @@ the next edit.
 
 ## Version
 
-**v0.4.** Eight rules. v0.4 (this) added §8 (verify cross-surface
-contract values against the authoritative source rather than inventing
-them; carry a "Cross-repo contracts" table in every plan-next gate
-review) — graduated from `[FEAT-2026-0003/G3-LESSONS]` after a draft
-invented GitHub report-back labels that diverged from the orchestrator's
-canonical `state:*` scheme. v0.2 added the produces-list companion in §3
-and the hygiene-WU pattern in §7. v0.3 tightened §7 with the
-canonical `T<NN>H` ID convention (the previous draft left the ID
-shape vague; a live insert had to rename `T1H` to `T04` because the
-linter regex didn't admit it), the explicit PLAN.md wiring step
-(insert + retarget depends_on + flip target status), and the
-evidence-from-events-log requirement that grounds the hygiene WU's
-Context in a specific human_escalation entry. Expected to keep
-growing — each multi-gate or multi-feature run that surfaces a rule
-that would change how a future WU is written or executed graduates
-here from LEARNINGS.md.
+**v0.5.** Nine rules. v0.5 (this) added §9 (explicit symbol-existence
+checks and completeness escalation triggers in the Verification section
+when a WU requires new importable functions or constants) — graduated
+from `[FEAT-2026-0007/G1-LESSONS]` after the retry escalation ladder
+(T04) was declared complete with zero production code committed and the
+`code` gate passed on the unchanged codebase. v0.4 added §8 (verify
+cross-surface contract values against the authoritative source rather
+than inventing them; carry a "Cross-repo contracts" table in every
+plan-next gate review) — graduated from `[FEAT-2026-0003/G3-LESSONS]`.
+v0.2 added the produces-list companion in §3 and the hygiene-WU pattern
+in §7. v0.3 tightened §7 with the canonical `T<NN>H` ID convention, the
+explicit PLAN.md wiring step, and the evidence-from-events-log
+requirement. Expected to keep growing — each multi-gate or multi-feature
+run that surfaces a rule that would change how a future WU is written or
+executed graduates here from LEARNINGS.md.

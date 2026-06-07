@@ -94,11 +94,17 @@ declared equivalent), files owned by other work units in this gate, secrets,
 
 **Verification.** The gates that must pass. For `implementation` units these are
 the `code` gates in `.specfuse/verification.yml` (tests, coverage ≥ 90%, zero
-warnings, lint, security scan). Name anything unit-specific in addition. See
-`.specfuse/skills/verification/SKILL.md` for how to run and interpret them.
+warnings, lint, security scan). Name anything unit-specific in addition — including
+explicit symbol-existence checks for any new functions or constants this WU
+introduces (e.g. `python3 -c "from module import new_function"`). The code gate
+passes when no tests assert a symbol exists and cannot detect its absence; these
+checks fill that gap. See `.specfuse/skills/verification/SKILL.md` for how to run
+and interpret them.
 
 **Escalation triggers.** Conditions under which you stop and emit `status: blocked`
 in the RESULT block rather than pushing through (spec ambiguity, a required
 modification of generated code, a missing dependency, a credential the unit
-should not be reading). Blocked is a respectable outcome — `result-contract.md`
-rule 4.
+should not be reading). For `implementation` units introducing new symbols, include
+a completeness trigger: "If [required_function / required_file] is absent from the
+files you edited, emit `status: blocked` — do not claim complete." Blocked is a
+respectable outcome — `result-contract.md` rule 4.
