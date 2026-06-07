@@ -5,7 +5,7 @@ slug: dispatch-cost-controls
 branch: feat/FEAT-2026-0007-dispatch-cost-controls
 roadmap_goal: Cut loop dispatch cost via per-WU model alias, effort tier, terseness, and per-gate budget.
 autonomy_default: auto
-status: active
+status: done
 ---
 
 # Plan: Dispatch cost controls
