@@ -124,6 +124,48 @@ overlay_item() {
   fi
 }
 
+# Detect ci-check.sh in the target and write .specfuse/verification.yml.
+# Sets CI_CHECK_PATH to the relative path found (empty if none).
+# Reads globals: $TARGET, $SRC_DIR, $DEST.
+seed_verification_yml() {
+  CI_CHECK_PATH=""
+  for candidate in ci-check.sh script/ci-check.sh scripts/ci-check.sh; do
+    if [[ -f "$TARGET/$candidate" ]]; then
+      CI_CHECK_PATH="$candidate"
+      break
+    fi
+  done
+  if [[ -n "$CI_CHECK_PATH" ]]; then
+    cat > "$DEST/verification.yml" <<EOF
+# .specfuse/verification.yml — auto-configured from $CI_CHECK_PATH
+#
+# $CI_CHECK_PATH was detected in the repo. The code gate delegates
+# to it so your Specfuse verification stays in sync with CI automatically.
+# Replace or extend if you need gate-level granularity (e.g. split tests
+# from lint so the driver can report which check failed).
+#
+# See verification.yml.example for the full field reference.
+
+code:
+  - name: ci-check
+    command: "bash $CI_CHECK_PATH"
+
+# Reflective units (retrospective, lessons, docs): the artifact exists /
+# something changed. Tighten as you like.
+doc:
+  - name: artifact-changed
+    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
+
+# plan-next: structural integrity of what it drafted.
+plannext:
+  - name: plan-lint
+    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
+EOF
+  else
+    cp "$DEST/verification.yml.example" "$DEST/verification.yml"
+  fi
+}
+
 # Claude Code wiring: make the loop's scaffold-shipped skills discoverable,
 # import the binding rules into session context, and allowlist the loop
 # scripts so dispatch isn't gated on per-invocation permission prompts.
@@ -260,46 +302,8 @@ if [[ $UPGRADE -eq 0 ]]; then
 
   # Seed user-authored files (INIT only — never on --upgrade).
   cp "$SRC_DIR/LEARNINGS.md" "$DEST/LEARNINGS.md"
-
-  # If the target ships ci-check.sh, wire it directly into the code gate
-  # rather than leaving the generic pytest/ruff/bandit placeholders.
   CI_CHECK_PATH=""
-  for candidate in ci-check.sh script/ci-check.sh scripts/ci-check.sh; do
-    if [[ -f "$TARGET/$candidate" ]]; then
-      CI_CHECK_PATH="$candidate"
-      break
-    fi
-  done
-  if [[ -n "$CI_CHECK_PATH" ]]; then
-    cat > "$DEST/verification.yml" <<EOF
-# .specfuse/verification.yml — auto-configured from $CI_CHECK_PATH
-#
-# $CI_CHECK_PATH was detected in the repo. The code gate delegates
-# to it so your Specfuse verification stays in sync with CI automatically.
-# Replace or extend if you need gate-level granularity (e.g. split tests
-# from lint so the driver can report which check failed).
-#
-# See verification.yml.example for the full field reference.
-
-code:
-  - name: ci-check
-    command: "bash $CI_CHECK_PATH"
-
-# Reflective units (retrospective, lessons, docs): the artifact exists /
-# something changed. Tighten as you like.
-doc:
-  - name: artifact-changed
-    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
-
-# plan-next: structural integrity of what it drafted.
-plannext:
-  - name: plan-lint
-    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
-EOF
-  else
-    cp "$DEST/verification.yml.example" "$DEST/verification.yml"
-  fi
-
+  seed_verification_yml
   cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
   mkdir -p "$DEST/features"
 
@@ -331,6 +335,34 @@ else
   for item in "${VERSIONED_ITEMS[@]}"; do
     overlay_item "$item"
   done
+
+  # Seed any user-authored files that are missing — happens when the
+  # orchestrator or a partial init created .specfuse/ bare.
+  if [[ $DRY_RUN -eq 1 ]]; then
+    [[ ! -f "$DEST/LEARNINGS.md" ]]     && echo "  would seed missing: .specfuse/LEARNINGS.md"
+    [[ ! -f "$DEST/verification.yml" ]] && echo "  would seed missing: .specfuse/verification.yml"
+    [[ ! -f "$DEST/roadmap.md" ]]       && echo "  would seed missing: .specfuse/roadmap.md"
+    [[ ! -d "$DEST/features" ]]         && echo "  would seed missing: .specfuse/features/"
+    true  # ensure set -e doesn't trigger on the last [[ ]] above being false
+  else
+    CI_CHECK_PATH=""
+    if [[ ! -f "$DEST/LEARNINGS.md" ]]; then
+      cp "$SRC_DIR/LEARNINGS.md" "$DEST/LEARNINGS.md"
+      echo "Seeded missing: .specfuse/LEARNINGS.md"
+    fi
+    if [[ ! -f "$DEST/verification.yml" ]]; then
+      seed_verification_yml
+      echo "Seeded missing: .specfuse/verification.yml"
+    fi
+    if [[ ! -f "$DEST/roadmap.md" ]]; then
+      cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
+      echo "Seeded missing: .specfuse/roadmap.md"
+    fi
+    if [[ ! -d "$DEST/features" ]]; then
+      mkdir -p "$DEST/features"
+      echo "Seeded missing: .specfuse/features/"
+    fi
+  fi
 
   if [[ $DRY_RUN -eq 0 ]]; then
     find "$DEST" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
