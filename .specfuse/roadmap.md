@@ -66,6 +66,30 @@ methodology default.
 **Status: planned.** Detail the first gate's WUs when ready to start; the
 roadmap entry stays one row until then.
 
+## FEAT-2026-0003 — GitHub feature-pick for the loop
+
+**Why.** Teach the loop to adopt a feature dispatched by the Specfuse
+Orchestrator — so an orchestrator can hand a feature to a component repo's loop
+and the loop grinds it through its gate cycle — in addition to today's
+locally-authored `.specfuse/features/` flow. Full brief:
+[`docs/handoff-github-feature-pick.md`](../docs/handoff-github-feature-pick.md).
+
+**Gate 1 (passed).** The read path: extended the loop's correlation-ID grammar
+to admit orchestrated `INIT-YYYY-NNNN/FNN[/TNN]` IDs alongside `FEAT-…`
+component-local IDs (rule + linter + tests); added
+`.specfuse/scripts/gh_features.py`, a discovery script that lists a target
+repo's `specfuse:feature` issues as feature candidates (injectable `gh` runner
+for fully offline unit testing). Both implementation WUs completed in one
+attempt with no escalations. GATE-01 status: `passed`.
+
+**Gates 2–3 (planned).** Gate 2: the write/adopt path — turn a picked GitHub
+issue into a dispatchable loop feature folder. Gate 3: report-back and smoke
+test — a `GitHubBackend` seam for issue-label state transitions, then one real
+orchestrated feature (`INIT-2026-0001/F06`) dispatched end-to-end. Each gate's
+WUs are drafted by the preceding gate's `plan-next`.
+
+**Status: active.** Detail gate 2 WUs when ready to arm.
+
 ## Notes
 
 - Correlation IDs are allocated here, sequentially per year: `FEAT-YYYY-NNNN`.

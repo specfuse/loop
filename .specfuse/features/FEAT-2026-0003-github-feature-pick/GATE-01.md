@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: passed
 ---
 
 # Gate 1 — The read path: orchestrated ID grammar + GitHub feature discovery
