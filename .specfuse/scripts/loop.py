@@ -619,6 +619,30 @@ def parse_claude_json_output(raw: str) -> tuple[str, dict | None]:
     return result_text, (usage if usage else None)
 
 
+def is_zero_token_attempt(usage: dict | None) -> bool:
+    """Did the dispatched session bill zero input tokens?
+
+    Returns True iff `usage` is a dict whose `input_tokens` key is exactly 0.
+    A zero-token attempt means the agent never produced output (often due to a
+    transient CLI / quota / connectivity failure that the SDK reports as a
+    success with empty content); its RESULT block — if present — is
+    hallucinated upstream and must not be trusted.
+
+    Returns False for `usage is None` (cost tracking disabled — preserve prior
+    behavior for users who opt out), for a dict missing `input_tokens`, and
+    for any positive integer. The guard is opt-in via the cost-tracking flag:
+    when the operator runs with cost tracking off, `dispatch()` always returns
+    `usage=None` and this function always returns False.
+
+    See FEAT-2026-0008 / RETROSPECTIVE for the failure mode this exists to
+    catch — a zero-token attempt in FEAT-2026-0007/T08H landed `status: done`
+    despite the agent never running.
+    """
+    if not isinstance(usage, dict):
+        return False
+    return usage.get("input_tokens") == 0
+
+
 RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
 
 
@@ -732,9 +756,12 @@ def execute_unit_attempt(
     verify_fn from a test.
 
     Returns (outcome, payload, usage) where outcome is one of:
-      "blocked" — agent explicitly emitted status: blocked
-      "passed"  — verify() passed
-      "failed"  — verify() failed
+      "zero_token" — usage reports input_tokens=0 (agent never ran); the
+                     RESULT block is unparsed and the attempt is treated as
+                     a failed attempt by the caller (payload is None)
+      "blocked"    — agent explicitly emitted status: blocked
+      "passed"     — verify() passed
+      "failed"     — verify() failed
 
     `usage` is the per-attempt cost/token dict from the agent dispatch when
     `cost_tracking` is True and the agent returned a parseable usage block;
@@ -753,6 +780,12 @@ def execute_unit_attempt(
         stdout, usage = result
     else:
         stdout, usage = result, None
+    # Zero-token guard runs BEFORE RESULT-block parsing: the agent did not
+    # produce output, so any block in stdout is hallucinated upstream and
+    # must not be trusted (FEAT-2026-0008/T01). Opt-in via cost tracking —
+    # when disabled, usage is None and is_zero_token_attempt returns False.
+    if is_zero_token_attempt(usage):
+        return "zero_token", None, usage
     is_blocked, reason = agent_reported_blocked(stdout or "")
     if is_blocked:
         return "blocked", reason, usage
@@ -880,6 +913,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             wu_events = [build_event("task_started", wu.wu_id,
                                      {"type": wu.type, "model": wu.model})]
             attempt_notes: list[tuple[int, str]] = []
+            attempt_outcomes: list[str] = []
             # Cost accumulators: per-attempt list goes to events.jsonl,
             # cumulative sum to WU frontmatter at outcome time.
             attempts_usage: list[dict] = []
@@ -905,6 +939,21 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 attempts_usage.append(attempt_record)
                 cum_usage["duration_seconds"] = round(
                     cum_usage["duration_seconds"] + duration, 3)
+                attempt_outcomes.append(outcome)
+
+                if outcome == "zero_token":
+                    # Agent never produced output (input_tokens=0). Skip
+                    # RESULT parsing, buffer an event, reset the tree, and
+                    # treat as a failed attempt for the purposes of the
+                    # attempt loop — counter already incremented at top.
+                    wu_events.append(build_event(
+                        "attempt_outcome", wu.wu_id,
+                        {"outcome": "zero_token_skip", "attempt": attempt},
+                    ))
+                    git("reset", "--hard", head_before)
+                    print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
+                          f"— no agent output, skipping")
+                    continue
 
                 if outcome == "blocked":
                     # Reset agent work first; THEN write our bookkeeping; THEN
@@ -956,9 +1005,21 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
             else:
                 # for-else: ran out of attempts without break = spinning.
-                # The reset has already happened in the failed branch above.
-                # Flush attempt notes to disk for human inspection, mark the
-                # WU blocked_human, then commit all of it.
+                # The reset has already happened in the failed/zero_token
+                # branch above. Flush attempt notes to disk for human
+                # inspection, mark the WU blocked_human, then commit it.
+                #
+                # Distinguish two spinning shapes in the event payload:
+                #   all_attempts_zero_token — every attempt billed 0 input
+                #     tokens (CLI/quota/connectivity issue, not a real
+                #     verification failure); no per-attempt notes to write.
+                #   spinning_detected — at least one attempt produced
+                #     output that failed verify(); per-attempt evidence is
+                #     buffered in attempt_notes.
+                all_zero = bool(attempt_outcomes) and all(
+                    o == "zero_token" for o in attempt_outcomes)
+                reason = ("all_attempts_zero_token" if all_zero
+                          else "spinning_detected")
                 wu_key = wu.wu_id.replace("/", "_")
                 note_paths = []
                 for atmpt, evidence in attempt_notes:
@@ -969,7 +1030,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 backend.set_wu(wu, "status", "blocked_human")
                 write_cost_to_wu(backend, wu, cum_usage)
                 wu_events.append(build_event("human_escalation", wu.wu_id, {
-                    "reason": "spinning_detected",
+                    "reason": reason,
                     "attempts": MAX_ATTEMPTS,
                     "attempts_usage": attempts_usage,
                 }))
@@ -977,9 +1038,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 commit_bookkeeping(
                     [wu.file, events_path, *note_paths],
                     f"chore(loop): {wu.wu_id} blocked_human "
-                    f"(spinning, {MAX_ATTEMPTS} attempts)\n\nFeature: {wu.wu_id}",
+                    f"({reason}, {MAX_ATTEMPTS} attempts)"
+                    f"\n\nFeature: {wu.wu_id}",
                 )
-                print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — escalated")
+                print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — "
+                      f"escalated ({reason})")
                 blocked = True
 
     if blocked:
