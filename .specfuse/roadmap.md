@@ -20,6 +20,7 @@ installation a target project copies via `init.sh`.
 |----------------|---------------------------------------------|----------|--------|
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
+| FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -111,6 +112,30 @@ bodies remain clean (regression guard). GATE-04 status: `passed`.
 report-back, lint-clean grind — are proven live against `example-org/example-app#287`. The
 `roadmap_goal` is met. See `RETROSPECTIVE.md §Feature-arc retrospective` and
 `SMOKE-INIT-2026-0001-F06.md`.
+
+## FEAT-2026-0004 — Single-driver working-tree lock
+
+**Why.** Two `loop.py` drivers sharing one working tree clobber each other: the
+driver's per-WU `git reset --hard` and `git checkout -B` are tree-global, so any
+interleaving corrupts WU state and mixes commits across units. Observed during the
+FEAT-2026-0003 dogfood: a sandboxed `ps` falsely reported the first driver as dead,
+a second was launched, and competing resets produced commits mixing multiple WUs'
+work plus contradictory WU statuses. True parallelism across features uses separate
+`git worktrees` — each worktree has its own working tree and therefore its own lock.
+
+**Gate 1 (passed).** Advisory lock on the working tree: `loop.py`'s `run()` acquires
+a non-blocking exclusive `fcntl.flock` on `.specfuse/.loop.lock` before any
+git-mutating call; a contending driver exits non-zero with a clear stderr message and
+touches no git or WU/GATE state; the lock auto-releases on process exit including
+SIGKILL (no stale-lock cleanup path). `--dry-run` is exempt (no mutation; inspecting
+while a real run is active must stay allowed). `init.sh` adds the targeted
+`.specfuse/.loop.lock` gitignore line to every destination repo it sets up (idempotent,
+without ignoring the rest of `.specfuse/`). Both this repo's `.gitignore` and every
+`init.sh`-initialized repo ignore the lock file. Tests cover kernel-level exclusion
+and release-on-close without spawning a real `claude -p`. All six acceptance criteria
+met in one attempt ($0.89, ~5 min). GATE-01 status: `passed`.
+
+**Status: active.** Single-gate feature; closing sequence in progress.
 
 ## Notes
 
