@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/T04
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.299924
+input_tokens: 8
+output_tokens: 8237
 ---
 
 # Interactive pick-and-adopt skill
