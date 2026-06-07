@@ -1,6 +1,6 @@
 ---
 gate: 4
-status: awaiting_review
+status: passed
 ---
 
 # Gate 4 — Adopted-folder lint admits orchestrator issue bodies

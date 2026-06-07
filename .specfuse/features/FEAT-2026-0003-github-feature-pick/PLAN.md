@@ -5,7 +5,7 @@ slug: github-feature-pick
 branch: feat/FEAT-2026-0003-github-feature-pick
 roadmap_goal: The loop can pick a feature from a target repo's GitHub issues (specfuse:feature) and grind it through its gate cycle, alongside today's locally-authored features.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: GitHub feature-pick for the loop
