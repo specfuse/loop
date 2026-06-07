@@ -123,3 +123,54 @@ on the agent's honesty, not on the gate.
    verified.
 3. The three-test structure (accept single-gate, reject multi-gate, regression
    on four-WU) is a good template for any future linter-guard change.
+
+---
+
+## Feature-arc retrospective — FEAT-2026-0005
+
+**Roadmap goal:** *A single-gate feature may close with one `close` work unit instead
+of the four-WU retrospective→lessons→docs→plan-next sequence.*
+
+**Verdict:** **Met.**
+
+**Evidence (gate 1, T01 — commit `86026af`):**
+
+1. **`close` WU type implemented in `lint_plan.py`.** `_CLOSING_TYPES = CLOSING_SEQUENCE
+   | {"close"}` separates "which types count as closing" from "what sequence they must
+   form." A three-branch conditional accepts `close` alone (single-gate only), accepts
+   `CLOSING_SEQUENCE` (any gate), and errors otherwise.
+2. **Single-gate-only constraint enforced.** Tests
+   `test_single_gate_close_passes` (accept) and `test_two_gate_close_rejected` (reject
+   with error naming the single-gate constraint) prove the guard fires in both
+   directions.
+3. **Regression on existing four-WU features.**
+   `test_four_wu_closing_sequence_still_passes` uses the live
+   `FEAT-2026-0001-health-endpoint` fixture; existing features still lint clean after
+   the `close` branch was added.
+4. **Correlation-ID surface widened.** `CORRELATION_ID_RE` now accepts the `CLOSE`
+   segment (`G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)`), so `G1-CLOSE`-style IDs pass
+   validation across both `FEAT-…` and `INIT-…/F…` namespaces.
+5. **Template documents the new type.** `WU.template.md` describes `close` in both
+   frontmatter and prose, including the production obligations (RETROSPECTIVE.md,
+   LEARNINGS.md entries, docs/roadmap reconciliation, terminal verdict) and the
+   single-gate-only constraint.
+6. **Driver dispatch wired.** `loop.py` maps `close → plannext` in `GATES_FOR_TYPE`, so
+   the driver reuses the existing `plan-lint` gate without a new entry in
+   `verification.yml`.
+
+**Caveat the feature itself acknowledged.** This feature closes with the **old**
+four-WU sequence (T01 → G1-RETRO → G1-LESSONS → G1-DOCS → G1-PLAN) because the
+`close` type it introduces does not exist at the moment its own driver loads
+`loop.py`. The roadmap goal is satisfied for FEAT-2026-0006 onward, which is the
+first feature able to dogfood the `close` WU.
+
+**Known follow-up (non-blocking, captured in LEARNINGS).** The `close` WU runs the
+`plannext` gate set, which checks structural validity but does not verify that the
+expected artifacts (RETROSPECTIVE.md updated, LEARNINGS.md appended, etc.) actually
+materialized — the obligation rests on agent honesty, not on a mechanical gate. A
+future hardening could give `close` its own verification entry combining
+`artifact-changed` (doc) and `plan-lint` (plannext). Not in scope for this feature;
+recorded as a gap in the gate-1 retrospective.
+
+**Closure recommendation.** No gate 2 needed. The goal is met by gate-1 evidence; no
+gap identified that requires a bounded gate-2 scope. Feature is ready for closure.
