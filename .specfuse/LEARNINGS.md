@@ -169,3 +169,69 @@ promoted here.
   plan-next WU (Opus model) is the natural checkpoint for this review —
   G2-PLAN's scope should include a pass over every scaffold-generated WU
   body in the gate it details.
+
+- [FEAT-2026-0003/G3-LESSONS] When a WU's acceptance criteria name values
+  that live in an external system — label names, API field names, event
+  schema keys, shared protocol constants — those values must be verified
+  against the authoritative documentation in that external system before
+  the gate is armed. Inventing plausible values from the feature's internal
+  conventions is a silent correctness risk: the value looks right to the
+  author, satisfies the WU's AC, and only fails at smoke time. T06's label
+  scheme (`loop:in-progress`/`loop:complete`) was invented by G2-PLAN; the
+  correct scheme (`state:in-progress`/`state:done`) came from reading the
+  orchestrator's `naming-convention.md §5.1` and `labels.md` at gate-3
+  arming time. Rule: for every WU AC that references an external system's
+  vocabulary, add a pre-arm check line to the WU spec: "verify [value]
+  against [authoritative source] before locking this AC." The gate review
+  document is the right place to list these open verifications; the gate is
+  not armed until every item is checked.
+
+- [FEAT-2026-0003/G3-LESSONS] The two-case linter test pattern from
+  [FEAT-2026-0003/G2-LESSONS] ("exits 0 on valid artifact, exits non-zero
+  on malformed artifact") is incomplete when an adapter embeds content from
+  an external surface verbatim. A third case is required: the external
+  surface's format variant may be structurally valid by that surface's own
+  convention but use a syntax the local linter does not accept (e.g., ATX
+  headings `## Context` vs the loop's bold-preamble `**Context.**`). Gate 3
+  surfaced this exactly: `adopt_feature.py` embedded `#287`'s body verbatim;
+  `lint_plan.py` rejected it not because sections were absent but because
+  ATX-heading detection was not implemented. Rule: when a WU spec writes an
+  adapter that embeds external-source content, add a third linter test
+  fixture that represents the external surface's actual heading/formatting
+  convention (verified against a real example from that surface). If the
+  linter rejects this fixture, that is a pre-dispatch blocking finding — the
+  linter must be widened before the adapter is dispatchable, not after.
+
+- [FEAT-2026-0003/G3-LESSONS] WUs that mutate state in an external
+  production system (live GitHub issues, deployed infrastructure, databases
+  with real data) are a categorically different class from automated WUs —
+  not because their output is hard to machine-verify (the G2-LESSONS
+  prose-artifact problem), but because the mutation itself is irreversible at
+  execution time and cannot be safely delegated to the driver's subprocess
+  loop. Rule: when a gate plan includes a live-mutation WU, designate it
+  out-of-loop in the WU spec before the gate is armed. The WU spec must
+  include: (1) an explicit pre-condition checklist stating what to verify
+  before running, (2) a cleanup/restore acceptance criterion confirming the
+  external system was returned to its pre-smoke state, (3) a smoke journal
+  filename as the mandatory output artifact, and (4) `artifact-changed` as
+  the driver-side verification proxy. The gate plan's arming note should
+  document the human-operated designation so reviewers understand why no
+  driver events exist for this WU.
+
+- [FEAT-2026-0003/G3-LESSONS/multi-gate] Plan-next WUs (Opus) produce
+  forward-design drafts from the prior gate's artifacts alone — they cannot
+  read other repositories or external documentation. This creates a
+  systematic blind spot: all values that name cross-repo contracts (label
+  namespaces, API field names, event schemas, shared protocol constants)
+  will be invented from first principles rather than verified. The
+  inventions are not random; they are plausible, internally consistent, and
+  wrong in precisely the way a well-reasoned guess is wrong. Gate 3
+  confirmed: G2-PLAN named the label-scheme uncertainty in GATE-03-REVIEW.md
+  Flagged 2 and prescribed the verification path; the human checked before
+  arming and found the correct scheme. The process works when the review
+  document is explicit and the human acts on it. Rule: every gate review
+  document produced by a plan-next WU must include a "Cross-repo contracts"
+  section listing each value the plan invented alongside the authoritative
+  source the human must read before arming. The gate is not armed until
+  every item in that section is checked and its entry updated with the
+  verified value.
