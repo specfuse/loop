@@ -118,10 +118,13 @@ initiative). For each gate:
   gate 2 or gate 3 — your call." Make these loud so they aren't
   missed in review.
 
-Show the skeleton; accept revisions before continuing. The four
-closing-sequence WUs (retrospective, lessons, docs, plan-next) are
-mandatory per the methodology and don't need to be discussed — they
-appear in every gate automatically.
+Show the skeleton; accept revisions before continuing. Every gate ends
+with a closing block. For multi-gate features — and optionally single-gate
+ones — this is the four-unit sequence (retrospective, lessons, docs,
+plan-next), which appears in every gate automatically. For single-gate
+features only, a single `close` WU may substitute, collapsing all four
+ceremonies into one session; propose this alternative when the feature
+has exactly one gate and no forward-design work is needed.
 
 ### 5. Propose gate 1's WUs
 
@@ -134,10 +137,12 @@ For gate 1 only:
   section body. **Delegate the per-WU craft** to
   [`../authoring-work-units/SKILL.md`](../authoring-work-units/SKILL.md) —
   read its rules and apply them; don't restate them here.
-- The four closing-sequence WUs (`G1-RETRO`, `G1-LESSONS`, `G1-DOCS`,
-  `G1-PLAN`) are mechanical: their IDs, file names, types, and models
-  follow the template. Generate them; surface them for confirmation
-  rather than per-section discussion.
+- Closing WUs for gate 1: for the four-WU sequence, generate `G1-RETRO`,
+  `G1-LESSONS`, `G1-DOCS`, `G1-PLAN` mechanically — IDs, file names, types,
+  and models follow the template. For a single-gate feature where the `close`
+  alternative was proposed in step 4, generate a single `G1-CLOSE` WU instead.
+  Surface whichever set applies for confirmation rather than per-section
+  discussion.
 
 Show each substantive WU's draft before writing. Accept, modify, or
 skip — same propose-and-confirm rhythm as `feature-conversion`.

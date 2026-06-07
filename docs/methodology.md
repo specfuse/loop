@@ -27,8 +27,9 @@ on both surfaces.
 - **Work unit (WU)** — a single, self-contained unit of work identified by a
   task-level correlation ID `FEAT-YYYY-NNNN/TNN` for substantive units,
   `FEAT-YYYY-NNNN/TNNH[N…]` for hygiene units that precede a target substantive
-  unit, or `FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN)` for the closing
-  sequence. A WU is crafted to be completed in one focused agent session.
+  unit, `FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN)` for the four-WU closing
+  sequence, or `FEAT-YYYY-NNNN/G<n>-CLOSE` for the single-gate `close`
+  alternative. A WU is crafted to be completed in one focused agent session.
   It carries its own prompt and is the contract between the planner and the
   executor.
 
@@ -59,12 +60,20 @@ Substantive:
 - `qa_authoring` / `qa_execution` / `qa_curation` — test-plan authoring,
   execution, and regression-suite curation.
 
-Closing sequence (every gate ends with exactly one of each, in this order):
+Closing sequence — every gate ends with **one** of two forms:
+
+*Four-WU sequence* (required for multi-gate features; valid for single-gate):
 - `retrospective` — feature-local raw observations for the gate.
 - `lessons` — promotes the *generalizable* subset of the retrospective into the
   cross-feature `LEARNINGS.md`.
 - `docs` — reconciles documentation and roadmap status with what was built.
 - `plan-next` — drafts the next gate and writes the human review summary.
+
+*Single-WU alternative* (single-gate features only):
+- `close` — collapses all four ceremonies into one session: writes
+  `RETROSPECTIVE.md`, promotes lessons to `LEARNINGS.md`, reconciles docs and
+  roadmap, and writes the terminal feature-arc verdict. `lint_plan.py` rejects
+  this type on any feature with more than one gate.
 
 ## 4. The five-section work-unit contract
 
@@ -104,9 +113,12 @@ For each gate, in order:
    commit per unit. A failed gate is retried with a fresh session carrying the
    failure evidence, up to three attempts (the spinning threshold), then
    escalated for human attention.
-3. **Close.** The closing sequence runs as the gate's last four units:
-   `retrospective → lessons → docs → plan-next`. `plan-next` drafts the *next*
-   gate's WUs and writes a human review summary.
+3. **Close.** The closing sequence runs as the gate's last units. For multi-gate
+   features (and optionally single-gate ones), this is the four-unit sequence
+   `retrospective → lessons → docs → plan-next`; `plan-next` drafts the *next*
+   gate's WUs and writes a human review summary. For single-gate features only,
+   a single `close` WU may substitute, collapsing all four ceremonies into one
+   session — no forward-design `plan-next` is needed when there is no next gate.
 4. **Review and arm.** The cycle stops for the human, who reviews the next gate's
    draft (guided by the review summary), edits or accepts it, arms the accepted
    units, and signals approval. Then the cycle repeats for the next gate.
