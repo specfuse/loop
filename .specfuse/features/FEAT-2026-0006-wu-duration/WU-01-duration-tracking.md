@@ -2,8 +2,11 @@
 id: FEAT-2026-0006/T01
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.996561
+input_tokens: 32
+output_tokens: 14843
 ---
 
 # Capture per-WU execution time alongside cost
