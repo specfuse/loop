@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: open
+status: awaiting_review
 ---
 
 # Gate 2 — The write path: adopt a GitHub issue into a feature folder
