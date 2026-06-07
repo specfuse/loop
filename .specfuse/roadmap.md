@@ -23,7 +23,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
-| FEAT-2026-0007 | Dispatch cost controls                      | active   | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
+| FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -243,8 +243,15 @@ despite no symbols landing. After Gate 2: `EFFORT_LADDER`, `effort_for_attempt`,
 Two `[FEAT-2026-0007/G2-LESSONS]` entries in `LEARNINGS.md` cover the 0-token
 session gap and the limit of agent-side safeguards.
 
-**Status: active.** Gate 2 substantive WUs done (T08H / T08 implementation absent
-— see above); closing sequence in progress (G2-DOCS → G2-PLAN).
+**Status: done.** Four `roadmap_goal` levers (model alias, effort tier, terseness,
+per-gate budget) all landed and importable; type-default policy layered on top.
+T04 retry ladder and T08 telemetry deferred — three reland attempts (T04, T08H, T08)
+all silently no-op'd via the same 0-token-session failure path. The fix is
+driver-side (refuse-commit on 0 tokens / empty diff / failed smoke-import), not
+spec-side, so it belongs in a successor feature rather than a Gate 3. **Strongly
+recommended next feature: FEAT-2026-0008 "Driver completeness-guard."** See
+`RETROSPECTIVE.md §Feature-arc verdict` for the full terminal rationale and the
+G4-LESSONS three-test analysis.
 
 ## Notes
 

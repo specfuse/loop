@@ -214,3 +214,89 @@ This failure path defeated both T04's original execution and T08H's corrective r
 **Gate 1 framing (for comparison).** Gate 1's CRITICAL FINDING named this as: "The gate has no mechanism to verify 'the required new test file was created' or 'the required functions exist.'" Gate 2 confirms this gap is load-bearing: even a hygiene WU written to correct it, with explicit smoke checks in its spec, did not close the gap because the driver-side verification still has no completeness check.
 
 **Structural gap requiring escalation.** The driver needs a post-commit, pre-dependency-unlock check: for each WU whose spec names a smoke import in its AC or Verification section, run that command before advancing. Alternatively, the driver should refuse to commit a WU as `done` if its `files_changed` list (from the RESULT block) contains a file that is unchanged from HEAD. Either check would have caught T04, T08H, and T08.
+
+---
+
+# Feature-arc verdict
+
+**Produced by:** WU-97 (G2-PLAN)
+**Branch decision:** TERMINAL.
+**Date:** 2026-06-07
+
+## What shipped vs `roadmap_goal`
+
+`roadmap_goal`: *Cut loop dispatch cost via per-WU model alias, effort tier, terseness, and per-gate budget.*
+
+All four levers landed in `loop.py` and are importable post-Gate-2:
+
+| Lever | WU | Symbol(s) | Status |
+|---|---|---|---|
+| Per-WU model alias | T01 | `MODEL_ALIASES`, alias resolution in `dispatch()` | ✅ landed |
+| Effort tier | T02 | `VALID_EFFORT`, `--effort` in `CLAUDE_CMD` | ✅ landed |
+| Terseness directive | T03 | `CAVEMAN_DIRECTIVE`, tier-gated preamble selection | ✅ landed |
+| Per-gate cost budget | T07 | `gate_budget_usd`, `gate_spent_usd`, `_should_halt_for_budget` | ✅ landed |
+
+Defaults-by-WU-type (T06) layered on top of the four levers — `MODEL_BY_TYPE` and `EFFORT_BY_TYPE` make the lever fields optional, so unauthored WUs inherit sensible model/effort without explicit declaration. This is the cost-control story complete: the four levers exist, they have type-driven defaults, and `WU.template.md` documents them as author-controlled.
+
+## What telemetry confirmed
+
+Real Gate 1 + Gate 2 events.jsonl (16 WUs, ~$13.20 total):
+
+- **Effort tier × model defaults work as designed at the cheap end.** T03 (low/medium effort, Sonnet) ran 128s / 4,261 output tokens / $0.40 — less than half the cost of any other substantive WU. Type-default policy assigned Sonnet to implementation WUs and Opus only where the WU spec opted in (T04, T07). This compounds across a gate.
+- **Cache reads dominate cost at scale.** T07 cost $3.61 (67% of Gate 2 total) primarily from a 4.5M-token cache-read window — the price of Opus × accumulated feature context, not the price of the lever itself. Cache-read cost grows monotonically with WU count in a gate; the four levers do not address it.
+- **Per-gate budget brake did not fire in Gate 2.** GATE-02.md carries no `cost_budget_usd` field — the brake was introduced by T07 and cannot be exercised against the gate that built it. First exercise belongs to a successor feature's gate per `[FEAT-2026-0007/G2-LESSONS]`. The mechanism is in code and unit-tested ($1.00 budget / $1.50 spent → halt); production exercise is the deferred item.
+- **Caveman directive landed but its cost-reduction effect is undermeasured.** T03 was cheap, but only one WU at low effort ran in this feature; the directive's empirical effect on output-token volume needs a feature with several low-effort WUs to measure.
+
+## What was deferred
+
+1. **Retry escalation ladder (T04 / T08H).** `EFFORT_LADDER`, `effort_for_attempt`, `terseness_for_attempt` are absent from `loop.py`. T04's original session and T08H's hygiene re-land both committed `status: done` with no production code (T08H billed 0 input/output tokens). Three attempts at agent-side fix proved insufficient — the gap is driver-side, not spec-side. **Candidate future feature: FEAT-2026-0008 Driver completeness-guard** (recommended below).
+2. **Telemetry extension (T08).** `cache_hit_rate`, `gate_summary`, `resolved_model` per-attempt field — all absent. Same failure path as T08H. The cost-control story is shipped but its observability is not, so the levers' actual savings cannot be measured retrospectively from `events.jsonl` alone. Belongs in the same future feature as the retry-ladder reland, or its successor.
+3. **Per-gate budget brake first exercise.** Set `cost_budget_usd` in the first Gate.md of the next feature that uses this loop, so the brake fires for real. Mechanical, not feature-sized.
+4. **Caveman directive empirical measurement.** Needs a feature with ≥3 low-effort WUs to compare output-token volume to a baseline. Not blocking.
+
+## Unresolved `Scope OUT` items
+
+From PLAN.md's `Scope OUT` section, the following remain unresolved at feature close:
+
+- **Prompt-caching SDK migration (`cache_control` breakpoints).** Still gated on a measurement spike of the `claude -p` CLI's built-in caching. Given that cache reads dominate cost in this feature's own telemetry (T07: 4.5M tokens, T06: 2.4M tokens), this is now the **highest-leverage** deferred lever for further cost control. Recommend opening a measurement-first feature against the CLI's caching surface, then deciding whether SDK migration is warranted.
+- **Parallel / concurrent WU dispatch.** Unchanged; needs separate design for `git`, `events.jsonl`, working-tree race conditions. FEAT-2026-0004's `flock` lock is the prerequisite (landed) but the dispatcher work is its own feature.
+- **Context pruning / per-WU file allowlist.** Unchanged; needs an agent-contract change. The cache-read cost pattern above strengthens the case but does not change the design boundary.
+- **Ceremony-WU adaptive strategy.** Was to be planned from this feature's telemetry. Now blocked on telemetry (T08) landing properly in a successor feature.
+
+## Why TERMINAL, not extend
+
+Per `[FEAT-2026-0003/G4-LESSONS]`, extending requires all three tests to pass:
+
+1. **Scope — hours not weeks.** The retry-ladder + telemetry reland looks bounded in code size, but **three attempts at the spec-side fix have already failed** (T04 with no completeness trigger, T08H with three explicit safeguards, T08 with the dependency on T08H). The next attempt must be driver-side: add a post-commit, pre-dependency-unlock symbol-existence check, refuse-commit-on-empty-files_changed, or 0-token-attempt detection. That work is the driver's verification contract, not a single hygiene WU — multiple file changes in `loop.py`, new unit tests against a real dispatch path, and a methodology decision about whether the agent's RESULT block's `files_changed` claim is verified pre-commit. This **fails the "hours not weeks" test** by failing the "single WU" interpretation: the fix is a feature, not a hygiene precursor.
+2. **Contiguous proof — yes.** All evidence (events.jsonl 0-token entries, two LEARNINGS entries) is on this branch.
+3. **Disciplined trigger — yes.** The evidence is live and concrete (T04 + T08H + T08 = three reproductions of the same failure mode in real telemetry).
+
+Tests 2 and 3 pass. Test 1 fails on the substantive sizing. Per the lesson's own rule: *"If any [test] fails, the correct move is to write the terminal verdict and open a new feature later if needed."*
+
+The cost-control roadmap_goal is met independent of the methodology gap — extending Gate 3 of this feature to fix the driver-side completeness gap would conflate two different threads and corrode the "feature ends" contract.
+
+## Methodology-level correctness gap (Escalation trigger 3 — fired)
+
+T08H was authored specifically to prevent T04's failure mode and **repeated it exactly**: 0 input tokens, 0 output tokens, 225s elapsed, `status: done` committed, no symbols landed. Three safeguards in T08H's spec (smoke-import AC, two escalation triggers) did not fire because the agent session produced no output to evaluate them against.
+
+This is a **driver-side correctness gap**, not an authoring gap. Agent-side safeguards require an agent session that actually runs. The fix shape:
+
+- **Mandatory recommendation for next feature (FEAT-2026-0008 candidate, "Driver completeness-guard"):**
+  1. The driver MUST treat a 0-input-token attempt as a failed attempt (re-dispatch), not a completed one. The `attempts_usage[].input_tokens > 0` check is mechanical and falsifiable.
+  2. If the WU's RESULT block declares `files_changed: [paths…]`, the driver MUST verify each path differs from `HEAD` before squashing — refuse the commit and re-dispatch otherwise.
+  3. If the WU's Verification section names a `python3 -c "from X import Y"` smoke check, the driver MUST run it after squash and before advancing the dependency frontier — fail the WU if it exits non-zero.
+
+Any one of those three would have caught T04, T08H, and T08 at the driver layer. All three together close the gap structurally. They are NOT in scope for this feature, and the temptation to extend Gate 3 to add them is what `[FEAT-2026-0003/G4-LESSONS]` warns against.
+
+## Roadmap-goal sanity check (Escalation trigger 2 — NOT fired)
+
+The `roadmap_goal` itself is not wrong. The four levers shipped and have the expected effect (T03's $0.40 cheap-end run, type-default model assignment doing what the spec said). What was undermeasured is the **aggregate cost-reduction percentage** vs a baseline — because the telemetry that would have measured it (T08) did not land. The goal is correct; the proof is partial. The successor feature that lands telemetry will close the proof.
+
+## Summary
+
+- Four cost-control levers landed; type-default policy layered cleanly on top.
+- Retry ladder and telemetry deferred to next feature due to driver-side completeness gap that defeated three reland attempts.
+- Cache-read cost (an architectural cost driver this feature does not address) is now the highest-leverage deferred lever — recommend a measurement-first feature on `claude -p` caching.
+- Methodology gap is loudly named; FEAT-2026-0008 "Driver completeness-guard" recommended as the next feature.
+
+Feature closes as **done**.

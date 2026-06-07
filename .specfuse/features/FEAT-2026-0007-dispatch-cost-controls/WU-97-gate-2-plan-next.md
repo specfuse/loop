@@ -3,8 +3,12 @@ id: FEAT-2026-0007/G2-PLAN
 type: plan-next
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 251.42
+cost_usd: 1.74745
+input_tokens: 31
+output_tokens: 12384
 ---
 
 # Plan the next gate (or write the terminal feature-arc verdict)
