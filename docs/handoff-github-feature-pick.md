@@ -53,8 +53,9 @@ initiative      orchestrator top; cross-repo            INIT-YYYY-NNNN
 
 ## 3. What to build
 
-**Delivery status (as of gate 2):** Steps 1 and 2 are shipped. Step 3 uses the existing
-loop unchanged. Step 4 is gate 3's scope — not yet delivered.
+**Delivery status (as of gate 3):** All four steps shipped. Step 3 uses the existing
+loop unchanged. Step 4 delivered in gate 3 — see §3.4 for as-built details and the
+one outstanding finding (lint-format gap) blocking a fully clean end-to-end grind.
 
 A GitHub feature-pick capability for the loop. Behaviorally:
 
@@ -90,10 +91,59 @@ A GitHub feature-pick capability for the loop. Behaviorally:
    loop here.
 
 4. **Report back:** state lives in GitHub issue labels + the feature's correlation thread
-   (the orchestrator's "state backend" seam — see methodology §10). At minimum: emit
-   feature started/completed signals the orchestrator can observe (issue label transitions
-   and/or the per-feature event log). The RESULT block already maps to the orchestrator's
-   `task_completed`. **Not yet delivered; gate 3's scope.**
+   (the orchestrator's "state backend" seam — see methodology §10). **Delivered (gate 3).**
+
+   **As-built shape:**
+
+   - **`Backend` seam** (`loop.py`): three lifecycle hooks added to the `Backend` base
+     class — `on_feature_start(feat_fm)`, `on_gate_passed(feat_fm, gate_n)`,
+     `on_feature_complete(feat_fm)` — plus a module-level factory `make_backend(feat_fm)`.
+     The base `Backend` provides no-op implementations; the loop driver calls all three at
+     the appropriate milestones (`run()` start, gate boundary, all-gates-passed exit).
+
+   - **Factory selection** (`make_backend`): inspects `feat_fm["source_issue_url"]`. If
+     present (i.e. the feature was adopted from a real GitHub issue via `adopt_feature.py`),
+     returns a `GitHubBackend` instance wired to that URL. If absent (component-local
+     features without `source_issue_url` in PLAN.md frontmatter), returns plain `Backend`
+     (no-op). A malformed URL falls back gracefully to plain `Backend`.
+
+   - **`GitHubBackend`** (`.specfuse/scripts/gh_backend.py`): subclasses `Backend`; uses
+     the injectable `_default_runner` pattern (matching `gh_features.py` lines 22–36) so
+     tests run fully offline. Label transitions via `gh issue edit`:
+     - `on_feature_start`: adds `state:in-progress`, removes `state:ready`
+     - `on_feature_complete`: adds `state:done`, removes `state:in-progress`
+     - `on_gate_passed`: v0.1 no-op stub — no gate-level label transition defined
+
+   - **Label scheme** (canonical per orchestrator `naming-convention.md §5.1` and
+     `shared/schemas/labels.md`): `state:ready → state:in-progress → state:done`. The
+     pre-pickup lifecycle state on a GitHub issue is `state:ready`; the loop sets
+     `state:in-progress` when a feature starts grinding and `state:done` when all gates
+     pass. *(Note: G2-PLAN's gate-3 draft proposed `loop:in-progress`/`loop:complete` as
+     first-principles label names; these were corrected to the canonical `state:*` namespace
+     at gate-3 arming time after verification against orchestrator docs.)*
+
+   **Live smoke result (T07, 2026-06-06, out-of-loop by human operator):**
+
+   | Mechanism | Result |
+   |-----------|--------|
+   | Discovery (`gh_features.py RestoManagerApp/Backend`) | **PASS** — 13 candidates; `#287` parsed correctly |
+   | Adopt (`adopt_feature.py RestoManagerApp/Backend 287`) | **PASS** — folder + encoding + body embed worked |
+   | Report-back (label transitions against live `#287`) | **PASS** — `state:ready → in-progress → done`; fully restored |
+   | Adopted-folder lint (`lint_plan.py`) | **FINDING** — see below |
+
+   **Outstanding finding — lint-format gap:** `#287`'s body contains all five mandatory
+   sections but uses `## ATX` Markdown headings (`## Context`, `## Acceptance criteria`,
+   …). The loop's `lint_plan.py` section detector matches `^(\**)<section>` (bold or plain
+   text) and does **not** recognise `## ATX` headings. An issue body embedded verbatim by
+   `adopt_feature.py` therefore fails the linter despite being structurally complete. This
+   blocks a clean end-to-end grind for any adopted feature whose body uses ATX headings.
+
+   **Fix options** (tracked for follow-on; decision by G3-PLAN):
+   1. **Broaden `lint_plan.py`** to accept ATX headings — smallest, loop-side, recommended.
+   2. **Normalize headings in `adopt_feature.py`** when embedding (`## X` → `**X.**`).
+   3. **Fix the orchestrator issue-body template** to emit bold sections (cross-surface).
+
+   Evidence: `SMOKE-INIT-2026-0001-F06.md` (smoke journal) and `RETROSPECTIVE.md §T07`.
 
 ### Decisions already locked (don't re-litigate)
 - **Uniform:** every dispatched unit IS a loop feature; small ones are trivially single-gate /
@@ -124,11 +174,13 @@ been single-gate; this is the unproven thing gating everything downstream. Two b
 
 ## 5. Smoke test target
 
-Once GitHub-pick works, dispatch one real orchestrated feature end-to-end:
+**Completed (gate 3, 2026-06-06).** The smoke against `INIT-2026-0001/F06` —
+`RestoManagerApp/Backend` issue #287 — was run out-of-loop by the human operator.
+
 - **`INIT-2026-0001/F06`** — "Conform publishRoster to validated spec" — `RestoManagerApp/Backend`
-  issue #287, label `specfuse:feature` + `initiative:INIT-2026-0001`, `type:implementation`,
-  autonomy `review`. Small, mostly-already-implemented conformance task — a low-risk first dispatch.
-  (The roster pilot initiative INIT-2026-0001 has features F01–F14; F06 is the simplest.)
+  issue #287, labels `specfuse:feature` + `initiative:INIT-2026-0001` + `type:implementation` +
+  `autonomy:review` + `state:ready`. Discovery, adopt, and report-back all PASS. Lint finding
+  (ATX heading format gap) noted — see §3.4 for details and the follow-on fix options.
 
 ## 6. Out of scope here
 - The orchestrator-side poller/dispatcher (separate, orchestrator repo).

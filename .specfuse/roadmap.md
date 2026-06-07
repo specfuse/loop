@@ -91,11 +91,22 @@ widened by one line to expose issue `body`. The `/adopt-feature` interactive
 skill wraps the script as a pick-list-then-adopt flow. Both implementation WUs
 completed in one attempt with no escalations. GATE-02 status: `passed`.
 
-**Gate 3 (planned).** Report-back and smoke test — a `GitHubBackend` seam for
-issue-label state transitions, then one real orchestrated feature
-(`INIT-2026-0001/F06`) dispatched end-to-end. Drafted by gate 2's plan-next.
+**Gate 3 (passed).** Report-back and smoke: `Backend` seam widened with three lifecycle
+hooks (`on_feature_start`, `on_gate_passed`, `on_feature_complete`) and a `make_backend(feat_fm)`
+factory (T05); `GitHubBackend(Backend)` label-transition backend in `gh_backend.py` using the
+canonical `state:ready → state:in-progress → state:done` scheme, factory selects it when
+`source_issue_url` is present in PLAN.md frontmatter (T06); live smoke of `INIT-2026-0001/F06`
+(`RestoManagerApp/Backend#287`) run out-of-loop by human operator — discovery, adopt, and
+report-back all PASS, `#287` fully restored post-smoke (T07). **Finding:** the adopted folder
+fails `lint_plan.py` because orchestrator issue bodies use `## ATX` headings; the linter only
+recognises `**bold**`/plain. This blocks a clean end-to-end grind. Fix deferred to a follow-on
+(gate 4 or `FEAT-2026-0004`). GATE-03 status: `passed`.
 
-**Status: active.** Gates 1 and 2 done; gate 3 planned.
+**Status: active.** Gates 1, 2, and 3 done. Feature remains `active`: the lint-format gap
+surfaced in T07's smoke (`## ATX` headings not recognised by `lint_plan.py`) blocks a fully
+clean end-to-end grind. The roadmap goal ("pick a feature and grind it through the gate cycle")
+is partially met — discovery, adopt, and report-back are proven live; the grind path requires
+the lint fix first. See `RETROSPECTIVE.md §Multi-gate proof` and `SMOKE-INIT-2026-0001-F06.md`.
 
 ## Notes
 

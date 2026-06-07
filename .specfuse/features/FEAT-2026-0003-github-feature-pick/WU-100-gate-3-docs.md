@@ -2,7 +2,11 @@
 id: FEAT-2026-0003/G3-DOCS
 type: docs
 model: claude-sonnet-4-6
-status: pending
+status: done
+attempts: 1
+cost_usd: 0.922754
+input_tokens: 28
+output_tokens: 13370
 ---
 
 # Gate 3 documentation update

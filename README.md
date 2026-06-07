@@ -100,7 +100,7 @@ specfuse-loop/
     ├── roadmap.template.md  verification.yml.example  LEARNINGS.md
     ├── rules/result-contract.md
     ├── skills/verification/SKILL.md
-    ├── scripts/{loop.py, lint_plan.py, gh_features.py, adopt_feature.py}
+    ├── scripts/{loop.py, lint_plan.py, gh_features.py, adopt_feature.py, gh_backend.py}
     ├── templates/{PLAN,GATE,WU}.template.md
     └── features/FEAT-2026-0001-health-endpoint/   (the worked example)
 ```
@@ -108,17 +108,26 @@ specfuse-loop/
 ## Status
 
 Early. The driver, linter, parsing, dependency ordering, draft/arm gating, and
-verification wiring are tested. Gates 1 and 2 of `FEAT-2026-0003` (the loop's
-first real multi-gate feature) are done. Gate 1 (the read path) demonstrated
-that `plan-next` drafts a gate you would actually arm: both implementation WUs
-completed in one attempt with no escalations, the plan held without deviation,
-and the full closing sequence ran cleanly. Gate 2 (the adopt path) delivered
-`adopt_feature.py` and the `/adopt-feature` skill — a human can now go from a
-GitHub `specfuse:feature` issue to a dispatchable loop-feature folder; both
-gate-2 implementation WUs completed in one attempt with no escalations. The
-multi-gate forward-design model (each gate's `plan-next` drafts the next) is
-proven across two gates; treat the methodology contracts as still-moving until
-more features confirm it.
+verification wiring are tested. All three gates of `FEAT-2026-0003` (the loop's
+first real multi-gate feature) have passed:
+
+- **Gate 1 (read path):** `plan-next` drafts a gate you would actually arm — both
+  implementation WUs completed in one attempt with no escalations; the plan held.
+- **Gate 2 (adopt path):** `adopt_feature.py` and the `/adopt-feature` skill — a
+  human can go from a GitHub `specfuse:feature` issue to a dispatchable loop-feature
+  folder in one command; both WUs completed in one attempt.
+- **Gate 3 (report-back + smoke):** `GitHubBackend(Backend)` in `gh_backend.py`
+  transitions `state:ready → state:in-progress → state:done` on the GitHub issue as
+  the loop grinds; `make_backend(feat_fm)` selects it automatically for adopted
+  features. Live smoke of `INIT-2026-0001/F06` (`RestoManagerApp/Backend#287`):
+  discovery, adopt, and report-back all PASS; issue fully restored post-smoke. **One
+  outstanding finding:** adopted folders fail `lint_plan.py` because orchestrator issue
+  bodies use `## ATX` headings while the linter expects `**bold**`/plain — a follow-on
+  fix (`FEAT-2026-0004` or gate 4) will broaden the section detector.
+
+The multi-gate forward-design model (each gate's `plan-next` drafts the next) is
+proven across three gates; treat the methodology contracts as still-moving until
+more features confirm them.
 
 ## License
 
