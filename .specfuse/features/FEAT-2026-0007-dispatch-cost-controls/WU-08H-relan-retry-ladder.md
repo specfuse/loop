@@ -3,8 +3,9 @@ id: FEAT-2026-0007/T08H
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 225.195
 ---
 
 # Hygiene: re-land the retry-ladder code that T04 reported done but never wrote
