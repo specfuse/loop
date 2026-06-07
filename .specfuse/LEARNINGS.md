@@ -363,3 +363,39 @@ promoted here.
   criteria — specifically which fields will be absent from the implementing WU's
   own `events.jsonl` entry — so a reviewer reading the log doesn't flag the
   absence as a correctness bug.
+
+- [FEAT-2026-0007/G1-LESSONS] The `code` gate (`python3 -m unittest discover`)
+  passes when no new tests are registered — it cannot detect that required new
+  symbols, files, or functions were never written. T04 declared `status: complete`,
+  the driver committed only the WU status flip, and verification passed on the
+  unchanged codebase because the existing tests made no assertion about the absent
+  functions. Rule: any WU that requires new importable symbols must include an
+  explicit existence check in its own Verification section — not just "run the
+  code gate." The canonical form is `python3 -c "from module import symbol_name"`
+  for functions, or `python3 -c "from module import CONSTANT_NAME"` for constants;
+  a `grep -c "^def symbol_name"` on the target file is an acceptable alternative
+  when the import would trigger side-effects. Without this, an agent can claim
+  complete without having written any production code and pass driver verification.
+
+- [FEAT-2026-0007/G1-LESSONS] Escalation triggers guard against wrong changes
+  but not against absent changes. T04's trigger read "stop if changing
+  `dispatch()`'s signature breaks T02 or T03 tests" — a correct wrong-change
+  guard. Its mirror was missing: "stop if the required functions are absent from
+  your edits." Rule: every implementation WU that requires new named symbols must
+  include a completeness escalation trigger alongside any correctness trigger. The
+  canonical form is: "If [required_function_name] / [required_file] is absent
+  from the files you edited, emit `status: blocked` — do not claim complete." The
+  driver's verification cannot substitute for this because it runs gates against
+  the post-commit tree; a completeness gap that passes the gates is invisible to
+  the driver and only becomes visible at integration time.
+
+- [FEAT-2026-0007/G1-LESSONS] When WU N produces a constant, directive, or prose
+  artifact that WU N+1 must extend or specialize (e.g., T03 produced the
+  `CAVEMAN_DIRECTIVE` body; T04 needed a "softer" variant of it), WU N's spec
+  must either specify the content or include a note: "the exact text will be
+  inferred by WU N+1 from this WU's output." Without that note, WU N+1's author
+  has no spec anchor and the agent must infer the upstream content from the commit
+  diff — which is correct in context but makes the dependency invisible to future
+  readers. Rule: when a chain of WUs progressively refines a shared artifact,
+  document the inheritance relationship explicitly in each WU's Context section so
+  the dependency is auditable without reading commit history.
