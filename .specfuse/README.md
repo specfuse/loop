@@ -35,6 +35,8 @@ isolated behind a seam (see the end of this file).
   scripts/
     loop.py                   # the driver
     lint_plan.py              # structural validator (also plan-next's verification gate)
+    gh_features.py            # list a repo's open specfuse:feature issues as candidates
+    adopt_feature.py          # scaffold a feature folder from a picked GitHub issue
   templates/
     PLAN.template.md  GATE.template.md  WU.template.md
 ```
@@ -55,8 +57,9 @@ pip install pyyaml
 ```
 
 Author a feature folder from the templates (the included `FEAT-2026-0001-health-endpoint`
-is a worked example you can copy and adapt). Then create the feature branch named in
-PLAN.md's frontmatter.
+is a worked example you can copy and adapt), or adopt one from a GitHub `specfuse:feature`
+issue via the `/adopt-feature` skill or `python .specfuse/scripts/adopt_feature.py <repo>
+<issue-number>`. Then create the feature branch named in PLAN.md's frontmatter.
 
 ## The lifecycle
 

@@ -82,13 +82,20 @@ repo's `specfuse:feature` issues as feature candidates (injectable `gh` runner
 for fully offline unit testing). Both implementation WUs completed in one
 attempt with no escalations. GATE-01 status: `passed`.
 
-**Gates 2–3 (planned).** Gate 2: the write/adopt path — turn a picked GitHub
-issue into a dispatchable loop feature folder. Gate 3: report-back and smoke
-test — a `GitHubBackend` seam for issue-label state transitions, then one real
-orchestrated feature (`INIT-2026-0001/F06`) dispatched end-to-end. Each gate's
-WUs are drafted by the preceding gate's `plan-next`.
+**Gate 2 (passed).** The write/adopt path: `.specfuse/scripts/adopt_feature.py`
+scaffolds a dispatchable loop-feature folder from a picked `specfuse:feature`
+issue — PLAN.md frontmatter (including `source_issue_url` and `initiative` when
+present), GATE-01/02 files, WU-01 seeded verbatim from the raw issue body, and
+gate-1 closing WUs 90–93 with generic placeholder bodies. `gh_features.py`
+widened by one line to expose issue `body`. The `/adopt-feature` interactive
+skill wraps the script as a pick-list-then-adopt flow. Both implementation WUs
+completed in one attempt with no escalations. GATE-02 status: `passed`.
 
-**Status: active.** Detail gate 2 WUs when ready to arm.
+**Gate 3 (planned).** Report-back and smoke test — a `GitHubBackend` seam for
+issue-label state transitions, then one real orchestrated feature
+(`INIT-2026-0001/F06`) dispatched end-to-end. Drafted by gate 2's plan-next.
+
+**Status: active.** Gates 1 and 2 done; gate 3 planned.
 
 ## Notes
 

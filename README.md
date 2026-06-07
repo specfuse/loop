@@ -42,7 +42,10 @@ the planning rigor Ralph's bare task list lacks.
   features dispatched by the Specfuse Orchestrator, identified by
   `INIT-YYYY-NNNN/FNN` IDs — the loop treats both namespaces identically; only
   the ID root differs. Use `.specfuse/scripts/gh_features.py` to discover a
-  target repo's open `specfuse:feature` issues as feature candidates.
+  target repo's open `specfuse:feature` issues as feature candidates; use
+  `.specfuse/scripts/adopt_feature.py <repo> <issue-number>` (or the
+  interactive `/adopt-feature` skill) to scaffold a dispatchable feature
+  folder from a picked issue.
 - The **driver** (`.specfuse/scripts/loop.py`) walks the current gate's ready
   work units, dispatches each as a fresh `claude -p` session, runs the unit's
   verification itself as the exit oracle, and commits one squashed,
@@ -97,7 +100,7 @@ specfuse-loop/
     ├── roadmap.template.md  verification.yml.example  LEARNINGS.md
     ├── rules/result-contract.md
     ├── skills/verification/SKILL.md
-    ├── scripts/{loop.py, lint_plan.py, gh_features.py}
+    ├── scripts/{loop.py, lint_plan.py, gh_features.py, adopt_feature.py}
     ├── templates/{PLAN,GATE,WU}.template.md
     └── features/FEAT-2026-0001-health-endpoint/   (the worked example)
 ```
@@ -105,12 +108,17 @@ specfuse-loop/
 ## Status
 
 Early. The driver, linter, parsing, dependency ordering, draft/arm gating, and
-verification wiring are tested. Gate 1 of `FEAT-2026-0003` (the loop's first
-real multi-gate feature) demonstrated that `plan-next` drafts a gate you would
-actually arm: both implementation WUs completed in one attempt with no
-escalations, the plan held without deviation, and the full closing sequence ran
-cleanly. The gate *cycle as a way of working* is proven at one data point;
-treat the methodology contracts as still-moving until more features confirm it.
+verification wiring are tested. Gates 1 and 2 of `FEAT-2026-0003` (the loop's
+first real multi-gate feature) are done. Gate 1 (the read path) demonstrated
+that `plan-next` drafts a gate you would actually arm: both implementation WUs
+completed in one attempt with no escalations, the plan held without deviation,
+and the full closing sequence ran cleanly. Gate 2 (the adopt path) delivered
+`adopt_feature.py` and the `/adopt-feature` skill — a human can now go from a
+GitHub `specfuse:feature` issue to a dispatchable loop-feature folder; both
+gate-2 implementation WUs completed in one attempt with no escalations. The
+multi-gate forward-design model (each gate's `plan-next` drafts the next) is
+proven across two gates; treat the methodology contracts as still-moving until
+more features confirm it.
 
 ## License
 

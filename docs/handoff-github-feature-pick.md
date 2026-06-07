@@ -53,19 +53,47 @@ initiative      orchestrator top; cross-repo            INIT-YYYY-NNNN
 
 ## 3. What to build
 
+**Delivery status (as of gate 2):** Steps 1 and 2 are shipped. Step 3 uses the existing
+loop unchanged. Step 4 is gate 3's scope — not yet delivered.
+
 A GitHub feature-pick capability for the loop. Behaviorally:
 
-1. **Discover:** query a target repo's open issues labelled `specfuse:feature`. Each is a feature.
-2. **Adopt:** turn a picked issue into a loop feature folder under `.specfuse/features/`, using the
-   issue ID as the feature ID (`INIT-2026-0001/F03` → a folder/PLAN the loop can run; pick a
-   filesystem-safe encoding, e.g. `INIT-2026-0001-F03-<slug>`). The issue body's five sections seed
-   the feature's gate-1 authoring; record the source issue URL + the `initiative:` label.
-3. **Decompose + grind:** the loop's existing gate cycle takes over — decompose into gates + WUs,
-   dispatch fresh sessions, verify-as-oracle, squash per WU. No change to the core loop here.
-4. **Report back:** state lives in GitHub issue labels + the feature's correlation thread (this is
-   the orchestrator's "state backend" seam — see methodology §10). At minimum: emit feature
-   started/completed signals the orchestrator can observe (issue label transitions and/or the
-   per-feature event log). The RESULT block already maps to the orchestrator's `task_completed`.
+1. **Discover:** query a target repo's open issues labelled `specfuse:feature`. Each is a
+   feature. **Shipped (gate 1):** `.specfuse/scripts/gh_features.py` — run
+   `python3 .specfuse/scripts/gh_features.py <repo>` or call `list_features('<repo>')`
+   programmatically from `.specfuse/scripts/`.
+
+2. **Adopt:** turn a picked issue into a loop feature folder under `.specfuse/features/`,
+   using the issue ID as the feature ID (`INIT-2026-0001/FNN` → folder on disk).
+   **Shipped (gate 2):**
+
+   - CLI: `python3 .specfuse/scripts/adopt_feature.py <repo> <issue-number>`
+   - Interactive: `/adopt-feature` skill (enumerates candidates, accepts pick, runs script)
+
+   The script names the folder `{encoded-id}-{slug}` where slashes are replaced with
+   dashes (`INIT-2026-0001/FNN` → `INIT-2026-0001-FNN-<slug>`; `FEAT-YYYY-NNNN` stays
+   unchanged). It writes: `PLAN.md` (frontmatter + 3-gate skeleton with empty work-unit
+   lists for gates 2 and 3), `GATE-01.md`, `GATE-02.md`, `WU-01-<slug>.md` (seeded
+   verbatim with the raw issue body), and gate-1 closing WUs 90–93 (generic placeholder
+   bodies — structurally correct, not immediately dispatchable; expect human or `plan-next`
+   refinement before arming). `source_issue_url` and `initiative` (omitted when absent) are
+   recorded in `PLAN.md` frontmatter. The new feature folder starts with `status: planned`;
+   arm it via `/pick-feature` or by editing the roadmap directly.
+
+   **Divergence from planned shape:** the original description said "the issue body's five
+   sections seed the feature's gate-1 authoring." The as-built behavior is narrower: only
+   WU-01 receives the raw issue body; the gate-1 closing WUs (G1-RETRO through G1-PLAN)
+   receive generic placeholder text.
+
+3. **Decompose + grind:** the loop's existing gate cycle takes over — decompose into gates
+   + WUs, dispatch fresh sessions, verify-as-oracle, squash per WU. No change to the core
+   loop here.
+
+4. **Report back:** state lives in GitHub issue labels + the feature's correlation thread
+   (the orchestrator's "state backend" seam — see methodology §10). At minimum: emit
+   feature started/completed signals the orchestrator can observe (issue label transitions
+   and/or the per-feature event log). The RESULT block already maps to the orchestrator's
+   `task_completed`. **Not yet delivered; gate 3's scope.**
 
 ### Decisions already locked (don't re-litigate)
 - **Uniform:** every dispatched unit IS a loop feature; small ones are trivially single-gate /
