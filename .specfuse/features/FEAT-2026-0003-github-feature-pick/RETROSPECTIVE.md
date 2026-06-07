@@ -485,3 +485,448 @@ decide). Q1 and Q2 are forwarded to G2-PLAN / gate 3 as open questions.
 **The forward-design model is proven again.** G1-PLAN drafted gate 2 correctly
 from gate 1's artifacts alone. G2-PLAN, running now from gate 2's artifacts, is
 in the same position for gate 3. The multi-gate proof holds.
+
+---
+
+# Gate 3 retrospective — FEAT-2026-0003
+
+Feature: GitHub feature-pick for the loop  
+Gate 3: Report back + end-to-end smoke  
+Branch: `feat/FEAT-2026-0003-github-feature-pick`  
+Date run: 2026-06-07
+
+---
+
+## Context
+
+Gate 3 carried three substantive WUs: T05 (`Backend` seam widening with
+lifecycle hooks), T06 (`GitHubBackend(Backend)` implementation + factory), and
+T07 (live end-to-end smoke against `RestoManagerApp/Backend#287`). T05 and T06
+were dispatched via the driver (offline, deterministic). T07 was executed
+**out-of-loop by the human operator** — a deliberate gate-3 arming decision to
+keep production-issue mutation under direct control.
+
+The events.jsonl gate-3 slice:
+
+| Event | Timestamp (UTC) | Detail |
+|---|---|---|
+| T05 task_started | 02:23:09 | — |
+| T05 task_completed | 02:26:50 | 1 attempt, $0.651, 11,256 output tokens |
+| T06 task_started | 02:26:50 | — |
+| T06 task_completed | 02:32:46 | 1 attempt, $0.827, 19,108 output tokens |
+| gate_reached (gate 3) | 02:32:47 | Fired after T05+T06; T07 is out-of-loop |
+
+T07 is not in events.jsonl (human-run, no driver events). The evidence record
+is the smoke journal `SMOKE-INIT-2026-0001-F06.md` and the commit sequence on
+the feature branch:
+
+- `c15b400` — feat: Widen the Backend seam (T05)
+- `77d394e` — feat: GitHubBackend(Backend) implementation (T06)
+- `a363060` — chore: gate 3 awaiting_review
+- `370a517` — test(smoke): live smoke — discovery/adopt/report-back PASS; lint finding (T07)
+- `2e3e2de` — chore: T07 done, reopen gate 3 for closing sequence
+
+The closing-sequence WUs (G3-RETRO through G3-PLAN) have no events.jsonl data;
+they fire sequentially after gate 3 is re-opened. G3-RETRO is the current session.
+
+---
+
+## T05 — Widen the Backend seam with feature/gate lifecycle hooks
+
+**Status:** done in 1 attempt  
+**Duration:** ~3m41s (02:23:09 → 02:26:50 UTC)  
+**Cost:** $0.651 | output tokens: 11,256 | cache read: 987k | cache creation: 49k
+
+### What worked
+
+**The seam shape was correct on the first attempt.** Three lifecycle hooks
+(`on_feature_start`, `on_gate_passed`, `on_feature_complete`) plus a module-
+level factory `make_backend(feat_fm)` are exactly the right contract surface
+for T06's `GitHubBackend` subclass. T06 consumed T05's seam without any
+modification to T05's signatures — the seam was not under-designed.
+
+**The "exactly two files" constraint held cleanly.** The WU produced exactly
+`loop.py` and a new `tests/test_backend.py` — the agent chose the new-test-
+module path (declaring it in the RESULT block as required) rather than
+complicating `tests/test_loop.py`. No scope creep.
+
+**The `on_feature_complete` call-site location was handled correctly.** GATE-03-
+REVIEW.md's Flagged 3 warned that `run()` has four exit paths and
+`on_feature_complete` should fire only on the "all gates passed" path. The
+agent found loop.py:590-591 as the correct anchor without escalating — the
+line-number anchoring in the WU's AC 5 provided sufficient precision.
+
+**Output volume well within range.** At 11,256 tokens, T05 is the smallest
+implementation WU in the feature. The mechanical nature of the task (add three
+stubs + a factory + tests) maps correctly to this size.
+
+### What failed / concerns
+
+Nothing failed. One minor observation: `on_gate_passed` is wired as a no-op
+v0.1 stub. GATE-03-REVIEW.md Q3 raised the YAGNI counter-argument (if no gate-
+level label transition is needed now, the hook is dead code). The stub was kept
+on the principle that adding a hook later requires re-touching the seam while
+adding behavior to an existing hook is non-breaking. The question was not
+escalated — the WU spec made the choice, and the agent followed it.
+
+### Missing or ambiguous rules/templates
+
+None. The exact line-range anchors in the WU (loop.py:586, loop.py:590-591,
+loop.py:748) prevented the agent from drifting to wrong call-sites.
+
+---
+
+## T06 — GitHubBackend(Backend) implementation — label-transition state backend
+
+**Status:** done in 1 attempt  
+**Duration:** ~5m56s (02:26:50 → 02:32:46 UTC)  
+**Cost:** $0.827 | output tokens: 19,108 | cache read: 1.14M | cache creation: 53k
+
+### What worked
+
+**The label-scheme correction (from G2-PLAN's draft to the orchestrator's
+canonical namespace) was caught and applied at arming time.** G2-PLAN's
+GATE-03-REVIEW.md proposed `loop:in-progress` / `loop:complete` labels,
+invented from first principles. At gate-3 arming time, the orchestrator's docs
+(`RestoManagerApp/orchestrator/docs/naming-convention.md §5.1` and
+`shared/schemas/labels.md`) confirmed the canonical lifecycle namespace is
+`state:*` — already in use on `#287` as `state:ready`. T06's WU spec was
+updated before dispatch to use `state:in-progress` (add) / `state:ready`
+(remove) on `on_feature_start`, and `state:done` (add) / `state:in-progress`
+(remove) on `on_feature_complete`. The smoke confirmed these transitions fired
+exactly. This is the review-before-arm checkpoint working as designed.
+
+**The "exactly three files" constraint held.** `gh_backend.py` (new),
+`tests/test_gh_backend.py` (new), and the `make_backend` body edit in
+`loop.py` — exactly the three declared files.
+
+**Offline-first held.** No network call fired during driver verification. The
+injectable `_default_runner` pattern (mirroring `gh_features.py` lines 22-36)
+enabled full coverage without `gh` on the test path.
+
+**Factory selection by `source_issue_url` is the correct discriminator.**
+The WU confirmed the design decision from GATE-03-REVIEW.md: selecting by
+`source_issue_url` is more direct than selecting by ID origin (`INIT-…` prefix)
+because `source_issue_url` is the exact signal that "this feature was adopted
+from a real GitHub issue we can label." An `INIT-…/FNN` folder created by hand
+(bypassing `adopt_feature.py`) would not carry a `source_issue_url` and should
+get plain `Backend`. The malformed-URL graceful fallback was implemented and
+tested per G2-LESSONS' failure-mode test pattern.
+
+**Output volume well within range.** 19,108 tokens — large relative to T05
+(11k) and T01/T02 (~13-16k each) but far below T03's 95k danger zone. The WU
+delivered one new module, one test file, and one function-body edit.
+
+### What failed / concerns
+
+No failures during the driver run. One concern carried forward: the
+`on_gate_passed` no-op stub passes the `check=True` subprocess call zero times,
+which means if a future maintainer adds gate-level label logic, they will also
+need to add test coverage that was not scaffolded here. This is an intentional
+gap (the stub's docstring says why), but a future WU adding gate-level behavior
+needs to remember to add the corresponding test.
+
+### Missing or ambiguous rules/templates
+
+The label-scheme gap (G2-PLAN invented labels without checking orchestrator
+docs) is the clearest example in this feature of a review check catching a
+design error before dispatch. GATE-03-REVIEW.md Flagged 2 named it; the human
+acted on it at arming time. No rule currently requires "verify label names
+against a cross-repo contract before locking WU ACs" — this check was
+discretionary. A future WU involving cross-repo label contracts should have an
+explicit pre-arm verification step in its WU spec.
+
+---
+
+## T07 — Live end-to-end smoke (out-of-loop, human-operated)
+
+**Status:** done (human-operated, out-of-loop by gate-3 arming decision)  
+**Evidence:** `SMOKE-INIT-2026-0001-F06.md`
+
+### What worked
+
+**Discovery — PASS.** `python3 .specfuse/scripts/gh_features.py
+RestoManagerApp/Backend` returned 13 `specfuse:feature` candidates. Issue #287
+was parsed correctly:
+
+```
+INIT-2026-0001/F06	implementation	review	https://github.com/RestoManagerApp/Backend/issues/287
+```
+
+All four fields (`feature_id`, `task_type`, `autonomy`, `url`) were correctly
+extracted from title + labels.
+
+**Adopt (folder creation) — PASS.** `python3 .specfuse/scripts/adopt_feature.py
+RestoManagerApp/Backend 287` created:
+
+```
+.specfuse/features/INIT-2026-0001-F06-conform-publishroster-to-validated-spec/
+```
+
+The filesystem-safe `INIT-2026-0001/F06` → `INIT-2026-0001-F06` slug encoding
+worked. The folder, WU-01 (with issue body embedded), and closing-sequence WUs
+were written.
+
+**Report-back — PASS.** The full label-transition sequence fired correctly
+against the live GitHub API:
+
+| Step | gh call | labels after |
+|---|---|---|
+| BEFORE | — | `state:ready` + 4 stable labels |
+| `on_feature_start` | `gh issue edit 287 --add-label state:in-progress --remove-label state:ready` | `state:in-progress` + 4 |
+| `on_feature_complete` | `gh issue edit 287 --add-label state:done --remove-label state:in-progress` | `state:done` + 4 |
+| restore | `gh issue edit 287 --add-label state:ready --remove-label state:done` | `state:ready` + 4 |
+
+`on_gate_passed` fired zero `gh` calls (confirmed v0.1 no-op). `make_backend`
+selected `GitHubBackend` for the `source_issue_url` frontmatter and plain
+`Backend` otherwise. **#287 fully restored to pre-smoke label state — no
+residue.**
+
+### What failed / concerns
+
+**Adopted-folder lint — FAIL (section-heading format gap).** `lint_plan.py
+.specfuse/features/INIT-2026-0001-F06-conform-publishroster-to-validated-spec`
+reported 5 missing sections: `Context`, `Acceptance criteria`, `Do not touch`,
+`Verification`, `Escalation triggers`.
+
+Root cause: **not** missing sections. Issue #287's body contains all five, but
+as Markdown ATX headings (`## Context`, `## Acceptance criteria`, etc.). The
+loop's `lint_plan.py` section detector matches `^(\**)<section>` (bold or
+plain), and does NOT recognize `## ATX` headings. An orchestrator issue body
+embedded verbatim by `adopt_feature.py` therefore fails the linter despite
+being structurally complete.
+
+This is a **section-heading-format contract gap** between the two surfaces:
+
+- Orchestrator issue bodies use ATX headings (`## Context`).
+- The loop's WU template and linter use bold-preamble (`**Context.**`).
+
+This was a known open question: GATE-02-REVIEW.md §3 flagged that "issue bodies
+are well-formed five-section WUs the linter accepts" was an assumption; GATE-03-
+REVIEW.md Q5 carried it forward. The smoke surfaced it as a real, specific,
+reproducible mismatch. The capability's core paths (discovery, adopt, report-
+back) work; a clean end-to-end grind is blocked until this is resolved.
+
+**No escalation triggered** at smoke time. The finding is documented in the
+journal and forwarded to G3-PLAN for branch decision (widen `lint_plan.py` vs
+normalize headings in `adopt_feature.py` vs fix the orchestrator template).
+
+**Recommended option from journal:** broaden `lint_plan.py` section detection
+to accept both `^(#+\s*)` ATX headings and the existing `^(\**)` bold/plain
+pattern. ATX is the more standard markdown; the loop should accept what real
+issue bodies use.
+
+### Missing or ambiguous rules/templates
+
+The smoke confirmed that the "issue-body contract" was underspecified at T03
+authoring time: the WU tested the happy path (section present) and the
+malformed case (section absent entirely), but the third case — "section present
+but in a different heading format" — was not anticipated. A future adopt WU
+should explicitly specify which heading formats the linter accepts.
+
+No rule governs "verify cross-repo format contracts (heading style, field
+naming) against the other surface's actual examples before writing the
+adapter." This check is discretionary; T07's safety preamble covers label-state
+checks but not format-contract checks. The smoke journal produced the evidence
+gap-detection requires.
+
+---
+
+## G3-RETRO — Gate-3 retrospective (this WU)
+
+**Status:** executing (1st attempt)  
+**Design:** sonnet-4-6, appends Gate 3 section to RETROSPECTIVE.md.
+
+This WU is the current session. The events.jsonl has no G3-RETRO data at time
+of writing; the WU reads the gate-3 event slice, the commits, the smoke
+journal, the WU specs, and the GATE-03-REVIEW.md to synthesize against concrete
+evidence.
+
+*Execution data not available at time of writing — this is the current session.*
+
+---
+
+## G3-LESSONS — Gate-3 lessons
+
+**Status:** pending (0 attempts)  
+**Design:** sonnet-4-6, appends generalizable entries to `.specfuse/LEARNINGS.md`.
+
+Will promote the subset of this retrospective that changes how a future WU is
+written. Likely candidates: the label-scheme cross-repo verification gap (check
+the other surface's actual label names before locking WU ACs), the section-
+heading-format contract gap (specify heading format in adopt WU specs), and
+the review-before-arm checkpoint's catch of G2-PLAN's `loop:*` invention.
+
+*No execution data — fires after this WU completes.*
+
+---
+
+## G3-DOCS — Gate-3 documentation update
+
+**Status:** pending (0 attempts)  
+**Design:** sonnet-4-6, reconciles surrounding docs and roadmap with gate 3's
+deliverables. Will update `docs/handoff-github-feature-pick.md` with the
+adopt-step heading-format finding, update the feature's roadmap row status, and
+add the smoke journal as the live-evidence artifact reference.
+
+*No execution data — fires after G3-LESSONS completes.*
+
+---
+
+## G3-PLAN — Gate-3 plan-next (terminal case)
+
+**Status:** pending (0 attempts)  
+**Design:** claude-opus-4-7. Terminal-case handler: branch-A (feature-arc
+retrospective + closure) if the smoke finding is bounded and a follow-on WU or
+`FEAT-2026-0004` can own the `lint_plan.py` fix; branch-B (extend PLAN.md with
+a gate 4) if the evidence demands it. The lint finding is likely a gate-4 or
+follow-on feature, not a feature-reopening condition — branch-A is the expected
+outcome, but the call belongs to G3-PLAN after reading this retrospective and
+G3-LESSONS.
+
+*No execution data — fires after G3-DOCS completes.*
+
+---
+
+## Gate-3 observations
+
+### Gate-cutting: did "report back + smoke" cohere as one gate?
+
+Yes. "Report back + smoke" is a single logical milestone: the deliverable is
+a `GitHubBackend` that emits observable signals AND a live confirmation that
+the signals reach the real GitHub API. Splitting into two gates (offline wiring
+vs smoke) would have been defensible — and T05+T06+T07's internal offline/live
+split already mirrors that boundary — but the gate-level granularity is correct
+because both offline wiring and live smoke are needed before the roadmap goal
+is evaluable. You cannot claim "report-back works" from T05+T06 alone; only
+T07 closes that claim.
+
+T07's out-of-loop execution did not create a gate-structure problem. The WU was
+always designed to be human-operated; the gate boundary just means T05+T06
+verify before T07 runs. The alternative (T07 as its own gate-4) would add a
+gate just to wrap a single human-run step, which is overhead without benefit
+at this scope.
+
+**If gate-4 would make sense:** only if the lint-finding fix (broaden
+`lint_plan.py`) needs to be verified against another live smoke. That is a
+bounded scope appropriate for a gate-4 or a `FEAT-2026-0004` follow-on; the
+decision belongs to G3-PLAN.
+
+### WU sizing: did the three-WU split hold under verification?
+
+Yes, cleanly. Token profile:
+
+| WU | Output tokens | Duration | Cost |
+|----|-------------|----------|------|
+| T05 (seam widening) | 11,256 | 3m41s | $0.651 |
+| T06 (GitHubBackend) | 19,108 | 5m56s | $0.827 |
+| T07 (live smoke) | n/a (human) | — | — |
+
+Neither T05 nor T06 approached the 80k+ danger zone flagged by G2-LESSONS. The
+three-WU split was the explicit lesson from T03's 95k output: separate the seam
+widening (T05), the subclass implementation (T06), and the live validation (T07)
+so no single WU carries both the implementation and its live-API proof. The
+split worked exactly as intended.
+
+The T05→T06 handoff was clean: T06 consumed T05's seam without modifications.
+This confirms the seam was correctly designed at T05 time — the fear from
+GATE-03-REVIEW.md §3 (that `on_feature_complete` might not have a clean
+call-site) did not materialize.
+
+### Whether the plan held as drafted by G2-PLAN
+
+The plan held with one substantive correction and zero escalations:
+
+**What was corrected:** G2-PLAN's GATE-03-REVIEW.md proposed `loop:in-progress`
+/ `loop:complete` as the lifecycle label names. The orchestrator's docs
+(`naming-convention.md §5.1`, `labels.md`) confirmed the canonical scheme is
+`state:*` (`state:ready → state:in-progress → state:done`). T06's WU spec was
+updated to the canonical names before dispatch. The smoke confirmed the
+corrected names are what `#287` carries and what `GitHubBackend` transitions.
+GATE-03-REVIEW.md Flagged 2 explicitly named "check the orchestrator's poller
+spec before arming" as the resolution path — the path was taken.
+
+**The three flagged risks from GATE-03-REVIEW.md, resolved:**
+
+1. **T07 mutates a real production issue (Flagged 1):** Out-of-loop + safety
+   preamble + cleanup AC mitigated the risk. #287 was fully restored.
+2. **Label-scheme coordination (Flagged 2):** Caught and corrected at arming
+   time. The design error (invented labels) was upstream in G2-PLAN; the
+   review process caught it before any code was dispatched.
+3. **Backend seam call-site assumption (Flagged 3):** T05 found the correct
+   anchor (loop.py:590-591) without escalation. The four exit-path analysis in
+   the review document was accurate; the agent implemented it correctly.
+
+**Open question Q5 materialized as predicted:** The section-heading-format
+mismatch was flagged in GATE-03-REVIEW.md Q5 ("if #287's body is malformed")
+and did materialize — though "malformed" was the wrong framing; the body is
+well-formed in Markdown, just using ATX headings instead of the loop's bold-
+preamble convention. The forwarding from gate 2 → gate 3 review → smoke
+journal is the forward-design model producing a concrete, grounded finding
+rather than a theoretical risk.
+
+---
+
+## Multi-gate proof
+
+### Did plan-next drafting produce three coherent, dispatchable gates?
+
+Yes. The evidence:
+
+**Gate 1 → gate 2:** G1-PLAN (Opus, 01:00-01:08 UTC, 37,976 output tokens)
+drafted gate 2's two WUs (T03 and T04) from gate 1's retrospective and lessons.
+Gate 2 dispatched and completed both WUs in 1 attempt each. The three
+pre-arm concerns from GATE-02-REVIEW.md (T03's 4-file bundle, T04's fig-leaf
+automated verification, malformed-body assumption) all resolved — one
+(malformed-body test) was acted on as AC 8e, strengthening T03 before dispatch.
+
+**Gate 2 → gate 3:** G2-PLAN (Opus, 01:57-02:05 UTC, 35,861 output tokens)
+drafted gate 3's three WUs (T05, T06, T07) and the GATE-03-REVIEW.md. Gate 3
+dispatched T05 and T06 in 1 attempt each and ran T07 out-of-loop with a PASS
+on the core paths and a concrete finding on the lint contract. The one design
+error (label-scheme invention) was caught by the review-before-arm checkpoint
+G2-PLAN itself named as the first action under Flagged 2.
+
+**Gate 3 → terminal case (G3-PLAN):** G3-PLAN is pending, but the evidence
+it will consume — this retrospective, the smoke journal, and G3-LESSONS — is
+coherent and grounded. G3-PLAN will choose branch-A (close with feature-arc
+retrospective) or branch-B (extend with gate 4 for the lint fix).
+
+### What does the evidence say about the forward-design move?
+
+The dogfood was set up to test whether a `plan-next` WU can draft the next
+gate from only the prior gate's retrospective + lessons — no human narrative,
+no re-reading of all prior artifacts. The evidence:
+
+- G1-PLAN drafted gate 2 correctly.
+- G2-PLAN drafted gate 3 correctly in shape, with one first-principles label
+  scheme that needed a cross-repo correction at arming time.
+- Both plan-next WUs were Opus-4-7; both consumed ~36-38k output tokens and
+  ~2.3-2.4M cache-read tokens.
+
+The forward-design move works at gate scope. The one correction (label names)
+was not a structural failure of the plan — G2-PLAN named the uncertainty,
+flagged the check, and the check was performed. The plan-next drafting cycle is
+sound; it requires the human-in-the-loop to perform the cross-repo verification
+steps that plan-next correctly names but cannot execute itself.
+
+### Was the roadmap goal met?
+
+**Partially.** PLAN.md's roadmap goal: *"The loop can pick a feature from a
+target repo's GitHub issues (specfuse:feature) and grind it through its gate
+cycle, alongside today's locally-authored features."*
+
+- **Pick (discovery + adopt):** ✓ Fully proven live. `gh_features.py` finds
+  `specfuse:feature` issues; `adopt_feature.py` creates a dispatchable folder.
+- **Report back:** ✓ Fully proven live. `GitHubBackend` transitions
+  `state:ready → state:in-progress → state:done` on the real GitHub issue.
+- **Grind through the gate cycle:** ✗ Not yet end-to-end clean. The adopted
+  folder fails `lint_plan.py` due to the ATX-heading format gap. The folder
+  cannot be dispatched to the loop without first resolving the section-detector
+  contract.
+
+The capability is operational for three of four mechanisms. The blocking gap
+is in a single linter detection rule, not in the core architecture. Discovery,
+adopt, and report-back are proven correct against a real GitHub issue. The
+`lint_plan.py` fix is a bounded follow-on; G3-PLAN will declare whether it
+belongs in a gate 4 or a `FEAT-2026-0004`.

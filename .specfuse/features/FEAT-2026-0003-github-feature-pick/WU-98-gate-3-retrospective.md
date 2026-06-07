@@ -2,7 +2,11 @@
 id: FEAT-2026-0003/G3-RETRO
 type: retrospective
 model: claude-sonnet-4-6
-status: pending
+status: done
+attempts: 1
+cost_usd: 0.54805
+input_tokens: 10
+output_tokens: 14861
 ---
 
 # Gate 3 retrospective
