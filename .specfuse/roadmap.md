@@ -24,7 +24,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
-| FEAT-2026-0008 | Driver completeness-guard                   | active   | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
+| FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -253,6 +253,47 @@ spec-side, so it belongs in a successor feature rather than a Gate 3. **Strongly
 recommended next feature: FEAT-2026-0008 "Driver completeness-guard."** See
 `RETROSPECTIVE.md §Feature-arc verdict` for the full terminal rationale and the
 G4-LESSONS three-test analysis.
+
+## FEAT-2026-0008 — Driver completeness-guard
+
+**Why.** FEAT-2026-0007 shipped four cost-control levers but T04 / T08H / T08
+all reported `status: done` while landing no production code (hollow passes,
+each via a 0-token session that the driver committed because the WU
+frontmatter status flip was the only staged change). Agent-side safeguards
+(smoke-import AC, completeness escalation triggers) are bypassed when the
+agent session crashes or produces 0 tokens. The fix is driver-side.
+
+**Gate 1 (passed).** Three independent driver-side guards landed in one
+attempt each, all wired into the attempt loop in `run()`:
+
+- **T01** — Zero-token attempt guard: `is_zero_token_attempt(usage)` at
+  `loop.py:711`, called at `loop.py:885` before RESULT-block parse. A
+  session billing `input_tokens: 0` is treated as a failed attempt; three
+  in a row escalate to `blocked_human` with `reason: "all_attempts_zero_token"`.
+  `usage is None` (cost tracking disabled) does NOT trigger the guard.
+- **T02** — `files_changed` diff guard: `verify_files_changed(result,
+  head_before)` at `loop.py:622`, called at `loop.py:901` between
+  `parse_result_block` and `squash_commit`. Any agent-claimed `files_changed`
+  path that does not differ from HEAD fails the attempt before squash.
+  Empty / absent `files_changed` opts out (pre-existing-WU compatibility).
+- **T03** — WU-Verification smoke-import runner: `extract_smoke_imports` /
+  `run_smoke_imports` at `loop.py:669` / `:684`, called at `loop.py:1110`-`:1112`
+  between successful verify+squash and the status-flip-to-done. Conservative
+  import-form regex only (no free-form `python3 -c` execution). A failing
+  smoke check rolls back the squash via `git reset --hard <head_before>`
+  and counts as a verification failure.
+
+All three landed in one attempt each (T01 $2.61 / T02 $1.75 / T03 $1.66,
+~17 min total). GATE-01 status: `passed`.
+
+**Status: done.** `roadmap_goal` met — all three guards present in `loop.py`
+AND wired into the attempt loop in `run()`. Per the FEAT-2026-0007 verdict's
+mandatory recommendation, any one of the three would have caught T04/T08H/T08;
+all three together close the gap structurally. The deferred FEAT-2026-0007
+work (T04 retry escalation ladder, T08 telemetry) can now be relanded under
+FEAT-2026-0009 — a third silent-no-op is structurally impossible. See
+`RETROSPECTIVE.md §Feature-arc verdict` for the audit and the recursive
+close-ceremony check.
 
 ## Notes
 

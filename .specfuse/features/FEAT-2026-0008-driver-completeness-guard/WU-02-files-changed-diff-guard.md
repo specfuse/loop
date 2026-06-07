@@ -3,8 +3,12 @@ id: FEAT-2026-0008/T02
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 336.905
+cost_usd: 1.746955
+input_tokens: 22
+output_tokens: 21351
 ---
 
 # `files_changed` diff guard

@@ -433,3 +433,17 @@ promoted here.
   arming the next gate to exercise this mechanism for the first time." The
   implementing gate's own GATE.md is intentionally left without a budget; the
   first exercise belongs to the successor.
+
+- [FEAT-2026-0008/G1-CLOSE] When a feature's whole purpose is to fix a failure
+  mode the methodology itself enables (a hollow pass, a silent no-op, a
+  trust-model gap), its close ceremony must run a recursive audit: did the
+  guards this feature was built to add actually land, AND are they wired into
+  the path they were meant to intercept? Defining the helpers is not enough —
+  an unwired helper is a hollow pass with extra steps. Rule: the close WU for
+  any methodology-fix feature must include a "Guard-helper existence audit"
+  section that runs grep / ls against the named symbols AND a wiring check
+  (`grep -n "<helper_name>(" <target_file>` returns a call site in the path the
+  feature names, not only the definition). If either check fails, the verdict
+  must NOT claim the goal is met and the WU must emit `status: blocked` —
+  hollow-passing the close ceremony of an anti-hollow-pass feature is the
+  worst-case recursive failure and the methodology must catch it.
