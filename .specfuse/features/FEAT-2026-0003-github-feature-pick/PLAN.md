@@ -69,7 +69,25 @@ gates:
         depends_on: [FEAT-2026-0003/G1-DOCS]
   - gate: 2
     file: GATE-02.md
-    work_units: []     # drafted by gate 1's plan-next
+    work_units:
+      - id: FEAT-2026-0003/T03
+        file: WU-03-adopt-script.md
+        depends_on: []
+      - id: FEAT-2026-0003/T04
+        file: WU-04-adopt-skill.md
+        depends_on: [FEAT-2026-0003/T03]
+      - id: FEAT-2026-0003/G2-RETRO
+        file: WU-94-gate-2-retrospective.md
+        depends_on: [FEAT-2026-0003/T03, FEAT-2026-0003/T04]
+      - id: FEAT-2026-0003/G2-LESSONS
+        file: WU-95-gate-2-lessons.md
+        depends_on: [FEAT-2026-0003/G2-RETRO]
+      - id: FEAT-2026-0003/G2-DOCS
+        file: WU-96-gate-2-docs.md
+        depends_on: [FEAT-2026-0003/G2-LESSONS]
+      - id: FEAT-2026-0003/G2-PLAN
+        file: WU-97-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0003/G2-DOCS]
   - gate: 3
     file: GATE-03.md
     work_units: []     # drafted by gate 2's plan-next
