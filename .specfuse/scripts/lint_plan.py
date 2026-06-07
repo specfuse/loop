@@ -51,6 +51,7 @@ _CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
 #   Orchestrated:    INIT-YYYY-NNNN/F<NN>, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 # A bare INIT-YYYY-NNNN (no /FNN segment) is NOT a loop feature ID.
 MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
 CORRELATION_ID_RE = re.compile(
@@ -138,6 +139,12 @@ def lint(feature_dir: Path) -> list[str]:
                 )
             if wfm.get("status") not in VALID_STATUS:
                 errs.append(f"{wfile}: invalid status '{wfm.get('status')}'")
+            _effort = wfm.get("effort")
+            if _effort is not None and _effort not in VALID_EFFORT:
+                errs.append(
+                    f"{wfile}: invalid effort '{_effort}' — must be one of "
+                    f"{sorted(VALID_EFFORT)}"
+                )
             types_in_order.append(wfm.get("type"))
 
             # Dispatchable WUs must have the five mandatory prompt sections.

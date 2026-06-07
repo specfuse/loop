@@ -2,8 +2,12 @@
 id: FEAT-2026-0007/T02
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 238.06
+cost_usd: 0.817826
+input_tokens: 30
+output_tokens: 9221
 ---
 
 # Add effort field and wire `claude -p --effort`

@@ -63,8 +63,10 @@ VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
 DRIVER_VERSION = "0.2.0"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
 
-# How to launch a fresh agent. {model} is filled per WU; the prompt is piped on stdin.
-CLAUDE_CMD = ["claude", "-p", "--model", "{model}"]
+# How to launch a fresh agent. {model} and {effort} are filled per WU; prompt is piped on stdin.
+CLAUDE_CMD = ["claude", "-p", "--model", "{model}", "--effort", "{effort}"]
+
+VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 # Family aliases accepted in WU frontmatter's `model:` field.
 # The CLI resolves them to the latest concrete model at dispatch time;
@@ -104,6 +106,7 @@ class WorkUnit:
     attempts: int
     title: str
     body: str                  # the prompt handed to the session
+    effort: str = "medium"     # low|medium|high|xhigh|max — passed as --effort to claude -p
 
 
 @dataclass
@@ -208,12 +211,19 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     path = feature_dir / ref["file"]
     fm, body = read_frontmatter(path)
     title_m = re.search(r"^#\s+(.*)$", body, re.MULTILINE)
+    effort = fm.get("effort", "medium")
+    if effort not in VALID_EFFORT:
+        raise ValueError(
+            f"{path}: invalid effort '{effort}' — must be one of "
+            f"{sorted(VALID_EFFORT)}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
         depends_on=list(ref.get("depends_on", []) or []),
         type=fm.get("type", "implementation"),
         model=fm.get("model", "claude-sonnet-4-6"),
+        effort=effort,
         status=fm.get("status", "pending"),
         attempts=int(fm.get("attempts", 0)),
         title=title_m.group(1).strip() if title_m else ref["id"],
@@ -470,7 +480,8 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
                    "A prior fresh attempt failed the gates below. Diagnose and fix; "
                    "do not repeat the same approach.\n\n"
                    + truncate_failure_note(failure_note))
-    cmd = [p.replace("{model}", wu.model) for p in CLAUDE_CMD]
+    cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
+           for p in CLAUDE_CMD]
     if cost_tracking:
         cmd += ["--output-format", "json"]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)

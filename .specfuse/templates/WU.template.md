@@ -2,6 +2,7 @@
 id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN) for closing
 type: implementation       # implementation | retrospective | lessons | docs | plan-next | close
 model: claude-opus-4-7     # opus for foundational/forward-design; sonnet for mechanical/synthesis
+effort: medium             # low | medium | high | xhigh | max — passed to claude -p --effort; default medium
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
 generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
@@ -30,6 +31,11 @@ Frontmatter notes (single-repo):
   `opus`, `haiku` — each resolves to the latest model in that family at
   dispatch time (CLI-side, not loop-side). Full model IDs
   (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`) pin a specific release.
+- `effort` — OPTIONAL. Controls the thinking budget passed to `claude -p`
+  via `--effort`. Five levels: `low`, `medium`, `high`, `xhigh`, `max`.
+  Default is `medium` when the field is absent. Use `high` or above for
+  units with substantial design work; `low` for purely mechanical edits.
+  Omitting the field is valid; the driver applies `medium` automatically.
 - `status` — the unit's lifecycle position. `draft` is what `plan-next` writes
   for the next gate's units; the human arms them by flipping to `pending`. The
   driver writes `in_progress`, `done`, and `blocked_human`. Other values are
