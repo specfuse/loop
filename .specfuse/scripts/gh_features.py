@@ -76,6 +76,7 @@ def list_features(repo: str, runner: Any = None) -> list:
             "autonomy": _extract_label_value(labels, "autonomy:") or "review",
             "url": issue.get("url", ""),
             "number": issue.get("number"),
+            "body": issue.get("body", ""),
         })
 
     return candidates

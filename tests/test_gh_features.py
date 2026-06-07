@@ -110,6 +110,9 @@ class TestOrchestratedIssue(unittest.TestCase):
     def test_number_preserved(self):
         self.assertEqual(self.candidate["number"], 42)
 
+    def test_body_preserved(self):
+        self.assertEqual(self.candidate["body"], "Five-section WU body.")
+
 
 # ---------------------------------------------------------------------------
 # Component-local issue — FEAT-YYYY-NNNN title, no initiative, no autonomy

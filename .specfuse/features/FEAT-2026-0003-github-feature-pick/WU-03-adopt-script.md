@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/T03
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 2.11692
+input_tokens: 24
+output_tokens: 95156
 ---
 
 # Adopt a picked issue into a dispatchable feature folder (script)
