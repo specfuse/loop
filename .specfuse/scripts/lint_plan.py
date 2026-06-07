@@ -50,6 +50,9 @@ _CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
 #   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 #   Orchestrated:    INIT-YYYY-NNNN/F<NN>, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
 # A bare INIT-YYYY-NNNN (no /FNN segment) is NOT a loop feature ID.
+MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
+
 CORRELATION_ID_RE = re.compile(
     r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|"
     r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$"
@@ -125,8 +128,14 @@ def lint(feature_dir: Path) -> list[str]:
                             f"must match {CORRELATION_ID_RE.pattern}")
             if wfm.get("type") not in VALID_TYPES:
                 errs.append(f"{wfile}: invalid type '{wfm.get('type')}'")
-            if not wfm.get("model"):
+            _model = wfm.get("model", "")
+            if not _model:
                 errs.append(f"{wfile}: missing model")
+            elif _model not in MODEL_ALIASES and not FULL_MODEL_ID_RE.match(_model):
+                errs.append(
+                    f"{wfile}: invalid model '{_model}' — must be a family alias "
+                    f"({sorted(MODEL_ALIASES)}) or a full model ID (claude-*)"
+                )
             if wfm.get("status") not in VALID_STATUS:
                 errs.append(f"{wfile}: invalid status '{wfm.get('status')}'")
             types_in_order.append(wfm.get("type"))

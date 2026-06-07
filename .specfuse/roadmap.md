@@ -23,6 +23,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
+| FEAT-2026-0007 | Dispatch cost controls                      | active   | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 

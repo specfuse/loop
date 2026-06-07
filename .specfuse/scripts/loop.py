@@ -66,6 +66,11 @@ MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
 # How to launch a fresh agent. {model} is filled per WU; the prompt is piped on stdin.
 CLAUDE_CMD = ["claude", "-p", "--model", "{model}"]
 
+# Family aliases accepted in WU frontmatter's `model:` field.
+# The CLI resolves them to the latest concrete model at dispatch time;
+# the loop passes the value verbatim — no expansion here.
+MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
+
 # Which verification gate set (a key in verification.yml) applies to each WU type.
 GATES_FOR_TYPE = {
     "implementation": "code",

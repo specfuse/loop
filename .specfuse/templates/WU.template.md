@@ -26,7 +26,10 @@ Frontmatter notes (single-repo):
   must use the `[retrospective, lessons, docs, plan-next]` sequence.
 - `model` — the Claude model the driver dispatches this unit with. Foundational
   / forward-design units (notably `plan-next`) take Opus; mechanical and
-  synthesis units take Sonnet.
+  synthesis units take Sonnet. Three family aliases are accepted: `sonnet`,
+  `opus`, `haiku` — each resolves to the latest model in that family at
+  dispatch time (CLI-side, not loop-side). Full model IDs
+  (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`) pin a specific release.
 - `status` — the unit's lifecycle position. `draft` is what `plan-next` writes
   for the next gate's units; the human arms them by flipping to `pending`. The
   driver writes `in_progress`, `done`, and `blocked_human`. Other values are
