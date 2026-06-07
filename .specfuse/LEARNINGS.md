@@ -63,3 +63,204 @@ promoted here.
   scratch files written during a failed attempt won't persist into the next
   attempt's prompt unless the agent explicitly buffers them in the prompt-
   facing failure note that the driver hands to the next attempt.
+
+- [FEAT-2026-0003/G1-LESSONS] State the exact expected file count in the
+  Do-not-touch section (e.g. "exactly three files: X, Y, Z"). An agent that
+  touches one extra file to be helpful does so because the WU did not
+  explicitly forbid it — a numeric bound closes that door without ambiguity.
+  Both T01 (3 files) and T02 (2 new files) finished in one attempt with no
+  scope drift; attribute at least part of that to the explicit count. Rule:
+  every WU's Do-not-touch must name specific paths AND state the total count
+  of files expected to change, so a reviewer reading the diff has a
+  falsifiable scope claim.
+
+- [FEAT-2026-0003/G1-LESSONS] When a WU defines a CLI surface or invokes an
+  external command that returns structured data, the AC must specify three
+  things: (1) the exact fields/keys to request or parse, (2) the output
+  field delimiter (tab, space, comma), and (3) how to render an absent or
+  None optional field (empty string, `-`, or another sentinel). Omitting
+  any of these forces the agent to make a reasonable-but-breaking choice the
+  next consumer inherits silently. T02's CLI printed the Python string
+  `"None"` for a missing `task_type` because the WU said what to print but
+  not how to render absence. A parser expecting an empty field gets the
+  literal four-character string instead.
+
+- [FEAT-2026-0003/G1-LESSONS] Cut gates along the offline/live boundary:
+  a gate whose entire scope can be unit-tested without external systems
+  (network, live auth, real API) can be verified deterministically and
+  atomically by the driver. Live integration belongs in a dedicated later
+  gate. The benefit is not just CI speed — it is that the offline gate's
+  verification is free of flakiness, reproducible across machines, and
+  never blocked by token/quota limits. Rule: when detailing a new gate, ask
+  "can every WU in this gate be tested without a network call?" If yes, mark
+  it offline-first in the PLAN and keep live-integration WUs out of scope
+  for that gate.
+
+- [FEAT-2026-0003/G1-LESSONS] Closing-WU numbering conventions (e.g.
+  "90+ range so they sort last") must live in a binding rule or the
+  `draft-feature` template, not in a PLAN.md comment. A comment in one
+  feature's PLAN is invisible to the next feature's author and produces
+  inconsistent scaffolding. Rule: any implicit scaffold convention that
+  future `draft-feature` runs must reproduce — WU numbering, section
+  ordering, required closing sequence — belongs in `.specfuse/rules/` or
+  the WU authoring guide, and the linter should enforce it if feasible.
+
+- [FEAT-2026-0003/G2-LESSONS] Output volume above ~80k tokens in a single
+  WU session is a prospective split signal, not just a retrospective
+  warning. T03 produced 95k output tokens (6× the prior max) because it
+  combined new script logic, 260 lines of tests requiring intimate
+  knowledge of another module's internal data structures, AND a one-line
+  cross-gate fix. The WU succeeded in one attempt, but it is not the safe
+  default for WUs of similar density. Rule: when a WU spec includes (a)
+  two or more new files totalling 400+ lines AND (b) a test suite that
+  must replicate another module's internal schemas or protocol shapes to
+  write correct stubs, split at the logic/test-coverage seam: a script WU
+  lands first, a test-coverage WU (T0N-test) runs after it. The split
+  point is justified by coupling — tests that depend on the script's
+  internals cannot be authored before the script exists anyway.
+
+- [FEAT-2026-0003/G2-LESSONS] When a WU's acceptance criteria include a
+  linter integration ("tool X exits 0 on the produced artifact"), the spec
+  must also include a companion failure-mode AC: "tool X exits non-zero on
+  a known-bad version of that artifact." Without an explicit failure-mode
+  AC, an agent will implement and test the happy path only; the rejection
+  direction tests only the linter's own correctness, not the integration
+  from this WU's output. Rule: for every AC of the form "lint_plan / ruff
+  / mypy exits 0 on artifact Y," add a sibling AC naming a specific
+  malformed variant and asserting a non-zero exit. T03's `TestMalformedBody`
+  test class was added via a pre-arm review catch, not from the original
+  spec — it would not have been written without that catch.
+
+- [FEAT-2026-0003/G2-LESSONS] Automated code gates (tests, ruff, bandit,
+  coverage --fail-under) pass trivially for prose and markdown artifacts.
+  A WU whose only output is a SKILL.md, a doc file, or a template receives
+  a structurally vacuous "pass" from the driver — no test runs, no linter
+  fires, nothing falsifiable executes. Rule: for WUs producing purely prose
+  artifacts, the Verification section must declare one of: (a) a structural
+  linter that checks required sections/keys (e.g. `grep -c "^## Method"
+  SKILL.md`), or (b) "human review at PR" as the explicit verification
+  gate with a checklist of what the reviewer must confirm. Letting code
+  gates stand in for prose quality produces a false-positive "pass" signal
+  that the driver cannot distinguish from a real verification.
+
+- [FEAT-2026-0003/G2-LESSONS] The hygiene WU pattern
+  ([meta/first-live-use]) covers *surprise* cross-cutting fixes discovered
+  during a WU's execution. It does NOT apply to cross-module changes the
+  WU author already anticipated: if a change to a gate-N module is listed
+  in the WU's own AC 0 before dispatch, that change belongs bundled into
+  the substantive WU — creating a hygiene WU for it adds unnecessary gate
+  complexity. The distinction is: surprise-during-grind → hygiene WU;
+  planned-and-listed-in-ACs → bundle and document in the commit message.
+  T03 widened `gh_features.list_features` (planned, in AC 0) correctly as
+  a bundle; the commit message explicitly called out both concerns. Rule:
+  before inserting a hygiene WU, check whether the cross-cutting change was
+  already in the dispatched WU's ACs. If it was, the hygiene WU is the
+  wrong tool — strengthen the commit message instead.
+
+- [FEAT-2026-0003/G2-LESSONS] Scaffold-generated WU bodies (from
+  `adopt_feature.py`, `draft-feature`, or any template emitter) are
+  structural scaffolding, not actionable specs. The `_closing_wu()` helper
+  in T03's adopt script generates closing WUs with generic ACs ("The
+  artifact for this unit exists and is substantive") and generic escalation
+  triggers. These satisfy the linter's five-section structural check but
+  are not dispatchable without human refinement. Rule: any WU whose body
+  was generated by a scaffold tool must be reviewed and its ACs rewritten
+  to be specific and falsifiable before the driver dispatches it. The
+  plan-next WU (Opus model) is the natural checkpoint for this review —
+  G2-PLAN's scope should include a pass over every scaffold-generated WU
+  body in the gate it details.
+
+- [FEAT-2026-0003/G3-LESSONS] When a WU's acceptance criteria name values
+  that live in an external system — label names, API field names, event
+  schema keys, shared protocol constants — those values must be verified
+  against the authoritative documentation in that external system before
+  the gate is armed. Inventing plausible values from the feature's internal
+  conventions is a silent correctness risk: the value looks right to the
+  author, satisfies the WU's AC, and only fails at smoke time. T06's label
+  scheme (`loop:in-progress`/`loop:complete`) was invented by G2-PLAN; the
+  correct scheme (`state:in-progress`/`state:done`) came from reading the
+  orchestrator's `naming-convention.md §5.1` and `labels.md` at gate-3
+  arming time. Rule: for every WU AC that references an external system's
+  vocabulary, add a pre-arm check line to the WU spec: "verify [value]
+  against [authoritative source] before locking this AC." The gate review
+  document is the right place to list these open verifications; the gate is
+  not armed until every item is checked.
+
+- [FEAT-2026-0003/G3-LESSONS] The two-case linter test pattern from
+  [FEAT-2026-0003/G2-LESSONS] ("exits 0 on valid artifact, exits non-zero
+  on malformed artifact") is incomplete when an adapter embeds content from
+  an external surface verbatim. A third case is required: the external
+  surface's format variant may be structurally valid by that surface's own
+  convention but use a syntax the local linter does not accept (e.g., ATX
+  headings `## Context` vs the loop's bold-preamble `**Context.**`). Gate 3
+  surfaced this exactly: `adopt_feature.py` embedded `#287`'s body verbatim;
+  `lint_plan.py` rejected it not because sections were absent but because
+  ATX-heading detection was not implemented. Rule: when a WU spec writes an
+  adapter that embeds external-source content, add a third linter test
+  fixture that represents the external surface's actual heading/formatting
+  convention (verified against a real example from that surface). If the
+  linter rejects this fixture, that is a pre-dispatch blocking finding — the
+  linter must be widened before the adapter is dispatchable, not after.
+
+- [FEAT-2026-0003/G3-LESSONS] WUs that mutate state in an external
+  production system (live GitHub issues, deployed infrastructure, databases
+  with real data) are a categorically different class from automated WUs —
+  not because their output is hard to machine-verify (the G2-LESSONS
+  prose-artifact problem), but because the mutation itself is irreversible at
+  execution time and cannot be safely delegated to the driver's subprocess
+  loop. Rule: when a gate plan includes a live-mutation WU, designate it
+  out-of-loop in the WU spec before the gate is armed. The WU spec must
+  include: (1) an explicit pre-condition checklist stating what to verify
+  before running, (2) a cleanup/restore acceptance criterion confirming the
+  external system was returned to its pre-smoke state, (3) a smoke journal
+  filename as the mandatory output artifact, and (4) `artifact-changed` as
+  the driver-side verification proxy. The gate plan's arming note should
+  document the human-operated designation so reviewers understand why no
+  driver events exist for this WU.
+
+- [FEAT-2026-0003/G3-LESSONS/multi-gate] Plan-next WUs (Opus) produce
+  forward-design drafts from the prior gate's artifacts alone — they cannot
+  read other repositories or external documentation. This creates a
+  systematic blind spot: all values that name cross-repo contracts (label
+  namespaces, API field names, event schemas, shared protocol constants)
+  will be invented from first principles rather than verified. The
+  inventions are not random; they are plausible, internally consistent, and
+  wrong in precisely the way a well-reasoned guess is wrong. Gate 3
+  confirmed: G2-PLAN named the label-scheme uncertainty in GATE-03-REVIEW.md
+  Flagged 2 and prescribed the verification path; the human checked before
+  arming and found the correct scheme. The process works when the review
+  document is explicit and the human acts on it. Rule: every gate review
+  document produced by a plan-next WU must include a "Cross-repo contracts"
+  section listing each value the plan invented alongside the authoritative
+  source the human must read before arming. The gate is not armed until
+  every item in that section is checked and its entry updated with the
+  verified value.
+
+- [FEAT-2026-0003/G4-LESSONS] When a terminal-case plan-next WU evaluates
+  branch-B (extend with an escalation gate) vs opening a new feature, three
+  tests must all pass before gate extension is chosen: (1) **Scope** — the
+  fix fits in hours of work, not a feature's worth; a single WU completing
+  in minutes is well within the threshold. (2) **Contiguous proof** — the
+  smoke evidence, the artifact under fix, and the proposed fix all live on
+  the active branch already; a new feature would re-discover the same
+  evidence from scratch. (3) **Disciplined trigger** — the escalation fired
+  on live, concrete evidence (a specific, reproducible failure against a real
+  artifact), not on speculative risk. If all three pass, extend with a gate.
+  If any fails — scope grows to weeks, evidence requires a fresh branch, or
+  the finding is theoretical — open a new feature instead. Appending gates
+  on weak evidence or large scope corrodes the "feature ends" contract and
+  trains future plan-next WUs to treat gate extension as a low-cost default.
+  T08 closed gate 4 in 2m54s at 7,826 output tokens; the entire fix was
+  one regex + three test cases. That scope is the bar.
+
+- [FEAT-2026-0003/G4-LESSONS] A gate's substantive WU count should match
+  its actual scope, not be inflated to match a prior gate's shape. Gate 4
+  closed the roadmap goal with one substantive WU — the smallest in the
+  feature — plus the standard four-WU closing sequence. No extra WUs were
+  added for structural symmetry with gate 3's three-WU split. The four-WU
+  closing sequence (RETRO → LESSONS → DOCS → PLAN) is fixed scaffolding and
+  applies at every gate regardless of size; what varies is the gate's
+  substantive WU list. Rule: when sizing a gate — especially an escalation
+  gate appended at a terminal case — let the work drive the WU count. A
+  single-WU gate on a genuinely bounded fix is correct methodology, not an
+  indication the gate was rushed or under-designed.
