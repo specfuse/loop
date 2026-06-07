@@ -16,6 +16,7 @@ import importlib.util
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -68,15 +69,36 @@ class TestGitHubBackendHooks(unittest.TestCase):
         self.backend.on_gate_passed("FEAT-2026-0003", 1)
         self.assertEqual(self.calls, [])
 
-    def test_on_feature_complete_exact_args(self):
-        self.backend.on_feature_complete("FEAT-2026-0003")
-        self.assertEqual(len(self.calls), 1)
-        self.assertEqual(self.calls[0], [
+    def test_on_feature_complete_creates_pr_and_flips_label(self):
+        self.backend.on_feature_start("FEAT-2026-0003", {
+            "branch": "feat/FEAT-2026-0003",
+            "title": "Add thing",
+            "initiative": "INIT-1",
+        })
+        self.calls.clear()
+        # gh pr view returns nonzero -> PR does not yet exist.
+        with patch.object(_gh.subprocess, "run") as mock_run:
+            mock_run.return_value = type("R", (), {"returncode": 1})()
+            self.backend.on_feature_complete("FEAT-2026-0003")
+        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(self.calls[0][:3], ["gh", "pr", "create"])
+        self.assertIn("--head", self.calls[0])
+        self.assertEqual(self.calls[0][self.calls[0].index("--head") + 1], "feat/FEAT-2026-0003")
+        self.assertEqual(self.calls[1], [
             "gh", "issue", "edit", "287",
             "--repo", "owner/repo",
             "--add-label", "state:done",
             "--remove-label", "state:in-progress",
         ])
+
+    def test_on_feature_complete_skips_pr_when_already_exists(self):
+        self.backend.on_feature_start("FEAT-2026-0003", {"branch": "feat/x", "title": "t"})
+        self.calls.clear()
+        with patch.object(_gh.subprocess, "run") as mock_run:
+            mock_run.return_value = type("R", (), {"returncode": 0})()
+            self.backend.on_feature_complete("FEAT-2026-0003")
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(self.calls[0][:4], ["gh", "issue", "edit", "287"])
 
     def test_github_backend_is_backend_subclass(self):
         self.assertIsInstance(self.backend, Backend)
