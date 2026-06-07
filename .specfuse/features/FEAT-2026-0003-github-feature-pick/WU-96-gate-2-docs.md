@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/G2-DOCS
 type: docs
 model: claude-sonnet-4-6
-status: draft
+status: pending
 attempts: 0
 ---
 

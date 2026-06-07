@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/G2-PLAN
 type: plan-next
 model: claude-opus-4-7
-status: draft
+status: pending
 attempts: 0
 ---
 

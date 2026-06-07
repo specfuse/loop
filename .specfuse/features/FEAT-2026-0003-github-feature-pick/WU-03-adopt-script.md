@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/T03
 type: implementation
 model: claude-sonnet-4-6
-status: draft
+status: pending
 attempts: 0
 ---
 
@@ -52,7 +52,7 @@ used by `gh_features.py` (default runner shells `gh`; tests inject a stub).
    `encoded_id` maps `INIT-YYYY-NNNN/FNN` → `INIT-YYYY-NNNN-FNN` and leaves
    `FEAT-YYYY-NNNN` unchanged. `slug` is derived from `candidate["title"]` by
    lowercasing, replacing runs of non-`[a-z0-9]` with a single `-`, and trimming.
-2. The created folder contains exactly seven files: `PLAN.md`, `GATE-01.md`,
+2. The created folder contains exactly eight files: `PLAN.md`, `GATE-01.md`,
    `GATE-02.md`, `WU-01-<slug>.md`, `WU-90-gate-1-retrospective.md`,
    `WU-91-gate-1-lessons.md`, `WU-92-gate-1-docs.md`,
    `WU-93-gate-1-plan-next.md`. No other files.
@@ -105,8 +105,12 @@ used by `gh_features.py` (default runner shells `gh`; tests inject a stub).
    (`FEAT-2027-0001`, no initiative) → asserts the `initiative` key is absent
    from PLAN.md frontmatter and the folder name is `FEAT-2027-0001-<slug>`;
    (c) `lint_plan.py <created_folder>` exits 0 for both; (d) the CLI invoked
-   with a stub `--runner` produces the expected folder and stdout. No live `gh`
-   call.
+   with a stub `--runner` produces the expected folder and stdout; (e) a
+   malformed-body candidate whose stubbed `body` omits one of the five required
+   sections (e.g. drops `Escalation triggers`) → `adopt_feature` still writes
+   the folder, but `python3 .specfuse/scripts/lint_plan.py <created_folder>`
+   exits non-zero, proving the linter rejects the missing section on the draft
+   `WU-01`. No live `gh` call.
 
 **Do not touch.** `.specfuse/scripts/loop.py`, `.specfuse/scripts/lint_plan.py`,
 `.specfuse/scripts/_miniyaml.py`, any existing folder under `.specfuse/features/`,
