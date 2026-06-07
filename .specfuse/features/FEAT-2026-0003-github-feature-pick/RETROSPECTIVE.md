@@ -1104,3 +1104,198 @@ arc is **not** ready for closure; gate 4 follows. Once gate 4 broadens
 the section detector and `lint_plan.py` accepts the adopted folder,
 the roadmap goal is met end-to-end and the feature closes.
 
+---
+
+# Gate 4 retrospective — FEAT-2026-0003
+
+Feature: GitHub feature-pick for the loop  
+Gate 4: Adopted-folder lint admits orchestrator issue bodies (ATX-heading fix)  
+Branch: `feat/FEAT-2026-0003-github-feature-pick`  
+Date run: 2026-06-07
+
+---
+
+## Context
+
+Gate 4 was the terminal-case escalation (branch B) that `G3-PLAN` appended
+after the gate-3 live smoke surfaced the section-heading-format contract gap.
+It carried exactly one substantive WU — T08 (`lint_plan.py` ATX-heading fix) —
+followed by the four-WU closing sequence. This retrospective is produced by
+`G4-RETRO` (WU-102), the first WU of that closing sequence.
+
+The gate-4 event slice in `events.jsonl`:
+
+| Event | Timestamp (UTC) | Detail |
+|---|---|---|
+| T08 task_started | 03:16:03 | — |
+| T08 task_completed | 03:18:57 | 1 attempt, $0.464, 7,826 output tokens |
+
+No `gate_reached(gate:4)` event exists at the time this retrospective is
+written — the gate-4 closing sequence is in progress (G4-RETRO is the current
+session). The log is sufficient to retrospect T08; the closing-sequence WUs
+are described from their specs.
+
+---
+
+## T08 — `lint_plan.py` accepts ATX (`## Section`) headings, not only bold
+
+**Status:** done in 1 attempt  
+**Duration:** ~2m54s (03:16:03 → 03:18:57 UTC)  
+**Cost:** $0.464 | output tokens: 7,826 | cache read: 681k | cache creation: 37k  
+**Commit:** `c19870e` — "feat: lint_plan.py accepts ATX (`## Section`) headings, not only bold"
+
+### What T08 changed
+
+The mandatory-section detector in `lint_plan.py`'s `lint()` function matched
+sections with the pattern `re.search(rf"(?mi)^\**{re.escape(sec)}", wbody)` —
+accepting bold-preamble (`**Context.**`) and plain forms but silently ignoring
+ATX headings (`## Context`, `### Acceptance criteria`). T08 broadened the
+leading-marker alternation to a union pattern:
+
+```
+re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody)
+```
+
+The change is one regex literal in one function. No other linter logic was
+altered: the correlation-ID check, the closing-sequence order check, and the
+section-name list (`REQUIRED_SECTIONS`) are all unchanged.
+
+T08 also added test coverage for the three cases the WU spec (AC 4) required:
+
+- An ATX-headed WU body passes the section check.
+- A bold-headed WU body still passes (regression guard for the loop's own WUs).
+- A body genuinely missing a section still fails (rejection direction preserved).
+
+The WU touched exactly two files as declared: `lint_plan.py` and the test file.
+
+### Whether the adopted folder lints clean
+
+The gate-3 smoke left `INIT-2026-0001-F06-conform-publishroster-to-validated-spec/`
+on the branch with `lint_plan.py` reporting 5 missing-section errors — all five
+sections (`Context`, `Acceptance criteria`, `Do not touch`, `Verification`,
+`Escalation triggers`) were present in issue #287's body as ATX headings but
+the old detector saw none of them.
+
+T08's AC 3 required:
+
+```
+python3 .specfuse/scripts/lint_plan.py \
+  .specfuse/features/INIT-2026-0001-F06-conform-publishroster-to-validated-spec
+```
+
+to exit 0. The WU completed with `status: done` in its first and only attempt,
+which means AC 3 was met: the adopted folder passes lint after the fix. The
+driver's verification run would have failed the attempt and kept the WU open
+if the folder had still reported errors.
+
+The existing feature folders (this feature's own WUs, `FEAT-2026-0001-health-
+endpoint`) use bold-preamble headings; the union pattern keeps them clean as
+required by AC 2.
+
+### What did not fail / concerns
+
+Nothing failed. T08 is the cleanest WU in the feature:
+
+| WU | Output tokens | Duration | Cost |
+|----|-------------|----------|------|
+| T01 (gate 1) | 12,615 | ~3m30s | $0.547 |
+| T02 (gate 1) | 15,485 | ~4m22s | $0.676 |
+| T03 (gate 2) | 95,156 | ~25m32s | $2.117 |
+| T04 (gate 2) | 8,237 | ~2m38s | $0.300 |
+| T05 (gate 3) | 11,256 | ~3m41s | $0.651 |
+| T06 (gate 3) | 19,108 | ~5m56s | $0.827 |
+| **T08 (gate 4)** | **7,826** | **~2m54s** | **$0.464** |
+
+T08 is the smallest substantive WU in the feature by output-token count and
+cost. This maps correctly to its scope: a one-regex change with three test
+cases and a single re-lint of an existing folder.
+
+The one minor observation: the ATX alternation uses `#+\s*` rather than a
+bounded `#{1,6}\s*`. Any number of `#` characters followed by optional
+whitespace will match. This is fine in practice — no WU body would plausibly
+begin a line with seven or more hash marks — but a future tightening for full
+CommonMark compliance (ATX headings are exactly 1-6 `#` characters) would
+change `#+` to `#{1,6}`. Not a correctness issue at gate 4's scope.
+
+### Missing or ambiguous rules/templates
+
+The GATE-04-REVIEW.md's "Cross-repo contracts" table flagged two unchecked
+values at gate-4 arming time: whether ATX is the orchestrator's only heading
+style, and whether case-insensitive matching is needed. The ATX-only question
+was resolved before T08 was dispatched (the orchestrator's
+`shared/templates/work-unit-issue.md` was confirmed to emit all five sections
+as `## ATX` headings, consistent with live issue #287). Case-insensitive
+matching (Q3 in GATE-04-REVIEW.md) was explicitly deferred as out of scope.
+Neither gap caused a T08 failure.
+
+---
+
+## Whether appending gate 4 proved the right call
+
+**Yes.** The decision point from `GATE-04-REVIEW.md` was binary: arm gate 4
+(fix the linter, close the goal) or open `FEAT-2026-0004` and leave this
+feature with three of four mechanisms proven. The evidence from T08's execution
+confirms the gate-4 path was correct on all the criteria that mattered at
+decision time.
+
+**Scope confirmed small.** T08 completed in 2m54s at 7,826 output tokens —
+the lowest of any substantive WU in this feature. The pre-arm estimate ("one
+regex widening + tests + re-lint of the existing adopted folder — smaller than
+any of gates 1-3") was accurate.
+
+**Contiguous proof.** The smoke journal that produced the finding
+(`SMOKE-INIT-2026-0001-F06.md`), the adopted folder the fix is verified
+against, and the linter commit all live on one branch and one PR. A
+`FEAT-2026-0004` would have re-entered the same evidence, re-confirmed the
+same finding, and severed the "this regex caused that lint failure, and this
+fix resolves it" trace. Nothing was gained by splitting.
+
+**No methodological debt introduced.** The GATE-04-REVIEW.md explicitly named
+the escalation risk: "the methodology's 'feature ends' contract is corroded if
+every feature extends to N+1 gates on a smoke finding." Gate 4 holds
+the boundary because the escalation trigger fired on clear, fresh evidence
+(live smoke, not speculation), and the scope test passed decisively (hours of
+work, not a feature's worth). The scope was even smaller than the review
+predicted — T08 took three minutes, not hours.
+
+**The roadmap goal is now met.** All four mechanisms from PLAN.md's
+`roadmap_goal` are proven:
+
+| Mechanism | Status | Evidence |
+|---|---|---|
+| Pick (discovery) | ✓ | Gate 3 smoke — 13 features enumerated, #287 row parsed |
+| Adopt (scaffold) | ✓ | Gate 3 smoke — folder + encoding + body embed |
+| Report back | ✓ | Gate 3 smoke — `state:ready → in-progress → done → ready`, no residue |
+| **Grind (lint-clean)** | **✓** | **Gate 4 T08 — adopted folder exits lint 0 after ATX fix** |
+
+---
+
+## Gate-4 observations
+
+### WU sizing: was a single-WU gate the right shape?
+
+Yes. Gate 4's entire substantive scope fit in one WU because the fix was
+genuinely narrow. Contrast with gate 2's T03 (four files, 95k tokens, one
+danger-zone WU) and gate 3's three-WU split. Gate 4 proves the
+methodology's ability to right-size: when scope is genuinely small, the
+gate is genuinely small. No artificial inflation to match a prior gate's
+structure.
+
+### Cross-repo contract verification — first prospective test
+
+`GATE-04-REVIEW.md` was the first gate review drafted under the new rule from
+`[FEAT-2026-0003/G3-LESSONS/multi-gate]`: every plan-next gate review must
+list cross-repo contract values with authoritative sources and check-boxes.
+The table named two UNCHECKED values at review time; the human checked them
+before arming, confirmed ATX-only, and cleared the check-boxes. T08 was
+dispatched with a correct linter target. The rule worked prospectively on
+its first use.
+
+### The feature-arc retrospective verdict
+
+The feature-arc retrospective (written by G3-PLAN) declared the roadmap goal
+"NOT MET; gate 4 follows." With gate 4 complete, that verdict updates to
+**MET after gate 4**. The four mechanisms that compose the goal are all
+proven against real GitHub infrastructure. The single bounded gap (ATX-heading
+format) is closed.
+
