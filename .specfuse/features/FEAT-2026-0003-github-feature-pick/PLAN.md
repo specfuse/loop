@@ -41,6 +41,15 @@ files own their own status; GATE files own gate status.
   one real orchestrated feature (`INIT-2026-0001/F06`, RestoManagerApp/Backend
   #287, autonomy `review`) is dispatched end-to-end as the smoke test.
   *(Drafted by gate 2's plan-next.)*
+- **Gate 4 — adopted-folder lint admits orchestrator issue bodies.** Gate 3's
+  smoke surfaced a bounded section-heading-format gap: `lint_plan.py`'s section
+  detector matches `^(\**)<section>` but real orchestrator issue bodies use
+  ATX (`## Context`) headings, so an adopted folder fails the linter on
+  WU-01 despite being structurally complete. Gate 4 broadens the linter's
+  section detector to accept both heading styles, re-verifies the existing
+  adopted `INIT-2026-0001-F06-…` folder lints clean, and closes the roadmap
+  goal end-to-end. *(Drafted by gate 3's plan-next as terminal-case branch B;
+  WUs themselves to be authored by gate 4's plan-next when armed.)*
 
 ## Task graph
 
@@ -112,6 +121,9 @@ gates:
       - id: FEAT-2026-0003/G3-PLAN
         file: WU-101-gate-3-plan-next.md
         depends_on: [FEAT-2026-0003/G3-DOCS]
+  - gate: 4
+    file: GATE-04.md
+    work_units: []
 ```
 
 ## Notes

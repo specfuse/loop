@@ -930,3 +930,177 @@ is in a single linter detection rule, not in the core architecture. Discovery,
 adopt, and report-back are proven correct against a real GitHub issue. The
 `lint_plan.py` fix is a bounded follow-on; G3-PLAN will declare whether it
 belongs in a gate 4 or a `FEAT-2026-0004`.
+
+---
+
+# Feature-arc retrospective — FEAT-2026-0003
+
+Feature: GitHub feature-pick for the loop
+Branch: `feat/FEAT-2026-0003-github-feature-pick`
+Arc duration: 2026-06-06 → 2026-06-07
+Author: `FEAT-2026-0003/G3-PLAN` (Opus), synthesizing across the three gate
+retrospectives, the smoke journal, the three `[FEAT-2026-0003/...]` LEARNINGS
+sets, and the handoff brief.
+
+---
+
+## Roadmap-goal verdict — NOT MET; gate 4 follows
+
+PLAN.md `roadmap_goal`: *"The loop can pick a feature from a target repo's
+GitHub issues (specfuse:feature) and grind it through its gate cycle,
+alongside today's locally-authored features."*
+
+Four mechanisms compose the goal. Three proved out live against
+`RestoManagerApp/Backend#287` (`INIT-2026-0001/F06`):
+
+| Mechanism | Status | Evidence |
+|---|---|---|
+| Pick (discovery) | ✓ | `SMOKE-INIT-2026-0001-F06.md` — 13 features enumerated, #287 row parsed correctly |
+| Adopt (scaffold) | ✓ | Smoke journal — `INIT-2026-0001-F06-conform-publishroster-to-validated-spec/` written, body embedded |
+| Report back | ✓ | Smoke journal — `state:ready → in-progress → done → ready` fired exactly, fully reverted, no residue |
+| **Grind through the gate cycle** | ✗ | Adopted folder fails `lint_plan.py`: WU-01 reports 5 missing sections because #287's body uses ATX (`## Context`) headings, the linter's section detector matches only `^(\**)<section>` |
+
+**The gap is precisely scoped.** Not architecture, not a seam, not a backend
+contract — one regex in `lint_plan.py` (loop-side) OR a heading-normalisation
+pass in `adopt_feature.py` (loop-side) OR an orchestrator-side template
+change (other surface). The smoke journal recommends option 1 (broaden the
+linter — ATX is the more standard markdown).
+
+**Why this is not "close enough."** A dispatchable adopted folder that
+fails `lint_plan.py` on its very first WU cannot be ground. The roadmap
+verb is "grind through its gate cycle" — that grind is exactly what the
+linter blocks. Closing the feature with the gap unfixed would ship a
+capability that demos in three steps and stalls on the fourth, contradicting
+its own roadmap statement.
+
+**Why gate 4 (not FEAT-2026-0004).** The fix is one regex widening + tests
++ one re-smoke against the already-adopted `INIT-2026-0001-F06-…` folder
+(no second `gh` mutation of #287 required). Smaller than any of gates 1-3.
+Closing it inside this feature's branch keeps the proof contiguous: the
+smoke journal that produced the finding, the adopted folder under verification,
+and the linter fix all live on one branch with one PR. Splitting into
+`FEAT-2026-0004` would re-discover the same issue from scratch, re-arm
+discovery+adopt evidence the loop already has on hand, and lose the direct
+"this regex caused that lint failure" linkage. The escalation trigger
+("scope large enough to be its own feature") does not fire — this is
+hours of work, not a feature's worth.
+
+---
+
+## Did the multi-gate forward-design move work?
+
+This was the first multi-gate feature run through the loop and the first
+empirical test of `plan-next` as a forward-design mechanism. The result is
+**yes, with one named blind spot the methodology now has a rule for.**
+
+### Each gate delivered what the prior gate's plan-next claimed
+
+**Gate 1 (read path).** Author: human (`draft-feature`). Outcome: T01
+admitted `INIT-…/FNN` IDs across rule + linter + tests in 1 attempt; T02
+shipped `gh_features.py` with an injectable runner in 1 attempt. No
+escalations. Plan held verbatim. The two gaps it raised (CLI
+null-sentinel convention, closing-WU numbering convention) were promoted to
+LEARNINGS by G1-LESSONS and consumed by every WU after.
+
+**Gate 2 (write path — adopt).** Author: `G1-PLAN` (Opus). Outcome: T03
+shipped `adopt_feature.py` (4 files, including the planned one-line widening
+of gate-1's `gh_features.list_features` to expose `body`) in 1 attempt;
+T04 shipped the `adopt-feature` SKILL.md in 1 attempt. No escalations.
+GATE-02-REVIEW.md flagged three pre-arm risks (the 4-file bundle, T04's
+fig-leaf automated verification, the malformed-body assumption); all three
+resolved at the levels predicted. The malformed-body test (AC 8e of T03)
+was added at arming time from Q4 of the review — **the review process
+demonstrably edits a WU's ACs**, not ceremonial.
+
+**Gate 3 (report back + smoke).** Author: `G2-PLAN` (Opus). Outcome: T05
+widened the `Backend` seam (3 hooks + factory) in 1 attempt; T06 shipped
+`GitHubBackend` against a stubbed runner in 1 attempt; T07 (out-of-loop
+human-operated) ran the live smoke. The three review-document Flagged
+risks (production-issue mutation, label-scheme coordination, seam call-site
+assumption) all resolved without escalation. The Q5 carry-forward (issue
+body well-formedness) materialised exactly as the gap that triggers gate 4.
+
+### Concrete examples of forward-design — review questions becoming WU AC text
+
+The forward-design proof is in the *traceable* edits from a gate review to
+the next gate's WU body:
+
+- **GATE-02-REVIEW.md Q4** ("does the test need a third case [malformed
+  body]?") became **T03 AC 8e** — the `TestMalformedBody` class verifying
+  that adopt writes the folder unconditionally but `lint_plan.py` rejects
+  the result. T03 implemented it in the first attempt.
+- **GATE-03-REVIEW.md Flagged 2** ("the label scheme decision is locked
+  here but is a contract with the orchestrator") prompted the cross-repo
+  check at arming time that found `state:ready` already in use, replacing
+  G2-PLAN's invented `loop:in-progress`/`loop:complete` with the canonical
+  `state:*` namespace. **T06's AC 3 was edited before dispatch** — the
+  forward-design caught its own error through the review checkpoint.
+- **GATE-03-REVIEW.md Flagged 3** ("`run()` has four exit paths") supplied
+  the specific anchor `loop.py:590-591` for `on_feature_complete`. T05 hit
+  the correct call-site in 1 attempt with zero escalation.
+- **GATE-03-REVIEW.md Q5** ("if #287's body is malformed") explicitly
+  predicted what gate 4 now owns. The prediction was correct in *shape*
+  (an issue-body-format gap) and wrong in *framing* (the body is well-
+  formed in Markdown, just using ATX headings). The forward-design surfaced
+  the risk; the live smoke refined what the risk actually was.
+
+### The one named blind spot — codified in `[FEAT-2026-0003/G3-LESSONS/multi-gate]`
+
+`plan-next` cannot read other repos. Every cross-repo contract a plan-next
+WU touches (label namespace, API field names, event schemas, shared
+constants) gets invented from first principles unless the WU instructs
+the human to verify before arming. G2-PLAN's `loop:*` invention proved
+this in the smallest possible way — the human's pre-arm check overturned
+it cleanly. The rule (every plan-next gate review must list a
+"Cross-repo contracts" section with authoritative source + a check-box)
+is now in LEARNINGS as the systemic mitigation. **Gate 4's review document
+will be the first to test the rule prospectively.**
+
+---
+
+## What carries forward to gate 4
+
+The gap is specific and the fix is bounded; gate 4's plan-next (when
+authored) will draft its own WUs. From this terminal-case position, the
+load-bearing observations the gate-4 author should consume:
+
+1. **Recommended fix path** (from `SMOKE-INIT-2026-0001-F06.md` Outcome
+   §): broaden `lint_plan.py` section detection to accept both ATX
+   (`^#+\s*<section>`) and the existing bold/plain (`^(\**)<section>`)
+   patterns. Smallest blast radius; touches one regex constant + tests.
+   Alternatives (normalise in `adopt_feature.py`, change the orchestrator
+   template) are documented but disfavoured.
+2. **Re-smoke target** (from `SMOKE-INIT-2026-0001-F06.md` §Adopt step):
+   `INIT-2026-0001-F06-conform-publishroster-to-validated-spec/` already
+   exists on this branch from T07. Re-running `lint_plan.py` against that
+   folder is the offline verification — no second `gh issue edit 287` is
+   required for the lint fix itself.
+3. **Cross-repo contract carry-over** (from
+   `[FEAT-2026-0003/G3-LESSONS/multi-gate]`): is the ATX-headings
+   assumption authoritative for orchestrator issue bodies? Gate 4's review
+   document must verify this against the orchestrator's issue-body
+   template (likely under `RestoManagerApp/orchestrator/`) before locking
+   the linter regex. If the orchestrator template can also produce
+   bold-style headings, the union-pattern is the right call; if only
+   ATX, the same pattern still works but the "accept both" framing is
+   wrong.
+4. **No second live smoke required for closure.** The `state:*` label
+   contract is settled; report-back is proven; the gate-4 fix is offline-
+   verifiable. A re-smoke against #287 is OPTIONAL belt-and-braces — it
+   adds a second production-issue mutation cycle for marginal evidence.
+   Gate 4's plan-next should weigh this and probably skip it.
+
+---
+
+## Summary
+
+Three gates delivered the read path, the adopt path, and the report-back +
+live smoke. The smoke surfaced a single, bounded, loop-side gap (linter's
+section detector doesn't accept ATX headings) that blocks the roadmap
+goal's fourth mechanism — the actual grind of the adopted folder. The
+multi-gate `plan-next` forward-design mechanism worked at gate scope, with
+the cross-repo blind spot caught and codified into a binding LEARNING. The
+arc is **not** ready for closure; gate 4 follows. Once gate 4 broadens
+the section detector and `lint_plan.py` accepts the adopted folder,
+the roadmap goal is met end-to-end and the feature closes.
+

@@ -2,7 +2,11 @@
 id: FEAT-2026-0003/G3-PLAN
 type: plan-next
 model: claude-opus-4-7
-status: pending
+status: done
+attempts: 1
+cost_usd: 1.708115
+input_tokens: 24
+output_tokens: 16967
 ---
 
 # Gate 3 plan-next — terminal-case handling
