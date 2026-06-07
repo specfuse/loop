@@ -2,8 +2,11 @@
 id: FEAT-2026-0004/T01
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.894365
+input_tokens: 6045
+output_tokens: 17452
 ---
 
 # Prevent two loop drivers running concurrently in one working tree

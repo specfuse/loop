@@ -387,6 +387,30 @@ if [[ $DRY_RUN -eq 0 ]]; then
   fi
 fi
 
+# --- lock-file gitignore (both modes) ------------------------------------ #
+# Ensure .specfuse/.loop.lock is never committed in the target repo.
+# This is a targeted ignore of just the lock file — not .specfuse/ itself,
+# which must remain tracked (the driver uses git as its state backend).
+LOCK_IGNORE_LINE=".specfuse/.loop.lock"
+GITIGNORE_FILE="$TARGET/.gitignore"
+if [[ $DRY_RUN -eq 1 ]]; then
+  if [[ ! -f "$GITIGNORE_FILE" ]]; then
+    echo "  would create $TARGET/.gitignore containing '$LOCK_IGNORE_LINE'"
+  elif ! grep -qxF "$LOCK_IGNORE_LINE" "$GITIGNORE_FILE" 2>/dev/null; then
+    echo "  would add '$LOCK_IGNORE_LINE' to $TARGET/.gitignore"
+  else
+    echo "  $TARGET/.gitignore already has '$LOCK_IGNORE_LINE' — left alone"
+  fi
+else
+  if [[ ! -f "$GITIGNORE_FILE" ]]; then
+    printf '%s\n' "$LOCK_IGNORE_LINE" > "$GITIGNORE_FILE"
+    echo "Added $LOCK_IGNORE_LINE to $TARGET/.gitignore (created)."
+  elif ! grep -qxF "$LOCK_IGNORE_LINE" "$GITIGNORE_FILE" 2>/dev/null; then
+    printf '\n%s\n' "$LOCK_IGNORE_LINE" >> "$GITIGNORE_FILE"
+    echo "Added $LOCK_IGNORE_LINE to $TARGET/.gitignore."
+  fi
+fi
+
 # --- closing instructions (INIT only) ------------------------------------ #
 if [[ $UPGRADE -eq 0 ]]; then
   echo "Next:"

@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fcntl
 import json
 import re
 import subprocess
@@ -333,6 +334,25 @@ def ensure_feature_branch(feat_fm: dict) -> None:
         print(f"Created feature branch '{branch}' from '{current}'.")
 
 
+def acquire_tree_lock(specfuse_dir: Path):
+    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive flock.
+
+    Returns the open file object; caller keeps it alive for the process
+    lifetime — the kernel auto-releases on fd close or process exit (SIGKILL
+    included), so no stale-lock cleanup is ever needed.
+    Raises BlockingIOError if another process already holds the lock.
+    """
+    lock_path = specfuse_dir / ".loop.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = lock_path.open("w")
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fd.close()
+        raise
+    return fd
+
+
 def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     """Write cumulative cost/token fields to the WU's frontmatter at outcome
     time. No-op if no usage was captured (cost_usd is 0 and no tokens)."""
@@ -613,6 +633,16 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         return 0
 
     if not dry_run:
+        # dry-run performs no mutation; inspecting while a real run is active must stay allowed.
+        try:
+            _lock_fd = acquire_tree_lock(SPECFUSE_DIR)  # held for run() lifetime
+        except BlockingIOError:
+            print(
+                "another loop driver is already running in this working tree "
+                "(.specfuse/.loop.lock held)",
+                file=sys.stderr,
+            )
+            return 1
         require_git_ready()
         ensure_feature_branch(feat_fm)
 
