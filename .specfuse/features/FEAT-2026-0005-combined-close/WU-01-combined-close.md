@@ -2,8 +2,11 @@
 id: FEAT-2026-0005/T01
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 1.225944
+input_tokens: 29
+output_tokens: 21926
 ---
 
 # Add a `close` WU type that collapses the closing sequence (single-gate only)
