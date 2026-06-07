@@ -130,7 +130,7 @@ def lint(feature_dir: Path) -> list[str]:
             # Dispatchable WUs must have the five mandatory prompt sections.
             if wfm.get("status") in SECTION_CHECK_STATUSES:
                 for sec in REQUIRED_SECTIONS:
-                    if not re.search(rf"(?mi)^\**{re.escape(sec)}", wbody):
+                    if not re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody):
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
 

@@ -2,8 +2,11 @@
 id: FEAT-2026-0003/T08
 type: implementation
 model: claude-sonnet-4-6
-status: pending
-attempts: 0
+status: done
+attempts: 1
+cost_usd: 0.463667
+input_tokens: 18
+output_tokens: 7826
 ---
 
 # lint_plan.py accepts ATX (`## Section`) headings, not only bold
