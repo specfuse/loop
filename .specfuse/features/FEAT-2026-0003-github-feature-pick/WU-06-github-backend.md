@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/T06
 type: implementation
 model: claude-sonnet-4-6
-status: draft
+status: pending
 ---
 
 # GitHubBackend(Backend) implementation — label-transition state backend
@@ -42,23 +42,28 @@ Read `[FEAT-2026-0003/G2-LESSONS]` on bundling: this WU is
 exactly one new file + one new test module + one call to T05's
 factory; no bundle, no hygiene WU needed.
 
-**Label scheme (declared explicitly, per
-`[FEAT-2026-0003/G1-LESSONS]` "specify the exact fields/keys"
-rule).** The transitions are:
+**Label scheme — the orchestrator's canonical `state:*` namespace
+(NOT a loop-invented namespace).** Confirmed against
+`RestoManagerApp/orchestrator/docs/naming-convention.md` §5.1 and the
+orchestrator's `shared/schemas/labels.md`: feature/task lifecycle state
+is encoded with `state:*` labels (`state:ready → state:in-progress →
+state:done`), and issue #287 already carries `state:ready`. The loop's
+report-back transitions that same canonical label so the orchestrator's
+poller observes progress without a forked contract. Per
+`[FEAT-2026-0003/G1-LESSONS]` ("specify the exact fields/keys"), the
+transitions are:
 
-- `on_feature_start`: ensure `loop:in-progress` is added to the
-  issue; remove `loop:complete` if present (re-entry safety).
+- `on_feature_start`: add `state:in-progress`; remove `state:ready`
+  (the pre-pickup state).
 - `on_gate_passed`: no label transition for v0.1 (gate-level
   observability stays in the per-feature event log; revisit if
   the orchestrator surfaces a gate-progress need). Hook is
   called but does nothing — documented as a no-op v0.1 stub.
-- `on_feature_complete`: ensure `loop:complete` is added;
-  remove `loop:in-progress` if present.
+- `on_feature_complete`: add `state:done`; remove `state:in-progress`.
 
-The `loop:in-progress` / `loop:complete` label namespace is
-chosen to be distinct from `specfuse:feature` (the pickable
-label set in gate 1) so a downstream orchestrator can query
-`label:loop:in-progress` without conflating with discovery.
+Do NOT invent a `loop:*` namespace — that would fork the contract the
+orchestrator's poller queries against. The `state:*` labels are the
+shared surface (charter §5: the contract means the same on both sides).
 
 **Acceptance criteria.**
 1. New file `.specfuse/scripts/gh_backend.py` exists with a class
@@ -76,9 +81,9 @@ label set in gate 1) so a downstream orchestrator can query
    `check=True`, `capture_output=True`, `text=True`).
 3. `on_feature_start` calls `runner(["gh", "issue", "edit",
    str(issue_number), "--repo", repo, "--add-label",
-   "loop:in-progress", "--remove-label", "loop:complete"])`.
+   "state:in-progress", "--remove-label", "state:ready"])`.
    `on_feature_complete` calls the symmetric `--add-label
-   loop:complete --remove-label loop:in-progress`. The
+   state:done --remove-label state:in-progress`. The
    `--remove-label` for a label not present is tolerated (gh's
    behavior — if it errors, the runner raises and the call
    fails loudly; do NOT swallow).

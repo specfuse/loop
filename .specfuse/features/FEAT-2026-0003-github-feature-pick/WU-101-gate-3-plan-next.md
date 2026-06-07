@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/G3-PLAN
 type: plan-next
 model: claude-opus-4-7
-status: draft
+status: pending
 ---
 
 # Gate 3 plan-next — terminal-case handling

@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/T05
 type: implementation
 model: claude-sonnet-4-6
-status: draft
+status: pending
 ---
 
 # Widen the Backend seam with feature/gate lifecycle hooks

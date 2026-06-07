@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/T07
 type: implementation
 model: claude-sonnet-4-6
-status: draft
+status: blocked_human
 ---
 
 # Live end-to-end smoke — adopt INIT-2026-0001/F06 and observe label transitions
@@ -44,15 +44,26 @@ repo's `.specfuse/features/` (where adopt_feature.py runs); the
 adopted folder is a verification artifact, not a dispatched
 feature here.
 
-**Safety preamble for the agent (read before acting).** This WU
+**Execution note (gate-3 arming decision).** This WU mutates a real
+production issue and is therefore executed **out-of-loop by the human
+operator**, not dispatched as an autonomous `claude -p` session — a
+deliberate blast-radius choice made at gate-3 arming time. The driver
+runs T05+T06 (offline); a human runs this smoke directly (`gh` with the
+sandbox disabled), then marks T07 `done` so the closing sequence can
+reflect the real smoke evidence. The acceptance criteria below are the
+runbook + falsifiable checklist for that human-run step.
+
+**Safety preamble (read before acting).** This WU
 mutates real GitHub state — issue labels on a real production
 issue. Two safety rules override the acceptance criteria:
 
 1. If `#287`'s current labels include anything OUTSIDE the
    expected set (`specfuse:feature`, `initiative:INIT-2026-0001`,
-   `type:implementation`, `autonomy:review`), STOP and block.
-   Do NOT add `loop:in-progress` to an issue whose state is
-   not what this WU assumes.
+   `type:implementation`, `autonomy:review`, `state:ready`), STOP
+   and block. (`state:ready` is the canonical pre-pickup lifecycle
+   state and is expected; see the label scheme in `WU-06`.) Do NOT
+   add `state:in-progress` to an issue whose state is not what
+   this WU assumes.
 2. If at any point the `gh` CLI returns 401/403/permission
    error, STOP and block immediately per
    `.specfuse/rules/security-boundaries.md` (do NOT
@@ -77,9 +88,10 @@ issue. Two safety rules override the acceptance criteria:
      invocations fired by `GitHubBackend` (manually invoked
      against the live issue from a small driver script or
      interactive Python session), the BEFORE labels, the AFTER
-     labels for each transition, and a final reset to
-     `loop:in-progress` removed + `loop:complete` removed (so
-     the issue is left in its original label state).
+     labels for each transition, and a final reset restoring the
+     issue to its original label state (re-add `state:ready`,
+     remove `state:in-progress` and `state:done`) so the smoke
+     leaves no residue.
    - `## Outcome` — a one-paragraph honest summary: did all
      three steps work? What surprised? Where did the
      specification diverge from observation?

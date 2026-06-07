@@ -2,7 +2,7 @@
 id: FEAT-2026-0003/G3-LESSONS
 type: lessons
 model: claude-sonnet-4-6
-status: draft
+status: pending
 ---
 
 # Gate 3 lessons learned
