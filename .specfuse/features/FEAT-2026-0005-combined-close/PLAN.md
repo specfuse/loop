@@ -5,7 +5,7 @@ slug: combined-close
 branch: feat/FEAT-2026-0005-combined-close
 roadmap_goal: A single-gate feature may close with one `close` work unit instead of the four-WU retrospective→lessons→docs→plan-next sequence.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: Combined close for single-gate features
