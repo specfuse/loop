@@ -619,6 +619,41 @@ def parse_claude_json_output(raw: str) -> tuple[str, dict | None]:
     return result_text, (usage if usage else None)
 
 
+def verify_files_changed(result: dict, head_before: str) -> list[str]:
+    """Return claimed `files_changed` paths that show no diff against head_before.
+
+    The RESULT-block contract lets the agent declare which paths its work
+    touched. This guard, run before squash_commit, checks each claimed path
+    actually differs from HEAD's pre-attempt SHA. A path that does not exist
+    on disk is reported as "unchanged" — it cannot have a diff to commit.
+
+    Returns an empty list when all claimed paths show real diffs, OR when
+    `files_changed` is absent / empty (the opt-out: pre-existing WUs and the
+    worked example do not always declare it; absence MUST NOT fire the
+    guard).
+
+    See FEAT-2026-0008 / RETROSPECTIVE for the failure mode this exists to
+    catch — T04 and T08 of FEAT-2026-0007 declared files_changed naming
+    source paths their attempts never touched.
+    """
+    paths = result.get("files_changed") or []
+    if not isinstance(paths, list) or not paths:
+        return []
+    unchanged: list[str] = []
+    for raw in paths:
+        path = str(raw)
+        if not Path(path).exists():
+            unchanged.append(path)
+            continue
+        rc = subprocess.run(
+            ["git", "diff", "--quiet", head_before, "--", path],
+            capture_output=True,
+        ).returncode
+        if rc == 0:
+            unchanged.append(path)
+    return unchanged
+
+
 def is_zero_token_attempt(usage: dict | None) -> bool:
     """Did the dispatched session bill zero input tokens?
 
@@ -748,6 +783,7 @@ def execute_unit_attempt(
     dispatch_fn=None,
     verify_fn=None,
     cost_tracking: bool = True,
+    head_before: str | None = None,
 ) -> tuple[str, object, dict | None]:
     """One dispatch + parse + (if not blocked) verify cycle.
 
@@ -756,12 +792,16 @@ def execute_unit_attempt(
     verify_fn from a test.
 
     Returns (outcome, payload, usage) where outcome is one of:
-      "zero_token" — usage reports input_tokens=0 (agent never ran); the
-                     RESULT block is unparsed and the attempt is treated as
-                     a failed attempt by the caller (payload is None)
-      "blocked"    — agent explicitly emitted status: blocked
-      "passed"     — verify() passed
-      "failed"     — verify() failed
+      "zero_token"              — usage reports input_tokens=0 (agent never
+                                  ran); payload is None
+      "blocked"                 — agent explicitly emitted status: blocked
+      "passed"                  — verify() passed AND the files_changed
+                                  guard found nothing to flag
+      "failed"                  — verify() failed
+      "files_changed_mismatch"  — verify() passed but the RESULT's
+                                  files_changed list names paths that show
+                                  no diff against head_before; payload is
+                                  the list of unchanged paths
 
     `usage` is the per-attempt cost/token dict from the agent dispatch when
     `cost_tracking` is True and the agent returned a parseable usage block;
@@ -769,6 +809,10 @@ def execute_unit_attempt(
 
     Backward-compatible dispatch_fn contract: stubs may return either a
     plain `str` (treated as text-only, usage=None) or `(str, dict|None)`.
+
+    `head_before` is the pre-attempt HEAD SHA the files_changed guard
+    diffs against. None disables the guard — preserved for unit tests that
+    exercise this function in isolation without a git working tree.
     """
     if verify_fn is None:
         verify_fn = verify
@@ -790,7 +834,20 @@ def execute_unit_attempt(
     if is_blocked:
         return "blocked", reason, usage
     passed, evidence = verify_fn(wu, feature_dir)
-    return ("passed" if passed else "failed"), evidence, usage
+    if not passed:
+        return "failed", evidence, usage
+    # files_changed guard (FEAT-2026-0008/T02): the agent's RESULT claim
+    # gets diffed against head_before BEFORE squash_commit. A non-empty
+    # mismatch flags the attempt as a verification failure even though
+    # verify() reported PASS — gates can't see "the diff is empty" when
+    # the gate commands operate on files unrelated to the WU's scope.
+    if head_before is not None:
+        parsed = parse_result_block(stdout or "")
+        if parsed:
+            unchanged = verify_files_changed(parsed, head_before)
+            if unchanged:
+                return "files_changed_mismatch", unchanged, usage
+    return "passed", evidence, usage
 
 
 # --------------------------------------------------------------------------- #
@@ -927,6 +984,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 t0 = time.monotonic()
                 outcome, payload, usage = execute_unit_attempt(
                     wu, feature_dir, failure_note, cost_tracking=cost_tracking,
+                    head_before=head_before,
                 )
                 duration = round(time.monotonic() - t0, 3)
                 attempt_record: dict = {"attempt": attempt,
@@ -994,6 +1052,32 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     done_ids.add(wu.wu_id)
                     print(f"   PASS — committed {sha}")
                     break
+
+                if outcome == "files_changed_mismatch":
+                    # RESULT declared files_changed paths that show no diff
+                    # against head_before. Treat as a failed attempt: skip
+                    # squash, reset the tree, record evidence, retry within
+                    # budget. payload is the list of unchanged paths.
+                    note = (
+                        "RESULT block declared `files_changed` paths that "
+                        "show NO diff against HEAD before this attempt:\n"
+                        + "\n".join(f"  - {p}" for p in payload)
+                        + "\nEither actually modify them, or correct the "
+                          "files_changed list to match what you really edited."
+                    )
+                    wu_events.append(build_event(
+                        "attempt_outcome", wu.wu_id,
+                        {"outcome": "files_changed_mismatch",
+                         "attempt": attempt,
+                         "unchanged_paths": list(payload)},
+                    ))
+                    attempt_notes.append((attempt, note))
+                    failure_note = note
+                    git("reset", "--hard", head_before)
+                    print(f"   FILES_CHANGED MISMATCH attempt "
+                          f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
+                          f"unchanged")
+                    continue
 
                 # outcome == "failed": evidence in payload, retry within budget.
                 # Per-attempt notes are buffered (not written to disk) so they
