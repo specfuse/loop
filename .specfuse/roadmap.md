@@ -19,6 +19,7 @@ installation a target project copies via `init.sh`.
 | Feature ID     | Title                                       | Status   | Folder |
 |----------------|---------------------------------------------|----------|--------|
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
+| FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -64,6 +65,52 @@ methodology default.
 
 **Status: planned.** Detail the first gate's WUs when ready to start; the
 roadmap entry stays one row until then.
+
+## FEAT-2026-0003 — GitHub feature-pick for the loop
+
+**Why.** Teach the loop to adopt a feature dispatched by the Specfuse
+Orchestrator — so an orchestrator can hand a feature to a component repo's loop
+and the loop grinds it through its gate cycle — in addition to today's
+locally-authored `.specfuse/features/` flow. Full brief:
+[`docs/handoff-github-feature-pick.md`](../docs/handoff-github-feature-pick.md).
+
+**Gate 1 (passed).** The read path: extended the loop's correlation-ID grammar
+to admit orchestrated `INIT-YYYY-NNNN/FNN[/TNN]` IDs alongside `FEAT-…`
+component-local IDs (rule + linter + tests); added
+`.specfuse/scripts/gh_features.py`, a discovery script that lists a target
+repo's `specfuse:feature` issues as feature candidates (injectable `gh` runner
+for fully offline unit testing). Both implementation WUs completed in one
+attempt with no escalations. GATE-01 status: `passed`.
+
+**Gate 2 (passed).** The write/adopt path: `.specfuse/scripts/adopt_feature.py`
+scaffolds a dispatchable loop-feature folder from a picked `specfuse:feature`
+issue — PLAN.md frontmatter (including `source_issue_url` and `initiative` when
+present), GATE-01/02 files, WU-01 seeded verbatim from the raw issue body, and
+gate-1 closing WUs 90–93 with generic placeholder bodies. `gh_features.py`
+widened by one line to expose issue `body`. The `/adopt-feature` interactive
+skill wraps the script as a pick-list-then-adopt flow. Both implementation WUs
+completed in one attempt with no escalations. GATE-02 status: `passed`.
+
+**Gate 3 (passed).** Report-back and smoke: `Backend` seam widened with three lifecycle
+hooks (`on_feature_start`, `on_gate_passed`, `on_feature_complete`) and a `make_backend(feat_fm)`
+factory (T05); `GitHubBackend(Backend)` label-transition backend in `gh_backend.py` using the
+canonical `state:ready → state:in-progress → state:done` scheme, factory selects it when
+`source_issue_url` is present in PLAN.md frontmatter (T06); live smoke of `INIT-2026-0001/F06`
+(`example-org/example-app#287`) run out-of-loop by human operator — discovery, adopt, and
+report-back all PASS, `#287` fully restored post-smoke (T07). **Finding:** the adopted folder
+failed `lint_plan.py` because orchestrator issue bodies use `## ATX` headings; the linter only
+recognised `**bold**`/plain. Fix delivered in gate 4. GATE-03 status: `passed`.
+
+**Gate 4 (passed).** ATX-heading linter fix: broadened `lint_plan.py`'s mandatory-section
+detector to a union pattern (`^(?:#+\s*|\**)`) that accepts both Markdown ATX headings
+(`## Context`) and the existing bold-preamble (`**Context.**`) form (T08). The adopted
+`INIT-2026-0001-F06-…` folder now passes `lint_plan.py` exit-0, and existing bold-headed WU
+bodies remain clean (regression guard). GATE-04 status: `passed`.
+
+**Status: done.** All four gates passed. All four pipeline mechanisms — discover, adopt,
+report-back, lint-clean grind — are proven live against `example-org/example-app#287`. The
+`roadmap_goal` is met. See `RETROSPECTIVE.md §Feature-arc retrospective` and
+`SMOKE-INIT-2026-0001-F06.md`.
 
 ## Notes
 
