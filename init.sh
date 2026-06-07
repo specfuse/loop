@@ -260,7 +260,46 @@ if [[ $UPGRADE -eq 0 ]]; then
 
   # Seed user-authored files (INIT only — never on --upgrade).
   cp "$SRC_DIR/LEARNINGS.md" "$DEST/LEARNINGS.md"
-  cp "$DEST/verification.yml.example" "$DEST/verification.yml"
+
+  # If the target ships ci-check.sh, wire it directly into the code gate
+  # rather than leaving the generic pytest/ruff/bandit placeholders.
+  CI_CHECK_PATH=""
+  for candidate in ci-check.sh script/ci-check.sh scripts/ci-check.sh; do
+    if [[ -f "$TARGET/$candidate" ]]; then
+      CI_CHECK_PATH="$candidate"
+      break
+    fi
+  done
+  if [[ -n "$CI_CHECK_PATH" ]]; then
+    cat > "$DEST/verification.yml" <<EOF
+# .specfuse/verification.yml — auto-configured from $CI_CHECK_PATH
+#
+# $CI_CHECK_PATH was detected in the repo. The code gate delegates
+# to it so your Specfuse verification stays in sync with CI automatically.
+# Replace or extend if you need gate-level granularity (e.g. split tests
+# from lint so the driver can report which check failed).
+#
+# See verification.yml.example for the full field reference.
+
+code:
+  - name: ci-check
+    command: "bash $CI_CHECK_PATH"
+
+# Reflective units (retrospective, lessons, docs): the artifact exists /
+# something changed. Tighten as you like.
+doc:
+  - name: artifact-changed
+    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
+
+# plan-next: structural integrity of what it drafted.
+plannext:
+  - name: plan-lint
+    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
+EOF
+  else
+    cp "$DEST/verification.yml.example" "$DEST/verification.yml"
+  fi
+
   cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
   mkdir -p "$DEST/features"
 
@@ -415,23 +454,29 @@ fi
 if [[ $UPGRADE -eq 0 ]]; then
   echo "Next:"
   echo "  1. cd $TARGET"
-  echo "  2. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
+  if [[ -n "$CI_CHECK_PATH" ]]; then
+    echo "  2. review .specfuse/verification.yml  (auto-configured from $CI_CHECK_PATH)"
+  else
+    echo "  2. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
+  fi
   echo "  3. author your first feature folder under .specfuse/features/ from .specfuse/templates/"
   echo "  4. python .specfuse/scripts/loop.py --dry-run"
   echo
   echo "The loop driver and linter have no runtime dependencies — stock Python 3"
   echo "is all you need. (You'll need whatever tools your gates in verification.yml"
-  echo "call, of course — pytest, ruff, etc. — installed however your stack does it.)"
+  echo "call, of course — installed however your stack does it.)"
   echo
-  echo "Optional — to auto-draft .specfuse/verification.yml from this repo's CI and"
-  echo "tooling for your review (instead of editing the example by hand in step 2):"
-  echo "    claude                     # start an interactive session in this repo"
-  echo "    > run the derive-verification skill"
-  echo "    # (or, equivalently, paste the contents of"
-  echo "    #  .specfuse/skills/derive-verification/PROMPT.md into the session)"
-  echo "Run INTERACTIVELY — the skill asks batched questions (coverage threshold,"
-  echo "canonical test command, which gates to add/drop) and needs your answers."
-  echo "Piping the prompt via 'claude -p < ...' consumes stdin so the skill cannot"
-  echo "ask, and falls back to a gap-riddled non-interactive draft. The skill"
-  echo "drafts; it does not write the file. Review and copy yourself."
+  if [[ -z "$CI_CHECK_PATH" ]]; then
+    echo "Optional — to auto-draft .specfuse/verification.yml from this repo's CI and"
+    echo "tooling for your review (instead of editing the example by hand in step 2):"
+    echo "    claude                     # start an interactive session in this repo"
+    echo "    > run the derive-verification skill"
+    echo "    # (or, equivalently, paste the contents of"
+    echo "    #  .specfuse/skills/derive-verification/PROMPT.md into the session)"
+    echo "Run INTERACTIVELY — the skill asks batched questions (coverage threshold,"
+    echo "canonical test command, which gates to add/drop) and needs your answers."
+    echo "Piping the prompt via 'claude -p < ...' consumes stdin so the skill cannot"
+    echo "ask, and falls back to a gap-riddled non-interactive draft. The skill"
+    echo "drafts; it does not write the file. Review and copy yourself."
+  fi
 fi
