@@ -43,12 +43,13 @@ VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
 # Correlation-ID pattern — canonical, mirroring `.specfuse/rules/correlation-ids.md`.
-# Admits FEAT-YYYY-NNNN (feature-level), FEAT-YYYY-NNNN/TNN (substantive WUs),
-# FEAT-YYYY-NNNN/TNN[H[N...]] (hygiene WUs, target's number + 'H' + optional
-# ordinal when multiple hygiene WUs precede the same target), and
-# FEAT-YYYY-NNNN/G<n>-(RETRO|LESSONS|DOCS|PLAN) (closing-sequence WUs).
+# Two namespaces:
+#   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
+#   Orchestrated:    INIT-YYYY-NNNN/F<NN>, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
+# A bare INIT-YYYY-NNNN (no /FNN segment) is NOT a loop feature ID.
 CORRELATION_ID_RE = re.compile(
-    r"^FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?$"
+    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?|"
+    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?)$"
 )
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the
 # template but not hard-required here.

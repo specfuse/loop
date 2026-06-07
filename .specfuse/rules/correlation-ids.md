@@ -11,7 +11,9 @@ before emitting an ID.
 
 ## Format
 
-Two shapes, and only two:
+Two namespaces, four canonical shapes:
+
+**Component-local** (authored inside the component repo):
 
 - **Feature-level:** `FEAT-YYYY-NNNN`
   - `YYYY` is the four-digit calendar year in which the feature was created.
@@ -31,10 +33,30 @@ Two shapes, and only two:
     semantic constraints; see `.specfuse/skills/authoring-work-units/SKILL.md`
     §7 for when to author one.
 
-The combined pattern accepted across feature and task IDs is:
+**Orchestrated** (dispatched to the component repo by an orchestrator):
+
+- **Feature-level:** `INIT-YYYY-NNNN/FNN`
+  - `INIT-YYYY-NNNN` is the initiative ID, assigned by the orchestrator. `YYYY`
+    is the initiative's creation year; `NNNN` is a zero-padded four-digit ordinal.
+  - `FNN` is a zero-padded two-digit feature ordinal within the initiative.
+  - Example: `INIT-2026-0001/F06`.
+  - A bare `INIT-YYYY-NNNN` (no `/FNN` feature segment) is an initiative ID —
+    it is **not** a loop feature ID and must be rejected as malformed.
+- **Task-level:** `INIT-YYYY-NNNN/FNN/<task-id>`
+  - The feature-level orchestrated ID, a literal `/`, then the same `<task-id>`
+    shapes as component-local: `TNN`, `TNNH[N…]`, or `G<n>-<NAME>`.
+  - Examples: `INIT-2026-0001/F06/T01`, `INIT-2026-0001/F06/T02H`,
+    `INIT-2026-0001/F06/G1-RETRO`.
+
+**Origin is read from the ID root.** `INIT-…` = orchestrated (linked to an
+initiative in the orchestrator). `FEAT-…` = component-local (standalone feature).
+The loop treats both as "a feature to grind"; only the namespace differs.
+Collisions between the two namespaces are structurally impossible.
+
+The combined pattern accepted across all shapes is:
 
 ```
-^FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?$
+^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN)))?)$
 ```
 
 A string that does not match is malformed.
