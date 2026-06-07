@@ -19,6 +19,7 @@ installation a target project copies via `init.sh`.
 | Feature ID     | Title                                       | Status   | Folder |
 |----------------|---------------------------------------------|----------|--------|
 | FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
+| FEAT-2026-0003 | GitHub feature-pick for the loop            | active   | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
