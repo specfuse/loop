@@ -783,6 +783,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
     if gate is None:
         print(f"{feature_id}: all gates passed — feature complete.")
         backend.on_feature_complete(feature_id)
+        write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
         return 0
 
     if not dry_run:
