@@ -619,6 +619,119 @@ def parse_claude_json_output(raw: str) -> tuple[str, dict | None]:
     return result_text, (usage if usage else None)
 
 
+def verify_files_changed(result: dict, head_before: str) -> list[str]:
+    """Return claimed `files_changed` paths that show no diff against head_before.
+
+    The RESULT-block contract lets the agent declare which paths its work
+    touched. This guard, run before squash_commit, checks each claimed path
+    actually differs from HEAD's pre-attempt SHA. A path that does not exist
+    on disk is reported as "unchanged" — it cannot have a diff to commit.
+
+    Returns an empty list when all claimed paths show real diffs, OR when
+    `files_changed` is absent / empty (the opt-out: pre-existing WUs and the
+    worked example do not always declare it; absence MUST NOT fire the
+    guard).
+
+    See FEAT-2026-0008 / RETROSPECTIVE for the failure mode this exists to
+    catch — T04 and T08 of FEAT-2026-0007 declared files_changed naming
+    source paths their attempts never touched.
+    """
+    paths = result.get("files_changed") or []
+    if not isinstance(paths, list) or not paths:
+        return []
+    unchanged: list[str] = []
+    for raw in paths:
+        path = str(raw)
+        if not Path(path).exists():
+            unchanged.append(path)
+            continue
+        rc = subprocess.run(
+            ["git", "diff", "--quiet", head_before, "--", path],
+            capture_output=True,
+        ).returncode
+        if rc == 0:
+            unchanged.append(path)
+    return unchanged
+
+
+# Smoke-import runner (FEAT-2026-0008/T03). The conservative pattern matches
+# ONLY a `python3 -c "from X import Y"` line. The agent-authored WU body may
+# declare an existence check naming new symbols this WU just minted; the
+# driver runs each match after a successful verify() + squash and rolls back
+# the squash if any smoke import raises. Free-form `python3 -c` lines are
+# NOT executed — running arbitrary agent-authored Python in the driver
+# process would be a security regression (see WU escalation trigger 2).
+SMOKE_IMPORT_RE = re.compile(
+    r'''^\s*python3?\s+-c\s+(["'])from\s+\S+\s+import\s+\S+\1\s*$'''
+)
+
+
+def extract_smoke_imports(wu_body: str) -> list[str]:
+    """Return WU-body lines matching the conservative import-smoke pattern.
+
+    Each returned element is the full command string ready for
+    `subprocess.run(shell=True, ...)`. Order preserved. Lines that look
+    similar but do not match — `python -c "import X"`, `python -c
+    "print(...)"`, prose — are skipped.
+    """
+    out: list[str] = []
+    for line in wu_body.splitlines():
+        if SMOKE_IMPORT_RE.match(line):
+            out.append(line.strip())
+    return out
+
+
+def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
+    """Run each smoke-import command in `cwd` in declared order.
+
+    Returns `(True, "")` if every command exits 0. On the first non-zero
+    exit, returns `(False, summary)` where `summary` names the failing
+    command and its stderr — short, suitable for an event payload and a
+    retry failure_note. Subsequent commands are not run; one failure is
+    enough to fail the attempt.
+
+    Inherits the driver's PATH so the active venv's `python3` resolves
+    (the methodology requires the driver to be invoked from within an
+    active venv per `[loop-driver-operation]`).
+    """
+    for cmd in commands:
+        proc = subprocess.run(  # nosec B602
+            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
+        )
+        if proc.returncode != 0:
+            summary = (
+                f"smoke import failed (exit {proc.returncode}):\n"
+                f"  $ {cmd}\n"
+                f"stderr:\n{proc.stderr.strip()}"
+            )
+            return False, summary
+    return True, ""
+
+
+def is_zero_token_attempt(usage: dict | None) -> bool:
+    """Did the dispatched session bill zero input tokens?
+
+    Returns True iff `usage` is a dict whose `input_tokens` key is exactly 0.
+    A zero-token attempt means the agent never produced output (often due to a
+    transient CLI / quota / connectivity failure that the SDK reports as a
+    success with empty content); its RESULT block — if present — is
+    hallucinated upstream and must not be trusted.
+
+    Returns False for `usage is None` (cost tracking disabled — preserve prior
+    behavior for users who opt out), for a dict missing `input_tokens`, and
+    for any positive integer. The guard is opt-in via the cost-tracking flag:
+    when the operator runs with cost tracking off, `dispatch()` always returns
+    `usage=None` and this function always returns False.
+
+    See FEAT-2026-0008 / RETROSPECTIVE for the failure mode this exists to
+    catch — a zero-token attempt in FEAT-2026-0007/T08H landed `status: done`
+    despite the agent never running.
+    """
+    if not isinstance(usage, dict):
+        return False
+    return usage.get("input_tokens") == 0
+
+
 RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
 
 
@@ -724,6 +837,7 @@ def execute_unit_attempt(
     dispatch_fn=None,
     verify_fn=None,
     cost_tracking: bool = True,
+    head_before: str | None = None,
 ) -> tuple[str, object, dict | None]:
     """One dispatch + parse + (if not blocked) verify cycle.
 
@@ -732,9 +846,16 @@ def execute_unit_attempt(
     verify_fn from a test.
 
     Returns (outcome, payload, usage) where outcome is one of:
-      "blocked" — agent explicitly emitted status: blocked
-      "passed"  — verify() passed
-      "failed"  — verify() failed
+      "zero_token"              — usage reports input_tokens=0 (agent never
+                                  ran); payload is None
+      "blocked"                 — agent explicitly emitted status: blocked
+      "passed"                  — verify() passed AND the files_changed
+                                  guard found nothing to flag
+      "failed"                  — verify() failed
+      "files_changed_mismatch"  — verify() passed but the RESULT's
+                                  files_changed list names paths that show
+                                  no diff against head_before; payload is
+                                  the list of unchanged paths
 
     `usage` is the per-attempt cost/token dict from the agent dispatch when
     `cost_tracking` is True and the agent returned a parseable usage block;
@@ -742,6 +863,10 @@ def execute_unit_attempt(
 
     Backward-compatible dispatch_fn contract: stubs may return either a
     plain `str` (treated as text-only, usage=None) or `(str, dict|None)`.
+
+    `head_before` is the pre-attempt HEAD SHA the files_changed guard
+    diffs against. None disables the guard — preserved for unit tests that
+    exercise this function in isolation without a git working tree.
     """
     if verify_fn is None:
         verify_fn = verify
@@ -753,11 +878,30 @@ def execute_unit_attempt(
         stdout, usage = result
     else:
         stdout, usage = result, None
+    # Zero-token guard runs BEFORE RESULT-block parsing: the agent did not
+    # produce output, so any block in stdout is hallucinated upstream and
+    # must not be trusted (FEAT-2026-0008/T01). Opt-in via cost tracking —
+    # when disabled, usage is None and is_zero_token_attempt returns False.
+    if is_zero_token_attempt(usage):
+        return "zero_token", None, usage
     is_blocked, reason = agent_reported_blocked(stdout or "")
     if is_blocked:
         return "blocked", reason, usage
     passed, evidence = verify_fn(wu, feature_dir)
-    return ("passed" if passed else "failed"), evidence, usage
+    if not passed:
+        return "failed", evidence, usage
+    # files_changed guard (FEAT-2026-0008/T02): the agent's RESULT claim
+    # gets diffed against head_before BEFORE squash_commit. A non-empty
+    # mismatch flags the attempt as a verification failure even though
+    # verify() reported PASS — gates can't see "the diff is empty" when
+    # the gate commands operate on files unrelated to the WU's scope.
+    if head_before is not None:
+        parsed = parse_result_block(stdout or "")
+        if parsed:
+            unchanged = verify_files_changed(parsed, head_before)
+            if unchanged:
+                return "files_changed_mismatch", unchanged, usage
+    return "passed", evidence, usage
 
 
 # --------------------------------------------------------------------------- #
@@ -880,6 +1024,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             wu_events = [build_event("task_started", wu.wu_id,
                                      {"type": wu.type, "model": wu.model})]
             attempt_notes: list[tuple[int, str]] = []
+            attempt_outcomes: list[str] = []
             # Cost accumulators: per-attempt list goes to events.jsonl,
             # cumulative sum to WU frontmatter at outcome time.
             attempts_usage: list[dict] = []
@@ -893,6 +1038,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 t0 = time.monotonic()
                 outcome, payload, usage = execute_unit_attempt(
                     wu, feature_dir, failure_note, cost_tracking=cost_tracking,
+                    head_before=head_before,
                 )
                 duration = round(time.monotonic() - t0, 3)
                 attempt_record: dict = {"attempt": attempt,
@@ -905,6 +1051,21 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 attempts_usage.append(attempt_record)
                 cum_usage["duration_seconds"] = round(
                     cum_usage["duration_seconds"] + duration, 3)
+                attempt_outcomes.append(outcome)
+
+                if outcome == "zero_token":
+                    # Agent never produced output (input_tokens=0). Skip
+                    # RESULT parsing, buffer an event, reset the tree, and
+                    # treat as a failed attempt for the purposes of the
+                    # attempt loop — counter already incremented at top.
+                    wu_events.append(build_event(
+                        "attempt_outcome", wu.wu_id,
+                        {"outcome": "zero_token_skip", "attempt": attempt},
+                    ))
+                    git("reset", "--hard", head_before)
+                    print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
+                          f"— no agent output, skipping")
+                    continue
 
                 if outcome == "blocked":
                     # Reset agent work first; THEN write our bookkeeping; THEN
@@ -933,18 +1094,72 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 if outcome == "passed":
                     # Flip status to DONE BEFORE the squash so the flip is
                     # included in the commit content — survives the next WU's
-                    # reset. Then flush events so they ride in the same commit.
+                    # reset.
                     backend.set_wu(wu, "status", DONE)
                     write_cost_to_wu(backend, wu, cum_usage)
+                    sha = squash_commit(wu, head_before)
+                    # Smoke-import runner (FEAT-2026-0008/T03): after a
+                    # successful verify() AND squash, run each
+                    # `python3 -c "from X import Y"` line declared in the WU
+                    # body. A non-zero exit fails the attempt — the squash
+                    # is rolled back via `git reset --hard head_before` so
+                    # the verify-passing-but-smoke-failing tree does not
+                    # remain in history. Rollback FIRST (before event log
+                    # and before the next attempt iterates) per WU
+                    # escalation trigger 3.
+                    smoke_cmds = extract_smoke_imports(wu.body)
+                    if smoke_cmds:
+                        smoke_ok, smoke_summary = run_smoke_imports(
+                            smoke_cmds, Path("."),
+                        )
+                        if not smoke_ok:
+                            git("reset", "--hard", head_before)
+                            wu_events.append(build_event(
+                                "attempt_outcome", wu.wu_id, {
+                                    "outcome": "smoke_import_failed",
+                                    "attempt": attempt,
+                                    "summary": smoke_summary,
+                                },
+                            ))
+                            attempt_notes.append((attempt, smoke_summary))
+                            failure_note = smoke_summary
+                            print(f"   SMOKE FAIL attempt "
+                                  f"{attempt}/{MAX_ATTEMPTS}")
+                            continue
                     wu_events.append(build_event("task_completed", wu.wu_id, {
                         "attempts": attempt,
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
-                    sha = squash_commit(wu, head_before)
                     done_ids.add(wu.wu_id)
                     print(f"   PASS — committed {sha}")
                     break
+
+                if outcome == "files_changed_mismatch":
+                    # RESULT declared files_changed paths that show no diff
+                    # against head_before. Treat as a failed attempt: skip
+                    # squash, reset the tree, record evidence, retry within
+                    # budget. payload is the list of unchanged paths.
+                    note = (
+                        "RESULT block declared `files_changed` paths that "
+                        "show NO diff against HEAD before this attempt:\n"
+                        + "\n".join(f"  - {p}" for p in payload)
+                        + "\nEither actually modify them, or correct the "
+                          "files_changed list to match what you really edited."
+                    )
+                    wu_events.append(build_event(
+                        "attempt_outcome", wu.wu_id,
+                        {"outcome": "files_changed_mismatch",
+                         "attempt": attempt,
+                         "unchanged_paths": list(payload)},
+                    ))
+                    attempt_notes.append((attempt, note))
+                    failure_note = note
+                    git("reset", "--hard", head_before)
+                    print(f"   FILES_CHANGED MISMATCH attempt "
+                          f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
+                          f"unchanged")
+                    continue
 
                 # outcome == "failed": evidence in payload, retry within budget.
                 # Per-attempt notes are buffered (not written to disk) so they
@@ -956,9 +1171,21 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
             else:
                 # for-else: ran out of attempts without break = spinning.
-                # The reset has already happened in the failed branch above.
-                # Flush attempt notes to disk for human inspection, mark the
-                # WU blocked_human, then commit all of it.
+                # The reset has already happened in the failed/zero_token
+                # branch above. Flush attempt notes to disk for human
+                # inspection, mark the WU blocked_human, then commit it.
+                #
+                # Distinguish two spinning shapes in the event payload:
+                #   all_attempts_zero_token — every attempt billed 0 input
+                #     tokens (CLI/quota/connectivity issue, not a real
+                #     verification failure); no per-attempt notes to write.
+                #   spinning_detected — at least one attempt produced
+                #     output that failed verify(); per-attempt evidence is
+                #     buffered in attempt_notes.
+                all_zero = bool(attempt_outcomes) and all(
+                    o == "zero_token" for o in attempt_outcomes)
+                reason = ("all_attempts_zero_token" if all_zero
+                          else "spinning_detected")
                 wu_key = wu.wu_id.replace("/", "_")
                 note_paths = []
                 for atmpt, evidence in attempt_notes:
@@ -969,7 +1196,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 backend.set_wu(wu, "status", "blocked_human")
                 write_cost_to_wu(backend, wu, cum_usage)
                 wu_events.append(build_event("human_escalation", wu.wu_id, {
-                    "reason": "spinning_detected",
+                    "reason": reason,
                     "attempts": MAX_ATTEMPTS,
                     "attempts_usage": attempts_usage,
                 }))
@@ -977,9 +1204,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 commit_bookkeeping(
                     [wu.file, events_path, *note_paths],
                     f"chore(loop): {wu.wu_id} blocked_human "
-                    f"(spinning, {MAX_ATTEMPTS} attempts)\n\nFeature: {wu.wu_id}",
+                    f"({reason}, {MAX_ATTEMPTS} attempts)"
+                    f"\n\nFeature: {wu.wu_id}",
                 )
-                print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — escalated")
+                print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — "
+                      f"escalated ({reason})")
                 blocked = True
 
     if blocked:
