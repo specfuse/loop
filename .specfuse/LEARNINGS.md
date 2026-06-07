@@ -264,3 +264,53 @@ promoted here.
   gate appended at a terminal case — let the work drive the WU count. A
   single-WU gate on a genuinely bounded fix is correct methodology, not an
   indication the gate was rushed or under-designed.
+
+- [FEAT-2026-0004/G1-LESSONS] Tools that perform tree-global git mutations
+  must enforce concurrency at the working-tree level, not at a logical-unit
+  or feature-id level. A pidfile is insufficient for the SIGKILL case: the
+  pid-holding process is dead, the file remains, and the next launch either
+  stalls or skips the check. `flock(2)` (Python: `fcntl.flock(fd, LOCK_EX |
+  LOCK_NB)`) is the correct primitive — the kernel releases the advisory lock
+  automatically on process exit, including SIGKILL, with no cleanup step.
+  Rule: when a WU adds concurrency protection to any subprocess-heavy driver,
+  specify `flock` + a `.lock` file tracked in `.gitignore` as the locking
+  primitive; explicitly rule out pidfiles in the WU spec and explain the
+  SIGKILL rationale so the agent does not substitute a pidfile as a "simpler"
+  alternative.
+
+- [FEAT-2026-0004/G1-LESSONS] When a Python function must hold a POSIX
+  advisory lock for its entire execution lifetime, assign the file descriptor
+  to a named local variable in that function's stack frame and never close or
+  release it explicitly. Do NOT use `with` / a context manager (closes the fd
+  on `__exit__`), and do NOT assign to `_` (may trigger GC and premature
+  release). The kernel releases the flock on process exit — including SIGKILL
+  — making `atexit` hooks and `try/finally` unnecessary. Rule: a WU spec that
+  requires a "held for process lifetime" lock must state this fd-lifetime
+  constraint explicitly; without it, an agent familiar with Python
+  context-manager idioms will wrap the acquire in `with`, silently releasing
+  the lock at the end of the block.
+
+- [FEAT-2026-0004/G1-LESSONS] When a bootstrap or `init.sh` script must
+  append a single line to a file (`.gitignore`, config, `.env.example`)
+  idempotently, use `grep -qxF "$line" "$file" || echo "$line" >> "$file"`.
+  The `-x` flag (full-line match) prevents a shorter prefix of the line from
+  satisfying the check; the `-F` flag (literal string, no regex) prevents
+  special characters in the line from producing false positives. Re-running
+  the script in either INIT or UPGRADE mode leaves the file untouched when
+  the line is already present. Rule: any WU that authors or modifies an
+  `init.sh`-style bootstrap script must use this idiom for line-append
+  idempotency; a plain `grep -q` without `-xF` is a latent bug waiting for a
+  line whose content is a prefix of another line already in the file.
+
+- [FEAT-2026-0004/G1-LESSONS] An escalation trigger is load-bearing only
+  when it names the exact structural condition that would fire it — not just
+  the outcome ("if this gets complicated, block"). T01's trigger read: "If
+  `run()` cannot acquire the lock before a git mutation without a larger
+  refactor of its early-setup ordering, block and name the ordering conflict."
+  That precision let the agent confirm non-firing explicitly ("the function's
+  structure was already compatible") rather than quietly work around the
+  constraint. Rule: when authoring a WU that touches an existing function with
+  non-trivial call ordering, write the escalation trigger as a falsifiable
+  structural claim — name the specific site, the condition, and what a
+  violating scenario looks like — so the agent can report "trigger checked,
+  did not fire" rather than omitting the check entirely.
