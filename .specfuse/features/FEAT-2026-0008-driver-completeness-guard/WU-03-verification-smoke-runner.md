@@ -3,8 +3,12 @@ id: FEAT-2026-0008/T03
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 323.812
+cost_usd: 1.657153
+input_tokens: 1256
+output_tokens: 22030
 ---
 
 # WU-Verification smoke-import runner
