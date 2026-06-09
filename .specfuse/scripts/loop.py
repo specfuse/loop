@@ -271,6 +271,22 @@ class Backend:
         setattr(wu, "status" if key == "status" else key, value)  # keep memory in sync
 
     def set_gate(self, gate: GateNode, status: str) -> None:
+        # Materialize the gate file if missing — PLAN.md may reference a gate
+        # whose markdown was never authored (e.g. plan-next drafted an empty
+        # follow-up gate that the human never filled in). Without this, the
+        # first set_gate on a missing file crashes write_frontmatter_field
+        # with FileNotFoundError and the whole feature halts unrecoverably.
+        if not gate.file.is_file():
+            gate.file.parent.mkdir(parents=True, exist_ok=True)
+            gate.file.write_text(
+                f"---\ngate: {gate.number}\nstatus: {status}\n---\n\n"
+                f"# Gate {gate.number}\n\n"
+                f"_Stub created by loop.set_gate because PLAN.md referenced "
+                f"this gate but no markdown file existed. Body intentionally "
+                f"minimal; edit if you want a real Definition of Done._\n"
+            )
+            gate.status = status
+            return
         write_frontmatter_field(gate.file, "status", status)
         gate.status = status
 
@@ -968,7 +984,22 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                   f"re-run.")
         return 2
 
-    done_ids = {u.wu_id for u in units if u.status == DONE}
+    # Done-set must include WUs from every PREVIOUS gate that are already done —
+    # cross-gate `depends_on` references are valid (e.g. gate 2's implementation
+    # WU may depend on gate 1's). Without this, the ready() filter sees the
+    # cross-gate dep as unmet and silently no-ops the gate (then set_gate
+    # awaiting_review fires on an empty run, leaving real WUs un-dispatched).
+    done_ids: set[str] = set()
+    for g in gates:
+        if g.number > gate.number:
+            continue
+        for ref in g.refs:
+            wu_path = feature_dir / ref["file"]
+            if not wu_path.is_file():
+                continue
+            wfm, _ = read_frontmatter(wu_path)
+            if wfm.get("status") == DONE:
+                done_ids.add(ref["id"])
     blocked = False
 
     while True:
