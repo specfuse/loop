@@ -25,18 +25,17 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
 | FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
+| FEAT-2026-0010 | Roadmap restructure: add + archive          | planned  | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` |
+| FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | planned  | — |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | planned  | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
-> Note: planned-row entries for FEAT-2026-0010 (roadmap restructure),
-> FEAT-2026-0011 (scoring framework), and FEAT-2026-0012 (closing-WU
-> deliverable guard) were authored mid-FEAT-2026-0002 but silently
-> dropped during the squash-merge of PR #7. The detail prose for each
-> lives in this file's history (and FEAT-2026-0010 has a folder under
-> `.specfuse/features/`); restore the rows when picking the next
-> feature.
+> Note: planned-row entry for FEAT-2026-0012 (closing-WU
+> deliverable guard) was authored mid-FEAT-2026-0002 but silently
+> dropped during the squash-merge of PR #7. Detail prose lives in this
+> file's git history; restore the row when picking the feature.
 
 ## FEAT-2026-0002 — Driver run-loop test coverage
 
@@ -329,6 +328,150 @@ work (T04 retry escalation ladder, T08 telemetry) can now be relanded under
 FEAT-2026-0009 — a third silent-no-op is structurally impossible. See
 `RETROSPECTIVE.md §Feature-arc verdict` for the audit and the recursive
 close-ceremony check.
+
+## FEAT-2026-0010 — Roadmap restructure: add + archive
+
+**Why.** The roadmap file currently mixes detail sections for every
+feature — done, abandoned, planned, active — into one document. As
+done features accumulate, `pick-feature` (and any other reader of the
+roadmap) loads ~70% irrelevant context every invocation. The file has
+also been edited entirely by hand; there is no skill to append a new
+planned entry, and no mechanism to graduate detail sections out of the
+hot file when work completes.
+
+**Goal.** Land the structural changes that let the roadmap stay lean
+without losing history:
+
+- Split `.specfuse/roadmap.md` so detail sections cover only `planned`
+  and `active` features; move `done` and `abandoned` detail sections
+  to a new `.specfuse/roadmap-archive.md` (table rows stay in the
+  main file with a link to the archive anchor).
+- Migrate FEAT-2026-0003..0008's existing detail sections to the
+  archive as the first dogfooding pass.
+- Ship a `roadmap-add` skill: interactive append of a new planned
+  row + detail section, auto-picking the next FEAT-YYYY-NNNN ID,
+  honoring reserved IDs in repo history.
+- Ship a `roadmap-archive` skill: given a FEAT-ID (or auto-detected
+  done/abandoned rows with detail still inline), cut the detail
+  section and append to the archive, leaving the table row intact.
+- Hook the driver: when `loop.py` flips `PLAN.md` status to
+  `complete`, suggest (or auto-fire) `roadmap-archive` for that
+  feature. Manual-first cut; auto a follow-up if the manual flow is
+  reliable.
+
+**Benefits.** Reduce hot-path context for every roadmap reader.
+Make adding a planned entry a one-command operation, removing the
+friction that causes ad-hoc shorthand to leak into the table.
+Preserve full history in a file that's never loaded on the hot
+path. Foundation for FEAT-2026-0011, which adds new columns and
+scoring data the table can't carry while it's still hand-edited.
+
+**Verification.** `pick-feature` invoked against the restructured
+roadmap loads strictly less context than today (measure: line count
+of the file it reads). `roadmap-add` writes a row + detail section
+that round-trips through the archive flow without losing data.
+`roadmap-archive` is idempotent (running twice does not duplicate
+the archive entry). Migration of 0003..0008 leaves the table
+unchanged in shape; archive contains 6 detail sections matching
+the originals byte-for-byte except for the new archive header.
+
+**Status: planned.** Folder exists at
+`.specfuse/features/FEAT-2026-0010-roadmap-restructure/` (PLAN.md,
+GATE-01.md, GATE-02.md, 4 substantive WUs, 4 closing WUs). Land
+before FEAT-2026-0011 (scoring needs the restructured table to
+carry the new columns).
+
+## FEAT-2026-0011 — Scoring framework for roadmap features
+
+**Why.** Today the roadmap has no scoring signal — `pick-feature`
+ranks by recency and gut feel. Christian's "Feature Prioritization
+Guidelines" methodology defines an objective formula
+(`(WCI×CI) + (WBV×BV) + (WTF×TF) − (WCOI×COI) − (WR×R)`, normalized
+to 0–100) that decouples stable per-feature criteria (objective,
+data-backed) from time-varying weights (quarterly strategic
+objectives). The methodology has been written down once; it needs
+to land as a reusable Specfuse component so every repo (and
+ultimately the orchestrator) inherits the same prioritization
+discipline.
+
+**Goal.** Land the scoring stack as a set of artifacts + skills.
+
+Artifacts:
+
+- `.specfuse/scoring-criteria.md` per repo, with stable definitions
+  of what each criterion (CI/BV/TF/COI/R) MEANS for the project,
+  including project-specific sub-criteria (e.g. specfuse-loop's
+  CI = "methodology user impact: reduce operator interrupts,
+  shorten WU spin time, lower per-feature cost"). Carries a
+  `revision:` field and a `## Revision log` for audited evolution.
+- `.specfuse/priorities/YYYY-QN.yml` per quarter, carrying the
+  current period's strategic objective + the five weights. Latest
+  file by name is active; history preserved by never overwriting.
+- Per-feature scoring data lives in the roadmap detail section as
+  a YAML block (not in the table row). Table row carries only
+  `ID | Title | Status | Budget`. Score is rendered, never
+  stored.
+- `.specfuse/roadmap-ranked.md`, auto-regenerated, git-tracked, the
+  always-current rendered view of priorities. Header includes the
+  period, weights, and timestamp used to compute it.
+- Audit lives in-detail as a `## Estimate revisions` subsection in
+  each feature's roadmap entry, travels with the feature into the
+  archive on completion.
+
+Skills:
+
+- `define-scoring-criteria` — bootstrap + `--revise` the per-repo
+  criteria file. Reads CLAUDE.md, roadmap, LEARNINGS; asks "who are
+  your customers", "what's strategic for this product", "what does
+  drift risk mean here"; drafts the file, asks user to confirm.
+- `set-priorities` — write the current quarter's weights file. On
+  each call, snapshots the active period and starts a new one if
+  the quarter rolled over.
+- `roadmap-estimate` — fill CI/BV/TF/R + Budget bucket for a
+  feature. Reads scoring-criteria.md as ground truth for the
+  rubric. COI derived from Budget bucket via fixed mapping
+  (`<$5 → 1, $5-25 → 4, $25-100 → 7, >$100 → 10`). Wires
+  events.jsonl telemetry (actual cost / attempts / escalations
+  across past features) as a grounding aid. For `active`
+  features, `--reason` is mandatory; revision is appended to the
+  feature's `## Estimate revisions` subsection.
+- `roadmap-rank` — compute Feature Score per current weights
+  using the methodology's formula + normalization. Two modes:
+  stdout (interactive ranked view), or `--snapshot` (write
+  `.specfuse/roadmap-ranked.md`). Active features and planned
+  features ranked in separate sections.
+
+Wiring:
+
+- `pick-feature` updated to read `roadmap-ranked.md` (or call
+  `roadmap-rank` if the snapshot is stale).
+- `set-priorities` / `roadmap-estimate` / `roadmap-add` /
+  `roadmap-archive` each call `roadmap-rank --snapshot` as their
+  final step so the rendered ranking never goes stale.
+- `init.sh` ships templates for `scoring-criteria.md` and a starter
+  `priorities/<current-quarter>.yml`.
+- Bootstrap specfuse-loop's OWN `scoring-criteria.md` and an
+  initial `priorities/<current-quarter>.yml` as part of this
+  feature (eats its own dog food).
+
+**Benefits.** Objective prioritization across the backlog. Decoupled
+"what does this feature offer" (stable) from "what are we chasing
+this quarter" (time-varying). Reproducible scoring across repos and,
+later, across the orchestrator's component repos. Audit trail when
+estimates change. Foundation for the orchestrator to aggregate
+features across component repos under one product-level weight set.
+
+**Verification.** Compute Feature Scores for FEAT-2026-0010 and a
+backfilled set of past features; manually validate the ranking
+matches Christian's intuitive ordering for at least one historical
+quarter. `roadmap-estimate` blocks re-rating `active` features
+without `--reason`. `roadmap-rank --snapshot` regenerates a
+deterministic file given the same inputs. `scoring-criteria.md`
+revision flow lets a user change the rubric without losing prior
+estimates' grounding (revision log captures the change).
+
+**Status: planned.** Depends on FEAT-2026-0010 landing first (table
+shape needs to be ready to carry the new column shape).
 
 ## FEAT-2026-0013 — CI integration_workspace cleanup race fix
 
