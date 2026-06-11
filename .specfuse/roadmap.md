@@ -25,8 +25,18 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` |
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` |
 | FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
+| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | planned  | — |
+| FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | planned  | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
+
+> Note: planned-row entries for FEAT-2026-0010 (roadmap restructure),
+> FEAT-2026-0011 (scoring framework), and FEAT-2026-0012 (closing-WU
+> deliverable guard) were authored mid-FEAT-2026-0002 but silently
+> dropped during the squash-merge of PR #7. The detail prose for each
+> lives in this file's history (and FEAT-2026-0010 has a folder under
+> `.specfuse/features/`); restore the rows when picking the next
+> feature.
 
 ## FEAT-2026-0002 — Driver run-loop test coverage
 
@@ -319,6 +329,74 @@ work (T04 retry escalation ladder, T08 telemetry) can now be relanded under
 FEAT-2026-0009 — a third silent-no-op is structurally impossible. See
 `RETROSPECTIVE.md §Feature-arc verdict` for the audit and the recursive
 close-ceremony check.
+
+## FEAT-2026-0013 — CI integration_workspace cleanup race fix
+
+**Why.** The repo's CI suite intermittently fails with
+`OSError: [Errno 39] Directory not empty: '/tmp/.../.git/objects'`
+when `tests/test_driver_integration.py::integration_workspace`'s
+`tempfile.TemporaryDirectory()` context manager exits and Python 3.12's
+`shutil.rmtree` races against leftover file descriptors holding parts
+of `.git/objects`. Three observed occurrences:
+
+- 2026-06-10 push, `test_no_files_changed_in_result_block_runs_squash_as_today`
+  — root cause was an unclosed `.specfuse/.loop.lock` fd; fixed by the
+  `try/finally` close in `loop.py::run()` (commit `7abc809`).
+- 2026-06-11 PR #7 first run,
+  `test_cumulative_duration_written_to_frontmatter` — same OSError, but
+  the prior fix doesn't touch the test that's failing now. A second
+  unclosed handle (or git subprocess that hasn't exited yet) is still
+  leaking inside `integration_workspace`.
+
+A subsequent CI run on the same PR passed without code changes,
+confirming the race is timing-dependent and not deterministic. CI
+flakes erode the verification-as-oracle property even when each
+individual failure has a reproducible root cause, and the team has
+now spent two halt-and-investigate cycles on the same symptom shape.
+
+**Goal.** Eliminate the race so the integration-test path is
+deterministic on Python 3.12 CI runners.
+
+Likely fix paths to evaluate:
+
+- `tempfile.TemporaryDirectory(ignore_cleanup_errors=True)` in
+  `integration_workspace` (Py 3.10+). Suppresses the symptom; doesn't
+  fix the underlying leak.
+- Audit `integration_workspace` for unclosed git subprocess handles
+  and add explicit `subprocess.run` `check=True` + completion-wait at
+  exit points. Fixes the root cause.
+- Move `.specfuse/.loop.lock` open-then-flock pattern out of test
+  paths that don't need it (the lock isn't load-bearing inside a
+  TemporaryDirectory the test owns).
+
+A single substantive WU per fix-path; recursive audit at close runs
+the suite 50× in a loop and asserts zero flakes.
+
+**Status: planned.** Independent of every other planned feature; can
+run any time after FEAT-2026-0002 (which raised the floor that makes
+the test-suite stability properties more visible).
+
+## FEAT-2026-0014 — GitHub Actions Node.js 20 deprecation bump
+
+**Why.** GitHub will force Node.js 20 actions to Node.js 24 on
+2026-06-16; Node 20 removed from runners 2026-09-16. CI's
+`actions/checkout@v4` and `actions/setup-python@v5` both emit the
+deprecation warning today. Without action, the forced upgrade lands
+during a normal CI run with no warning of which workflows will break
+their action pinning behavior — exactly the failure mode this repo's
+methodology is meant to surface before merge, not after.
+
+**Goal.** Bump `.github/workflows/ci.yml` to action versions that
+support Node 24 natively (currently: `actions/checkout@v5`,
+`actions/setup-python@v6` — verify the major-version compatibility at
+WU author time, not assume).
+
+Single substantive WU: edit `ci.yml` action `uses:` lines; trigger a
+CI run on the PR and confirm no deprecation warning fires; assert
+both jobs still pass against the existing test suite.
+
+**Status: planned.** Independent. Time-bounded — should land before
+2026-06-16 forced upgrade or this becomes urgent.
 
 ## Notes
 
