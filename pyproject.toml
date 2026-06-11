@@ -38,6 +38,7 @@ dev = [
   "ruff>=0.6",
   "bandit>=1.7",
   "coverage>=7.0",
+  "jsonschema>=4.0",
 ]
 
 [project.urls]

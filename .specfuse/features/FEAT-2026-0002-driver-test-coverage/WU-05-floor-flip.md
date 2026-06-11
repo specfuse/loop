@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T05
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 45.427
+cost_usd: 0.173537
+input_tokens: 7
+output_tokens: 1042
 ---
 
 # Raise coverage --fail-under floor to 90

@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T02
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 853.775
+cost_usd: 2.138758
+input_tokens: 682
+output_tokens: 40865
 ---
 
 # Cover validate-event.py
@@ -17,6 +21,20 @@ existing test file. Read the script first to enumerate (a) the schema
 it validates (event_type + payload shape per `events.jsonl`), (b) its
 exit codes, (c) its error messages. Drive every documented branch from
 a test.
+
+**Dependency: `jsonschema`.** `validate-event.py` imports `jsonschema`
+(`Draft202012Validator`). It is now declared in `pyproject.toml`'s
+`[project.optional-dependencies].dev` (added alongside this WU's
+re-arming). The CI environment installs it via `pip install -e '.[dev]'`
+in `.github/workflows/ci.yml`. Local: `pip install jsonschema>=4.0` if
+absent.
+
+**Schema-source contract.** The script's schema defines `source` as
+`^(human|specs|pm|qa|config-steward|merge-watcher|component:...)$` —
+the Specfuse Orchestrator's event protocol. Loop-driver-emitted events
+use `source: "driver"` and are intentionally NOT valid under this
+schema; they follow a different contract owned by `loop.py`. Your tests
+must respect this boundary (see AC 4).
 
 LEARNINGS [FEAT-2026-0003/G2-LESSONS] (two-case linter pattern) and
 [FEAT-2026-0005/G1-LESSONS] (regression case on existing valid fixture)
@@ -40,11 +58,17 @@ Reference the binding rules under `.specfuse/rules/`. Edit files only.
    unknown event_type, (d) malformed JSON line. Each rejection asserts
    the exact exit code and that the error message names the offending
    key or condition.
-4. Regression on existing valid fixture: at least one test reads a real
-   event line from `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/events.jsonl`
-   and asserts `validate-event.py` accepts it (exit 0). This protects
-   against a strictness regression that would reject already-emitted
-   events.
+4. Schema-rejection regression on a real driver-emitted event: at least
+   one test reads a real event line from
+   `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/events.jsonl`
+   and asserts `validate-event.py` REJECTS it (exit != 0) because those
+   events use `source: "driver"` which is intentionally NOT in the
+   schema's `source` enum (`^(human|specs|pm|qa|config-steward|merge-watcher|component:...)$`).
+   This pins the documented contract: driver-emitted events follow a
+   different schema than the orchestrator/component-author event protocol
+   the script validates. If the script's schema is later widened to admit
+   `driver`, this test must be updated in the same change — that is the
+   correct coupling.
 5. **Per-file coverage AC.** `coverage run --source=.specfuse/scripts
    -m unittest discover -s tests && coverage report
    --include=.specfuse/scripts/validate-event.py --fail-under=90` exits 0.

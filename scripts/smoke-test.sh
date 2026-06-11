@@ -53,9 +53,9 @@ ruff check .specfuse/scripts tests scripts
 echo "==> [gate: security] bandit"
 bandit -r .specfuse/scripts -ll
 
-echo "==> [gate: coverage] coverage --fail-under=70"
+echo "==> [gate: coverage] coverage --fail-under=90"
 coverage run --source=.specfuse/scripts -m unittest discover -s tests \
-  && coverage report --fail-under=70
+  && coverage report --fail-under=90
 
 echo
 echo "smoke test: OK"
