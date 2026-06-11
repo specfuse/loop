@@ -27,15 +27,11 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` |
 | FEAT-2026-0010 | Roadmap restructure: add + archive          | planned  | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` |
 | FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` |
+| FEAT-2026-0012 | Closing-WU deliverable guard                | planned  | — |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | planned  | — |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | planned  | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
-
-> Note: planned-row entry for FEAT-2026-0012 (closing-WU
-> deliverable guard) was authored mid-FEAT-2026-0002 but silently
-> dropped during the squash-merge of PR #7. Detail prose lives in this
-> file's git history; restore the row when picking the feature.
 
 ## FEAT-2026-0002 — Driver run-loop test coverage
 
@@ -472,6 +468,76 @@ estimates' grounding (revision log captures the change).
 
 **Status: planned.** Depends on FEAT-2026-0010 landing first (table
 shape needs to be ready to carry the new column shape).
+
+## FEAT-2026-0012 — Closing-WU deliverable guard
+
+**Why.** FEAT-2026-0008 closed the hollow-pass surface for
+`type: implementation` WUs via three driver-side guards (zero-token,
+`files_changed` diff, smoke-import). Closing-sequence WUs
+(`plan-next`, `close`, `retrospective`, `lessons`, `docs`) have the
+same hollow-pass surface and none of the three FEAT-2026-0008 guards
+catch them:
+
+- Zero-token misses: the agent billed real tokens.
+- `files_changed` diff guard misses: per FEAT-2026-0008/T02, empty or
+  absent `files_changed` opts out, and closing WUs typically emit
+  empty lists.
+- Smoke-import misses: closing WUs produce prose deliverables, not
+  importable symbols.
+
+Observed live in an external (IaC) project's feature dogfood: a
+terminal-gate `plan-next` WU billed `cost_usd: 0.90`,
+`output_tokens: 4389`, emitted RESULT `status: complete`, and the
+driver flipped `attempts: 1` / `status: done` while the agent had
+never invoked `Write` / `Edit`: `GATE-NN-REVIEW.md` absent,
+`PLAN.md status: active` unchanged, roadmap row unchanged. The
+driver believed an honest RESULT block without confirmation.
+
+Also encountered locally during FEAT-2026-0002/G1-CLOSE: the close
+agent correctly flipped PLAN.md status, roadmap row, and wrote
+RETROSPECTIVE.md — but only because the WU spec told it to. If the
+agent had emitted PASS without writing, the driver would have
+believed it and FEAT-2026-0002 would have closed hollow. The same
+gap blocks reliable auto-progression of the roadmap row on feature
+close (current behavior depends entirely on the close-agent
+following the WU AC).
+
+**Goal.** A driver-side guard, analogous in shape to FEAT-2026-0008's
+three guards, that asserts type-keyed closing-deliverable existence
+between successful verify+squash and the status-flip-to-done.
+Type-keyed assertion table:
+
+- `retrospective` → `<feature_dir>/RETROSPECTIVE.md` exists +
+  size > N bytes (small floor, ~200).
+- `lessons` → `git diff head_before -- .specfuse/LEARNINGS.md`
+  shows ≥1 added line.
+- `docs` → at least one file in `<feature_dir>` or
+  `.specfuse/roadmap.md` shows a diff against `head_before`.
+- `plan-next` → `<feature_dir>/GATE-<N>-REVIEW.md` exists +
+  non-empty AND one of: (a) next gate's `work_units` non-empty
+  in PLAN.md, (b) PLAN.md `status: done`, (c) roadmap row `done`.
+- `close` → RETROSPECTIVE.md exists + non-empty AND LEARNINGS.md
+  diff AND PLAN.md `status: done` AND roadmap row `done`.
+- `implementation` → unchanged; FEAT-2026-0008's three guards
+  already cover.
+
+Failure rolls back via `git reset --hard head_before`, records an
+`attempt_outcome` event with `outcome: "closing_deliverable_missing"`
+naming the failed assertion, and counts as a verification failure
+in the attempt loop — three in a row escalate to `blocked_human`.
+
+**Verification.** New tests under `tests/test_loop_closing_guard.py`
+covering negative case (agent emits PASS without writing the
+type-keyed deliverable, guard fires, attempt fails) and positive
+case (agent writes everything, guard passes). Recursive audit per
+LEARNINGS [FEAT-2026-0008/G1-CLOSE]: the close ceremony for this
+feature must run the new guard against itself — if any deliverable
+is missing, the close WU emits `status: blocked`, not `complete`.
+
+**Status: planned.** Independent of FEAT-2026-0010/0011. Detail the
+first gate's WUs when ready to start. Single gate, one substantive
+WU (`closing-deliverable-guard`) + `close` ceremony — mirrors
+FEAT-2026-0008's shape.
 
 ## FEAT-2026-0013 — CI integration_workspace cleanup race fix
 
