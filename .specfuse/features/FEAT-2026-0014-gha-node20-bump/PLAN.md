@@ -5,7 +5,7 @@ slug: gha-node20-bump
 branch: feat/FEAT-2026-0014-gha-node20-bump
 roadmap_goal: Bump GitHub Actions to versions supporting Node.js 24 natively, ahead of the 2026-06-16 deprecation, so CI keeps running without warnings.
 autonomy_default: auto
-status: active
+status: done
 ---
 
 # Plan: GitHub Actions Node.js 20 deprecation bump
