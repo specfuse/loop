@@ -64,6 +64,10 @@ the planning rigor Ralph's bare task list lacks.
 
 In a target single-repo project:
 
+**Contributing to this repo?** Run `./scripts/install-hooks.sh` once after
+cloning to enable the pre-push hook (runs `scripts/smoke-test.sh` — same
+checks CI runs — before each `git push`). Bypass with `git push --no-verify`.
+
 ```bash
 # from the specfuse-loop checkout
 ./init.sh /path/to/your-project
