@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T03
 type: implementation
 effort: medium
-status: pending
+status: blocked_human
 attempts: 0
+duration_seconds: 2337.269
+cost_usd: 4.087813
+input_tokens: 128
+output_tokens: 126025
 ---
 
 # Cover lint_plan.py error arms
