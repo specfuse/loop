@@ -447,3 +447,20 @@ promoted here.
   must NOT claim the goal is met and the WU must emit `status: blocked` —
   hollow-passing the close ceremony of an anti-hollow-pass feature is the
   worst-case recursive failure and the methodology must catch it.
+
+- [driver/files_changed-guard] The `files_changed` guard's diff check must
+  account for **untracked** files, not just tracked diffs. `git diff
+  head_before -- <path>` returns 0 ("no diff") for a freshly-created file
+  the agent just wrote, because `git diff` doesn't see untracked files.
+  Without the fix, a WU that legitimately creates new deliverables (a new
+  `.tf`, `.sh`, `.md`, etc.) spins to `blocked_human` with the message
+  "RESULT block declared files_changed paths that show NO diff against
+  HEAD before this attempt" — even though the file is present and correct
+  on disk. Compounding factor: `git reset --hard head_before` between
+  attempts only resets tracked content; the untracked file persists, the
+  next attempt re-writes the same bytes, and the false positive recurs.
+  Rule: guards that probe "did this attempt actually change X" against a
+  git baseline must combine `git diff --quiet` with `git ls-files --others
+  --exclude-standard` to catch added-untracked. Symptom seen 4× in
+  FEAT-2026-0012 (T04, T08, G3-PLAN, T11); fix lives in
+  `verify_files_changed`.

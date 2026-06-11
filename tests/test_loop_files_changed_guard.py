@@ -101,6 +101,40 @@ class TestVerifyFilesChanged(unittest.TestCase):
         self.assertEqual(
             loop.verify_files_changed({"files_changed": None}, self.head), [])
 
+    def test_newly_created_untracked_file_is_not_flagged(self):
+        # Regression: `git diff --quiet head_before -- new.sh` returns 0
+        # for untracked files (diff ignores them), which used to flag
+        # them as unchanged. An agent-created new file IS a change vs
+        # head_before — it didn't exist there — so the guard must pass.
+        (self.root / "new.sh").write_text("#!/bin/sh\necho hi\n")
+        result = {"files_changed": ["new.sh"]}
+        self.assertEqual(loop.verify_files_changed(result, self.head), [])
+
+    def test_newly_created_untracked_file_in_subdir_is_not_flagged(self):
+        (self.root / "scripts").mkdir()
+        (self.root / "scripts" / "check.sh").write_text("#!/bin/sh\n")
+        result = {"files_changed": ["scripts/check.sh"]}
+        self.assertEqual(loop.verify_files_changed(result, self.head), [])
+
+    def test_mixed_new_untracked_and_unchanged_tracked(self):
+        # new.md (untracked, new) MUST pass; a.py (tracked, unchanged)
+        # MUST still flag — the guard's job stays intact.
+        (self.root / "new.md").write_text("fresh\n")
+        result = {"files_changed": ["new.md", "a.py"]}
+        self.assertEqual(
+            loop.verify_files_changed(result, self.head), ["a.py"])
+
+    def test_gitignored_untracked_file_is_still_flagged(self):
+        # If the path is excluded by .gitignore, ls-files --others
+        # --exclude-standard won't list it, so the guard still flags it.
+        # This matches intent: agent declared work on a path git will
+        # never commit, which is almost certainly a mistake.
+        (self.root / ".gitignore").write_text("ignored.log\n")
+        (self.root / "ignored.log").write_text("noise\n")
+        result = {"files_changed": ["ignored.log"]}
+        self.assertEqual(
+            loop.verify_files_changed(result, self.head), ["ignored.log"])
+
 
 # --------------------------------------------------------------------------- #
 # Integration scaffolding (copied/trimmed from test_loop_zero_token_guard)    #
@@ -392,6 +426,101 @@ class TestFilesChangedOmittedPassesIntegration(unittest.TestCase):
             self.assertEqual(mismatch_events, [],
                              "guard must NOT fire when files_changed is "
                              "absent (escalation trigger 2)")
+
+
+
+# --------------------------------------------------------------------------- #
+# Integration: agent creates a NEW untracked file declared in files_changed   #
+# — guard must pass (regression for FEAT-2026-0012 false-positive)            #
+# --------------------------------------------------------------------------- #
+
+
+class TestFilesChangedNewUntrackedFilePassesIntegration(unittest.TestCase):
+
+    def setUp(self):
+        self._cwd = os.getcwd()
+        self._patches = []
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+        for name, original in self._patches:
+            setattr(loop, name, original)
+
+    def _patch(self, name: str, replacement):
+        self._patches.append((name, getattr(loop, name)))
+        setattr(loop, name, replacement)
+
+    def test_agent_creates_new_file_and_declares_it_completes(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            write_minimal_feature(root, "FEAT-2026-9403", "files-new-untracked",
+                                  "feat/test-files-new-untracked", [
+                                      ("FEAT-2026-9403/T01", "implementation",
+                                       "pending"),
+                                  ])
+
+            # Stub dispatch: agent creates a brand-new file (.sh, would be
+            # untracked) AND declares it in files_changed. Before the fix
+            # the guard misfired because `git diff` ignores untracked.
+            result_block = (
+                "```result\n"
+                "status: complete\n"
+                "summary: created a brand-new script\n"
+                "files_changed:\n"
+                "  - scripts/check-image-architectures.sh\n"
+                "```\n"
+            )
+
+            plain_block = (
+                "```result\n"
+                "status: complete\n"
+                "summary: closing WU, no files_changed\n"
+                "```\n"
+            )
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                if wu.wu_id.endswith("/T01"):
+                    target = Path("scripts/check-image-architectures.sh")
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text("#!/bin/sh\necho hi\n")
+                    return (result_block, {"input_tokens": 100,
+                                           "output_tokens": 50,
+                                           "cost_usd": 0.001})
+                return (plain_block, {"input_tokens": 100,
+                                      "output_tokens": 50,
+                                      "cost_usd": 0.001})
+
+            def fake_verify(wu, feature_dir, cfg=None):
+                return True, "(stub verify pass)"
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", fake_verify)
+
+            rc = loop.run(None, dry_run=False)
+            self.assertEqual(rc, 0,
+                             "WU must complete on attempt 1 — declared "
+                             "files_changed naming a freshly-created "
+                             "untracked file is a real change vs HEAD")
+
+            fdir = (root / ".specfuse/features"
+                         / "FEAT-2026-9403-files-new-untracked")
+            t01_fm = _read_frontmatter(fdir / "WU-T01.md")
+            self.assertEqual(t01_fm.get("status"), "done")
+
+            events = _read_events(fdir / "events.jsonl")
+            mismatch_events = [
+                e for e in events
+                if e["event_type"] == "attempt_outcome"
+                and e["payload"].get("outcome") == "files_changed_mismatch"
+            ]
+            self.assertEqual(mismatch_events, [],
+                             "guard MUST NOT fire on legitimately-new "
+                             "untracked deliverable")
+
+            log = _git(root, "log", "--format=%s",
+                       "feat/test-files-new-untracked")
+            self.assertIn("feat: T01", log,
+                          "squash commit must land for T01")
 
 
 if __name__ == "__main__":
