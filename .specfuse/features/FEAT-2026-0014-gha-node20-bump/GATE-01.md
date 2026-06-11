@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 ---
 
 # Gate 1 — CI workflow on Node 24 generation, no deprecation warnings
