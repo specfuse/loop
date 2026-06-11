@@ -27,15 +27,8 @@ code:
     command: "bandit -r .specfuse/scripts -ll"
 
   - name: coverage
-    # --fail-under=70 is the loop repo's own floor — BELOW the methodology's
-    # ≥ 90% default but climbing. Measured 80% TOTAL today (_miniyaml.py 86%,
-    # lint_plan.py 73%, loop.py 78%); the 70 floor sits ~10pp below current
-    # so a small refactor doesn't trip the gate. The run-loop integration
-    # tests added with the Bug 1 / Bug 2 fixes covered most of loop.py's
-    # orchestration; remaining gaps are in dispatch (subprocess to claude),
-    # squash_commit's git surgery for the soft-reset path, and find_feature
-    # edge cases. Raise this floor toward 90 once those land.
-    command: "coverage run --source=.specfuse/scripts -m unittest discover -s tests && coverage report --fail-under=70"
+    # --fail-under=90 matches the methodology default.
+    command: "coverage run --source=.specfuse/scripts -m unittest discover -s tests && coverage report --fail-under=90"
 
   # warnings: CONSCIOUSLY DROPPED.
   # Python has no compiler-warnings analogue; this gate assumes a compiled
