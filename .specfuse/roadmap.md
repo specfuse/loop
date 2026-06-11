@@ -18,7 +18,7 @@ installation a target project copies via `init.sh`.
 
 | Feature ID     | Title                                       | Status   | Folder |
 |----------------|---------------------------------------------|----------|--------|
-| FEAT-2026-0002 | Driver run-loop test coverage               | active   | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/` |
+| FEAT-2026-0002 | Driver run-loop test coverage               | done     | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/` |
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
@@ -61,15 +61,40 @@ toward 90. Specifically:
 - `require_git_ready` happy + missing-commits + non-repo (already covered
   manually after the original fix; promote to unit tests).
 
-**Verification.** When this feature's last gate passes, raise
-`.specfuse/verification.yml`'s coverage `--fail-under` to a number matching
-the new measured floor (target ≥ 80; if the integration tests don't reach
-80 alone, scope the feature to add what's needed). Update the comment in
-the YAML to remove the deviation note once the floor is at or above the
-methodology default.
+**Gate 1 (passed).** Single-gate feature, five substantive WUs:
 
-**Status: active.** Detail the first gate's WUs when ready to start; the
-roadmap entry stays one row until then.
+- **T01** — `tests/test_loop_orchestration.py` raised `loop.py` from 87%
+  to ≥ 95% by covering `squash_commit` soft-reset, `find_feature` 0/1/many,
+  `require_git_ready`, dispatch error arms, lock contention, gate-budget
+  halt, and `main()` argparse. Landed in 2 attempts (high effort).
+- **T02** — `tests/test_validate_event.py` raised `validate-event.py` from
+  0% to 97% by covering schema accept/reject and a real-event regression.
+  First attempt blocked (AC 4 polarity error: the spec asserted the schema
+  *accepts* a driver-emitted event, but the orchestrator's schema
+  intentionally rejects `source: "driver"`); re-arm inverted the AC and
+  added `jsonschema` to dev deps. Landed in 1 attempt post-re-arm.
+- **T03** — `tests/test_lint_plan_errors.py` raised `lint_plan.py` from
+  79% to 99% by covering the 11 named error arms + a regression on the
+  bundled FEAT-2026-0001 fixture. First dispatch spun 3 attempts on a
+  ruff F401 (`import sys` unused); re-arm added pre-flight lint discipline.
+  Landed in 1 attempt post-re-arm.
+- **T04** — `tests/test_miniyaml_negative.py` extended raised `_miniyaml.py`
+  from 87% to 100% with escape-handling and indent-error fixtures. Landed
+  in 1 attempt.
+- **T05** — `.specfuse/verification.yml` and `scripts/smoke-test.sh`
+  flipped from `--fail-under=70` to `--fail-under=90`; deviation comment
+  removed. Landed in 1 attempt (45 s).
+
+Post-gate coverage: TOTAL = **97%** (was 78% at feature start), with each
+targeted module at or above its per-WU threshold (`loop.py` 97%,
+`validate-event.py` 97%, `lint_plan.py` 99%, `_miniyaml.py` 100%). The
+two-site `--fail-under` floor (`.specfuse/verification.yml` +
+`scripts/smoke-test.sh`) reads `=90` and matches the methodology default.
+GATE-01 status: `passed`.
+
+**Status: done.** `roadmap_goal` met — this repo's coverage floor now
+matches the methodology default (≥ 90%), with measured TOTAL at 97% and
+no module under 90%. See `RETROSPECTIVE.md §Feature-arc verdict`.
 
 ## FEAT-2026-0003 — GitHub feature-pick for the loop
 
