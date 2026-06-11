@@ -535,3 +535,82 @@ promoted here.
   driver helper that commits a curated, driver-owned path list must
   `git add -f` and must NOT be reused for paths that come from the
   agent, RESULT block, or user input.
+
+- [FEAT-2026-0014/T01/driver-wipes-uncommitted] The driver's per-attempt
+  `git reset --hard head_before` (between failed dispatches) WIPES any
+  tracked-file modifications that aren't committed at the moment the
+  driver runs, INCLUDING uncommitted edits to driver source
+  (`.specfuse/scripts/loop.py`), other features' WU specs, or
+  `.specfuse/LEARNINGS.md`. Untracked files survive (because `reset
+  --hard` only touches tracked files), but a tracked file modified in
+  the working tree and not yet committed disappears on the first WU
+  block. Surfaced 2026-06-11 during FEAT-2026-0014/T01 cycles: a session
+  authored loop.py improvements + a WU rewrite + LEARNINGS appends, did
+  not commit, ran the loop on the same feature, and the driver reset
+  wiped all three. Rule for operators: BEFORE running `python3
+  .specfuse/scripts/loop.py` against an active feature, commit
+  EVERYTHING tracked-but-uncommitted under `.specfuse/` (and anywhere
+  else you've touched) — or move work to a non-tracked path. Rule for
+  driver authors: consider extending the head_before reset to preserve
+  files outside the active feature's folder (an allowlist of paths the
+  agent is explicitly authorized to touch); current behavior is
+  documented as a gotcha until that lands.
+
+- [FEAT-2026-0014/T01/gh-claudeP-broken] `gh auth status` fails inside
+  the dispatched `claude -p` subprocess even when the same `GH_TOKEN`
+  succeeds via the operator's shell `gh` AND via shell `curl
+  https://api.github.com/user`. Crucially the failure persists when
+  claude -p is invoked with `--dangerously-skip-permissions` — so it
+  is NOT the claude-p sandbox and the WU-level `unsandboxed: true`
+  escape hatch does NOT fix it. Token is valid; gh's local state knows
+  the account ("Active account: true" still prints); the API
+  verification call inside claude-p returns "X Failed to log in to
+  github.com using token (GH_TOKEN)". Root cause lives in the
+  `gh`-binary ↔ claude-p subprocess interaction, unidentified as of
+  2026-06-11. Reproducible from any shell: `gh auth status` ✓ + `curl
+  -H "Authorization: token $GH_TOKEN" https://api.github.com/user` ✓,
+  but `echo "Run \`gh auth status\` and dump raw output between
+  MARK_BEGIN and MARK_END" | claude -p` (with or without
+  `--dangerously-skip-permissions`) shows `X Failed`. Rule for WU
+  authoring: any AC or escalation trigger that invokes `gh` from the
+  dispatched agent's bash MUST NOT be written today. Instead choose
+  one of: (a) operator-manual verification post-merge, recorded as a
+  named step in `RETROSPECTIVE.md`; (b) replace `gh` with shell-side
+  preflight + a simpler agent AC (operator runs `gh auth status`
+  outside the loop, agent only edits the file); (c) `curl` with
+  `$GH_TOKEN` from inside the agent — note the agent's safety filter
+  may refuse curl with `Authorization` headers, so this path is
+  unproven and requires its own probe at WU author time. Audit the
+  unsandboxed escape hatch as INSUFFICIENT for this surface; the flag
+  is still useful for other surfaces but is not a generic "make
+  external CLIs work" lever.
+
+- [FEAT-2026-0014/T01/preflight-must-dump-raw] When a preflight or
+  diagnostic asks a `claude -p` session to classify the result of an
+  external command ("output VALID or INVALID"), the model can emit
+  either word without running the command, and the script gets a
+  false positive. Rule: every probe that aims to verify an external
+  tool's behavior must demand the *raw stdout+stderr* be dumped
+  between unforgeable BEGIN/END markers and then grep the dumped
+  text for a signature only the real tool emits (e.g. `gh auth
+  status` prints `Logged in to github.com` on success; `curl /user`
+  prints `"login":` on success). Apply to any future preflight or
+  diagnostic skill that consults a `claude -p` session for ground
+  truth: never trust agent classification when raw output exists.
+
+- [FEAT-2026-0014/T01/unsandboxed-opt-in] The driver supports per-WU
+  sandbox-escape via WU frontmatter `unsandboxed: true` +
+  `unsandboxed_rationale: "<one-line>"`. The driver REFUSES to
+  dispatch if `unsandboxed: true` without rationale (the rationale
+  IS the audit signal). The driver emits an `unsandboxed_dispatch`
+  event in events.jsonl BEFORE each attempt and prints a `⚠
+  UNSANDBOXED dispatch` console line. Implemented in
+  `.specfuse/scripts/loop.py::load_wu` (validation) and
+  `loop.py::dispatch` (flag injection) and the attempt loop
+  (event + console). The `/unblock-wu` skill offers re-arm-
+  unsandboxed as an explicit per-WU decision; recovery-time
+  escalation only — at planning time, prefer (a) operator-manual
+  verification or (b) AC redesign when the trigger surface is a
+  CLI's auth round-trip (see gh-claudeP-broken above). Sandbox-
+  escape is NOT a substitute for AC redesign when the surface is
+  broken upstream.

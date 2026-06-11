@@ -126,6 +126,13 @@ class WorkUnit:
     title: str
     body: str                  # the prompt handed to the session
     effort: str = "medium"     # low|medium|high|xhigh|max — passed as --effort to claude -p
+    # OPTIONAL sandbox-escape. When `unsandboxed: true` in WU frontmatter,
+    # driver appends `--dangerously-skip-permissions` to the claude -p
+    # invocation. Requires `unsandboxed_rationale` string in same frontmatter
+    # (one-line justification, written to events.jsonl as the audit signal).
+    # load_wu refuses to load a WU with unsandboxed=True and no rationale.
+    unsandboxed: bool = False
+    unsandboxed_rationale: str = ""
 
 
 @dataclass
@@ -247,6 +254,14 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     wu_model = fm.get("model")
     if wu_model is None:
         wu_model = MODEL_BY_TYPE.get(wu_type, "claude-sonnet-4-6")
+    unsandboxed = bool(fm.get("unsandboxed", False))
+    unsandboxed_rationale = str(fm.get("unsandboxed_rationale", "") or "").strip()
+    if unsandboxed and not unsandboxed_rationale:
+        raise ValueError(
+            f"{path}: `unsandboxed: true` requires a non-empty "
+            f"`unsandboxed_rationale` in the same frontmatter. Sandbox-escape "
+            f"is auditable; the rationale is the audit signal."
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -258,6 +273,8 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         attempts=int(fm.get("attempts", 0)),
         title=title_m.group(1).strip() if title_m else ref["id"],
         body=body.strip(),
+        unsandboxed=unsandboxed,
+        unsandboxed_rationale=unsandboxed_rationale,
     )
 
 
@@ -605,6 +622,11 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
                    + truncate_failure_note(failure_note))
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
+    if wu.unsandboxed:
+        # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
+        # emitted in run()'s attempt loop; rationale lives in WU frontmatter.
+        # Inserted after `-p` so it composes with --model/--effort/--output-format.
+        cmd.insert(2, "--dangerously-skip-permissions")
     if cost_tracking:
         cmd += ["--output-format", "json"]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
@@ -1078,6 +1100,15 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 # bookkeeping commit (BLOCKED/SPINNING).
                 wu_events = [build_event("task_started", wu.wu_id,
                                          {"type": wu.type, "model": wu.model})]
+                if wu.unsandboxed:
+                    # Audit signal: WU opted out of the claude -p sandbox.
+                    # Event logged before first attempt so the trail exists
+                    # even if the attempt crashes. Rationale carried verbatim.
+                    wu_events.append(build_event("unsandboxed_dispatch", wu.wu_id, {
+                        "rationale": wu.unsandboxed_rationale,
+                    }))
+                    print(f"   ⚠ UNSANDBOXED dispatch — rationale: "
+                          f"{wu.unsandboxed_rationale}")
                 attempt_notes: list[tuple[int, str]] = []
                 attempt_outcomes: list[str] = []
                 # Cost accumulators: per-attempt list goes to events.jsonl,
