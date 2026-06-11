@@ -666,7 +666,20 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
             capture_output=True,
         ).returncode
         if rc == 0:
-            unchanged.append(path)
+            # `git diff` only sees tracked content — a freshly created file
+            # is invisible to it even though it's a real change vs
+            # head_before. Probe ls-files --others to catch the
+            # newly-created-untracked case; without this, agent-created new
+            # files (.tf, .sh, .md the WU just added) get flagged as
+            # "unchanged" and the WU spins to blocked_human even though the
+            # deliverable is present and correct.
+            ls = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard",
+                 "--", path],
+                capture_output=True, text=True,
+            ).stdout.strip()
+            if not ls:
+                unchanged.append(path)
     return unchanged
 
 
