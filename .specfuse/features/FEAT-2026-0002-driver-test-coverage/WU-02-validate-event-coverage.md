@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T02
 type: implementation
 effort: medium
-status: pending
+status: blocked_human
 attempts: 0
+duration_seconds: 1133.022
+cost_usd: 2.648814
+input_tokens: 41
+output_tokens: 65240
 ---
 
 # Cover validate-event.py
