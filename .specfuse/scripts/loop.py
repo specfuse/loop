@@ -506,7 +506,10 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     existing = [str(p) for p in paths if Path(p).exists()]
     if not existing:
         return None
-    git("add", *existing)
+    # -f: caller curates the path list (driver-managed bookkeeping state); some
+    # paths intentionally live under `.specfuse/**/work/` which the scaffold
+    # gitignores. Force-add bypasses the ignore for these known paths only.
+    git("add", "-f", *existing)
     if not git("status", "--porcelain"):
         return None  # all paths were already in their committed state
     subprocess.run(["git", "commit", "-m", message], check=True, capture_output=True)
