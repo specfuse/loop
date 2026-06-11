@@ -18,7 +18,7 @@ installation a target project copies via `init.sh`.
 
 | Feature ID     | Title                                       | Status   | Folder |
 |----------------|---------------------------------------------|----------|--------|
-| FEAT-2026-0002 | Driver run-loop test coverage               | planned  | —      |
+| FEAT-2026-0002 | Driver run-loop test coverage               | active   | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/` |
 | FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` |
 | FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` |
 | FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` |
@@ -68,7 +68,7 @@ the new measured floor (target ≥ 80; if the integration tests don't reach
 the YAML to remove the deviation note once the floor is at or above the
 methodology default.
 
-**Status: planned.** Detail the first gate's WUs when ready to start; the
+**Status: active.** Detail the first gate's WUs when ready to start; the
 roadmap entry stays one row until then.
 
 ## FEAT-2026-0003 — GitHub feature-pick for the loop
