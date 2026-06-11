@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T02
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 853.775
+cost_usd: 2.138758
+input_tokens: 682
+output_tokens: 40865
 ---
 
 # Cover validate-event.py
