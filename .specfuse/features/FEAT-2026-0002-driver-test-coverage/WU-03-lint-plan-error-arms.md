@@ -2,8 +2,12 @@
 id: FEAT-2026-0002/T03
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 378.795
+cost_usd: 0.727147
+input_tokens: 16
+output_tokens: 22232
 ---
 
 # Cover lint_plan.py error arms
@@ -91,3 +95,12 @@ PLUS the per-file coverage AC 5, PLUS the existence check AC 6. Declare
    `lint(Path(".specfuse/features/FEAT-2026-0001-health-endpoint"))`
    ever returns non-empty errs, do not modify the fixture. Emit
    `status: blocked` — this is a pre-existing bug for a separate WU.
+
+**Pre-flight lint discipline.** Before emitting `status: complete`,
+run `ruff check tests/test_lint_plan_errors.py` and remove every
+finding. The `lint` gate runs `ruff check .specfuse/scripts tests
+scripts` — a single unused import (`F401`) in your new file fails the
+whole gate and counts as a failed attempt. Remove unused imports
+(`import sys`, `import io`, etc.) before declaring complete. A prior
+dispatch of this WU spun three attempts on exactly this: `import sys`
+was unused and `F401` failed every attempt. Do not repeat.

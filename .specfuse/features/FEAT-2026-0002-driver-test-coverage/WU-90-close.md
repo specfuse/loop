@@ -1,8 +1,12 @@
 ---
 id: FEAT-2026-0002/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 260.702
+cost_usd: 1.58033
+input_tokens: 21
+output_tokens: 13518
 ---
 
 # Gate 1 close — retrospective + lessons + docs + verdict

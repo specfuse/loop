@@ -464,3 +464,74 @@ promoted here.
   --exclude-standard` to catch added-untracked. Symptom seen 4× in
   FEAT-2026-0012 (T04, T08, G3-PLAN, T11); fix lives in
   `verify_files_changed`.
+
+- [FEAT-2026-0002/G1-CLOSE] Per-WU coverage acceptance criteria must use a
+  per-file threshold (`coverage report --include=<path> --fail-under=N`),
+  not a TOTAL roll-up. A per-file threshold is falsifiable about the module
+  the WU touched: it survives unrelated changes elsewhere in the tree,
+  decouples module-level completion from TOTAL drift, and forces the WU
+  spec to name the actual surface under test. FEAT-2026-0002's four
+  per-module WUs (T01 loop.py ≥ 95%, T02 validate-event.py ≥ 90%,
+  T03 lint_plan.py ≥ 90%, T04 _miniyaml.py ≥ 90%) each carried its own
+  `--include=` AC; the floor-flip WU (T05) then satisfied the TOTAL claim
+  as a derived consequence. Rule: when authoring a coverage WU that targets
+  a specific module, the AC must read `coverage report --include=<file>
+  --fail-under=N`, not `coverage report --fail-under=N`. A TOTAL-only AC
+  can be silently satisfied by *other* modules' coverage and tells a
+  reviewer nothing about whether the WU's named surface was actually
+  exercised.
+
+- [FEAT-2026-0002/G1-CLOSE] When raising a project's `--fail-under` coverage
+  floor, enumerate every site that asserts the floor and flip them
+  atomically in a single WU. Sites typically include
+  `.specfuse/verification.yml` (the methodology's `code` gate command),
+  `scripts/smoke-test.sh` (the local smoke runner the operator runs before
+  push), and any CI-side coverage step (`.github/workflows/ci.yml` if it
+  carries an inline `--fail-under` rather than delegating to the others).
+  A flip in one without the others produces silent drift where one gate
+  enforces the new floor and another still enforces the old; a re-arm that
+  changes the test floor without changing the smoke floor (or vice versa)
+  lets the gates disagree across attempts. Rule: the floor-flip WU spec
+  must list every `--fail-under` site as a falsifiable AC (`grep -n
+  "fail-under" <files>` returning `=N` for each), and the close-WU's
+  recursive audit must include the same grep so an inconsistent flip
+  blocks the close. FEAT-2026-0002 T05 flipped both
+  `.specfuse/verification.yml` and `scripts/smoke-test.sh` in one commit;
+  the close ceremony audited both.
+
+- [FEAT-2026-0002/G1-CLOSE] When a WU's AC uses a real existing artifact as
+  "regression on valid fixture" evidence, the author must verify the
+  artifact's actual contract status against the script under test before
+  dispatching — not after. T02's AC 4 originally read "assert
+  `validate-event.py` accepts a real event line from FEAT-2026-0008's
+  events.jsonl"; the agent correctly identified that the orchestrator's
+  schema rejects driver-emitted events by design (the schema's source
+  enum is the orchestrator protocol; loop-driver events use
+  `source: "driver"` and follow a different contract owned by `loop.py`).
+  The re-arm fix inverted the AC to "rejects this real event" — semantically
+  the right boundary evidence, polarity corrected. Rule: every AC of the
+  form "tool X accepts/rejects existing artifact Y" must include, in the
+  WU's Context section, the contract claim that justifies the polarity
+  (e.g., "Y's `source` field is in X's enum, therefore X accepts Y"). If
+  the author cannot state the justifying contract, the AC is a guess and
+  must be verified by running the tool on the artifact at author-time, not
+  defer that verification to the agent's first attempt.
+
+- [FEAT-2026-0002/G1-CLOSE/driver-incident] Bookkeeping commits the
+  driver writes (`commit_bookkeeping` in `loop.py`) must force-add
+  through `.gitignore` because some paths the driver intends to commit
+  live under user-configured ignore prefixes — specifically
+  `.specfuse/<feature>/work/<wu>/attempt-N.md`, persisted by the
+  spinning-escalation path for human review while `.gitignore` declares
+  `.specfuse/**/work/` as scratch (the rule landed alongside
+  FEAT-2026-0004's lock-file ignore work). Without `git add -f`,
+  `git add` returns exit 1 and the driver crashes with partially-flipped
+  state on disk (WU frontmatter + `events.jsonl` append written, no
+  commit). Force-add is safe for this function only because its caller
+  is always the driver itself and curates the path list to driver-managed
+  state; it is NOT a general license to bypass ignore rules elsewhere.
+  Surfaced in FEAT-2026-0002/T03's first dispatch (3-attempt spin);
+  driver fix in commit `17319cb` / cherry-pick `bf2fd16`. Rule: any
+  driver helper that commits a curated, driver-owned path list must
+  `git add -f` and must NOT be reused for paths that come from the
+  agent, RESULT block, or user input.

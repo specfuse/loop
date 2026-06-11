@@ -5,7 +5,7 @@ slug: driver-test-coverage
 branch: feat/FEAT-2026-0002-driver-test-coverage
 roadmap_goal: Cover the driver's remaining orchestration paths and the scaffold modules (loop.py, validate-event.py, lint_plan.py, _miniyaml.py) so this repo's coverage --fail-under floor climbs from 70 to the methodology default of 90.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: Driver run-loop test coverage
