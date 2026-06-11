@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# pre-push hook — runs the same checks CI runs (scripts/smoke-test.sh) so
+# server-side failures surface locally before the push. Bypass with
+# `git push --no-verify` when intentional (e.g. WIP branch).
+#
+# Activated per-clone via `scripts/install-hooks.sh` (sets core.hooksPath).
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+exec "$REPO_ROOT/scripts/smoke-test.sh"
