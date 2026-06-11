@@ -959,10 +959,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
         return 0
 
+    lock_fd = None
     if not dry_run:
         # dry-run performs no mutation; inspecting while a real run is active must stay allowed.
         try:
-            _lock_fd = acquire_tree_lock(SPECFUSE_DIR)  # held for run() lifetime
+            lock_fd = acquire_tree_lock(SPECFUSE_DIR)
         except BlockingIOError:
             print(
                 "another loop driver is already running in this working tree "
@@ -973,314 +974,319 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         require_git_ready()
         ensure_feature_branch(feat_fm)
 
-    # Per-project cost-tracking toggle (top-level key in verification.yml,
-    # default True). When True, the driver records cumulative cost / tokens
-    # on each WU's frontmatter at outcome time and a per-attempt breakdown
-    # in events.jsonl; when False the driver passes plain text mode to
-    # `claude -p` and writes no cost fields.
-    cfg = load_verification()
-    cost_tracking = cfg.get("cost_tracking", True) is not False
+    try:
 
-    units = [load_wu(feature_dir, ref) for ref in gate.refs]
-    print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
-          f"({len(units)} work units) ==")
+        # Per-project cost-tracking toggle (top-level key in verification.yml,
+        # default True). When True, the driver records cumulative cost / tokens
+        # on each WU's frontmatter at outcome time and a per-attempt breakdown
+        # in events.jsonl; when False the driver passes plain text mode to
+        # `claude -p` and writes no cost fields.
+        cfg = load_verification()
+        cost_tracking = cfg.get("cost_tracking", True) is not False
 
-    # Arm check: a gate plan-next drafted starts with draft WUs. Don't execute drafts.
-    drafts = [u for u in units if u.status == "draft"]
-    if drafts and not dry_run:
-        review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
-        print(f"\nGate {gate.number} is drafted but not armed. {len(drafts)} work "
-              f"unit(s) are in `draft`.")
-        if review.exists():
-            print(f"Read {review} for the planner's findings, review the draft WU "
-                  f"files, then flip the ones you accept to `status: pending` and "
-                  f"re-run.")
-        return 2
+        units = [load_wu(feature_dir, ref) for ref in gate.refs]
+        print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
+              f"({len(units)} work units) ==")
 
-    # Done-set must include WUs from every PREVIOUS gate that are already done —
-    # cross-gate `depends_on` references are valid (e.g. gate 2's implementation
-    # WU may depend on gate 1's). Without this, the ready() filter sees the
-    # cross-gate dep as unmet and silently no-ops the gate (then set_gate
-    # awaiting_review fires on an empty run, leaving real WUs un-dispatched).
-    done_ids: set[str] = set()
-    for g in gates:
-        if g.number > gate.number:
-            continue
-        for ref in g.refs:
-            wu_path = feature_dir / ref["file"]
-            if not wu_path.is_file():
+        # Arm check: a gate plan-next drafted starts with draft WUs. Don't execute drafts.
+        drafts = [u for u in units if u.status == "draft"]
+        if drafts and not dry_run:
+            review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
+            print(f"\nGate {gate.number} is drafted but not armed. {len(drafts)} work "
+                  f"unit(s) are in `draft`.")
+            if review.exists():
+                print(f"Read {review} for the planner's findings, review the draft WU "
+                      f"files, then flip the ones you accept to `status: pending` and "
+                      f"re-run.")
+            return 2
+
+        # Done-set must include WUs from every PREVIOUS gate that are already done —
+        # cross-gate `depends_on` references are valid (e.g. gate 2's implementation
+        # WU may depend on gate 1's). Without this, the ready() filter sees the
+        # cross-gate dep as unmet and silently no-ops the gate (then set_gate
+        # awaiting_review fires on an empty run, leaving real WUs un-dispatched).
+        done_ids: set[str] = set()
+        for g in gates:
+            if g.number > gate.number:
                 continue
-            wfm, _ = read_frontmatter(wu_path)
-            if wfm.get("status") == DONE:
-                done_ids.add(ref["id"])
-    blocked = False
+            for ref in g.refs:
+                wu_path = feature_dir / ref["file"]
+                if not wu_path.is_file():
+                    continue
+                wfm, _ = read_frontmatter(wu_path)
+                if wfm.get("status") == DONE:
+                    done_ids.add(ref["id"])
+        blocked = False
 
-    while True:
-        pending = ready(units, done_ids)
-        if not pending:
-            break
-        for wu in pending:  # sequential v1; the frontier is independent -> fan-out later
-            # Per-gate cost budget brake — halt-between-WUs.
-            # Mirrors MAX_ATTEMPTS' shape (a brake, not an estimator). Fires
-            # before the next WU's set_wu(in_progress) so an in-progress WU
-            # always runs to a terminal outcome (squash contract intact).
-            # Skipped when the gate is already awaiting_review: the closing
-            # sequence already flipped the gate; the reviewer will observe the
-            # overshoot via the spent vs budget numbers in the next review.
-            if not dry_run and gate.status != "awaiting_review":
-                gate_dict = {"file": gate.file.name, "work_units": gate.refs}
-                if _should_halt_for_budget(feat_fm, gate_dict, feature_dir):
-                    budget = gate_budget_usd(gate.file)
-                    spent = gate_spent_usd(feat_fm, gate_dict, feature_dir)
-                    backend.set_gate(gate, "awaiting_review")
-                    flush_events(events_path, [build_event(
-                        "human_escalation", feature_id, {
-                            "reason": "gate_budget_exceeded",
-                            "budget_usd": budget,
-                            "spent_usd": round(spent, 6),
-                            "next_wu_id": wu.wu_id,
-                        })])
-                    commit_bookkeeping(
-                        [gate.file, events_path],
-                        f"chore(loop): gate {gate.number} budget exceeded "
-                        f"— awaiting_review\n\nFeature: {feature_id}",
-                    )
-                    print(f"\nGate {gate.number} budget exceeded: spent "
-                          f"${spent:.4f} >= budget ${budget:.4f}. "
-                          f"Halted before {wu.wu_id}.")
-                    return 1
+        while True:
+            pending = ready(units, done_ids)
+            if not pending:
+                break
+            for wu in pending:  # sequential v1; the frontier is independent -> fan-out later
+                # Per-gate cost budget brake — halt-between-WUs.
+                # Mirrors MAX_ATTEMPTS' shape (a brake, not an estimator). Fires
+                # before the next WU's set_wu(in_progress) so an in-progress WU
+                # always runs to a terminal outcome (squash contract intact).
+                # Skipped when the gate is already awaiting_review: the closing
+                # sequence already flipped the gate; the reviewer will observe the
+                # overshoot via the spent vs budget numbers in the next review.
+                if not dry_run and gate.status != "awaiting_review":
+                    gate_dict = {"file": gate.file.name, "work_units": gate.refs}
+                    if _should_halt_for_budget(feat_fm, gate_dict, feature_dir):
+                        budget = gate_budget_usd(gate.file)
+                        spent = gate_spent_usd(feat_fm, gate_dict, feature_dir)
+                        backend.set_gate(gate, "awaiting_review")
+                        flush_events(events_path, [build_event(
+                            "human_escalation", feature_id, {
+                                "reason": "gate_budget_exceeded",
+                                "budget_usd": budget,
+                                "spent_usd": round(spent, 6),
+                                "next_wu_id": wu.wu_id,
+                            })])
+                        commit_bookkeeping(
+                            [gate.file, events_path],
+                            f"chore(loop): gate {gate.number} budget exceeded "
+                            f"— awaiting_review\n\nFeature: {feature_id}",
+                        )
+                        print(f"\nGate {gate.number} budget exceeded: spent "
+                              f"${spent:.4f} >= budget ${budget:.4f}. "
+                              f"Halted before {wu.wu_id}.")
+                        return 1
 
-            print(f"\n-- {wu.wu_id} [{wu.type}] model={wu.model} effort={wu.effort}")
-            if dry_run:
-                print("   (dry run — would dispatch)")
-                wu.status = DONE
-                done_ids.add(wu.wu_id)
-                continue
-
-            head_before = git("rev-parse", "HEAD")
-            backend.set_wu(wu, "status", "in_progress")
-            # Events and per-attempt notes are buffered in memory during the
-            # WU's lifecycle and flushed at outcome time. This prevents the
-            # `git reset --hard` between failed attempts from silently
-            # wiping appended events / status flips — anything that should
-            # be durable is either committed in the squash (PASS) or in a
-            # bookkeeping commit (BLOCKED/SPINNING).
-            wu_events = [build_event("task_started", wu.wu_id,
-                                     {"type": wu.type, "model": wu.model})]
-            attempt_notes: list[tuple[int, str]] = []
-            attempt_outcomes: list[str] = []
-            # Cost accumulators: per-attempt list goes to events.jsonl,
-            # cumulative sum to WU frontmatter at outcome time.
-            attempts_usage: list[dict] = []
-            cum_usage = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0,
-                         "duration_seconds": 0.0}
-
-            failure_note = None
-            for attempt in range(1, MAX_ATTEMPTS + 1):
-                backend.set_wu(wu, "attempts", attempt)
-                print(f"   attempt {attempt}/{MAX_ATTEMPTS} "
-                      f"model={wu.model} effort={wu.effort} — fresh session")
-                if attempt > 1 and failure_note:
-                    reason = failure_note.strip().splitlines()[0][:200]
-                    print(f"   retry reason: {reason}")
-                t0 = time.monotonic()
-                outcome, payload, usage = execute_unit_attempt(
-                    wu, feature_dir, failure_note, cost_tracking=cost_tracking,
-                    head_before=head_before,
-                )
-                duration = round(time.monotonic() - t0, 3)
-                attempt_record: dict = {"attempt": attempt,
-                                        "duration_seconds": duration}
-                if usage:
-                    attempt_record.update(usage)
-                    cum_usage["cost_usd"] += float(usage.get("cost_usd", 0.0))
-                    cum_usage["input_tokens"] += int(usage.get("input_tokens", 0))
-                    cum_usage["output_tokens"] += int(usage.get("output_tokens", 0))
-                attempts_usage.append(attempt_record)
-                cum_usage["duration_seconds"] = round(
-                    cum_usage["duration_seconds"] + duration, 3)
-                attempt_outcomes.append(outcome)
-
-                if outcome == "zero_token":
-                    # Agent never produced output (input_tokens=0). Skip
-                    # RESULT parsing, buffer an event, reset the tree, and
-                    # treat as a failed attempt for the purposes of the
-                    # attempt loop — counter already incremented at top.
-                    wu_events.append(build_event(
-                        "attempt_outcome", wu.wu_id,
-                        {"outcome": "zero_token_skip", "attempt": attempt},
-                    ))
-                    git("reset", "--hard", head_before)
-                    print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
-                          f"— no agent output, skipping")
+                print(f"\n-- {wu.wu_id} [{wu.type}] model={wu.model} effort={wu.effort}")
+                if dry_run:
+                    print("   (dry run — would dispatch)")
+                    wu.status = DONE
+                    done_ids.add(wu.wu_id)
                     continue
 
-                if outcome == "blocked":
-                    # Reset agent work first; THEN write our bookkeeping; THEN
-                    # commit it. Doing the flip before the reset would let the
-                    # reset wipe the flip — the silent-state-loss bug.
+                head_before = git("rev-parse", "HEAD")
+                backend.set_wu(wu, "status", "in_progress")
+                # Events and per-attempt notes are buffered in memory during the
+                # WU's lifecycle and flushed at outcome time. This prevents the
+                # `git reset --hard` between failed attempts from silently
+                # wiping appended events / status flips — anything that should
+                # be durable is either committed in the squash (PASS) or in a
+                # bookkeeping commit (BLOCKED/SPINNING).
+                wu_events = [build_event("task_started", wu.wu_id,
+                                         {"type": wu.type, "model": wu.model})]
+                attempt_notes: list[tuple[int, str]] = []
+                attempt_outcomes: list[str] = []
+                # Cost accumulators: per-attempt list goes to events.jsonl,
+                # cumulative sum to WU frontmatter at outcome time.
+                attempts_usage: list[dict] = []
+                cum_usage = {"cost_usd": 0.0, "input_tokens": 0, "output_tokens": 0,
+                             "duration_seconds": 0.0}
+
+                failure_note = None
+                for attempt in range(1, MAX_ATTEMPTS + 1):
+                    backend.set_wu(wu, "attempts", attempt)
+                    print(f"   attempt {attempt}/{MAX_ATTEMPTS} "
+                          f"model={wu.model} effort={wu.effort} — fresh session")
+                    if attempt > 1 and failure_note:
+                        reason = failure_note.strip().splitlines()[0][:200]
+                        print(f"   retry reason: {reason}")
+                    t0 = time.monotonic()
+                    outcome, payload, usage = execute_unit_attempt(
+                        wu, feature_dir, failure_note, cost_tracking=cost_tracking,
+                        head_before=head_before,
+                    )
+                    duration = round(time.monotonic() - t0, 3)
+                    attempt_record: dict = {"attempt": attempt,
+                                            "duration_seconds": duration}
+                    if usage:
+                        attempt_record.update(usage)
+                        cum_usage["cost_usd"] += float(usage.get("cost_usd", 0.0))
+                        cum_usage["input_tokens"] += int(usage.get("input_tokens", 0))
+                        cum_usage["output_tokens"] += int(usage.get("output_tokens", 0))
+                    attempts_usage.append(attempt_record)
+                    cum_usage["duration_seconds"] = round(
+                        cum_usage["duration_seconds"] + duration, 3)
+                    attempt_outcomes.append(outcome)
+
+                    if outcome == "zero_token":
+                        # Agent never produced output (input_tokens=0). Skip
+                        # RESULT parsing, buffer an event, reset the tree, and
+                        # treat as a failed attempt for the purposes of the
+                        # attempt loop — counter already incremented at top.
+                        wu_events.append(build_event(
+                            "attempt_outcome", wu.wu_id,
+                            {"outcome": "zero_token_skip", "attempt": attempt},
+                        ))
+                        git("reset", "--hard", head_before)
+                        print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
+                              f"— no agent output, skipping")
+                        continue
+
+                    if outcome == "blocked":
+                        # Reset agent work first; THEN write our bookkeeping; THEN
+                        # commit it. Doing the flip before the reset would let the
+                        # reset wipe the flip — the silent-state-loss bug.
+                        git("reset", "--hard", head_before)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        wu_events.append(build_event("human_escalation", wu.wu_id, {
+                            "reason": "agent_reported_blocked",
+                            "blocked_reason": payload,
+                            "attempts": attempt,
+                            "attempts_usage": attempts_usage,
+                        }))
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(agent-reported)\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   BLOCKED by agent — "
+                              f"{payload or '(no reason given)'}")
+                        blocked = True
+                        break
+
+                    if outcome == "passed":
+                        # Flip status to DONE BEFORE the squash so the flip is
+                        # included in the commit content — survives the next WU's
+                        # reset.
+                        backend.set_wu(wu, "status", DONE)
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        sha = squash_commit(wu, head_before)
+                        # Smoke-import runner (FEAT-2026-0008/T03): after a
+                        # successful verify() AND squash, run each
+                        # `python3 -c "from X import Y"` line declared in the WU
+                        # body. A non-zero exit fails the attempt — the squash
+                        # is rolled back via `git reset --hard head_before` so
+                        # the verify-passing-but-smoke-failing tree does not
+                        # remain in history. Rollback FIRST (before event log
+                        # and before the next attempt iterates) per WU
+                        # escalation trigger 3.
+                        smoke_cmds = extract_smoke_imports(wu.body)
+                        if smoke_cmds:
+                            smoke_ok, smoke_summary = run_smoke_imports(
+                                smoke_cmds, Path("."),
+                            )
+                            if not smoke_ok:
+                                git("reset", "--hard", head_before)
+                                wu_events.append(build_event(
+                                    "attempt_outcome", wu.wu_id, {
+                                        "outcome": "smoke_import_failed",
+                                        "attempt": attempt,
+                                        "summary": smoke_summary,
+                                    },
+                                ))
+                                attempt_notes.append((attempt, smoke_summary))
+                                failure_note = smoke_summary
+                                print(f"   SMOKE FAIL attempt "
+                                      f"{attempt}/{MAX_ATTEMPTS}")
+                                continue
+                        wu_events.append(build_event("task_completed", wu.wu_id, {
+                            "attempts": attempt,
+                            "attempts_usage": attempts_usage,
+                        }))
+                        flush_events(events_path, wu_events)
+                        done_ids.add(wu.wu_id)
+                        print(f"   PASS — committed {sha}")
+                        break
+
+                    if outcome == "files_changed_mismatch":
+                        # RESULT declared files_changed paths that show no diff
+                        # against head_before. Treat as a failed attempt: skip
+                        # squash, reset the tree, record evidence, retry within
+                        # budget. payload is the list of unchanged paths.
+                        note = (
+                            "RESULT block declared `files_changed` paths that "
+                            "show NO diff against HEAD before this attempt:\n"
+                            + "\n".join(f"  - {p}" for p in payload)
+                            + "\nEither actually modify them, or correct the "
+                              "files_changed list to match what you really edited."
+                        )
+                        wu_events.append(build_event(
+                            "attempt_outcome", wu.wu_id,
+                            {"outcome": "files_changed_mismatch",
+                             "attempt": attempt,
+                             "unchanged_paths": list(payload)},
+                        ))
+                        attempt_notes.append((attempt, note))
+                        failure_note = note
+                        git("reset", "--hard", head_before)
+                        print(f"   FILES_CHANGED MISMATCH attempt "
+                              f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
+                              f"unchanged")
+                        continue
+
+                    # outcome == "failed": evidence in payload, retry within budget.
+                    # Per-attempt notes are buffered (not written to disk) so they
+                    # ride with the spinning-escalation commit if we exhaust
+                    # attempts; on eventual PASS they're discarded as scratch.
+                    attempt_notes.append((attempt, payload))
+                    failure_note = payload
                     git("reset", "--hard", head_before)
+                    print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
+                else:
+                    # for-else: ran out of attempts without break = spinning.
+                    # The reset has already happened in the failed/zero_token
+                    # branch above. Flush attempt notes to disk for human
+                    # inspection, mark the WU blocked_human, then commit it.
+                    #
+                    # Distinguish two spinning shapes in the event payload:
+                    #   all_attempts_zero_token — every attempt billed 0 input
+                    #     tokens (CLI/quota/connectivity issue, not a real
+                    #     verification failure); no per-attempt notes to write.
+                    #   spinning_detected — at least one attempt produced
+                    #     output that failed verify(); per-attempt evidence is
+                    #     buffered in attempt_notes.
+                    all_zero = bool(attempt_outcomes) and all(
+                        o == "zero_token" for o in attempt_outcomes)
+                    reason = ("all_attempts_zero_token" if all_zero
+                              else "spinning_detected")
+                    wu_key = wu.wu_id.replace("/", "_")
+                    note_paths = []
+                    for atmpt, evidence in attempt_notes:
+                        p = work_dir / wu_key / f"attempt-{atmpt}.md"
+                        p.parent.mkdir(parents=True, exist_ok=True)
+                        p.write_text(evidence)
+                        note_paths.append(p)
                     backend.set_wu(wu, "status", "blocked_human")
                     write_cost_to_wu(backend, wu, cum_usage)
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
-                        "reason": "agent_reported_blocked",
-                        "blocked_reason": payload,
-                        "attempts": attempt,
+                        "reason": reason,
+                        "attempts": MAX_ATTEMPTS,
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
                     commit_bookkeeping(
-                        [wu.file, events_path],
+                        [wu.file, events_path, *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
-                        f"(agent-reported)\n\nFeature: {wu.wu_id}",
+                        f"({reason}, {MAX_ATTEMPTS} attempts)"
+                        f"\n\nFeature: {wu.wu_id}",
                     )
-                    print(f"   BLOCKED by agent — "
-                          f"{payload or '(no reason given)'}")
+                    print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — "
+                          f"escalated ({reason})")
                     blocked = True
-                    break
 
-                if outcome == "passed":
-                    # Flip status to DONE BEFORE the squash so the flip is
-                    # included in the commit content — survives the next WU's
-                    # reset.
-                    backend.set_wu(wu, "status", DONE)
-                    write_cost_to_wu(backend, wu, cum_usage)
-                    sha = squash_commit(wu, head_before)
-                    # Smoke-import runner (FEAT-2026-0008/T03): after a
-                    # successful verify() AND squash, run each
-                    # `python3 -c "from X import Y"` line declared in the WU
-                    # body. A non-zero exit fails the attempt — the squash
-                    # is rolled back via `git reset --hard head_before` so
-                    # the verify-passing-but-smoke-failing tree does not
-                    # remain in history. Rollback FIRST (before event log
-                    # and before the next attempt iterates) per WU
-                    # escalation trigger 3.
-                    smoke_cmds = extract_smoke_imports(wu.body)
-                    if smoke_cmds:
-                        smoke_ok, smoke_summary = run_smoke_imports(
-                            smoke_cmds, Path("."),
-                        )
-                        if not smoke_ok:
-                            git("reset", "--hard", head_before)
-                            wu_events.append(build_event(
-                                "attempt_outcome", wu.wu_id, {
-                                    "outcome": "smoke_import_failed",
-                                    "attempt": attempt,
-                                    "summary": smoke_summary,
-                                },
-                            ))
-                            attempt_notes.append((attempt, smoke_summary))
-                            failure_note = smoke_summary
-                            print(f"   SMOKE FAIL attempt "
-                                  f"{attempt}/{MAX_ATTEMPTS}")
-                            continue
-                    wu_events.append(build_event("task_completed", wu.wu_id, {
-                        "attempts": attempt,
-                        "attempts_usage": attempts_usage,
-                    }))
-                    flush_events(events_path, wu_events)
-                    done_ids.add(wu.wu_id)
-                    print(f"   PASS — committed {sha}")
-                    break
+        if blocked:
+            print("\nGate halted: work unit(s) need human attention.")
+            return 1
+        if dry_run:
+            print(f"\n(dry run) Gate {gate.number} would complete and await review.")
+            return 0
 
-                if outcome == "files_changed_mismatch":
-                    # RESULT declared files_changed paths that show no diff
-                    # against head_before. Treat as a failed attempt: skip
-                    # squash, reset the tree, record evidence, retry within
-                    # budget. payload is the list of unchanged paths.
-                    note = (
-                        "RESULT block declared `files_changed` paths that "
-                        "show NO diff against HEAD before this attempt:\n"
-                        + "\n".join(f"  - {p}" for p in payload)
-                        + "\nEither actually modify them, or correct the "
-                          "files_changed list to match what you really edited."
-                    )
-                    wu_events.append(build_event(
-                        "attempt_outcome", wu.wu_id,
-                        {"outcome": "files_changed_mismatch",
-                         "attempt": attempt,
-                         "unchanged_paths": list(payload)},
-                    ))
-                    attempt_notes.append((attempt, note))
-                    failure_note = note
-                    git("reset", "--hard", head_before)
-                    print(f"   FILES_CHANGED MISMATCH attempt "
-                          f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
-                          f"unchanged")
-                    continue
-
-                # outcome == "failed": evidence in payload, retry within budget.
-                # Per-attempt notes are buffered (not written to disk) so they
-                # ride with the spinning-escalation commit if we exhaust
-                # attempts; on eventual PASS they're discarded as scratch.
-                attempt_notes.append((attempt, payload))
-                failure_note = payload
-                git("reset", "--hard", head_before)
-                print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
-            else:
-                # for-else: ran out of attempts without break = spinning.
-                # The reset has already happened in the failed/zero_token
-                # branch above. Flush attempt notes to disk for human
-                # inspection, mark the WU blocked_human, then commit it.
-                #
-                # Distinguish two spinning shapes in the event payload:
-                #   all_attempts_zero_token — every attempt billed 0 input
-                #     tokens (CLI/quota/connectivity issue, not a real
-                #     verification failure); no per-attempt notes to write.
-                #   spinning_detected — at least one attempt produced
-                #     output that failed verify(); per-attempt evidence is
-                #     buffered in attempt_notes.
-                all_zero = bool(attempt_outcomes) and all(
-                    o == "zero_token" for o in attempt_outcomes)
-                reason = ("all_attempts_zero_token" if all_zero
-                          else "spinning_detected")
-                wu_key = wu.wu_id.replace("/", "_")
-                note_paths = []
-                for atmpt, evidence in attempt_notes:
-                    p = work_dir / wu_key / f"attempt-{atmpt}.md"
-                    p.parent.mkdir(parents=True, exist_ok=True)
-                    p.write_text(evidence)
-                    note_paths.append(p)
-                backend.set_wu(wu, "status", "blocked_human")
-                write_cost_to_wu(backend, wu, cum_usage)
-                wu_events.append(build_event("human_escalation", wu.wu_id, {
-                    "reason": reason,
-                    "attempts": MAX_ATTEMPTS,
-                    "attempts_usage": attempts_usage,
-                }))
-                flush_events(events_path, wu_events)
-                commit_bookkeeping(
-                    [wu.file, events_path, *note_paths],
-                    f"chore(loop): {wu.wu_id} blocked_human "
-                    f"({reason}, {MAX_ATTEMPTS} attempts)"
-                    f"\n\nFeature: {wu.wu_id}",
-                )
-                print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — "
-                      f"escalated ({reason})")
-                blocked = True
-
-    if blocked:
-        print("\nGate halted: work unit(s) need human attention.")
-        return 1
-    if dry_run:
-        print(f"\n(dry run) Gate {gate.number} would complete and await review.")
+        backend.set_gate(gate, "awaiting_review")
+        # on_gate_passed fires here: WUs all done, gate now awaiting human review
+        backend.on_gate_passed(feature_id, gate.number)
+        flush_events(events_path,
+                     [build_event("gate_reached", feature_id, {"gate": gate.number})])
+        commit_bookkeeping(
+            [gate.file, events_path],
+            f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
+        )
+        review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
+        print(f"\nGate {gate.number} complete (retro, lessons, docs, plan-next).")
+        print(f"The next gate has been drafted. Read {review.name} for the planner's "
+              f"findings and where to look, review the draft WU files, arm the ones you "
+              f"accept (status -> pending), set this gate's status to `passed`, re-run.")
         return 0
-
-    backend.set_gate(gate, "awaiting_review")
-    # on_gate_passed fires here: WUs all done, gate now awaiting human review
-    backend.on_gate_passed(feature_id, gate.number)
-    flush_events(events_path,
-                 [build_event("gate_reached", feature_id, {"gate": gate.number})])
-    commit_bookkeeping(
-        [gate.file, events_path],
-        f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
-    )
-    review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
-    print(f"\nGate {gate.number} complete (retro, lessons, docs, plan-next).")
-    print(f"The next gate has been drafted. Read {review.name} for the planner's "
-          f"findings and where to look, review the draft WU files, arm the ones you "
-          f"accept (status -> pending), set this gate's status to `passed`, re-run.")
-    return 0
+    finally:
+        if lock_fd is not None:
+            lock_fd.close()
 
 
 def main() -> int:
