@@ -199,7 +199,12 @@ def find_feature(arg: str | None) -> Path:
     if len(actives) == 1:
         return actives[0]
     if not actives:
-        sys.exit("No active feature. Set a feature's PLAN.md status to 'active'.")
+        sys.exit(
+            "No active feature. Set a feature's PLAN.md status to 'active'.\n"
+            "  - /pick-feature   choose a 'planned' feature from the roadmap and activate it\n"
+            "  - /draft-feature  scaffold a new feature (gates + gate-1 work units)\n"
+            "  - /arm-gate       if a feature halted at a gate boundary awaiting review"
+        )
     sys.exit(f"Multiple active features; pass --feature. Found: "
              f"{[d.name for d in actives]}")
 
