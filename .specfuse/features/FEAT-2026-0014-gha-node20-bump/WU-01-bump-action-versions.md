@@ -5,10 +5,10 @@ model: claude-sonnet-4-6
 effort: medium
 status: blocked_human
 attempts: 1
-duration_seconds: 25.803
-cost_usd: 0.109231
-input_tokens: 6
-output_tokens: 1380
+duration_seconds: 306.332
+cost_usd: 0.595073
+input_tokens: 25
+output_tokens: 12550
 ---
 
 # Bump GitHub Actions to Node-24 generation in ci.yml
