@@ -5,7 +5,11 @@ slug: health-endpoint
 branch: feat/FEAT-2026-0001-health-endpoint
 roadmap_goal: Operators can verify a running instance is healthy without inspecting logs.
 autonomy_default: review
-status: active
+# Bundled worked-example fixture for this source repo (not on planned work
+# per roadmap.md). Status is `done` here so `find_feature(None)` doesn't
+# collide with real in-flight features. Target projects copying this folder
+# via `init.sh` can flip to `active` if they want to grind the demo.
+status: done
 ---
 
 # Plan: Health-check endpoint
