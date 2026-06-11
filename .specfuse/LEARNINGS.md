@@ -516,3 +516,22 @@ promoted here.
   the author cannot state the justifying contract, the AC is a guess and
   must be verified by running the tool on the artifact at author-time, not
   defer that verification to the agent's first attempt.
+
+- [FEAT-2026-0002/G1-CLOSE/driver-incident] Bookkeeping commits the
+  driver writes (`commit_bookkeeping` in `loop.py`) must force-add
+  through `.gitignore` because some paths the driver intends to commit
+  live under user-configured ignore prefixes — specifically
+  `.specfuse/<feature>/work/<wu>/attempt-N.md`, persisted by the
+  spinning-escalation path for human review while `.gitignore` declares
+  `.specfuse/**/work/` as scratch (the rule landed alongside
+  FEAT-2026-0004's lock-file ignore work). Without `git add -f`,
+  `git add` returns exit 1 and the driver crashes with partially-flipped
+  state on disk (WU frontmatter + `events.jsonl` append written, no
+  commit). Force-add is safe for this function only because its caller
+  is always the driver itself and curates the path list to driver-managed
+  state; it is NOT a general license to bypass ignore rules elsewhere.
+  Surfaced in FEAT-2026-0002/T03's first dispatch (3-attempt spin);
+  driver fix in commit `17319cb` / cherry-pick `bf2fd16`. Rule: any
+  driver helper that commits a curated, driver-owned path list must
+  `git add -f` and must NOT be reused for paths that come from the
+  agent, RESULT block, or user input.

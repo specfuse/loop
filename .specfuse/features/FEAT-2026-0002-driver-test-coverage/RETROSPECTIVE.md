@@ -99,6 +99,45 @@ without the author verifying the polarity / lint cleanliness against
 that state. The fixes were spec-side, not code-side. Both lessons are
 appended to `.specfuse/LEARNINGS.md`.
 
+## §Driver-side incident surfaced during this grind
+
+T03's first dispatch spinning-detected after 3 attempts, then the
+driver crashed in `commit_bookkeeping` when trying to commit the
+attempt notes that the spinning-escalation path persists at
+`<feature_dir>/work/<wu_id>/attempt-N.md`. Root cause: `.gitignore:28`
+declares `.specfuse/**/work/` as scratch, but the spinning escalation
+explicitly persists those notes for human review and the bookkeeping
+commit tries `git add` them — git refused with exit 1 ("paths are
+ignored"). The driver halted with partially-flipped state (WU
+frontmatter `status: blocked_human` + `events.jsonl` append on disk,
+no commit).
+
+Recovery + fix:
+- Manual bookkeeping commit (`55f7796`) to capture the partial state
+  the driver had written but couldn't commit.
+- Driver fix in `commit_bookkeeping` to use `git add -f` (commit
+  `17319cb` on this branch; cherry-picked to `main` as `bf2fd16`).
+  Force-add is safe because the caller already curates the path list
+  to driver-managed bookkeeping state only — user-uncontrolled paths
+  never reach this function.
+
+This is methodology-relevant: the same class as FEAT-2026-0008's
+three driver-side guards (zero-token, files_changed, smoke-import).
+The bug existed since the spinning-escalation persistence path
+landed; THIS feature's grind exposed it because T03 was the first
+spinning escalation since the `.gitignore` `.specfuse/**/work/` rule
+came into effect (added under FEAT-2026-0004's lock-file ignore work).
+LEARNINGS appended.
+
+**Outstanding regression-test gap.** T01's
+`tests/test_loop_orchestration.py` covers `commit_bookkeeping`'s
+empty-paths and no-diff early-return arms but NOT the
+gitignored-path force-add. A future agent removing `-f` would pass
+all current tests. Successor feature should land a targeted
+regression: stage a path under `.specfuse/<feat>/work/<wu>/` against
+a tree where `.gitignore` excludes that prefix, call
+`commit_bookkeeping`, assert exit 0 and the path is committed.
+
 ## §Recursive audit (per LEARNINGS [FEAT-2026-0008/G1-CLOSE])
 
 Three-command check, ran fresh at close time:
