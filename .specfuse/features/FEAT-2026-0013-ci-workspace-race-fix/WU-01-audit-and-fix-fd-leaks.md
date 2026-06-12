@@ -3,12 +3,14 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: done
-attempts: 1
-duration_seconds: 362.795
-cost_usd: 0.326895
-input_tokens: 13
-output_tokens: 3707
+status: pending
+attempts: 0
+# Cost preserved from v1 (2026-06-12, shipped methodologically but CI race
+# recurred on Linux → re-armed; see PLAN.md ## Prior attempts).
+historical_cost_usd: 0.326895
+historical_duration_seconds: 362.795
+historical_input_tokens: 13
+historical_output_tokens: 3707
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
@@ -51,6 +53,14 @@ Suspect surfaces (each WU author MUST audit):
 Reference the binding rules under `.specfuse/rules/`. Edit files
 only; the driver owns all git.
 
+**v1 → v2 amendment (2026-06-12).** v1 (gc.auto=0 + git rev-parse
+sync barrier) passed 50× on macOS local but the SAME race fired on
+Linux CI runner (run `27412918877`). Oracle was wrong-environment.
+v2 keeps v1's root-cause attack AND adds belt-and-suspenders
+`ignore_cleanup_errors=True` to suppress the symptom if the
+root-cause fix still misses a Linux-only surface. v2's oracle is
+CI itself — local audit alone is insufficient evidence.
+
 **Acceptance criteria.**
 1. Every `subprocess.run` call inside `integration_workspace()`
    (`tests/test_driver_integration.py`) declares `check=True` and
@@ -69,17 +79,34 @@ only; the driver owns all git.
    check=True, capture_output=True)`. This is a cheap git command
    that forces the index lock to flush and any pending writers to
    release before teardown.
-4. The 50× audit runs locally with zero failures:
+4. **NEW v2.** `integration_workspace()` constructs its
+   `tempfile.TemporaryDirectory` with `ignore_cleanup_errors=True`
+   (Python 3.10+). Rationale: Linux-CI race recurrence in
+   FEAT-2026-0013 v1 proved AC2-3 alone insufficient. This is
+   harm-reduction — root-cause attack stays primary; suppression
+   is the safety net for Linux-only surfaces not addressed by
+   gc + sync barrier.
+5. The 50× audit runs locally with zero failures:
    `for i in $(seq 1 50); do .venv/bin/python3 -m unittest
    tests.test_driver_integration -q 2>&1 | tail -1; done | sort -u`
-   prints only `OK` (and nothing else — no `FAILED`, no `ERROR`).
-   Quote the resulting summary verbatim in the RESULT block.
-5. `integration_workspace` is still a `@contextmanager` (per
+   prints only `OK` lines. Quote the resulting summary verbatim
+   in the RESULT block. (Local-only oracle; insufficient on its
+   own — see AC6.)
+6. **NEW v2: CI-environment oracle.** A sanity-check that the v2
+   spec actually addresses Linux-CI: the agent does NOT run CI
+   itself (CI runs at push time, post-squash). Instead the agent
+   verifies the produced code path by running:
+   `.venv/bin/python3 -c "import tempfile; import inspect; src = inspect.getsource(__import__('tests.test_driver_integration', fromlist=['integration_workspace']).integration_workspace); assert 'ignore_cleanup_errors=True' in src, 'belt-and-suspenders missing'; assert 'gc.auto' in src, 'gc.auto=0 not set'; print('v2 surfaces present')"`
+   — must exit `0` AND print `v2 surfaces present`. If not, emit
+   `status: blocked`. The CI run on the post-squash push is the
+   FINAL oracle; that result is the operator's call at /wrap-feature
+   step 7, NOT this WU's responsibility.
+7. `integration_workspace` is still a `@contextmanager` (per
    `from contextlib import contextmanager` import) and still yields
    a `pathlib.Path`. No API break. Any test that uses
    `with integration_workspace() as root:` continues to receive a
    `Path` named `root`.
-6. **Existence check** before declaring complete:
+8. **Existence check** before declaring complete:
    `.venv/bin/python3 -c "import inspect; from tests.test_driver_integration import integration_workspace; assert callable(integration_workspace)"`
    must exit `0`. If not, emit `status: blocked`.
 

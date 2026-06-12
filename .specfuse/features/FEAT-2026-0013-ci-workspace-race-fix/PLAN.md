@@ -5,10 +5,25 @@ slug: ci-workspace-race-fix
 branch: feat/FEAT-2026-0013-ci-workspace-race-fix
 roadmap_goal: Eliminate the fd-leak race in `integration_workspace()` so the integration-test path is deterministic on Python 3.12 CI runners (no `OSError: Directory not empty` flakes).
 autonomy_default: auto
-status: done
+status: active
 ---
 
 # Plan: CI integration_workspace cleanup race fix
+
+## Prior attempts
+
+- **v1** (2026-06-12, $2.21 total / 944.97s wall): shipped methodologically
+  with root-cause fix only (gc.auto=0 + `git rev-parse HEAD` sync barrier
+  in `integration_workspace`). Oracle was 50× macOS-local audit, 50/50 OK.
+  PR #9 push CI on Linux runner `27412918877` re-fired the SAME race
+  (`test_no_files_changed_in_result_block_runs_squash_as_today` ERROR on
+  `tempfile._rmtree`). Root cause: oracle environment mismatch — macOS
+  APFS hides a race Linux ext4 surfaces. v1 cost preserved in each WU's
+  `historical_*` frontmatter fields. PR #9 NOT merged. T01 + G1-CLOSE
+  re-armed (`status: pending`, `attempts: 0`) for v2.
+- **v2** (in progress): root-cause attack STAYS + belt-and-suspenders
+  `ignore_cleanup_errors=True` ADDED + operator-side Linux Docker probe
+  (`scripts/check-linux-race.sh`) gates the next push.
 
 CI intermittently fails with `OSError: [Errno 39] Directory not empty:
 '/tmp/.../.git/objects'` when `integration_workspace()` (in
@@ -29,10 +44,16 @@ file owns gate status.
   `Path`).
 - Changing other tests' fixture patterns — only this one fixture is
   at issue today.
-- **Belt-and-suspenders `ignore_cleanup_errors=True`** — explicitly
-  rejected. Symptom suppression hides future leaks and erodes the
-  verification-as-oracle property. Revisit only if root-cause audit
-  cannot converge on a deterministic fix.
+- ~~Belt-and-suspenders `ignore_cleanup_errors=True` — explicitly
+  rejected.~~ **REVISED 2026-06-12 after v1 ship-and-CI-recur.** PR #9's
+  v1 fix (gc.auto=0 + git rev-parse sync barrier) passed 50× locally on
+  macOS but the SAME race fired on Linux CI runners
+  (run `27412918877`, same `test_..._rmtree` ERROR). The oracle ran in
+  the wrong environment. Root-cause fix STAYS in v2 + belt-and-
+  suspenders `ignore_cleanup_errors=True` is ADDED to cover the
+  Linux-only fs surface not addressed by gc + sync barrier alone.
+  This is harm-reduction not symptom-only: root cause still being
+  attacked AND the symptom is suppressed if it slips through.
 
 ## Task graph
 

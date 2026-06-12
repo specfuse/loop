@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: passed
+status: open
 ---
 
 # Gate 1 — integration_workspace deterministic, 50× audit passes

@@ -3,12 +3,14 @@ id: FEAT-2026-0013/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: done
-attempts: 1
-duration_seconds: 582.178
-cost_usd: 1.886625
-input_tokens: 32
-output_tokens: 12204
+status: pending
+attempts: 0
+# Cost preserved from v1 (2026-06-12, closed methodologically with macOS-local
+# 50× audit; CI on Linux subsequently failed → re-armed).
+historical_cost_usd: 1.886625
+historical_duration_seconds: 582.178
+historical_input_tokens: 32
+historical_output_tokens: 12204
 ---
 
 # Gate 1 close — combined closing ceremony
@@ -37,33 +39,54 @@ to HEAD. A single failure here invalidates the feature-arc verdict.
    what worked, what failed and why, attempt count, and any
    rule/template/boundary missing or ambiguous. Cite specific
    `events.jsonl` evidence per WU.
-2. **Recursive audit (oracle).** The retrospective includes a
-   section `## 50× recursive audit` that runs and reports the FULL
-   output of:
+2. **Local recursive audit (weak oracle).** The retrospective
+   includes a section `## 50× recursive audit (macOS local)` that
+   runs and reports the FULL output of:
    `for i in $(seq 1 50); do .venv/bin/python3 -m unittest tests.test_driver_integration -q 2>&1 | tail -1; done | sort | uniq -c`
-   Expected: exactly one line of the form `  50 OK`. Any other
-   output (FAILED, ERROR, multiple distinct lines) means the fix did
-   NOT hold and the verdict CANNOT claim the goal is met. Quote the
-   command's literal output in the retrospective.
-3. Durable, generalizable lessons (if any) appended to the root
+   Expected: exactly one line of the form `  50 OK`. **v1 LESSON
+   (durable):** this audit alone is INSUFFICIENT — v1 passed it
+   50/50 and still failed on Linux CI. The verdict MUST explicitly
+   state local audit is necessary-but-not-sufficient and that the
+   FINAL oracle is the operator-side Linux Docker probe
+   (`scripts/check-linux-race.sh`) run pre-push at `/wrap-feature`
+   step 4 (or 5) PLUS the CI run on the pushed branch.
+3. **v1 cost reconciliation.** The retrospective includes a section
+   `## v1 cost reconciliation` quoting the `historical_cost_usd` /
+   `historical_duration_seconds` fields from both WUs' frontmatter
+   and stating the v2 cumulative total = v1 cost + this run's cost.
+   This is the audit signal that prior failed attempts were
+   preserved, not silently overwritten.
+4. Durable, generalizable lessons appended to the root
    `.specfuse/LEARNINGS.md`, tagged `FEAT-2026-0013/G1-CLOSE`.
-   Feature-specific noise stays in `RETROSPECTIVE.md`. Most likely
-   lesson surface: "test fixtures using subprocess + TemporaryDirectory
-   on Py 3.12 must disable git background gc + add a sync barrier
-   before teardown." If nothing generalizes, append nothing and say
-   so.
-4. Docs and roadmap reconciled: this feature's row in
+   Feature-specific noise stays in `RETROSPECTIVE.md`. **Required
+   lessons from v1**: (a) "test fixtures using subprocess +
+   TemporaryDirectory on Py 3.12 must disable git background gc +
+   add a sync barrier before teardown — AND set
+   `ignore_cleanup_errors=True` as belt-and-suspenders for
+   Linux-only surfaces"; (b) "oracle environment must match goal
+   environment — a 50× macOS-local audit is NOT evidence about
+   Linux CI behavior; use `scripts/check-linux-race.sh` Docker
+   probe for Linux-targeted verifications"; (c) "script-parity ≠
+   environment-parity — pre-push hooks running once on developer
+   machines cannot catch races that are deterministic-on-CI". If
+   these are already there from v1, skip; otherwise append.
+5. Docs and roadmap reconciled: this feature's row in
    `.specfuse/roadmap.md` reflects `status: done` (assuming AC2
-   passed). The detail section's `**Status: planned.**` line in the
-   roadmap detail block — if present — is updated to `**Status: done.**`.
-   The `PLAN.md status:` field flips to `done` in this WU — the close
-   ceremony owns this flip, not a follow-on commit.
-5. A `# Feature-arc verdict` section is appended to
-   `RETROSPECTIVE.md` stating whether `roadmap_goal` is met, citing
-   AC 2's 50× audit output verbatim. If even one of the 50 runs
-   failed, the verdict must explicitly say the goal is NOT met and
-   recommend the appropriate recovery action (reopen feature, file
-   FEAT-2026-0015, etc.).
+   AC3 passed). The detail section's `**Status: planned.**` line
+   in the roadmap detail block — if present — is updated to
+   `**Status: done.**`. The `PLAN.md status:` field flips to
+   `done` in this WU — the close ceremony owns this flip, not a
+   follow-on commit.
+6. A `# Feature-arc verdict` section is appended to
+   `RETROSPECTIVE.md` stating whether `roadmap_goal` is met. The
+   verdict MUST: (a) cite AC 2's macOS-local audit output verbatim,
+   (b) explicitly state that local audit alone is NECESSARY but
+   NOT SUFFICIENT (per v1 LESSON), (c) name the operator-side
+   Linux Docker probe + CI run as the FINAL oracle that the
+   operator is responsible for invoking at `/wrap-feature`, (d)
+   if even one of the 50 local runs failed, the verdict must
+   explicitly say the goal is NOT met and recommend the recovery
+   action (re-arm WU-01, file FEAT-2026-0015, etc.).
 
 **Do not touch.** Source code (`tests/`, `loop.py`, etc.) — this is
 a closing unit, it does not change behavior. Other WU files,
