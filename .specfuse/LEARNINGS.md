@@ -790,3 +790,47 @@ promoted here.
   FEAT-2026-0008's own close ceremony's audit-of-itself); use it
   when justifying analogous driver-side guards on other surfaces
   (e.g. FEAT-2026-0012's planned closing-deliverable guard).
+
+- [FEAT-2026-0010/G1] Name load-bearing strings once in the
+  foundation WU and reference them as exact-match literals in every
+  dependent WU. FEAT-2026-0010/T01 specified the exact anchor string
+  and back-link string for the archive format; T02 and T04 consumed
+  those strings without drift, producing byte-reproducible output
+  across the dependent chain. The pattern is reliable because it
+  eliminates the "reasonable-but-different" synonym a later agent
+  would otherwise invent. Rule: for any WU that introduces a string
+  that a later WU must match (section headings, anchor IDs, back-link
+  templates, CLI flag names), quote the exact target string in the
+  foundation WU's Acceptance criteria and repeat it verbatim in each
+  dependent WU's Context section — do not leave the dependent WU to
+  infer it from the diff.
+
+- [FEAT-2026-0010/G1] Interactive skill WUs that ship an `--auto`
+  batch mode must state explicitly in their Context section whether
+  downstream dogfood WUs in the same gate are expected to
+  subprocess-invoke the skill or re-implement its algorithm by direct
+  file editing. FEAT-2026-0010/T02 shipped the `roadmap-archive`
+  skill with `--auto`; T04 re-implemented the algorithm directly (no
+  subprocess call) and produced correct output — but the contract was
+  implicit. An agent dispatched after T02 with no such note may
+  choose either approach; subprocess-invoke and direct-edit produce
+  the same result only when the skill has no side-effects on unrelated
+  rows (which is a non-trivial property to verify at WU author time).
+  Rule: every skill WU that ships a batch mode must include a
+  "downstream use" note in Context naming which of the two patterns
+  the next WU should follow and why.
+
+- [FEAT-2026-0010/G1] A gate-close assertion that event count in
+  `events.jsonl` equals the gate's WU count must run before the
+  driver marks a gate `passed`. FEAT-2026-0010/T02 completed and had
+  its WU frontmatter updated correctly, but no `task_started` /
+  `task_completed` events were appended; the retro WU (T90) could not
+  reconstruct T02's wall-clock span from the log and could only
+  estimate cost from WU frontmatter. Missing events are detectable
+  only by cross-referencing frontmatter against `events.jsonl` — a
+  fragile, retro-only check. Rule: when authoring a gate-plan or
+  driver feature, add a gate-close pre-condition: `assert len([e for e
+  in events if e["feature_id"] == gate_id]) >= expected_wu_count`
+  (or equivalent grep on `events.jsonl`); if the count is short,
+  block gate advancement and surface the gap for operator review
+  before the gate is marked passed.

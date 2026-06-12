@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/G1-LESSONS
 type: lessons
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 64.96
+cost_usd: 0.23318
+input_tokens: 7
+output_tokens: 3201
 ---
 
 # Gate 1 lessons
