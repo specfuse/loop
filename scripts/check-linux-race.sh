@@ -58,9 +58,31 @@ docker run --rm \
             exit 1
         }
         echo '==> Running tests.test_driver_integration ${N}× in Linux container'
+        pass=0
+        fail=0
+        oserrs=0
         for i in \$(seq 1 ${N}); do
-            python -m unittest tests.test_driver_integration -q 2>&1 | tail -1
-        done | sort | uniq -c
+            out=\$(python -m unittest tests.test_driver_integration -q 2>&1)
+            rc=\$?
+            if [ \$rc -eq 0 ]; then
+                pass=\$((pass+1))
+            else
+                fail=\$((fail+1))
+            fi
+            # Independent race-shape check: count runs whose stderr mentioned
+            # OSError + 'Directory not empty' — the actual failure mode
+            # FEAT-2026-0013 attacks. Surfaces even if unittest exit was 0
+            # (e.g. an ignore_cleanup_errors=True suppression).
+            if printf '%s' \"\$out\" | grep -qE 'OSError.*Directory not empty'; then
+                oserrs=\$((oserrs+1))
+            fi
+        done
+        echo \"==> Results across ${N} runs:\"
+        echo \"    PASS (exit 0):                    \$pass\"
+        echo \"    FAIL (exit nonzero):              \$fail\"
+        echo \"    Runs that emitted the race OSError: \$oserrs\"
+        # Surface exit-0 nonzero only if any failed
+        [ \$fail -eq 0 ] || exit 1
     "
 rc=$?
 
@@ -71,6 +93,10 @@ if [ $rc -ne 0 ]; then
 fi
 
 echo ""
-echo "==> Probe complete. Inspect the uniq -c output above:"
-echo "    - Exactly one line of \"  ${N} OK\" → safe to push."
-echo "    - Any FAILED / ERROR / mixed counts → race still fires; do NOT push."
+echo "==> Probe complete. Read the counts above:"
+echo "    - PASS == ${N} AND OSError count == 0  → safe to push."
+echo "    - FAIL > 0                              → race still fires; do NOT push."
+echo "    - PASS == ${N} but OSError count > 0    → suppression hid the race"
+echo "                                              (e.g. ignore_cleanup_errors=True)."
+echo "                                              Symptom suppressed but root cause"
+echo "                                              still active. Decide accordingly."
