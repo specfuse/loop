@@ -126,6 +126,13 @@ class WorkUnit:
     title: str
     body: str                  # the prompt handed to the session
     effort: str = "medium"     # low|medium|high|xhigh|max — passed as --effort to claude -p
+    # OPTIONAL sandbox-escape. When `unsandboxed: true` in WU frontmatter,
+    # driver appends `--dangerously-skip-permissions` to the claude -p
+    # invocation. Requires `unsandboxed_rationale` string in same frontmatter
+    # (one-line justification, written to events.jsonl as the audit signal).
+    # load_wu refuses to load a WU with unsandboxed=True and no rationale.
+    unsandboxed: bool = False
+    unsandboxed_rationale: str = ""
 
 
 @dataclass
@@ -190,21 +197,37 @@ def find_feature(arg: str | None) -> Path:
             sys.exit(f"No PLAN.md under {d}")
         return d
     actives = []
+    done_pending_wrap = []
     for d in sorted(FEATURES_DIR.glob("*/")):
         plan = d / "PLAN.md"
         if plan.exists():
             fm, _ = read_frontmatter(plan)
             if fm.get("status") == "active":
                 actives.append(d)
+            elif fm.get("status") == "done":
+                # Surface done features that may not have been wrapped yet.
+                # Conservative heuristic: a RETROSPECTIVE.md exists (close
+                # ceremony ran). Operator decides via /wrap-feature whether
+                # push + PR are pending.
+                if (d / "RETROSPECTIVE.md").is_file():
+                    done_pending_wrap.append(d)
     if len(actives) == 1:
         return actives[0]
     if not actives:
-        sys.exit(
-            "No active feature. Set a feature's PLAN.md status to 'active'.\n"
+        msg = "No active feature. Set a feature's PLAN.md status to 'active'.\n"
+        if done_pending_wrap:
+            names = ", ".join(d.name for d in done_pending_wrap[-3:])
+            msg += (
+                f"  - /wrap-feature   finalize a recently-closed feature "
+                f"(push branch + open PR + merge advisory).\n"
+                f"                    Candidates: {names}\n"
+            )
+        msg += (
             "  - /pick-feature   choose a 'planned' feature from the roadmap and activate it\n"
             "  - /draft-feature  scaffold a new feature (gates + gate-1 work units)\n"
             "  - /arm-gate       if a feature halted at a gate boundary awaiting review"
         )
+        sys.exit(msg)
     sys.exit(f"Multiple active features; pass --feature. Found: "
              f"{[d.name for d in actives]}")
 
@@ -247,6 +270,14 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     wu_model = fm.get("model")
     if wu_model is None:
         wu_model = MODEL_BY_TYPE.get(wu_type, "claude-sonnet-4-6")
+    unsandboxed = bool(fm.get("unsandboxed", False))
+    unsandboxed_rationale = str(fm.get("unsandboxed_rationale", "") or "").strip()
+    if unsandboxed and not unsandboxed_rationale:
+        raise ValueError(
+            f"{path}: `unsandboxed: true` requires a non-empty "
+            f"`unsandboxed_rationale` in the same frontmatter. Sandbox-escape "
+            f"is auditable; the rationale is the audit signal."
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -258,6 +289,8 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         attempts=int(fm.get("attempts", 0)),
         title=title_m.group(1).strip() if title_m else ref["id"],
         body=body.strip(),
+        unsandboxed=unsandboxed,
+        unsandboxed_rationale=unsandboxed_rationale,
     )
 
 
@@ -605,6 +638,11 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
                    + truncate_failure_note(failure_note))
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
+    if wu.unsandboxed:
+        # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
+        # emitted in run()'s attempt loop; rationale lives in WU frontmatter.
+        # Inserted after `-p` so it composes with --model/--effort/--output-format.
+        cmd.insert(2, "--dangerously-skip-permissions")
     if cost_tracking:
         cmd += ["--output-format", "json"]
     proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
@@ -1078,6 +1116,15 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 # bookkeeping commit (BLOCKED/SPINNING).
                 wu_events = [build_event("task_started", wu.wu_id,
                                          {"type": wu.type, "model": wu.model})]
+                if wu.unsandboxed:
+                    # Audit signal: WU opted out of the claude -p sandbox.
+                    # Event logged before first attempt so the trail exists
+                    # even if the attempt crashes. Rationale carried verbatim.
+                    wu_events.append(build_event("unsandboxed_dispatch", wu.wu_id, {
+                        "rationale": wu.unsandboxed_rationale,
+                    }))
+                    print(f"   ⚠ UNSANDBOXED dispatch — rationale: "
+                          f"{wu.unsandboxed_rationale}")
                 attempt_notes: list[tuple[int, str]] = []
                 attempt_outcomes: list[str] = []
                 # Cost accumulators: per-attempt list goes to events.jsonl,
@@ -1286,11 +1333,53 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             [gate.file, events_path],
             f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
         )
+        is_terminal_gate = gate is gates[-1]
+        used_combined_close = any(
+            (feature_dir / ref["file"]).is_file()
+            and read_frontmatter(feature_dir / ref["file"])[0].get("type") == "close"
+            for ref in gate.refs
+        )
+        # Re-read PLAN.md status after the close ceremony: a `close` or
+        # `plan-next` WU may have flipped it to `done` (single-gate combined
+        # close always does; multi-gate terminal plan-next does on the
+        # terminal gate). The branching below honors what the close ceremony
+        # actually decided rather than guessing from gate shape alone.
+        plan_fm_after, _ = read_frontmatter(feature_dir / "PLAN.md")
+        feature_done = plan_fm_after.get("status") == "done"
         review = feature_dir / f"GATE-{gate.number:02d}-REVIEW.md"
-        print(f"\nGate {gate.number} complete (retro, lessons, docs, plan-next).")
-        print(f"The next gate has been drafted. Read {review.name} for the planner's "
-              f"findings and where to look, review the draft WU files, arm the ones you "
-              f"accept (status -> pending), set this gate's status to `passed`, re-run.")
+        if feature_done:
+            ceremony = ("combined close ceremony"
+                        if used_combined_close
+                        else "retro, lessons, docs, plan-next")
+            print(f"\nGate {gate.number} complete ({ceremony}); "
+                  f"PLAN.md status: done.")
+            print(
+                "Terminal — feature ready to wrap. Next step:\n"
+                "  - /wrap-feature        cosmetic gate flip + push branch + "
+                "open PR + merge advisory (single-confirm per step).\n"
+                "  - Or manually: read RETROSPECTIVE.md, flip "
+                f"{gate.file.name} `status: passed`, git push, gh pr create."
+            )
+        elif is_terminal_gate:
+            print(f"\nGate {gate.number} complete (retro, lessons, docs, "
+                  f"plan-next); terminal gate but PLAN.md not yet `done`.")
+            print(
+                "Inconsistency: terminal gate closed without close ceremony "
+                "flipping PLAN.md to `done`. Inspect RETROSPECTIVE.md / "
+                "events.jsonl. Likely fix: manually flip PLAN.md `status: "
+                "active -> done`, then `/wrap-feature`."
+            )
+        else:
+            print(f"\nGate {gate.number} complete (retro, lessons, docs, "
+                  f"plan-next).")
+            print(
+                f"Next gate drafted. Next step:\n"
+                f"  - /arm-gate            walk drafts, accept/revise/reject, "
+                f"flip accepted WUs to `pending`,\n"
+                f"                          mark this gate `passed`. "
+                f"Reads {review.name} for planner findings.\n"
+                f"  - Resume               python3 .specfuse/scripts/loop.py"
+            )
         return 0
     finally:
         if lock_fd is not None:

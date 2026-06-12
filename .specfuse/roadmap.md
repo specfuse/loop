@@ -29,7 +29,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` |
 | FEAT-2026-0012 | Closing-WU deliverable guard                | planned  | — |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | planned  | — |
-| FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | planned  | — |
+| FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -604,8 +604,14 @@ Single substantive WU: edit `ci.yml` action `uses:` lines; trigger a
 CI run on the PR and confirm no deprecation warning fires; assert
 both jobs still pass against the existing test suite.
 
-**Status: planned.** Independent. Time-bounded — should land before
-2026-06-16 forced upgrade or this becomes urgent.
+**Status: done.** `roadmap_goal` met — `.github/workflows/ci.yml`
+pins `actions/checkout@v6` and `actions/setup-python@v6`; no stale
+`@v[0-5]` pins remain. Five days of deadline margin (closed
+2026-06-11; forced upgrade 2026-06-16). T01 landed in 1 attempt
+after a WU re-arm; the original ACs coupled the WU to the
+operator's `gh` CLI auth state and burned 5 dispatches before the
+re-arm dropped the host-coupled checks. See
+`RETROSPECTIVE.md §Feature-arc verdict`.
 
 ## Notes
 
