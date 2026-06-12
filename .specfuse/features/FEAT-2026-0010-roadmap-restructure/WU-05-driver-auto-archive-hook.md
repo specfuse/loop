@@ -2,7 +2,7 @@
 id: FEAT-2026-0010/T05
 type: implementation
 effort: medium
-status: draft
+status: pending
 attempts: 0
 ---
 

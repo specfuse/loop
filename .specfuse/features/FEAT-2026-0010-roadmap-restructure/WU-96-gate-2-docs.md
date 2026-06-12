@@ -2,7 +2,7 @@
 id: FEAT-2026-0010/G2-DOCS
 type: docs
 effort: low
-status: draft
+status: pending
 attempts: 0
 ---
 

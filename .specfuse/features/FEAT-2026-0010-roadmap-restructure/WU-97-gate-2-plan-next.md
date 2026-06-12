@@ -2,7 +2,7 @@
 id: FEAT-2026-0010/G2-PLAN
 type: plan-next
 effort: high
-status: draft
+status: pending
 attempts: 0
 ---
 
