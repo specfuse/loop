@@ -3,8 +3,12 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 362.795
+cost_usd: 0.326895
+input_tokens: 13
+output_tokens: 3707
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace

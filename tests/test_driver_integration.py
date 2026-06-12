@@ -47,6 +47,8 @@ def integration_workspace():
                         "test@example.com"], check=True)
         subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"],
                        check=True)
+        subprocess.run(["git", "-C", str(root), "config", "gc.auto", "0"],
+                       check=True)
         (root / "README.md").write_text("# fixture\n")
         subprocess.run(["git", "-C", str(root), "add", "."], check=True)
         subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"],
@@ -61,7 +63,13 @@ def integration_workspace():
             "plannext:\n  - name: noop\n    command: \"true\"\n"
         )
         (root / ".specfuse/features").mkdir(parents=True)
-        yield root
+        try:
+            yield root
+        finally:
+            subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "HEAD"],
+                check=True, capture_output=True,
+            )
 
 
 def write_minimal_feature(root: Path, feature_id: str, slug: str,
