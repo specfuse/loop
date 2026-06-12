@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/T02
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 532.187
+cost_usd: 1.160804
+input_tokens: 1901
+output_tokens: 28946
 ---
 
 # Ship the roadmap-archive skill
