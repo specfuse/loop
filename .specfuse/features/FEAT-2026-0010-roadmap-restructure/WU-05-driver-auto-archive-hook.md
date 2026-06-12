@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/T05
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
+duration_seconds: 841.032
+cost_usd: 2.052703
+input_tokens: 56
+output_tokens: 38302
 ---
 
 # Driver auto-archive hook on feature completion
