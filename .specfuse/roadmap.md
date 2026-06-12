@@ -28,7 +28,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0010 | Roadmap restructure: add + archive          | planned  | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` |
 | FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` |
 | FEAT-2026-0012 | Closing-WU deliverable guard                | planned  | — |
-| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | active   | — |
+| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | active   | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
