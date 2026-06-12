@@ -3,14 +3,18 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 # Cost preserved from v1 (2026-06-12, shipped methodologically but CI race
 # recurred on Linux → re-armed; see PLAN.md ## Prior attempts).
 historical_cost_usd: 0.326895
 historical_duration_seconds: 362.795
 historical_input_tokens: 13
 historical_output_tokens: 3707
+duration_seconds: 266.463
+cost_usd: 0.205443
+input_tokens: 12
+output_tokens: 2535
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace

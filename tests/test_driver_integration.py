@@ -39,7 +39,7 @@ SCAFFOLD_SRC = REPO_ROOT / ".specfuse"
 @contextmanager
 def integration_workspace():
     """Build a temp git repo with a minimal .specfuse/ scaffold and yield its path."""
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         root = Path(tmp)
         # git init with main as default branch + one initial commit
         subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
