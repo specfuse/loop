@@ -148,11 +148,7 @@ the archive entry). Migration of 0003..0008 leaves the table
 unchanged in shape; archive contains 6 detail sections matching
 the originals byte-for-byte except for the new archive header.
 
-**Status: planned.** Folder exists at
-`.specfuse/features/FEAT-2026-0010-roadmap-restructure/` (PLAN.md,
-GATE-01.md, GATE-02.md, 4 substantive WUs, 4 closing WUs). Land
-before FEAT-2026-0011 (scoring needs the restructured table to
-carry the new columns).
+**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. Gate 2 scope TBD (see RETROSPECTIVE.md).
 
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 
