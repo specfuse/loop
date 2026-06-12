@@ -614,3 +614,179 @@ promoted here.
   CLI's auth round-trip (see gh-claudeP-broken above). Sandbox-
   escape is NOT a substitute for AC redesign when the surface is
   broken upstream.
+
+- [FEAT-2026-0013/G1-CLOSE] Test fixtures that combine `subprocess.run`
+  (especially `git`) with `tempfile.TemporaryDirectory` on Python 3.12
+  race against `shutil.rmtree` on cleanup. Two specific causes, both
+  must be addressed together: (1) git's `gc.autoDetach` (default true
+  since git 2.0) means any `git commit` / `git gc --auto` background-
+  detaches a gc subprocess that outlives the parent and is still
+  writing to `.git/objects` when `TemporaryDirectory.cleanup()` fires;
+  (2) the index lock and other writers may not have flushed when the
+  parent exits. Symptom: `OSError: [Errno 39] Directory not empty:
+  '/tmp/.../.git/objects'`, intermittent, timing-dependent — three
+  occurrences across different tests in this repo before fix. Rule:
+  any test fixture that initializes a temp git repo inside a
+  `TemporaryDirectory` MUST (a) pass `-c gc.auto=0` to every `git`
+  invocation inside the fixture body (or `git -C <root> config gc.auto
+  0` after `git init`), AND (b) run a sync barrier — `subprocess.run(
+  ["git", "-C", str(root), "rev-parse", "HEAD"], check=True,
+  capture_output=True)` — in a `finally:` block after the `yield`,
+  before the `TemporaryDirectory` context exits. Either alone is
+  insufficient; both close the race deterministically. Belt-and-
+  suspenders `ignore_cleanup_errors=True` is explicitly rejected — it
+  hides future leaks and erodes verification-as-oracle.
+
+- [FEAT-2026-0013/G1-CLOSE] An oracle of the form
+  `unittest -q 2>&1 | tail -1` is fragile when the tests-under-test
+  spawn subprocesses whose stdout is forwarded to the parent — that
+  subprocess output can arrive AFTER unittest's `OK` / `FAILED`
+  summary line, and `tail -1` will quietly start returning chatter
+  instead of the verdict. The drift is silent: the oracle's output
+  changes shape but the underlying tests are still passing (or
+  failing) for the same reasons. T01's AC4 and G1-CLOSE's AC2 both
+  used this oracle; both produced one-distinct-line output on this
+  close run, but the line was driver chatter from an inner
+  integration test, not `OK`. Rule: when an AC's oracle is "are
+  N runs of a test suite all clean," prefer an exit-code count
+  (`for i in $(seq 1 N); do unittest -q >/dev/null 2>&1; [ $? -eq 0
+  ] && pass=$((pass+1)) || fail=$((fail+1)); done; echo "PASS:$pass
+  FAIL:$fail"`) over a `tail -1 | sort | uniq -c` pattern. The exit
+  code IS the verdict; stdout-tail is a proxy that decouples from the
+  verdict the first time a downstream test starts logging. Apply at
+  WU author time for any "run-N-times" AC.
+
+- [FEAT-2026-0013/G1-CLOSE] **Amends and supersedes v1's gc.auto=0 +
+  sync-barrier rule above (entry dated v1, line 618).** Test fixtures
+  that combine `subprocess.run` (especially `git`) with
+  `tempfile.TemporaryDirectory` on Python 3.12 race against
+  `shutil.rmtree` on cleanup. v1's rule (a) gc.auto=0 + (b) sync
+  barrier is necessary but proved INSUFFICIENT on Linux ext4 CI
+  runners: FEAT-2026-0013 v1 shipped with both fixes, passed 50×
+  macOS-local, and the SAME `OSError: Directory not empty` race fired
+  on Linux runner `27412918877` (PR #9). Linux ext4 surfaces a
+  cleanup race that macOS APFS hides. Rule (revised): any test
+  fixture that initializes a temp git repo inside a
+  `TemporaryDirectory` MUST do all three: (a) pass `-c gc.auto=0` to
+  every `git` invocation in the fixture body (or `git -C <root>
+  config gc.auto 0` after `git init`); (b) run a sync barrier —
+  `subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+  check=True, capture_output=True)` — in a `finally:` block after
+  the `yield`, before the `TemporaryDirectory` context exits; (c)
+  construct the `TemporaryDirectory` with `ignore_cleanup_errors=True`
+  (Python 3.10+) as belt-and-suspenders against Linux-only surfaces
+  the gc + sync barrier doesn't cover. The v1 stance that
+  `ignore_cleanup_errors=True` "hides future leaks and erodes
+  verification-as-oracle" is REVERSED: when the root cause is being
+  attacked AT THE SAME TIME (a)+(b), the suppression is
+  harm-reduction, not symptom-only. Three together close the race
+  deterministically on Linux CI; root-cause AND suppression, not
+  either-or.
+
+- [FEAT-2026-0013/G1-CLOSE] Oracle environment must match goal
+  environment. A `roadmap_goal` of "deterministic on Python 3.12 CI
+  runners" cannot be falsified by a 50× macOS-local audit — macOS
+  APFS and Linux ext4 differ on whether in-flight directory writes
+  race against `rmtree`, and the CI environment is the only place
+  the goal's environment lives. v1's close ceremony reported the
+  goal met on macOS-local evidence alone; the same fix failed on
+  the very next CI run. Rule: when authoring a close-ceremony AC
+  whose oracle is "run the failing test N times", the oracle command
+  MUST be runnable in (or equivalent to) the environment named by
+  `roadmap_goal`. For Linux-CI goals: add a Docker probe
+  (`scripts/check-linux-race.sh` shape — Linux image, identical
+  `tail` of the suite) and treat the operator-side probe run as the
+  load-bearing AC, with macOS-local audit kept only as a necessary-
+  but-not-sufficient pre-check. The verdict must explicitly call
+  out the operator-side step and the CI run as the FINAL oracle.
+
+- [FEAT-2026-0013/G1-CLOSE] Script-parity ≠ environment-parity. A
+  pre-push hook (or any locally-runnable script) that REPRODUCES
+  CI's commands verbatim does NOT reproduce CI's environment — it
+  still runs on the developer's filesystem, kernel, and tempdir
+  semantics. A race that is non-deterministic on macOS and
+  deterministic on Linux ext4 will not surface in a pre-push hook
+  on a Mac no matter how faithfully the hook mirrors the CI YAML.
+  Rule: any pre-push gate intended to catch CI-environment-only
+  failures (filesystem races, kernel-version-specific syscalls,
+  glibc-vs-musl behavior, container runtime semantics) MUST run
+  inside a container that matches CI's image. Document the
+  distinction at the gate's spec-author time so future amendments
+  do not collapse "we run the same commands" with "we run in the
+  same environment." Pre-push hooks running on developer machines
+  cannot catch races that are deterministic-on-CI; only a
+  Docker-probe or equivalent environment-parity gate can.
+
+- [FEAT-2026-0013/G1-CLOSE] Centralize-or-enumerate cross-cutting
+  fixture patterns BEFORE the first fix-shape is dispatched. When a
+  test fixture pattern (an `integration_workspace`, a `_minimal_git_
+  repo`, a tempdir-backed harness) is duplicated across multiple test
+  files via copy-paste, fixing one site does not generalize — the
+  same race / leak / config-gap can fire from any of the other sites
+  on the next CI run, in a DIFFERENT test name. FEAT-2026-0013's v1
+  shipped a fix to `tests/test_driver_integration.py::
+  integration_workspace`, passed 50× macOS-local + 50× Linux Docker,
+  and the SAME race fired in `tests/test_loop_files_changed_guard.py
+  ::integration_workspace` on Linux CI (v2 attempt). The repo has
+  FIVE copies of `def integration_workspace()` plus ~50 bare
+  `tempfile.TemporaryDirectory()` call sites. Rule: when an
+  implementation WU author identifies a fixture-level race or leak,
+  the WU spec MUST include a discovery AC: `grep -rn "def
+  <fixture_name>" tests/` (or equivalent for the pattern at hand)
+  and enumerate every site in the WU spec by file + line number.
+  The fix-shape is correct only when applied to every enumerated
+  site — typically by centralizing into one shared helper and
+  replacing duplicate definitions with imports. Single-site fixes
+  on cross-cutting patterns are a structural under-discovery, not a
+  bounded scope. Cost of missing this on FEAT-2026-0013: two ship-
+  and-CI-re-fail cycles + a re-arm cycle = ~$5 in agent costs and
+  three days of methodology rounds.
+
+- [FEAT-2026-0013/G1-CLOSE] Global git config can ambush WU
+  dispatch. A developer machine carrying `commit.gpgsign=true` +
+  `gpg.format=ssh` GLOBALLY (the default for some setups) will
+  fail any `git commit` inside a dispatched agent session when no
+  ssh-agent is reachable in the session's environment. The failure
+  surfaces as `gpg failed to sign the data` / exit 128 inside any
+  test fixture that runs `git commit`, including
+  `_minimal_git_repo()` helpers. The agent — correctly — emits
+  `status: blocked` rather than scope-creep into the test file,
+  burning a dispatch cycle. Recovery is an operator-side
+  `git config --local commit.gpgsign false` (working-copy only;
+  preserves the global setting for the operator's own commits).
+  FEAT-2026-0013 v3-attempts-1 and 2 burned $4.70 / 2552s on this
+  block before the operator disabled it locally. Rule: every WU
+  spec that requires `git commit` inside a temp-repo test fixture
+  MUST also (a) set `commit.gpgSign=false` on the temp repo
+  (`git -C <root> config commit.gpgSign false` right after
+  `git init`), AND (b) document in the feature folder's PLAN.md or
+  RETROSPECTIVE.md that the operator must verify
+  `git config --get commit.gpgsign` returns `false` or empty in
+  the repo's working copy BEFORE the first dispatch. The skill-side
+  remedy is to extend `init.sh` or `/wrap-feature` with a preflight
+  check on the operator's global gpg config; until that lands, this
+  is a known dispatch-time foot-gun.
+
+- [FEAT-2026-0013/G1-CLOSE] FEAT-2026-0008's `files_changed` diff
+  guard is recursively validated. During FEAT-2026-0013 v3-attempt-3
+  attempt-1, the dispatched agent emitted `status: complete` with
+  `files_changed: ["tests/_workspace.py", ...]` but did not write
+  `tests/_workspace.py` (the new file at the center of the v3 fix).
+  The FEAT-2026-0008/T02 `verify_files_changed` guard caught the
+  unchanged path (`attempt_outcome: files_changed_mismatch` in
+  `events.jsonl`), rolled the squash back via
+  `git reset --hard head_before`, and re-dispatched. Attempt-2
+  wrote the file correctly and completed. Without the guard, the
+  driver would have committed only the WU frontmatter status flip,
+  `status: done` would have advanced the dependency frontier, and
+  the gate would have closed against a missing file. This is the
+  same failure mode FEAT-2026-0007's T04/T08H/T08 hit before
+  FEAT-2026-0008 landed; the guard now closes it. Rule (durable,
+  observational): the value of driver-side completeness guards is
+  proven across multiple feature shipments; agent-side ACs and
+  spec-side completeness triggers are necessary but the driver-side
+  guard is the load-bearing safety net. Catalog this incident as
+  the second live recursive validation of FEAT-2026-0008 (after
+  FEAT-2026-0008's own close ceremony's audit-of-itself); use it
+  when justifying analogous driver-side guards on other surfaces
+  (e.g. FEAT-2026-0012's planned closing-deliverable guard).
