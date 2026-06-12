@@ -614,3 +614,44 @@ promoted here.
   CLI's auth round-trip (see gh-claudeP-broken above). Sandbox-
   escape is NOT a substitute for AC redesign when the surface is
   broken upstream.
+
+- [FEAT-2026-0013/G1-CLOSE] Test fixtures that combine `subprocess.run`
+  (especially `git`) with `tempfile.TemporaryDirectory` on Python 3.12
+  race against `shutil.rmtree` on cleanup. Two specific causes, both
+  must be addressed together: (1) git's `gc.autoDetach` (default true
+  since git 2.0) means any `git commit` / `git gc --auto` background-
+  detaches a gc subprocess that outlives the parent and is still
+  writing to `.git/objects` when `TemporaryDirectory.cleanup()` fires;
+  (2) the index lock and other writers may not have flushed when the
+  parent exits. Symptom: `OSError: [Errno 39] Directory not empty:
+  '/tmp/.../.git/objects'`, intermittent, timing-dependent — three
+  occurrences across different tests in this repo before fix. Rule:
+  any test fixture that initializes a temp git repo inside a
+  `TemporaryDirectory` MUST (a) pass `-c gc.auto=0` to every `git`
+  invocation inside the fixture body (or `git -C <root> config gc.auto
+  0` after `git init`), AND (b) run a sync barrier — `subprocess.run(
+  ["git", "-C", str(root), "rev-parse", "HEAD"], check=True,
+  capture_output=True)` — in a `finally:` block after the `yield`,
+  before the `TemporaryDirectory` context exits. Either alone is
+  insufficient; both close the race deterministically. Belt-and-
+  suspenders `ignore_cleanup_errors=True` is explicitly rejected — it
+  hides future leaks and erodes verification-as-oracle.
+
+- [FEAT-2026-0013/G1-CLOSE] An oracle of the form
+  `unittest -q 2>&1 | tail -1` is fragile when the tests-under-test
+  spawn subprocesses whose stdout is forwarded to the parent — that
+  subprocess output can arrive AFTER unittest's `OK` / `FAILED`
+  summary line, and `tail -1` will quietly start returning chatter
+  instead of the verdict. The drift is silent: the oracle's output
+  changes shape but the underlying tests are still passing (or
+  failing) for the same reasons. T01's AC4 and G1-CLOSE's AC2 both
+  used this oracle; both produced one-distinct-line output on this
+  close run, but the line was driver chatter from an inner
+  integration test, not `OK`. Rule: when an AC's oracle is "are
+  N runs of a test suite all clean," prefer an exit-code count
+  (`for i in $(seq 1 N); do unittest -q >/dev/null 2>&1; [ $? -eq 0
+  ] && pass=$((pass+1)) || fail=$((fail+1)); done; echo "PASS:$pass
+  FAIL:$fail"`) over a `tail -1 | sort | uniq -c` pattern. The exit
+  code IS the verdict; stdout-tail is a proxy that decouples from the
+  verdict the first time a downstream test starts logging. Apply at
+  WU author time for any "run-N-times" AC.

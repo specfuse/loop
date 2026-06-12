@@ -5,7 +5,7 @@ slug: ci-workspace-race-fix
 branch: feat/FEAT-2026-0013-ci-workspace-race-fix
 roadmap_goal: Eliminate the fd-leak race in `integration_workspace()` so the integration-test path is deterministic on Python 3.12 CI runners (no `OSError: Directory not empty` flakes).
 autonomy_default: auto
-status: active
+status: done
 ---
 
 # Plan: CI integration_workspace cleanup race fix
