@@ -5,11 +5,14 @@ model: claude-sonnet-4-6
 effort: high
 status: pending
 attempts: 0
-# Cost preserved from v1 + v2 (see PLAN.md ## Prior attempts).
-historical_cost_usd: 0.532338
-historical_duration_seconds: 629.258
-historical_input_tokens: 25
-historical_output_tokens: 6242
+# Cost preserved from v1 + v2 + v3-attempt-1 (see PLAN.md ## Prior attempts).
+# v3-attempt-1 wasted by operator gpg-agent misconfiguration; agent's diagnosis
+# of `_minimal_git_repo` was a red herring (real cause was operator-side signing
+# switch). Re-armed for v3-attempt-2 after operator switched back to SSH.
+historical_cost_usd: 2.273894
+historical_duration_seconds: 1326.598
+historical_input_tokens: 72
+historical_output_tokens: 40970
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
