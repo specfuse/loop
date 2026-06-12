@@ -224,3 +224,180 @@ Gate 2 planning WU (WU-93) should address:
   everything required. At minimum, the driver event-emission gap (#1 above) warrants
   a follow-up work unit in the driver subsystem (likely a separate feature); the
   plan-next WU should decide whether to file it here or as a new feature.
+
+---
+
+# Gate 2 Retrospective — Driver auto-archive hook
+
+---
+feature: FEAT-2026-0010
+gate: 2
+correlation_id: FEAT-2026-0010/G2-RETRO
+written_by: WU-94-gate-2-retrospective
+---
+
+## Per-WU analysis
+
+### T05 — Driver auto-archive hook on feature completion
+
+**What worked.**
+
+- The implementation strategy (re-implement the skill algorithm directly in Python rather than
+  subprocess-invoking the skill) was correct. The `auto_archive_feature` function was delivered
+  as a standalone top-level function with the exact wire-format return strings (`"archived"`,
+  `"already archived"`, `"refused: <reason>"`), matching the skill's single-feature algorithm
+  Steps 1–6 verbatim.
+- The load-bearing string literals — anchor `<a id="feat-yyyy-nnnn"></a>` and back-link
+  `[→ archive](roadmap-archive.md#feat-yyyy-nnnn)` — were reproduced byte-exactly by lowercasing
+  the feature ID. All three test cases assert these exact strings, and the tests pass.
+- The `run()` integration hook landed in the correct location: after
+  `write_frontmatter_field(... "status", "complete")` and before `return 0`. Refused outcomes
+  print a warning and do not abort the driver (feature is `complete`; operator can run
+  `/roadmap-archive` manually). This is the correct non-fatal posture for a best-effort hook.
+- The test file (`tests/test_loop_auto_archive.py`) exercises all three required cases: happy
+  path, idempotency, and refusal. Idempotency is verified by byte-equal file comparison after
+  the second call. No `git init` was required or used in the fixture; `tempfile.TemporaryDirectory(
+  ignore_cleanup_errors=True)` was used as prescribed.
+- The `_loop_loader.py` import shim (pre-existing from earlier gates) allowed `loop.py` to be
+  imported directly from `.specfuse/scripts/` without packaging changes. The test used this
+  pattern cleanly.
+- The commit squash touched exactly the two substantive files (`loop.py` and
+  `tests/test_loop_auto_archive.py`) plus the driver-managed WU frontmatter update — correct.
+
+**What failed and why.**
+
+T05 required 2 attempts. Attempt 1 ran 429.751 s and produced 19 567 output tokens; attempt 2
+ran 411.281 s and produced 18 735 output tokens. The attempt-1 failure reason is not preserved
+in `events.jsonl` (the driver records cost/duration per attempt but not the rejection cause —
+the same gap documented in Gate 1 structural correctness item #2). From available evidence:
+
+- Token counts are similar between attempts, ruling out a catastrophic structural failure
+  (attempt 1 was not an empty or radically wrong artifact).
+- The most likely failure gate is one of the scoped verification commands: the regex used to
+  extract the inline section (`section_re`) or the column-index arithmetic in the row-update
+  step may have produced an off-by-one result that the test assertions caught but a visual
+  read did not flag. Alternatively, `ruff check` or `coverage --fail-under=90` may have
+  caught a style or branch-coverage gap in attempt 1.
+- Because attempt-1 failure evidence is not preserved, this remains inference, not confirmed
+  root cause.
+
+**Attempts.** 2
+
+**Rule/template gaps.**
+
+The WU specified the regex anchor/back-link strings by prose description (referencing the
+`roadmap-archive.md` Conventions section and SKILL.md). Attempt 2 succeeded, so the strings
+landed correctly, but the two-attempt trajectory suggests the first attempt's regex for the
+Detail-cell update (`detail_start`/`detail_end` offset arithmetic relative to the row match
+object) was fragile. A reference fixture showing an exact before/after for the row mutation
+would reduce per-attempt failure rate for regex-heavy file-mutation WUs.
+
+**Cost / duration (from T05 frontmatter).**
+
+`cost_usd: 2.052703` / `duration_seconds: 841.032`
+
+Attempt breakdown (from `events.jsonl`):
+
+| Attempt | Duration (s) | Cost (USD)  | Output tokens |
+|---------|-------------|-------------|---------------|
+| 1       | 429.751     | 1.194742    | 19 567        |
+| 2       | 411.281     | 0.857961    | 18 735        |
+| **Total** | **841.032** | **2.052703** | **38 302**  |
+
+---
+
+## Gate-level summary
+
+### Totals
+
+| WU  | Attempts | Duration (s) | Cost (USD) |
+|-----|----------|-------------|------------|
+| T05 | 2        | 841.032     | 2.052703   |
+| **Gate total** | **2** | **841.032** | **2.052703** |
+
+Gate 2 was a single-WU gate. No parallelism was possible or attempted.
+
+### Spinning
+
+T05 did not spin. Two attempts against a three-attempt threshold. Gate 2 did not trigger the
+spinning-threshold escalation path.
+
+### Idempotency path — production vs test suite
+
+The `auto_archive_feature` idempotency path (the `"already archived"` return branch, triggered
+when `"roadmap-archive.md#"` is found in the Detail cell) was exercised only by the test suite
+at T05 dispatch time. It has not been exercised by an actual feature-complete dispatch: FEAT-2026-0010
+itself is the first feature whose `loop.py` contains the hook, and the hook will fire for the
+first time in production when this feature's own `PLAN.md` is flipped to `complete`. Whether
+the idempotency guard is exercised on that first dispatch depends on whether `wrap-feature` or
+the driver's completion branch is invoked first.
+
+### Helper and `commit_bookkeeping` interaction
+
+No surprising interaction. `auto_archive_feature` is a pure file-mutation function: it reads
+and writes `.specfuse/roadmap.md` and `.specfuse/roadmap-archive.md`, then returns a status
+string. It does not stage, commit, or touch the git index. The driver's existing
+`commit_bookkeeping` flow treats those edits as part of the normal working-tree diff for the
+WU's squash commit — no special handling was needed. This is the correct separation: the
+helper is a file transformer; the driver owns all git operations.
+
+The only non-obvious interaction is timing: if the completion branch fires during a run where
+the working tree already has staged changes (e.g., if a future refactor stages files before
+calling `auto_archive_feature`), those staged changes would be included in the commit. No such
+case exists today, but it is a latent coupling to note for any future refactor of the
+completion branch.
+
+---
+
+## Structural correctness gaps
+
+1. **Idempotency path exercised only by tests.** The `"already archived"` branch in
+   `auto_archive_feature` is test-validated but not production-validated as of Gate 2 close.
+   The first production exercise will occur when FEAT-2026-0010 itself completes. If the Detail
+   cell format written by `commit_bookkeeping` (or by `wrap-feature`) differs from the exact
+   string `"roadmap-archive.md#"` the guard tests for, the guard will fail silently — calling
+   `auto_archive_feature` a second time would attempt to re-archive an already-archived section.
+   Low probability, but worth a smoke-test at feature-close.
+
+2. **Column-index regex fragility.** `auto_archive_feature` locates the Detail cell via capture
+   groups on a pipe-delimited regex: group 4 = Detail. If the roadmap table ever gains an
+   additional column between Folder and Detail (or columns are reordered), the column-index
+   arithmetic will silently target the wrong cell and corrupt the row without raising an error.
+   The helper has no column-header verification step. A future hardening WU should match
+   columns by header name rather than positional index.
+
+3. **Attempt-failure evidence still not preserved.** T05's attempt 1 failure is unrecoverable
+   from `events.jsonl`. This is the same gap documented in Gate 1 structural correctness item
+   #2. Gate 2 did not close it; it remains an open driver bug.
+
+---
+
+## Generalizable lessons (candidates for LEARNINGS.md)
+
+1. For regex-heavy row-mutation WUs (where the agent must compute byte-offset arithmetic
+   against a match object), providing a concrete before/after fixture in the WU spec reduces
+   first-attempt failure rate. T05's two-attempt trajectory is consistent with offset-arithmetic
+   fragility in attempt 1.
+
+2. A helper that is fully test-validated but not yet exercised in production (T05's idempotency
+   path) should be flagged explicitly in the plan-next WU so the feature-close checklist
+   includes a smoke-test. Do not rely on test coverage alone for paths that depend on the
+   exact byte content of files written by other tools.
+
+3. The "re-implement the algorithm directly in Python" pattern (established in T04, repeated in
+   T05) scales correctly to driver-side helpers. The alternative — subprocess-invoking the
+   skill — is brittle in the driver's execution context and was correctly ruled out in both
+   gates. This pattern should be elevated to a LEARNINGS entry as a settled decision.
+
+---
+
+## Focus areas for Gate 2 close-out (plan-next WU)
+
+- Confirm the idempotency path fires correctly when FEAT-2026-0010 itself completes (the first
+  production exercise of the hook). If wrap-feature runs before the driver's completion branch,
+  the roadmap entry may already have a back-link; the guard should return `"already archived"`
+  cleanly.
+- File a follow-up feature or task for column-header verification in `auto_archive_feature`
+  (gap #2 above).
+- Promote the "re-implement algorithm directly" pattern and the "fixture-driven exact-string
+  spec" lesson to `.specfuse/LEARNINGS.md` (gap from this gate's generalizable lessons).
