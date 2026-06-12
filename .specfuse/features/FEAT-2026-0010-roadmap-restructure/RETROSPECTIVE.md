@@ -401,3 +401,68 @@ completion branch.
   (gap #2 above).
 - Promote the "re-implement algorithm directly" pattern and the "fixture-driven exact-string
   spec" lesson to `.specfuse/LEARNINGS.md` (gap from this gate's generalizable lessons).
+
+---
+
+## Feature verdict
+
+Written by `G2-PLAN` (WU-97). Terminal-gate verdict for FEAT-2026-0010.
+
+### Scope IN — delivered
+
+PLAN.md does not carry an explicit `## Scope IN` heading; the in-scope set is
+named by the intro paragraph and the `roadmap_goal` frontmatter. Per that
+source:
+
+| Scope IN item | Delivered by | Evidence |
+|---|---|---|
+| Split `.specfuse/roadmap.md` so the hot file carries `planned` / `active` detail sections only | T01 (scaffold + Detail column add) + T04 (migrate 6 done sections out) | Main roadmap 647 → 424 lines (−223); `grep`-asserted 0 inline `## FEAT-2026-0003..0008` headings post-T04 |
+| `.specfuse/roadmap-archive.md` holds `done` / `abandoned` detail sections | T01 (scaffold + Conventions section with literal anchor / back-link strings) + T04 (populated 6 anchored sections) | Archive file at 275 lines; 6 `<a id="feat-yyyy-NNNN"></a>` anchors |
+| New `Detail` back-link column on the main roadmap table | T01 | Column header present; cells `—` for non-archived rows, `[→ archive](roadmap-archive.md#...)` for the 6 migrated rows after T04 |
+| `roadmap-add` skill | T03 | `.specfuse/skills/roadmap-add/SKILL.md` + symlink; `tests/test_roadmap_add_skill.py` passes; three-source next-ID scan implemented |
+| `roadmap-archive` skill | T02 | `.specfuse/skills/roadmap-archive/SKILL.md` + symlink; `tests/test_roadmap_archive_skill.py` passes; per-ID and `--auto` batch modes both shipped; refuses `planned` / `active` rows |
+| Dogfood migrate FEAT-2026-0003..0008 detail sections | T04 | All 6 sections moved; all 6 Detail cells now carry back-links; no row outside 0003..0008 touched |
+| Driver auto-archive hook (added to Scope IN at Gate 1 plan-next; see disposition table below for Scope OUT origin) | T05 | `auto_archive_feature` helper in `.specfuse/scripts/loop.py`, called from the `gate is None` completion branch after `status: complete` flip; `tests/test_loop_auto_archive.py` covers happy / idempotent / refused paths |
+
+### Scope OUT — disposition
+
+| Scope OUT item (PLAN.md) | Disposition | Routed to |
+|---|---|---|
+| New roadmap columns (CI / BV / TF / R / Budget / Score) | Routed | FEAT-2026-0011 (planned in `.specfuse/roadmap.md`) |
+| `scoring-criteria.md`, `priorities/<period>.yml`, weighting, scoring formula, `roadmap-rank` skill, `roadmap-estimate` skill | Routed | FEAT-2026-0011 (planned) |
+| Auto-archive hook in `loop.py` at PLAN status flip | **Delivered in this feature.** PLAN.md flagged this as "manual-first cut; auto follow-up after this feature lands"; Gate 1 plan-next (`G1-PLAN`, `GATE-01-REVIEW.md`) reconsidered and routed it back as Gate 2 T05 rather than spawning a new feature, because the scope (one driver function + smoke test) was small enough to land on this branch | T05 (this feature) |
+| Orchestrator-level cross-repo aggregation | Routed | Deferred to a future feature once the orchestrator exists. Named in PLAN.md Scope OUT as such; no orchestrator exists today so no FEAT-ID can be minted yet |
+| Rewriting prose content of any feature's detail section (Why, Goal, Benefits, Verification) | Consciously dropped | T04 confirmed split-only: 6 sections moved verbatim, no prose re-authored. Re-author work is not planned |
+
+### Per-gate cost and duration
+
+| Gate | Substantive WUs | Total attempts | Duration (s) | Cost (USD) |
+|---|---|---|---|---|
+| Gate 1 | T01, T02, T03, T04 | 5 | 2 015.363 | 4.133024 |
+| Gate 2 | T05 | 2 | 841.032 | 2.052703 |
+| **Feature total (substantive WUs only)** | **5** | **7** | **2 856.395** | **6.185727** |
+
+Closing-sequence WUs (G1-RETRO / G1-LESSONS / G1-DOCS / G1-PLAN, then
+G2-RETRO / G2-LESSONS / G2-DOCS / G2-PLAN) are not aggregated above — they
+are methodology overhead, not feature work, and each landed in one attempt
+apiece per Gate 1 RETRO and Gate 2 RETRO.
+
+### Roadmap-goal verdict
+
+`roadmap_goal` (from PLAN.md frontmatter): *".specfuse/roadmap.md carries
+detail sections only for planned/active features; done/abandoned details
+live in .specfuse/roadmap-archive.md; roadmap-add and roadmap-archive
+skills exist; current done features (0003..0008) migrated."*
+
+**Met.** Every clause shipped: the main roadmap was cleaved (−223 lines,
+6 detail sections moved); the archive file was created with the
+back-link / anchor convention pinned in its `## Conventions` section; both
+skills are in `.specfuse/skills/` with self-tests passing; the six named
+done features (FEAT-2026-0003 through 0008) all carry `[→ archive]`
+back-links in their Detail cell and no longer have inline detail in the
+hot file. Beyond the literal goal, T05 added the driver auto-archive hook
+so future features close cleanly without an operator step. The
+first production exercise of the hook fires on this feature's own
+completion — flagged in Gate 2 RETRO as a smoke-test to watch on the
+next `loop.py` run — but that exercise happens after this WU commits and
+PLAN.md flips, not during this WU. Feature ready for the close ceremony.

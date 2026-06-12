@@ -5,7 +5,7 @@ slug: roadmap-restructure
 branch: feat/FEAT-2026-0010-roadmap-restructure
 roadmap_goal: .specfuse/roadmap.md carries detail sections only for planned/active features; done/abandoned details live in .specfuse/roadmap-archive.md; roadmap-add and roadmap-archive skills exist; current done features (0003..0008) migrated.
 autonomy_default: review
-status: active
+status: done
 ---
 
 # Plan: Roadmap restructure - add and archive
