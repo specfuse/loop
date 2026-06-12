@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/G1-PLAN
 type: plan-next
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 310.732
+cost_usd: 2.409882
+input_tokens: 28
+output_tokens: 20563
 ---
 
 # Gate 1 plan-next — detail Gate 2 or close it out
