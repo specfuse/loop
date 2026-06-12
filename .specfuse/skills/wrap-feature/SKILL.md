@@ -1,0 +1,199 @@
+---
+name: wrap-feature
+description: Finalize a feature after its close ceremony — flip the terminal gate to `passed` (cosmetic), push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
+---
+
+# Wrap feature (interactive, post-close finalization)
+
+After the close ceremony runs (`/G1-CLOSE` for single-gate features, or
+the four-WU `retrospective → lessons → docs → plan-next` sequence for
+the terminal gate of multi-gate features), the methodology has done its
+job: `PLAN.md status: done`, the roadmap row reflects `done`,
+`RETROSPECTIVE.md` exists, and durable lessons are appended. What
+remains is the **plumbing handoff**: cosmetic gate flip, push the
+branch, open the PR, watch CI, merge advisory, then point at the next
+pick.
+
+This skill is the per-feature human checkpoint **after** the loop has
+finished doing methodology work but before the change is shipped to
+the world (or to `main`). Before this skill existed, those steps were
+freelance and inconsistent — see the earlier dogfood runs in
+`.specfuse/LEARNINGS.md` for examples of feature folders that closed
+methodologically but stalled on push/PR for days.
+
+Posture: **single-confirm for irreversible-ish actions** (push, PR
+open). Everything before that is read-only inspection. Stop at any
+step if the operator decides to take the rest manually.
+
+**Run interactively.** Confirmation prompts are the whole point;
+`claude -p` with redirected stdin falls back to a degraded "report
+plan and stop" mode.
+
+## Hard rules
+
+- **Refuse on non-`done` features.** PLAN.md `status` MUST be `done`
+  before this skill will touch anything. If `active`: stop, point at
+  `/gate-status` (if a WU is blocked) or wait for the close ceremony.
+  If `abandoned`: stop, this skill is the wrong path. If `active` and
+  the gate is `awaiting_review` with closing-sequence WUs pending,
+  point at re-running `loop.py` (drafted closing WUs need dispatch
+  before wrap).
+- **Read-only on RETROSPECTIVE / LEARNINGS / roadmap content.** The
+  close ceremony OWNS those edits. This skill only confirms they
+  exist + reads their tail. Do not amend retrospectives here.
+- **Modify only the terminal gate's status.** One write surface
+  before any git: flip `GATE-NN.md status: awaiting_review` →
+  `passed` for the terminal gate. Everything else is a git/gh action
+  taken after operator confirmation.
+- **gh-CLI gracefully degraded.** Per LEARNINGS
+  `[FEAT-2026-0014/T01/gh-claudeP-broken]`, `gh` is unreliable inside
+  agent dispatch and may be similarly unreliable inside whatever
+  context invokes this skill. Probe with `gh auth status` once
+  before any `gh` step. If it fails: print the exact `gh` command(s)
+  the operator should run, do not attempt them.
+- **Never auto-merge.** PR opening is fine after confirm; the merge
+  itself is an operator-owned decision (after CI green + review).
+
+## When to invoke
+
+When the loop driver has printed something like:
+
+```
+Gate N complete (combined close ceremony ran).
+Terminal gate of this feature.
+```
+
+— or any time the active feature's PLAN.md is `status: done` and you
+have not yet pushed the branch + opened the PR. The loop driver
+points at this skill in that printout (see `loop.py`'s terminal-gate
+branch).
+
+If the feature is mid-flight (`active`, not `done`), the skill stops
+and points elsewhere. It does NOT run a final verification gate or a
+retrospective check — those are the close ceremony's job, run before
+this.
+
+## Method
+
+### 1. Locate and validate the target feature
+
+- Find the most recently `done` feature whose PLAN.md is `done` (or
+  the one named explicitly via `--feature`). Read its frontmatter
+  (`feature_id`, `slug`, `branch`, `roadmap_goal`).
+- Refuse if PLAN.md `status` is not `done`:
+  - `active` → `/gate-status` (if blocked) or wait for close.
+  - `abandoned` → wrong skill.
+- Confirm the roadmap row matches (`status: done` and folder path).
+  If row says `active` while PLAN.md says `done`, the close ceremony
+  was imperfect — surface this gap and ask before continuing.
+
+### 2. Surface the verdict
+
+- Read the **tail** of `RETROSPECTIVE.md` — specifically the
+  `# Feature-arc verdict` section the close ceremony writes. Quote
+  it in 2-3 lines.
+- Read the **tail** of `.specfuse/LEARNINGS.md` to confirm the close
+  ceremony's lessons append landed. Quote ID tags.
+- Show the operator the feature-arc verdict, the LEARNINGS tags
+  promoted, and the production diff stat (`git diff main...HEAD
+  --stat`).
+- Ask: "Verdict looks right? (y / n / `let me read retrospective`)"
+  — n or read-first exits without further writes.
+
+### 3. Cosmetic gate flip
+
+- For the **terminal** gate (the last entry in PLAN.md's gates
+  graph, regardless of single-gate or multi-gate), if its
+  `GATE-NN.md status` is `awaiting_review`, flip to `passed`.
+- This is cosmetic only — PLAN.md is already `done` so the
+  feature-arc terminal signal is intact either way. But a
+  `passed` terminal gate is the methodology's "this gate is
+  closed" signal and reads cleaner in audits.
+- If already `passed`, skip with a note.
+
+### 4. Manual verification step (operator-owned)
+
+- For any deferred verification recorded in `RETROSPECTIVE.md`
+  (e.g. WUs that dropped gh-CLI ACs and moved CI-log inspection
+  out-of-loop), list the exact steps the operator must run before
+  push. Quote from RETROSPECTIVE.md verbatim — do not invent or
+  paraphrase verification steps.
+- Ask: "Manual verification done? (y / n / `not applicable`)" —
+  n exits with the verification command list as next step.
+
+### 5. Push the branch
+
+- Read PLAN.md's `branch` field (e.g. `feat/FEAT-2026-0014-gha-node20-bump`).
+- Confirm `git branch --show-current` matches.
+- Confirm `git status --short` is clean (no uncommitted changes;
+  the close ceremony's writes should already be committed by the
+  driver as `chore(loop): gate N awaiting_review`).
+- Show diff stat: `git diff main...HEAD --stat`.
+- Ask: "Push to origin/<branch>? (y / n)" — n exits with the
+  push command for the operator.
+- On y: `git push -u origin <branch>`. Report the upstream
+  tracking confirmation or the error.
+
+### 6. Open the PR
+
+- Probe `gh auth status` once. If ✗: per LEARNINGS, print the
+  exact `gh pr create --fill` command for the operator and skip
+  to step 7.
+- If ✓: ask "Open PR via `gh pr create --fill`? (y / n)"
+- On y: run it. Capture the PR URL from output; report it.
+- On n: print the command for the operator.
+
+### 7. Watch CI (optional, gh-only)
+
+- If `gh` works and PR was opened: offer "Watch CI? (y / n)"
+- On y: `gh run watch --branch <branch>`. Stream summary to
+  operator. Do NOT block on completion forever — bail with a
+  hint after a reasonable timeout (~10 min) and print the
+  watch command for resume.
+- On n / gh broken: skip.
+
+### 8. Merge advisory (do NOT merge)
+
+- Do not auto-merge. State: "PR is open at <url>. Wait for CI
+  green + review, then merge via `gh pr merge` or the GitHub UI."
+- If branch protection / required reviews are configured, name
+  them (best-effort via `gh pr view --json mergeable,mergeStateStatus`).
+
+### 9. Point at the next pick
+
+- After merge advisory, suggest `/pick-feature` for the next
+  roadmap row.
+- If the operator says they want to keep working: also mention
+  `/draft-feature` (new initiative) and `/abandon-feature` (if
+  the next pick is wrong).
+
+### 10. RESULT
+
+Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
+`status: complete` means every step ran or was skipped by operator
+choice, the gate cosmetic flip wrote (if needed), and the operator
+has a clear path to merge. `status: blocked` is reserved for the
+case where the canonical files contradict each other (e.g. PLAN.md
+`done` but roadmap row `active`) AND the operator declined to
+reconcile.
+
+## What this skill does NOT do
+
+- **Does not run verification gates.** Close ceremony did that.
+- **Does not write to RETROSPECTIVE.md, LEARNINGS.md, or roadmap.md
+  content.** Read-only on those surfaces. Cosmetic gate flip is the
+  only write before git.
+- **Does not auto-merge the PR.** Operator-owned decision.
+- **Does not archive the roadmap detail section.** Future
+  `/roadmap-archive` skill's job.
+- **Does not flip PLAN.md status.** The close ceremony already did.
+  If PLAN.md is not `done`, this skill stops.
+
+## Version
+
+**v0.1.** Nine steps; single-confirm posture for push + PR is the
+entire safety discipline today. Expected to grow once real wraps
+surface needs that don't fit it — e.g. multi-PR features (stacked
+PRs), feature-flagged rollouts (don't merge yet), or
+auto-archive-on-merge wiring once `/roadmap-archive` exists. Shared
+methodology craft (loop is near-term author).
