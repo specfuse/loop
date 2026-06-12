@@ -5,7 +5,7 @@ slug: ci-workspace-race-fix
 branch: feat/FEAT-2026-0013-ci-workspace-race-fix
 roadmap_goal: Eliminate the fd-leak race in `integration_workspace()` so the integration-test path is deterministic on Python 3.12 CI runners (no `OSError: Directory not empty` flakes).
 autonomy_default: auto
-status: done
+status: active
 ---
 
 # Plan: CI integration_workspace cleanup race fix
@@ -21,9 +21,21 @@ status: done
   APFS hides a race Linux ext4 surfaces. v1 cost preserved in each WU's
   `historical_*` frontmatter fields. PR #9 NOT merged. T01 + G1-CLOSE
   re-armed (`status: pending`, `attempts: 0`) for v2.
-- **v2** (in progress): root-cause attack STAYS + belt-and-suspenders
-  `ignore_cleanup_errors=True` ADDED + operator-side Linux Docker probe
-  (`scripts/check-linux-race.sh`) gates the next push.
+- **v2** (2026-06-12, $2.05 total / 701.7s wall): added belt-and-
+  suspenders `ignore_cleanup_errors=True` + source-presence verification
+  to v1's root-cause fix. macOS local 50× and Linux Docker 50× both
+  PASS=50 OSError=0. Pushed to PR #9. Linux CI **re-failed** in
+  `tests/test_loop_files_changed_guard.py::test_agent_creates_new_file_and_declares_it_completes`
+  — same OSError race, DIFFERENT integration_workspace. Scope-discovery
+  miss: repo has 5 copies of `def integration_workspace` (test_driver_
+  integration, test_backend, test_loop_files_changed_guard, test_loop_
+  smoke_runner, test_loop_zero_token_guard) AND ~50 bare
+  `tempfile.TemporaryDirectory()` call sites. v1+v2 only fixed one of
+  five. WU-01 + WU-90 reverse-flipped; v2 cost preserved.
+- **v3** (in progress): widened scope. Centralize all 5 copies into
+  one shared `tests/_workspace.py::integration_workspace()`. Apply
+  `gc.auto=0` + sync barrier + `ignore_cleanup_errors=True` ONCE in the
+  central helper. Replace 5 duplicate definitions with import statements.
 
 CI intermittently fails with `OSError: [Errno 39] Directory not empty:
 '/tmp/.../.git/objects'` when `integration_workspace()` (in

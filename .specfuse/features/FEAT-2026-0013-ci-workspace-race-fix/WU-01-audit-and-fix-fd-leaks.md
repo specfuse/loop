@@ -3,18 +3,13 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: done
-attempts: 1
-# Cost preserved from v1 (2026-06-12, shipped methodologically but CI race
-# recurred on Linux → re-armed; see PLAN.md ## Prior attempts).
-historical_cost_usd: 0.326895
-historical_duration_seconds: 362.795
-historical_input_tokens: 13
-historical_output_tokens: 3707
-duration_seconds: 266.463
-cost_usd: 0.205443
-input_tokens: 12
-output_tokens: 2535
+status: pending
+attempts: 0
+# Cost preserved from v1 + v2 (see PLAN.md ## Prior attempts).
+historical_cost_usd: 0.532338
+historical_duration_seconds: 629.258
+historical_input_tokens: 25
+historical_output_tokens: 6242
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
@@ -57,67 +52,86 @@ Suspect surfaces (each WU author MUST audit):
 Reference the binding rules under `.specfuse/rules/`. Edit files
 only; the driver owns all git.
 
-**v1 → v2 amendment (2026-06-12).** v1 (gc.auto=0 + git rev-parse
-sync barrier) passed 50× on macOS local but the SAME race fired on
-Linux CI runner (run `27412918877`). Oracle was wrong-environment.
-v2 keeps v1's root-cause attack AND adds belt-and-suspenders
-`ignore_cleanup_errors=True` to suppress the symptom if the
-root-cause fix still misses a Linux-only surface. v2's oracle is
-CI itself — local audit alone is insufficient evidence.
+**v2 → v3 amendment (2026-06-12).** v2 shipped to PR #9 with macOS
+local + Linux Docker 50× both PASS=50 OSError=0. CI on PR re-failed
+(run `27417616885`) in `tests/test_loop_files_changed_guard.py::
+test_agent_creates_new_file_and_declares_it_completes` — same
+OSError, DIFFERENT `integration_workspace` definition. Scope-
+discovery miss: the repo has FIVE `def integration_workspace()`
+copies (test_driver_integration:40, test_backend:36, test_loop_
+files_changed_guard:145, test_loop_smoke_runner:135, test_loop_
+zero_token_guard:74). v1+v2 only touched the first.
+
+v3 fix: CENTRALIZE. Create one shared helper at
+`tests/_workspace.py::integration_workspace()` carrying the
+gc.auto=0 + sync barrier + `ignore_cleanup_errors=True` once.
+Replace each of the five duplicate definitions with a single
+`from tests._workspace import integration_workspace` import. One
+source of truth; future race fixes touch one file. Bare
+`tempfile.TemporaryDirectory()` call sites outside the five
+helpers are OUT of scope for this WU — most are not git-coupled
+(lint tests writing yaml fixtures, etc.) and a follow-on feature
+can address them if evidence warrants.
 
 **Acceptance criteria.**
-1. Every `subprocess.run` call inside `integration_workspace()`
-   (`tests/test_driver_integration.py`) declares `check=True` and
-   captures completion. No fire-and-forget subprocess invocations.
-2. `integration_workspace()` disables git background gc for the
-   fixture's temp repo by passing `-c gc.auto=0` to every `git`
-   invocation inside the context manager body (or equivalent
-   project-wide via `git -C <root> config gc.auto 0` after `git
-   init`). Rationale: gc.autoDetach is git's #1 documented source
-   of post-parent-exit fs writes; eliminating it removes the most
-   likely leak shape from the suspect list.
-3. Before `TemporaryDirectory`'s context exits — i.e. inside
-   `integration_workspace`'s body, after the `yield root` line, in
-   a `finally:` block — run a synchronization barrier:
-   `subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
-   check=True, capture_output=True)`. This is a cheap git command
-   that forces the index lock to flush and any pending writers to
-   release before teardown.
-4. **NEW v2.** `integration_workspace()` constructs its
-   `tempfile.TemporaryDirectory` with `ignore_cleanup_errors=True`
-   (Python 3.10+). Rationale: Linux-CI race recurrence in
-   FEAT-2026-0013 v1 proved AC2-3 alone insufficient. This is
-   harm-reduction — root-cause attack stays primary; suppression
-   is the safety net for Linux-only surfaces not addressed by
-   gc + sync barrier.
-5. The 50× audit runs locally with zero failures:
-   `for i in $(seq 1 50); do .venv/bin/python3 -m unittest
-   tests.test_driver_integration -q 2>&1 | tail -1; done | sort -u`
-   prints only `OK` lines. Quote the resulting summary verbatim
-   in the RESULT block. (Local-only oracle; insufficient on its
-   own — see AC6.)
-6. **NEW v2: CI-environment oracle.** A sanity-check that the v2
-   spec actually addresses Linux-CI: the agent does NOT run CI
-   itself (CI runs at push time, post-squash). Instead the agent
-   verifies the produced code path by running:
-   `.venv/bin/python3 -c "import tempfile; import inspect; src = inspect.getsource(__import__('tests.test_driver_integration', fromlist=['integration_workspace']).integration_workspace); assert 'ignore_cleanup_errors=True' in src, 'belt-and-suspenders missing'; assert 'gc.auto' in src, 'gc.auto=0 not set'; print('v2 surfaces present')"`
-   — must exit `0` AND print `v2 surfaces present`. If not, emit
-   `status: blocked`. The CI run on the post-squash push is the
-   FINAL oracle; that result is the operator's call at /wrap-feature
-   step 7, NOT this WU's responsibility.
-7. `integration_workspace` is still a `@contextmanager` (per
-   `from contextlib import contextmanager` import) and still yields
-   a `pathlib.Path`. No API break. Any test that uses
-   `with integration_workspace() as root:` continues to receive a
-   `Path` named `root`.
-8. **Existence check** before declaring complete:
-   `.venv/bin/python3 -c "import inspect; from tests.test_driver_integration import integration_workspace; assert callable(integration_workspace)"`
-   must exit `0`. If not, emit `status: blocked`.
+1. **New shared helper at `tests/_workspace.py`** exports a
+   `@contextmanager` `integration_workspace()` that yields a
+   `pathlib.Path`. The body:
+   - constructs `tempfile.TemporaryDirectory(ignore_cleanup_errors=True)`
+   - inits a git repo (`git init -q -b main`)
+   - sets `gc.auto 0` on the temp repo immediately after init
+   - sets user.email and user.name for test commits
+   - performs a baseline commit so the repo has HEAD
+   - in a `finally:` block before `TemporaryDirectory` exits, runs the
+     sync barrier: `subprocess.run(["git", "-C", str(root),
+     "rev-parse", "HEAD"], check=True, capture_output=True)`
+   - every `subprocess.run` carries `check=True` and captures
+     completion (no fire-and-forget)
+2. **The 5 duplicate definitions are replaced with imports.** Each of
+   the following lines `def integration_workspace():` and the
+   immediately-following `with tempfile.TemporaryDirectory()` body MUST
+   be deleted; the file MUST instead carry
+   `from tests._workspace import integration_workspace` near the top:
+   - `tests/test_driver_integration.py:40`
+   - `tests/test_backend.py:36`
+   - `tests/test_loop_files_changed_guard.py:145`
+   - `tests/test_loop_smoke_runner.py:135`
+   - `tests/test_loop_zero_token_guard.py:74`
+3. **Source-presence check.** Before declaring complete, agent runs:
+   `.venv/bin/python3 -c "
+   import inspect
+   from tests._workspace import integration_workspace
+   src = inspect.getsource(integration_workspace)
+   assert 'ignore_cleanup_errors=True' in src
+   assert 'gc.auto' in src or \"'gc.auto', '0'\" in src
+   assert 'rev-parse' in src
+   for mod_name in ['tests.test_driver_integration', 'tests.test_backend', 'tests.test_loop_files_changed_guard', 'tests.test_loop_smoke_runner', 'tests.test_loop_zero_token_guard']:
+       mod = __import__(mod_name, fromlist=['integration_workspace'])
+       assert mod.integration_workspace is integration_workspace, mod_name + ' did not import the shared helper'
+   print('v3 surfaces present')
+   "`
+   — must exit `0` AND print `v3 surfaces present`. If not, emit
+   `status: blocked`.
+4. **Local 50× audit (weak oracle, necessary not sufficient).** The
+   full suite runs 50× locally with zero exit-nonzero:
+   `pass=0; fail=0; for i in $(seq 1 50); do .venv/bin/python3 -m unittest discover tests -q >/dev/null 2>&1 && pass=$((pass+1)) || fail=$((fail+1)); done; echo "PASS=$pass FAIL=$fail"`
+   Expected: `PASS=50 FAIL=0`. Quote in RESULT block.
+5. **Coverage stays ≥90%.** `code` gate set in
+   `.specfuse/verification.yml` continues to pass.
+6. **No API break.** Every existing `with integration_workspace() as
+   root:` call site continues to receive a `Path` named `root`. (The
+   imports preserve calling semantics; tests don't change behavior.)
 
-**Do not touch.** Exactly 1 file changes:
-`tests/test_driver_integration.py`. No edits to: `.specfuse/`,
-`scripts/`, `pyproject.toml`, other test files, `loop.py`,
-`verification.yml`, secrets, `.git/`. See
+**Do not touch.** Exactly 6 files change:
+- `tests/_workspace.py` (NEW)
+- `tests/test_driver_integration.py` (replace definition with import)
+- `tests/test_backend.py` (replace definition with import)
+- `tests/test_loop_files_changed_guard.py` (replace definition with import)
+- `tests/test_loop_smoke_runner.py` (replace definition with import)
+- `tests/test_loop_zero_token_guard.py` (replace definition with import)
+
+No edits to: `.specfuse/`, `scripts/`, `pyproject.toml`, other test
+files, `loop.py`, `verification.yml`, secrets, `.git/`. See
 `.specfuse/rules/never-touch.md`.
 
 **Verification.** The `code` gate set in `.specfuse/verification.yml`
