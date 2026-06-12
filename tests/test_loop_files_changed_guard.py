@@ -22,19 +22,15 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
 
 from tests._loop_loader import load_loop
+from tests._workspace import integration_workspace
 
 loop = load_loop()
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-SCAFFOLD_SRC = REPO_ROOT / ".specfuse"
 
 
 # --------------------------------------------------------------------------- #
@@ -134,36 +130,6 @@ class TestVerifyFilesChanged(unittest.TestCase):
         result = {"files_changed": ["ignored.log"]}
         self.assertEqual(
             loop.verify_files_changed(result, self.head), ["ignored.log"])
-
-
-# --------------------------------------------------------------------------- #
-# Integration scaffolding (copied/trimmed from test_loop_zero_token_guard)    #
-# --------------------------------------------------------------------------- #
-
-
-@contextmanager
-def integration_workspace():
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-        subprocess.run(["git", "-C", str(root), "config", "user.email",
-                        "test@example.com"], check=True)
-        subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"],
-                       check=True)
-        (root / "README.md").write_text("# fixture\n")
-        subprocess.run(["git", "-C", str(root), "add", "."], check=True)
-        subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"],
-                       check=True)
-        shutil.copytree(SCAFFOLD_SRC / "scripts", root / ".specfuse/scripts")
-        shutil.copytree(SCAFFOLD_SRC / "templates", root / ".specfuse/templates")
-        shutil.copytree(SCAFFOLD_SRC / "rules", root / ".specfuse/rules")
-        (root / ".specfuse/verification.yml").write_text(
-            "code:\n  - name: noop\n    command: \"true\"\n"
-            "doc:\n  - name: noop\n    command: \"true\"\n"
-            "plannext:\n  - name: noop\n    command: \"true\"\n"
-        )
-        (root / ".specfuse/features").mkdir(parents=True)
-        yield root
 
 
 def write_minimal_feature(root: Path, feature_id: str, slug: str,

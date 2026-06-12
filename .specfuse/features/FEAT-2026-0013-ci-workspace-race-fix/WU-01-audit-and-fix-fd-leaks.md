@@ -3,8 +3,8 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 2
 # Cost preserved from v1 + v2 + v3-attempt-1 + v3-attempt-2 (see PLAN.md
 # ## Prior attempts). v3-attempt-2 again wasted: same ssh-agent-unreachable
 # block in test_loop_orchestration._minimal_git_repo. Operator now disabled
@@ -14,6 +14,10 @@ historical_cost_usd: 5.228352
 historical_duration_seconds: 3181.344
 historical_input_tokens: 134
 historical_output_tokens: 120510
+duration_seconds: 1898.807
+cost_usd: 2.715082
+input_tokens: 84
+output_tokens: 47479
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
