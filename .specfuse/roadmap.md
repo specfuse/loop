@@ -28,7 +28,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0010 | Roadmap restructure: add + archive          | planned  | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` |
 | FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` |
 | FEAT-2026-0012 | Closing-WU deliverable guard                | planned  | — |
-| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | active   | — |
+| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
@@ -581,9 +581,29 @@ Likely fix paths to evaluate:
 A single substantive WU per fix-path; recursive audit at close runs
 the suite 50× in a loop and asserts zero flakes.
 
-**Status: planned.** Independent of every other planned feature; can
-run any time after FEAT-2026-0002 (which raised the floor that makes
-the test-suite stability properties more visible).
+**Gate 1 (passed).** T01 audited `integration_workspace` and applied
+two coupled fixes in one attempt (362.795 s, $0.327): (a) `git -c
+gc.auto=0` on every `git` invocation inside the fixture body, killing
+gc.autoDetach's post-parent-exit background-subprocess class; (b) a
+`git -C <root> rev-parse HEAD` sync barrier in a `finally:` block
+after the `yield root` line, forcing index-lock flush and pending
+writer release before `TemporaryDirectory` teardown. `subprocess.run`
+calls inside the fixture use `check=True` with completion-wait;
+fixture remains a `@contextmanager` yielding `Path` (no API break).
+50× local audit at T01 close: 50/50 clean. GATE-01 status: `passed`.
+
+**Status: done.** `roadmap_goal` met — the close-session 50×
+recursive audit, post-T01-squash on HEAD `2a9e2aa`, shows 50/50
+unittest exits 0 with no `OSError: Directory not empty`, no
+`FAILED`, no `ERROR`. `tail -1 | sort | uniq -c` returned one
+distinct line across 50 runs (driver stdout from an inner
+integration test, not unittest's verdict — see RETROSPECTIVE.md
+"Reading the output"); exit-code count confirmed PASS:50 FAIL:0.
+The race is eliminated locally; CI on a Py 3.12 runner is the
+field test (next PR run). Two `[FEAT-2026-0013/G1-CLOSE]` entries
+landed in LEARNINGS.md covering the gc.auto=0 + sync-barrier rule
+and the `tail -1` oracle fragility. See `RETROSPECTIVE.md
+§Feature-arc verdict`.
 
 ## FEAT-2026-0014 — GitHub Actions Node.js 20 deprecation bump
 
