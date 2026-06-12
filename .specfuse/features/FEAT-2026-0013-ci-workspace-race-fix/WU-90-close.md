@@ -3,13 +3,17 @@ id: FEAT-2026-0013/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 # Cost preserved from v1 + v2 (see PLAN.md ## Prior attempts).
 historical_cost_usd: 3.736543
 historical_duration_seconds: 1017.459
 historical_input_tokens: 63
 historical_output_tokens: 26776
+duration_seconds: 425.261
+cost_usd: 1.844094
+input_tokens: 19
+output_tokens: 17285
 ---
 
 # Gate 1 close — combined closing ceremony

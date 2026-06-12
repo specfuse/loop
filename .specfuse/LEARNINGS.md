@@ -716,3 +716,77 @@ promoted here.
   same environment." Pre-push hooks running on developer machines
   cannot catch races that are deterministic-on-CI; only a
   Docker-probe or equivalent environment-parity gate can.
+
+- [FEAT-2026-0013/G1-CLOSE] Centralize-or-enumerate cross-cutting
+  fixture patterns BEFORE the first fix-shape is dispatched. When a
+  test fixture pattern (an `integration_workspace`, a `_minimal_git_
+  repo`, a tempdir-backed harness) is duplicated across multiple test
+  files via copy-paste, fixing one site does not generalize — the
+  same race / leak / config-gap can fire from any of the other sites
+  on the next CI run, in a DIFFERENT test name. FEAT-2026-0013's v1
+  shipped a fix to `tests/test_driver_integration.py::
+  integration_workspace`, passed 50× macOS-local + 50× Linux Docker,
+  and the SAME race fired in `tests/test_loop_files_changed_guard.py
+  ::integration_workspace` on Linux CI (v2 attempt). The repo has
+  FIVE copies of `def integration_workspace()` plus ~50 bare
+  `tempfile.TemporaryDirectory()` call sites. Rule: when an
+  implementation WU author identifies a fixture-level race or leak,
+  the WU spec MUST include a discovery AC: `grep -rn "def
+  <fixture_name>" tests/` (or equivalent for the pattern at hand)
+  and enumerate every site in the WU spec by file + line number.
+  The fix-shape is correct only when applied to every enumerated
+  site — typically by centralizing into one shared helper and
+  replacing duplicate definitions with imports. Single-site fixes
+  on cross-cutting patterns are a structural under-discovery, not a
+  bounded scope. Cost of missing this on FEAT-2026-0013: two ship-
+  and-CI-re-fail cycles + a re-arm cycle = ~$5 in agent costs and
+  three days of methodology rounds.
+
+- [FEAT-2026-0013/G1-CLOSE] Global git config can ambush WU
+  dispatch. A developer machine carrying `commit.gpgsign=true` +
+  `gpg.format=ssh` GLOBALLY (the default for some setups) will
+  fail any `git commit` inside a dispatched agent session when no
+  ssh-agent is reachable in the session's environment. The failure
+  surfaces as `gpg failed to sign the data` / exit 128 inside any
+  test fixture that runs `git commit`, including
+  `_minimal_git_repo()` helpers. The agent — correctly — emits
+  `status: blocked` rather than scope-creep into the test file,
+  burning a dispatch cycle. Recovery is an operator-side
+  `git config --local commit.gpgsign false` (working-copy only;
+  preserves the global setting for the operator's own commits).
+  FEAT-2026-0013 v3-attempts-1 and 2 burned $4.70 / 2552s on this
+  block before the operator disabled it locally. Rule: every WU
+  spec that requires `git commit` inside a temp-repo test fixture
+  MUST also (a) set `commit.gpgSign=false` on the temp repo
+  (`git -C <root> config commit.gpgSign false` right after
+  `git init`), AND (b) document in the feature folder's PLAN.md or
+  RETROSPECTIVE.md that the operator must verify
+  `git config --get commit.gpgsign` returns `false` or empty in
+  the repo's working copy BEFORE the first dispatch. The skill-side
+  remedy is to extend `init.sh` or `/wrap-feature` with a preflight
+  check on the operator's global gpg config; until that lands, this
+  is a known dispatch-time foot-gun.
+
+- [FEAT-2026-0013/G1-CLOSE] FEAT-2026-0008's `files_changed` diff
+  guard is recursively validated. During FEAT-2026-0013 v3-attempt-3
+  attempt-1, the dispatched agent emitted `status: complete` with
+  `files_changed: ["tests/_workspace.py", ...]` but did not write
+  `tests/_workspace.py` (the new file at the center of the v3 fix).
+  The FEAT-2026-0008/T02 `verify_files_changed` guard caught the
+  unchanged path (`attempt_outcome: files_changed_mismatch` in
+  `events.jsonl`), rolled the squash back via
+  `git reset --hard head_before`, and re-dispatched. Attempt-2
+  wrote the file correctly and completed. Without the guard, the
+  driver would have committed only the WU frontmatter status flip,
+  `status: done` would have advanced the dependency frontier, and
+  the gate would have closed against a missing file. This is the
+  same failure mode FEAT-2026-0007's T04/T08H/T08 hit before
+  FEAT-2026-0008 landed; the guard now closes it. Rule (durable,
+  observational): the value of driver-side completeness guards is
+  proven across multiple feature shipments; agent-side ACs and
+  spec-side completeness triggers are necessary but the driver-side
+  guard is the load-bearing safety net. Catalog this incident as
+  the second live recursive validation of FEAT-2026-0008 (after
+  FEAT-2026-0008's own close ceremony's audit-of-itself); use it
+  when justifying analogous driver-side guards on other surfaces
+  (e.g. FEAT-2026-0012's planned closing-deliverable guard).
