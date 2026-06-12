@@ -3,20 +3,17 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: blocked_human
+status: pending
 attempts: 0
-# Cost preserved from v1 + v2 + v3-attempt-1 (see PLAN.md ## Prior attempts).
-# v3-attempt-1 wasted by operator gpg-agent misconfiguration; agent's diagnosis
-# of `_minimal_git_repo` was a red herring (real cause was operator-side signing
-# switch). Re-armed for v3-attempt-2 after operator switched back to SSH.
-historical_cost_usd: 2.273894
-historical_duration_seconds: 1326.598
-historical_input_tokens: 72
-historical_output_tokens: 40970
-duration_seconds: 1854.746
-cost_usd: 2.954458
-input_tokens: 62
-output_tokens: 79540
+# Cost preserved from v1 + v2 + v3-attempt-1 + v3-attempt-2 (see PLAN.md
+# ## Prior attempts). v3-attempt-2 again wasted: same ssh-agent-unreachable
+# block in test_loop_orchestration._minimal_git_repo. Operator now disabled
+# commit.gpgsign locally (git config --local commit.gpgsign false) so v3-
+# attempt-3 should not hit it.
+historical_cost_usd: 5.228352
+historical_duration_seconds: 3181.344
+historical_input_tokens: 134
+historical_output_tokens: 120510
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
