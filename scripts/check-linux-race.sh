@@ -57,12 +57,13 @@ docker run --rm \
             tail -20 /tmp/pip.log
             exit 1
         }
-        echo '==> Running tests.test_driver_integration ${N}× in Linux container'
+        echo '==> Running full test suite (discover tests) ${N}× in Linux container'
+        echo '    (covers all 5 integration_workspace import sites + every other test)'
         pass=0
         fail=0
         oserrs=0
         for i in \$(seq 1 ${N}); do
-            out=\$(python -m unittest tests.test_driver_integration -q 2>&1)
+            out=\$(python -m unittest discover tests -q 2>&1)
             rc=\$?
             if [ \$rc -eq 0 ]; then
                 pass=\$((pass+1))
