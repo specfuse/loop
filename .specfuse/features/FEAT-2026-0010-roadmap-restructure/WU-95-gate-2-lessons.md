@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/G2-LESSONS
 type: lessons
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 62.129
+cost_usd: 0.256921
+input_tokens: 8
+output_tokens: 2987
 ---
 
 # Gate 2 lessons

@@ -834,3 +834,49 @@ promoted here.
   (or equivalent grep on `events.jsonl`); if the count is short,
   block gate advancement and surface the gap for operator review
   before the gate is marked passed.
+
+- [FEAT-2026-0010/G2] For regex-heavy row-mutation WUs — where the
+  agent must compute byte-offset or capture-group index arithmetic
+  against a match object to locate and rewrite a specific cell — a
+  concrete before/after fixture in the WU spec reduces first-attempt
+  failure rate. T05 required 2 attempts; the most likely cause was
+  off-by-one arithmetic in the Detail-cell update step. Rule: any WU
+  spec that requires an agent to (a) match a structured text row via
+  regex and (b) mutate a specific field within that row must include
+  an exact before/after example showing the raw bytes of the row
+  before the mutation and the expected bytes after. "Apply the
+  Conventions section's format" is insufficient — show the
+  transformation, not just the format.
+
+- [FEAT-2026-0010/G2] A helper function that is fully test-validated
+  but not yet exercised in production (e.g., T05's idempotency path
+  in `auto_archive_feature`) must be flagged explicitly in the
+  plan-next WU so the feature-close checklist includes a smoke-test
+  at real completion time. Test coverage cannot substitute for
+  production exercise when the path depends on the exact byte content
+  of files written by other tools (e.g., `commit_bookkeeping`,
+  `wrap-feature`). Rule: when a WU's retro notes that a code path was
+  tested but not yet production-exercised, the plan-next WU for that
+  gate must add a named checklist item: "smoke-test [path/function]
+  at feature-close by triggering the production condition and
+  confirming the return value matches the test fixture." Omitting this
+  step leaves a class of silent failures (wrong byte sentinel,
+  column-format mismatch) undetected until the next feature exercises
+  the path in production.
+
+- [FEAT-2026-0010/G2] When a driver-side helper must replicate the
+  logic of an existing skill (e.g., `auto_archive_feature` in
+  `loop.py` replicating `roadmap-archive`), the correct implementation
+  pattern is to re-implement the algorithm directly in Python, NOT to
+  subprocess-invoke the skill file. The pattern was established in T04
+  (file-editing WU) and confirmed in T05 (driver hook): subprocess
+  invocation is brittle in the driver's execution context (path
+  assumptions, working-directory state, no clean stderr capture) while
+  direct re-implementation is pure-function, unit-testable, and has no
+  external dependencies. This pattern is now a settled decision for
+  this codebase. Rule: when authoring a WU that adds a driver-side
+  hook replicating skill behavior, state in the Context section: "use
+  direct Python re-implementation, not subprocess invocation" and name
+  the skill's algorithm steps the re-implementation must match
+  verbatim. Do not leave the choice implicit; an agent without this
+  note may choose subprocess invocation as the "DRY" option.
