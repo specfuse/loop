@@ -148,7 +148,7 @@ the archive entry). Migration of 0003..0008 leaves the table
 unchanged in shape; archive contains 6 detail sections matching
 the originals byte-for-byte except for the new archive header.
 
-**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. Gate 2 scope TBD (see RETROSPECTIVE.md).
+**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. **Gate 2 (passed).** Driver auto-archive hook shipped: `loop.py` now calls `auto_archive_feature` after flipping `PLAN.md` status to `complete`, automatically archiving the feature's roadmap detail section on feature close. Tests cover happy path, idempotency, and refusal. 1 WU (T05), 2 attempts, $2.05.
 
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 

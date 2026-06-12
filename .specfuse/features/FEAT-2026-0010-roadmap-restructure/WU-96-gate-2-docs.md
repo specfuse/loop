@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/G2-DOCS
 type: docs
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 2
+duration_seconds: 102.578
+cost_usd: 0.485186
+input_tokens: 20
+output_tokens: 5086
 ---
 
 # Gate 2 docs
