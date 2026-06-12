@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/G1-RETRO
 type: retrospective
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 166.383
+cost_usd: 0.333384
+input_tokens: 12
+output_tokens: 7931
 ---
 
 # Gate 1 retrospective
