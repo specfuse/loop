@@ -655,3 +655,64 @@ promoted here.
   code IS the verdict; stdout-tail is a proxy that decouples from the
   verdict the first time a downstream test starts logging. Apply at
   WU author time for any "run-N-times" AC.
+
+- [FEAT-2026-0013/G1-CLOSE] **Amends and supersedes v1's gc.auto=0 +
+  sync-barrier rule above (entry dated v1, line 618).** Test fixtures
+  that combine `subprocess.run` (especially `git`) with
+  `tempfile.TemporaryDirectory` on Python 3.12 race against
+  `shutil.rmtree` on cleanup. v1's rule (a) gc.auto=0 + (b) sync
+  barrier is necessary but proved INSUFFICIENT on Linux ext4 CI
+  runners: FEAT-2026-0013 v1 shipped with both fixes, passed 50×
+  macOS-local, and the SAME `OSError: Directory not empty` race fired
+  on Linux runner `27412918877` (PR #9). Linux ext4 surfaces a
+  cleanup race that macOS APFS hides. Rule (revised): any test
+  fixture that initializes a temp git repo inside a
+  `TemporaryDirectory` MUST do all three: (a) pass `-c gc.auto=0` to
+  every `git` invocation in the fixture body (or `git -C <root>
+  config gc.auto 0` after `git init`); (b) run a sync barrier —
+  `subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
+  check=True, capture_output=True)` — in a `finally:` block after
+  the `yield`, before the `TemporaryDirectory` context exits; (c)
+  construct the `TemporaryDirectory` with `ignore_cleanup_errors=True`
+  (Python 3.10+) as belt-and-suspenders against Linux-only surfaces
+  the gc + sync barrier doesn't cover. The v1 stance that
+  `ignore_cleanup_errors=True` "hides future leaks and erodes
+  verification-as-oracle" is REVERSED: when the root cause is being
+  attacked AT THE SAME TIME (a)+(b), the suppression is
+  harm-reduction, not symptom-only. Three together close the race
+  deterministically on Linux CI; root-cause AND suppression, not
+  either-or.
+
+- [FEAT-2026-0013/G1-CLOSE] Oracle environment must match goal
+  environment. A `roadmap_goal` of "deterministic on Python 3.12 CI
+  runners" cannot be falsified by a 50× macOS-local audit — macOS
+  APFS and Linux ext4 differ on whether in-flight directory writes
+  race against `rmtree`, and the CI environment is the only place
+  the goal's environment lives. v1's close ceremony reported the
+  goal met on macOS-local evidence alone; the same fix failed on
+  the very next CI run. Rule: when authoring a close-ceremony AC
+  whose oracle is "run the failing test N times", the oracle command
+  MUST be runnable in (or equivalent to) the environment named by
+  `roadmap_goal`. For Linux-CI goals: add a Docker probe
+  (`scripts/check-linux-race.sh` shape — Linux image, identical
+  `tail` of the suite) and treat the operator-side probe run as the
+  load-bearing AC, with macOS-local audit kept only as a necessary-
+  but-not-sufficient pre-check. The verdict must explicitly call
+  out the operator-side step and the CI run as the FINAL oracle.
+
+- [FEAT-2026-0013/G1-CLOSE] Script-parity ≠ environment-parity. A
+  pre-push hook (or any locally-runnable script) that REPRODUCES
+  CI's commands verbatim does NOT reproduce CI's environment — it
+  still runs on the developer's filesystem, kernel, and tempdir
+  semantics. A race that is non-deterministic on macOS and
+  deterministic on Linux ext4 will not surface in a pre-push hook
+  on a Mac no matter how faithfully the hook mirrors the CI YAML.
+  Rule: any pre-push gate intended to catch CI-environment-only
+  failures (filesystem races, kernel-version-specific syscalls,
+  glibc-vs-musl behavior, container runtime semantics) MUST run
+  inside a container that matches CI's image. Document the
+  distinction at the gate's spec-author time so future amendments
+  do not collapse "we run the same commands" with "we run in the
+  same environment." Pre-push hooks running on developer machines
+  cannot catch races that are deterministic-on-CI; only a
+  Docker-probe or equivalent environment-parity gate can.
