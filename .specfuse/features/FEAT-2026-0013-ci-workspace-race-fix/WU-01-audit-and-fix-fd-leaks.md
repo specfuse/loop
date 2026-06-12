@@ -3,7 +3,7 @@ id: FEAT-2026-0013/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
+status: blocked_human
 attempts: 0
 # Cost preserved from v1 + v2 + v3-attempt-1 (see PLAN.md ## Prior attempts).
 # v3-attempt-1 wasted by operator gpg-agent misconfiguration; agent's diagnosis
@@ -13,6 +13,10 @@ historical_cost_usd: 2.273894
 historical_duration_seconds: 1326.598
 historical_input_tokens: 72
 historical_output_tokens: 40970
+duration_seconds: 1854.746
+cost_usd: 2.954458
+input_tokens: 62
+output_tokens: 79540
 ---
 
 # Audit and fix fd/handle leaks in integration_workspace
