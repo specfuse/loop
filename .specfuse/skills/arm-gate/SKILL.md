@@ -38,9 +38,9 @@ degraded "list drafts and stop" mode.
 ## When to invoke
 
 When `./scripts/smoke-test.sh` or `python3 .specfuse/scripts/loop.py`
-just printed `Gate N complete (retro, lessons, docs, plan-next). The
-next gate has been drafted. …`, or any time a gate file sits at
-`status: awaiting_review` and the next gate has drafts pending review.
+just printed that a gate is complete and the next gate has been drafted,
+or any time a gate file sits at `status: awaiting_review` and the next
+gate has drafts pending review.
 
 If no gate is in `awaiting_review`, the skill stops with a hint
 (probably you wanted `/gate-status` for a blocked WU, or
@@ -66,8 +66,9 @@ If no gate is in `awaiting_review`, the skill stops with a hint
   thinking about the drafts.
 - `.specfuse/LEARNINGS.md` tail — any new rules surfaced by the
   just-completed gate that affect the drafts.
-- Briefly summarize: "Gate N drafted M substantive WUs + the four
-  closing-sequence units. Reviewing them in order."
+- Briefly summarize: "Gate N drafted M substantive WUs + the closing
+  sequence (two-WU intermediate, single-WU terminal, or legacy four-WU).
+  Reviewing them in order."
 
 ### 3. Per-draft accept / revise / reject
 

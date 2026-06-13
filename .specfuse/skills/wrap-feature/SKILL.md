@@ -1,18 +1,23 @@
 ---
 name: wrap-feature
-description: Finalize a feature after its close ceremony — flip the terminal gate to `passed` (cosmetic), push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
+description: Finalize a feature after its close ceremony — push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Terminal state flips (gate status, roadmap row) are now driver-side (FEAT-2026-0015/T06). Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
 ---
 
 # Wrap feature (interactive, post-close finalization)
 
+> **As of FEAT-2026-0015/T06, terminal flips are driver-side; /wrap-feature
+> no longer touches `GATE-NN.md` status or the roadmap row.** The driver's
+> `fire_terminal_flips` helper fires automatically when a `close`-type WU
+> passes with `verdict: met`, flipping the terminal gate to `passed`, the
+> roadmap row to `done`, and triggering auto-archive.
+
 After the close ceremony runs (`/G1-CLOSE` for single-gate features, or
 the four-WU `retrospective → lessons → docs → plan-next` sequence for
 the terminal gate of multi-gate features), the methodology has done its
-job: `PLAN.md status: done`, the roadmap row reflects `done`,
-`RETROSPECTIVE.md` exists, and durable lessons are appended. What
-remains is the **plumbing handoff**: cosmetic gate flip, push the
-branch, open the PR, watch CI, merge advisory, then point at the next
-pick.
+job: `PLAN.md status: done`, `GATE-NN.md status: passed`, the roadmap
+row reflects `done`, `RETROSPECTIVE.md` exists, and durable lessons are
+appended. What remains is the **plumbing handoff**: push the branch,
+open the PR, watch CI, merge advisory, then point at the next pick.
 
 This skill is the per-feature human checkpoint **after** the loop has
 finished doing methodology work but before the change is shipped to
@@ -41,10 +46,10 @@ plan and stop" mode.
 - **Read-only on RETROSPECTIVE / LEARNINGS / roadmap content.** The
   close ceremony OWNS those edits. This skill only confirms they
   exist + reads their tail. Do not amend retrospectives here.
-- **Modify only the terminal gate's status.** One write surface
-  before any git: flip `GATE-NN.md status: awaiting_review` →
-  `passed` for the terminal gate. Everything else is a git/gh action
-  taken after operator confirmation.
+- **No file writes before git.** All state flips (gate status, roadmap
+  row) are now performed driver-side by `fire_terminal_flips`. This
+  skill is read-only on all `.specfuse/` files; git actions happen
+  after operator confirmation.
 - **gh-CLI gracefully degraded.** Per LEARNINGS
   `[FEAT-2026-0014/T01/gh-claudeP-broken]`, `gh` is unreliable inside
   agent dispatch and may be similarly unreliable inside whatever
@@ -83,9 +88,11 @@ this.
 - Refuse if PLAN.md `status` is not `done`:
   - `active` → `/gate-status` (if blocked) or wait for close.
   - `abandoned` → wrong skill.
-- Confirm the roadmap row matches (`status: done` and folder path).
-  If row says `active` while PLAN.md says `done`, the close ceremony
-  was imperfect — surface this gap and ask before continuing.
+- Confirm the terminal gate is `passed` and the roadmap row is `done`.
+  These are set driver-side by `fire_terminal_flips` when the close WU
+  passes with `verdict: met`. If either is still `awaiting_review` /
+  `active`, the close WU likely ran with a hedged verdict — surface
+  this and stop; do not attempt manual reconciliation here.
 
 ### 2. Surface the executive recap
 
@@ -140,18 +147,7 @@ If a section can't be assembled from canonical files, say so
 explicitly ("PLAN.md has no Scope OUT section; plan-adherence read
 limited to gates graph + WU outcomes") rather than fabricate.
 
-### 3. Cosmetic gate flip
-
-- For the **terminal** gate (the last entry in PLAN.md's gates
-  graph, regardless of single-gate or multi-gate), if its
-  `GATE-NN.md status` is `awaiting_review`, flip to `passed`.
-- This is cosmetic only — PLAN.md is already `done` so the
-  feature-arc terminal signal is intact either way. But a
-  `passed` terminal gate is the methodology's "this gate is
-  closed" signal and reads cleaner in audits.
-- If already `passed`, skip with a note.
-
-### 4. Manual verification step (operator-owned)
+### 3. Manual verification step (operator-owned)
 
 - For any deferred verification recorded in `RETROSPECTIVE.md`
   (e.g. WUs that dropped gh-CLI ACs and moved CI-log inspection
@@ -161,29 +157,30 @@ limited to gates graph + WU outcomes") rather than fabricate.
 - Ask: "Manual verification done? (y / n / `not applicable`)" —
   n exits with the verification command list as next step.
 
-### 5. Push the branch
+### 4. Push the branch
 
 - Read PLAN.md's `branch` field (e.g. `feat/FEAT-2026-0014-gha-node20-bump`).
 - Confirm `git branch --show-current` matches.
 - Confirm `git status --short` is clean (no uncommitted changes;
   the close ceremony's writes should already be committed by the
-  driver as `chore(loop): gate N awaiting_review`).
+  driver as `chore(loop): gate N awaiting_review` and
+  `chore(loop): {wu_id} terminal flips`).
 - Show diff stat: `git diff main...HEAD --stat`.
 - Ask: "Push to origin/<branch>? (y / n)" — n exits with the
   push command for the operator.
 - On y: `git push -u origin <branch>`. Report the upstream
   tracking confirmation or the error.
 
-### 6. Open the PR
+### 5. Open the PR
 
 - Probe `gh auth status` once. If ✗: per LEARNINGS, print the
   exact `gh pr create --fill` command for the operator and skip
-  to step 7.
+  to step 6.
 - If ✓: ask "Open PR via `gh pr create --fill`? (y / n)"
 - On y: run it. Capture the PR URL from output; report it.
 - On n: print the command for the operator.
 
-### 7. Watch CI (optional, gh-only)
+### 6. Watch CI (optional, gh-only)
 
 - If `gh` works and PR was opened: offer "Watch CI? (y / n)"
 - On y: `gh run watch --branch <branch>`. Stream summary to
@@ -192,14 +189,14 @@ limited to gates graph + WU outcomes") rather than fabricate.
   watch command for resume.
 - On n / gh broken: skip.
 
-### 8. Merge advisory (do NOT merge)
+### 7. Merge advisory (do NOT merge)
 
 - Do not auto-merge. State: "PR is open at <url>. Wait for CI
   green + review, then merge via `gh pr merge` or the GitHub UI."
 - If branch protection / required reviews are configured, name
   them (best-effort via `gh pr view --json mergeable,mergeStateStatus`).
 
-### 9. Point at the next pick
+### 8. Point at the next pick
 
 - After merge advisory, suggest `/pick-feature` for the next
   roadmap row.
@@ -207,33 +204,32 @@ limited to gates graph + WU outcomes") rather than fabricate.
   `/draft-feature` (new initiative) and `/abandon-feature` (if
   the next pick is wrong).
 
-### 10. RESULT
+### 9. RESULT
 
 Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
 `status: complete` means every step ran or was skipped by operator
-choice, the gate cosmetic flip wrote (if needed), and the operator
-has a clear path to merge. `status: blocked` is reserved for the
-case where the canonical files contradict each other (e.g. PLAN.md
-`done` but roadmap row `active`) AND the operator declined to
-reconcile.
+choice and the operator has a clear path to merge. `status: blocked`
+is reserved for the case where the canonical files contradict each
+other (e.g. PLAN.md `done` but terminal gate still `awaiting_review`)
+AND the operator declined to investigate.
 
 ## What this skill does NOT do
 
 - **Does not run verification gates.** Close ceremony did that.
 - **Does not write to RETROSPECTIVE.md, LEARNINGS.md, or roadmap.md
-  content.** Read-only on those surfaces. Cosmetic gate flip is the
-  only write before git.
+  content.** Read-only on those surfaces.
+- **Does not flip GATE-NN.md status or the roadmap row.** These are
+  now driver-side (FEAT-2026-0015/T06). See `fire_terminal_flips` in
+  `loop.py`.
 - **Does not auto-merge the PR.** Operator-owned decision.
-- **Does not archive the roadmap detail section.** Future
-  `/roadmap-archive` skill's job.
+- **Does not archive the roadmap detail section.** `/roadmap-archive`
+  skill's job.
 - **Does not flip PLAN.md status.** The close ceremony already did.
   If PLAN.md is not `done`, this skill stops.
 
 ## Version
 
-**v0.1.** Nine steps; single-confirm posture for push + PR is the
-entire safety discipline today. Expected to grow once real wraps
-surface needs that don't fit it — e.g. multi-PR features (stacked
-PRs), feature-flagged rollouts (don't merge yet), or
-auto-archive-on-merge wiring once `/roadmap-archive` exists. Shared
-methodology craft (loop is near-term author).
+**v0.2** (FEAT-2026-0015/T06). Nine steps reduced to eight; terminal
+state flips (gate status, roadmap row, auto-archive) moved to the
+driver's `fire_terminal_flips` helper. Single-confirm posture for
+push + PR is the safety discipline.

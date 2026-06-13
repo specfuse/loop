@@ -312,8 +312,9 @@ when cost matters more than depth **and** the task fits the narrow profile below
 - `implementation` — multi-file edits require cross-file reasoning that
   regresses on Haiku (observed: symbols introduced in file A not referenced
   correctly in file B without a full-context pass).
-- `plan-next` and `close` — forward design, cross-WU coordination, and
-  terminal feature-arc verdicts require the full reasoning budget; Haiku
+- `plan-next`, `close`, and `close-intermediate` — forward design, cross-WU
+  coordination, terminal feature-arc verdicts, and the folded retro+lessons+docs
+  synthesis in `close-intermediate` require the full reasoning budget; Haiku
   consistently misses implicit constraints.
 - `retrospective` for a gate with > 3 substantive WUs — synthesising cost
   tables, failure traces, and lessons-to-graduate across many WUs requires

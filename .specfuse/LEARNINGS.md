@@ -880,3 +880,151 @@ promoted here.
   the skill's algorithm steps the re-implementation must match
   verbatim. Do not leave the choice implicit; an agent without this
   note may choose subprocess invocation as the "DRY" option.
+
+- [FEAT-2026-0015/G1] The §10 helper-duplication escalation trigger
+  must be authored with the target file's specific coupling surfaces in
+  mind, not just the obvious symbol names. FEAT-2026-0015/T02's §10
+  grep checked `CLOSING_SEQUENCE|_CLOSING_TYPES` but omitted
+  `CORRELATION_ID_RE` — a separate constant in the same file that
+  encodes overlapping knowledge about the closing-type lexicon. The
+  omission caused a silent divergence that T03's first attempt surfaced
+  as a blocking failure. Rule: before authoring a §10 escalation
+  trigger, enumerate every site in the target file that encodes
+  overlapping knowledge about the new symbol (type registries, regexes,
+  schema constants, enum members, doc examples) and include a grep
+  pattern for each. A §10 trigger that only checks the most obvious
+  coupling point is incomplete; the correct test is "is there ANY other
+  location in the file — or in the files that import it — that must
+  mirror this change?"
+
+- [FEAT-2026-0015/G1] A WU re-armed after a hygiene-WU resolves its
+  blocking condition may silently produce zero file changes on its
+  first re-dispatch attempt — even though the hygiene fix is committed
+  and the blocking pre-condition is gone. FEAT-2026-0015/T03 exited
+  `files_changed_mismatch` on the second dispatch's first attempt
+  (all four expected paths unchanged) despite T02H having landed. The
+  plausible cause is cached tool-call state from the prior blocked
+  session, which prevented the re-armed agent from perceiving the
+  hygiene changes as "new context requiring action." No driver-level
+  mitigation exists as of this writing. Rule: when arming a WU that
+  was previously blocked by a missing pre-condition (now resolved via
+  a hygiene WU), add a note to the arm-gate review: "first attempt
+  may exit `files_changed_mismatch`; if so, re-dispatch unmodified —
+  the second attempt will perceive the post-hygiene state correctly."
+  Account for this extra dispatch in the WU's planned cost.
+
+- [FEAT-2026-0015/G1] `low` effort ($0.50 planned cost) is
+  systematically undersized for WUs that touch three or more files
+  when any of those files carry documentation coupling (a prose rule
+  that must stay consistent with a code constant, a template whose
+  prose must agree with a linter, a skill whose examples must reflect
+  the current valid-type set). FEAT-2026-0015/T03 was classified
+  `low` and planned at $0.50; it touched four files (two templates,
+  one skill, one test file) and ran $1.53 on its productive dispatch
+  alone — 3× plan. T02H was classified `low` and ran $0.98 across two
+  attempts against a $0.50 plan, driven by the surrounding regex
+  correctness surface and documentation coupling in `correlation-
+  ids.md`. Rule: classify a WU as `medium` ($0.80–$1.00 planned cost)
+  when it touches three or more files OR when any touched file has
+  documentation coupling. Reserve `low` for WUs that touch exactly
+  one or two files with no prose-consistency obligation. Pure-additive
+  dict extension in a single file (T01's profile: one driver file,
+  three dict entries, four tests) is the canonical `low`/`medium`
+  boundary case; T01 completed at $0.42 on a $1.00 medium plan,
+  suggesting `low` is appropriate there — but only for that pattern.
+
+- [FEAT-2026-0015/G1] When a WU modifies a scaffold template (e.g.,
+  `PLAN.template.md`, `WU.template.md`), the gate must include a test
+  that renders the template (or a representative excerpt) and runs the
+  downstream linter against the rendered output. Verifying that the
+  template file itself is well-formed is insufficient — the gate's
+  oracle must be "lint passes on a PLAN.md produced from this
+  template." FEAT-2026-0015/T03 introduced
+  `tests/test_template_closing_shapes.py` for exactly this: it
+  constructs minimal closing-WU sequences from the template shapes and
+  asserts `lint_plan.py` accepts them. This extends the existing prose-
+  artifact rule ([FEAT-2026-0003/G2-LESSONS]) specifically to
+  templates: the structural linter that counts required sections must
+  run on a RENDERED instance, not on the raw template text (which may
+  pass naive section-count checks while producing linter-rejecting
+  output when instantiated). Rule: any WU that edits a scaffold
+  template file must declare, in its Verification section, the command
+  that (a) instantiates the template into a minimal artifact and (b)
+  runs the downstream linter on that artifact. A test file exercising
+  this path is the preferred form; a Makefile or inline shell command
+  is acceptable when a test file is out of scope.
+
+- [FEAT-2026-0015/G2-CLOSE] Planned-cost estimation for WUs that touch
+  the driver core (`loop.py`) is systematically half the actual cost
+  at the current model mix (Sonnet 4.6 + Opus 4.7). Gate 2's five
+  substantive WUs ran 106–194% over plan; the gate subtotal ran 147%
+  over plan ($14.84 actual vs $6.00 planned). The pattern is
+  uniform across all five WUs, not driven by outliers. Rule: when a
+  WU is `implementation` type AND touches `.specfuse/scripts/loop.py`
+  (or `lint_plan.py`), set the planned-cost floor at:
+  `low → $1.50`, `medium → $2.50`, `high → $4.00`. Use the existing
+  `low/medium/high` effort taxonomy but with these driver-core
+  floors. Outside `loop.py` / `lint_plan.py`, the prior floors
+  ([FEAT-2026-0015/G1]) still apply. Two-gate evidence (Gate 1 +68%,
+  Gate 2 +147%) — this is no longer noise.
+
+- [FEAT-2026-0015/G2-CLOSE] Type-keyed assertion tables
+  (`dict[str, list[Callable]]`) are the right shape for a guard whose
+  required deliverables differ by WU subtype. T07 landed
+  `CLOSING_ASSERTIONS_BY_TYPE` with three keys (`close`,
+  `close-intermediate`, `plan-next`), each carrying a per-subtype
+  assertion list (5/3/2 respectively). The shape lets a new subtype be
+  added without touching existing entries — additive-only — and lets
+  each assertion be tested in isolation. Compare to a single-callable
+  guard (`assert_closing_deliverables` as one giant if-chain): the
+  if-chain forces shared early-return logic and makes per-subtype
+  testing harder. Rule: when a driver guard must enforce
+  context-dependent deliverables (different per WU type, per gate,
+  per language), prefer a type-keyed dispatch table over inline
+  branching. Each table entry is a unit-testable assertion; the
+  dispatcher is a one-line `assertions = TABLE.get(wu.type, [])`
+  lookup.
+
+- [FEAT-2026-0015/G2-CLOSE] Lint surfaces introduced into a
+  populated codebase should default to WARN (not ERROR) until a
+  backfill sweep runs against existing artifacts. T05's `oracle_env`
+  lint surface defaults to WARN because every WU authored before
+  this feature pre-dates the field; an ERROR-only default would have
+  spuriously blocked every legacy feature on its first re-lint. T08
+  applied the same WARN-first stance to `planned_cost_usd`. Rule:
+  when adding a new required field via lint, the rollout shape is
+  (1) WARN-only for one feature cycle to confirm the field is being
+  set in new authoring, (2) backfill sweep across legacy artifacts
+  (single hygiene WU), (3) WARN → ERROR flip in a follow-on feature.
+  Skipping step 1 and going ERROR-on-first-ship is a known
+  spurious-block pattern.
+
+- [FEAT-2026-0015/G2-CLOSE] When a planning artifact (PLAN.md's
+  `## Planned-cost table`) and a per-unit frontmatter field
+  (`WU.frontmatter.planned_cost_usd`) carry overlapping numeric
+  knowledge, the two go stale the moment one is revised without the
+  other. T08's WU frontmatter says `planned_cost_usd: 0.80` while
+  PLAN.md's table row says `0.50` — both refer to the same WU.
+  Neither is wrong; the WU was upgraded from `low` to `medium` after
+  the table was drafted, and the table didn't track. Rule: designate
+  ONE source as authoritative and have the other read from it. For
+  this codebase the per-WU frontmatter is authoritative (set at draft
+  time, revisable per-WU during planning); PLAN.md's table should be
+  generated from the frontmatter or carry a stale-warning comment.
+  Until the generation lands, treat WU frontmatter as the value the
+  cost-analysis section quotes, with a footnote on any discrepancy.
+
+- [FEAT-2026-0015/G2-CLOSE] The recursive-dogfood close ceremony
+  pattern from [FEAT-2026-0008/G1-CLOSE] is now validated on a
+  multi-gate feature whose terminal close is the FIRST production
+  exercise of the new contract it shipped. This WU (G2-CLOSE) used
+  `type: close` (new), wrote `verdict: met` (new field), produced a
+  `## Cost analysis` section (new assertion target), and was
+  exercised by T07's guard (new code) against its own commit. All six
+  AC7 recursive grep checks passed. The pattern works: a methodology
+  feature whose terminal close uses the methodology's own new shape
+  is the load-bearing test that the contract is sound. Rule
+  (reinforcing [FEAT-2026-0008/G1-CLOSE]): any future feature whose
+  scope is "ship a new close-ceremony contract" MUST close its own
+  terminal gate using that contract. Falling back to the previous
+  contract "to be safe" invalidates the feature's central claim.

@@ -43,6 +43,7 @@ import argparse
 import datetime as dt
 import fcntl
 import json
+import logging
 import re
 import subprocess
 import sys
@@ -77,20 +78,22 @@ MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 # Defaults applied by load_wu when `model` or `effort` are absent from WU frontmatter.
 # A WU that declares either field explicitly overrides these. Keys cover every VALID_TYPES value.
 MODEL_BY_TYPE = {
-    "implementation": "sonnet",
-    "retrospective":  "sonnet",
-    "lessons":        "sonnet",
-    "docs":           "sonnet",
-    "plan-next":      "opus",
-    "close":          "opus",
+    "implementation":    "sonnet",
+    "retrospective":     "sonnet",
+    "lessons":           "sonnet",
+    "docs":              "sonnet",
+    "plan-next":         "opus",
+    "close":             "opus",
+    "close-intermediate": "opus",
 }
 EFFORT_BY_TYPE = {
-    "implementation": "medium",
-    "retrospective":  "low",
-    "lessons":        "low",
-    "docs":           "low",
-    "plan-next":      "high",
-    "close":          "high",
+    "implementation":    "medium",
+    "retrospective":     "low",
+    "lessons":           "low",
+    "docs":              "low",
+    "plan-next":         "high",
+    "close":             "high",
+    "close-intermediate": "high",
 }
 
 # Which verification gate set (a key in verification.yml) applies to each WU type.
@@ -100,15 +103,26 @@ GATES_FOR_TYPE = {
     "lessons": "doc",
     "docs": "doc",
     "plan-next": "plannext",
-    # `close` collapses the four closing ceremonies into one session (single-gate only).
-    # Reuses the `plannext` gate set: lint_plan.py verifies structural integrity post-close.
+    # `close` collapses the four closing ceremonies into one session for any terminal gate
+    # (single- or multi-gate); `close-intermediate` is the equivalent for non-terminal gates,
+    # leaving `plan-next` as a separate dispatch.
+    # Both reuse the `plannext` gate set: lint_plan.py verifies structural integrity post-close.
     "close": "plannext",
+    "close-intermediate": "plannext",
 }
+
+VERDICT_VALUES = frozenset({"met", "met_locally", "partially_met", "not_met"})
 
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
 # writes the next gate's WUs as drafts, and a human must arm them first.
 DISPATCHABLE = {"pending", "ready"}
 DONE = "done"
+
+
+def verdict_permits_terminal_flips(verdict: str | None) -> bool:
+    """Return True iff verdict == 'met'; False for every other value including None."""
+    return verdict == "met"
+
 
 # --------------------------------------------------------------------------- #
 # Data model                                                                  #
@@ -134,6 +148,7 @@ class WorkUnit:
     # load_wu refuses to load a WU with unsandboxed=True and no rationale.
     unsandboxed: bool = False
     unsandboxed_rationale: str = ""
+    verdict: str | None = None
 
 
 @dataclass
@@ -279,6 +294,9 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"`unsandboxed_rationale` in the same frontmatter. Sandbox-escape "
             f"is auditable; the rationale is the audit signal."
         )
+    verdict: str | None = None
+    if wu_type in {"close", "close-intermediate"}:
+        verdict = fm.get("verdict") or None
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -292,6 +310,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         body=body.strip(),
         unsandboxed=unsandboxed,
         unsandboxed_rationale=unsandboxed_rationale,
+        verdict=verdict,
     )
 
 
@@ -553,6 +572,36 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
         return None  # all paths were already in their committed state
     subprocess.run(["git", "commit", "-m", message], check=True, capture_output=True)
     return git("rev-parse", "HEAD")
+
+
+def reset_preserving_events(head_before: str, events_path: Path) -> None:
+    """`git reset --hard <head_before>` without losing events.jsonl content.
+
+    The hard-reset is the methodology's "wipe agent's edits before we write our
+    bookkeeping" move. But events.jsonl can carry flushed-but-not-yet-committed
+    entries from a PRIOR WU whose flush happened after its squash commit (the
+    passed path flushes events AFTER the squash). Those entries sit on disk
+    waiting for the NEXT WU's `commit_bookkeeping` to capture them. A bare
+    `git reset --hard` between WUs rolls events.jsonl back to its last-
+    committed state, silently dropping the prior WU's lifecycle events.
+
+    Surfaced FEAT-2026-0015/T02 (commits 52a176a / 74d1911): T02 ran clean,
+    its task_started + task_completed events were flushed post-squash, then
+    T03 blocked → bare hard-reset wiped them. Same loss recurred when T02H
+    completed clean and T03 was re-armed.
+
+    This helper:
+      1. Reads events.jsonl content (if any) into memory.
+      2. Performs the hard-reset (drops the agent's working-tree edits).
+      3. Writes the preserved events.jsonl back to disk.
+
+    Subsequent `flush_events` calls then append to the preserved content;
+    `commit_bookkeeping` captures the full history.
+    """
+    saved = events_path.read_text() if events_path.is_file() else None
+    git("reset", "--hard", head_before)
+    if saved is not None:
+        events_path.write_text(saved)
 
 
 def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
@@ -1056,6 +1105,347 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     return "archived"
 
 
+def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> list[Path]:
+    """Flip terminal gate → passed, roadmap row → done, call auto_archive_feature.
+
+    Called for close-type WUs after squash when verdict_permits_terminal_flips is True.
+    Non-fatal: skips via logging, only raises on internal exceptions.
+    Returns the Paths actually modified (for the bookkeeping commit add list).
+    """
+    modified: set[Path] = set()
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        logging.warning("fire_terminal_flips: no gates in PLAN.md for %s", wu.wu_id)
+    else:
+        terminal_gate = gates[-1]
+        gate_path = terminal_gate.file
+        if not gate_path.exists():
+            logging.warning(
+                "fire_terminal_flips: terminal gate file absent: %s — skipping gate flip",
+                gate_path,
+            )
+        else:
+            current_gate_status = terminal_gate.status
+            if current_gate_status == "passed":
+                logging.info(
+                    "fire_terminal_flips: %s already passed — skipping gate flip",
+                    gate_path.name,
+                )
+            elif current_gate_status == "awaiting_review":
+                write_frontmatter_field(gate_path, "status", "passed")
+                modified.add(gate_path)
+            else:
+                logging.warning(
+                    "fire_terminal_flips: %s status is %r (not awaiting_review or passed)"
+                    " — skipping gate flip",
+                    gate_path.name,
+                    current_gate_status,
+                )
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if not roadmap_path.exists():
+        logging.warning(
+            "fire_terminal_flips: roadmap.md absent at %s — skipping row flip",
+            roadmap_path,
+        )
+    else:
+        roadmap_text = roadmap_path.read_text()
+        row_re = re.compile(
+            r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|[^\n]*$",
+            re.MULTILINE,
+        )
+        row_m = row_re.search(roadmap_text)
+        if not row_m:
+            logging.warning(
+                "fire_terminal_flips: %s not found in roadmap.md — skipping row flip",
+                feature_id,
+            )
+        else:
+            current_row_status = row_m.group(2).strip()
+            if current_row_status == "done":
+                logging.info(
+                    "fire_terminal_flips: roadmap row for %s already done — skipping",
+                    feature_id,
+                )
+            elif current_row_status == "active":
+                new_roadmap = (
+                    roadmap_text[: row_m.start(2)]
+                    + row_m.group(2).replace("active", "done", 1)
+                    + roadmap_text[row_m.end(2):]
+                )
+                roadmap_path.write_text(new_roadmap)
+                modified.add(roadmap_path)
+            else:
+                logging.warning(
+                    "fire_terminal_flips: roadmap row for %s has status %r"
+                    " (not active or done) — skipping row flip",
+                    feature_id,
+                    current_row_status,
+                )
+
+    archive_result = auto_archive_feature(feature_id, repo_root)
+    if archive_result == "archived":
+        modified.add(roadmap_path)
+        modified.add(repo_root / ".specfuse" / "roadmap-archive.md")
+    elif archive_result == "already archived":
+        logging.info(
+            "fire_terminal_flips: %s already archived — skipping auto-archive",
+            feature_id,
+        )
+    else:
+        logging.warning(
+            "fire_terminal_flips: auto_archive_feature: %s — run /roadmap-archive manually",
+            archive_result,
+        )
+
+    return list(modified)
+
+
+# --------------------------------------------------------------------------- #
+# Closing-ceremony deliverable guards (FEAT-2026-0015/T07)                   #
+# --------------------------------------------------------------------------- #
+
+
+def _gate_number_from_wu_id(wu_id: str) -> int | None:
+    """Parse gate number from a closing WU ID like FEAT-2026-0015/G1-PLAN."""
+    segment = wu_id.rsplit("/", 1)[-1]
+    m = re.match(r"G(\d+)-", segment)
+    return int(m.group(1)) if m else None
+
+
+def assert_retrospective_exists(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-a) RETROSPECTIVE.md exists and is non-empty in the feature dir."""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists() or not retro.read_text().strip():
+        return (
+            False,
+            "assert_retrospective_exists: RETROSPECTIVE.md absent or empty in feature dir",
+        )
+    return True, ""
+
+
+def assert_learnings_appended_or_noop(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
+    proc = subprocess.run(
+        ["git", "diff", head_before, "HEAD", "--", ".specfuse/LEARNINGS.md"],
+        capture_output=True, text=True,
+    )
+    added = any(
+        ln.startswith("+") and not ln.startswith("+++")
+        for ln in proc.stdout.splitlines()
+    )
+    if added:
+        return True, ""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists() and "nothing generalizes" in retro.read_text().lower():
+        return True, ""
+    return (
+        False,
+        "assert_learnings_appended_or_noop: no LEARNINGS.md additions in squash "
+        "and no 'nothing generalizes' note in RETROSPECTIVE.md",
+    )
+
+
+def assert_doc_or_roadmap_diff(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-c) A docs/ or .specfuse/roadmap.md file appears in the squash diff."""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True,
+    )
+    for path in proc.stdout.splitlines():
+        if path == ".specfuse/roadmap.md" or path.startswith("docs/"):
+            return True, ""
+    # For close-intermediate: skip when the WU spec declares no doc surface.
+    if wu.type == "close-intermediate":
+        if "docs/" not in wu.body and "roadmap.md" not in wu.body:
+            return True, ""
+    return (
+        False,
+        "assert_doc_or_roadmap_diff: no docs/ or .specfuse/roadmap.md file in squash diff",
+    )
+
+
+def assert_verdict_well_formed(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-d) verdict frontmatter field is present and in VERDICT_VALUES."""
+    if wu.verdict is None or wu.verdict not in VERDICT_VALUES:
+        return (
+            False,
+            f"assert_verdict_well_formed: verdict {wu.verdict!r} absent or not in "
+            f"VERDICT_VALUES ({sorted(VERDICT_VALUES)})",
+        )
+    return True, ""
+
+
+def assert_cost_analysis_section_when_met(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-e) When verdict=='met', RETROSPECTIVE.md must have a '## Cost analysis' header."""
+    if wu.verdict != "met":
+        return True, ""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists():
+        if re.search(r"^##+ Cost analysis", retro.read_text(), re.MULTILINE | re.IGNORECASE):
+            return True, ""
+    return (
+        False,
+        "assert_cost_analysis_section_when_met: verdict=met but '## Cost analysis' "
+        "section absent from RETROSPECTIVE.md",
+    )
+
+
+def assert_retrospective_gate_section(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-intermediate-a) RETROSPECTIVE.md contains a '## Gate N' or '### Gate N' section."""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_retrospective_gate_section: cannot parse gate number from wu_id",
+        )
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists():
+        return (
+            False,
+            "assert_retrospective_gate_section: RETROSPECTIVE.md absent in feature dir",
+        )
+    if re.search(rf"^#{{1,3}} Gate {gate_n}\b", retro.read_text(), re.MULTILINE):
+        return True, ""
+    return (
+        False,
+        f"assert_retrospective_gate_section: RETROSPECTIVE.md has no "
+        f"'## Gate {gate_n}' or '### Gate {gate_n}' section",
+    )
+
+
+def assert_gate_review_exists(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(plan-next-a) GATE-(N+1)-REVIEW.md exists + non-empty, or no next gate (terminal)."""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_gate_review_exists: cannot parse gate number from wu_id",
+        )
+    # If no next gate is defined in PLAN.md the feature is terminal: no review expected.
+    _, gates = load_graph(feature_dir)
+    if not any(g.number == gate_n + 1 for g in gates):
+        return True, ""
+    next_gate = gate_n + 1
+    review = feature_dir / f"GATE-{next_gate:02d}-REVIEW.md"
+    if not review.exists() or not review.read_text().strip():
+        return (
+            False,
+            f"assert_gate_review_exists: GATE-{next_gate:02d}-REVIEW.md absent or empty",
+        )
+    return True, ""
+
+
+def assert_next_gate_drafted_or_terminal(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(plan-next-b) Next gate has ≥1 drafted WU in PLAN.md, or PLAN.md/roadmap is terminal."""
+    plan_path = feature_dir / "PLAN.md"
+    plan_fm, _ = read_frontmatter(plan_path)
+    if plan_fm.get("status") == "done":
+        return True, ""
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if roadmap_path.exists():
+        row_re = re.compile(
+            r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|",
+            re.MULTILINE,
+        )
+        rm = row_re.search(roadmap_path.read_text())
+        if rm and rm.group(2).strip() == "done":
+            return True, ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_next_gate_drafted_or_terminal: cannot parse gate number from wu_id",
+        )
+    _, gates = load_graph(feature_dir)
+    next_gates = [g for g in gates if g.number == gate_n + 1]
+    # No gate N+1 in PLAN.md → terminal (plan-next set PLAN.md done or feature is single-gate).
+    if not next_gates:
+        return True, ""
+    if next_gates[0].refs:
+        return True, ""
+    return (
+        False,
+        f"assert_next_gate_drafted_or_terminal: gate {gate_n + 1} has no drafted "
+        f"work_units in PLAN.md and neither PLAN.md nor roadmap marks done",
+    )
+
+
+CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
+    "close": [
+        assert_retrospective_exists,
+        assert_learnings_appended_or_noop,
+        assert_doc_or_roadmap_diff,
+        assert_verdict_well_formed,
+        assert_cost_analysis_section_when_met,
+    ],
+    "close-intermediate": [
+        assert_retrospective_gate_section,
+        assert_learnings_appended_or_noop,
+        assert_doc_or_roadmap_diff,
+    ],
+    "plan-next": [
+        assert_gate_review_exists,
+        assert_next_gate_drafted_or_terminal,
+    ],
+}
+
+
+def assert_closing_deliverables(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Fire the type-keyed closing deliverable guard (FEAT-2026-0015/T07).
+
+    Returns (True, "") if the WU type has no assertions (implementation type —
+    other guards handle it) or all assertions pass.  On the first failure returns
+    (False, reason) where reason names the failing assertion function.
+
+    Pre-condition: if the squash diff contains ONLY the driver's own bookkeeping
+    write to the WU file (status/cost), the agent produced no substantive output;
+    skip the assertions.  Other guards (zero_token, files_changed, smoke) cover
+    that surface.  This avoids false negatives in test fixtures that use hollow
+    dispatch stubs to test orthogonal behaviors.
+    """
+    assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
+    if not assertions:
+        return True, ""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True,
+    )
+    changed = {p for p in proc.stdout.splitlines() if p}
+    wu_rel = str(wu.file)
+    if not (changed - {wu_rel}):
+        return True, ""
+    for fn in assertions:
+        ok, reason = fn(wu, feature_dir, repo_root, head_before)
+        if not ok:
+            return False, reason
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # The loop                                                                    #
 # --------------------------------------------------------------------------- #
@@ -1080,11 +1470,6 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         print(f"{feature_id}: all gates passed — feature complete.")
         backend.on_feature_complete(feature_id)
         write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
-        archive_result = auto_archive_feature(feature_id, REPO_ROOT)
-        if archive_result.startswith("refused:"):
-            print(f"warning: auto-archive skipped — {archive_result}. Run /roadmap-archive manually.")
-        else:
-            print(f"{feature_id}: {archive_result}")
         return 0
 
     lock_fd = None
@@ -1145,6 +1530,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 if wfm.get("status") == DONE:
                     done_ids.add(ref["id"])
         blocked = False
+        close_wu_for_terminal: WorkUnit | None = None
 
         while True:
             pending = ready(units, done_ids)
@@ -1181,7 +1567,8 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                               f"Halted before {wu.wu_id}.")
                         return 1
 
-                print(f"\n-- {wu.wu_id} [{wu.type}] model={wu.model} effort={wu.effort}")
+                print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
+                      f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 if dry_run:
                     print("   (dry run — would dispatch)")
                     wu.status = DONE
@@ -1218,8 +1605,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 failure_note = None
                 for attempt in range(1, MAX_ATTEMPTS + 1):
                     backend.set_wu(wu, "attempts", attempt)
-                    print(f"   attempt {attempt}/{MAX_ATTEMPTS} "
-                          f"model={wu.model} effort={wu.effort} — fresh session")
+                    print(f"   [{time.strftime('%H:%M:%S')}] attempt "
+                          f"{attempt}/{MAX_ATTEMPTS} model={wu.model} "
+                          f"effort={wu.effort} — fresh session")
                     if attempt > 1 and failure_note:
                         reason = failure_note.strip().splitlines()[0][:200]
                         print(f"   retry reason: {reason}")
@@ -1250,7 +1638,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                             "attempt_outcome", wu.wu_id,
                             {"outcome": "zero_token_skip", "attempt": attempt},
                         ))
-                        git("reset", "--hard", head_before)
+                        reset_preserving_events(head_before, events_path)
                         print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
                               f"— no agent output, skipping")
                         continue
@@ -1259,7 +1647,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                         # Reset agent work first; THEN write our bookkeeping; THEN
                         # commit it. Doing the flip before the reset would let the
                         # reset wipe the flip — the silent-state-loss bug.
-                        git("reset", "--hard", head_before)
+                        # Use reset_preserving_events to keep prior WU's
+                        # flushed-but-uncommitted events.jsonl entries.
+                        reset_preserving_events(head_before, events_path)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
@@ -1301,7 +1691,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                                 smoke_cmds, Path("."),
                             )
                             if not smoke_ok:
-                                git("reset", "--hard", head_before)
+                                reset_preserving_events(head_before, events_path)
                                 wu_events.append(build_event(
                                     "attempt_outcome", wu.wu_id, {
                                         "outcome": "smoke_import_failed",
@@ -1314,6 +1704,52 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                                 print(f"   SMOKE FAIL attempt "
                                       f"{attempt}/{MAX_ATTEMPTS}")
                                 continue
+                        # Closing deliverable guard (FEAT-2026-0015/T07):
+                        # fires after smoke, before terminal-flip bookkeeping.
+                        closing_ok, closing_summary = assert_closing_deliverables(
+                            wu, feature_dir, REPO_ROOT, head_before,
+                        )
+                        if not closing_ok:
+                            reset_preserving_events(head_before, events_path)
+                            wu_events.append(build_event(
+                                "attempt_outcome", wu.wu_id, {
+                                    "outcome": "closing_deliverable_missing",
+                                    "attempt": attempt,
+                                    "assertion": closing_summary.split(":", 1)[0].strip(),
+                                    "summary": closing_summary,
+                                },
+                            ))
+                            attempt_notes.append((attempt, closing_summary))
+                            failure_note = closing_summary
+                            print(
+                                f"   CLOSING DELIVERABLE MISSING attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
+                            )
+                            continue
+                        if wu.type == "close":
+                            # Re-read frontmatter post-squash: the agent writes
+                            # `verdict:` to the WU file DURING dispatch, but
+                            # `wu.verdict` was populated by `load_wu` BEFORE
+                            # dispatch. Without this re-read, the agent's
+                            # verdict write is invisible to the close-path
+                            # check and `fire_terminal_flips` never fires.
+                            # Surfaced FEAT-2026-0015/G2-CLOSE: verdict: met
+                            # written by agent; in-memory wu.verdict stayed
+                            # None; terminal flips skipped silently.
+                            wu_fm_post, _ = read_frontmatter(wu.file)
+                            wu.verdict = wu_fm_post.get("verdict") or None
+                            if verdict_permits_terminal_flips(wu.verdict):
+                                close_wu_for_terminal = wu
+                            else:
+                                plan_path = feature_dir / "PLAN.md"
+                                plan_fm_recheck, _ = read_frontmatter(plan_path)
+                                if plan_fm_recheck.get("status") == "done":
+                                    write_frontmatter_field(plan_path, "status", "active")
+                                    commit_bookkeeping(
+                                        [plan_path],
+                                        f"chore(loop): {wu.wu_id} revert PLAN.md done"
+                                        f" (hedged verdict)\n\nFeature: {wu.wu_id}",
+                                    )
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
@@ -1343,7 +1779,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
-                        git("reset", "--hard", head_before)
+                        reset_preserving_events(head_before, events_path)
                         print(f"   FILES_CHANGED MISMATCH attempt "
                               f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
                               f"unchanged")
@@ -1355,7 +1791,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     # attempts; on eventual PASS they're discarded as scratch.
                     attempt_notes.append((attempt, payload))
                     failure_note = payload
-                    git("reset", "--hard", head_before)
+                    reset_preserving_events(head_before, events_path)
                     print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
                 else:
                     # for-else: ran out of attempts without break = spinning.
@@ -1415,6 +1851,14 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             [gate.file, events_path],
             f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
         )
+        if close_wu_for_terminal is not None:
+            flip_paths = fire_terminal_flips(close_wu_for_terminal, feature_dir, REPO_ROOT)
+            if flip_paths:
+                commit_bookkeeping(
+                    flip_paths,
+                    f"chore(loop): {close_wu_for_terminal.wu_id} terminal flips"
+                    f"\n\nFeature: {feature_id}",
+                )
         is_terminal_gate = gate is gates[-1]
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()
@@ -1437,10 +1881,10 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                   f"PLAN.md status: done.")
             print(
                 "Terminal — feature ready to wrap. Next step:\n"
-                "  - /wrap-feature        cosmetic gate flip + push branch + "
+                "  - /wrap-feature        push branch + "
                 "open PR + merge advisory (single-confirm per step).\n"
-                "  - Or manually: read RETROSPECTIVE.md, flip "
-                f"{gate.file.name} `status: passed`, git push, gh pr create."
+                "  - Or manually: read RETROSPECTIVE.md, "
+                "git push, gh pr create."
             )
         elif is_terminal_gate:
             print(f"\nGate {gate.number} complete (retro, lessons, docs, "
