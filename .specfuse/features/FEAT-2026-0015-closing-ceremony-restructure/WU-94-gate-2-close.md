@@ -3,7 +3,7 @@ id: FEAT-2026-0015/G2-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 1.50
 oracle_env: macos_local

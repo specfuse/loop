@@ -3,7 +3,7 @@ id: FEAT-2026-0015/T08
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 0.80
 ---
