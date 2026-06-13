@@ -2,9 +2,13 @@
 id: FEAT-2026-0015/G1-PLAN
 type: plan-next
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 1.50
+duration_seconds: 851.432
+cost_usd: 5.764284
+input_tokens: 73
+output_tokens: 53847
 ---
 
 # Gate 1 plan-next: detail Gate 2's WUs
