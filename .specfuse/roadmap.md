@@ -25,7 +25,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` | [→ archive](roadmap-archive.md#feat-2026-0006) |
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` | [→ archive](roadmap-archive.md#feat-2026-0007) |
 | FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` | [→ archive](roadmap-archive.md#feat-2026-0008) |
-| FEAT-2026-0010 | Roadmap restructure: add + archive          | active   | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` | — |
+| FEAT-2026-0010 | Roadmap restructure: add + archive          | done     | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0010) |
 | FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` | — |
 | FEAT-2026-0012 | Closing-WU deliverable guard                | planned  | — | — |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | — |
@@ -101,54 +101,6 @@ GATE-01 status: `passed`.
 matches the methodology default (≥ 90%), with measured TOTAL at 97% and
 no module under 90%. See `RETROSPECTIVE.md §Feature-arc verdict`.
 
-
-## FEAT-2026-0010 — Roadmap restructure: add + archive
-
-**Why.** The roadmap file currently mixes detail sections for every
-feature — done, abandoned, planned, active — into one document. As
-done features accumulate, `pick-feature` (and any other reader of the
-roadmap) loads ~70% irrelevant context every invocation. The file has
-also been edited entirely by hand; there is no skill to append a new
-planned entry, and no mechanism to graduate detail sections out of the
-hot file when work completes.
-
-**Goal.** Land the structural changes that let the roadmap stay lean
-without losing history:
-
-- Split `.specfuse/roadmap.md` so detail sections cover only `planned`
-  and `active` features; move `done` and `abandoned` detail sections
-  to a new `.specfuse/roadmap-archive.md` (table rows stay in the
-  main file with a link to the archive anchor).
-- Migrate FEAT-2026-0003..0008's existing detail sections to the
-  archive as the first dogfooding pass.
-- Ship a `roadmap-add` skill: interactive append of a new planned
-  row + detail section, auto-picking the next FEAT-YYYY-NNNN ID,
-  honoring reserved IDs in repo history.
-- Ship a `roadmap-archive` skill: given a FEAT-ID (or auto-detected
-  done/abandoned rows with detail still inline), cut the detail
-  section and append to the archive, leaving the table row intact.
-- Hook the driver: when `loop.py` flips `PLAN.md` status to
-  `complete`, suggest (or auto-fire) `roadmap-archive` for that
-  feature. Manual-first cut; auto a follow-up if the manual flow is
-  reliable.
-
-**Benefits.** Reduce hot-path context for every roadmap reader.
-Make adding a planned entry a one-command operation, removing the
-friction that causes ad-hoc shorthand to leak into the table.
-Preserve full history in a file that's never loaded on the hot
-path. Foundation for FEAT-2026-0011, which adds new columns and
-scoring data the table can't carry while it's still hand-edited.
-
-**Verification.** `pick-feature` invoked against the restructured
-roadmap loads strictly less context than today (measure: line count
-of the file it reads). `roadmap-add` writes a row + detail section
-that round-trips through the archive flow without losing data.
-`roadmap-archive` is idempotent (running twice does not duplicate
-the archive entry). Migration of 0003..0008 leaves the table
-unchanged in shape; archive contains 6 detail sections matching
-the originals byte-for-byte except for the new archive header.
-
-**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. **Gate 2 (passed).** Driver auto-archive hook shipped: `loop.py` now calls `auto_archive_feature` after flipping `PLAN.md` status to `complete`, automatically archiving the feature's roadmap detail section on feature close. Tests cover happy path, idempotency, and refusal. 1 WU (T05), 2 attempts, $2.05.
 
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 
