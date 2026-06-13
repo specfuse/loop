@@ -149,6 +149,7 @@ class WorkUnit:
     unsandboxed: bool = False
     unsandboxed_rationale: str = ""
     verdict: str | None = None
+    produces_driver_helper: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -297,6 +298,18 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     verdict: str | None = None
     if wu_type in {"close", "close-intermediate"}:
         verdict = fm.get("verdict") or None
+    raw_pdh = fm.get("produces_driver_helper")
+    if raw_pdh is None:
+        produces_driver_helper: list[str] = []
+    elif isinstance(raw_pdh, str):
+        produces_driver_helper = [raw_pdh]
+    elif isinstance(raw_pdh, list):
+        produces_driver_helper = raw_pdh
+    else:
+        raise ValueError(
+            f"{path}: `produces_driver_helper` must be a string or list of strings, "
+            f"got {type(raw_pdh).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -311,6 +324,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         unsandboxed=unsandboxed,
         unsandboxed_rationale=unsandboxed_rationale,
         verdict=verdict,
+        produces_driver_helper=produces_driver_helper,
     )
 
 

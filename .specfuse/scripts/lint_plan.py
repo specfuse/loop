@@ -72,6 +72,32 @@ SECTION_CHECK_STATUSES = {"draft", "pending", "ready"}
 
 # Oracle-env lint (FEAT-2026-0015/T05).
 _ORACLE_EXEMPT_TYPES = frozenset({"lessons", "docs", "retrospective"})
+
+# Driver-wiring keyword detector (FEAT-2026-0017/T02).
+_DRIVER_WIRING_PATTERNS = [
+    re.compile(r"\bloop\.py\b", re.IGNORECASE),
+    re.compile(r"\bdriver-side\b", re.IGNORECASE),
+    re.compile(r"\bMODEL_BY_TYPE\b", re.IGNORECASE),
+    re.compile(r"\bEFFORT_BY_TYPE\b", re.IGNORECASE),
+    re.compile(r"\bGATES_FOR_TYPE\b", re.IGNORECASE),
+    re.compile(r"\bCLOSING_ASSERTIONS_BY_TYPE\b", re.IGNORECASE),
+    re.compile(r"\bPOST_PASS_INVARIANTS_BY_TYPE\b", re.IGNORECASE),
+    re.compile(r"\bfire_terminal_flips\b", re.IGNORECASE),
+    re.compile(r"\bassert_terminal_flips_fired\b", re.IGNORECASE),
+    re.compile(r"\bsquash_commit\b", re.IGNORECASE),
+    re.compile(r"\breset_preserving_events\b", re.IGNORECASE),
+    re.compile(r"\bcommit_bookkeeping\b", re.IGNORECASE),
+]
+
+
+def detect_driver_wiring(wu_body: str) -> list[str]:
+    """Return matched wiring-keyword strings found in wu_body."""
+    found = []
+    for pat in _DRIVER_WIRING_PATTERNS:
+        m = pat.search(wu_body)
+        if m:
+            found.append(m.group(0))
+    return found
 ORACLE_VERB_PATTERNS = (
     re.compile(r"\btest\s+loops?\b", re.IGNORECASE),
     re.compile(r"\bloops?\s+of\s+tests?\b", re.IGNORECASE),
@@ -323,6 +349,19 @@ def lint(feature_dir: Path) -> list[str]:
                         f"(matched: {oracle_matches}) but frontmatter has no "
                         f"'oracle_env' field. "
                         f"See LEARNINGS [FEAT-2026-0013/G1-CLOSE]."
+                    )
+
+            # Driver-wiring declaration WARN (FEAT-2026-0017/T02).
+            if wu_type_val == "implementation":
+                wiring_matches = detect_driver_wiring(wbody)
+                pdh = wfm.get("produces_driver_helper")
+                pdh_empty = not pdh  # None, [], "", or missing all count as empty
+                if wiring_matches and pdh_empty:
+                    print(
+                        f"WARN: {wfile}: implementation WU mentions driver wiring "
+                        f"({wiring_matches}) but `produces_driver_helper` frontmatter "
+                        f"is empty. Declare the symbol(s) this WU produces in the "
+                        f"driver. See authoring-work-units §9 + FEAT-2026-0017."
                     )
 
         # Closing shape check.

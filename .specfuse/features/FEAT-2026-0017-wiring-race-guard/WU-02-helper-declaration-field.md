@@ -3,11 +3,15 @@ id: FEAT-2026-0017/T02
 type: implementation
 model: claude-sonnet-4-6
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.50
 produces_driver_helper:
   - produces_driver_helper
+duration_seconds: 336.116
+cost_usd: 1.233022
+input_tokens: 48
+output_tokens: 11788
 ---
 
 # Add `produces_driver_helper` WU frontmatter field + lint warning
