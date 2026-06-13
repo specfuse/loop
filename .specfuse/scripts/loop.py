@@ -77,20 +77,22 @@ MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 # Defaults applied by load_wu when `model` or `effort` are absent from WU frontmatter.
 # A WU that declares either field explicitly overrides these. Keys cover every VALID_TYPES value.
 MODEL_BY_TYPE = {
-    "implementation": "sonnet",
-    "retrospective":  "sonnet",
-    "lessons":        "sonnet",
-    "docs":           "sonnet",
-    "plan-next":      "opus",
-    "close":          "opus",
+    "implementation":    "sonnet",
+    "retrospective":     "sonnet",
+    "lessons":           "sonnet",
+    "docs":              "sonnet",
+    "plan-next":         "opus",
+    "close":             "opus",
+    "close-intermediate": "opus",
 }
 EFFORT_BY_TYPE = {
-    "implementation": "medium",
-    "retrospective":  "low",
-    "lessons":        "low",
-    "docs":           "low",
-    "plan-next":      "high",
-    "close":          "high",
+    "implementation":    "medium",
+    "retrospective":     "low",
+    "lessons":           "low",
+    "docs":              "low",
+    "plan-next":         "high",
+    "close":             "high",
+    "close-intermediate": "high",
 }
 
 # Which verification gate set (a key in verification.yml) applies to each WU type.
@@ -100,9 +102,12 @@ GATES_FOR_TYPE = {
     "lessons": "doc",
     "docs": "doc",
     "plan-next": "plannext",
-    # `close` collapses the four closing ceremonies into one session (single-gate only).
-    # Reuses the `plannext` gate set: lint_plan.py verifies structural integrity post-close.
+    # `close` collapses the four closing ceremonies into one session for any terminal gate
+    # (single- or multi-gate); `close-intermediate` is the equivalent for non-terminal gates,
+    # leaving `plan-next` as a separate dispatch.
+    # Both reuse the `plannext` gate set: lint_plan.py verifies structural integrity post-close.
     "close": "plannext",
+    "close-intermediate": "plannext",
 }
 
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
