@@ -3,13 +3,17 @@ id: FEAT-2026-0017/T01
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces_driver_helper:
   - POST_PASS_INVARIANTS_BY_TYPE
   - assert_terminal_flips_fired
   - verify_post_pass_invariants
+duration_seconds: 221.01
+cost_usd: 0.417855
+input_tokens: 121
+output_tokens: 10105
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
