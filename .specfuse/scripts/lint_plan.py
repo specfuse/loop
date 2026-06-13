@@ -70,6 +70,48 @@ REQUIRED_SECTIONS = ["Context", "Acceptance criteria", "Do not touch",
                      "Verification", "Escalation triggers"]
 SECTION_CHECK_STATUSES = {"draft", "pending", "ready"}
 
+# Oracle-env lint (FEAT-2026-0015/T05).
+_ORACLE_EXEMPT_TYPES = frozenset({"lessons", "docs", "retrospective"})
+ORACLE_VERB_PATTERNS = (
+    re.compile(r"\btest\s+loops?\b", re.IGNORECASE),
+    re.compile(r"\bloops?\s+of\s+tests?\b", re.IGNORECASE),
+    re.compile(r"\baudit\b", re.IGNORECASE),
+    re.compile(r"\brecursive\s+run\b", re.IGNORECASE),
+    re.compile(r"\brun\s+\d+\s+times\b", re.IGNORECASE),
+    re.compile(r"\b\d+\s+consecutive\s+runs?\b", re.IGNORECASE),
+    re.compile(r"\bsmoke[-\s]tests?\b", re.IGNORECASE),
+    re.compile(r"\boracle\b", re.IGNORECASE),
+    re.compile(r"\bintegration\s+tests?\b", re.IGNORECASE),
+    re.compile(r"\be2e\b", re.IGNORECASE),
+    re.compile(r"for\s+i\s+in\s+\$\(seq\b", re.IGNORECASE),
+    re.compile(r"\brepeat\s+\d+\s+times\b", re.IGNORECASE),
+)
+_AC_START_RE = re.compile(
+    r"(?mi)^\*\*Acceptance criteria[^\n*]*\*\*\.?|^#{1,6}\s+Acceptance criteria"
+)
+_AC_END_RE = re.compile(r"(?m)^(?:\*\*|#{1,6}\s)")
+
+
+def _slice_ac_section(body: str) -> str:
+    """Return the text of the Acceptance criteria section only (bold-preamble or ATX)."""
+    m = _AC_START_RE.search(body)
+    if not m:
+        return ""
+    nl = body.find("\n", m.end())
+    after = body[nl + 1:] if nl != -1 else ""
+    em = _AC_END_RE.search(after)
+    return after[:em.start()] if em else after
+
+
+def detect_oracle_verbs(ac_section_text: str) -> list[str]:
+    """Return matched oracle-verb strings found in the AC section text."""
+    found = []
+    for pat in ORACLE_VERB_PATTERNS:
+        m = pat.search(ac_section_text)
+        if m:
+            found.append(m.group(0))
+    return found
+
 
 def read_frontmatter(path: Path) -> tuple[dict, str]:
     lines = path.read_text().splitlines()
@@ -208,6 +250,18 @@ def lint(feature_dir: Path) -> list[str]:
                         f"ERROR: {wfile}: 'verdict' frontmatter is only meaningful for "
                         f"closing types (close, close-intermediate); remove it from "
                         f"this {wu_type_val!r} WU."
+                    )
+
+            # Oracle-env WARN (FEAT-2026-0015/T05).
+            if wu_type_val not in _ORACLE_EXEMPT_TYPES:
+                ac_text = _slice_ac_section(wbody)
+                oracle_matches = detect_oracle_verbs(ac_text)
+                if oracle_matches and "oracle_env" not in wfm:
+                    print(
+                        f"WARN: {wfile}: AC mentions oracle-like work "
+                        f"(matched: {oracle_matches}) but frontmatter has no "
+                        f"'oracle_env' field. "
+                        f"See LEARNINGS [FEAT-2026-0013/G1-CLOSE]."
                     )
 
         # Closing shape check.

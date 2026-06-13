@@ -6,6 +6,7 @@ type: implementation       # implementation | retrospective | lessons | docs | p
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
 generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
+# oracle_env: macos_local  # OPTIONAL — environment where this WU's verifying oracle runs; see frontmatter notes
 ---
 
 <!--
@@ -67,6 +68,20 @@ Frontmatter notes (single-repo):
   this unit's acceptance depends on existing and behaving correctly. Empty list
   or omitted for units that do not depend on generated code. Authoring this
   field at plan time makes the dependency reviewable before dispatch.
+- `oracle_env` — OPTIONAL. The environment in which the WU's verifying oracle
+  runs. Four accepted forms:
+  - `macos_local` — developer macOS shell (APFS, BSD utils).
+  - `linux_docker` — Docker container (Linux kernel, glibc).
+  - `github_actions_ci` — GitHub Actions runner (Ubuntu image unless narrowed).
+  - Any operator-named string (e.g. `windows_powershell`, `alpine_musl`) for
+    environments not covered above; the operator is responsible for matching it
+    to the goal environment at close time.
+  Lint emits a WARN when the Acceptance criteria section mentions oracle-like
+  verbs (test loop, audit, run N times, oracle, e2e, integration test, etc.) but
+  this field is absent. The WARN is non-blocking. Set this field to suppress it
+  and to make the target environment explicit for reviewers and T07 env-parity
+  enforcement. Rationale: LEARNINGS [FEAT-2026-0013/G1-CLOSE] — "oracle
+  environment must match goal environment" (macOS-local audits hide Linux races).
 
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
 here — see `docs/methodology.md` §2 (one fact, one home).

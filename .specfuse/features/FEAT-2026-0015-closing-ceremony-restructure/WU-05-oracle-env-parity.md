@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T05
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 3
 planned_cost_usd: 1.00
+duration_seconds: 1023.008
+cost_usd: 2.382919
+input_tokens: 79
+output_tokens: 44385
 ---
 
 # Add `oracle_env` frontmatter field and lint warning
