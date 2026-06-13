@@ -43,6 +43,7 @@ import argparse
 import datetime as dt
 import fcntl
 import json
+import logging
 import re
 import subprocess
 import sys
@@ -1104,6 +1105,104 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     return "archived"
 
 
+def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> list[Path]:
+    """Flip terminal gate → passed, roadmap row → done, call auto_archive_feature.
+
+    Called for close-type WUs after squash when verdict_permits_terminal_flips is True.
+    Non-fatal: skips via logging, only raises on internal exceptions.
+    Returns the Paths actually modified (for the bookkeeping commit add list).
+    """
+    modified: set[Path] = set()
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        logging.warning("fire_terminal_flips: no gates in PLAN.md for %s", wu.wu_id)
+    else:
+        terminal_gate = gates[-1]
+        gate_path = terminal_gate.file
+        if not gate_path.exists():
+            logging.warning(
+                "fire_terminal_flips: terminal gate file absent: %s — skipping gate flip",
+                gate_path,
+            )
+        else:
+            current_gate_status = terminal_gate.status
+            if current_gate_status == "passed":
+                logging.info(
+                    "fire_terminal_flips: %s already passed — skipping gate flip",
+                    gate_path.name,
+                )
+            elif current_gate_status == "awaiting_review":
+                write_frontmatter_field(gate_path, "status", "passed")
+                modified.add(gate_path)
+            else:
+                logging.warning(
+                    "fire_terminal_flips: %s status is %r (not awaiting_review or passed)"
+                    " — skipping gate flip",
+                    gate_path.name,
+                    current_gate_status,
+                )
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if not roadmap_path.exists():
+        logging.warning(
+            "fire_terminal_flips: roadmap.md absent at %s — skipping row flip",
+            roadmap_path,
+        )
+    else:
+        roadmap_text = roadmap_path.read_text()
+        row_re = re.compile(
+            r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|[^\n]*$",
+            re.MULTILINE,
+        )
+        row_m = row_re.search(roadmap_text)
+        if not row_m:
+            logging.warning(
+                "fire_terminal_flips: %s not found in roadmap.md — skipping row flip",
+                feature_id,
+            )
+        else:
+            current_row_status = row_m.group(2).strip()
+            if current_row_status == "done":
+                logging.info(
+                    "fire_terminal_flips: roadmap row for %s already done — skipping",
+                    feature_id,
+                )
+            elif current_row_status == "active":
+                new_roadmap = (
+                    roadmap_text[: row_m.start(2)]
+                    + row_m.group(2).replace("active", "done", 1)
+                    + roadmap_text[row_m.end(2):]
+                )
+                roadmap_path.write_text(new_roadmap)
+                modified.add(roadmap_path)
+            else:
+                logging.warning(
+                    "fire_terminal_flips: roadmap row for %s has status %r"
+                    " (not active or done) — skipping row flip",
+                    feature_id,
+                    current_row_status,
+                )
+
+    archive_result = auto_archive_feature(feature_id, repo_root)
+    if archive_result == "archived":
+        modified.add(roadmap_path)
+        modified.add(repo_root / ".specfuse" / "roadmap-archive.md")
+    elif archive_result == "already archived":
+        logging.info(
+            "fire_terminal_flips: %s already archived — skipping auto-archive",
+            feature_id,
+        )
+    else:
+        logging.warning(
+            "fire_terminal_flips: auto_archive_feature: %s — run /roadmap-archive manually",
+            archive_result,
+        )
+
+    return list(modified)
+
+
 # --------------------------------------------------------------------------- #
 # The loop                                                                    #
 # --------------------------------------------------------------------------- #
@@ -1128,11 +1227,6 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         print(f"{feature_id}: all gates passed — feature complete.")
         backend.on_feature_complete(feature_id)
         write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
-        archive_result = auto_archive_feature(feature_id, REPO_ROOT)
-        if archive_result.startswith("refused:"):
-            print(f"warning: auto-archive skipped — {archive_result}. Run /roadmap-archive manually.")
-        else:
-            print(f"{feature_id}: {archive_result}")
         return 0
 
     lock_fd = None
@@ -1193,6 +1287,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 if wfm.get("status") == DONE:
                     done_ids.add(ref["id"])
         blocked = False
+        close_wu_for_terminal: WorkUnit | None = None
 
         while True:
             pending = ready(units, done_ids)
@@ -1366,6 +1461,19 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                                 print(f"   SMOKE FAIL attempt "
                                       f"{attempt}/{MAX_ATTEMPTS}")
                                 continue
+                        if wu.type == "close":
+                            if verdict_permits_terminal_flips(wu.verdict):
+                                close_wu_for_terminal = wu
+                            else:
+                                plan_path = feature_dir / "PLAN.md"
+                                plan_fm_recheck, _ = read_frontmatter(plan_path)
+                                if plan_fm_recheck.get("status") == "done":
+                                    write_frontmatter_field(plan_path, "status", "active")
+                                    commit_bookkeeping(
+                                        [plan_path],
+                                        f"chore(loop): {wu.wu_id} revert PLAN.md done"
+                                        f" (hedged verdict)\n\nFeature: {wu.wu_id}",
+                                    )
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
@@ -1467,6 +1575,14 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             [gate.file, events_path],
             f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
         )
+        if close_wu_for_terminal is not None:
+            flip_paths = fire_terminal_flips(close_wu_for_terminal, feature_dir, REPO_ROOT)
+            if flip_paths:
+                commit_bookkeeping(
+                    flip_paths,
+                    f"chore(loop): {close_wu_for_terminal.wu_id} terminal flips"
+                    f"\n\nFeature: {feature_id}",
+                )
         is_terminal_gate = gate is gates[-1]
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()
@@ -1489,10 +1605,10 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                   f"PLAN.md status: done.")
             print(
                 "Terminal — feature ready to wrap. Next step:\n"
-                "  - /wrap-feature        cosmetic gate flip + push branch + "
+                "  - /wrap-feature        push branch + "
                 "open PR + merge advisory (single-confirm per step).\n"
-                "  - Or manually: read RETROSPECTIVE.md, flip "
-                f"{gate.file.name} `status: passed`, git push, gh pr create."
+                "  - Or manually: read RETROSPECTIVE.md, "
+                "git push, gh pr create."
             )
         elif is_terminal_gate:
             print(f"\nGate {gate.number} complete (retro, lessons, docs, "

@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T06
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
+duration_seconds: 1071.842
+cost_usd: 3.086076
+input_tokens: 58
+output_tokens: 54494
 ---
 
 # Move terminal state-flips from `/wrap-feature` into the `close` WU's post-verify driver flow
