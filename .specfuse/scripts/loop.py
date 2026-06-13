@@ -1229,7 +1229,8 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                               f"Halted before {wu.wu_id}.")
                         return 1
 
-                print(f"\n-- {wu.wu_id} [{wu.type}] model={wu.model} effort={wu.effort}")
+                print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
+                      f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 if dry_run:
                     print("   (dry run — would dispatch)")
                     wu.status = DONE
@@ -1266,8 +1267,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 failure_note = None
                 for attempt in range(1, MAX_ATTEMPTS + 1):
                     backend.set_wu(wu, "attempts", attempt)
-                    print(f"   attempt {attempt}/{MAX_ATTEMPTS} "
-                          f"model={wu.model} effort={wu.effort} — fresh session")
+                    print(f"   [{time.strftime('%H:%M:%S')}] attempt "
+                          f"{attempt}/{MAX_ATTEMPTS} model={wu.model} "
+                          f"effort={wu.effort} — fresh session")
                     if attempt > 1 and failure_note:
                         reason = failure_note.strip().splitlines()[0][:200]
                         print(f"   retry reason: {reason}")

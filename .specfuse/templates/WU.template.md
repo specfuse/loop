@@ -5,6 +5,7 @@ type: implementation       # implementation | retrospective | lessons | docs | p
 # effort: <override>       # optional — defaults per EFFORT_BY_TYPE[type] in loop.py; low | medium | high | xhigh | max
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
+# planned_cost_usd: 0.00   # OPTIONAL — estimated USD cost at draft time; see roadmap_goal § Planned-cost capture
 generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
 # oracle_env: macos_local  # OPTIONAL — environment where this WU's verifying oracle runs; see frontmatter notes
 ---
@@ -63,6 +64,14 @@ Frontmatter notes (single-repo):
   attempts on this WU. Authors leave it off; the driver owns it.
   Per-attempt duration also appears in `events.jsonl`'s outcome event
   payload, in the `attempts_usage` list alongside cost/token fields.
+- `planned_cost_usd` — OPTIONAL. The operator's estimated cost for this work
+  unit at draft time, in USD. Used by the close WU's `## Cost analysis`
+  section to compare planned vs actual spend. Lint emits a WARN when this
+  field is absent on active or draft WUs (non-blocking; exit code 0). Sealed
+  WUs (status=`done` AND PLAN.md status=`done`) are skipped silently.
+  See PLAN.md `roadmap_goal` § "Planned-cost capture". The driver's
+  `cost_usd` field (written at outcome time) is the actual; this field is
+  the plan. Authors set it at draft/arm time; the driver never overwrites it.
 - `generated_surfaces` — OPTIONAL. Lists paths inside this repo to generated
   files (`_generated/`, `gen-src/`, or the repo's declared equivalent) that
   this unit's acceptance depends on existing and behaving correctly. Empty list

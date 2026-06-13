@@ -8,6 +8,7 @@ roadmap_goal: <one line copied from the roadmap — the north star this feature 
   it should change>
 autonomy_default: review        # auto | review | supervised
 status: active                  # active | done | abandoned
+# planned_cost_usd: 0.00        # OPTIONAL — sum of WU planned costs; lint warns when missing or when delta from WU sum > 10%
 ---
 
 # Plan: <short feature title>

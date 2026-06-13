@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T08
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.80
+duration_seconds: 754.749
+cost_usd: 2.13577
+input_tokens: 6158
+output_tokens: 33829
 ---
 
 # Planned-cost capture: WU + PLAN frontmatter, close `## Cost analysis` AC, lint warning

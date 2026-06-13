@@ -152,6 +152,15 @@ For gate 1 only:
   Surface whichever set applies for confirmation rather than per-section
   discussion.
 
+  **Every `close` (and `close-intermediate`) WU body must include a
+  `## Cost analysis` section as one of its acceptance criteria bullets.**
+  Draft the AC bullet as: "A `## Cost analysis` section is present,
+  reconciling `planned_cost_usd` (from PLAN.md and per-WU frontmatter)
+  against actual spend (from events.jsonl), with delta named." The
+  hollow-pass guard (`assert_cost_analysis_section_when_met`, T07)
+  enforces this at execution time; listing it as an explicit AC bullet
+  makes the contract visible at plan-next authoring time.
+
 #### Legacy: 4-WU sequence
 
 Older features used a four-WU closing sequence: `G1-RETRO`

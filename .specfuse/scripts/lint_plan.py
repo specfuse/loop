@@ -123,6 +123,67 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     return _miniyaml.parse("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
 
 
+def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
+    """Emit WARN for missing planned_cost_usd on WUs and PLAN.md.
+
+    Sealed WUs (wu status=done AND plan status=done) are skipped silently —
+    backfilling cost estimates on history is pointless.  Active or draft WUs
+    get the WARN.  PLAN.md is compared against the sum of WU planned costs;
+    delta > 10% emits a separate WARN naming the delta.  Never raises or
+    appends to an errors list — all findings are WARN-only (exit code 0).
+    """
+    plan_status = plan_fm.get("status", "")
+    wu_sum = 0.0
+
+    for g in gates:
+        units = g.get("work_units") or []
+        for ref in units:
+            wfile = ref.get("file")
+            if not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            wu_status = wfm.get("status", "")
+            planned = wfm.get("planned_cost_usd")
+
+            # Sealed: feature done AND this WU done — nothing useful to backfill.
+            is_sealed = (wu_status == "done" and plan_status == "done")
+            if not is_sealed and planned is None:
+                print(
+                    f"WARN: {wfile}: missing 'planned_cost_usd' frontmatter "
+                    f"(optional but recommended for cost-variance calibration). "
+                    f"See PLAN.md roadmap_goal § Planned-cost capture."
+                )
+            if planned is not None:
+                wu_sum += float(planned)
+
+    wu_sum = round(wu_sum, 2)
+
+    plan_cost = plan_fm.get("planned_cost_usd")
+    if plan_cost is None:
+        print(
+            f"WARN: {feature_dir}/PLAN.md: missing 'planned_cost_usd' frontmatter "
+            f"(optional but recommended for cost-variance calibration). "
+            f"See PLAN.md roadmap_goal § Planned-cost capture."
+        )
+    else:
+        plan_cost_f = round(float(plan_cost), 2)
+        if plan_cost_f > 0 or wu_sum > 0:
+            denom = plan_cost_f if plan_cost_f > 0 else wu_sum
+            delta_pct = abs(plan_cost_f - wu_sum) / denom * 100
+        else:
+            delta_pct = 0.0
+        if delta_pct > 10:
+            print(
+                f"WARN: {feature_dir}/PLAN.md: planned_cost_usd "
+                f"${plan_cost_f:.2f} differs from sum of WU planned costs "
+                f"${wu_sum:.2f} (delta {delta_pct:.0f}%, threshold 10%). "
+                f"Review estimates."
+            )
+
+
 def lint(feature_dir: Path) -> list[str]:
     errs: list[str] = []
     plan = feature_dir / "PLAN.md"
@@ -307,6 +368,9 @@ def lint(feature_dir: Path) -> list[str]:
                 f"WU (terminal new); found {closing_found}"
             )
             _gate_closing_shapes[gnum] = "INVALID"
+
+    # Planned-cost capture: WARN on missing/divergent planned_cost_usd fields.
+    check_planned_cost(feature_dir, fm, gates)
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
