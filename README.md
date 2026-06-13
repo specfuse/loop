@@ -51,10 +51,12 @@ the planning rigor Ralph's bare task list lacks.
   verification itself as the exit oracle, and commits one squashed,
   trailer-carrying commit per unit. A failed gate is retried with a fresh
   session carrying the failure evidence, up to three attempts, then escalated.
-- Each gate ends with a fixed **closing sequence** — retrospective, lessons,
-  docs, and plan-next — so reflection, a durable cross-feature `LEARNINGS.md`,
-  documentation, and *drafting the next gate* all happen systematically rather
-  than when you remember to ask.
+- Each gate ends with a **closing sequence** so reflection, a durable
+  cross-feature `LEARNINGS.md`, documentation, and *drafting the next gate* all
+  happen systematically. Non-terminal gates use a two-WU form
+  (`close-intermediate` + `plan-next`); the terminal gate uses a single `close`
+  WU. A legacy four-WU form (`retrospective → lessons → docs → plan-next`) is
+  accepted but emits a lint warning.
 - The gate is the **human boundary.** The driver runs unattended within a gate
   and stops at it; you review the next gate's draft and arm it. (Under automatic
   mode, safe gates can self-arm; the dangerous edges always pull you back in —

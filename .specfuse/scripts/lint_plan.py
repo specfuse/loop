@@ -32,19 +32,25 @@ import re
 import sys
 from pathlib import Path
 
-# Strict mini-YAML reader (alongside this script) — keeps the linter zero-install.
+# Strict mini-YAML reader and loop constants (alongside this script).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _miniyaml  # noqa: E402
+from loop import VERDICT_VALUES  # noqa: E402
 
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
-VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close"}
+VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close",
+               "close-intermediate"}
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
-# All WU types that count as closing work — the four-WU sequence members
-# plus the single-session `close` alternative (single-gate features only).
-_CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
+# New compact closing shapes (FEAT-2026-0015):
+#   non-terminal gate: close-intermediate → plan-next
+#   terminal gate:     close  (any feature size)
+# Legacy 4-WU CLOSING_SEQUENCE still accepted on any gate but emits a WARN.
+NEW_INTERMEDIATE_SEQUENCE = ["close-intermediate", "plan-next"]
+# All WU types that count as closing work.
+_CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close", "close-intermediate"}
 # Correlation-ID pattern — canonical, mirroring `.specfuse/rules/correlation-ids.md`.
 # Two namespaces:
 #   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
@@ -55,14 +61,56 @@ VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
 CORRELATION_ID_RE = re.compile(
-    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|"
-    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$"
+    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|"
+    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$"
 )
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the
 # template but not hard-required here.
 REQUIRED_SECTIONS = ["Context", "Acceptance criteria", "Do not touch",
                      "Verification", "Escalation triggers"]
 SECTION_CHECK_STATUSES = {"draft", "pending", "ready"}
+
+# Oracle-env lint (FEAT-2026-0015/T05).
+_ORACLE_EXEMPT_TYPES = frozenset({"lessons", "docs", "retrospective"})
+ORACLE_VERB_PATTERNS = (
+    re.compile(r"\btest\s+loops?\b", re.IGNORECASE),
+    re.compile(r"\bloops?\s+of\s+tests?\b", re.IGNORECASE),
+    re.compile(r"\baudit\b", re.IGNORECASE),
+    re.compile(r"\brecursive\s+run\b", re.IGNORECASE),
+    re.compile(r"\brun\s+\d+\s+times\b", re.IGNORECASE),
+    re.compile(r"\b\d+\s+consecutive\s+runs?\b", re.IGNORECASE),
+    re.compile(r"\bsmoke[-\s]tests?\b", re.IGNORECASE),
+    re.compile(r"\boracle\b", re.IGNORECASE),
+    re.compile(r"\bintegration\s+tests?\b", re.IGNORECASE),
+    re.compile(r"\be2e\b", re.IGNORECASE),
+    re.compile(r"for\s+i\s+in\s+\$\(seq\b", re.IGNORECASE),
+    re.compile(r"\brepeat\s+\d+\s+times\b", re.IGNORECASE),
+)
+_AC_START_RE = re.compile(
+    r"(?mi)^\*\*Acceptance criteria[^\n*]*\*\*\.?|^#{1,6}\s+Acceptance criteria"
+)
+_AC_END_RE = re.compile(r"(?m)^(?:\*\*|#{1,6}\s)")
+
+
+def _slice_ac_section(body: str) -> str:
+    """Return the text of the Acceptance criteria section only (bold-preamble or ATX)."""
+    m = _AC_START_RE.search(body)
+    if not m:
+        return ""
+    nl = body.find("\n", m.end())
+    after = body[nl + 1:] if nl != -1 else ""
+    em = _AC_END_RE.search(after)
+    return after[:em.start()] if em else after
+
+
+def detect_oracle_verbs(ac_section_text: str) -> list[str]:
+    """Return matched oracle-verb strings found in the AC section text."""
+    found = []
+    for pat in ORACLE_VERB_PATTERNS:
+        m = pat.search(ac_section_text)
+        if m:
+            found.append(m.group(0))
+    return found
 
 
 def read_frontmatter(path: Path) -> tuple[dict, str]:
@@ -73,6 +121,67 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
     return _miniyaml.parse("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
+
+
+def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
+    """Emit WARN for missing planned_cost_usd on WUs and PLAN.md.
+
+    Sealed WUs (wu status=done AND plan status=done) are skipped silently —
+    backfilling cost estimates on history is pointless.  Active or draft WUs
+    get the WARN.  PLAN.md is compared against the sum of WU planned costs;
+    delta > 10% emits a separate WARN naming the delta.  Never raises or
+    appends to an errors list — all findings are WARN-only (exit code 0).
+    """
+    plan_status = plan_fm.get("status", "")
+    wu_sum = 0.0
+
+    for g in gates:
+        units = g.get("work_units") or []
+        for ref in units:
+            wfile = ref.get("file")
+            if not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            wu_status = wfm.get("status", "")
+            planned = wfm.get("planned_cost_usd")
+
+            # Sealed: feature done AND this WU done — nothing useful to backfill.
+            is_sealed = (wu_status == "done" and plan_status == "done")
+            if not is_sealed and planned is None:
+                print(
+                    f"WARN: {wfile}: missing 'planned_cost_usd' frontmatter "
+                    f"(optional but recommended for cost-variance calibration). "
+                    f"See PLAN.md roadmap_goal § Planned-cost capture."
+                )
+            if planned is not None:
+                wu_sum += float(planned)
+
+    wu_sum = round(wu_sum, 2)
+
+    plan_cost = plan_fm.get("planned_cost_usd")
+    if plan_cost is None:
+        print(
+            f"WARN: {feature_dir}/PLAN.md: missing 'planned_cost_usd' frontmatter "
+            f"(optional but recommended for cost-variance calibration). "
+            f"See PLAN.md roadmap_goal § Planned-cost capture."
+        )
+    else:
+        plan_cost_f = round(float(plan_cost), 2)
+        if plan_cost_f > 0 or wu_sum > 0:
+            denom = plan_cost_f if plan_cost_f > 0 else wu_sum
+            delta_pct = abs(plan_cost_f - wu_sum) / denom * 100
+        else:
+            delta_pct = 0.0
+        if delta_pct > 10:
+            print(
+                f"WARN: {feature_dir}/PLAN.md: planned_cost_usd "
+                f"${plan_cost_f:.2f} differs from sum of WU planned costs "
+                f"${wu_sum:.2f} (delta {delta_pct:.0f}%, threshold 10%). "
+                f"Review estimates."
+            )
 
 
 def lint(feature_dir: Path) -> list[str]:
@@ -92,10 +201,16 @@ def lint(feature_dir: Path) -> list[str]:
     graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
     all_ids = {wu["id"] for g in gates for wu in (g.get("work_units") or [])}
-    nonempty_gates_count = sum(1 for g in gates if g.get("work_units"))
+    # Last non-empty gate is the terminal gate; `close` is only valid there.
+    terminal_gate_gnum = next(
+        (g.get("gate", "?") for g in reversed(gates) if g.get("work_units")), None
+    )
+    # Track closing shape per gate for cross-gate mixed-shape detection.
+    _gate_closing_shapes: dict = {}  # gnum -> "NEW" | "LEGACY" | "INVALID"
 
     for g in gates:
         gnum = g.get("gate", "?")
+        is_terminal = (gnum == terminal_gate_gnum)
         units = g.get("work_units") or []
 
         # GATE.md cost_budget_usd: optional, must be numeric when present.
@@ -176,20 +291,119 @@ def lint(feature_dir: Path) -> list[str]:
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
 
-        # Closing: either the four-WU sequence or a single `close` WU (single-gate only).
+            # Verdict frontmatter validation.
+            wu_verdict = wfm.get("verdict")
+            wu_status = wfm.get("status")
+            wu_type_val = wfm.get("type")
+            if wu_type_val in {"close", "close-intermediate"}:
+                # draft/pending: verdict written at execution time, not before dispatch.
+                # done/abandoned/blocked_human: legacy fixtures without verdict are valid.
+                if wu_status not in {"draft", "pending", "done", "abandoned", "blocked_human"}:
+                    if wu_verdict is None or wu_verdict not in VERDICT_VALUES:
+                        errs.append(
+                            f"ERROR: {wfile}: close-type WU missing or invalid 'verdict' "
+                            f"frontmatter (must be one of: "
+                            f"met, met_locally, partially_met, not_met)."
+                        )
+            else:
+                if wu_verdict is not None:
+                    errs.append(
+                        f"ERROR: {wfile}: 'verdict' frontmatter is only meaningful for "
+                        f"closing types (close, close-intermediate); remove it from "
+                        f"this {wu_type_val!r} WU."
+                    )
+
+            # Oracle-env WARN (FEAT-2026-0015/T05).
+            if wu_type_val not in _ORACLE_EXEMPT_TYPES:
+                ac_text = _slice_ac_section(wbody)
+                oracle_matches = detect_oracle_verbs(ac_text)
+                if oracle_matches and "oracle_env" not in wfm:
+                    print(
+                        f"WARN: {wfile}: AC mentions oracle-like work "
+                        f"(matched: {oracle_matches}) but frontmatter has no "
+                        f"'oracle_env' field. "
+                        f"See LEARNINGS [FEAT-2026-0013/G1-CLOSE]."
+                    )
+
+        # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]
         if closing_found == ["close"]:
-            if nonempty_gates_count != 1:
+            if is_terminal:
+                _gate_closing_shapes[gnum] = "NEW"
+            else:
                 errs.append(
-                    f"gate {gnum}: `close` WU is only valid in single-gate features "
-                    f"({nonempty_gates_count} non-empty gates found); "
-                    f"multi-gate features must use {CLOSING_SEQUENCE}"
+                    f"gate {gnum}: `close` WU is only valid on a terminal gate; "
+                    f"non-terminal gates must use {NEW_INTERMEDIATE_SEQUENCE} "
+                    f"(new) or {CLOSING_SEQUENCE} (legacy)"
                 )
-        elif closing_found != CLOSING_SEQUENCE:
+                _gate_closing_shapes[gnum] = "INVALID"
+        elif closing_found == NEW_INTERMEDIATE_SEQUENCE:
+            if not is_terminal:
+                _gate_closing_shapes[gnum] = "NEW"
+            else:
+                errs.append(
+                    f"gate {gnum}: `close-intermediate → plan-next` is for "
+                    f"non-terminal gates; terminal gate must use a single `close` WU "
+                    f"(new) or {CLOSING_SEQUENCE} (legacy)"
+                )
+                _gate_closing_shapes[gnum] = "INVALID"
+        elif closing_found == CLOSING_SEQUENCE:
+            gate_file_for_warn = gate_file_rel or f"GATE-{gnum:02d}.md"
+            print(
+                f"WARN: {feature_dir}/{gate_file_for_warn} uses legacy 4-WU closing "
+                f"sequence; new contract is 2-WU (close-intermediate + plan-next) for "
+                f"intermediate or 1-WU (close) for terminal. See FEAT-2026-0015."
+            )
+            _gate_closing_shapes[gnum] = "LEGACY"
+        elif "close-intermediate" in closing_found:
             errs.append(
-                f"gate {gnum}: closing sequence must be exactly "
-                f"{CLOSING_SEQUENCE} in order (or a single `close` WU for "
-                f"single-gate features); found {closing_found}"
+                f"gate {gnum}: close-intermediate must be immediately followed by "
+                f"plan-next; found closing sequence {closing_found}"
+            )
+            _gate_closing_shapes[gnum] = "INVALID"
+        else:
+            errs.append(
+                f"gate {gnum}: closing sequence must be {CLOSING_SEQUENCE} (legacy), "
+                f"{NEW_INTERMEDIATE_SEQUENCE} (non-terminal new), or a single `close` "
+                f"WU (terminal new); found {closing_found}"
+            )
+            _gate_closing_shapes[gnum] = "INVALID"
+
+    # Planned-cost capture: WARN on missing/divergent planned_cost_usd fields.
+    check_planned_cost(feature_dir, fm, gates)
+
+    # Cross-gate mixed-shape check. Two directions of mix:
+    #
+    # - FORWARD MIGRATION (legacy on earlier gates + NEW on terminal):
+    #   ALLOWED with WARN. This is the documented dogfood-inversion pattern
+    #   FEAT-2026-0015 uses on itself (gate 1 closed under the legacy 4-WU
+    #   sequence; gate 2 ships + dogfoods the NEW close contract). Operators
+    #   migrating an in-flight feature mid-stream land here naturally.
+    #
+    # - BACKWARD DRIFT (NEW on earlier gates + legacy on terminal): ERROR.
+    #   The new contract is the canonical target; sliding back to legacy on
+    #   the terminal gate after using NEW earlier is methodology drift the
+    #   author owes a deliberate explanation for. Don't soft-fail it.
+    new_gnums = sorted(n for n, s in _gate_closing_shapes.items() if s == "NEW")
+    legacy_gnums = sorted(n for n, s in _gate_closing_shapes.items() if s == "LEGACY")
+    if new_gnums and legacy_gnums:
+        terminal_gnum = max(new_gnums + legacy_gnums)
+        if terminal_gnum in new_gnums:
+            # Forward migration: legacy earlier, NEW terminal.
+            print(
+                f"WARN: {feature_dir}: forward-mixed closing-shape contracts — "
+                f"gate(s) {legacy_gnums} use LEGACY 4-WU, terminal gate "
+                f"{terminal_gnum} uses NEW. This is allowed as a dogfood / "
+                f"migration pattern (see FEAT-2026-0015 LEARNINGS). Future "
+                f"features should consistently use NEW from the start."
+            )
+        else:
+            errs.append(
+                f"ERROR: {feature_dir}: backward-mixed closing-shape contracts — "
+                f"gate(s) {new_gnums} use NEW but terminal gate {terminal_gnum} "
+                f"uses LEGACY. The new contract is canonical; reverting to "
+                f"legacy on the terminal gate is methodology drift. Pick NEW "
+                f"on the terminal gate, or use LEGACY consistently."
             )
 
     return errs
