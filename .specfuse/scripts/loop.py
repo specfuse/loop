@@ -1727,6 +1727,17 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                             )
                             continue
                         if wu.type == "close":
+                            # Re-read frontmatter post-squash: the agent writes
+                            # `verdict:` to the WU file DURING dispatch, but
+                            # `wu.verdict` was populated by `load_wu` BEFORE
+                            # dispatch. Without this re-read, the agent's
+                            # verdict write is invisible to the close-path
+                            # check and `fire_terminal_flips` never fires.
+                            # Surfaced FEAT-2026-0015/G2-CLOSE: verdict: met
+                            # written by agent; in-memory wu.verdict stayed
+                            # None; terminal flips skipped silently.
+                            wu_fm_post, _ = read_frontmatter(wu.file)
+                            wu.verdict = wu_fm_post.get("verdict") or None
                             if verdict_permits_terminal_flips(wu.verdict):
                                 close_wu_for_terminal = wu
                             else:
