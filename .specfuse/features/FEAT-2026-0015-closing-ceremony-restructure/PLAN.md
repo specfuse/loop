@@ -81,7 +81,33 @@ gates:
           - FEAT-2026-0015/G1-DOCS
   - gate: 2
     file: GATE-02.md
-    work_units: []     # drafted by G1-PLAN
+    work_units:
+      - id: FEAT-2026-0015/T04
+        file: WU-04-verdict-coupling.md
+        depends_on: []
+      - id: FEAT-2026-0015/T05
+        file: WU-05-oracle-env-parity.md
+        depends_on: []
+      - id: FEAT-2026-0015/T06
+        file: WU-06-state-flip-consolidation.md
+        depends_on:
+          - FEAT-2026-0015/T04
+      - id: FEAT-2026-0015/T07
+        file: WU-07-hollow-pass-guard.md
+        depends_on:
+          - FEAT-2026-0015/T04
+          - FEAT-2026-0015/T05
+      - id: FEAT-2026-0015/T08
+        file: WU-08-planned-cost-capture.md
+        depends_on: []
+      - id: FEAT-2026-0015/G2-CLOSE
+        file: WU-94-gate-2-close.md
+        depends_on:
+          - FEAT-2026-0015/T04
+          - FEAT-2026-0015/T05
+          - FEAT-2026-0015/T06
+          - FEAT-2026-0015/T07
+          - FEAT-2026-0015/T08
 ```
 
 ## Notes

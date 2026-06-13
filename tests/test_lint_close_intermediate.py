@@ -275,6 +275,72 @@ class TestCloseIntermediateShapes(unittest.TestCase):
             self.assertTrue(mixed_errs,
                             f"errors must name the mixed-contract problem; errs={errs}")
 
+    def test_forward_mixed_shapes_warn_no_error(self):
+        """Forward-migration mix (legacy on earlier gates + NEW on terminal gate)
+        is the documented dogfood pattern FEAT-2026-0015 uses on itself. Must
+        emit a WARN (stdout) but NOT block via errs list — lint exits 0."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = Path(tmpdir) / "feature"
+            feature.mkdir()
+            # Gate 1 = LEGACY 4-WU, Gate 2 (terminal) = NEW single `close`.
+            _write_plan(feature, (
+                "gates:\n"
+                "  - gate: 1\n"
+                "    file: GATE-01.md\n"
+                "    work_units:\n"
+                "      - id: FEAT-2026-9003/T01\n"
+                "        file: WU-01-impl.md\n"
+                "        depends_on: []\n"
+                "      - id: FEAT-2026-9003/G1-RETRO\n"
+                "        file: WU-90-retro.md\n"
+                "        depends_on: [FEAT-2026-9003/T01]\n"
+                "      - id: FEAT-2026-9003/G1-LESSONS\n"
+                "        file: WU-91-lessons.md\n"
+                "        depends_on: [FEAT-2026-9003/G1-RETRO]\n"
+                "      - id: FEAT-2026-9003/G1-DOCS\n"
+                "        file: WU-92-docs.md\n"
+                "        depends_on: [FEAT-2026-9003/G1-LESSONS]\n"
+                "      - id: FEAT-2026-9003/G1-PLAN\n"
+                "        file: WU-93-plan.md\n"
+                "        depends_on: [FEAT-2026-9003/G1-DOCS]\n"
+                "  - gate: 2\n"
+                "    file: GATE-02.md\n"
+                "    work_units:\n"
+                "      - id: FEAT-2026-9003/T02\n"
+                "        file: WU-02-impl.md\n"
+                "        depends_on: [FEAT-2026-9003/G1-PLAN]\n"
+                "      - id: FEAT-2026-9003/G2-CLOSE\n"
+                "        file: WU-94-close.md\n"
+                "        depends_on: [FEAT-2026-9003/T02]"
+            ))
+            _write_wu(feature, "WU-01-impl.md", "FEAT-2026-9003/T01", "implementation")
+            _write_wu(feature, "WU-90-retro.md", "FEAT-2026-9003/G1-RETRO", "retrospective")
+            _write_wu(feature, "WU-91-lessons.md", "FEAT-2026-9003/G1-LESSONS", "lessons")
+            _write_wu(feature, "WU-92-docs.md", "FEAT-2026-9003/G1-DOCS", "docs")
+            _write_wu(feature, "WU-93-plan.md", "FEAT-2026-9003/G1-PLAN", "plan-next")
+            _write_wu(feature, "WU-02-impl.md", "FEAT-2026-9003/T02", "implementation")
+            _write_wu(feature, "WU-94-close.md", "FEAT-2026-9003/G2-CLOSE", "close")
+
+            captured = io.StringIO()
+            old_stdout = sys.stdout
+            sys.stdout = captured
+            try:
+                errs = lint_plan.lint(feature)
+            finally:
+                sys.stdout = old_stdout
+
+            # No errors — forward-mixed is allowed
+            mixed_errs = [e for e in errs if "mixed" in e.lower()]
+            self.assertFalse(
+                mixed_errs,
+                f"forward-mixed (legacy earlier + NEW terminal) must NOT produce "
+                f"mixed-contract errors; got: {mixed_errs}",
+            )
+            # WARN is on stdout
+            out = captured.getvalue()
+            self.assertIn("WARN", out, f"expected WARN on stdout; got: {out!r}")
+            self.assertIn("forward-mixed", out)
+
     def test_close_intermediate_followed_by_non_plan_next_emits_error(self):
         """close-intermediate that is NOT followed by plan-next must produce a lint
         error — the two WUs must appear as an adjacent pair."""

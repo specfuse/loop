@@ -231,15 +231,39 @@ def lint(feature_dir: Path) -> list[str]:
             )
             _gate_closing_shapes[gnum] = "INVALID"
 
-    # Cross-gate mixed-shape check: operators must pick one contract per feature.
-    new_gnums = [n for n, s in _gate_closing_shapes.items() if s == "NEW"]
-    legacy_gnums = [n for n, s in _gate_closing_shapes.items() if s == "LEGACY"]
+    # Cross-gate mixed-shape check. Two directions of mix:
+    #
+    # - FORWARD MIGRATION (legacy on earlier gates + NEW on terminal):
+    #   ALLOWED with WARN. This is the documented dogfood-inversion pattern
+    #   FEAT-2026-0015 uses on itself (gate 1 closed under the legacy 4-WU
+    #   sequence; gate 2 ships + dogfoods the NEW close contract). Operators
+    #   migrating an in-flight feature mid-stream land here naturally.
+    #
+    # - BACKWARD DRIFT (NEW on earlier gates + legacy on terminal): ERROR.
+    #   The new contract is the canonical target; sliding back to legacy on
+    #   the terminal gate after using NEW earlier is methodology drift the
+    #   author owes a deliberate explanation for. Don't soft-fail it.
+    new_gnums = sorted(n for n, s in _gate_closing_shapes.items() if s == "NEW")
+    legacy_gnums = sorted(n for n, s in _gate_closing_shapes.items() if s == "LEGACY")
     if new_gnums and legacy_gnums:
-        errs.append(
-            f"ERROR: {feature_dir}: mixed closing-shape contracts across gates "
-            f"(gate {new_gnums[0]} uses NEW, gate {legacy_gnums[0]} uses LEGACY). "
-            f"Pick one contract per feature."
-        )
+        terminal_gnum = max(new_gnums + legacy_gnums)
+        if terminal_gnum in new_gnums:
+            # Forward migration: legacy earlier, NEW terminal.
+            print(
+                f"WARN: {feature_dir}: forward-mixed closing-shape contracts — "
+                f"gate(s) {legacy_gnums} use LEGACY 4-WU, terminal gate "
+                f"{terminal_gnum} uses NEW. This is allowed as a dogfood / "
+                f"migration pattern (see FEAT-2026-0015 LEARNINGS). Future "
+                f"features should consistently use NEW from the start."
+            )
+        else:
+            errs.append(
+                f"ERROR: {feature_dir}: backward-mixed closing-shape contracts — "
+                f"gate(s) {new_gnums} use NEW but terminal gate {terminal_gnum} "
+                f"uses LEGACY. The new contract is canonical; reverting to "
+                f"legacy on the terminal gate is methodology drift. Pick NEW "
+                f"on the terminal gate, or use LEGACY consistently."
+            )
 
     return errs
 

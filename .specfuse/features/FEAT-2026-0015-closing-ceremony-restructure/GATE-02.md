@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: open
 ---
 
 # Gate 2 — Semantics, audit, and new-contract dogfood
