@@ -3,11 +3,15 @@ id: FEAT-2026-0017/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 1.20
 oracle_env: macos_local
 verdict: not_set
+duration_seconds: 87.011
+cost_usd: 0.90931
+input_tokens: 16
+output_tokens: 5406
 ---
 
 # Gate 1 close — terminal close ceremony (NEW contract; recursive dogfood)
