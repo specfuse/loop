@@ -6,9 +6,10 @@
 
 Three assertions:
   (a) lint accepts a single-gate feature whose gate closes with one `close` WU
-  (b) lint rejects a `close` WU in a two-gate feature
+  (b) lint rejects a `close` WU on a non-terminal gate (terminal gate with
+      `close` is now valid for any feature size — single- or multi-gate)
   (c) lint still accepts the four-WU [retrospective, lessons, docs, plan-next]
-      closing sequence — regression guard for multi-gate features
+      closing sequence — regression guard (emits WARN, exits zero)
 """
 
 from __future__ import annotations
@@ -86,9 +87,10 @@ class TestCloseWuLint(unittest.TestCase):
             self.assertEqual(errs, [],
                              f"single-gate close WU must pass lint; errs={errs}")
 
-    def test_two_gate_close_rejected(self):
-        """(b) `close` WU in a two-gate feature must produce a lint error naming
-        the single-gate constraint."""
+    def test_non_terminal_gate_close_rejected(self):
+        """(b) `close` WU on a non-terminal gate must produce a lint error naming
+        the terminal-gate constraint.  The terminal gate's `close` is now valid
+        for any feature size (FEAT-2026-0015)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             feature = Path(tmpdir) / "feature"
             feature.mkdir()
@@ -118,11 +120,11 @@ class TestCloseWuLint(unittest.TestCase):
             _write_wu(feature, "WU-02-impl.md", "FEAT-2026-9001/T02", "implementation")
             _write_wu(feature, "WU-91-close.md", "FEAT-2026-9001/G2-CLOSE", "close")
             errs = lint_plan.lint(feature)
-            self.assertTrue(errs, "two-gate close WU must produce lint errors")
-            close_errs = [e for e in errs if "`close`" in e or "single-gate" in e]
+            self.assertTrue(errs, "close WU on non-terminal gate must produce lint errors")
+            close_errs = [e for e in errs if "`close`" in e or "terminal" in e]
             self.assertTrue(
                 close_errs,
-                f"errors must name the single-gate constraint; errs={errs}",
+                f"errors must name the terminal-gate constraint; errs={errs}",
             )
 
     def test_four_wu_closing_sequence_still_passes(self):

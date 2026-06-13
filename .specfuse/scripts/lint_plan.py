@@ -38,13 +38,18 @@ import _miniyaml  # noqa: E402
 
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
-VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close"}
+VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close",
+               "close-intermediate"}
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
-# All WU types that count as closing work — the four-WU sequence members
-# plus the single-session `close` alternative (single-gate features only).
-_CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close"}
+# New compact closing shapes (FEAT-2026-0015):
+#   non-terminal gate: close-intermediate → plan-next
+#   terminal gate:     close  (any feature size)
+# Legacy 4-WU CLOSING_SEQUENCE still accepted on any gate but emits a WARN.
+NEW_INTERMEDIATE_SEQUENCE = ["close-intermediate", "plan-next"]
+# All WU types that count as closing work.
+_CLOSING_TYPES = frozenset(CLOSING_SEQUENCE) | {"close", "close-intermediate"}
 # Correlation-ID pattern — canonical, mirroring `.specfuse/rules/correlation-ids.md`.
 # Two namespaces:
 #   Component-local: FEAT-YYYY-NNNN, optional /(T<NN>[H[N*]] | G<n>-<CLOSE>).
@@ -92,10 +97,16 @@ def lint(feature_dir: Path) -> list[str]:
     graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
     all_ids = {wu["id"] for g in gates for wu in (g.get("work_units") or [])}
-    nonempty_gates_count = sum(1 for g in gates if g.get("work_units"))
+    # Last non-empty gate is the terminal gate; `close` is only valid there.
+    terminal_gate_gnum = next(
+        (g.get("gate", "?") for g in reversed(gates) if g.get("work_units")), None
+    )
+    # Track closing shape per gate for cross-gate mixed-shape detection.
+    _gate_closing_shapes: dict = {}  # gnum -> "NEW" | "LEGACY" | "INVALID"
 
     for g in gates:
         gnum = g.get("gate", "?")
+        is_terminal = (gnum == terminal_gate_gnum)
         units = g.get("work_units") or []
 
         # GATE.md cost_budget_usd: optional, must be numeric when present.
@@ -176,21 +187,59 @@ def lint(feature_dir: Path) -> list[str]:
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
 
-        # Closing: either the four-WU sequence or a single `close` WU (single-gate only).
+        # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]
         if closing_found == ["close"]:
-            if nonempty_gates_count != 1:
+            if is_terminal:
+                _gate_closing_shapes[gnum] = "NEW"
+            else:
                 errs.append(
-                    f"gate {gnum}: `close` WU is only valid in single-gate features "
-                    f"({nonempty_gates_count} non-empty gates found); "
-                    f"multi-gate features must use {CLOSING_SEQUENCE}"
+                    f"gate {gnum}: `close` WU is only valid on a terminal gate; "
+                    f"non-terminal gates must use {NEW_INTERMEDIATE_SEQUENCE} "
+                    f"(new) or {CLOSING_SEQUENCE} (legacy)"
                 )
-        elif closing_found != CLOSING_SEQUENCE:
-            errs.append(
-                f"gate {gnum}: closing sequence must be exactly "
-                f"{CLOSING_SEQUENCE} in order (or a single `close` WU for "
-                f"single-gate features); found {closing_found}"
+                _gate_closing_shapes[gnum] = "INVALID"
+        elif closing_found == NEW_INTERMEDIATE_SEQUENCE:
+            if not is_terminal:
+                _gate_closing_shapes[gnum] = "NEW"
+            else:
+                errs.append(
+                    f"gate {gnum}: `close-intermediate → plan-next` is for "
+                    f"non-terminal gates; terminal gate must use a single `close` WU "
+                    f"(new) or {CLOSING_SEQUENCE} (legacy)"
+                )
+                _gate_closing_shapes[gnum] = "INVALID"
+        elif closing_found == CLOSING_SEQUENCE:
+            gate_file_for_warn = gate_file_rel or f"GATE-{gnum:02d}.md"
+            print(
+                f"WARN: {feature_dir}/{gate_file_for_warn} uses legacy 4-WU closing "
+                f"sequence; new contract is 2-WU (close-intermediate + plan-next) for "
+                f"intermediate or 1-WU (close) for terminal. See FEAT-2026-0015."
             )
+            _gate_closing_shapes[gnum] = "LEGACY"
+        elif "close-intermediate" in closing_found:
+            errs.append(
+                f"gate {gnum}: close-intermediate must be immediately followed by "
+                f"plan-next; found closing sequence {closing_found}"
+            )
+            _gate_closing_shapes[gnum] = "INVALID"
+        else:
+            errs.append(
+                f"gate {gnum}: closing sequence must be {CLOSING_SEQUENCE} (legacy), "
+                f"{NEW_INTERMEDIATE_SEQUENCE} (non-terminal new), or a single `close` "
+                f"WU (terminal new); found {closing_found}"
+            )
+            _gate_closing_shapes[gnum] = "INVALID"
+
+    # Cross-gate mixed-shape check: operators must pick one contract per feature.
+    new_gnums = [n for n, s in _gate_closing_shapes.items() if s == "NEW"]
+    legacy_gnums = [n for n, s in _gate_closing_shapes.items() if s == "LEGACY"]
+    if new_gnums and legacy_gnums:
+        errs.append(
+            f"ERROR: {feature_dir}: mixed closing-shape contracts across gates "
+            f"(gate {new_gnums[0]} uses NEW, gate {legacy_gnums[0]} uses LEGACY). "
+            f"Pick one contract per feature."
+        )
 
     return errs
 

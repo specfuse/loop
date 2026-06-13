@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T02
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
+duration_seconds: 453.975
+cost_usd: 1.163975
+input_tokens: 32
+output_tokens: 24562
 ---
 
 # Update `lint_plan.py` to accept new closing-WU shapes
