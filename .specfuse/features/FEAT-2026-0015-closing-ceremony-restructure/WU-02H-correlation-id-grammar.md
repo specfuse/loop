@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T02H
 type: implementation
 model: claude-sonnet-4-6
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 0.50
+duration_seconds: 383.343
+cost_usd: 0.984542
+input_tokens: 47
+output_tokens: 13305
 ---
 
 # Hygiene: extend correlation-ID grammar to include `CLOSE-INTERMEDIATE`

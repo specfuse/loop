@@ -24,6 +24,9 @@ retrospective and lessons.
 ## Task graph
 
 ```yaml
+# Closing shape: gate 1 is non-terminal → use 2-WU intermediate pattern (FEAT-2026-0015).
+# Gate 2 is terminal → close WU is drafted by gate 1's plan-next when the time comes.
+# Legacy 4-WU sequence (RETRO/LESSONS/DOCS/PLAN) is accepted by lint but emits WARN.
 gates:
   - gate: 1
     file: GATE-01.md
@@ -34,19 +37,13 @@ gates:
       - id: FEAT-YYYY-NNNN/T02
         file: WU-02-<slug>.md
         depends_on: [FEAT-YYYY-NNNN/T01]
-      # --- mandatory closing sequence (lint enforces presence + order) ---
-      - id: FEAT-YYYY-NNNN/G1-RETRO
-        file: WU-90-gate-1-retrospective.md
+      # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
+      - id: FEAT-YYYY-NNNN/G1-CLOSE-INTERMEDIATE
+        file: WU-90-gate-1-close-intermediate.md
         depends_on: [FEAT-YYYY-NNNN/T01, FEAT-YYYY-NNNN/T02]
-      - id: FEAT-YYYY-NNNN/G1-LESSONS
-        file: WU-91-gate-1-lessons.md
-        depends_on: [FEAT-YYYY-NNNN/G1-RETRO]
-      - id: FEAT-YYYY-NNNN/G1-DOCS
-        file: WU-92-gate-1-docs.md
-        depends_on: [FEAT-YYYY-NNNN/G1-LESSONS]
       - id: FEAT-YYYY-NNNN/G1-PLAN
-        file: WU-93-gate-1-plan-next.md
-        depends_on: [FEAT-YYYY-NNNN/G1-DOCS]
+        file: WU-91-gate-1-plan-next.md
+        depends_on: [FEAT-YYYY-NNNN/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
     work_units: []     # drafted by gate 1's plan-next; empty is valid (= not yet planned)

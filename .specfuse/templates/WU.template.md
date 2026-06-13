@@ -1,6 +1,6 @@
 ---
-id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN) for closing
-type: implementation       # implementation | retrospective | lessons | docs | plan-next | close
+id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN|CLOSE|CLOSE-INTERMEDIATE) for closing
+type: implementation       # implementation | retrospective | lessons | docs | plan-next | close | close-intermediate
 # model: <override>        # optional — defaults per MODEL_BY_TYPE[type] in loop.py; aliases: sonnet | opus | haiku
 # effort: <override>       # optional — defaults per EFFORT_BY_TYPE[type] in loop.py; low | medium | high | xhigh | max
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
@@ -19,12 +19,17 @@ Frontmatter notes (single-repo):
   (`implementation` → `code`; `retrospective`/`lessons`/`docs` → `doc`;
   `plan-next` → `plannext`; `close` → `plannext`). Same concept as the
   orchestrator's `task_type`, kept under the loop's existing field name.
-  `close` is a single-gate-only alternative to the four-WU closing sequence: it
-  collapses retrospective + lessons + docs + terminal verdict into one session.
-  One `close` WU must produce `RETROSPECTIVE.md`, append durable entries to
-  `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal feature-arc
-  verdict. Only valid when the feature has exactly one gate; multi-gate features
-  must use the `[retrospective, lessons, docs, plan-next]` sequence.
+  Three closing shapes (FEAT-2026-0015):
+  - `close-intermediate` (non-terminal gate): folds RETRO+LESSONS+DOCS into one
+    session; must be paired with a separate `plan-next` WU immediately after.
+    Use for any gate that is not the final gate.
+  - `close` (terminal gate): collapses retrospective + lessons + docs + terminal
+    verdict into one session. Must produce `RETROSPECTIVE.md`, append durable
+    entries to `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal
+    feature-arc verdict.
+  - Legacy four-WU sequence `[retrospective, lessons, docs, plan-next]`: accepted
+    by lint but emits WARN. Prefer `close-intermediate` + `plan-next` for new
+    features.
 - `model` — OPTIONAL. The Claude model the driver dispatches this unit with.
   When absent, defaults to `MODEL_BY_TYPE[type]` in `loop.py` (`sonnet` for
   implementation/retrospective/lessons/docs; `opus` for plan-next/close). Three

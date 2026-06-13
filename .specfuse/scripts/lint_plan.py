@@ -60,8 +60,8 @@ VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
 CORRELATION_ID_RE = re.compile(
-    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|"
-    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$"
+    r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|"
+    r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$"
 )
 # The five mandatory sections (architecture §8). 'Objective' is recommended in the
 # template but not hard-required here.
