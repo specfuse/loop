@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/T01
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 140.664
+cost_usd: 0.381761
+input_tokens: 13
+output_tokens: 3870
 ---
 
 # Create roadmap-archive.md and add Detail column to roadmap.md

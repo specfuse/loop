@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/T04
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
+duration_seconds: 582.829
+cost_usd: 0.91579
+input_tokens: 606
+output_tokens: 29050
 ---
 
 # Migrate FEAT-2026-0003..0008 detail sections to the archive

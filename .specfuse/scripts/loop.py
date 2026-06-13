@@ -58,6 +58,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _miniyaml  # noqa: E402
 
 SPECFUSE_DIR = Path(".specfuse")
+REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
 DRIVER_VERSION = "0.2.0"
@@ -980,6 +981,82 @@ def execute_unit_attempt(
 
 
 # --------------------------------------------------------------------------- #
+# Auto-archive helper                                                         #
+# --------------------------------------------------------------------------- #
+
+
+def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
+    """Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver.
+
+    Returns "archived", "already archived", or "refused: <reason>".
+    No git operations; touches only roadmap.md and roadmap-archive.md under repo_root.
+    """
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    archive_path = repo_root / ".specfuse" / "roadmap-archive.md"
+
+    feat_id_lower = feature_id.lower()
+    anchor = f'<a id="{feat_id_lower}"></a>'
+    back_link = f'[→ archive](roadmap-archive.md#{feat_id_lower})'
+    marker = "<!-- Archived sections appended below -->"
+
+    # Step 1 — read and validate table row
+    if not roadmap_path.exists():
+        return f"refused: {roadmap_path} not found"
+    roadmap_text = roadmap_path.read_text()
+
+    row_re = re.compile(
+        r'^\|\s*' + re.escape(feature_id) + r'\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|[^\n]*$',
+        re.MULTILINE,
+    )
+    row_m = row_re.search(roadmap_text)
+    if not row_m:
+        return f"refused: {feature_id} not found in roadmap"
+
+    # Columns: Title(1) | Status(2) | Folder(3) | Detail(4)
+    status = row_m.group(2).strip()
+    detail = row_m.group(4).strip()
+
+    if "roadmap-archive.md#" in detail:
+        return "already archived"
+    if status not in ("done", "abandoned"):
+        return f"refused: status={status}"
+
+    # Step 2 — extract inline section
+    section_re = re.compile(
+        r'^(## ' + re.escape(feature_id) + r'[^\n]*(?:\n(?!## )[^\n]*)*\n?)',
+        re.MULTILINE,
+    )
+    section_m = section_re.search(roadmap_text)
+    if not section_m:
+        return "already archived"
+    section_text = section_m.group(1).rstrip('\n') + '\n'
+
+    # Step 3 — append anchor + section to archive after marker
+    archive_text = archive_path.read_text()
+    if marker not in archive_text:
+        return "refused: archive marker absent"
+    marker_end = archive_text.index(marker) + len(marker)
+    new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
+    archive_path.write_text(new_archive)
+
+    # Step 4 — update Detail cell with back-link
+    detail_start = row_m.start(4) - row_m.start(0)
+    detail_end = row_m.end(4) - row_m.start(0)
+    old_row = row_m.group(0)
+    new_row = old_row[:detail_start] + f' {back_link} ' + old_row[detail_end:]
+    roadmap_text = roadmap_text[:row_m.start()] + new_row + roadmap_text[row_m.end():]
+
+    # Step 5 — remove inline section (re-search since row update shifted offsets)
+    section_m2 = section_re.search(roadmap_text)
+    if section_m2:
+        roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
+        roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
+    roadmap_path.write_text(roadmap_text)
+
+    return "archived"
+
+
+# --------------------------------------------------------------------------- #
 # The loop                                                                    #
 # --------------------------------------------------------------------------- #
 
@@ -1003,6 +1080,11 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         print(f"{feature_id}: all gates passed — feature complete.")
         backend.on_feature_complete(feature_id)
         write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
+        archive_result = auto_archive_feature(feature_id, REPO_ROOT)
+        if archive_result.startswith("refused:"):
+            print(f"warning: auto-archive skipped — {archive_result}. Run /roadmap-archive manually.")
+        else:
+            print(f"{feature_id}: {archive_result}")
         return 0
 
     lock_fd = None

@@ -2,8 +2,12 @@
 id: FEAT-2026-0010/T03
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
+duration_seconds: 759.683
+cost_usd: 1.674669
+input_tokens: 52
+output_tokens: 32715
 ---
 
 # Ship the roadmap-add skill
