@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T03
 type: implementation
 model: claude-sonnet-4-6
 effort: low
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 0.50
+duration_seconds: 422.703
+cost_usd: 0.950612
+input_tokens: 681
+output_tokens: 18939
 ---
 
 # Update templates and `/draft-feature` skill to emit new closing shapes
