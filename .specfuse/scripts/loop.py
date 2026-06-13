@@ -1204,6 +1204,249 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
 
 
 # --------------------------------------------------------------------------- #
+# Closing-ceremony deliverable guards (FEAT-2026-0015/T07)                   #
+# --------------------------------------------------------------------------- #
+
+
+def _gate_number_from_wu_id(wu_id: str) -> int | None:
+    """Parse gate number from a closing WU ID like FEAT-2026-0015/G1-PLAN."""
+    segment = wu_id.rsplit("/", 1)[-1]
+    m = re.match(r"G(\d+)-", segment)
+    return int(m.group(1)) if m else None
+
+
+def assert_retrospective_exists(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-a) RETROSPECTIVE.md exists and is non-empty in the feature dir."""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists() or not retro.read_text().strip():
+        return (
+            False,
+            "assert_retrospective_exists: RETROSPECTIVE.md absent or empty in feature dir",
+        )
+    return True, ""
+
+
+def assert_learnings_appended_or_noop(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
+    proc = subprocess.run(
+        ["git", "diff", head_before, "HEAD", "--", ".specfuse/LEARNINGS.md"],
+        capture_output=True, text=True,
+    )
+    added = any(
+        ln.startswith("+") and not ln.startswith("+++")
+        for ln in proc.stdout.splitlines()
+    )
+    if added:
+        return True, ""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists() and "nothing generalizes" in retro.read_text().lower():
+        return True, ""
+    return (
+        False,
+        "assert_learnings_appended_or_noop: no LEARNINGS.md additions in squash "
+        "and no 'nothing generalizes' note in RETROSPECTIVE.md",
+    )
+
+
+def assert_doc_or_roadmap_diff(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-c) A docs/ or .specfuse/roadmap.md file appears in the squash diff."""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True,
+    )
+    for path in proc.stdout.splitlines():
+        if path == ".specfuse/roadmap.md" or path.startswith("docs/"):
+            return True, ""
+    # For close-intermediate: skip when the WU spec declares no doc surface.
+    if wu.type == "close-intermediate":
+        if "docs/" not in wu.body and "roadmap.md" not in wu.body:
+            return True, ""
+    return (
+        False,
+        "assert_doc_or_roadmap_diff: no docs/ or .specfuse/roadmap.md file in squash diff",
+    )
+
+
+def assert_verdict_well_formed(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-d) verdict frontmatter field is present and in VERDICT_VALUES."""
+    if wu.verdict is None or wu.verdict not in VERDICT_VALUES:
+        return (
+            False,
+            f"assert_verdict_well_formed: verdict {wu.verdict!r} absent or not in "
+            f"VERDICT_VALUES ({sorted(VERDICT_VALUES)})",
+        )
+    return True, ""
+
+
+def assert_cost_analysis_section_when_met(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-e) When verdict=='met', RETROSPECTIVE.md must have a '## Cost analysis' header."""
+    if wu.verdict != "met":
+        return True, ""
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists():
+        if re.search(r"^##+ Cost analysis", retro.read_text(), re.MULTILINE | re.IGNORECASE):
+            return True, ""
+    return (
+        False,
+        "assert_cost_analysis_section_when_met: verdict=met but '## Cost analysis' "
+        "section absent from RETROSPECTIVE.md",
+    )
+
+
+def assert_retrospective_gate_section(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-intermediate-a) RETROSPECTIVE.md contains a '## Gate N' or '### Gate N' section."""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_retrospective_gate_section: cannot parse gate number from wu_id",
+        )
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists():
+        return (
+            False,
+            "assert_retrospective_gate_section: RETROSPECTIVE.md absent in feature dir",
+        )
+    if re.search(rf"^#{{1,3}} Gate {gate_n}\b", retro.read_text(), re.MULTILINE):
+        return True, ""
+    return (
+        False,
+        f"assert_retrospective_gate_section: RETROSPECTIVE.md has no "
+        f"'## Gate {gate_n}' or '### Gate {gate_n}' section",
+    )
+
+
+def assert_gate_review_exists(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(plan-next-a) GATE-(N+1)-REVIEW.md exists + non-empty, or no next gate (terminal)."""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_gate_review_exists: cannot parse gate number from wu_id",
+        )
+    # If no next gate is defined in PLAN.md the feature is terminal: no review expected.
+    _, gates = load_graph(feature_dir)
+    if not any(g.number == gate_n + 1 for g in gates):
+        return True, ""
+    next_gate = gate_n + 1
+    review = feature_dir / f"GATE-{next_gate:02d}-REVIEW.md"
+    if not review.exists() or not review.read_text().strip():
+        return (
+            False,
+            f"assert_gate_review_exists: GATE-{next_gate:02d}-REVIEW.md absent or empty",
+        )
+    return True, ""
+
+
+def assert_next_gate_drafted_or_terminal(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(plan-next-b) Next gate has ≥1 drafted WU in PLAN.md, or PLAN.md/roadmap is terminal."""
+    plan_path = feature_dir / "PLAN.md"
+    plan_fm, _ = read_frontmatter(plan_path)
+    if plan_fm.get("status") == "done":
+        return True, ""
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if roadmap_path.exists():
+        row_re = re.compile(
+            r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|",
+            re.MULTILINE,
+        )
+        rm = row_re.search(roadmap_path.read_text())
+        if rm and rm.group(2).strip() == "done":
+            return True, ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return (
+            False,
+            "assert_next_gate_drafted_or_terminal: cannot parse gate number from wu_id",
+        )
+    _, gates = load_graph(feature_dir)
+    next_gates = [g for g in gates if g.number == gate_n + 1]
+    # No gate N+1 in PLAN.md → terminal (plan-next set PLAN.md done or feature is single-gate).
+    if not next_gates:
+        return True, ""
+    if next_gates[0].refs:
+        return True, ""
+    return (
+        False,
+        f"assert_next_gate_drafted_or_terminal: gate {gate_n + 1} has no drafted "
+        f"work_units in PLAN.md and neither PLAN.md nor roadmap marks done",
+    )
+
+
+CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
+    "close": [
+        assert_retrospective_exists,
+        assert_learnings_appended_or_noop,
+        assert_doc_or_roadmap_diff,
+        assert_verdict_well_formed,
+        assert_cost_analysis_section_when_met,
+    ],
+    "close-intermediate": [
+        assert_retrospective_gate_section,
+        assert_learnings_appended_or_noop,
+        assert_doc_or_roadmap_diff,
+    ],
+    "plan-next": [
+        assert_gate_review_exists,
+        assert_next_gate_drafted_or_terminal,
+    ],
+}
+
+
+def assert_closing_deliverables(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Fire the type-keyed closing deliverable guard (FEAT-2026-0015/T07).
+
+    Returns (True, "") if the WU type has no assertions (implementation type —
+    other guards handle it) or all assertions pass.  On the first failure returns
+    (False, reason) where reason names the failing assertion function.
+
+    Pre-condition: if the squash diff contains ONLY the driver's own bookkeeping
+    write to the WU file (status/cost), the agent produced no substantive output;
+    skip the assertions.  Other guards (zero_token, files_changed, smoke) cover
+    that surface.  This avoids false negatives in test fixtures that use hollow
+    dispatch stubs to test orthogonal behaviors.
+    """
+    assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
+    if not assertions:
+        return True, ""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True,
+    )
+    changed = {p for p in proc.stdout.splitlines() if p}
+    wu_rel = str(wu.file)
+    if not (changed - {wu_rel}):
+        return True, ""
+    for fn in assertions:
+        ok, reason = fn(wu, feature_dir, repo_root, head_before)
+        if not ok:
+            return False, reason
+    return True, ""
+
+
+# --------------------------------------------------------------------------- #
 # The loop                                                                    #
 # --------------------------------------------------------------------------- #
 
@@ -1461,6 +1704,28 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                                 print(f"   SMOKE FAIL attempt "
                                       f"{attempt}/{MAX_ATTEMPTS}")
                                 continue
+                        # Closing deliverable guard (FEAT-2026-0015/T07):
+                        # fires after smoke, before terminal-flip bookkeeping.
+                        closing_ok, closing_summary = assert_closing_deliverables(
+                            wu, feature_dir, REPO_ROOT, head_before,
+                        )
+                        if not closing_ok:
+                            reset_preserving_events(head_before, events_path)
+                            wu_events.append(build_event(
+                                "attempt_outcome", wu.wu_id, {
+                                    "outcome": "closing_deliverable_missing",
+                                    "attempt": attempt,
+                                    "assertion": closing_summary.split(":", 1)[0].strip(),
+                                    "summary": closing_summary,
+                                },
+                            ))
+                            attempt_notes.append((attempt, closing_summary))
+                            failure_note = closing_summary
+                            print(
+                                f"   CLOSING DELIVERABLE MISSING attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
+                            )
+                            continue
                         if wu.type == "close":
                             if verdict_permits_terminal_flips(wu.verdict):
                                 close_wu_for_terminal = wu

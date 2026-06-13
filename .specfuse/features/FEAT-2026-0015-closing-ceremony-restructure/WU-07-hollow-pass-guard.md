@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T07
 type: implementation
 model: claude-sonnet-4-6
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
+duration_seconds: 2020.782
+cost_usd: 4.416517
+input_tokens: 636
+output_tokens: 97317
 ---
 
 # Type-keyed hollow-pass guard for the new closing taxonomy
