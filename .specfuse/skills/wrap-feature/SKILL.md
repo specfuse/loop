@@ -87,18 +87,58 @@ this.
   If row says `active` while PLAN.md says `done`, the close ceremony
   was imperfect — surface this gap and ask before continuing.
 
-### 2. Surface the verdict
+### 2. Surface the executive recap
 
-- Read the **tail** of `RETROSPECTIVE.md` — specifically the
-  `# Feature-arc verdict` section the close ceremony writes. Quote
-  it in 2-3 lines.
-- Read the **tail** of `.specfuse/LEARNINGS.md` to confirm the close
-  ceremony's lessons append landed. Quote ID tags.
-- Show the operator the feature-arc verdict, the LEARNINGS tags
-  promoted, and the production diff stat (`git diff main...HEAD
-  --stat`).
-- Ask: "Verdict looks right? (y / n / `let me read retrospective`)"
-  — n or read-first exits without further writes.
+Operator may be coming back to a feature they haven't thought about in
+hours, days, or weeks. The skill's job here is to **put them back in
+context** in the time it takes to read a paragraph, then surface the
+verdict so they can make an informed go/no-go call.
+
+Build and display the recap in this order. Be terse — each section
+1-3 lines unless evidence demands more:
+
+1. **Goal recap.** Quote `roadmap_goal` from PLAN.md frontmatter
+   verbatim. This is the north star the feature was sized against;
+   the verdict pass/fail hangs off it.
+2. **Value delivered.** Walk `git diff main...HEAD --stat` and pick
+   files OUTSIDE the feature folder + outside RETROSPECTIVE / LEARNINGS
+   / roadmap (those are bookkeeping the close ceremony already owns).
+   Summarize what surfaces shipped:
+   - New scripts / modules / skills (named).
+   - Modified driver / library files (named with one-line "what
+     changed").
+   - New tests (count + which surface they cover).
+   Skip bookkeeping commits, RETROSPECTIVE itself, the feature
+   folder's WU files.
+3. **Plan-adherence read.** Compare PLAN.md's gates graph + Scope OUT
+   section against what actually shipped:
+   - **On-plan** if: all gates closed in drafted order, no scope-OUT
+     items pulled in, no scope-IN items punted.
+   - **Off-plan** otherwise. Name the deviation in one line per
+     instance:
+     - WUs re-armed (count and which).
+     - Scope items added or removed mid-flight.
+     - WUs that took >1 attempt (count and which).
+     - Cost spent vs initial estimate if recorded.
+   The bar for "off-plan" is structural drift, not minor revision —
+   "T03 took 2 attempts and closed clean" is still on-plan.
+4. **Retrospective summary (only if off-plan).** Read RETROSPECTIVE.md
+   for sections like `## What worked / didn't`, `## Surprises`,
+   `## Structural gap`. Synthesize 2-4 bullets naming what changed
+   and why. Skip this entirely if §3 said on-plan.
+5. **Feature-arc verdict.** Quote `# Feature-arc verdict` (or
+   equivalent) from RETROSPECTIVE.md in 2-3 lines (Met / Not met /
+   Partially met, plus the one-sentence reason).
+6. **LEARNINGS promoted.** List `[FEAT-YYYY-NNNN/G…]` tags the close
+   ceremony appended to `.specfuse/LEARNINGS.md`. One line per tag —
+   just the rule.
+
+Then ask: "Verdict looks right? (y / n / `let me read retrospective`)"
+— n or read-first exits without further writes.
+
+If a section can't be assembled from canonical files, say so
+explicitly ("PLAN.md has no Scope OUT section; plan-adherence read
+limited to gates graph + WU outcomes") rather than fabricate.
 
 ### 3. Cosmetic gate flip
 
