@@ -5,7 +5,7 @@ slug: roadmap-restructure
 branch: feat/FEAT-2026-0010-roadmap-restructure
 roadmap_goal: .specfuse/roadmap.md carries detail sections only for planned/active features; done/abandoned details live in .specfuse/roadmap-archive.md; roadmap-add and roadmap-archive skills exist; current done features (0003..0008) migrated.
 autonomy_default: review
-status: planned
+status: done
 ---
 
 # Plan: Roadmap restructure - add and archive
@@ -80,7 +80,28 @@ gates:
           - FEAT-2026-0010/G1-DOCS
   - gate: 2
     file: GATE-02.md
-    work_units: []
+    work_units:
+      - id: FEAT-2026-0010/T05
+        file: WU-05-driver-auto-archive-hook.md
+        depends_on:
+          - FEAT-2026-0010/T01
+          - FEAT-2026-0010/T02
+      - id: FEAT-2026-0010/G2-RETRO
+        file: WU-94-gate-2-retrospective.md
+        depends_on:
+          - FEAT-2026-0010/T05
+      - id: FEAT-2026-0010/G2-LESSONS
+        file: WU-95-gate-2-lessons.md
+        depends_on:
+          - FEAT-2026-0010/G2-RETRO
+      - id: FEAT-2026-0010/G2-DOCS
+        file: WU-96-gate-2-docs.md
+        depends_on:
+          - FEAT-2026-0010/G2-LESSONS
+      - id: FEAT-2026-0010/G2-PLAN
+        file: WU-97-gate-2-plan-next.md
+        depends_on:
+          - FEAT-2026-0010/G2-DOCS
 ```
 
 ## Notes
