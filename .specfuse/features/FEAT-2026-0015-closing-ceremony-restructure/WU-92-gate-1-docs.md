@@ -2,9 +2,13 @@
 id: FEAT-2026-0015/G1-DOCS
 type: docs
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.30
+duration_seconds: 141.179
+cost_usd: 0.491994
+input_tokens: 18
+output_tokens: 7035
 ---
 
 # Gate 1 docs
