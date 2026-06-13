@@ -262,6 +262,39 @@ codebase. Observed in `FEAT-2026-0007/T04`: all required functions absent from
 > defined — the exact failure mode in `FEAT-2026-0007/T04` (retry escalation
 > ladder declared complete with zero production code committed).
 
+## 10. Helper-duplication pre-flight — enumerate symbols before declaring scope
+
+When a WU's spec names a helper symbol that exists in the codebase
+(a fixture, a context manager, a top-level function in `tests/` or
+elsewhere), do **NOT** assume it appears only once. Enumerate before
+authoring the WU's "Do not touch" / Acceptance criteria sections:
+
+```bash
+grep -rn "def <symbol>" tests/                       # for test helpers
+grep -rn "def <symbol>\|class <symbol>" src/         # for code symbols
+```
+
+If the enumeration returns more than one hit, EVERY hit is in scope
+for the WU OR every hit must be named in "Do not touch" with the
+explicit reason "out of scope — handled in <other WU / future
+feature>". Silently fixing one of N duplicates ships an incomplete
+fix; the others slip and surface later (typically in CI on the
+deferred surface).
+
+The rule applies symmetrically when the WU CREATES a new symbol
+intended to replace duplicates: enumerate the current call sites and
+list them as `## Files modified to switch to the new helper`. If the
+WU author cannot enumerate exhaustively, the WU is under-specified
+and should not be dispatched.
+
+> *Prevents:* the FEAT-2026-0013 ship-fail-fail-fail-fail cycle. v1
+> attacked ONE `integration_workspace()` fixture; CI re-failed on a
+> different test file's OWN copy. v2 attacked the same one + added
+> belt-and-suspenders; CI re-failed on a copy in yet another file.
+> v3 finally centralized after enumerating all 5 sites. Cumulative
+> cost of the missed enumeration: ~$10 (v1+v2 dispatches + re-arm
+> overhead). The pre-flight grep is free.
+
 ---
 
 ## Haiku — when (and when not)
@@ -311,6 +344,11 @@ and would clearly change WU authoring, it's a candidate for promotion on
 the next edit.
 
 ## Version
+
+**v0.8.** Added §10 (Helper-duplication pre-flight: enumerate symbols
+before declaring scope) — graduated from `[FEAT-2026-0013/G1+G2]` after
+the ship-fail-ship-fail-ship-fail cycle that burned ~$10 on missed
+duplicates of `integration_workspace()` across 5 test files.
 
 **v0.7.** Added cross-reference in the Haiku section to `WU.template.md`
 frontmatter notes for the full `model:` / `effort:` field contract and
