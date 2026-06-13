@@ -110,10 +110,18 @@ GATES_FOR_TYPE = {
     "close-intermediate": "plannext",
 }
 
+VERDICT_VALUES = frozenset({"met", "met_locally", "partially_met", "not_met"})
+
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
 # writes the next gate's WUs as drafts, and a human must arm them first.
 DISPATCHABLE = {"pending", "ready"}
 DONE = "done"
+
+
+def verdict_permits_terminal_flips(verdict: str | None) -> bool:
+    """Return True iff verdict == 'met'; False for every other value including None."""
+    return verdict == "met"
+
 
 # --------------------------------------------------------------------------- #
 # Data model                                                                  #
@@ -139,6 +147,7 @@ class WorkUnit:
     # load_wu refuses to load a WU with unsandboxed=True and no rationale.
     unsandboxed: bool = False
     unsandboxed_rationale: str = ""
+    verdict: str | None = None
 
 
 @dataclass
@@ -284,6 +293,9 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"`unsandboxed_rationale` in the same frontmatter. Sandbox-escape "
             f"is auditable; the rationale is the audit signal."
         )
+    verdict: str | None = None
+    if wu_type in {"close", "close-intermediate"}:
+        verdict = fm.get("verdict") or None
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -297,6 +309,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         body=body.strip(),
         unsandboxed=unsandboxed,
         unsandboxed_rationale=unsandboxed_rationale,
+        verdict=verdict,
     )
 
 

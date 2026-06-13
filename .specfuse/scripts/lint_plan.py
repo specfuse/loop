@@ -32,9 +32,10 @@ import re
 import sys
 from pathlib import Path
 
-# Strict mini-YAML reader (alongside this script) — keeps the linter zero-install.
+# Strict mini-YAML reader and loop constants (alongside this script).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _miniyaml  # noqa: E402
+from loop import VERDICT_VALUES  # noqa: E402
 
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
@@ -186,6 +187,28 @@ def lint(feature_dir: Path) -> list[str]:
                     if not re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody):
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
+
+            # Verdict frontmatter validation.
+            wu_verdict = wfm.get("verdict")
+            wu_status = wfm.get("status")
+            wu_type_val = wfm.get("type")
+            if wu_type_val in {"close", "close-intermediate"}:
+                # draft/pending: verdict written at execution time, not before dispatch.
+                # done/abandoned/blocked_human: legacy fixtures without verdict are valid.
+                if wu_status not in {"draft", "pending", "done", "abandoned", "blocked_human"}:
+                    if wu_verdict is None or wu_verdict not in VERDICT_VALUES:
+                        errs.append(
+                            f"ERROR: {wfile}: close-type WU missing or invalid 'verdict' "
+                            f"frontmatter (must be one of: "
+                            f"met, met_locally, partially_met, not_met)."
+                        )
+            else:
+                if wu_verdict is not None:
+                    errs.append(
+                        f"ERROR: {wfile}: 'verdict' frontmatter is only meaningful for "
+                        f"closing types (close, close-intermediate); remove it from "
+                        f"this {wu_type_val!r} WU."
+                    )
 
         # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]

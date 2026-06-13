@@ -3,9 +3,13 @@ id: FEAT-2026-0015/T04
 type: implementation
 model: claude-sonnet-4-6
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 1.20
+duration_seconds: 1108.12
+cost_usd: 2.81825
+input_tokens: 92
+output_tokens: 46692
 ---
 
 # Couple verdict frontmatter to driver-side terminal flips
