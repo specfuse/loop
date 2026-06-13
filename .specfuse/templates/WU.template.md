@@ -1,11 +1,13 @@
 ---
-id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN) for closing
-type: implementation       # implementation | retrospective | lessons | docs | plan-next | close
+id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN|CLOSE|CLOSE-INTERMEDIATE) for closing
+type: implementation       # implementation | retrospective | lessons | docs | plan-next | close | close-intermediate
 # model: <override>        # optional — defaults per MODEL_BY_TYPE[type] in loop.py; aliases: sonnet | opus | haiku
 # effort: <override>       # optional — defaults per EFFORT_BY_TYPE[type] in loop.py; low | medium | high | xhigh | max
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
+# planned_cost_usd: 0.00   # OPTIONAL — estimated USD cost at draft time; see roadmap_goal § Planned-cost capture
 generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
+# oracle_env: macos_local  # OPTIONAL — environment where this WU's verifying oracle runs; see frontmatter notes
 ---
 
 <!--
@@ -19,12 +21,17 @@ Frontmatter notes (single-repo):
   (`implementation` → `code`; `retrospective`/`lessons`/`docs` → `doc`;
   `plan-next` → `plannext`; `close` → `plannext`). Same concept as the
   orchestrator's `task_type`, kept under the loop's existing field name.
-  `close` is a single-gate-only alternative to the four-WU closing sequence: it
-  collapses retrospective + lessons + docs + terminal verdict into one session.
-  One `close` WU must produce `RETROSPECTIVE.md`, append durable entries to
-  `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal feature-arc
-  verdict. Only valid when the feature has exactly one gate; multi-gate features
-  must use the `[retrospective, lessons, docs, plan-next]` sequence.
+  Three closing shapes (FEAT-2026-0015):
+  - `close-intermediate` (non-terminal gate): folds RETRO+LESSONS+DOCS into one
+    session; must be paired with a separate `plan-next` WU immediately after.
+    Use for any gate that is not the final gate.
+  - `close` (terminal gate): collapses retrospective + lessons + docs + terminal
+    verdict into one session. Must produce `RETROSPECTIVE.md`, append durable
+    entries to `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal
+    feature-arc verdict.
+  - Legacy four-WU sequence `[retrospective, lessons, docs, plan-next]`: accepted
+    by lint but emits WARN. Prefer `close-intermediate` + `plan-next` for new
+    features.
 - `model` — OPTIONAL. The Claude model the driver dispatches this unit with.
   When absent, defaults to `MODEL_BY_TYPE[type]` in `loop.py` (`sonnet` for
   implementation/retrospective/lessons/docs; `opus` for plan-next/close). Three
@@ -57,11 +64,33 @@ Frontmatter notes (single-repo):
   attempts on this WU. Authors leave it off; the driver owns it.
   Per-attempt duration also appears in `events.jsonl`'s outcome event
   payload, in the `attempts_usage` list alongside cost/token fields.
+- `planned_cost_usd` — OPTIONAL. The operator's estimated cost for this work
+  unit at draft time, in USD. Used by the close WU's `## Cost analysis`
+  section to compare planned vs actual spend. Lint emits a WARN when this
+  field is absent on active or draft WUs (non-blocking; exit code 0). Sealed
+  WUs (status=`done` AND PLAN.md status=`done`) are skipped silently.
+  See PLAN.md `roadmap_goal` § "Planned-cost capture". The driver's
+  `cost_usd` field (written at outcome time) is the actual; this field is
+  the plan. Authors set it at draft/arm time; the driver never overwrites it.
 - `generated_surfaces` — OPTIONAL. Lists paths inside this repo to generated
   files (`_generated/`, `gen-src/`, or the repo's declared equivalent) that
   this unit's acceptance depends on existing and behaving correctly. Empty list
   or omitted for units that do not depend on generated code. Authoring this
   field at plan time makes the dependency reviewable before dispatch.
+- `oracle_env` — OPTIONAL. The environment in which the WU's verifying oracle
+  runs. Four accepted forms:
+  - `macos_local` — developer macOS shell (APFS, BSD utils).
+  - `linux_docker` — Docker container (Linux kernel, glibc).
+  - `github_actions_ci` — GitHub Actions runner (Ubuntu image unless narrowed).
+  - Any operator-named string (e.g. `windows_powershell`, `alpine_musl`) for
+    environments not covered above; the operator is responsible for matching it
+    to the goal environment at close time.
+  Lint emits a WARN when the Acceptance criteria section mentions oracle-like
+  verbs (test loop, audit, run N times, oracle, e2e, integration test, etc.) but
+  this field is absent. The WARN is non-blocking. Set this field to suppress it
+  and to make the target environment explicit for reviewers and T07 env-parity
+  enforcement. Rationale: LEARNINGS [FEAT-2026-0013/G1-CLOSE] — "oracle
+  environment must match goal environment" (macOS-local audits hide Linux races).
 
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
 here — see `docs/methodology.md` §2 (one fact, one home).

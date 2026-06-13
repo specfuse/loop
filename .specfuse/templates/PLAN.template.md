@@ -8,6 +8,7 @@ roadmap_goal: <one line copied from the roadmap — the north star this feature 
   it should change>
 autonomy_default: review        # auto | review | supervised
 status: active                  # active | done | abandoned
+# planned_cost_usd: 0.00        # OPTIONAL — sum of WU planned costs; lint warns when missing or when delta from WU sum > 10%
 ---
 
 # Plan: <short feature title>
@@ -24,6 +25,12 @@ retrospective and lessons.
 ## Task graph
 
 ```yaml
+# Closing shape (FEAT-2026-0015):
+#   Non-terminal gate (gate 1): 2-WU → close-intermediate + plan-next.
+#   Terminal gate (gate 2): 1-WU → close.
+#   Gate 2's WUs are drafted by gate 1's plan-next; scaffold them here so
+#   lint can identify gate 1 as non-terminal from the start.
+#   Legacy 4-WU sequence (RETRO/LESSONS/DOCS/PLAN) is accepted by lint but emits WARN.
 gates:
   - gate: 1
     file: GATE-01.md
@@ -34,22 +41,22 @@ gates:
       - id: FEAT-YYYY-NNNN/T02
         file: WU-02-<slug>.md
         depends_on: [FEAT-YYYY-NNNN/T01]
-      # --- mandatory closing sequence (lint enforces presence + order) ---
-      - id: FEAT-YYYY-NNNN/G1-RETRO
-        file: WU-90-gate-1-retrospective.md
+      # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
+      - id: FEAT-YYYY-NNNN/G1-CLOSE-INTERMEDIATE
+        file: WU-90-gate-1-close-intermediate.md
         depends_on: [FEAT-YYYY-NNNN/T01, FEAT-YYYY-NNNN/T02]
-      - id: FEAT-YYYY-NNNN/G1-LESSONS
-        file: WU-91-gate-1-lessons.md
-        depends_on: [FEAT-YYYY-NNNN/G1-RETRO]
-      - id: FEAT-YYYY-NNNN/G1-DOCS
-        file: WU-92-gate-1-docs.md
-        depends_on: [FEAT-YYYY-NNNN/G1-LESSONS]
       - id: FEAT-YYYY-NNNN/G1-PLAN
-        file: WU-93-gate-1-plan-next.md
-        depends_on: [FEAT-YYYY-NNNN/G1-DOCS]
+        file: WU-91-gate-1-plan-next.md
+        depends_on: [FEAT-YYYY-NNNN/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []     # drafted by gate 1's plan-next; empty is valid (= not yet planned)
+    work_units:
+      # --- closing sequence: 1-WU close (terminal gate) ---
+      # Scaffold this now so lint can identify gate 1 as non-terminal.
+      # G1-PLAN fills in the substantive WUs above this entry when gate 1 completes.
+      - id: FEAT-YYYY-NNNN/G2-CLOSE
+        file: WU-90-gate-2-close.md
+        depends_on: []   # G1-PLAN will set real depends_on when it drafts gate 2
 ```
 
 ## Notes

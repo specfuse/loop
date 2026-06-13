@@ -24,9 +24,12 @@ Two namespaces, four canonical shapes:
   - Substantive units use `TNN` — `T` followed by a zero-padded two-digit ordinal,
     unique within the feature. Example: `FEAT-2026-0042/T07`.
   - Closing-sequence units use `G<n>-<NAME>` — `G`, the gate number, a hyphen, and
-    one of `RETRO`, `LESSONS`, `DOCS`, `PLAN` (four-WU closing sequence) or `CLOSE`
-    (single-gate `close` alternative). Example: `FEAT-2026-0042/G1-RETRO`;
-    `FEAT-2026-0042/G1-CLOSE` for a single-gate feature using the `close` type.
+    one of `RETRO`, `LESSONS`, `DOCS`, `PLAN` (legacy four-WU closing sequence,
+    accepted by lint but emits WARN), `CLOSE` (single-WU terminal close), or
+    `CLOSE-INTERMEDIATE` (non-terminal close in a two-WU intermediate sequence
+    paired with a `PLAN` WU; see FEAT-2026-0015). Example: `FEAT-2026-0042/G1-RETRO`;
+    `FEAT-2026-0042/G1-CLOSE` for a terminal gate; `FEAT-2026-0042/G1-CLOSE-INTERMEDIATE`
+    paired with `G1-PLAN` for a non-terminal gate.
   - **Hygiene units** use `TNNH[N…]` — the *target* substantive WU's ordinal
     followed by a literal `H`, optionally suffixed with an ordinal when more
     than one hygiene WU precedes the same target. Example: `FEAT-2026-0042/T07H`
@@ -58,7 +61,7 @@ Collisions between the two namespaces are structurally impossible.
 The combined pattern accepted across all shapes is:
 
 ```
-^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE)))?)$
+^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$
 ```
 
 A string that does not match is malformed.
@@ -123,13 +126,19 @@ year starts fresh at `0001`.
 **Task-level.** Within a feature, substantive units start at `T01` and increment by
 one. Padding is always two digits, which caps a feature at `T99`; that ceiling is
 unlikely to bind, and if it does, raise an escalation rather than invent a new
-format. Closing-sequence IDs are mechanical. For the four-WU sequence: `G<gate>-RETRO`,
-`G<gate>-LESSONS`, `G<gate>-DOCS`, `G<gate>-PLAN`, one of each per gate, in that
-order. For the single-gate `close` alternative: a single `G<gate>-CLOSE` ID
-replaces all four. The session running `plan-next` mints the next gate's
-substantive IDs as drafts; the human arms them. When adding a new closing WU
-type to `lint_plan.py`, also add its `<NAME>` segment to `CORRELATION_ID_RE` so
-the new IDs pass validation.
+format. Closing-sequence IDs are mechanical. Three closing shapes exist:
+
+- **Two-WU intermediate** (non-terminal gate, introduced in FEAT-2026-0015):
+  `G<gate>-CLOSE-INTERMEDIATE` (folds RETRO+LESSONS+DOCS into one session) then
+  `G<gate>-PLAN`. Use when the gate is not the last gate in the feature.
+- **One-WU terminal**: a single `G<gate>-CLOSE` replaces the full closing sequence.
+  Use when the gate is the terminal gate.
+- **Legacy four-WU sequence** (accepted by lint but emits WARN): `G<gate>-RETRO`,
+  `G<gate>-LESSONS`, `G<gate>-DOCS`, `G<gate>-PLAN`, in that fixed order.
+
+The session running `plan-next` mints the next gate's substantive IDs as drafts;
+the human arms them. When adding a new closing WU type to `lint_plan.py`, also
+add its `<NAME>` segment to `CORRELATION_ID_RE` so the new IDs pass validation.
 
 Do not reuse an ordinal even after a unit is abandoned. Once an ID has appeared in
 the event log, it is spent. Reusing it would make history ambiguous.
@@ -150,9 +159,11 @@ The seventh substantive unit in that feature's gate 1:
 - Commit trailer on the squashed commit: `Feature: FEAT-2026-0042/T07`
 - Event entries: `correlation_id: FEAT-2026-0042/T07`
 
-Gate 1's closing sequence (four-WU form): `FEAT-2026-0042/G1-RETRO`,
-`G1-LESSONS`, `G1-DOCS`, `G1-PLAN`, in that fixed order. For a single-gate
-feature using the `close` alternative: `FEAT-2026-0042/G1-CLOSE` alone.
+Gate 1's closing sequence, two-WU intermediate form (non-terminal gate):
+`FEAT-2026-0042/G1-CLOSE-INTERMEDIATE` then `FEAT-2026-0042/G1-PLAN`.
+For a terminal gate using the single-WU close: `FEAT-2026-0042/G1-CLOSE` alone.
+Legacy four-WU form (emits WARN): `FEAT-2026-0042/G1-RETRO`, `G1-LESSONS`,
+`G1-DOCS`, `G1-PLAN`, in that fixed order.
 
 ## Failure modes
 
