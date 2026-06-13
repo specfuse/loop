@@ -322,3 +322,168 @@ unchanged in shape; archive contains 6 detail sections matching
 the originals byte-for-byte except for the new archive header.
 
 **Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. **Gate 2 (passed).** Driver auto-archive hook shipped: `loop.py` now calls `auto_archive_feature` after flipping `PLAN.md` status to `complete`, automatically archiving the feature's roadmap detail section on feature close. Tests cover happy path, idempotency, and refusal. 1 WU (T05), 2 attempts, $2.05.
+
+<a id="feat-2026-0002"></a>
+## FEAT-2026-0002 — Driver run-loop test coverage
+
+**Why.** This repo's own `code` coverage gate ships at `--fail-under=35`,
+deliberately below the methodology's ≥ 90% default
+(`.specfuse/verification.yml`). The gap is concentrated in the orchestration
+paths of `loop.py`: `run()` (the attempt loop and gate-completion flow),
+`squash_commit`, `log_event`, `find_feature`, `load_graph`, `load_wu`,
+`require_git_ready`, the `dispatch` subprocess invocation, and the
+`blocked_human` escalation flow end-to-end. The parse/decide/verify core is
+already covered by the existing 27 unit tests.
+
+**Goal.** Land integration tests that exercise the run-loop without
+spawning a real `claude -p`, then raise this repo's `--fail-under` floor
+toward 90. Specifically:
+
+- `run()` happy path (a single passing WU lands a squashed commit and
+  flips status to `done`).
+- `run()` failed-then-passed path (attempt 1 fails verify, attempt 2
+  passes; assert the failure note is written, the attempt counter is
+  written to frontmatter, and only one squashed commit ends up on HEAD).
+- `run()` agent-reported-blocked path (assert single attempt, `blocked_human`
+  status, `human_escalation` event with `agent_reported_blocked` reason,
+  `git reset --hard` ran).
+- `run()` spinning-detection path (three failed verify cycles → `blocked_human`,
+  `human_escalation` with `spinning detected` reason).
+- `squash_commit` against a temp git repo: produces one commit with the
+  correct trailer, folds away any commits the (stub) agent made.
+- `log_event` round-trip: appends a single line of valid JSON with the
+  expected fields.
+- `find_feature` with zero/one/multiple actives.
+- `require_git_ready` happy + missing-commits + non-repo (already covered
+  manually after the original fix; promote to unit tests).
+
+**Gate 1 (passed).** Single-gate feature, five substantive WUs:
+
+- **T01** — `tests/test_loop_orchestration.py` raised `loop.py` from 87%
+  to ≥ 95% by covering `squash_commit` soft-reset, `find_feature` 0/1/many,
+  `require_git_ready`, dispatch error arms, lock contention, gate-budget
+  halt, and `main()` argparse. Landed in 2 attempts (high effort).
+- **T02** — `tests/test_validate_event.py` raised `validate-event.py` from
+  0% to 97% by covering schema accept/reject and a real-event regression.
+  First attempt blocked (AC 4 polarity error: the spec asserted the schema
+  *accepts* a driver-emitted event, but the orchestrator's schema
+  intentionally rejects `source: "driver"`); re-arm inverted the AC and
+  added `jsonschema` to dev deps. Landed in 1 attempt post-re-arm.
+- **T03** — `tests/test_lint_plan_errors.py` raised `lint_plan.py` from
+  79% to 99% by covering the 11 named error arms + a regression on the
+  bundled FEAT-2026-0001 fixture. First dispatch spun 3 attempts on a
+  ruff F401 (`import sys` unused); re-arm added pre-flight lint discipline.
+  Landed in 1 attempt post-re-arm.
+- **T04** — `tests/test_miniyaml_negative.py` extended raised `_miniyaml.py`
+  from 87% to 100% with escape-handling and indent-error fixtures. Landed
+  in 1 attempt.
+- **T05** — `.specfuse/verification.yml` and `scripts/smoke-test.sh`
+  flipped from `--fail-under=70` to `--fail-under=90`; deviation comment
+  removed. Landed in 1 attempt (45 s).
+
+Post-gate coverage: TOTAL = **97%** (was 78% at feature start), with each
+targeted module at or above its per-WU threshold (`loop.py` 97%,
+`validate-event.py` 97%, `lint_plan.py` 99%, `_miniyaml.py` 100%). The
+two-site `--fail-under` floor (`.specfuse/verification.yml` +
+`scripts/smoke-test.sh`) reads `=90` and matches the methodology default.
+GATE-01 status: `passed`.
+
+**Status: done.** `roadmap_goal` met — this repo's coverage floor now
+matches the methodology default (≥ 90%), with measured TOTAL at 97% and
+no module under 90%. See `RETROSPECTIVE.md §Feature-arc verdict`.
+
+<a id="feat-2026-0013"></a>
+## FEAT-2026-0013 — CI integration_workspace cleanup race fix
+
+**Why.** The repo's CI suite intermittently fails with
+`OSError: [Errno 39] Directory not empty: '/tmp/.../.git/objects'`
+when `tests/test_driver_integration.py::integration_workspace`'s
+`tempfile.TemporaryDirectory()` context manager exits and Python 3.12's
+`shutil.rmtree` races against leftover file descriptors holding parts
+of `.git/objects`. Three observed occurrences:
+
+- 2026-06-10 push, `test_no_files_changed_in_result_block_runs_squash_as_today`
+  — root cause was an unclosed `.specfuse/.loop.lock` fd; fixed by the
+  `try/finally` close in `loop.py::run()` (commit `7abc809`).
+- 2026-06-11 PR #7 first run,
+  `test_cumulative_duration_written_to_frontmatter` — same OSError, but
+  the prior fix doesn't touch the test that's failing now. A second
+  unclosed handle (or git subprocess that hasn't exited yet) is still
+  leaking inside `integration_workspace`.
+
+A subsequent CI run on the same PR passed without code changes,
+confirming the race is timing-dependent and not deterministic. CI
+flakes erode the verification-as-oracle property even when each
+individual failure has a reproducible root cause, and the team has
+now spent two halt-and-investigate cycles on the same symptom shape.
+
+**Goal.** Eliminate the race so the integration-test path is
+deterministic on Python 3.12 CI runners.
+
+Likely fix paths to evaluate:
+
+- `tempfile.TemporaryDirectory(ignore_cleanup_errors=True)` in
+  `integration_workspace` (Py 3.10+). Suppresses the symptom; doesn't
+  fix the underlying leak.
+- Audit `integration_workspace` for unclosed git subprocess handles
+  and add explicit `subprocess.run` `check=True` + completion-wait at
+  exit points. Fixes the root cause.
+- Move `.specfuse/.loop.lock` open-then-flock pattern out of test
+  paths that don't need it (the lock isn't load-bearing inside a
+  TemporaryDirectory the test owns).
+
+A single substantive WU per fix-path; recursive audit at close runs
+the suite 50× in a loop and asserts zero flakes.
+
+**Gate 1 (passed).** T01 audited `integration_workspace` and applied
+two coupled fixes in one attempt (362.795 s, $0.327): (a) `git -c
+gc.auto=0` on every `git` invocation inside the fixture body, killing
+gc.autoDetach's post-parent-exit background-subprocess class; (b) a
+`git -C <root> rev-parse HEAD` sync barrier in a `finally:` block
+after the `yield root` line, forcing index-lock flush and pending
+writer release before `TemporaryDirectory` teardown. `subprocess.run`
+calls inside the fixture use `check=True` with completion-wait;
+fixture remains a `@contextmanager` yielding `Path` (no API break).
+50× local audit at T01 close: 50/50 clean. GATE-01 status: `passed`.
+
+**Status: done.** `roadmap_goal` met — the close-session 50×
+recursive audit, post-T01-squash on HEAD `2a9e2aa`, shows 50/50
+unittest exits 0 with no `OSError: Directory not empty`, no
+`FAILED`, no `ERROR`. `tail -1 | sort | uniq -c` returned one
+distinct line across 50 runs (driver stdout from an inner
+integration test, not unittest's verdict — see RETROSPECTIVE.md
+"Reading the output"); exit-code count confirmed PASS:50 FAIL:0.
+The race is eliminated locally; CI on a Py 3.12 runner is the
+field test (next PR run). Two `[FEAT-2026-0013/G1-CLOSE]` entries
+landed in LEARNINGS.md covering the gc.auto=0 + sync-barrier rule
+and the `tail -1` oracle fragility. See `RETROSPECTIVE.md
+§Feature-arc verdict`.
+
+<a id="feat-2026-0014"></a>
+## FEAT-2026-0014 — GitHub Actions Node.js 20 deprecation bump
+
+**Why.** GitHub will force Node.js 20 actions to Node.js 24 on
+2026-06-16; Node 20 removed from runners 2026-09-16. CI's
+`actions/checkout@v4` and `actions/setup-python@v5` both emit the
+deprecation warning today. Without action, the forced upgrade lands
+during a normal CI run with no warning of which workflows will break
+their action pinning behavior — exactly the failure mode this repo's
+methodology is meant to surface before merge, not after.
+
+**Goal.** Bump `.github/workflows/ci.yml` to action versions that
+support Node 24 natively (currently: `actions/checkout@v5`,
+`actions/setup-python@v6` — verify the major-version compatibility at
+WU author time, not assume).
+
+Single substantive WU: edit `ci.yml` action `uses:` lines; trigger a
+CI run on the PR and confirm no deprecation warning fires; assert
+both jobs still pass against the existing test suite.
+
+**Status: done.** `roadmap_goal` met — `.github/workflows/ci.yml`
+pins `actions/checkout@v6` and `actions/setup-python@v6`; no stale
+`@v[0-5]` pins remain. Five days of deadline margin (closed
+2026-06-11; forced upgrade 2026-06-16). T01 landed in 1 attempt
+after a WU re-arm; the original ACs coupled the WU to the
+operator's `gh` CLI auth state and burned 5 dispatches before the
+re-arm dropped the host-coupled checks. See
+`RETROSPECTIVE.md §Feature-arc verdict`.
