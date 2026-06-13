@@ -880,3 +880,76 @@ promoted here.
   the skill's algorithm steps the re-implementation must match
   verbatim. Do not leave the choice implicit; an agent without this
   note may choose subprocess invocation as the "DRY" option.
+
+- [FEAT-2026-0015/G1] The §10 helper-duplication escalation trigger
+  must be authored with the target file's specific coupling surfaces in
+  mind, not just the obvious symbol names. FEAT-2026-0015/T02's §10
+  grep checked `CLOSING_SEQUENCE|_CLOSING_TYPES` but omitted
+  `CORRELATION_ID_RE` — a separate constant in the same file that
+  encodes overlapping knowledge about the closing-type lexicon. The
+  omission caused a silent divergence that T03's first attempt surfaced
+  as a blocking failure. Rule: before authoring a §10 escalation
+  trigger, enumerate every site in the target file that encodes
+  overlapping knowledge about the new symbol (type registries, regexes,
+  schema constants, enum members, doc examples) and include a grep
+  pattern for each. A §10 trigger that only checks the most obvious
+  coupling point is incomplete; the correct test is "is there ANY other
+  location in the file — or in the files that import it — that must
+  mirror this change?"
+
+- [FEAT-2026-0015/G1] A WU re-armed after a hygiene-WU resolves its
+  blocking condition may silently produce zero file changes on its
+  first re-dispatch attempt — even though the hygiene fix is committed
+  and the blocking pre-condition is gone. FEAT-2026-0015/T03 exited
+  `files_changed_mismatch` on the second dispatch's first attempt
+  (all four expected paths unchanged) despite T02H having landed. The
+  plausible cause is cached tool-call state from the prior blocked
+  session, which prevented the re-armed agent from perceiving the
+  hygiene changes as "new context requiring action." No driver-level
+  mitigation exists as of this writing. Rule: when arming a WU that
+  was previously blocked by a missing pre-condition (now resolved via
+  a hygiene WU), add a note to the arm-gate review: "first attempt
+  may exit `files_changed_mismatch`; if so, re-dispatch unmodified —
+  the second attempt will perceive the post-hygiene state correctly."
+  Account for this extra dispatch in the WU's planned cost.
+
+- [FEAT-2026-0015/G1] `low` effort ($0.50 planned cost) is
+  systematically undersized for WUs that touch three or more files
+  when any of those files carry documentation coupling (a prose rule
+  that must stay consistent with a code constant, a template whose
+  prose must agree with a linter, a skill whose examples must reflect
+  the current valid-type set). FEAT-2026-0015/T03 was classified
+  `low` and planned at $0.50; it touched four files (two templates,
+  one skill, one test file) and ran $1.53 on its productive dispatch
+  alone — 3× plan. T02H was classified `low` and ran $0.98 across two
+  attempts against a $0.50 plan, driven by the surrounding regex
+  correctness surface and documentation coupling in `correlation-
+  ids.md`. Rule: classify a WU as `medium` ($0.80–$1.00 planned cost)
+  when it touches three or more files OR when any touched file has
+  documentation coupling. Reserve `low` for WUs that touch exactly
+  one or two files with no prose-consistency obligation. Pure-additive
+  dict extension in a single file (T01's profile: one driver file,
+  three dict entries, four tests) is the canonical `low`/`medium`
+  boundary case; T01 completed at $0.42 on a $1.00 medium plan,
+  suggesting `low` is appropriate there — but only for that pattern.
+
+- [FEAT-2026-0015/G1] When a WU modifies a scaffold template (e.g.,
+  `PLAN.template.md`, `WU.template.md`), the gate must include a test
+  that renders the template (or a representative excerpt) and runs the
+  downstream linter against the rendered output. Verifying that the
+  template file itself is well-formed is insufficient — the gate's
+  oracle must be "lint passes on a PLAN.md produced from this
+  template." FEAT-2026-0015/T03 introduced
+  `tests/test_template_closing_shapes.py` for exactly this: it
+  constructs minimal closing-WU sequences from the template shapes and
+  asserts `lint_plan.py` accepts them. This extends the existing prose-
+  artifact rule ([FEAT-2026-0003/G2-LESSONS]) specifically to
+  templates: the structural linter that counts required sections must
+  run on a RENDERED instance, not on the raw template text (which may
+  pass naive section-count checks while producing linter-rejecting
+  output when instantiated). Rule: any WU that edits a scaffold
+  template file must declare, in its Verification section, the command
+  that (a) instantiates the template into a minimal artifact and (b)
+  runs the downstream linter on that artifact. A test file exercising
+  this path is the preferred form; a Makefile or inline shell command
+  is acceptable when a test file is out of scope.
