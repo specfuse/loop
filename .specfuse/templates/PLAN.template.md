@@ -24,9 +24,12 @@ retrospective and lessons.
 ## Task graph
 
 ```yaml
-# Closing shape: gate 1 is non-terminal → use 2-WU intermediate pattern (FEAT-2026-0015).
-# Gate 2 is terminal → close WU is drafted by gate 1's plan-next when the time comes.
-# Legacy 4-WU sequence (RETRO/LESSONS/DOCS/PLAN) is accepted by lint but emits WARN.
+# Closing shape (FEAT-2026-0015):
+#   Non-terminal gate (gate 1): 2-WU → close-intermediate + plan-next.
+#   Terminal gate (gate 2): 1-WU → close.
+#   Gate 2's WUs are drafted by gate 1's plan-next; scaffold them here so
+#   lint can identify gate 1 as non-terminal from the start.
+#   Legacy 4-WU sequence (RETRO/LESSONS/DOCS/PLAN) is accepted by lint but emits WARN.
 gates:
   - gate: 1
     file: GATE-01.md
@@ -46,7 +49,13 @@ gates:
         depends_on: [FEAT-YYYY-NNNN/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []     # drafted by gate 1's plan-next; empty is valid (= not yet planned)
+    work_units:
+      # --- closing sequence: 1-WU close (terminal gate) ---
+      # Scaffold this now so lint can identify gate 1 as non-terminal.
+      # G1-PLAN fills in the substantive WUs above this entry when gate 1 completes.
+      - id: FEAT-YYYY-NNNN/G2-CLOSE
+        file: WU-90-gate-2-close.md
+        depends_on: []   # G1-PLAN will set real depends_on when it drafts gate 2
 ```
 
 ## Notes

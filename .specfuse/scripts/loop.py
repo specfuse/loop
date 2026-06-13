@@ -560,6 +560,36 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     return git("rev-parse", "HEAD")
 
 
+def reset_preserving_events(head_before: str, events_path: Path) -> None:
+    """`git reset --hard <head_before>` without losing events.jsonl content.
+
+    The hard-reset is the methodology's "wipe agent's edits before we write our
+    bookkeeping" move. But events.jsonl can carry flushed-but-not-yet-committed
+    entries from a PRIOR WU whose flush happened after its squash commit (the
+    passed path flushes events AFTER the squash). Those entries sit on disk
+    waiting for the NEXT WU's `commit_bookkeeping` to capture them. A bare
+    `git reset --hard` between WUs rolls events.jsonl back to its last-
+    committed state, silently dropping the prior WU's lifecycle events.
+
+    Surfaced FEAT-2026-0015/T02 (commits 52a176a / 74d1911): T02 ran clean,
+    its task_started + task_completed events were flushed post-squash, then
+    T03 blocked → bare hard-reset wiped them. Same loss recurred when T02H
+    completed clean and T03 was re-armed.
+
+    This helper:
+      1. Reads events.jsonl content (if any) into memory.
+      2. Performs the hard-reset (drops the agent's working-tree edits).
+      3. Writes the preserved events.jsonl back to disk.
+
+    Subsequent `flush_events` calls then append to the preserved content;
+    `commit_bookkeeping` captures the full history.
+    """
+    saved = events_path.read_text() if events_path.is_file() else None
+    git("reset", "--hard", head_before)
+    if saved is not None:
+        events_path.write_text(saved)
+
+
 def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
     if git("rev-parse", "HEAD") != head_before:
         git("reset", "--soft", head_before)  # fold away any commits the agent made
@@ -1255,7 +1285,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                             "attempt_outcome", wu.wu_id,
                             {"outcome": "zero_token_skip", "attempt": attempt},
                         ))
-                        git("reset", "--hard", head_before)
+                        reset_preserving_events(head_before, events_path)
                         print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
                               f"— no agent output, skipping")
                         continue
@@ -1264,7 +1294,9 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                         # Reset agent work first; THEN write our bookkeeping; THEN
                         # commit it. Doing the flip before the reset would let the
                         # reset wipe the flip — the silent-state-loss bug.
-                        git("reset", "--hard", head_before)
+                        # Use reset_preserving_events to keep prior WU's
+                        # flushed-but-uncommitted events.jsonl entries.
+                        reset_preserving_events(head_before, events_path)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
@@ -1306,7 +1338,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                                 smoke_cmds, Path("."),
                             )
                             if not smoke_ok:
-                                git("reset", "--hard", head_before)
+                                reset_preserving_events(head_before, events_path)
                                 wu_events.append(build_event(
                                     "attempt_outcome", wu.wu_id, {
                                         "outcome": "smoke_import_failed",
@@ -1348,7 +1380,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
-                        git("reset", "--hard", head_before)
+                        reset_preserving_events(head_before, events_path)
                         print(f"   FILES_CHANGED MISMATCH attempt "
                               f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
                               f"unchanged")
@@ -1360,7 +1392,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     # attempts; on eventual PASS they're discarded as scratch.
                     attempt_notes.append((attempt, payload))
                     failure_note = payload
-                    git("reset", "--hard", head_before)
+                    reset_preserving_events(head_before, events_path)
                     print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
                 else:
                     # for-else: ran out of attempts without break = spinning.

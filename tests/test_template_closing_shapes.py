@@ -42,12 +42,10 @@ class TestPlanTemplateClosingShapes(unittest.TestCase):
                       "PLAN.template.md must include G1-PLAN (plan-next) WU")
 
     def test_plan_template_uses_1wu_close_for_terminal_gate(self):
-        """PLAN.template.md must NOT use the legacy 4-WU closing sequence as default.
+        """PLAN.template.md must use a single close WU for the terminal gate (gate 2).
 
-        The template shows gate 2 with work_units: [] (drafted by plan-next),
-        meaning gate 2 is terminal and gets a single close WU when eventually
-        populated. The template should not list RETRO/LESSONS/DOCS as the
-        default closing sequence.
+        The template scaffolds gate 2 with a G2-CLOSE WU so lint can identify
+        gate 1 as non-terminal. The legacy 4-WU sequence must not appear.
         """
         text = self._plan_template_text()
         # Legacy sequence IDs must NOT appear in the template's task graph
@@ -60,10 +58,10 @@ class TestPlanTemplateClosingShapes(unittest.TestCase):
                          "PLAN.template.md graph must not use legacy G1-LESSONS")
         self.assertNotIn("G1-DOCS", graph_yaml,
                          "PLAN.template.md graph must not use legacy G1-DOCS")
-        # Gate 2 must be empty (terminal gate — close WU drafted by plan-next)
-        self.assertIn("work_units: []", graph_yaml,
-                      "Gate 2 in PLAN.template.md must have work_units: [] "
-                      "(terminal gate, populated by plan-next)")
+        # Gate 2 must scaffold a G2-CLOSE WU (terminal gate close)
+        self.assertIn("G2-CLOSE", graph_yaml,
+                      "Gate 2 in PLAN.template.md must scaffold a G2-CLOSE WU "
+                      "so lint can identify gate 1 as non-terminal")
 
     def test_plan_template_explains_closing_shape_choice(self):
         """PLAN.template.md must include a comment explaining the closing shape."""

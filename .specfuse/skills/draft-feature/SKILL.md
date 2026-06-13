@@ -119,12 +119,14 @@ initiative). For each gate:
   missed in review.
 
 Show the skeleton; accept revisions before continuing. Every gate ends
-with a closing block. For multi-gate features — and optionally single-gate
-ones — this is the four-unit sequence (retrospective, lessons, docs,
-plan-next), which appears in every gate automatically. For single-gate
-features only, a single `close` WU may substitute, collapsing all four
-ceremonies into one session; propose this alternative when the feature
-has exactly one gate and no forward-design work is needed.
+with a closing block whose shape depends on gate position:
+
+- **Non-terminal gate** (any gate that is not the last): 2-WU closing
+  sequence — `close-intermediate` (folds RETRO+LESSONS+DOCS into one
+  session) followed immediately by `plan-next`.
+- **Terminal gate** (the feature's final gate, any feature shape):
+  single `close` WU, collapsing retrospective + lessons + docs +
+  terminal verdict into one session.
 
 ### 5. Propose gate 1's WUs
 
@@ -137,12 +139,28 @@ For gate 1 only:
   section body. **Delegate the per-WU craft** to
   [`../authoring-work-units/SKILL.md`](../authoring-work-units/SKILL.md) —
   read its rules and apply them; don't restate them here.
-- Closing WUs for gate 1: for the four-WU sequence, generate `G1-RETRO`,
-  `G1-LESSONS`, `G1-DOCS`, `G1-PLAN` mechanically — IDs, file names, types,
-  and models follow the template. For a single-gate feature where the `close`
-  alternative was proposed in step 4, generate a single `G1-CLOSE` WU instead.
+- Closing WUs for gate 1 follow the shape decided in step 4:
+  - **Gate 1 is non-terminal**: generate 2 closing WUs mechanically —
+    `G1-CLOSE-INTERMEDIATE` (file `WU-90-gate-1-close-intermediate.md`,
+    type `close-intermediate`) then `G1-PLAN` (file
+    `WU-91-gate-1-plan-next.md`, type `plan-next`). The
+    `close-intermediate` WU depends on all substantive WUs; `G1-PLAN`
+    depends on `G1-CLOSE-INTERMEDIATE`.
+  - **Gate 1 is terminal** (single-gate feature): generate a single
+    `G1-CLOSE` WU (file `WU-90-gate-1-close.md`, type `close`)
+    depending on all substantive WUs.
   Surface whichever set applies for confirmation rather than per-section
   discussion.
+
+#### Legacy: 4-WU sequence
+
+Older features used a four-WU closing sequence: `G1-RETRO`
+(`retrospective`), `G1-LESSONS` (`lessons`), `G1-DOCS` (`docs`),
+`G1-PLAN` (`plan-next`). This shape is accepted by lint but emits a
+WARN — do NOT use it for new features. If you are migrating an
+in-flight feature that already has `G1-RETRO` / `G1-LESSONS` /
+`G1-DOCS` drafted, leave those WUs as-is and let the gate complete
+normally; the lint warning is advisory for in-flight work.
 
 Show each substantive WU's draft before writing. Accept, modify, or
 skip — same propose-and-confirm rhythm as `feature-conversion`.
