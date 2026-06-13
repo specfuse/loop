@@ -30,7 +30,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0012 | Closing-WU deliverable guard (folded into 0015) | abandoned | — | [→ archive](roadmap-archive.md#feat-2026-0012) |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
-| FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | active   | — | — |
+| FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | active   | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | — |
 | FEAT-2026-0016 | Re-arm contract + audit trail               | planned  | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).

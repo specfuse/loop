@@ -3,10 +3,15 @@ id: FEAT-2026-0015/G2-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 oracle_env: macos_local
+verdict: met
+duration_seconds: 385.52
+cost_usd: 2.854313
+input_tokens: 37
+output_tokens: 21872
 ---
 
 # Gate 2 close — terminal close ceremony (NEW contract; recursive dogfood)

@@ -953,3 +953,78 @@ promoted here.
   runs the downstream linter on that artifact. A test file exercising
   this path is the preferred form; a Makefile or inline shell command
   is acceptable when a test file is out of scope.
+
+- [FEAT-2026-0015/G2-CLOSE] Planned-cost estimation for WUs that touch
+  the driver core (`loop.py`) is systematically half the actual cost
+  at the current model mix (Sonnet 4.6 + Opus 4.7). Gate 2's five
+  substantive WUs ran 106–194% over plan; the gate subtotal ran 147%
+  over plan ($14.84 actual vs $6.00 planned). The pattern is
+  uniform across all five WUs, not driven by outliers. Rule: when a
+  WU is `implementation` type AND touches `.specfuse/scripts/loop.py`
+  (or `lint_plan.py`), set the planned-cost floor at:
+  `low → $1.50`, `medium → $2.50`, `high → $4.00`. Use the existing
+  `low/medium/high` effort taxonomy but with these driver-core
+  floors. Outside `loop.py` / `lint_plan.py`, the prior floors
+  ([FEAT-2026-0015/G1]) still apply. Two-gate evidence (Gate 1 +68%,
+  Gate 2 +147%) — this is no longer noise.
+
+- [FEAT-2026-0015/G2-CLOSE] Type-keyed assertion tables
+  (`dict[str, list[Callable]]`) are the right shape for a guard whose
+  required deliverables differ by WU subtype. T07 landed
+  `CLOSING_ASSERTIONS_BY_TYPE` with three keys (`close`,
+  `close-intermediate`, `plan-next`), each carrying a per-subtype
+  assertion list (5/3/2 respectively). The shape lets a new subtype be
+  added without touching existing entries — additive-only — and lets
+  each assertion be tested in isolation. Compare to a single-callable
+  guard (`assert_closing_deliverables` as one giant if-chain): the
+  if-chain forces shared early-return logic and makes per-subtype
+  testing harder. Rule: when a driver guard must enforce
+  context-dependent deliverables (different per WU type, per gate,
+  per language), prefer a type-keyed dispatch table over inline
+  branching. Each table entry is a unit-testable assertion; the
+  dispatcher is a one-line `assertions = TABLE.get(wu.type, [])`
+  lookup.
+
+- [FEAT-2026-0015/G2-CLOSE] Lint surfaces introduced into a
+  populated codebase should default to WARN (not ERROR) until a
+  backfill sweep runs against existing artifacts. T05's `oracle_env`
+  lint surface defaults to WARN because every WU authored before
+  this feature pre-dates the field; an ERROR-only default would have
+  spuriously blocked every legacy feature on its first re-lint. T08
+  applied the same WARN-first stance to `planned_cost_usd`. Rule:
+  when adding a new required field via lint, the rollout shape is
+  (1) WARN-only for one feature cycle to confirm the field is being
+  set in new authoring, (2) backfill sweep across legacy artifacts
+  (single hygiene WU), (3) WARN → ERROR flip in a follow-on feature.
+  Skipping step 1 and going ERROR-on-first-ship is a known
+  spurious-block pattern.
+
+- [FEAT-2026-0015/G2-CLOSE] When a planning artifact (PLAN.md's
+  `## Planned-cost table`) and a per-unit frontmatter field
+  (`WU.frontmatter.planned_cost_usd`) carry overlapping numeric
+  knowledge, the two go stale the moment one is revised without the
+  other. T08's WU frontmatter says `planned_cost_usd: 0.80` while
+  PLAN.md's table row says `0.50` — both refer to the same WU.
+  Neither is wrong; the WU was upgraded from `low` to `medium` after
+  the table was drafted, and the table didn't track. Rule: designate
+  ONE source as authoritative and have the other read from it. For
+  this codebase the per-WU frontmatter is authoritative (set at draft
+  time, revisable per-WU during planning); PLAN.md's table should be
+  generated from the frontmatter or carry a stale-warning comment.
+  Until the generation lands, treat WU frontmatter as the value the
+  cost-analysis section quotes, with a footnote on any discrepancy.
+
+- [FEAT-2026-0015/G2-CLOSE] The recursive-dogfood close ceremony
+  pattern from [FEAT-2026-0008/G1-CLOSE] is now validated on a
+  multi-gate feature whose terminal close is the FIRST production
+  exercise of the new contract it shipped. This WU (G2-CLOSE) used
+  `type: close` (new), wrote `verdict: met` (new field), produced a
+  `## Cost analysis` section (new assertion target), and was
+  exercised by T07's guard (new code) against its own commit. All six
+  AC7 recursive grep checks passed. The pattern works: a methodology
+  feature whose terminal close uses the methodology's own new shape
+  is the load-bearing test that the contract is sound. Rule
+  (reinforcing [FEAT-2026-0008/G1-CLOSE]): any future feature whose
+  scope is "ship a new close-ceremony contract" MUST close its own
+  terminal gate using that contract. Falling back to the previous
+  contract "to be safe" invalidates the feature's central claim.

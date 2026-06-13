@@ -5,7 +5,7 @@ slug: closing-ceremony-restructure
 branch: feat/FEAT-2026-0015-closing-ceremony-restructure
 roadmap_goal: Restructure the closing-WU contract from 4-WU sequence to 1+2-WU patterns + ship type-keyed hollow-pass guard for the new taxonomy; verdict-state ↔ PLAN-flip coupling, oracle env-parity declaration, state-flip ownership consolidation, and planned-vs-actual cost capture all enforced driver-side. Recursive dogfood: this feature's own terminal close uses the new contract.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 12.00
 ---
 
