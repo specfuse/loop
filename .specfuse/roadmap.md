@@ -255,6 +255,56 @@ states the durable rule but does not enforce it. New WU contract:
 - Lint check: `lint_plan.py` warns if a WU's ACs name an oracle
   without `oracle_env`. Failing lint blocks dispatch.
 
+## Planned-cost capture + actual-vs-planned comparison
+
+Today there is no convention for capturing a feature-level cost
+estimate up front. `/wrap-feature` §2 plan-adherence read
+acknowledges the gap ("Cost spent vs initial estimate if one was
+recorded"). FEAT-2026-0011 plans a coarse Budget bucket for scoring,
+but that's a prioritization input, not a close-time delta baseline.
+
+Capture planned cost at TWO levels — WU and feature:
+
+- **WU frontmatter** `planned_cost_usd: <float>` — per-WU operator
+  estimate. THIS is the unit of learning: per-type/per-effort
+  variance across features lets us calibrate the heuristic.
+- **PLAN.md frontmatter** `planned_cost_usd: <float>` — feature-
+  level estimate; SHOULD equal Σ of per-WU planned costs at
+  activation time (lint warns on mismatch >10%). Operator
+  declares the headline number explicitly so the feature-arc
+  verdict can quote it.
+
+Both fields are optional today (warn-only for new features),
+mandatory once /draft-feature emits them by default.
+
+Close-WU spec change (folds into the new `close` and
+`close-intermediate` types):
+
+- Required `## Cost analysis` section in RETROSPECTIVE.md (or its
+  gate-section equivalent). For each WU in scope, quote
+  `planned_cost_usd`, compute actual from events.jsonl (sum
+  cost_usd across all this WU's attempts including re-arms via
+  cumulative fields per FEAT-2026-0016), report delta %. Then
+  aggregate to gate total. Then aggregate to feature total
+  (terminal close only). Variance > 50% on any unit requires a
+  one-paragraph rationale citing the cause (oracle env mismatch,
+  scope discovery miss, re-arm cycle, etc.).
+- Lint warnings when WU files or PLAN.md are missing
+  `planned_cost_usd` for new features (grandfathered for in-flight).
+  Same shape as the oracle-env-parity warning above.
+
+**Future analysis path** (out of scope for 0015 — file as 0017
+or fold into 0011 scoring):
+
+- Aggregate per-WU `planned_cost_usd` vs actual across ALL
+  features. Group by `(type, effort)` pair. Compute mean delta
+  per group. Use as a self-calibrating heuristic in /draft-feature
+  to seed future estimates. Closes the methodology learning loop.
+
+Recursive dogfood: this feature's PLAN.md AND every WU file MUST
+carry `planned_cost_usd` at activation/draft time; close ceremony
+exercises the cost-analysis AC against itself.
+
 ## State-flip ownership consolidation
 
 Today the closing surfaces are split between close ceremony and
