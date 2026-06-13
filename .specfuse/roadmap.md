@@ -30,7 +30,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0012 | Closing-WU deliverable guard (folded into 0015) | abandoned | — | [→ archive](roadmap-archive.md#feat-2026-0012) |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
-| FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | — |
+| FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0015) |
 | FEAT-2026-0016 | Re-arm contract + audit trail               | planned  | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
@@ -128,81 +128,6 @@ estimates' grounding (revision log captures the change).
 **Status: planned.** Depends on FEAT-2026-0010 landing first (table
 shape needs to be ready to carry the new column shape).
 
-
-## FEAT-2026-0015 — Closing-ceremony restructure + hollow-pass guard
-
-**Subsumes FEAT-2026-0012** (filed 2026-06-12, abandoned 2026-06-13
-when this feature was scoped). 0012 proposed a driver-side closing-WU
-deliverable guard against the 4-WU taxonomy. That investment would be
-partially obsoleted by this feature's collapse of the taxonomy from
-4 WU types to 2-3. Building the guard against the NEW taxonomy from
-day 1 is cheaper end-to-end. The hollow-pass guard work is folded
-into this feature's `## Subsumed scope` section below.
-
-**Why.** The current 4-WU closing sequence (`retrospective → lessons →
-docs → plan-next`) consistently consumes ~50% of feature cost despite
-the inner three WUs (RETRO, LESSONS, DOCS) being summary+append work
-on overlapping context. Live evidence from FEAT-2026-0010:
-
-- Gate 1 close: $3.17 of $6.15 (52%); cache-creation across 4 WUs
-  ≈ 209k tokens (each fresh session re-bootstraps the same context).
-- Gate 2 close: $2.23 of $4.28 (52%); same shape.
-- LESSONS WUs frequently produce 0-1 entries; DOCS WUs often produce
-  empty diffs or `files_changed_mismatch` on the same file the close
-  ceremony already touched.
-
-The single-gate `close` alternative (FEAT-2026-0005) proved a combined
-session works for terminal-of-single-gate: $0.83 on FEAT-2026-0014;
-$1.84 on FEAT-2026-0013 v3-a3. Multi-gate features have no equivalent
-shortcut today; their terminal gate also pays the full 4-WU tax even
-though no `plan-next` is needed (terminal = nothing to plan).
-
-**Goal.** Restructure the closing contract to two patterns:
-
-- **Terminal gate (any feature, single- or multi-gate)**: single
-  combined `close` WU. Folds retrospective + lessons + docs +
-  feature-arc verdict into one session. Extends FEAT-2026-0005's
-  pattern from single-gate-only to any-feature-terminal-gate.
-- **Intermediate gate (multi-gate only)**: 2-WU close.
-  `close-intermediate` (new type) folds RETRO + LESSONS + DOCS into
-  one session; `plan-next` remains separate as today (high-stakes,
-  opus, drafts next gate's WUs against fresh context).
-
-Per-feature estimated savings: $1.50-3.00 + ~100k cache-creation
-tokens per closed gate. Wall-time: 4 sessions → 2 per intermediate
-gate, 4 → 1 per terminal gate.
-
-**Scope.**
-
-- New `close-intermediate` WU type in `loop.py` (`MODEL_BY_TYPE` +
-  `EFFORT_BY_TYPE` + `GATES_FOR_TYPE` + verification routing).
-- Update `.specfuse/templates/WU.template.md` and PLAN.md template to
-  use 2-WU intermediate and 1-WU terminal patterns by default.
-- Update `lint_plan.py` to accept the new shapes; reject the old
-  4-WU sequence as deprecated (with a grandfather window for
-  in-flight features so this PR doesn't break existing branches).
-- Update `.specfuse/skills/authoring-work-units/SKILL.md` to document
-  the new contract.
-- Update `/draft-feature` skill to emit the new patterns.
-- The `close-intermediate` WU type's prompt must demand explicit
-  subsections: `## RETROSPECTIVE`, `## LEARNINGS to promote`,
-  `## Docs reconciled` — the audit trail per-step the old per-WU
-  sequence provided implicitly.
-
-**Scope OUT.**
-
-- Backfilling already-closed features (their 4-WU history stays as
-  precedent).
-- Changing `plan-next`'s shape — keep its dedicated session.
-- Single-gate's existing `close` alternative — already correct
-  shape; just rename `close-terminal` for clarity or leave as-is.
-
-**Verification.** A dogfood feature (FEAT-2026-0016 or this feature
-itself) closed under the new contract shows: (a) terminal-gate cost
-≤ $1 (matches G1-CLOSE precedent); (b) intermediate-gate close cost
-≤ $1 (close-intermediate, no plan-next); (c) lint accepts the new
-shapes and rejects the old (modulo grandfather). `tests/test_lint_*`
-updated.
 
 ## Verdict-state ↔ PLAN.md coupling
 
