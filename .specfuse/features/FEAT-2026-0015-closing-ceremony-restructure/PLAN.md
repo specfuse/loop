@@ -50,16 +50,22 @@ gates:
         file: WU-02-lint-new-shapes.md
         depends_on:
           - FEAT-2026-0015/T01
+      - id: FEAT-2026-0015/T02H
+        file: WU-02H-correlation-id-grammar.md
+        depends_on:
+          - FEAT-2026-0015/T02
       - id: FEAT-2026-0015/T03
         file: WU-03-templates-and-draft-feature.md
         depends_on:
           - FEAT-2026-0015/T01
           - FEAT-2026-0015/T02
+          - FEAT-2026-0015/T02H
       - id: FEAT-2026-0015/G1-RETRO
         file: WU-90-gate-1-retrospective.md
         depends_on:
           - FEAT-2026-0015/T01
           - FEAT-2026-0015/T02
+          - FEAT-2026-0015/T02H
           - FEAT-2026-0015/T03
       - id: FEAT-2026-0015/G1-LESSONS
         file: WU-91-gate-1-lessons.md

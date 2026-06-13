@@ -3,13 +3,16 @@ id: FEAT-2026-0015/T03
 type: implementation
 model: claude-sonnet-4-6
 effort: low
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 0.50
-duration_seconds: 422.703
-cost_usd: 0.950612
-input_tokens: 681
-output_tokens: 18939
+# Prior attempt was diagnostic-only (agent surfaced T02 spec gap, blocked
+# per §10 helper-duplication trigger). T02H drafted as the hygiene WU;
+# T03 re-armed unmodified. Wasted cost preserved in historical_*.
+historical_cost_usd: 0.950612
+historical_duration_seconds: 422.703
+historical_input_tokens: 681
+historical_output_tokens: 18939
 ---
 
 # Update templates and `/draft-feature` skill to emit new closing shapes
