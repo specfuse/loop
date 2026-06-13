@@ -31,6 +31,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
 | FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | planned  | — | — |
+| FEAT-2026-0016 | Re-arm contract + audit trail               | planned  | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -203,6 +204,79 @@ itself) closed under the new contract shows: (a) terminal-gate cost
 shapes and rejects the old (modulo grandfather). `tests/test_lint_*`
 updated.
 
+## Verdict-state ↔ PLAN.md coupling
+
+Today the close ceremony flips PLAN.md `done` regardless of verdict
+hedging. FEAT-2026-0013 v1 close emitted **"Met locally;
+field-confirmation pending operator action"** AND flipped PLAN.md to
+done — then CI failed and the operator had to reverse-flip 4 surfaces
+to re-arm.
+
+New rule (driver-enforced):
+
+- Verdict **"Met"** → close MAY flip PLAN.md `done`, gate `passed`,
+  roadmap row `done`.
+- Verdict **"Met locally / field-pending"**, **"Partially met"**, or
+  any qualified form → close MAY NOT flip PLAN.md done. PLAN.md
+  stays `active`. Gate stays `awaiting_review`. RETROSPECTIVE
+  records the hedge + the operator-side oracle that must run before
+  the verdict can upgrade.
+- Verdict **"Not met"** → close emits `status: blocked` per
+  result-contract; no flips.
+
+Implementation:
+
+- Close WU spec requires a frontmatter field `verdict: met |
+  met_locally | partially_met | not_met` written before the
+  PLAN.md-flip step.
+- Driver reads the field; only `verdict: met` permits the terminal
+  flips. Other values keep state in close-pending limbo until
+  operator confirms field-side oracle (typically via `/wrap-feature`
+  step 4 or a dedicated `/confirm-verdict` skill, future).
+- The recursive close audit (FEAT-2026-0008 pattern) runs on the
+  guard itself: this feature's own close MUST exercise the verdict-
+  coupling check.
+
+## Oracle environment-parity declaration
+
+LEARNINGS `[FEAT-2026-0013/G1-CLOSE/oracle-environment]` already
+states the durable rule but does not enforce it. New WU contract:
+
+- Every Acceptance Criterion that uses a verifying oracle (test loop,
+  audit, lint, recursive-50× pattern, etc.) MUST declare the
+  environment the oracle runs in: `oracle_env: macos_local |
+  linux_docker | github_actions_ci | <named>`.
+- Close ceremony refuses `verdict: met` if any load-bearing AC's
+  declared `oracle_env` does not match the goal's target
+  environment. FEAT-2026-0013's `roadmap_goal` named "Python 3.12 CI
+  runners"; a macOS-local oracle would have been rejected at close
+  time, forcing the Linux Docker probe before the verdict could
+  upgrade.
+- Lint check: `lint_plan.py` warns if a WU's ACs name an oracle
+  without `oracle_env`. Failing lint blocks dispatch.
+
+## State-flip ownership consolidation
+
+Today the closing surfaces are split between close ceremony and
+`/wrap-feature`:
+
+| Surface | Owner today | Owner after 0015 |
+|---|---|---|
+| PLAN.md status | close | close (per verdict-coupling above) |
+| Terminal gate status | wrap-feature (cosmetic) | close |
+| Roadmap row status | wrap-feature (manual flip) | close |
+| Auto-archive call | wrap-feature (manual) OR driver's gate-is-None hook (chicken-and-egg) | close |
+
+Live evidence: FEAT-2026-0010, 0013, 0014 all had `roadmap row = active`
+after PLAN.md `done`. /wrap-feature step 1 surfaced the drift every
+time. FEAT-2026-0010's auto-archive hook (T05) didn't fire on itself
+because gate-is-None requires the gate cosmetic flip, which happens at
+wrap. Move ALL terminal flips into close → drift becomes impossible
++ auto-archive fires cleanly on every feature including its own.
+
+/wrap-feature shrinks to: read RETRO recap, push branch, open PR,
+merge advisory, next pick. No state flips.
+
 ## Subsumed scope (from FEAT-2026-0012)
 
 Hollow-pass guard against the NEW closing-WU taxonomy:
@@ -238,6 +312,87 @@ Likely shape: one substantive WU to ship the new WU types +
 templates + lint, one substantive WU to ship the type-keyed guard
 table + tests, then closing ceremony (using the new contract for
 recursive dogfood).
+
+## FEAT-2026-0016 — Re-arm contract + audit trail
+
+**Why.** FEAT-2026-0013 burned $13.50 across 5 dispatches (v1, v2,
+v3-attempt-1, v3-attempt-2, v3-attempt-3) before the fix held. Each
+re-arm required the operator to manually compute cumulative
+`historical_cost_usd`, `historical_duration_seconds`, etc., and write
+them into WU frontmatter to preserve audit. The driver does NONE of
+this; the `/unblock-wu` skill spec mentions the pattern but does not
+automate it. /gate-status reports "this WU is blocked" but does NOT
+surface "this WU has been re-armed 2 times". The audit signal for
+re-arm history is invisible to every other skill.
+
+Failure modes the gap surfaces:
+
+- Operator under-estimates feature cost because each /unblock-wu
+  resets `cost_usd: 0` and visible `attempts: 0`. FEAT-2026-0013's
+  $13.50 was only visible by manually summing five events.jsonl
+  blocks plus three commit messages.
+- Re-arm rationale is captured in commit messages (FEAT-2026-0013
+  history) but not in frontmatter — so /gate-status can't surface
+  "this is re-arm 3; prior reasons: gh-auth, gpg-config, scope-miss".
+- Methodology drift: the `historical_*` field naming was invented
+  ad-hoc during 0013; no template, no lint, no driver awareness.
+
+**Goal.** Standardize the re-arm contract end-to-end.
+
+WU frontmatter additions:
+
+- `re_arm_count: <int>` — number of times this WU has been re-armed
+  from `blocked_human` (or `done` post-CI-fail) back to `pending`.
+  Initialized 0; incremented by driver on next dispatch after an
+  `/unblock-wu` write.
+- `re_arm_history: [{timestamp, prior_status, prior_attempts,
+  prior_cost_usd, prior_duration_seconds, reason}]` — append-only
+  list. Operator (or /unblock-wu skill) writes one entry per
+  re-arm.
+- `cumulative_cost_usd`, `cumulative_duration_seconds`,
+  `cumulative_input_tokens`, `cumulative_output_tokens` —
+  cross-attempt sums INCLUDING all re-arms. Driver maintains;
+  /unblock-wu does not touch.
+
+Driver changes:
+
+- On `/unblock-wu` re-arm write (detected: WU was `blocked_human`,
+  now `pending` with `re_arm_count` incremented), driver fold prior
+  attempt's `cost_usd` / `duration_seconds` into the cumulative
+  fields BEFORE resetting `cost_usd: 0`.
+- New event `re_arm_dispatched` written to `events.jsonl` carrying
+  re-arm number + rationale.
+- `task_started` event carries `re_arm_count` so dashboards can
+  group attempts across re-arms.
+
+Skill changes:
+
+- `/unblock-wu` prompts for one-line re-arm rationale (already
+  recommended in the skill spec; now MANDATORY). Writes the new
+  `re_arm_history` entry.
+- `/gate-status` surfaces "re-arm N (last reason: ...)" prominently
+  on any WU with `re_arm_count > 0`.
+- `/wrap-feature` executive recap (§3 plan-adherence) reads
+  `re_arm_count` per WU instead of grep'ing events.jsonl.
+
+**Scope OUT.**
+
+- Changing the `/unblock-wu` decision vocabulary (re-arm /
+  abandon / skip stays as-is).
+- Driver auto-deciding when to abandon a WU after N re-arms
+  (would be a separate retry-ceiling feature).
+- Cross-feature cost rollup — that belongs to FEAT-2026-0011
+  (scoring framework consumes per-feature cumulative cost).
+
+**Verification.** Recursive: dogfood this feature's own close
+ceremony exercises the new frontmatter fields. Tests cover the
+driver's cumulative-fold logic, /unblock-wu's mandatory-rationale
+prompt, and /gate-status's re-arm surfacing.
+
+**Status: planned.** Independent of FEAT-2026-0015. Can land
+in parallel. Probably small (one substantive WU for the driver
+fold-logic, one for /unblock-wu + /gate-status updates, one for
+WU template/lint changes).
 
 
 ## Notes
