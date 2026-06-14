@@ -161,6 +161,25 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     return _miniyaml.parse("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
 
 
+def _find_task_graph_block(body: str) -> dict | None:
+    """Find the YAML block in PLAN.md that contains the task graph (issue #21).
+
+    PLAN.md may include multiple ```yaml fenced blocks (e.g. frontmatter
+    schema examples, type catalogs) before the actual task graph. Identify
+    the task-graph block by its top-level `gates:` key, scanning every
+    yaml block in order and returning the first one whose parsed value
+    contains `gates`.
+
+    Returns the parsed dict (with `gates` key) on success, or None when no
+    yaml block in the body contains a `gates` key.
+    """
+    for m in re.finditer(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL):
+        parsed = _miniyaml.parse(m.group(1)) or {}
+        if "gates" in parsed:
+            return parsed
+    return None
+
+
 def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
     """Emit WARN for missing planned_cost_usd on WUs and PLAN.md.
 
@@ -233,10 +252,9 @@ def lint(feature_dir: Path) -> list[str]:
     if missing:
         errs.append(f"PLAN.md frontmatter missing keys: {sorted(missing)}")
 
-    m = re.search(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL)
-    if not m:
+    graph = _find_task_graph_block(body)
+    if graph is None:
         return errs + ["PLAN.md has no ```yaml graph block"]
-    graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
     all_ids = {wu["id"] for g in gates for wu in (g.get("work_units") or [])}
     # Last non-empty gate is the terminal gate; `close` is only valid there.
@@ -473,11 +491,10 @@ def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
         return warns
 
     _, body = read_frontmatter(plan)
-    m = re.search(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL)
-    if not m:
+    graph = _find_task_graph_block(body)
+    if graph is None:
         return warns
 
-    graph = _miniyaml.parse(m.group(1)) or {}
     gates = graph.get("gates", [])
 
     next_gate_num = just_closed_gate + 1
