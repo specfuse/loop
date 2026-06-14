@@ -102,6 +102,32 @@ Frontmatter notes (single-repo):
   enforcement. Rationale: LEARNINGS [FEAT-2026-0013/G1-CLOSE] — "oracle
   environment must match goal environment" (macOS-local audits hide Linux races).
 
+- `re_arm_count` — OPTIONAL. Integer count of `/unblock-wu` re-arms applied to
+  this WU. Written by `/unblock-wu` (T06 of FEAT-2026-0016) on each re-arm;
+  incremented from 0 on first re-arm. Default: absent (treated as 0 by the
+  driver). Read by the driver's `detect_rearm_dispatch` and `task_started` /
+  `attempt_outcome` event payloads for dashboard cross-arm grouping.
+- `re_arm_history` — OPTIONAL. Ordered list of re-arm records, each a dict with
+  at least a `reason` key (the operator-supplied rationale). Appended by
+  `/unblock-wu` (T06 of FEAT-2026-0016) on each re-arm. Default: absent
+  (treated as empty list). Read by the driver to populate the `reason` field of
+  the `re_arm_dispatched` event.
+- `cumulative_cost_usd` — OPTIONAL. Running total of `cost_usd` across all
+  re-arm cycles. Written by the driver's `fold_cumulative_on_rearm` helper at
+  the start of each re-arm dispatch; absent until the first re-arm. Default: 0.
+  Read by `/gate-status` (T05) and close-ceremony cost analysis (T07) to report
+  the true multi-cycle spend. Authors leave it off; the driver owns it.
+- `cumulative_duration_seconds` — OPTIONAL. Running total of `duration_seconds`
+  across all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm
+  dispatch time. Default: 0. Read alongside `cumulative_cost_usd` for cost
+  analysis. Authors leave it off; the driver owns it.
+- `cumulative_input_tokens` — OPTIONAL. Running total of `input_tokens` across
+  all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm dispatch
+  time. Default: 0. Authors leave it off; the driver owns it.
+- `cumulative_output_tokens` — OPTIONAL. Running total of `output_tokens` across
+  all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm dispatch
+  time. Default: 0. Authors leave it off; the driver owns it.
+
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
 here — see `docs/methodology.md` §2 (one fact, one home).
 -->

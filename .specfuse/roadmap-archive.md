@@ -716,3 +716,85 @@ verdict-flip blind-spot logged for deep-analysis. Full RETROSPECTIVE
 Actual cost $39.37 vs planned $3.20 — 12.3× overrun, all on
 dogfood-surfaced bug discovery cycles where the agent worked
 correctly but verify-gates failed for reasons outside WU scope.
+
+<a id="feat-2026-0016"></a>
+## FEAT-2026-0016 — Per-attempt outcome events + re-arm contract + audit trail
+
+**Why.** FEAT-2026-0013 burned $13.50 across 5 dispatches (v1, v2,
+v3-attempt-1, v3-attempt-2, v3-attempt-3) before the fix held. Each
+re-arm required the operator to manually compute cumulative
+`historical_cost_usd`, `historical_duration_seconds`, etc., and write
+them into WU frontmatter to preserve audit. The driver does NONE of
+this; the `/unblock-wu` skill spec mentions the pattern but does not
+automate it. /gate-status reports "this WU is blocked" but does NOT
+surface "this WU has been re-armed 2 times". The audit signal for
+re-arm history is invisible to every other skill.
+
+Failure modes the gap surfaces:
+
+- Operator under-estimates feature cost because each /unblock-wu
+  resets `cost_usd: 0` and visible `attempts: 0`. FEAT-2026-0013's
+  $13.50 was only visible by manually summing five events.jsonl
+  blocks plus three commit messages.
+- Re-arm rationale is captured in commit messages (FEAT-2026-0013
+  history) but not in frontmatter — so /gate-status can't surface
+  "this is re-arm 3; prior reasons: gh-auth, gpg-config, scope-miss".
+- Methodology drift: the `historical_*` field naming was invented
+  ad-hoc during 0013; no template, no lint, no driver awareness.
+
+**Goal.** Standardize the re-arm contract end-to-end.
+
+WU frontmatter additions:
+
+- `re_arm_count: <int>` — number of times this WU has been re-armed
+  from `blocked_human` (or `done` post-CI-fail) back to `pending`.
+  Initialized 0; incremented by driver on next dispatch after an
+  `/unblock-wu` write.
+- `re_arm_history: [{timestamp, prior_status, prior_attempts,
+  prior_cost_usd, prior_duration_seconds, reason}]` — append-only
+  list. Operator (or /unblock-wu skill) writes one entry per
+  re-arm.
+- `cumulative_cost_usd`, `cumulative_duration_seconds`,
+  `cumulative_input_tokens`, `cumulative_output_tokens` —
+  cross-attempt sums INCLUDING all re-arms. Driver maintains;
+  /unblock-wu does not touch.
+
+Driver changes:
+
+- On `/unblock-wu` re-arm write (detected: WU was `blocked_human`,
+  now `pending` with `re_arm_count` incremented), driver fold prior
+  attempt's `cost_usd` / `duration_seconds` into the cumulative
+  fields BEFORE resetting `cost_usd: 0`.
+- New event `re_arm_dispatched` written to `events.jsonl` carrying
+  re-arm number + rationale.
+- `task_started` event carries `re_arm_count` so dashboards can
+  group attempts across re-arms.
+
+Skill changes:
+
+- `/unblock-wu` prompts for one-line re-arm rationale (already
+  recommended in the skill spec; now MANDATORY). Writes the new
+  `re_arm_history` entry.
+- `/gate-status` surfaces "re-arm N (last reason: ...)" prominently
+  on any WU with `re_arm_count > 0`.
+- `/wrap-feature` executive recap (§3 plan-adherence) reads
+  `re_arm_count` per WU instead of grep'ing events.jsonl.
+
+**Scope OUT.**
+
+- Changing the `/unblock-wu` decision vocabulary (re-arm /
+  abandon / skip stays as-is).
+- Driver auto-deciding when to abandon a WU after N re-arms
+  (would be a separate retry-ceiling feature).
+- Cross-feature cost rollup — that belongs to FEAT-2026-0011
+  (scoring framework consumes per-feature cumulative cost).
+
+**Verification.** Recursive: dogfood this feature's own close
+ceremony exercises the new frontmatter fields. Tests cover the
+driver's cumulative-fold logic, /unblock-wu's mandatory-rationale
+prompt, and /gate-status's re-arm surfacing.
+
+**Status: planned.** Independent of FEAT-2026-0015. Can land
+in parallel. Probably small (one substantive WU for the driver
+fold-logic, one for /unblock-wu + /gate-status updates, one for
+WU template/lint changes).

@@ -2,11 +2,22 @@
 id: FEAT-2026-0016/T03
 type: implementation
 effort: high
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
 produces_driver_helper: []
+prior_attempts:
+  - attempts: 1
+    model: claude-sonnet-4-6
+    outcome: blocked_agent_correct_diagnosis
+    duration_seconds: 280.018
+    cost_usd: 0.835044
+    notes: "AC7e used `git diff --name-only HEAD` which excludes untracked files. New test file IS untracked so check spuriously fails. Agent correctly diagnosed + proposed fix. Same class as LEARNINGS [driver/files_changed-guard]. Spec revised: AC7e now uses combined `{ git diff --name-only HEAD; git ls-files --others --exclude-standard; }`. G1-CLOSE-INTERMEDIATE AC6 had same broken pattern (creates RETROSPECTIVE.md); also fixed pre-emptively."
+duration_seconds: 659.659
+cost_usd: 1.475623
+input_tokens: 28
+output_tokens: 39736
 ---
 
 # Unit tests for attempt_outcome emission + re-arm cumulative-fold logic
@@ -155,8 +166,11 @@ mocking patterns. `tests/_workspace.py` for tempdir-git repo setup
    # d. Coverage ≥ 90%
    coverage run -m unittest discover tests && coverage report --include=.specfuse/scripts/loop.py --fail-under=90
 
-   # e. Working-tree diff touches the test file
-   git diff --name-only HEAD | grep -qx 'tests/test_attempt_outcome_emission.py'
+   # e. Working-tree diff (tracked + untracked) touches the test file.
+   # Newly created files are untracked, so `git diff --name-only HEAD`
+   # alone misses them — combine with `git ls-files --others
+   # --exclude-standard`. See LEARNINGS [driver/files_changed-guard].
+   { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | grep -qx 'tests/test_attempt_outcome_emission.py'
    ```
 
    Any check failing → `status: blocked`. Do NOT flip frontmatter

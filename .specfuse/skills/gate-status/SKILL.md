@@ -161,6 +161,69 @@ State the recommendation in a single sentence with the specific WU
 ID it would insert ("Add `FEAT-XXXX/T1H` titled '<fix>' as a
 precursor; flip current T02 back to `pending`; re-run the loop.").
 
+#### Per-attempt outcomes
+
+Source: `events.jsonl` for the active feature. Filter to events where
+`event_type == "attempt_outcome"` and `correlation_id` matches the
+blocked WU's id. Rows must come from that file only — the skill MUST
+NOT infer per-attempt outcomes from any other source.
+
+Render a table in event-file order, one row per matching event:
+
+```
+attempt | outcome | failure_class | failure_signature | duration (s) | cost ($)
+```
+
+- `failure_class` and `failure_signature` show `-` when null or absent.
+- `cost` rendered to 4 decimal places (e.g. `0.0031`).
+- `duration` rendered to 3 decimal places (e.g. `12.345`).
+
+After the table, quote the `failure_excerpt` field verbatim for the
+**latest failing attempt** (the one immediately preceding the
+`human_escalation` event). Quoting only the latest excerpt keeps the
+report scannable; earlier excerpts are available in `events.jsonl` for
+deeper inspection.
+
+If NO `attempt_outcome` events exist for the WU in `events.jsonl`,
+print:
+
+```
+(no per-attempt events; legacy feature — see human_escalation above)
+```
+
+Do not raise or stop on missing events.
+
+#### Re-arm history
+
+Source: the blocked WU's frontmatter fields `re_arm_count` and
+`re_arm_history`. These are written by the driver's re-arm operation
+(FEAT-2026-0016 gate 1).
+
+- If `re_arm_count` is absent, treat as `0`.
+- If `re_arm_history` is absent, treat as an empty list.
+
+**When `re_arm_count == 0`:** print:
+
+```
+re_arm_count: 0 — never re-armed
+```
+
+Stop the subsection.
+
+**When `re_arm_count > 0`:** print:
+
+```
+re_arm_count: <N>  latest re-arm reason: "<reason>"
+```
+
+where `<reason>` is `re_arm_history[-1].reason` quoted verbatim. If
+`re_arm_history[-1]` has a `timestamp` field, also print it on the
+same line:
+
+```
+re_arm_count: <N>  latest re-arm reason: "<reason>"  (re-armed at <timestamp>)
+```
+
 ### 5. If nothing is blocked but the gate hasn't finished
 
 Report the ready WUs (those whose `depends_on` are all done and
@@ -189,6 +252,14 @@ WUs have non-pending statuses).
   whether the bug the agent named is actually a bug.
 
 ## Version
+
+**v0.3.** Added `#### Per-attempt outcomes` and `#### Re-arm history`
+subsections under §4. Per-attempt table reads `attempt_outcome` events
+from `events.jsonl` (correlation-id-filtered); re-arm history reads
+`re_arm_count` + `re_arm_history` from WU frontmatter. Both contracts
+locked at v1 by FEAT-2026-0016 gate 1 (T01 emits, T02 writes
+frontmatter). Legacy features with no `attempt_outcome` records
+degrade gracefully to a note rather than failing.
 
 **v0.2.** Added budget-brake fields to §2: `cost_budget_usd` in GATE
 files and the `gate_budget_exceeded` escalation event in `events.jsonl`
