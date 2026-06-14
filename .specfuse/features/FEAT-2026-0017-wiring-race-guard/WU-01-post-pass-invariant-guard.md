@@ -3,7 +3,7 @@ id: FEAT-2026-0017/T01
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.50
 produces_driver_helper:
@@ -22,6 +22,10 @@ prior_attempts:
     duration_seconds: 1943.08
     cost_usd: 11.947744
     notes: "Opus 4.7 wrote substantive loop.py + 293-line test file. Tests failed all 3 attempts because new tempdir-git tests omitted 'git config commit.gpgSign false' setup (operator's global commit.gpgsign=true with SSH signing). Driver reset wiped loop.py edits each attempt; test file survived as untracked. Driver then crashed during spinning-detected commit_bookkeeping (same signing flake). Fix: repo-local commit.gpgsign=false set + WU body now mandates the gpgSign-false setup pattern."
+duration_seconds: 1579.077
+cost_usd: 11.081799
+input_tokens: 154
+output_tokens: 93150
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
