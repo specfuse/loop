@@ -576,5 +576,212 @@ class TestIdempotentAppendOnReArm(unittest.TestCase):
         )
 
 
+# ---------------------------------------------------------------------------
+# Regression test for #23 — maybe_auto_close_intermediate idempotency
+# ---------------------------------------------------------------------------
+
+
+class TestMaybeAutoCloseIntermediateIdempotent(unittest.TestCase):
+    """Regression for issue #23.
+
+    Before the fix, the dispatch loop could re-enter with a stale in-memory
+    `wu.status == "pending"` even though the auto-close path had already
+    written `status: done` + `auto_close: true` to disk and added the WU id
+    to `done_ids`. Calling `maybe_auto_close_intermediate` a second time then
+    appended a duplicate `auto_close_decision` event and (in the caller) a
+    duplicate bookkeeping commit.
+
+    The fix is two layered guards:
+
+    1. `maybe_auto_close_intermediate` short-circuits at the top if the
+       WU's on-disk frontmatter already shows status=done AND auto_close
+       truthy, returning (False, decision_with_auto=False) and emitting
+       no event.
+    2. The caller mirrors the disk status flip into the in-memory
+       `wu.status = DONE`, so `ready()`'s `u.status in DISPATCHABLE`
+       filter excludes the WU on the next while-loop pass.
+
+    Guard 1 is what this test exercises. Guard 2 is exercised by
+    TestPlanNextDispatchedAfterAutoIntermediate.test_close_intermediate_never_dispatched
+    (which already mirrors the in-memory flip).
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_id = "FEAT-2026-9974"
+        fdir = self.root
+        self.fdir = fdir
+
+        _write_plan_md_two_gate(fdir, self.feature_id)
+        _write_wu_impl(fdir, f"{self.feature_id}/T01", "WU-01.md")
+        _write_wu_close_intermediate(fdir, f"{self.feature_id}/G1-CI", "WU-ci.md")
+        _write_wu_plan_next(fdir, f"{self.feature_id}/G1-PLAN", "WU-plan.md")
+        (fdir / "WU-02.md").write_text(
+            f"---\nid: {self.feature_id}/T02\ntype: implementation\nmodel: sonnet\n"
+            f"status: pending\nattempts: 0\n---\n\n# T02{_WU_BODY}"
+        )
+        _write_gate_file(fdir, 1)
+        _write_gate_file(fdir, 2)
+        _write_task_completed_event(fdir, f"{self.feature_id}/T01")
+
+        refs_g1 = [
+            {"id": f"{self.feature_id}/T01", "file": "WU-01.md", "depends_on": []},
+            {"id": f"{self.feature_id}/G1-CI", "file": "WU-ci.md",
+             "depends_on": [f"{self.feature_id}/T01"]},
+            {"id": f"{self.feature_id}/G1-PLAN", "file": "WU-plan.md",
+             "depends_on": [f"{self.feature_id}/G1-CI"]},
+        ]
+        refs_g2 = [
+            {"id": f"{self.feature_id}/T02", "file": "WU-02.md", "depends_on": []},
+        ]
+        self.gate1 = _make_gate_node(fdir, self.feature_id, 1, refs_g1)
+        self.gate2 = _make_gate_node(fdir, self.feature_id, 2, refs_g2)
+        self.gates = [self.gate1, self.gate2]
+        self.ci_wu = _make_ci_wu(fdir, f"{self.feature_id}/G1-CI")
+        self.plan_next_wu = _make_plan_next_wu(fdir, f"{self.feature_id}/G1-PLAN")
+        self.events_path = fdir / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _call(self):
+        return loop.maybe_auto_close_intermediate(
+            self.fdir, self.feature_id, self.gate1, self.gates,
+            self.events_path, self.root, self.ci_wu, self.plan_next_wu,
+        )
+
+    def test_first_call_fires_second_call_short_circuits(self):
+        first_ok, first_decision = self._call()
+        self.assertTrue(first_ok)
+        self.assertTrue(first_decision.auto)
+
+        second_ok, second_decision = self._call()
+        self.assertFalse(
+            second_ok,
+            "second call must report no-action when WU is already auto-closed",
+        )
+        self.assertFalse(
+            second_decision.auto,
+            "decision.auto must be False on the idempotent short-circuit",
+        )
+        self.assertIn(
+            "already_auto_closed", second_decision.reasons,
+            "decision.reasons must surface the short-circuit cause",
+        )
+
+    def test_exactly_one_auto_close_decision_event(self):
+        self._call()
+        self._call()
+        events = _load_events(self.events_path)
+        auto_events = [
+            e for e in events if e.get("event_type") == "auto_close_decision"
+        ]
+        self.assertEqual(
+            len(auto_events), 1,
+            f"expected exactly 1 auto_close_decision event, got {len(auto_events)} "
+            f"— second call must NOT re-emit (issue #23 double-fire regression)",
+        )
+
+    def test_retrospective_has_exactly_one_gate_section(self):
+        self._call()
+        self._call()
+        retro_text = (self.fdir / "RETROSPECTIVE.md").read_text()
+        matches = re.findall(r"^## Gate 1\b", retro_text, re.MULTILINE)
+        self.assertEqual(
+            len(matches), 1,
+            "second auto-close call must not duplicate the Gate 1 section",
+        )
+
+
+class TestMaybeAutoCloseTerminalIdempotent(unittest.TestCase):
+    """Regression for issue #23 — same idempotency contract on the terminal
+    path. Setup mirrors the existing terminal-auto-close fixtures: single-gate
+    feature with one impl WU and one close WU."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_id = "FEAT-2026-9975"
+        fdir = self.root
+        self.fdir = fdir
+
+        (fdir / "PLAN.md").write_text(
+            f"---\n"
+            f"feature_id: {self.feature_id}\n"
+            f"title: Test\n"
+            f"branch: feat/{self.feature_id.lower()}-test\n"
+            f"roadmap_goal: test\n"
+            f"status: active\n"
+            f"---\n\n# Plan\n\n```yaml\n"
+            f"gates:\n"
+            f"  - gate: 1\n"
+            f"    file: GATE-01.md\n"
+            f"    work_units:\n"
+            f"      - id: {self.feature_id}/T01\n"
+            f"        file: WU-01.md\n"
+            f"        depends_on: []\n"
+            f"      - id: {self.feature_id}/G1-CLOSE\n"
+            f"        file: WU-close.md\n"
+            f"        depends_on: [{self.feature_id}/T01]\n"
+            f"```\n"
+        )
+        _write_wu_impl(fdir, f"{self.feature_id}/T01", "WU-01.md")
+        (fdir / "WU-close.md").write_text(
+            f"---\nid: {self.feature_id}/G1-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: pending\nattempts: 0\n---\n\n# Close{_WU_BODY}"
+        )
+        _write_gate_file(fdir, 1)
+        _write_task_completed_event(fdir, f"{self.feature_id}/T01")
+
+        refs_g1 = [
+            {"id": f"{self.feature_id}/T01", "file": "WU-01.md", "depends_on": []},
+            {"id": f"{self.feature_id}/G1-CLOSE", "file": "WU-close.md",
+             "depends_on": [f"{self.feature_id}/T01"]},
+        ]
+        self.gate1 = _make_gate_node(fdir, self.feature_id, 1, refs_g1)
+        self.gates = [self.gate1]
+        self.close_wu = loop.WorkUnit(
+            wu_id=f"{self.feature_id}/G1-CLOSE",
+            file=fdir / "WU-close.md",
+            depends_on=[f"{self.feature_id}/T01"],
+            type="close",
+            model="opus",
+            effort="high",
+            status="pending",
+            attempts=0,
+            title="Close",
+            body="",
+        )
+        self.events_path = fdir / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _call(self):
+        return loop.maybe_auto_close_terminal(
+            self.fdir, self.feature_id, self.gate1, self.gates,
+            self.events_path, self.close_wu, repo_root=self.root,
+        )
+
+    def test_second_call_short_circuits(self):
+        first_ok, _ = self._call()
+        self.assertTrue(first_ok)
+
+        second_ok, second_decision = self._call()
+        self.assertFalse(second_ok)
+        self.assertFalse(second_decision.auto)
+        self.assertIn("already_auto_closed", second_decision.reasons)
+
+        events = _load_events(self.events_path)
+        auto_events = [
+            e for e in events if e.get("event_type") == "auto_close_decision"
+        ]
+        self.assertEqual(
+            len(auto_events), 1,
+            "terminal auto-close must not double-fire (issue #23 regression)",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
