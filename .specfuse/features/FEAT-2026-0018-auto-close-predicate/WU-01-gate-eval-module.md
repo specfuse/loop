@@ -2,8 +2,8 @@
 id: FEAT-2026-0018/T01
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 1.80
 generated_surfaces: []
 produces_driver_helper:
@@ -13,6 +13,10 @@ produces_driver_helper:
   - _read_wu_metrics
   - _read_events
   - _apply_predicate
+duration_seconds: 1340.116
+cost_usd: 2.85459
+input_tokens: 56
+output_tokens: 72423
 ---
 
 # Standalone `gate_eval.py` module — predicate + decision dataclass
