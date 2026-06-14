@@ -214,10 +214,21 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Drafted by G2-PLAN at gate-2 close.
+      - id: FEAT-2026-0016/T07
+        file: WU-07-close-ceremony-cost-analysis.md
+        depends_on: []
+      - id: FEAT-2026-0016/T08
+        file: WU-08-learnings-suggest-skill.md
+        depends_on: []
+      - id: FEAT-2026-0016/T09
+        file: WU-09-docs-and-roadmap-archive.md
+        depends_on: []
       - id: FEAT-2026-0016/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []   # G2-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0016/T07
+          - FEAT-2026-0016/T08
+          - FEAT-2026-0016/T09
 ```
 
 ## Notes
