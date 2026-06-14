@@ -2,10 +2,14 @@
 id: FEAT-2026-0018/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 1.20
 generated_surfaces: []
+duration_seconds: 382.639
+cost_usd: 2.530078
+input_tokens: 42
+output_tokens: 21475
 ---
 
 # Gate 1 close-intermediate — retrospective + lessons + docs, single session

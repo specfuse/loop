@@ -1124,3 +1124,25 @@ promoted here.
   estimates should include a "first-of-its-kind dogfood
   multiplier" (typical 5-15×) when the feature introduces a new
   contract no prior feature has exercised end-to-end.
+
+- **[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE] Effort-band pricing is
+  blind to spec density and history-as-fixture reads.** Gate 1
+  overran +132% ($4.10 plan → $9.51 actual) across three WUs
+  whose plans used the standard effort-band defaults
+  (`implementation/high` → $1.50–1.80, `implementation/medium`
+  → $0.80). T02 (tests) shipped 15 named test classes + 12
+  lint-clean synthetic fixture directories on a single attempt
+  for $4.18 — 92k output tokens, 2.79× plan. T03 (CLI +
+  calibration) read 4 historical feature folders as fixtures
+  in a single attempt — 5.3M cache-read tokens, 3.09× plan.
+  T01's retry cost on a small-delta cycle was nearly equal to
+  its first attempt (~$1.29 vs $1.56) because cache-reload on
+  re-dispatch dominates the bill, so "attempt-2 << attempt-1"
+  cost models are wrong. Rule: when planning a WU, raise the
+  effort-band default by the spec-density inputs the band does
+  not see — count named test classes / fixture directories /
+  history-folder reads in the AC body and add a per-unit
+  surcharge (rough heuristic: +$0.10 per named test class above
+  5, +$0.10 per lint-clean fixture directory, +$0.20 per
+  historical-feature-folder read). Treat re-dispatch cost as
+  full-cycle cost, not delta cost, when budgeting attempts.
