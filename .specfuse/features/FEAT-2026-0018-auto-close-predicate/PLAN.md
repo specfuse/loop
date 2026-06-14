@@ -5,8 +5,10 @@ slug: auto-close-predicate
 branch: feat/FEAT-2026-0018-auto-close-predicate
 roadmap_goal: Replace AI-judgment gate close with deterministic predicate that auto-flips on-plan gates (terminal + intermediate) and skips reflective WUs, preserving full ceremony for off-plan cases.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 19.40
+actual_cost_usd: 40.85
+verdict: met_locally
 ---
 
 # Plan: Deterministic gate-close predicate + auto-close path
