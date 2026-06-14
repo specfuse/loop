@@ -2,9 +2,10 @@
 id: FEAT-2026-0018/G3-CLOSE
 type: close
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
+verdict: met_locally
 generated_surfaces: []
 prior_attempts:
   - attempts: 1
@@ -13,10 +14,10 @@ prior_attempts:
     duration_seconds: 458.426
     cost_usd: 2.408081
     notes: "G3-CLOSE first pass set verdict=met_locally because T04's wiring at loop.py:2310 (post-loop) failed to skip this WU's dispatch even though predicate returned auto=True for gate 3. Agent diagnosed the wire-site bug in RETROSPECTIVE.md. T11H relocates the wiring to mirror T05's pre-dispatch pattern. Re-armed post-T11H to allow predicate auto-fire path to exercise itself."
-duration_seconds: 458.426
-cost_usd: 2.408081
+duration_seconds: 299.926
+cost_usd: 1.878136
 input_tokens: 25
-output_tokens: 26111
+output_tokens: 18184
 ---
 
 # Gate 3 close — terminal: retro + lessons + docs + feature-arc verdict

@@ -486,6 +486,152 @@ T09's effort-band miss is the same shape already captured by the
 G1-CLOSE-INTERMEDIATE and G2-CLOSE-INTERMEDIATE entries; promoting
 a third would duplicate without adding rule-shape generality.
 
+### T11H — terminal auto-close wiring relocation (post-G3-CLOSE hygiene)
+
+T11H authored AFTER G3-CLOSE's first attempt, on operator decision to
+arm the recursive-dogfood loop one more turn. Diagnosis from the
+first-attempt feature-arc verdict (above): T04's terminal auto-close
+branch lived at `loop.py:2310` — the post-WU-dispatch-loop terminal-
+flip block — instead of inside the per-WU dispatch loop pre-dispatch,
+where T05's intermediate branch correctly sits. Consequence on the
+first G3-CLOSE attempt: predicate returned `auto=True` for gate 3 (see
+prior backtest output in this section) but the close WU dispatched
+anyway because the predicate was consulted too late in the gate
+lifecycle. T11H relocates the call site.
+
+- Attempts: 2 (first 642.83 s, $1.37; second 982.22 s, $2.28).
+- Blockers: first attempt did not satisfy one of T11H's AC7 symbol-
+  existence checks (likely the negative grep on the deleted post-loop
+  block — easy to leave the old branch in place while adding the new
+  one); re-dispatch landed clean.
+- Surprises: 4.56× plan on a `medium` effort band ($0.80) — the
+  largest single-WU ratio of the entire feature. Single-file
+  relocation with a structural template (T05) to copy and an
+  invariant-shaped acceptance criterion (the relocated call must
+  pre-empt dispatch on `auto=True`); the plan priced it as "small
+  pure-relocation" but the actual work shipped a guard
+  (`wu.verdict is None`, see loop.py:2022–2023 — added to prevent the
+  in-loop branch from re-firing on a re-dispatched close WU whose
+  prior attempt set a verdict), the override-active sibling branch
+  preserved per T06, AND a careful no-double-event invariant
+  (`auto_close_decision` must not emit twice if the relocated
+  branch coexists with anything in the post-loop block — T11H
+  removed the old branch entirely). Three semantic moves disguised
+  as one mechanical relocation. Same shape as T06's "small CLI add
+  that hooks two wiring sites": effort band saw single-file diff,
+  not multi-invariant surface.
+
+### Post-T11H predicate self-check (recursive-dogfood, REVISED)
+
+After T11H committed and gate 3 was re-armed, the predicate
+verdict for gate 3 **inverts**: T11H's $3.65 actual against $0.80
+planned trips both `per_wu_cost_overrun` (4.56× > 1.5×) and
+`per_wu_hard_overrun` (4.56× > 2×); gate-3 substantive total rises
+to $8.40, exceeding the $8.00 raised budget. Verbatim output of
+`python3 .specfuse/scripts/gate_eval.py backtest FEAT-2026-0018 --gate 3`:
+
+```
+FEAT-2026-0018  predicate=v1
+  G03  auto=False
+    reasons:
+      - per_wu_cost_overrun: T11H actual=$3.65 planned=$0.80 ratio=4.56x
+      - per_wu_hard_overrun: T11H actual=$3.65 planned=$0.80 ratio=4.56x
+      - gate_budget_exceeded: total=$8.40 budget=$8.00
+    metrics:
+      gate_total_cost: $8.40
+      gate_budget: $8.00
+```
+
+**Recursive-dogfood result (REVISED).** The predicate that earlier
+in this gate accepted gate 3 as on-plan now correctly refuses gate
+3 as off-plan — driven entirely by the hygiene WU that the gate
+itself surfaced. This is the inverse polarity of the meta-
+confirmation captured pre-T11H: **the predicate's verdict tracks
+the evidence base, not the gate's identity**. The same `gate 3`
+went from `auto=True` to `auto=False` because the data changed —
+exactly what a deterministic predicate over per-WU cost evidence
+should do. Recursive-dogfood now has both verdicts on record for
+the same gate, separated by one hygiene-WU commit. This is
+load-bearing for the LEARNINGS entry below.
+
+**Auto-close path: which path fired (REVISED, post-T11H).** The
+re-dispatch of G3-CLOSE hit the relocated branch at `loop.py:2022`
+(now `in-loop, pre-dispatch, gate is gates[-1]`) per T11H AC1.
+That branch called `maybe_auto_close_terminal`, which evaluated
+`auto=False` (per the backtest above) and returned without
+emitting an `auto_close_decision` event (correct: see
+loop.py:1306–1308 — early return on `not decision.auto`). Control
+fell through to normal close-WU dispatch, which is THIS dispatch.
+The structural fix T11H lands is verified by the existence of
+the in-loop branch (loop.py:2022 — `grep -qE 'wu\.type == "close"
+and gate is gates\[-1\]'` passes), the absence of the post-loop
+branch (the `is_terminal_gate and close_wu_for_terminal is not
+None and not _override_active` block is gone), and tests still
+green. End-to-end exercise of the `auto=True` skip on the
+terminal path is NOT observable in this feature's dogfood — the
+hygiene WU that landed the fix itself pushed gate 3 over budget,
+removing the only auto-eligible terminal-gate moment this feature
+ever had. The end-to-end verification anchors to the next
+feature whose terminal gate happens to land under predicate
+criteria with the relocated wiring already in tree.
+
+### Cost analysis (revised, gate 3 + feature totals post-T11H)
+
+| WU | planned_cost_usd | cost_usd | ratio | delta | criterion 3 (≤ 1.5×) | criterion 4 (≤ 2×) |
+|----|------------------|----------|-------|-------|----------------------|---------------------|
+| T11H | $0.80 | $3.64789560 | 4.560× | +356.0% | FAIL | FAIL |
+| G3-CLOSE (1st attempt) | $1.50 | $2.40808075 | 1.605× | +60.5% | FAIL | pass |
+| **gate 3 sub-total (substantive + hygiene + 1st close attempt)** | **$5.20** | **$8.40090310** | **1.616×** | **+61.6%** | — | — |
+| **FEATURE sub-total (substantive + hygiene + close attempt costs visible)** | **$14.50** | **$26.94470605** | **1.858×** | **+85.8%** | — | — |
+
+Notes:
+- T11H is hygiene-class but its per-WU ratio counts toward the
+  predicate's gate verdict — `evaluate_auto_close` evaluates every
+  WU with `planned_cost_usd > 0`, hygiene or substantive. This is
+  the falsifiable property the gate-3 re-evaluation demonstrates.
+- G3-CLOSE's first-attempt cost ($2.41) is included in the gate
+  total per `evaluate_auto_close`'s sum logic (closing-WU costs
+  feed `gate_total_cost`). The second attempt (this dispatch) is
+  not yet recorded; the predicate verdict above reflects only the
+  first attempt's spend. A second-attempt cost addition will push
+  the gate further over budget but not change the verdict —
+  T11H's 4.56× hard-overrun alone is sufficient.
+- Predicate-v1 self-evaluation against gate-3's revised data: T11H
+  trips criteria 3 AND 4; criterion 6 fails by $0.40. Gate 3
+  correctly refuses auto under the predicate this feature ships —
+  and the predicate this feature ships is correctly identifying
+  the hygiene WU as the cause. Self-consistent.
+
+### Variance > 50% rationale — gate 3 (T11H added)
+
+T11H joins T09 as variance >50% rationale entries. T11H's miss is
++356% (4.56×), the largest single-WU ratio of the feature. The
+shape is structural, not estimation noise:
+
+- **T11H (+356.0%).** Two attempts. Priced as `implementation/
+  medium` ($0.80) on the "single-file relocation" effort-band
+  default. Actually shipped: (a) a relocated `if` branch with an
+  added `wu.verdict is None` re-dispatch guard that wasn't in
+  T05's template, (b) preservation of the override-active sibling
+  semantics, (c) removal of the old post-loop branch (the
+  negative-existence check), (d) the load-bearing invariant that
+  the new branch must run BEFORE dispatch on the terminal gate
+  (one bit of logic with a falsifiable end-to-end test target).
+  Same effort-band-blindness as T06: "single file edit" is a
+  diff-size signal; "multi-invariant pre-dispatch wiring" is the
+  load-bearing surface the band missed. Compounded by re-dispatch
+  cache amplification (T01's gate-1 finding): attempt-2 of T11H
+  cost $2.28, only 39% less than attempt-1 — the second attempt's
+  fix-delta was tiny but the cache-reload + spec re-read cost was
+  unchanged. Two structural drivers stacking explain the magnitude.
+
+## Notes on docs/roadmap (gate 3, revised)
+
+T10 shipped `docs/methodology.md` updates in its own commit; T11H
+shipped a `loop.py` change. The cumulative gate-3 diff satisfies
+`assert_doc_or_roadmap_diff` via T10's methodology touch. No new
+docs/roadmap touch from THIS close WU is required.
+
 # Feature-arc verdict
 
 **Verdict: `met_locally`.**
@@ -493,23 +639,33 @@ a third would duplicate without adding rule-shape generality.
 The roadmap_goal — "Replace AI-judgment gate close with deterministic
 predicate that auto-flips on-plan gates (terminal + intermediate) and
 skips reflective WUs, preserving full ceremony for off-plan cases" —
-lands as specified for the intermediate-gate path and for the
-predicate itself: gate-1 and gate-2 close-intermediate WUs evaluated
-predicate=False before dispatch and correctly ran ceremony; the
-predicate ships, backtest CLI ships with calibration regression,
-recursive-dogfood self-evaluation runs true for all three gates of
-this feature. Hedged to `met_locally` rather than `met` because the
-terminal-gate auto-close path's WIRING-SITE position (loop.py:2310,
-post-loop) means the predicate's `auto=True` verdict on gate 3 did
-NOT skip this WU's dispatch — either because the operator
-deliberately forced ceremony to document the recursive dogfood (the
-audit value of THIS document IS the deliverable; see §"Auto-close
-path: which path fired" above) or because the terminal hook is
-positioned analogously to where it would need to move into the
-dispatch loop to mirror the intermediate path. Both deliverables
-ship (T04 helpers exist; intermediate path is exercised on every
-gate close); the terminal path's pre-dispatch skip behavior is the
-scope-deferred item — explicitly documented in this retrospective
-so a follow-up feature has a falsifiable anchor to land the
-loop.py:2310 → in-loop relocation against, IF #2 is the explanation
-(no-op if #1).
+lands as specified for the predicate, intermediate-gate path, and
+terminal-gate path STRUCTURALLY: gate-1 and gate-2 close-intermediate
+WUs evaluated predicate=False before dispatch and correctly ran
+ceremony; the predicate ships, the backtest CLI ships with
+calibration regression; the terminal auto-close wiring (T04 helpers
++ T11H relocation) now sits PRE-dispatch inside the per-WU loop at
+`loop.py:2022`, mirroring T05's intermediate branch at
+`loop.py:1987`; T11H's relocation is structurally verified (in-loop
+branch present, post-loop branch removed, tests green); recursive-
+dogfood self-evaluation runs true for all three gates of this
+feature — initially accepting gate 3 (T07–T10 on-plan) and then
+correctly refusing gate 3 again after T11H's $3.65 hygiene-WU spend
+pushed the gate over budget. Hedged to `met_locally` rather than
+`met` because the terminal auto-close PATH'S END-TO-END SKIP
+behavior — predicate returns `auto=True`, in-loop branch fires
+pre-dispatch, close WU is bypassed, stub retro is written,
+terminal flips fire — was not exercised against this feature's
+own evidence: T11H's own cost added itself onto gate 3 and made
+gate 3 auto-ineligible. The scope-deferred verification is one
+event observation in a future feature's gate close — when a
+terminal gate lands on-plan under predicate criteria, observe
+that the close WU's dispatch is skipped (no `task_started` event
+for the close WU; an `auto_close_decision` event with `auto: true`
+appears at the in-loop call site). All four declared deliverables
+ship: predicate + module (gate 1), driver wiring + force-full-close
++ override frontmatter (gate 2 + T11H gate-3 hygiene), plan-next
+lint hook + wrap-feature trim + /migrate-to-auto-close skill +
+methodology docs (gate 3). No deliverable is missing or
+disabled; the open item is exercise evidence on a single code
+path, not a feature gap.

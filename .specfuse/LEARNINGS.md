@@ -1216,3 +1216,34 @@ promoted here.
   time. When verdicts disagree, the disagreement itself is the
   feature's first real escaped-bug evidence — promote it to a
   blocking lesson before shipping the next feature.
+
+- **[FEAT-2026-0018/G3-CLOSE] A hygiene WU authored mid-gate to fix a
+  bug surfaced by that same gate's evidence will, by its own cost,
+  often push the gate over the predicate's auto-close criteria —
+  pre-commit to whether the gate's predicate verdict is read pre-
+  hygiene or post-hygiene.** FEAT-2026-0018's gate 3 originally
+  evaluated `auto=True` against T07–T10 ($2.34 substantive, well
+  under $8.00 budget). G3-CLOSE's first attempt diagnosed a wiring
+  bug at `loop.py:2310` (terminal auto-close branch post-loop
+  instead of in-loop pre-dispatch); the operator armed hygiene WU
+  T11H to relocate the call site. T11H landed structurally clean
+  but cost $3.65 against $0.80 planned (4.56×), pushing gate-3
+  substantive to $8.40 — over the $8.00 budget AND tripping
+  per-WU hard-overrun (criterion 4). The same gate, same data
+  shape, same predicate, returned `auto=False` on the re-evaluation.
+  Rule: when a gate-N close ceremony surfaces a hygiene WU that
+  will land inside gate N, decide explicitly which predicate
+  verdict is load-bearing — the PRE-hygiene verdict (the gate's
+  outcome BEFORE the fix was needed; load-bearing for what the
+  shipped feature actually achieved) or the POST-hygiene verdict
+  (the gate's outcome AFTER the fix landed; load-bearing for
+  the next planner reading the calibration history). Both are
+  legitimate but they answer different questions; the
+  retrospective must paste BOTH backtest outputs so the audit
+  trail is unambiguous, and the verdict frontmatter must cite
+  which one it anchors to. Corollary: hygiene WU `planned_cost_usd`
+  must be priced generously, especially when the hygiene WU
+  carries an invariant-shaped acceptance criterion (here,
+  pre-dispatch ordering) — the hygiene WU's own cost is what
+  determines whether the gate's recursive-dogfood verdict
+  agrees with itself across the fix boundary.
