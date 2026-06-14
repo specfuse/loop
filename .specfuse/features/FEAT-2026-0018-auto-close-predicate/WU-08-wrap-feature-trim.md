@@ -2,10 +2,14 @@
 id: FEAT-2026-0018/T08
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.40
 generated_surfaces: []
+duration_seconds: 178.296
+cost_usd: 0.424391
+input_tokens: 14
+output_tokens: 6994
 ---
 
 # /wrap-feature skill trim — push + PR + CI + next-pick only
