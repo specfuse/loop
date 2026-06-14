@@ -1,7 +1,7 @@
 ---
 gate: 1
 status: open
-cost_budget_usd: 8.00
+cost_budget_usd: 14.00  # raised mid-flight from 8.00 — T01/T02 ran 1.6×/2.8× plan; predicate v1 self-fires gate_budget_exceeded against original 8.00 captured in retrospective
 ---
 
 # Gate 1 — `gate_eval.py` module + tests + backtest CLI

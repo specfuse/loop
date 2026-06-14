@@ -94,14 +94,24 @@ layer. The CLI is a render around the module, nothing more.
      `FEAT-2026-0015`, `FEAT-2026-0017`, calls
      `evaluate_auto_close` against each of its gates.
    - Asserts the (auto, reason-class-set) pair matches a
-     pinned baseline:
+     pinned baseline. Baseline reflects predicate v1's
+     STRICT semantics (any historical `blocked_human` event
+     in events.jsonl disables auto, even if the WU was
+     re-armed and eventually passed; both `per_wu_cost_overrun`
+     and `per_wu_hard_overrun` co-fire when a WU exceeds 2×
+     plan — independent checks emitting distinct reasons).
+     Under v1, the auto rate against this baseline is 0/5 —
+     predicate v1 tightens beyond the design-time backtest.
+     Acknowledged; tuning lives in future predicate v2 informed
+     by gate-1's retrospective:
+
      ```python
      CALIBRATION = {
-         ("FEAT-2026-0013", 1): {"auto": True, "reason_classes": set()},
-         ("FEAT-2026-0014", 1): {"auto": True, "reason_classes": set()},
-         ("FEAT-2026-0015", 1): {"auto": False, "reason_classes": {"per_wu_cost_overrun", "plan_next_overrun"}},
-         ("FEAT-2026-0015", 2): {"auto": False, "reason_classes": {"per_wu_cost_overrun"}},
-         ("FEAT-2026-0017", 1): {"auto": False, "reason_classes": {"blocked_human_in_chain", "per_wu_cost_overrun"}},
+         ("FEAT-2026-0013", 1): {"auto": False, "reason_classes": {"blocked_human_in_chain"}},
+         ("FEAT-2026-0014", 1): {"auto": False, "reason_classes": {"blocked_human_in_chain"}},
+         ("FEAT-2026-0015", 1): {"auto": False, "reason_classes": {"blocked_human_in_chain", "final_attempt_not_passed", "per_wu_cost_overrun", "per_wu_hard_overrun", "plan_next_overrun"}},
+         ("FEAT-2026-0015", 2): {"auto": False, "reason_classes": {"per_wu_cost_overrun", "per_wu_hard_overrun"}},
+         ("FEAT-2026-0017", 1): {"auto": False, "reason_classes": {"blocked_human_in_chain", "per_wu_cost_overrun", "per_wu_hard_overrun"}},
      }
      ```
      Reason class = first colon-separated segment of each
