@@ -193,10 +193,21 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Drafted by G1-PLAN at gate-1 close.
+      - id: FEAT-2026-0016/T04
+        file: WU-04-spinning-detector-driver-hook.md
+        depends_on: []
+      - id: FEAT-2026-0016/T05
+        file: WU-05-gate-status-per-attempt-surface.md
+        depends_on: []
+      - id: FEAT-2026-0016/T06
+        file: WU-06-unblock-wu-rationale-history.md
+        depends_on: []
       - id: FEAT-2026-0016/G2-CLOSE-INTERMEDIATE
         file: WU-90-gate-2-close-intermediate.md
-        depends_on: []   # G1-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0016/T04
+          - FEAT-2026-0016/T05
+          - FEAT-2026-0016/T06
       - id: FEAT-2026-0016/G2-PLAN
         file: WU-91-gate-2-plan-next.md
         depends_on: [FEAT-2026-0016/G2-CLOSE-INTERMEDIATE]
