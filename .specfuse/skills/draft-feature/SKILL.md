@@ -161,6 +161,26 @@ For gate 1 only:
   enforces this at execution time; listing it as an explicit AC bullet
   makes the contract visible at plan-next authoring time.
 
+  **Every `close` (and `close-intermediate`) WU body must also include
+  a `## What the loop did NOT verify` section as one of its acceptance
+  criteria bullets.** Draft the AC bullet as: "A `## What the loop did
+  NOT verify` section is present, enumerating each acceptance criterion
+  whose verification was deferred (loop-sandbox limit, cross-repo
+  coordination, real-system access). For each: the criterion, why
+  deferred, and where verification actually happens (post-merge step,
+  operator action, follow-up feature). If the list has more than 2
+  entries OR more than 30% of the gate's criteria, the retrospective
+  must flag the feature's single-gate sizing under `## What I'd
+  change`." The section is required even when empty — write
+  `(nothing — every acceptance criterion was verified in-loop)` so
+  the explicit count is visible. The section's purpose is to surface
+  the artifact-vs-real-state gap that single-gate cross-system
+  features otherwise paper over: a feature that closes `verdict: met`
+  while four of six AC bullets are post-merge-deferred is closing on
+  artifact shape, not real-system behaviour. Counting them at retro
+  time, where the lessons WU runs, is the methodology's last chance
+  to catch the gap before the close commit.
+
   Cost tables feed `evaluate_auto_close` at gate close. A WU's
   `planned_cost_usd` is the threshold the predicate's per-WU ratio check
   measures against (criteria 3 + 4 in PLAN.md's Predicate v1). Honest
