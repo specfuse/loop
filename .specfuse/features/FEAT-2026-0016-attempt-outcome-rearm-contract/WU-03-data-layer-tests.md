@@ -2,11 +2,15 @@
 id: FEAT-2026-0016/T03
 type: implementation
 effort: high
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 1.50
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 280.018
+cost_usd: 0.835044
+input_tokens: 5319
+output_tokens: 15826
 ---
 
 # Unit tests for attempt_outcome emission + re-arm cumulative-fold logic
