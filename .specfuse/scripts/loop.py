@@ -1190,6 +1190,36 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     return "archived"
 
 
+def _legacy_4wu_terminal_close_complete(
+    wu: "WorkUnit",
+    units: "list[WorkUnit]",
+    gate,
+    gates: list,
+) -> bool:
+    """Detect legacy 4-WU close sequence completion on a terminal gate (issue #16).
+
+    Pre-FEAT-2026-0015 feature scaffolds use the four-WU closing sequence
+    (`retrospective` → `lessons` → `docs` → `plan-next`). FEAT-2026-0015 wired
+    `fire_terminal_flips` to fire only on `close`-type WUs, leaving the legacy
+    sequence with no terminating-equivalent trigger. This helper recognizes
+    completion of the 4-WU sequence as terminating-equivalent so the driver
+    can fire `fire_terminal_flips` on the gate.
+
+    Returns True iff:
+      - `wu.type == "plan-next"` (the last WU in the sequence)
+      - `gate is gates[-1]` (terminal gate)
+      - The gate's `units` include all four legacy types
+        (`retrospective`, `lessons`, `docs`, `plan-next`) AND each is `done`.
+    """
+    if wu.type != "plan-next":
+        return False
+    if gate is not gates[-1]:
+        return False
+    required = {"retrospective", "lessons", "docs", "plan-next"}
+    have_done = {u.type for u in units if u.type in required and u.status == DONE}
+    return required.issubset(have_done)
+
+
 def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> list[Path]:
     """Flip terminal gate → passed, roadmap row → done, call auto_archive_feature.
 
@@ -2294,6 +2324,16 @@ def run(
                                         f"chore(loop): {wu.wu_id} revert PLAN.md done"
                                         f" (hedged verdict)\n\nFeature: {wu.wu_id}",
                                     )
+                        elif _legacy_4wu_terminal_close_complete(
+                            wu, units, gate, gates,
+                        ):
+                            # Legacy 4-WU close sequence completed on terminal gate
+                            # (issue #16). The pre-FEAT-2026-0015 shape
+                            # (retrospective + lessons + docs + plan-next) has no
+                            # close-type WU and no verdict field. Treat the
+                            # plan-next pass as terminating-equivalent so the
+                            # post-loop block fires fire_terminal_flips.
+                            close_wu_for_terminal = wu
                         # FEAT-2026-0018/T07 — plan-next-draft lint hook (warn-only v1)
                         if wu.type == "plan-next":
                             try:
