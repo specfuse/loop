@@ -2,7 +2,7 @@
 id: FEAT-2026-0016/T04
 type: implementation
 effort: high
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.00
 generated_surfaces: []
@@ -121,12 +121,42 @@ don't quietly duplicate.
      `(cls, A)` and trips. This is correct behavior:
      intervening zero_tokens don't reset the repeat clock.
 
-4. **Reason string locked.** The `human_escalation.payload.reason`
+4. **Defend against `no_gate_marker` sentinel.** The pair
+   `("other", "no_gate_marker")` represents "T01's parser failed
+   to identify the gate that failed" — a known v1 limitation
+   surfaced by events.jsonl line 11 of THIS feature's gate 1
+   (G1-CLOSE-INTERMEDIATE's `### plan-lint: FAIL` did not match
+   T01's `^### (\w+): FAIL` regex; hyphen excluded from `\w`).
+   Two unrelated `plan-lint`-class failures would both record
+   `("other", "no_gate_marker")` and compare equal — false
+   positive halt. Treat this sentinel as not-comparable, same
+   shape as `None`:
+   - `detect_spinning_signature_repeat` returns `False` when
+     `current == ("other", "no_gate_marker")` OR
+     `prior == ("other", "no_gate_marker")`. Mirrors the
+     `None`-element defense in AC1.
+   - The hook MUST NOT update `prior_failure_signature` after a
+     `failed` attempt whose signature is
+     `("other", "no_gate_marker")`. The prior remains whatever
+     the most-recent-comparable failure was. Mirrors the
+     zero_token defense in AC3.
+   - Net effect: a `[failed(A), failed(other,no_gate_marker),
+     failed(A)]` shape correctly trips at attempt 3 (sentinel
+     doesn't reset the repeat clock; mirrors the zero_token
+     case). A `[failed(other,no_gate_marker),
+     failed(other,no_gate_marker)]` shape does NOT trip
+     (sentinel pair self-matches must be ignored).
+   - Conservative cost: at most one extra attempt vs the
+     non-defensive shape. Cheaper than fixing T01's regex in
+     this gate; T01 regex extension is a future hygiene WU
+     candidate (operator-decided).
+
+5. **Reason string locked.** The `human_escalation.payload.reason`
    value is the literal string `spinning_signature_repeat`.
    Documented in this WU; downstream consumers (`/gate-status`,
    future predicate-v2, dashboards) filter on the exact string.
 
-5. **The repeat-halt fires on attempt 2 at the earliest.** A single
+6. **The repeat-halt fires on attempt 2 at the earliest.** A single
    `failed` attempt is NOT a repeat — `prior_failure_signature is
    None` after the first failed attempt is processed; the second
    failed attempt with the same signature is the trigger. This
@@ -135,7 +165,7 @@ don't quietly duplicate.
    full 3 and falls through to the existing for-else
    `spinning_detected` path).
 
-6. **Compatibility with `re_arm` cycles.** When a WU is re-armed,
+7. **Compatibility with `re_arm` cycles.** When a WU is re-armed,
    the attempt counter resets (per `/unblock-wu`); the
    `prior_failure_signature` local is in the per-WU dispatch
    scope and reinitializes per dispatch. Re-arming after a
@@ -143,7 +173,7 @@ don't quietly duplicate.
    that compares against nothing on attempt 1 (correct — the
    re-arm reason may have fixed the underlying cause).
 
-7. **Symbol-existence checks** before declaring complete:
+8. **Symbol-existence checks** before declaring complete:
 
    ```bash
    # a. Helper present
@@ -183,8 +213,8 @@ only. See `.specfuse/rules/never-touch.md`.
 
 **Verification.** The `code` gate set in
 `.specfuse/verification.yml` (tests, lint, security, coverage) +
-AC7 symbol-existence + import checks. Add at least two unit tests
-to `tests/test_attempt_outcome_emission.py`:
+AC8 symbol-existence + import checks. Add at least these unit
+tests to `tests/test_attempt_outcome_emission.py`:
 - `test_detect_spinning_signature_repeat_true_on_match` — pass
   `current=("tests", "test_foo")`, `prior=("tests", "test_foo")`,
   expect `True`.
@@ -194,11 +224,17 @@ to `tests/test_attempt_outcome_emission.py`:
 - `test_detect_spinning_signature_repeat_false_on_null_element` —
   pass `current=(None, "test_foo")` or `current=("tests", None)`,
   expect `False` (defends orthogonality with zero-token spin).
+- `test_detect_spinning_signature_repeat_false_on_no_gate_marker_current` —
+  pass `current=("other", "no_gate_marker")`, prior=anything,
+  expect `False` (defends against AC4 sentinel).
+- `test_detect_spinning_signature_repeat_false_on_no_gate_marker_prior` —
+  pass `current=("tests", "test_foo")`,
+  `prior=("other", "no_gate_marker")`, expect `False`.
 
 **Escalation triggers.**
 
-1. **Completeness.** AC7 (a) returns anything other than `1` or
-   AC7 (b) `ImportError` → `status: blocked`. Helper missing.
+1. **Completeness.** AC8 (a) returns anything other than `1` or
+   AC8 (b) `ImportError` → `status: blocked`. Helper missing.
    Per `[FEAT-2026-0007/G1-LESSONS]` — frontmatter-flip-only is
    the documented hollow-pass shape; refuse it explicitly.
 2. **Failure-signature comparability gap.** If the §10 pre-flight

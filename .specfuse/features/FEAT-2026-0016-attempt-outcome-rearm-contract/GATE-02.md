@@ -1,7 +1,7 @@
 ---
 gate: 2
 status: open
-cost_budget_usd: 9.50
+cost_budget_usd: 12.00  # raised at arm time from 9.50 — gate-1 ratio 1.62× × $7.40 plan ≈ $12; T04 spec revised with no_gate_marker defense per GATE-02-REVIEW open-verification #5
 ---
 
 # Gate 2 — Consumers: spinning-detector hook + /gate-status + /unblock-wu (drafted by G1-PLAN)
