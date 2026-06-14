@@ -1,22 +1,40 @@
 ---
 id: FEAT-2026-0017/T01
 type: implementation
-model: claude-sonnet-4-6
+model: claude-opus-4-7
 effort: high
-status: done
-attempts: 1
-planned_cost_usd: 1.50
+status: pending
+attempts: 0
+planned_cost_usd: 3.50
 produces_driver_helper:
   - POST_PASS_INVARIANTS_BY_TYPE
   - assert_terminal_flips_fired
   - verify_post_pass_invariants
-duration_seconds: 221.01
-cost_usd: 0.417855
-input_tokens: 121
-output_tokens: 10105
+prior_attempts:
+  - attempts: 3
+    model: claude-sonnet-4-6
+    outcome: hollow_pass_x3
+    initial_commit: 514beee
+    notes: "Sonnet 4.6 hollow-passed 3 times. Squash modified only WU-01 frontmatter. loop.py wiring + symbols absent every attempt. tests/test_loop_post_pass_invariant.py written (untracked, survived reset). Detected by G1-CLOSE existence check. Escalating to Opus 4.7 + planned_cost raised 1.50 to 3.50."
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
+
+**⚠️ Prior hollow-pass (3 attempts on Sonnet 4.6) — read first.**
+This WU was dispatched three times before being escalated to Opus
+4.7. Each Sonnet attempt flipped this WU's own frontmatter
+(`status: pending → done`, `produces_driver_helper`, cost) and
+wrote `tests/test_loop_post_pass_invariant.py` — but made ZERO edits
+to `.specfuse/scripts/loop.py`. Verify gate passed because tests
+ran against unchanged code (no new symbols imported → no failure).
+G1-CLOSE caught it via the authoring-work-units §9 existence check
+(`grep POST_PASS_INVARIANTS_BY_TYPE loop.py` → 0 hits). The work
+is shipping three symbols in `loop.py` AND wiring `verify_post_pass_invariants`
+into `run()`'s passed path AND the test file. Frontmatter +
+test-file-only is the documented hollow-pass shape; do not reproduce
+it. Before declaring complete you MUST run the existence-check
+block in AC6 below; if any command exits non-zero or returns the
+wrong count, emit `status: blocked` rather than `status: done`.
 
 **Objective.** Wire driver-side post-pass invariant assertions keyed
 by WU type. Fire AFTER squash + verdict-flip but BEFORE bookkeeping
@@ -115,8 +133,36 @@ all git; edit files only.
      guard returns `(False, ...)`. This test is the canary against
      re-introducing the wu.verdict-re-read race.
 6. **Existence check** before declaring complete (per
-   authoring-work-units §9):
-   `python3 -c "from loop import POST_PASS_INVARIANTS_BY_TYPE, assert_terminal_flips_fired, verify_post_pass_invariants"` exits 0.
+   authoring-work-units §9). Run ALL of the following from repo
+   root; every command must exit 0 and meet its assertion. If any
+   fails, emit `status: blocked` with the failing command + observed
+   output in the RESULT block — do NOT flip this WU's frontmatter
+   `status` field as a substitute for shipping the code.
+
+   ```bash
+   # a. Three new symbols present in loop.py source
+   test "$(grep -cE '^(POST_PASS_INVARIANTS_BY_TYPE|def assert_terminal_flips_fired|def verify_post_pass_invariants)' .specfuse/scripts/loop.py)" = "3"
+
+   # b. Symbols importable (catches syntax errors + name typos)
+   (cd .specfuse/scripts && python3 -c "from loop import POST_PASS_INVARIANTS_BY_TYPE, assert_terminal_flips_fired, verify_post_pass_invariants; assert POST_PASS_INVARIANTS_BY_TYPE.get('close'), 'close key missing or empty'")
+
+   # c. verify_post_pass_invariants invoked from run() (not just defined)
+   grep -nE 'verify_post_pass_invariants\(' .specfuse/scripts/loop.py | grep -v 'def verify_post_pass_invariants'
+
+   # d. Regression test file exists and references the T06 pattern
+   test -f tests/test_loop_post_pass_invariant.py
+   grep -qE 'test_feat_2026_0015_t06_regression|test_close_with_verdict_met_fails_when_gate_unflipped' tests/test_loop_post_pass_invariant.py
+
+   # e. New tests run and pass
+   python3 -m pytest tests/test_loop_post_pass_invariant.py -v
+
+   # f. THE PRIOR HOLLOW-PASS GUARD: working-tree diff must touch loop.py
+   git diff --name-only HEAD | grep -qx '.specfuse/scripts/loop.py'
+   ```
+
+   If `git diff --name-only HEAD` shows ONLY this WU file (and/or
+   only the test file), you have reproduced the prior 3x hollow-pass
+   — STOP and emit blocked.
 
 **Do not touch.** Exactly 2 files change:
 - `.specfuse/scripts/loop.py` (additions only; do not modify
@@ -139,6 +185,11 @@ not T07's closing guards).
 1. **Completeness.** If any of `POST_PASS_INVARIANTS_BY_TYPE`,
    `assert_terminal_flips_fired`, or `verify_post_pass_invariants`
    is absent from `loop.py` after your edits, emit `status: blocked`.
+   AC6's command (a) is the canonical check — if it returns anything
+   other than `3`, the WU is incomplete. Do NOT flip this WU's
+   frontmatter `status` field as a substitute for shipping the code;
+   that is the prior 3x hollow-pass shape and will be caught again
+   by G1-CLOSE.
 2. **Behavior drift.** If your edit modifies `CLOSING_ASSERTIONS_BY_TYPE`,
    `assert_closing_deliverables`, or any other existing constant /
    function beyond the documented additions, emit `status: blocked`.

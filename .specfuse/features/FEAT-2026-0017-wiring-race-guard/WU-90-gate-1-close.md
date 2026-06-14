@@ -3,15 +3,18 @@ id: FEAT-2026-0017/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 1.20
 oracle_env: macos_local
 verdict: not_set
-duration_seconds: 87.011
-cost_usd: 0.90931
-input_tokens: 16
-output_tokens: 5406
+prior_attempts:
+  - attempt: 1
+    outcome: blocked_human
+    reason: agent_reported_blocked
+    duration_seconds: 87.011
+    cost_usd: 0.90931
+    notes: "Refused verdict: met because T01 hollow-passed (loop.py unchanged, three declared symbols absent). Existence check per authoring-work-units §9 caught it. Re-armed after T01 escalated to Opus 4.7 with hardened body."
 ---
 
 # Gate 1 close — terminal close ceremony (NEW contract; recursive dogfood)
