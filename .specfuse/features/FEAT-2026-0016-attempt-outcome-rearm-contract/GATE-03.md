@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: awaiting_review
+status: passed
 cost_budget_usd: 7.00  # raised at arm time from 5.50 — gate-1 ratio 1.62× × $4.20 plan ≈ $6.80, buffer to $7
 ---
 
