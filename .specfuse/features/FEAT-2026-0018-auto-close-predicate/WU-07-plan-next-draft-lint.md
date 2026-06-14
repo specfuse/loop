@@ -2,12 +2,16 @@
 id: FEAT-2026-0018/T07
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 generated_surfaces: []
 produces_driver_helper:
   - lint_plan_next_draft
+duration_seconds: 463.863
+cost_usd: 1.284293
+input_tokens: 40
+output_tokens: 23307
 ---
 
 # Plan-next-draft lint extension + driver hook

@@ -2188,6 +2188,21 @@ def run(
                                         f"chore(loop): {wu.wu_id} revert PLAN.md done"
                                         f" (hedged verdict)\n\nFeature: {wu.wu_id}",
                                     )
+                        # FEAT-2026-0018/T07 — plan-next-draft lint hook (warn-only v1)
+                        if wu.type == "plan-next":
+                            try:
+                                from lint_plan import lint_plan_next_draft
+                                _warns = lint_plan_next_draft(feature_dir, gate.number)
+                            except Exception as _exc:
+                                _warns = [f"lint_plan_next_draft raised: {_exc}"]
+                            for _w in _warns:
+                                print(f"   WARN (plan-next-draft lint): {_w}")
+                            if _warns:
+                                wu_events.append(build_event(
+                                    "plan_next_draft_lint", wu.wu_id,
+                                    {"gate": gate.number, "warns": list(_warns),
+                                     "blocking": False},
+                                ))
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
