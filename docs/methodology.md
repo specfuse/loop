@@ -83,6 +83,66 @@ Closing sequence — every gate ends with **one** of three forms:
 - `docs` — reconciles documentation and roadmap status with what was built.
 - `plan-next` — drafts the next gate and writes the human review summary.
 
+### Deterministic auto-close path (FEAT-2026-0018)
+
+The driver evaluates a deterministic predicate (`gate_eval.py`, predicate=v1) at
+every gate boundary — intermediate and terminal — before dispatching any close WU.
+The predicate exists to eliminate the human `/arm-gate` round-trip and the
+hollow-pass / wiring-race brittleness class on fully on-plan gates; the full close
+ceremony (retrospective, lessons, docs) remains valuable precisely when things go
+off-plan, and the predicate routes each gate to the right path without AI judgment.
+For the full design rationale see `PLAN.md` for FEAT-2026-0018.
+
+**Predicate v1 — a gate auto-closes iff ALL hold:**
+
+1. **No blocked_human in attempt chain** — no WU in this gate has `blocked_human`
+   in its lifecycle events (`events.jsonl`) for this run. Re-arm history from
+   FEAT-2026-0016, if present, is also inspected — any prior `blocked_human`
+   cycle disables auto.
+2. **No replan** — no `replan` event in `events.jsonl` for this gate's WUs.
+3. **Per-WU cost ≤ 1.5× planned** — every substantive WU's `cost_usd` ≤
+   `planned_cost_usd × 1.5`. If `planned_cost_usd` absent: skip this check for
+   that WU (graceful degrade — emits a warning reason in the decision but doesn't
+   disable auto).
+4. **No WU > 2× planned** — even one substantive WU exceeding plan by > 2×
+   disables auto regardless of others. Catches estimation drift like
+   FEAT-2026-0015/G1-PLAN (3.8× over).
+5. **Plan-next ≤ 1.5× planned** — the `plan-next` type WU is held to the same
+   1.5× ceiling, enforced separately so plan-next overrun is a visible reason
+   in the decision.
+6. **Gate total ≤ `cost_budget_usd`** — if `GATE-NN.md` declares a budget, sum
+   of all WU `cost_usd` in the gate must be ≤ budget. Absent budget: skip.
+7. **No test/lint/security failures in attempt notes** — every substantive WU's
+   final attempt's `attempt_outcome` must be `passed`. Earlier attempts may have
+   failed (already governed by check 1 if blocked), but the FINAL outcome on
+   each WU must be clean.
+
+**Auto-close terminal** — when the predicate fires on a terminal gate, the driver
+writes a stub `RETROSPECTIVE.md`, marks the close WU `status: done` with
+`auto_close: true` frontmatter, and fires `fire_terminal_flips` directly. The
+close WU's dispatch is skipped. The FEAT-2026-0017 invariant guard
+(`assert_terminal_flips_fired`) still runs — the driver calls it after the stub
+is written, so the guard exercises the same path regardless of ceremony form.
+
+**Auto-close intermediate (option A)** — on a non-terminal gate that auto-closes,
+the `close-intermediate` WU dispatch is skipped (no retrospective session, no
+lessons promotion), but `plan-next` still dispatches to author the next gate's
+draft work units. The human review-and-arm checkpoint therefore still fires;
+auto-close only eliminates the reflective overhead, not the forward-design step.
+
+**Override surfaces** — two escape hatches exist. Pass `--force-full-close
+<feature-id>` on the CLI to bypass the predicate for a single gate and run the
+full close ceremony regardless of predicate outcome. Alternatively, set
+`auto_close_disabled: true` in a feature's `PLAN.md` frontmatter to disable
+auto-close permanently for that feature (e.g., for features that are inherently
+exploratory and expect off-plan behavior).
+
+**Predicate-version transparency** — every `auto_close_decision` event in
+`events.jsonl` carries a `predicate_version` field (e.g., `predicate_version:
+v1`). Future revisions to the predicate constants increment this version, so
+the audit trail for any gate boundary remains interpretable retroactively even
+after v2+ revisions ship.
+
 ## 4. The five-section work-unit contract
 
 Every dispatchable WU prompt has these five mandatory sections (a sixth,
