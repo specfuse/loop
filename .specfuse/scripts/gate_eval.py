@@ -8,32 +8,33 @@ Given a feature directory and a gate id, evaluates the v1 predicate and
 returns an AutoCloseDecision. No imports from loop.py. No subprocess calls.
 No file writes. Pure read + compute.
 
-# pragma: no cover — tests land in T02; all lines excluded from coverage
-# until then so the overall coverage threshold is unaffected.
+Coverage pragmas removed in T02 (tests/test_gate_eval.py) — T01 had added
+them temporarily so the overall coverage threshold was unaffected before
+tests landed.
 """
 
-from __future__ import annotations  # pragma: no cover
+from __future__ import annotations
 
-import json  # pragma: no cover
-import re  # pragma: no cover
-from dataclasses import dataclass  # pragma: no cover
-from pathlib import Path  # pragma: no cover
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
 
-import _miniyaml  # pragma: no cover
+import _miniyaml
 
-PREDICATE_VERSION = "v1"  # pragma: no cover
-PER_WU_COST_RATIO_CEILING = 1.5  # pragma: no cover
-PER_WU_HARD_OVERRUN_RATIO = 2.0  # pragma: no cover
-PLAN_NEXT_COST_RATIO_CEILING = 1.5  # pragma: no cover
+PREDICATE_VERSION = "v1"
+PER_WU_COST_RATIO_CEILING = 1.5
+PER_WU_HARD_OVERRUN_RATIO = 2.0
+PLAN_NEXT_COST_RATIO_CEILING = 1.5
 
-_FM_DELIM = re.compile(r"^---\s*$")  # pragma: no cover
-_YAML_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)\n```", re.DOTALL)  # pragma: no cover
-_CLOSING_TYPES = frozenset({"close", "close-intermediate"})  # pragma: no cover
-_NON_SUBSTANTIVE_TYPES = frozenset({"close", "close-intermediate", "plan-next"})  # pragma: no cover
+_FM_DELIM = re.compile(r"^---\s*$")
+_YAML_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)\n```", re.DOTALL)
+_CLOSING_TYPES = frozenset({"close", "close-intermediate"})
+_NON_SUBSTANTIVE_TYPES = frozenset({"close", "close-intermediate", "plan-next"})
 
 
-@dataclass(frozen=True)  # pragma: no cover
-class AutoCloseDecision:  # pragma: no cover
+@dataclass(frozen=True)
+class AutoCloseDecision:
     auto: bool                  # True iff predicate fires
     reasons: list[str]          # one entry per failing criterion (empty if auto=True)
     metrics: dict               # raw numbers for human inspection
@@ -42,7 +43,7 @@ class AutoCloseDecision:  # pragma: no cover
     predicate_version: str      # "v1" — bumped when constants change
 
 
-def _parse_frontmatter(text: str) -> tuple[dict, str]:  # pragma: no cover
+def _parse_frontmatter(text: str) -> tuple[dict, str]:
     """Return (frontmatter_dict, body_text) from ---\n...\n--- delimited text."""
     lines = text.splitlines()
     if not lines or not _FM_DELIM.match(lines[0]):
@@ -55,7 +56,7 @@ def _parse_frontmatter(text: str) -> tuple[dict, str]:  # pragma: no cover
     return fm, body
 
 
-def _read_plan_metrics(feature_dir: Path) -> dict:  # pragma: no cover
+def _read_plan_metrics(feature_dir: Path) -> dict:
     """Return frontmatter + parsed task-graph gates from PLAN.md."""
     text = (feature_dir / "PLAN.md").read_text()
     fm, body = _parse_frontmatter(text)
@@ -67,7 +68,7 @@ def _read_plan_metrics(feature_dir: Path) -> dict:  # pragma: no cover
     return {"frontmatter": fm, "gates": gates}
 
 
-def _read_wu_metrics(wu_path: Path) -> dict:  # pragma: no cover
+def _read_wu_metrics(wu_path: Path) -> dict:
     """Return WU frontmatter as dict, with defaults for missing fields."""
     fm, _ = _parse_frontmatter(wu_path.read_text())
     return {
@@ -82,7 +83,7 @@ def _read_wu_metrics(wu_path: Path) -> dict:  # pragma: no cover
     }
 
 
-def _read_events(events_path: Path, wu_ids: list[str]) -> list[dict]:  # pragma: no cover
+def _read_events(events_path: Path, wu_ids: list[str]) -> list[dict]:
     """Return events whose correlation_id is in wu_ids. Returns [] if file missing."""
     if not events_path.exists():
         return []
@@ -102,7 +103,7 @@ def _read_events(events_path: Path, wu_ids: list[str]) -> list[dict]:  # pragma:
     return out
 
 
-def _apply_predicate(  # pragma: no cover
+def _apply_predicate(
     plan_metrics: dict,
     wu_metrics_list: list[dict],
     events: list[dict],
@@ -279,7 +280,7 @@ def _apply_predicate(  # pragma: no cover
     return reasons, metrics
 
 
-def evaluate_auto_close(feature_dir: Path, gate_id: int) -> AutoCloseDecision:  # pragma: no cover
+def evaluate_auto_close(feature_dir: Path, gate_id: int) -> AutoCloseDecision:
     """Return AutoCloseDecision for gate_id in the given feature directory."""
     plan = _read_plan_metrics(feature_dir)
     fm = plan["frontmatter"]

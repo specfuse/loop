@@ -2,11 +2,15 @@
 id: FEAT-2026-0018/T02
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 1494.1
+cost_usd: 4.181495
+input_tokens: 54
+output_tokens: 92062
 ---
 
 # Unit tests for `gate_eval.py` — fixture per criterion, ≥ 90% coverage
