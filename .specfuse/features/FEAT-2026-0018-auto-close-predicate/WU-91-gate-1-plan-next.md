@@ -2,10 +2,14 @@
 id: FEAT-2026-0018/G1-PLAN
 type: plan-next
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
+duration_seconds: 403.756
+cost_usd: 2.504065
+input_tokens: 26
+output_tokens: 28156
 ---
 
 # Gate 1 plan-next — draft gate 2's substantive WUs

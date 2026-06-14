@@ -137,10 +137,21 @@ gates:
     file: GATE-02.md
     work_units:
       # Substantive WUs drafted by G1-PLAN at gate-1 close.
-      # Closing sequence scaffolded so lint can identify gate 2 as non-terminal.
+      - id: FEAT-2026-0018/T04
+        file: WU-04-driver-terminal-wiring.md
+        depends_on: []
+      - id: FEAT-2026-0018/T05
+        file: WU-05-driver-intermediate-wiring.md
+        depends_on: [FEAT-2026-0018/T04]
+      - id: FEAT-2026-0018/T06
+        file: WU-06-force-full-close-flag.md
+        depends_on: [FEAT-2026-0018/T05]
       - id: FEAT-2026-0018/G2-CLOSE-INTERMEDIATE
         file: WU-90-gate-2-close-intermediate.md
-        depends_on: []   # G1-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0018/T04
+          - FEAT-2026-0018/T05
+          - FEAT-2026-0018/T06
       - id: FEAT-2026-0018/G2-PLAN
         file: WU-91-gate-2-plan-next.md
         depends_on: [FEAT-2026-0018/G2-CLOSE-INTERMEDIATE]
