@@ -74,7 +74,8 @@ Reference: `.specfuse/rules/result-contract.md`,
    grep -q 'predicate=v1' .specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/RETROSPECTIVE.md
    git diff HEAD .specfuse/LEARNINGS.md | grep -qE '^\+- \[FEAT-2026-0016' || \
      grep -q 'nothing generalizes' .specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/RETROSPECTIVE.md
-   git diff --name-only HEAD | grep -qx '.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/RETROSPECTIVE.md'
+   # Newly created file is untracked; combine diff + ls-files.
+   { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | grep -qx '.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/RETROSPECTIVE.md'
    ```
 
 **Do not touch.** Files this WU may edit/create:
