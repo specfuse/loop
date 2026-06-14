@@ -1,6 +1,6 @@
 ---
 name: wrap-feature
-description: Finalize a feature after its close ceremony — push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Terminal state flips (gate status, roadmap row) are now driver-side (FEAT-2026-0015/T06). Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
+description: Finalize a feature after its close ceremony — push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Supports both auto-close and full-ceremony features. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
 ---
 
 # Wrap feature (interactive, post-close finalization)
@@ -58,6 +58,12 @@ plan and stop" mode.
   the operator should run, do not attempt them.
 - **Never auto-merge.** PR opening is fine after confirm; the merge
   itself is an operator-owned decision (after CI green + review).
+- **Auto-close and full-ceremony features both supported.** Skill MUST
+  NOT assume `RETROSPECTIVE.md` carries a `# Feature-arc verdict`
+  section — the auto-close stub does not. Detection via
+  `grep -qE '^## Gate [0-9]+ — auto-closed \(predicate=v[0-9]+\)'`
+  in RETROSPECTIVE.md; if that matches, treat the feature as
+  auto-closed. Never synthesize recap sections from a stub.
 
 ## When to invoke
 
@@ -80,7 +86,7 @@ this.
 
 ## Method
 
-### 1. Locate and validate the target feature
+### 1. Locate and surface the target feature
 
 - Find the most recently `done` feature whose PLAN.md is `done` (or
   the one named explicitly via `--feature`). Read its frontmatter
@@ -93,71 +99,14 @@ this.
   passes with `verdict: met`. If either is still `awaiting_review` /
   `active`, the close WU likely ran with a hedged verdict — surface
   this and stop; do not attempt manual reconciliation here.
+- Detect close path: run
+  `grep -qE '^## Gate [0-9]+ — auto-closed \(predicate=v[0-9]+\)'`
+  on RETROSPECTIVE.md. Match → auto-closed; no match → full ceremony.
+- Print one line: `<feature_id> [<slug>] — auto-closed | ceremony`
+  then two lines: `branch: <branch>` and `goal: <roadmap_goal>`.
+  No recap synthesis, no diff-stat walk, no LEARNINGS enumeration.
 
-### 2. Surface the executive recap
-
-Operator may be coming back to a feature they haven't thought about in
-hours, days, or weeks. The skill's job here is to **put them back in
-context** in the time it takes to read a paragraph, then surface the
-verdict so they can make an informed go/no-go call.
-
-Build and display the recap in this order. Be terse — each section
-1-3 lines unless evidence demands more:
-
-1. **Goal recap.** Quote `roadmap_goal` from PLAN.md frontmatter
-   verbatim. This is the north star the feature was sized against;
-   the verdict pass/fail hangs off it.
-2. **Value delivered.** Walk `git diff main...HEAD --stat` and pick
-   files OUTSIDE the feature folder + outside RETROSPECTIVE / LEARNINGS
-   / roadmap (those are bookkeeping the close ceremony already owns).
-   Summarize what surfaces shipped:
-   - New scripts / modules / skills (named).
-   - Modified driver / library files (named with one-line "what
-     changed").
-   - New tests (count + which surface they cover).
-   Skip bookkeeping commits, RETROSPECTIVE itself, the feature
-   folder's WU files.
-3. **Plan-adherence read.** Compare PLAN.md's gates graph + Scope OUT
-   section against what actually shipped:
-   - **On-plan** if: all gates closed in drafted order, no scope-OUT
-     items pulled in, no scope-IN items punted.
-   - **Off-plan** otherwise. Name the deviation in one line per
-     instance:
-     - WUs re-armed (count and which).
-     - Scope items added or removed mid-flight.
-     - WUs that took >1 attempt (count and which).
-     - Cost spent vs initial estimate if recorded.
-   The bar for "off-plan" is structural drift, not minor revision —
-   "T03 took 2 attempts and closed clean" is still on-plan.
-4. **Retrospective summary (only if off-plan).** Read RETROSPECTIVE.md
-   for sections like `## What worked / didn't`, `## Surprises`,
-   `## Structural gap`. Synthesize 2-4 bullets naming what changed
-   and why. Skip this entirely if §3 said on-plan.
-5. **Feature-arc verdict.** Quote `# Feature-arc verdict` (or
-   equivalent) from RETROSPECTIVE.md in 2-3 lines (Met / Not met /
-   Partially met, plus the one-sentence reason).
-6. **LEARNINGS promoted.** List `[FEAT-YYYY-NNNN/G…]` tags the close
-   ceremony appended to `.specfuse/LEARNINGS.md`. One line per tag —
-   just the rule.
-
-Then ask: "Verdict looks right? (y / n / `let me read retrospective`)"
-— n or read-first exits without further writes.
-
-If a section can't be assembled from canonical files, say so
-explicitly ("PLAN.md has no Scope OUT section; plan-adherence read
-limited to gates graph + WU outcomes") rather than fabricate.
-
-### 3. Manual verification step (operator-owned)
-
-- For any deferred verification recorded in `RETROSPECTIVE.md`
-  (e.g. WUs that dropped gh-CLI ACs and moved CI-log inspection
-  out-of-loop), list the exact steps the operator must run before
-  push. Quote from RETROSPECTIVE.md verbatim — do not invent or
-  paraphrase verification steps.
-- Ask: "Manual verification done? (y / n / `not applicable`)" —
-  n exits with the verification command list as next step.
-
-### 4. Push the branch
+### 2. Push the branch
 
 - Read PLAN.md's `branch` field (e.g. `feat/FEAT-2026-0014-gha-node20-bump`).
 - Confirm `git branch --show-current` matches.
@@ -171,16 +120,16 @@ limited to gates graph + WU outcomes") rather than fabricate.
 - On y: `git push -u origin <branch>`. Report the upstream
   tracking confirmation or the error.
 
-### 5. Open the PR
+### 3. Open the PR
 
 - Probe `gh auth status` once. If ✗: per LEARNINGS, print the
   exact `gh pr create --fill` command for the operator and skip
-  to step 6.
+  to step 4.
 - If ✓: ask "Open PR via `gh pr create --fill`? (y / n)"
 - On y: run it. Capture the PR URL from output; report it.
 - On n: print the command for the operator.
 
-### 6. Watch CI (optional, gh-only)
+### 4. Watch CI (optional, gh-only)
 
 - If `gh` works and PR was opened: offer "Watch CI? (y / n)"
 - On y: `gh run watch --branch <branch>`. Stream summary to
@@ -189,14 +138,14 @@ limited to gates graph + WU outcomes") rather than fabricate.
   watch command for resume.
 - On n / gh broken: skip.
 
-### 7. Merge advisory (do NOT merge)
+### 5. Merge advisory (do NOT merge)
 
 - Do not auto-merge. State: "PR is open at <url>. Wait for CI
   green + review, then merge via `gh pr merge` or the GitHub UI."
 - If branch protection / required reviews are configured, name
   them (best-effort via `gh pr view --json mergeable,mergeStateStatus`).
 
-### 8. Point at the next pick
+### 6. Point at the next pick
 
 - After merge advisory, suggest `/pick-feature` for the next
   roadmap row.
@@ -204,7 +153,7 @@ limited to gates graph + WU outcomes") rather than fabricate.
   `/draft-feature` (new initiative) and `/abandon-feature` (if
   the next pick is wrong).
 
-### 9. RESULT
+### 7. RESULT
 
 Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
 `status: complete` means every step ran or was skipped by operator
@@ -228,6 +177,12 @@ AND the operator declined to investigate.
   If PLAN.md is not `done`, this skill stops.
 
 ## Version
+
+**v0.3** (FEAT-2026-0018/T08). Method §§ 2–3 removed — executive
+recap + manual-verification step are noise on the auto-close path.
+Wrap is now: locate → push → PR → CI watch → next-pick. The
+deterministic close path makes the recap redundant on most features;
+rare off-plan cases surface via RETROSPECTIVE.md directly.
 
 **v0.2** (FEAT-2026-0015/T06). Nine steps reduced to eight; terminal
 state flips (gate status, roadmap row, auto-archive) moved to the

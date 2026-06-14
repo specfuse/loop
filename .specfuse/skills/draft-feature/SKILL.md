@@ -161,6 +161,12 @@ For gate 1 only:
   enforces this at execution time; listing it as an explicit AC bullet
   makes the contract visible at plan-next authoring time.
 
+  Cost tables feed `evaluate_auto_close` at gate close. A WU's
+  `planned_cost_usd` is the threshold the predicate's per-WU ratio check
+  measures against (criteria 3 + 4 in PLAN.md's Predicate v1). Honest
+  planning makes auto-close behave; over-generous estimates make every
+  gate auto-close even when it shouldn't.
+
 #### Legacy: 4-WU sequence
 
 Older features used a four-WU closing sequence: `G1-RETRO`

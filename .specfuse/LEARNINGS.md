@@ -1124,3 +1124,126 @@ promoted here.
   estimates should include a "first-of-its-kind dogfood
   multiplier" (typical 5-15×) when the feature introduces a new
   contract no prior feature has exercised end-to-end.
+
+- **[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE] Effort-band pricing is
+  blind to spec density and history-as-fixture reads.** Gate 1
+  overran +132% ($4.10 plan → $9.51 actual) across three WUs
+  whose plans used the standard effort-band defaults
+  (`implementation/high` → $1.50–1.80, `implementation/medium`
+  → $0.80). T02 (tests) shipped 15 named test classes + 12
+  lint-clean synthetic fixture directories on a single attempt
+  for $4.18 — 92k output tokens, 2.79× plan. T03 (CLI +
+  calibration) read 4 historical feature folders as fixtures
+  in a single attempt — 5.3M cache-read tokens, 3.09× plan.
+  T01's retry cost on a small-delta cycle was nearly equal to
+  its first attempt (~$1.29 vs $1.56) because cache-reload on
+  re-dispatch dominates the bill, so "attempt-2 << attempt-1"
+  cost models are wrong. Rule: when planning a WU, raise the
+  effort-band default by the spec-density inputs the band does
+  not see — count named test classes / fixture directories /
+  history-folder reads in the AC body and add a per-unit
+  surcharge (rough heuristic: +$0.10 per named test class above
+  5, +$0.10 per lint-clean fixture directory, +$0.20 per
+  historical-feature-folder read). Treat re-dispatch cost as
+  full-cycle cost, not delta cost, when budgeting attempts.
+
+- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Effort bands do not see
+  wiring-site count; price multi-site driver-wiring per site.**
+  Gate 2's three driver-wiring WUs split clean on the site axis:
+  T05 wired ONE new site backed by T04's already-paid-for
+  scaffolding and came in at 1.21× plan (`xhigh` $2.20). T04
+  wired one site PLUS the FEAT-2026-0017 ordering invariant
+  (stub-retro before `fire_terminal_flips`; post-flip
+  `assert_terminal_flips_fired` must hold) and came in at 1.64×
+  plan ($4.10). T06 was priced as `medium` ($0.80) but actually
+  hooked into BOTH wiring sites T04 and T05 introduced, added a
+  PLAN.md frontmatter field, defined precedence ordering between
+  the CLI flag and the frontmatter, and shipped tests for each —
+  same single-site-pricing-of-multi-site-work shape as gate 1's
+  T02 (a 2.86× miss). Reproducible signal: count the distinct
+  call-sites or files the WU's AC actually mutates; an
+  `implementation/medium` band that touches ≥ 2 distinct wiring
+  sites belongs at `high` with a per-extra-site surcharge
+  (rough heuristic: +$0.40 per additional wiring site beyond the
+  first, +$0.30 per orchestration-invariant the WU must preserve).
+  Re-using a sibling WU's scaffolding (T05 ← T04) is the cheap
+  case; introducing or coordinating sites is the expensive case.
+  Rule: when an AC body names ≥ 2 file paths the WU must mutate,
+  or ≥ 2 already-shipped helpers the WU must call into, raise
+  the band; effort alone will price single-site work.
+
+- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Driver-wiring
+  implementation WUs default to 2 attempts in practice; budget
+  accordingly.** Every substantive gate-2 WU (T04, T05, T06)
+  needed exactly 2 attempts. None escalated to `blocked_human`;
+  none replanned. The first attempt commonly lands code that
+  fails an AC-level verifier — symbol-existence check (AC8 in
+  driver-wiring WUs), an integration test, or a post-pass
+  invariant guard — and the re-dispatch lands clean. Combined
+  with the gate-1 finding that re-dispatch cost is full-cycle
+  cost (not delta cost), this means an honest cost plan for
+  driver-wiring WUs should assume 2× the single-attempt cost,
+  not 1× plus a small retry margin. Rule: when authoring a WU
+  whose AC includes a symbol-existence guard (`produces_driver_
+  helper`) or a multi-site integration assertion, set
+  `planned_cost_usd` to 1.5–2× the single-attempt estimate;
+  prefer over-budgeting on the planning line to under-budgeting
+  and learning it from a 1.6× post-hoc ratio.
+
+- **[FEAT-2026-0018/G3-CLOSE] A predicate that scores planner output
+  is itself the planner-quality oracle once shipped — run it against the
+  feature it shipped in at close ceremony.** FEAT-2026-0018 shipped
+  `gate_eval.py` (deterministic on-plan / off-plan predicate against
+  per-gate cost ratios, hard-overrun ceiling, plan-next overrun, and
+  gate-budget exceedance). At G3-CLOSE, running `gate_eval.py backtest
+  FEAT-2026-0018` against this feature itself returned `G01 auto=False`
+  + `G02 auto=False` + `G03 auto=True` — every verdict matched the
+  retrospective evidence the human had already written: gates 1 and 2
+  documented multi-WU effort-band misclassifications + plan-next
+  overruns + budget exceedances; gate 3 came in clean (single-attempt
+  per WU, 0.81× plan substantive, well under raised budget). The
+  predicate refused its own development gates and accepted its own
+  dogfood gate, self-consistent. This is more than a sanity check: it
+  promotes the predicate from "thing the close ceremony runs" to "thing
+  the close ceremony USES as its planner-quality verdict." Rule: any
+  feature that ships a verifier scoring planner output (cost-ratio gate,
+  schema lint, drift detector, prediction calibration) must include a
+  recursive self-evaluation in its close ceremony — run the verifier
+  against the FEATURE'S OWN per-gate evidence and paste the verbatim
+  output into the retrospective. When verdicts agree with the human-
+  written narrative, that 'self-consistent' note is the
+  load-bearing audit signal future planners read at draft-feature
+  time. When verdicts disagree, the disagreement itself is the
+  feature's first real escaped-bug evidence — promote it to a
+  blocking lesson before shipping the next feature.
+
+- **[FEAT-2026-0018/G3-CLOSE] A hygiene WU authored mid-gate to fix a
+  bug surfaced by that same gate's evidence will, by its own cost,
+  often push the gate over the predicate's auto-close criteria —
+  pre-commit to whether the gate's predicate verdict is read pre-
+  hygiene or post-hygiene.** FEAT-2026-0018's gate 3 originally
+  evaluated `auto=True` against T07–T10 ($2.34 substantive, well
+  under $8.00 budget). G3-CLOSE's first attempt diagnosed a wiring
+  bug at `loop.py:2310` (terminal auto-close branch post-loop
+  instead of in-loop pre-dispatch); the operator armed hygiene WU
+  T11H to relocate the call site. T11H landed structurally clean
+  but cost $3.65 against $0.80 planned (4.56×), pushing gate-3
+  substantive to $8.40 — over the $8.00 budget AND tripping
+  per-WU hard-overrun (criterion 4). The same gate, same data
+  shape, same predicate, returned `auto=False` on the re-evaluation.
+  Rule: when a gate-N close ceremony surfaces a hygiene WU that
+  will land inside gate N, decide explicitly which predicate
+  verdict is load-bearing — the PRE-hygiene verdict (the gate's
+  outcome BEFORE the fix was needed; load-bearing for what the
+  shipped feature actually achieved) or the POST-hygiene verdict
+  (the gate's outcome AFTER the fix landed; load-bearing for
+  the next planner reading the calibration history). Both are
+  legitimate but they answer different questions; the
+  retrospective must paste BOTH backtest outputs so the audit
+  trail is unambiguous, and the verdict frontmatter must cite
+  which one it anchors to. Corollary: hygiene WU `planned_cost_usd`
+  must be priced generously, especially when the hygiene WU
+  carries an invariant-shaped acceptance criterion (here,
+  pre-dispatch ordering) — the hygiene WU's own cost is what
+  determines whether the gate's recursive-dogfood verdict
+  agrees with itself across the fix boundary.

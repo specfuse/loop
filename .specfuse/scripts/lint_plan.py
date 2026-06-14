@@ -129,6 +129,18 @@ def _slice_ac_section(body: str) -> str:
     return after[:em.start()] if em else after
 
 
+def _slice_section(body: str, section_name: str) -> str:
+    """Return content between a named section heading and the next heading."""
+    start_re = re.compile(rf"(?mi)^(?:#+\s*|\**){re.escape(section_name)}")
+    m = start_re.search(body)
+    if not m:
+        return ""
+    nl = body.find("\n", m.end())
+    after = body[nl + 1:] if nl != -1 else ""
+    em = _AC_END_RE.search(after)
+    return after[:em.start()] if em else after
+
+
 def detect_oracle_verbs(ac_section_text: str) -> list[str]:
     """Return matched oracle-verb strings found in the AC section text."""
     found = []
@@ -448,18 +460,128 @@ def lint(feature_dir: Path) -> list[str]:
     return errs
 
 
+def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
+    """Warn-only lint over draft WUs produced by the just-completed plan-next.
+
+    Walks gate (just_closed_gate+1) in PLAN.md and applies focused checks to
+    each WU with status=='draft'. Returns WARN strings; empty = clean.
+    Callers must not raise on non-empty return.
+    """
+    warns: list[str] = []
+    plan = feature_dir / "PLAN.md"
+    if not plan.exists():
+        return warns
+
+    _, body = read_frontmatter(plan)
+    m = re.search(r"```ya?ml\s*\n(.*?)\n```", body, re.DOTALL)
+    if not m:
+        return warns
+
+    graph = _miniyaml.parse(m.group(1)) or {}
+    gates = graph.get("gates", [])
+
+    next_gate_num = just_closed_gate + 1
+    next_gate = next((g for g in gates if g.get("gate") == next_gate_num), None)
+    if next_gate is None:
+        return warns  # Terminal gate: no N+1 — clean
+
+    units = next_gate.get("work_units") or []
+    for ref in units:
+        wfile = ref.get("file")
+        if not wfile:
+            continue
+        wpath = feature_dir / wfile
+        if not wpath.exists():
+            continue
+        wfm, wbody = read_frontmatter(wpath)
+        if wfm.get("status") != "draft":
+            continue
+
+        wid = ref.get("id", wfile)
+
+        # Correlation-ID format check.
+        if not CORRELATION_ID_RE.match(wid):
+            warns.append(f"{wfile}: malformed correlation ID '{wid}'")
+
+        # planned_cost_usd: present and parses as a positive float.
+        planned = wfm.get("planned_cost_usd")
+        if planned is None:
+            warns.append(f"{wfile}: missing 'planned_cost_usd' frontmatter")
+        else:
+            try:
+                if float(planned) <= 0:
+                    warns.append(
+                        f"{wfile}: 'planned_cost_usd' must be a positive float, "
+                        f"got {planned!r}"
+                    )
+            except (TypeError, ValueError):
+                warns.append(
+                    f"{wfile}: 'planned_cost_usd' is not a valid float: {planned!r}"
+                )
+
+        # type must be in VALID_TYPES.
+        wu_type = wfm.get("type")
+        if wu_type not in VALID_TYPES:
+            warns.append(
+                f"{wfile}: invalid 'type' {wu_type!r} — must be one of "
+                f"{sorted(VALID_TYPES)}"
+            )
+
+        # Five mandatory sections: presence + non-empty content.
+        for sec in REQUIRED_SECTIONS:
+            if not re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody):
+                warns.append(f"{wfile}: draft WU missing section '{sec}'")
+                continue
+            if not _slice_section(wbody, sec).strip():
+                warns.append(f"{wfile}: section '{sec}' is empty")
+
+        # Implementation + driver-wiring + empty produces_driver_helper → WARN.
+        if wu_type == "implementation":
+            wiring = detect_driver_wiring(wbody)
+            pdh = wfm.get("produces_driver_helper")
+            if wiring and not pdh:
+                warns.append(
+                    f"{wfile}: implementation draft WU mentions driver wiring "
+                    f"({wiring}) but 'produces_driver_helper' frontmatter is empty"
+                )
+
+    return warns
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        sys.exit("usage: lint_plan.py <feature_dir>")
-    feature_dir = Path(sys.argv[1])
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Specfuse plan linter.",
+        usage="lint_plan.py <feature_dir> [--just-closed-gate N]",
+    )
+    parser.add_argument("feature_dir", type=Path)
+    parser.add_argument(
+        "--just-closed-gate",
+        type=int,
+        dest="just_closed_gate",
+        default=None,
+        metavar="N",
+        help="Also run plan-next-draft lint for gate N+1 draft WUs (warn-only).",
+    )
+    args = parser.parse_args()
+    feature_dir = args.feature_dir
     errs = lint(feature_dir)
     if errs:
         print(f"FAIL — {len(errs)} issue(s) in {feature_dir}:")
         for e in errs:
             print(f"  - {e}")
-        return 1
-    print(f"OK — {feature_dir} is structurally valid.")
-    return 0
+    else:
+        print(f"OK — {feature_dir} is structurally valid.")
+    if args.just_closed_gate is not None:
+        _draft_warns = lint_plan_next_draft(feature_dir, args.just_closed_gate)
+        for _w in _draft_warns:
+            print(f"WARN (plan-next-draft lint): {_w}")
+        if _draft_warns:
+            print(
+                f"plan-next-draft lint: {len(_draft_warns)} warning(s) for gate "
+                f"{args.just_closed_gate + 1} draft WUs."
+            )
+    return 1 if errs else 0
 
 
 if __name__ == "__main__":

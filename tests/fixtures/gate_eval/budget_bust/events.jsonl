@@ -1,0 +1,2 @@
+{"event_type": "task_completed", "correlation_id": "FEAT-2026-9907/T01", "timestamp": "2026-01-01T00:00:00Z", "payload": {"outcome": "passed"}}
+{"event_type": "task_completed", "correlation_id": "FEAT-2026-9907/T02", "timestamp": "2026-01-01T01:00:00Z", "payload": {"outcome": "passed"}}

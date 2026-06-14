@@ -705,7 +705,7 @@ class TestMainArgparse(unittest.TestCase):
             with patch.object(sys, "argv", ["loop", "--feature", "my-feature"]):
                 result = loop.main()
         self.assertEqual(result, 0)
-        mock_run.assert_called_once_with("my-feature", False)
+        mock_run.assert_called_once_with("my-feature", False, force_full_close=None)
 
     def test_dry_run_flag_forwarded_to_run(self):
         """--dry-run is forwarded as dry_run=True to run()."""
@@ -716,7 +716,7 @@ class TestMainArgparse(unittest.TestCase):
         with patch.object(loop, "run", return_value=0) as mock_run:
             with patch.object(sys, "argv", ["loop", "--dry-run"]):
                 loop.main()
-        mock_run.assert_called_once_with(None, True)
+        mock_run.assert_called_once_with(None, True, force_full_close=None)
 
     def test_multi_active_error_propagates_from_run(self):
         """main() with no args propagates the find_feature multi-active SystemExit."""
