@@ -147,6 +147,18 @@ For gate 1 only:
   happy-path test with external commands stubbed. Surface this in
   the proposal so the user can confirm or skip on the
   pure-markdown-runbook exception.
+- **Red-test-first trigger.** For every proposed `implementation` WU
+  that introduces new behavior, apply `/authoring-work-units` §12:
+  Acceptance bullet 1 names a specific scoped test (`tests/<path>::
+  <test_name>` or runner-equivalent nodeid) that **fails on HEAD
+  before this WU runs**; bullet 3 asserts the same test passes after.
+  Propose the red_test path at draft time so the operator can confirm
+  the test exists / will be authored as the WU's first step, or
+  invoke the §12 exemption (refactor / migration / pure-data WU)
+  with a one-line rationale. Skip the trigger for closing WUs
+  (`close`, `close-intermediate`, `plan-next`, `retrospective`,
+  `lessons`, `docs`) — the rule applies to behaviour-introducing
+  implementation work only.
 - Closing WUs for gate 1 follow the shape decided in step 4:
   - **Gate 1 is non-terminal**: generate 2 closing WUs mechanically —
     `G1-CLOSE-INTERMEDIATE` (file `WU-90-gate-1-close-intermediate.md`,

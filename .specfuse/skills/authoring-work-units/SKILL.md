@@ -354,6 +354,70 @@ executable, not on the WU's docs-vs-implementation type.
 
 ---
 
+## 12. Red-test first — name the failing test in the Acceptance criteria
+
+`implementation` WUs that introduce new behavior must name a specific
+test that **fails on the current tree** before any production code is
+written, and **passes after** the WU's edits land. This is the loop's
+cheapest hollow-pass guard: an agent that has not written the test
+cannot show the red→green transition, and an agent that has not
+written the production code cannot flip the test from red to green.
+Every other hollow-pass surface in this skill (§4 silent runners, §9
+symbol-existence, §10 helper duplication) addresses a downstream
+failure mode of skipping this rule.
+
+Authoring shape — three bullets in **Acceptance criteria**:
+
+1. `tests/<path>::<test_name>` exists and **fails on HEAD before this
+   WU runs** (`pytest tests/<path>::<test_name>` exits non-zero, or
+   the test file does not yet exist — both count as red).
+2. The WU's substantive change — written as the objective AC bullet
+   would have been written without this rule.
+3. The same test **passes after the WU's edits** (`pytest
+   tests/<path>::<test_name>` exits zero). Naming the same nodeid
+   in bullets 1 and 3 is the contract.
+
+The named test must be **scoped** (pytest nodeid, mocha `--grep`,
+JUnit `--tests`, etc.) — never the full suite. A minutes-long full
+run on every attempt collapses the three-attempt budget into one
+(§4). Use scoped runs for the red/green proof; the full `code` gate
+still runs at verification time to catch regressions.
+
+**Skip the rule when** the WU genuinely has no behavior to assert:
+
+- Pure refactors with no behavior change (existing tests are the
+  oracle; rename the rule applies only to *new* behavior).
+- Migrations / data backfills whose oracle is row counts or schema
+  shape, not a unit test.
+- Pure docs, lessons, retrospective, close, plan-next — the rule
+  applies to `implementation` (and `bug-fix`, where `/fix-bug`
+  already mandates it).
+
+When skipping, write one line in the WU body explaining why:
+`Red-test exempt: <reason>` (e.g. `Red-test exempt: refactor — no
+behavior change; existing test suite is the regression oracle`).
+A reviewer should be able to read the exemption and agree at a
+glance. An exemption without a reason is the rule violation; the
+reviewer's right move is to reject the WU before dispatch.
+
+**Phased adoption.** This rule is the skill-side contract today.
+A later phase will add an optional `red_test:` frontmatter field +
+a lint WARN when an `implementation` WU lacks it, and eventually a
+driver pre-flight check that records `red_test_verified` /
+`red_test_flipped_green` events in events.jsonl. Skill-level
+adoption first lets us learn which carve-outs matter before any
+mechanical enforcement.
+
+> *Prevents:* the hollow-pass class — agent declares `complete`
+> with no test asserting the new behavior, the `code` gate passes
+> on an unchanged codebase, the gap surfaces at integration time.
+> Same failure mode named in §9 (FEAT-2026-0007/T04 retry escalation
+> ladder declared complete with zero production code) but caught
+> *before* dispatch instead of *after* — the agent can't write the
+> green-state proof without first writing the test.
+
+---
+
 ## Haiku — when (and when not)
 
 `model: haiku` is opt-in only — never a default in `MODEL_BY_TYPE`. Use it
@@ -402,6 +466,15 @@ and would clearly change WU authoring, it's a candidate for promotion on
 the next edit.
 
 ## Version
+
+**v0.10.** Added §12 (Red-test first — name the failing test in the
+Acceptance criteria for any `implementation` WU that introduces new
+behavior) — Phase 1 of the TDD-as-methodology rollout. Skill-side
+contract today; phase 2 adds an optional `red_test:` frontmatter field
++ lint WARN; phase 3 adds a driver pre-flight that records
+`red_test_verified` / `red_test_flipped_green` events. Pairs with §9
+(symbol-existence checks) by catching the same hollow-pass class
+*before* dispatch instead of after.
 
 **v0.9.** Added §11 (Operator scripts are software, not docs — require
 shellcheck + `bash -n` + bats happy-path in Acceptance for any WU that

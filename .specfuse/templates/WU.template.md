@@ -158,7 +158,13 @@ than restating them.
 **Acceptance criteria.** Explicit, testable statements of done. Write them so the
 verification gates — and a reviewer — can judge them objectively. Avoid compound
 criteria ("X and also Y"); split them so a single failure attributes to a single
-line.
+line. For `implementation` WUs that introduce new behavior, the first criterion
+names a scoped test (`tests/<path>::<test_name>` or runner-equivalent nodeid)
+that **fails on HEAD before this WU runs**, and a later criterion asserts the
+same test **passes after the WU's edits**. The red→green proof is the loop's
+cheapest hollow-pass guard; see `/authoring-work-units` §12 for the contract and
+the carve-outs (refactor, migration, pure-data → explicit `Red-test exempt:
+<reason>` line in the WU body).
 
 **Do not touch.** Generated directories (`_generated/`, `gen-src/`, or the repo's
 declared equivalent), files owned by other work units in this gate, secrets,
