@@ -297,6 +297,63 @@ and should not be dispatched.
 
 ---
 
+## 11. Operator scripts are software, not docs — require shellcheck + bats
+
+When a WU emits an **executable artifact intended for human operators**
+(a committed `.sh` script, an installer helper, a runbook whose body is
+a sequence of shell commands an operator copy-pastes), the loop's
+default `code` gate set typically does NOT exercise it — there is no
+unit test, no syntax check, and nothing that catches the kinds of
+quirks shell scripts ship with on a fresh workstation. The WU passes
+on "the file exists with these sections" and the operator discovers
+the bugs against real systems post-merge.
+
+For every WU that ships an executable operator script, its Acceptance
+criteria must include all three of the following — phrased as
+gate-mechanically-checkable lines (§2):
+
+1. **`shellcheck <script>` produces zero warnings**, or every disable
+   directive (`# shellcheck disable=SCxxxx`) carries an inline
+   justification comment naming the reason.
+2. **`bash -n <script>` parses clean** — catches typos and unterminated
+   constructs the shellcheck pass would skip on a parse failure.
+3. **At least one bats-core test against the happy path**, with all
+   external commands (`az`, `kubectl`, `curl`, `gh`, `terraform`, etc.)
+   replaced by PATH-shimmed stubs. The bats test is the contract: the
+   stubs assert the script's call shape, the test verifies the script's
+   exit code + observable output on the success path. A test on the
+   happy path alone is enough to catch lifecycle bugs (trap-revoke
+   ordering, set -e silent-abort, premature exits); error-branch
+   coverage is bonus, not required by this rule.
+
+Add a corresponding entry to the WU's **Verification** section naming
+the gate command — for most repos this is a `code` gate entry like
+`bash -n scripts/<name>.sh && shellcheck scripts/<name>.sh && bats
+tests/<name>.bats`. If your `verification.yml` does not yet declare
+a gate that runs bats, the WU's Hygiene precursor (§7) is to add one.
+
+**Skip the rule when** the WU body is a pure file artifact with no
+executable shipped — a markdown-only runbook that documents commands
+without committing a script, a Terraform module, a Helm chart, a
+config file. The rule fires on the presence of a committed
+executable, not on the WU's docs-vs-implementation type.
+
+> *Prevents:* the failure observed in `resto-manager-iac` Argo CD
+> session 2026-06-14 — FEAT-2026-0028/T02 shipped two ~500-LoC
+> operator scripts (`bootstrap-argocd-entra-app.sh`,
+> `bootstrap-argocd-cluster.sh`) treated as docs artifacts. Post-merge
+> the operator hit 10 patches over ~3.5hr fixing portability
+> (`${VAR,,}` doesn't work on stock macOS bash 3.2), lifecycle
+> (trap-revoke fired before the revoke was needed; KV read aborted
+> silently under `set -e`), and surface (`az ad sp create` raced with
+> re-runs; `az ad sp show` would have caught it). `shellcheck` flags
+> the portability issue at static analysis; one bats happy-path test
+> with `az` stubbed catches the create-race + lifecycle bugs at WU
+> time. Cost: ~15min of test setup per script in WU acceptance vs
+> ~3.5hr of post-merge patching across 10 PRs.
+
+---
+
 ## Haiku — when (and when not)
 
 `model: haiku` is opt-in only — never a default in `MODEL_BY_TYPE`. Use it
@@ -345,6 +402,14 @@ and would clearly change WU authoring, it's a candidate for promotion on
 the next edit.
 
 ## Version
+
+**v0.9.** Added §11 (Operator scripts are software, not docs — require
+shellcheck + `bash -n` + bats happy-path in Acceptance for any WU that
+ships an executable operator artifact) — graduated from the
+`resto-manager-iac` Argo-CD-on-AKS session of 2026-06-14, where two
+~500-LoC bootstrap scripts shipped as docs artifacts cost ~3.5hr of
+post-merge patching across 10 PRs to fix portability, lifecycle, and
+surface bugs that static + bats checks would catch at WU time.
 
 **v0.8.** Added §10 (Helper-duplication pre-flight: enumerate symbols
 before declaring scope) — graduated from `[FEAT-2026-0013/G1+G2]` after
