@@ -3,7 +3,7 @@ id: FEAT-2026-0017/T01
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 3.50
 produces_driver_helper:
@@ -22,10 +22,12 @@ prior_attempts:
     duration_seconds: 1943.08
     cost_usd: 11.947744
     notes: "Opus 4.7 wrote substantive loop.py + 293-line test file. Tests failed all 3 attempts because new tempdir-git tests omitted 'git config commit.gpgSign false' setup (operator's global commit.gpgsign=true with SSH signing). Driver reset wiped loop.py edits each attempt; test file survived as untracked. Driver then crashed during spinning-detected commit_bookkeeping (same signing flake). Fix: repo-local commit.gpgsign=false set + WU body now mandates the gpgSign-false setup pattern."
-duration_seconds: 1579.077
-cost_usd: 11.081799
-input_tokens: 154
-output_tokens: 93150
+  - attempts: 3
+    model: claude-opus-4-7
+    outcome: blocked_pre_existing_env_test_bug
+    duration_seconds: 1579.077
+    cost_usd: 11.081799
+    notes: "Opus correctly diagnosed and refused: pre-existing 20 errors in tests/test_loop_files_changed_guard.py + tests/test_loop_orchestration.py whose _init_git helpers lacked gpgSign-false setup. Reproduces on main. Out of WU scope. Also flagged AC4 wiring as structural deviation (Escalation trigger 4) for operator review. Hygiene-fix applied operator-side: gpgSign-false line added to both helpers; 40 tests OK. Re-armed."
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
