@@ -1,0 +1,2 @@
+{"event_type": "replan", "correlation_id": "FEAT-2026-9903/G1-CLOSE", "timestamp": "2026-01-01T00:00:00Z", "payload": {}}
+{"event_type": "task_completed", "correlation_id": "FEAT-2026-9903/G1-CLOSE", "timestamp": "2026-01-02T00:00:00Z", "payload": {"outcome": "passed"}}
