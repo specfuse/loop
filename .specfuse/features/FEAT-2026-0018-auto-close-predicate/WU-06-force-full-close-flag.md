@@ -2,12 +2,16 @@
 id: FEAT-2026-0018/T06
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 0.80
 generated_surfaces: []
 produces_driver_helper:
   - resolve_auto_close_override
+duration_seconds: 882.45
+cost_usd: 2.286465
+input_tokens: 83
+output_tokens: 36218
 ---
 
 # `--force-full-close` CLI flag + `auto_close_disabled` PLAN.md override

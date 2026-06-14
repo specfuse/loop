@@ -1273,6 +1273,21 @@ def mark_close_wu_auto_closed(
     write_frontmatter_field(wu.file, "auto_close_reasons", "[]")
 
 
+def resolve_auto_close_override(
+    args: "argparse.Namespace",
+    feature_dir: Path,
+) -> tuple[bool, str]:
+    """Return (override_active, reason) for --force-full-close or PLAN.md field."""
+    if getattr(args, "force_full_close", None):
+        return (True, "force_full_close_cli_flag")
+    plan_path = feature_dir / "PLAN.md"
+    if plan_path.is_file():
+        fm, _ = read_frontmatter(plan_path)
+        if fm.get("auto_close_disabled") in (True, "true", "True"):
+            return (True, "auto_close_disabled_per_plan")
+    return (False, "")
+
+
 def maybe_auto_close_terminal(
     feature_dir: Path,
     feature_id: str,
@@ -1837,10 +1852,21 @@ def ready(units: list[WorkUnit], done_ids: set[str]) -> list[WorkUnit]:
             if u.status in DISPATCHABLE and all(d in done_ids for d in u.depends_on)]
 
 
-def run(feature_arg: str | None, dry_run: bool) -> int:
+def run(
+    feature_arg: str | None,
+    dry_run: bool,
+    force_full_close: str | None = None,
+) -> int:
     feature_dir = find_feature(feature_arg)
     feat_fm, gates = load_graph(feature_dir)
     feature_id = feat_fm.get("feature_id", feature_dir.name)
+    if force_full_close is not None and force_full_close != feature_id:
+        sys.exit(
+            f"loop.py: --force-full-close {force_full_close} does not match "
+            f"feature being processed {feature_id}"
+        )
+    _override_ns = argparse.Namespace(force_full_close=force_full_close)
+    _override_active, _override_reason = resolve_auto_close_override(_override_ns, feature_dir)
     events_path = feature_dir / "events.jsonl"
     work_dir = feature_dir / "work"
     backend = make_backend(feat_fm)
@@ -1957,7 +1983,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     continue
 
                 # FEAT-2026-0018/T05 — intermediate auto-close branch
-                if wu.type == "close-intermediate":
+                if wu.type == "close-intermediate" and not _override_active:
                     _plan_next_wu = next(
                         (w for w in units if w.type == "plan-next"),
                         None,
@@ -1975,6 +2001,17 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                         )
                         done_ids.add(wu.wu_id)
                         continue
+                elif wu.type == "close-intermediate" and _override_active:
+                    flush_events(events_path, [build_event(
+                        "auto_close_decision", wu.wu_id, {
+                            "gate": gate.number,
+                            "gate_type": "intermediate",
+                            "auto": False,
+                            "reasons": [_override_reason],
+                            "predicate_version": "v1",
+                            "override": True,
+                        }
+                    )])
 
                 head_before = git("rev-parse", "HEAD")
                 backend.set_wu(wu, "status", "in_progress")
@@ -2255,7 +2292,7 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
         # FEAT-2026-0018/T04 — terminal auto-close branch
         is_terminal_gate = gate is gates[-1]
         auto_closed = False
-        if is_terminal_gate and close_wu_for_terminal is not None:
+        if is_terminal_gate and close_wu_for_terminal is not None and not _override_active:
             auto_closed, decision = maybe_auto_close_terminal(
                 feature_dir, feature_id, gate, gates,
                 events_path, close_wu_for_terminal, repo_root=REPO_ROOT,
@@ -2274,6 +2311,16 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                 )
                 if rc:
                     return rc
+        elif is_terminal_gate and close_wu_for_terminal is not None and _override_active:
+            flush_events(events_path, [build_event(
+                "auto_close_decision", close_wu_for_terminal.wu_id, {
+                    "gate": gate.number,
+                    "auto": False,
+                    "reasons": [_override_reason],
+                    "predicate_version": "v1",
+                    "override": True,
+                }
+            )])
         if close_wu_for_terminal is not None and not auto_closed:
             # Post-pass driver-state invariant guard (FEAT-2026-0017/T01):
             # fires AFTER fire_terminal_flips so the side-effect checks (gate
@@ -2341,10 +2388,13 @@ def main() -> int:
                     "(optional if exactly one feature is active).")
     ap.add_argument("--dry-run", action="store_true",
                     help="Walk the current gate without dispatching or writing.")
+    ap.add_argument("--force-full-close", metavar="FEATURE_ID",
+                    help="Bypass predicate consultation and run the existing close "
+                    "path for the named feature. Must match the feature being processed.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
-    return run(args.feature, args.dry_run)
+    return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
 
 
 if __name__ == "__main__":
