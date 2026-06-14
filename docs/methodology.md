@@ -143,6 +143,45 @@ v1`). Future revisions to the predicate constants increment this version, so
 the audit trail for any gate boundary remains interpretable retroactively even
 after v2+ revisions ship.
 
+### Per-attempt outcome events (FEAT-2026-0016)
+
+Every dispatched attempt emits exactly one `attempt_outcome` event to
+`events.jsonl`. The payload carries a standardized set of fields:
+`outcome`, `failure_class`, `failure_signature`, `failure_excerpt`,
+`cost_usd`, `duration_seconds`, `attempt`, and `re_arm_count`. For
+the field-by-field schema see
+`.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/PLAN.md`
+§ "Event payload shape — `attempt_outcome` v1". The full payload is
+not restated here (one fact, one home).
+
+`outcome` taxonomy is **locked at v1**: `passed | failed | blocked |
+zero_token | files_changed_mismatch | post_pass_invariant_failed |
+closing_deliverable_missing | smoke_import_failed`. Extending the
+taxonomy requires a deliberate versioning decision.
+
+`failure_class` taxonomy is **locked at v1**: `tests | lint |
+security | coverage | symbol_existence | bandit | other | null`.
+`failure_class: other` is the explicit catch-all for paths not yet
+classified; `null` means the outcome was `passed` (no failure).
+
+Consumers that read `attempt_outcome` events (the auto-close
+predicate, `/gate-status`, the spinning-detector hook, close-ceremony
+cost analysis) treat the `outcome` and `failure_class` values as an
+enum — new values are a breaking change.
+
+### Re-arm WU frontmatter additions (FEAT-2026-0016)
+
+When a WU is re-armed from `blocked_human` back to `pending`, six
+cumulative audit fields track cross-attempt state:
+`re_arm_count`, `re_arm_history`, `cumulative_cost_usd`,
+`cumulative_duration_seconds`, `cumulative_input_tokens`,
+`cumulative_output_tokens`. For the field-level spec (initialization
+values, write ownership, append semantics) see
+`.specfuse/templates/WU.template.md` frontmatter notes. The driver
+maintains the cumulative fields; `/unblock-wu` writes `re_arm_history`
+entries; `/gate-status` surfaces `re_arm_count` prominently on any WU
+where it is > 0.
+
 ## 4. The five-section work-unit contract
 
 Every dispatchable WU prompt has these five mandatory sections (a sixth,
