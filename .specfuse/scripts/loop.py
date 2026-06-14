@@ -1311,6 +1311,89 @@ def maybe_auto_close_terminal(
     return True, decision
 
 
+# --------------------------------------------------------------------------- #
+# Intermediate auto-close helpers (FEAT-2026-0018/T05)                        #
+# --------------------------------------------------------------------------- #
+
+
+def append_stub_retrospective_intermediate(
+    feature_dir: Path,
+    gate_number: int,
+    decision: AutoCloseDecision,
+) -> None:
+    """APPEND a Gate N auto-close stub to RETROSPECTIVE.md; create file if absent.
+
+    Idempotent: skips if a '## Gate N ... auto-closed' heading already exists
+    (re-arm guard, AC5). Satisfies assert_retrospective_gate_section.
+    """
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists() and re.search(
+        rf"^##\s+Gate\s+{gate_number}\b.*auto-closed",
+        retro.read_text(),
+        re.MULTILINE,
+    ):
+        return
+    metrics = decision.metrics
+    budget = metrics.get("gate_budget")
+    budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
+    total_cost = metrics.get("gate_total_cost", 0.0)
+    section = (
+        f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
+        f"On-plan intermediate close; full close-intermediate ceremony\n"
+        f"skipped per `evaluate_auto_close`. `plan-next` WU dispatched\n"
+        f"to draft gate {gate_number + 1}.\n\n"
+        f"- feature_id: {decision.feature_id}\n"
+        f"- predicate_version: {decision.predicate_version}\n"
+        f"- gate_total_cost: ${total_cost:.2f}\n"
+        f"- gate_budget: {budget_str}\n"
+        f"- reasons: [] (auto=True)\n"
+    )
+    if retro.exists():
+        with retro.open("a") as fh:
+            fh.write("\n" + section)
+    else:
+        retro.write_text(section)
+
+
+def maybe_auto_close_intermediate(
+    feature_dir: Path,
+    feature_id: str,
+    gate: "GateNode",
+    gates: "list[GateNode]",
+    events_path: Path,
+    repo_root: Path,
+    close_intermediate_wu: "WorkUnit | None",
+    plan_next_wu: "WorkUnit | None",
+) -> tuple[bool, AutoCloseDecision]:
+    """Evaluate auto-close predicate for an intermediate (non-terminal) gate.
+
+    Returns (True, decision) when predicate fires and the auto path was taken.
+    Returns (False, decision) when predicate refuses; caller falls through to
+    the existing close-intermediate dispatch unchanged.
+    Caller is responsible for dispatching plan_next_wu afterward (AC4).
+    Does NOT set verdict: met — close-intermediate has no terminal verdict.
+    """
+    decision = evaluate_auto_close(feature_dir, gate.number)
+    if not decision.auto:
+        return False, decision
+    append_stub_retrospective_intermediate(feature_dir, gate.number, decision)
+    if close_intermediate_wu is not None:
+        write_frontmatter_field(close_intermediate_wu.file, "status", "done")
+        write_frontmatter_field(close_intermediate_wu.file, "auto_close", "true")
+        write_frontmatter_field(close_intermediate_wu.file, "auto_close_reasons", "[]")
+    flush_events(events_path, [build_event(
+        "auto_close_decision", feature_id, {
+            "gate": gate.number,
+            "gate_type": "intermediate",
+            "auto": True,
+            "reasons": decision.reasons,
+            "plan_next_dispatched": True,
+            "predicate_version": decision.predicate_version,
+        },
+    )])
+    return True, decision
+
+
 def _fire_and_verify_terminal_flips(
     close_wu: "WorkUnit",
     feature_dir: Path,
@@ -1872,6 +1955,26 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     wu.status = DONE
                     done_ids.add(wu.wu_id)
                     continue
+
+                # FEAT-2026-0018/T05 — intermediate auto-close branch
+                if wu.type == "close-intermediate":
+                    _plan_next_wu = next(
+                        (w for w in units if w.type == "plan-next"),
+                        None,
+                    )
+                    _auto_closed, _ = maybe_auto_close_intermediate(
+                        feature_dir, feature_id, gate, gates,
+                        events_path, REPO_ROOT, wu, _plan_next_wu,
+                    )
+                    if _auto_closed:
+                        commit_bookkeeping(
+                            [feature_dir / "RETROSPECTIVE.md",
+                             wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} auto-closed "
+                            f"(predicate=v1)\n\nFeature: {feature_id}",
+                        )
+                        done_ids.add(wu.wu_id)
+                        continue
 
                 head_before = git("rev-parse", "HEAD")
                 backend.set_wu(wu, "status", "in_progress")

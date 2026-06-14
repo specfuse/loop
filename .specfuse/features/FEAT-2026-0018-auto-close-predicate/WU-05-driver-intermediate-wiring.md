@@ -2,13 +2,17 @@
 id: FEAT-2026-0018/T05
 type: implementation
 effort: xhigh
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.20
 generated_surfaces: []
 produces_driver_helper:
   - maybe_auto_close_intermediate
   - append_stub_retrospective_intermediate
+duration_seconds: 1040.325
+cost_usd: 2.653762
+input_tokens: 203
+output_tokens: 46390
 ---
 
 # Driver integration at intermediate gate boundary (option A)
