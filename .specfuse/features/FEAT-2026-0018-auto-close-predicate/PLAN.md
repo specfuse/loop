@@ -159,10 +159,25 @@ gates:
     file: GATE-03.md
     work_units:
       # Substantive WUs drafted by G2-PLAN at gate-2 close.
-      # Single close WU scaffolded so lint identifies gate 3 as terminal.
+      - id: FEAT-2026-0018/T07
+        file: WU-07-plan-next-draft-lint.md
+        depends_on: []
+      - id: FEAT-2026-0018/T08
+        file: WU-08-wrap-feature-trim.md
+        depends_on: []
+      - id: FEAT-2026-0018/T09
+        file: WU-09-migrate-to-auto-close-skill.md
+        depends_on: []
+      - id: FEAT-2026-0018/T10
+        file: WU-10-docs-methodology-auto-close.md
+        depends_on: [FEAT-2026-0018/T09]
       - id: FEAT-2026-0018/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []   # G2-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0018/T07
+          - FEAT-2026-0018/T08
+          - FEAT-2026-0018/T09
+          - FEAT-2026-0018/T10
 ```
 
 ## Notes
