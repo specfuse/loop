@@ -2,10 +2,14 @@
 id: FEAT-2026-0018/T09
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.20
 generated_surfaces: []
+duration_seconds: 140.711
+cost_usd: 0.349642
+input_tokens: 15
+output_tokens: 5431
 ---
 
 # /migrate-to-auto-close skill — surface capability per feature, opt-in
