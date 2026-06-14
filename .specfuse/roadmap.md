@@ -31,7 +31,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
 | FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0015) |
-| FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | planned  | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | — |
+| FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | active   | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | — |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
 

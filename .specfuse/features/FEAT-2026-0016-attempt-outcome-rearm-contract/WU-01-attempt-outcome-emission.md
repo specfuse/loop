@@ -2,7 +2,7 @@
 id: FEAT-2026-0016/T01
 type: implementation
 effort: xhigh
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 generated_surfaces: []

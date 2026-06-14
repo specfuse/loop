@@ -5,7 +5,7 @@ slug: attempt-outcome-rearm-contract
 branch: feat/FEAT-2026-0016-attempt-outcome-rearm-contract
 roadmap_goal: Every dispatched attempt emits one `attempt_outcome` event with structured failure metadata, and re-arm cycles carry cumulative audit fields, so /gate-status, the predicate, the spinning-detector hook, and close-ceremony cost analysis read events.jsonl directly instead of re-parsing driver stdout.
 autonomy_default: review
-status: planned
+status: active
 planned_cost_usd: 20.10
 ---
 
