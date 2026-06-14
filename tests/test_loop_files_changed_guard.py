@@ -45,6 +45,8 @@ class TestVerifyFilesChanged(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
         subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+        subprocess.run(["git", "-C", str(root), "config", "commit.gpgSign",
+                        "false"], check=True)
         subprocess.run(["git", "-C", str(root), "config", "user.email",
                         "test@example.com"], check=True)
         subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"],

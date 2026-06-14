@@ -32,7 +32,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
 | FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0015) |
 | FEAT-2026-0016 | Re-arm contract + audit trail               | planned  | — | — |
-| FEAT-2026-0017 | Close-WU wiring-race guard                  | active   | — | — |
+| FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -369,87 +369,6 @@ prompt, and /gate-status's re-arm surfacing.
 in parallel. Probably small (one substantive WU for the driver
 fold-logic, one for /unblock-wu + /gate-status updates, one for
 WU template/lint changes).
-
-## FEAT-2026-0017 — Close-WU wiring-race guard
-
-**Why.** FEAT-2026-0015/T06 shipped `fire_terminal_flips` driver-side
-+ wired it into the close path. Wiring looked correct on inspection
-and on test (T06's own tests). The recursive dogfood (G2-CLOSE) ran
-clean, wrote `verdict: met` to its WU frontmatter, and the driver
-flipped PLAN.md to `done`. But the terminal gate stayed
-`awaiting_review` and the roadmap row stayed `active`. Auto-archive
-never fired.
-
-Root cause: `wu.verdict` was populated by `load_wu` BEFORE dispatch
-(value: `None`). Agent wrote `verdict: met` to the frontmatter DURING
-dispatch. The driver's check at the close-path squash compared the
-IN-MEMORY `wu.verdict` (still `None`) against the threshold. Check
-returned False. `close_wu_for_terminal` stayed `None`.
-`fire_terminal_flips` never invoked.
-
-Race between WorkUnit-in-memory and agent's frontmatter write.
-
-None of today's hollow-pass guards (FEAT-2026-0008's three +
-FEAT-2026-0015/T07's four) catch this:
-
-- Zero-token guard: T06 ran productively.
-- `files_changed` guard: T06 listed `loop.py` + the test file; both
-  changed.
-- Smoke-import guard: `fire_terminal_flips` symbol existed +
-  imported.
-- Closing-deliverable guards (T07): T07 didn't model wiring-race —
-  it asserts on file existence and content shape post-pass, not on
-  driver-state invariants that should fire as a CONSEQUENCE of the
-  WU's effect.
-
-**Goal.** Add a new guard category for **post-pass invariants**: a
-WU passes verify + smoke + files_changed, but the LIVE side effect
-it was supposed to produce in the driver / fs DIDN'T happen.
-
-Type-keyed post-pass invariant table (extends T07):
-
-- **`close` (type)** — after squash, the driver must observe one of:
-  (a) terminal gate → `passed`, roadmap row → `done`, auto-archive
-  trail (when `verdict: met`); (b) PLAN.md stays `active` (when
-  verdict is hedged). If neither holds and `verdict: met` is in the
-  WU's post-squash frontmatter, hollow-pass: emit
-  `attempt_outcome: post_pass_invariant_failed` naming the missing
-  side effect, reset, re-attempt within budget.
-- **`implementation` WUs that target driver code** — when a WU
-  declares `produces_driver_helper: <symbol>` in frontmatter, the
-  driver verifies the helper is INVOKED from the right call path
-  via grep, not just defined. Symbol-existence alone is the
-  hollow-pass surface FEAT-2026-0007/T04 already lost on; T06 lost
-  on a more subtle variant (helper invoked from path that's never
-  reached due to stale in-memory state).
-
-**Scope IN.**
-
-- Driver-side post-pass invariant check, type-keyed.
-- New WU frontmatter field `produces_driver_helper: <symbol>` or
-  similar, optional, with lint warning when an `implementation`
-  WU's body claims to wire something into the driver but doesn't
-  declare the symbol.
-- Tests cover: T06's exact failure mode reproduced as a
-  regression test; positive case where flips fire cleanly.
-
-**Scope OUT.**
-
-- Re-architecting WorkUnit-in-memory ↔ frontmatter sync. T06's
-  fix (re-read frontmatter post-squash) is sufficient for the
-  verdict path; broader sync is unwarranted.
-- Wiring-race detection beyond the close path — only `close` WUs
-  exhibit the load-time-vs-dispatch-time gap because they're the
-  only ones whose driver behavior depends on agent-written
-  frontmatter.
-
-**Verification.** Recursive: this feature's own G1-CLOSE (single-
-gate, new contract) MUST exercise the new guard. Regression test
-reproduces FEAT-2026-0015/T06 G2-CLOSE bug pattern.
-
-**Status: planned.** Single gate, ~2 substantive WUs (driver guard
-table + frontmatter field + lint) + 1-WU close. Estimated $3-5.
-
 
 ## Notes
 
