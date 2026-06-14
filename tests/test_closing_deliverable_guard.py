@@ -69,6 +69,27 @@ def _make_wu(
     )
 
 
+def _write_wu_file(wu: "loop.WorkUnit", on_disk_verdict: str | None | object = ...) -> None:
+    """Materialize wu.file on disk with frontmatter.
+
+    By default the on-disk verdict matches `wu.verdict`. Pass
+    `on_disk_verdict=` explicitly (incl. `None`) to model the
+    stale-in-memory-vs-fresh-on-disk scenario the post-issue-#12
+    assertions must handle.
+    """
+    disk_verdict = wu.verdict if on_disk_verdict is ... else on_disk_verdict
+    wu.file.parent.mkdir(parents=True, exist_ok=True)
+    fm_lines = [
+        f"id: {wu.wu_id}",
+        f"type: {wu.type}",
+        f"status: {wu.status}",
+        f"attempts: {wu.attempts}",
+    ]
+    if disk_verdict is not None:
+        fm_lines.append(f"verdict: {disk_verdict}")
+    wu.file.write_text("---\n" + "\n".join(fm_lines) + "\n---\n\n" + wu.body)
+
+
 def _init_git(root: Path) -> None:
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     subprocess.run(["git", "-C", str(root), "config", "user.email", "t@test.com"], check=True)
@@ -264,14 +285,16 @@ class TestAssertVerdictWellFormed(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
             for verdict in loop.VERDICT_VALUES:
-                wu = _make_wu(verdict=verdict)
+                wu = _make_wu(file=fdir / "WU.md", verdict=verdict)
+                _write_wu_file(wu)
                 ok, reason = loop.assert_verdict_well_formed(wu, fdir, fdir, DUMMY_HEAD)
                 self.assertTrue(ok, f"Expected pass for verdict={verdict!r}")
 
     def test_fails_with_none_verdict(self):
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
-            wu = _make_wu(verdict=None)
+            wu = _make_wu(file=fdir / "WU.md", verdict=None)
+            _write_wu_file(wu)
             ok, reason = loop.assert_verdict_well_formed(wu, fdir, fdir, DUMMY_HEAD)
             self.assertFalse(ok)
             self.assertIn("assert_verdict_well_formed", reason)
@@ -279,7 +302,45 @@ class TestAssertVerdictWellFormed(unittest.TestCase):
     def test_fails_with_invalid_verdict_string(self):
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
-            wu = _make_wu(verdict="definitely_not_valid")
+            wu = _make_wu(file=fdir / "WU.md", verdict="definitely_not_valid")
+            _write_wu_file(wu)
+            ok, reason = loop.assert_verdict_well_formed(wu, fdir, fdir, DUMMY_HEAD)
+            self.assertFalse(ok)
+            self.assertIn("assert_verdict_well_formed", reason)
+
+    def test_reads_fresh_verdict_from_disk_not_stale_memory(self):
+        """Issue #12 regression: in-memory wu.verdict is the placeholder set by
+        load_wu at gate start; the agent writes the real verdict to the WU file
+        during dispatch. Assertion MUST read fresh from disk, else every close
+        spins to MAX_ATTEMPTS and rolls back all artifacts.
+
+        Surfaced in example-iac FEAT-2026-0019 ($14.70 sunk over 6
+        attempts) and FEAT-2026-0017/G1-CLOSE (5 attempts).
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            fdir = Path(tmp)
+            wu = _make_wu(file=fdir / "WU.md", verdict="not_set")
+            _write_wu_file(wu, on_disk_verdict="met")
+            ok, reason = loop.assert_verdict_well_formed(wu, fdir, fdir, DUMMY_HEAD)
+            self.assertTrue(
+                ok,
+                f"Assertion must read fresh from disk; got reason: {reason!r}",
+            )
+            self.assertEqual(
+                wu.verdict, "met",
+                "Assertion must update in-memory wu.verdict so downstream "
+                "checks (verdict_permits_terminal_flips, cost analysis) see "
+                "the post-squash value.",
+            )
+
+    def test_reads_fresh_when_disk_verdict_none(self):
+        """Companion to the regression test: when in-memory is 'met' (carried
+        from prior gate) but disk has no verdict (agent failed to write),
+        assertion must fail — not accept the stale in-memory value."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fdir = Path(tmp)
+            wu = _make_wu(file=fdir / "WU.md", verdict="met")
+            _write_wu_file(wu, on_disk_verdict=None)
             ok, reason = loop.assert_verdict_well_formed(wu, fdir, fdir, DUMMY_HEAD)
             self.assertFalse(ok)
             self.assertIn("assert_verdict_well_formed", reason)
@@ -296,7 +357,8 @@ class TestAssertCostAnalysisSectionWhenMet(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
             for v in ("met_locally", "partially_met", "not_met"):
-                wu = _make_wu(verdict=v)
+                wu = _make_wu(file=fdir / "WU.md", verdict=v)
+                _write_wu_file(wu)
                 ok, reason = loop.assert_cost_analysis_section_when_met(
                     wu, fdir, fdir, DUMMY_HEAD,
                 )
@@ -308,7 +370,8 @@ class TestAssertCostAnalysisSectionWhenMet(unittest.TestCase):
             (fdir / "RETROSPECTIVE.md").write_text(
                 "# Retro\n\nSome content.\n\n## Cost analysis\n\nCost details.\n"
             )
-            wu = _make_wu(verdict="met")
+            wu = _make_wu(file=fdir / "WU.md", verdict="met")
+            _write_wu_file(wu)
             ok, reason = loop.assert_cost_analysis_section_when_met(
                 wu, fdir, fdir, DUMMY_HEAD,
             )
@@ -318,12 +381,30 @@ class TestAssertCostAnalysisSectionWhenMet(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
             (fdir / "RETROSPECTIVE.md").write_text("# Retro\n\nSome content.\n")
-            wu = _make_wu(verdict="met")
+            wu = _make_wu(file=fdir / "WU.md", verdict="met")
+            _write_wu_file(wu)
             ok, reason = loop.assert_cost_analysis_section_when_met(
                 wu, fdir, fdir, DUMMY_HEAD,
             )
             self.assertFalse(ok)
             self.assertIn("assert_cost_analysis_section_when_met", reason)
+
+    def test_reads_fresh_verdict_from_disk_not_stale_memory(self):
+        """Issue #12 regression (close-e variant): in-memory verdict='not_set',
+        disk verdict='met', RETROSPECTIVE.md has '## Cost analysis' section.
+        Pre-patch the assertion read stale `wu.verdict` and treated this as
+        the not-met skip path, masking missing cost sections in real runs."""
+        with tempfile.TemporaryDirectory() as tmp:
+            fdir = Path(tmp)
+            (fdir / "RETROSPECTIVE.md").write_text(
+                "# Retro\n\n## Cost analysis\n\nCost details.\n"
+            )
+            wu = _make_wu(file=fdir / "WU.md", verdict="not_set")
+            _write_wu_file(wu, on_disk_verdict="met")
+            ok, reason = loop.assert_cost_analysis_section_when_met(
+                wu, fdir, fdir, DUMMY_HEAD,
+            )
+            self.assertTrue(ok, f"Expected pass; got: {reason!r}")
 
 
 # --------------------------------------------------------------------------- #
@@ -551,6 +632,11 @@ class TestCloseAssertions(unittest.TestCase):
                 ".specfuse/LEARNINGS.md": "# Learnings\n\nOld entry.\n\nNew entry.\n",
                 ".specfuse/roadmap.md": "# Roadmap\n\nUpdated.\n",
                 "feature/RETROSPECTIVE.md": retro_content,
+                "feature/WU-close.md": (
+                    "---\nid: FEAT-9999/G1-CLOSE\ntype: close\n"
+                    "status: done\nattempts: 1\nverdict: met\n---\n\n"
+                    "# Close ceremony\n"
+                ),
             })
             fdir = root / "feature"
             fdir.mkdir(exist_ok=True)
