@@ -1,7 +1,7 @@
 ---
 gate: 3
 status: open
-cost_budget_usd: 4.50
+cost_budget_usd: 8.00  # raised from 4.50 per G2-PLAN GATE-03-REVIEW open-verification #1 — gate-2 ratio 1.64×, gate 3 substantives + close projected ~$6 with buffer
 ---
 
 # Gate 3 — Plan-next lint + /wrap-feature trim + migrate skill + docs (drafted by G2-PLAN)

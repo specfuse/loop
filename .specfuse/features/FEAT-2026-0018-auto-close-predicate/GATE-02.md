@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: passed
 cost_budget_usd: 16.00  # raised from 9.00 — gate 1 ran 2.14× plan; gate 2 driver-wiring (xhigh × 2 + medium) likely similar
 ---
 

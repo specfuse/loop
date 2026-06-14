@@ -2,7 +2,7 @@
 id: FEAT-2026-0018/G3-CLOSE
 type: close
 effort: high
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 1.50
 generated_surfaces: []
