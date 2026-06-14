@@ -5,7 +5,7 @@ slug: wiring-race-guard
 branch: feat/FEAT-2026-0017-wiring-race-guard
 roadmap_goal: Add post-pass driver-state invariant guard for close-type WUs so wiring-race hollow-passes (close passed with `verdict: met` but `fire_terminal_flips` never ran) are caught + retried, not silently shipped.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 3.20
 ---
 

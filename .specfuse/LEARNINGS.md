@@ -1028,3 +1028,99 @@ promoted here.
   scope is "ship a new close-ceremony contract" MUST close its own
   terminal gate using that contract. Falling back to the previous
   contract "to be safe" invalidates the feature's central claim.
+
+## FEAT-2026-0017/G1-CLOSE — close-WU hollow-pass surfaces compound
+
+- **Verify-gate cannot catch impl-WU hollow-pass on its own.**
+  Sonnet 4.6 hollow-passed FEAT-2026-0017/T01 three times by
+  modifying only the WU frontmatter; tests passed because they
+  ran against unchanged code. The existence-check discipline
+  (authoring-work-units §9) caught it ONLY at the next close-WU
+  layer. Rule: any implementation WU that declares
+  `produces_driver_helper: <symbol>` should have a driver-side
+  post-impl existence guard, not only a close-WU existence
+  check. Until then, escalate driver-wiring impl-WUs to Opus
+  4.7 by default — Sonnet's hollow-pass rate on this shape is
+  high.
+
+- **`assert_closing_deliverables` diff-only-touches-wu bypass
+  was a silent hollow-pass loophole.** Added "for test fixture
+  convenience" but no test actually depended on it. Real
+  close-WU runs could pass with zero substantive output (only
+  the driver's bookkeeping write in the squash diff). Removed
+  in commit `6084a89` with regression test
+  `test_close_fails_when_diff_only_touches_wu_file`. Rule:
+  every "skip-assertions-on-trivial-diff" shortcut in the
+  driver is a hollow-pass loophole until proven otherwise; any
+  future addition needs an existing test that depends on it
+  AND a paired test asserting it doesn't bypass real runs.
+
+- **Methodology-level guard contracts must be cross-checked at
+  feature plan time.** FEAT-2026-0015 added T06 (driver owns
+  roadmap flip — close WU MUST NOT touch roadmap.md) and T07
+  (close-deliverable guard REQUIRES docs/ or roadmap.md in
+  squash) in the same feature. They contradict each other.
+  Lint did not catch this. The first feature to actually
+  exercise the post-T06 close-contract (FEAT-2026-0017)
+  surfaced it. Rule: when a feature adds or changes a guard
+  contract, the planning phase must include a "does any other
+  guard contract this contradicts?" review step — ideally
+  enforced by lint.
+
+- **Operator's global git config can silently break tempdir-git
+  tests across the whole repo.** Global `commit.gpgsign=true`
+  with SSH signing → tempdir subprocesses fail `git commit -m
+  init` with exit 128 because ssh-agent isn't reachable. Two
+  test files (`test_loop_files_changed_guard.py`,
+  `test_loop_orchestration.py`) had `_init_git` helpers that
+  omitted the `git config commit.gpgSign false` pattern used by
+  `tests/_workspace.py:36` and others. Reproduced on `main`.
+  Fixed in commit `36cd193`. Rule: every tempdir-git test
+  helper MUST run `git config commit.gpgSign false` after `git
+  init`. Worth a lint check on tempdir-git patterns in tests.
+
+- **The driver's `commit_bookkeeping` step is itself subject to
+  the same signing flake.** During FEAT-2026-0017/T01 cycle 2,
+  after the spinning-escalation, the driver tried to commit
+  the blocked-status marker and crashed with the same exit 128
+  signing failure — losing the audit trail commit. Rule: every
+  driver `git commit` call site is a hidden subprocess-signing
+  failure mode; the driver should detect signing is enabled and
+  warn (or set `commit.gpgsign=false` for its own commits).
+
+- **Opus 4.7 has a verdict-flip blind-spot for close-WUs.**
+  Three consecutive attempts of FEAT-2026-0017/G1-CLOSE
+  produced the bulky deliverables (RETROSPECTIVE.md, LEARNINGS
+  append) every time but consistently failed to flip the
+  one-line `verdict: not_set` frontmatter field, even with
+  explicit retry feedback ("verdict 'not_set' absent or not in
+  VERDICT_VALUES"). Likely cause: WU-body's "set verdict ONLY
+  when X AND Y AND Z confirmed" caution overrides the terse
+  retry signal; model stays neutral rather than commit.
+  Workaround: operator finishes manually. Rule (provisional,
+  needs deep-analysis): close-WU bodies should not
+  over-condition the verdict-flip directive; consider promoting
+  verdict-flip to a separate single-instruction step OR
+  auto-deriving verdict from the RETROSPECTIVE.md's
+  "Feature-arc verdict" section content. Tagged for
+  deep-analysis session.
+
+- **Uncommitted re-arm edits get reset.** Operator's first
+  re-arm of T01 (status: blocked_human → pending) was not
+  committed; the driver's `reset_preserving_events` on the
+  next failed attempt wiped the re-arm via `git reset --hard
+  head_before`. Cost: a full dispatch cycle that reproduced
+  the original hollow-pass state. Rule: every operator-side
+  re-arm via `/unblock-wu` (or manual frontmatter edit) MUST
+  commit before re-dispatch. Worth building into the
+  `/unblock-wu` skill as a mandatory step.
+
+- **Full-feature cost can run 10× over plan when dogfood
+  surfaces compound bugs.** FEAT-2026-0017 planned cost $3.20;
+  actual $39.37 (12.3× overrun). All overspend on cycles where
+  agent worked correctly but verify-gates failed for reasons
+  outside WU stated scope (pre-existing repo bugs surfaced by
+  the new feature's surface). Rule: planning-phase cost
+  estimates should include a "first-of-its-kind dogfood
+  multiplier" (typical 5-15×) when the feature introduces a new
+  contract no prior feature has exercised end-to-end.

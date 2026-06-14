@@ -3,11 +3,11 @@ id: FEAT-2026-0017/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: blocked_human
-attempts: 0
+status: done
+attempts: 10
 planned_cost_usd: 1.20
 oracle_env: macos_local
-verdict: not_set
+verdict: met
 prior_attempts:
   - attempt: 1
     outcome: blocked_human
@@ -19,11 +19,21 @@ prior_attempts:
     outcome: blocked_pre_existing_methodology_bug
     duration_seconds: 839.536
     cost_usd: 4.97415
-    notes: "Spun on assert_doc_or_roadmap_diff guard requiring docs/ or roadmap.md touch in squash, but WU body forbids roadmap.md edit (FEAT-2026-0015/T06 consolidated driver-side) and scaffold has no docs/. T07 guard contract contradicts T06 consolidation. Hygiene-fix applied: guard now also accepts .specfuse/LEARNINGS.md and RETROSPECTIVE.md (the real close-ceremony documentation deliverables). 30 closing-deliverable guard tests still OK. Re-armed."
-duration_seconds: 705.545
-cost_usd: 4.700944
-input_tokens: 82
-output_tokens: 42858
+    notes: "Spun on assert_doc_or_roadmap_diff guard requiring docs/ or roadmap.md touch in squash, but WU body forbids roadmap.md edit (FEAT-2026-0015/T06 consolidated driver-side) and scaffold has no docs/. T07 guard contract contradicts T06 consolidation. Hygiene-fix applied: guard now also accepts .specfuse/LEARNINGS.md and RETROSPECTIVE.md."
+  - attempts: 3
+    outcome: hollow_pass_via_diff_bypass
+    duration_seconds: 705.545
+    cost_usd: 4.700944
+    notes: "Attempts 1+2 failed assert_verdict_well_formed. Attempt 3 passed via the diff-only-touches-wu bypass in assert_closing_deliverables (loop.py:1465-1468) without producing RETROSPECTIVE.md or LEARNINGS append. Driver flagged inconsistency. Hollow squash reset; bypass removed in commit 6084a89 with regression test."
+  - attempts: 3
+    outcome: blocked_opus_verdict_blindspot
+    duration_seconds: 715.0
+    cost_usd: 4.701
+    notes: "With bypass removed, agent satisfied retrospective + learnings + doc-diff every attempt but consistently failed to flip verdict: not_set despite explicit retry feedback (3 retries with identical failure_note: 'verdict not_set absent or not in VERDICT_VALUES'). Model-level blind-spot; logged for deep-analysis. Operator finished close manually."
+duration_seconds: 0
+cost_usd: 0
+input_tokens: 0
+output_tokens: 0
 ---
 
 # Gate 1 close — terminal close ceremony (NEW contract; recursive dogfood)

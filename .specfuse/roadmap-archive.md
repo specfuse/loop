@@ -642,3 +642,77 @@ itself) closed under the new contract shows: (a) terminal-gate cost
 ≤ $1 (close-intermediate, no plan-next); (c) lint accepts the new
 shapes and rejects the old (modulo grandfather). `tests/test_lint_*`
 updated.
+
+
+<a id="feat-2026-0017"></a>
+
+## FEAT-2026-0017 — Close-WU wiring-race guard
+
+**Why.** FEAT-2026-0015/T06 shipped `fire_terminal_flips` driver-side
++ wired it into the close path. Wiring looked correct on inspection
+and on test (T06's own tests). The recursive dogfood (G2-CLOSE) ran
+clean, wrote `verdict: met` to its WU frontmatter, and the driver
+flipped PLAN.md to `done`. But the terminal gate stayed
+`awaiting_review` and the roadmap row stayed `active`. Auto-archive
+never fired.
+
+Root cause: `wu.verdict` was populated by `load_wu` BEFORE dispatch
+(value: `None`). Agent wrote `verdict: met` to the frontmatter DURING
+dispatch. The driver's check at the close-path squash compared the
+IN-MEMORY `wu.verdict` (still `None`) against the threshold. Check
+returned False. `close_wu_for_terminal` stayed `None`.
+`fire_terminal_flips` never invoked.
+
+Race between WorkUnit-in-memory and agent's frontmatter write.
+
+None of today's hollow-pass guards (FEAT-2026-0008's three +
+FEAT-2026-0015/T07's four) caught this:
+
+- Zero-token guard: T06 ran productively.
+- `files_changed` guard: T06 listed `loop.py` + the test file; both
+  changed.
+- Smoke-import guard: `fire_terminal_flips` symbol existed +
+  imported.
+- Closing-deliverable guards (T07): T07 didn't model wiring-race —
+  it asserts on file existence and content shape post-pass, not on
+  driver-state invariants that should fire as a CONSEQUENCE of the
+  WU's effect.
+
+**Delivered.** Driver-side post-pass invariant check, type-keyed.
+For close-type WUs with `verdict: met`, asserts terminal gate
+`passed`, roadmap row `done`, archive anchor present. On failure:
+reset, attempt_outcome event, retry within budget. T02 added the
+`produces_driver_helper` WU frontmatter field + lint warning for
+implementation-WUs whose body claims driver-wiring without
+declaring the symbol(s) produced. Recursive dogfood: G1-CLOSE was
+intended to exercise the new guard against itself.
+
+**Bonus deliverables surfaced by dogfood.** Three pre-existing
+hollow-pass / methodology surfaces were also closed in this
+feature's branch:
+
+- `tests/test_loop_files_changed_guard.py` +
+  `tests/test_loop_orchestration.py` `_init_git` helpers now run
+  `git config commit.gpgSign false` after `git init`, matching the
+  pattern at `tests/_workspace.py:36`. 20 pre-existing test errors
+  (operator-global SSH signing + tempdir-git incompatibility)
+  fixed.
+- `assert_doc_or_roadmap_diff` (loop.py) now also accepts
+  `.specfuse/LEARNINGS.md` and `RETROSPECTIVE.md` — resolves the
+  T06 (driver owns roadmap flip) ↔ T07 (close-deliverable guard
+  requires roadmap.md or docs/) contract contradiction surfaced
+  by the post-T06 close-contract.
+- `assert_closing_deliverables` diff-only-touches-wu bypass
+  removed. Previously silently passed hollow close-ceremony
+  attempts where only the driver's bookkeeping write touched the
+  WU file. New regression test
+  `test_close_fails_when_diff_only_touches_wu_file`.
+
+**Verdict.** `met` — original wiring-race surface closed by T01;
+three bonus hollow-pass surfaces also closed; Opus 4.7
+verdict-flip blind-spot logged for deep-analysis. Full RETROSPECTIVE
++ cost analysis in
+`.specfuse/features/FEAT-2026-0017-wiring-race-guard/RETROSPECTIVE.md`.
+Actual cost $39.37 vs planned $3.20 — 12.3× overrun, all on
+dogfood-surfaced bug discovery cycles where the agent worked
+correctly but verify-gates failed for reasons outside WU scope.

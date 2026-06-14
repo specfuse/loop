@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: passed
 ---
 
 # Gate 1 — Post-pass invariant guard + helper-declaration field
