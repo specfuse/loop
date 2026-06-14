@@ -1,7 +1,7 @@
 ---
 gate: 2
 status: open
-cost_budget_usd: 9.00
+cost_budget_usd: 16.00  # raised from 9.00 — gate 1 ran 2.14× plan; gate 2 driver-wiring (xhigh × 2 + medium) likely similar
 ---
 
 # Gate 2 — Driver wiring + stub retro + force-full-close (drafted by G1-PLAN)
