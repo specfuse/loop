@@ -2,11 +2,15 @@
 id: FEAT-2026-0018/T11H
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 0.80
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 1625.042
+cost_usd: 3.647896
+input_tokens: 105
+output_tokens: 68376
 ---
 
 # Hygiene: relocate T04 terminal auto-close wiring into the per-WU dispatch loop

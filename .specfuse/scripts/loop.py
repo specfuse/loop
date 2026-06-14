@@ -1938,6 +1938,7 @@ def run(
                     done_ids.add(ref["id"])
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
+        _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
 
         while True:
             pending = ready(units, done_ids)
@@ -2012,6 +2013,41 @@ def run(
                             "override": True,
                         }
                     )])
+
+                # FEAT-2026-0018/T11H — terminal auto-close branch (relocated from post-loop)
+                # Guard wu.verdict is None: only attempt auto-close for WUs that have
+                # not yet been dispatched (no verdict written). WUs with a pre-existing
+                # verdict (e.g. met_locally from a prior attempt) fall through to
+                # normal dispatch so their verdict semantics are honoured.
+                if (wu.type == "close" and gate is gates[-1]
+                        and not _override_active and wu.verdict is None):
+                    _auto_closed, _decision = maybe_auto_close_terminal(
+                        feature_dir, feature_id, gate, gates,
+                        events_path, wu, repo_root=REPO_ROOT,
+                    )
+                    if _auto_closed:
+                        commit_bookkeeping(
+                            [feature_dir / "RETROSPECTIVE.md",
+                             wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} auto-closed "
+                            f"(predicate=v1)\n\nFeature: {feature_id}",
+                        )
+                        # Terminal flips fire in post-loop after set_gate(awaiting_review)
+                        _terminal_auto_closed_wu = wu
+                        done_ids.add(wu.wu_id)
+                        continue
+                elif (wu.type == "close" and gate is gates[-1]
+                        and _override_active and wu.verdict is None):
+                    flush_events(events_path, [build_event(
+                        "auto_close_decision", wu.wu_id, {
+                            "gate": gate.number,
+                            "auto": False,
+                            "reasons": [_override_reason],
+                            "predicate_version": "v1",
+                            "override": True,
+                        }
+                    )])
+                    # Fall through to existing close-WU dispatch path
 
                 head_before = git("rev-parse", "HEAD")
                 backend.set_wu(wu, "status", "in_progress")
@@ -2304,39 +2340,16 @@ def run(
             [gate.file, events_path],
             f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
         )
-        # FEAT-2026-0018/T04 — terminal auto-close branch
         is_terminal_gate = gate is gates[-1]
-        auto_closed = False
-        if is_terminal_gate and close_wu_for_terminal is not None and not _override_active:
-            auto_closed, decision = maybe_auto_close_terminal(
-                feature_dir, feature_id, gate, gates,
-                events_path, close_wu_for_terminal, repo_root=REPO_ROOT,
+        # FEAT-2026-0018/T11H: in-loop auto-close sets _terminal_auto_closed_wu;
+        # fire terminal flips here after gate is at awaiting_review.
+        if _terminal_auto_closed_wu is not None:
+            rc = _fire_and_verify_terminal_flips(
+                _terminal_auto_closed_wu, feature_dir, events_path, feature_id,
             )
-            if auto_closed:
-                commit_bookkeeping(
-                    [feature_dir / "RETROSPECTIVE.md",
-                     close_wu_for_terminal.file,
-                     events_path],
-                    f"chore(loop): {close_wu_for_terminal.wu_id} "
-                    f"auto-closed (predicate=v1)\n\n"
-                    f"Feature: {feature_id}",
-                )
-                rc = _fire_and_verify_terminal_flips(
-                    close_wu_for_terminal, feature_dir, events_path, feature_id,
-                )
-                if rc:
-                    return rc
-        elif is_terminal_gate and close_wu_for_terminal is not None and _override_active:
-            flush_events(events_path, [build_event(
-                "auto_close_decision", close_wu_for_terminal.wu_id, {
-                    "gate": gate.number,
-                    "auto": False,
-                    "reasons": [_override_reason],
-                    "predicate_version": "v1",
-                    "override": True,
-                }
-            )])
-        if close_wu_for_terminal is not None and not auto_closed:
+            if rc:
+                return rc
+        elif close_wu_for_terminal is not None:
             # Post-pass driver-state invariant guard (FEAT-2026-0017/T01):
             # fires AFTER fire_terminal_flips so the side-effect checks (gate
             # `passed`, roadmap row `done`, archive anchor) observe the flips.
