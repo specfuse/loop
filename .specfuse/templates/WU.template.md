@@ -77,6 +77,16 @@ Frontmatter notes (single-repo):
   this unit's acceptance depends on existing and behaving correctly. Empty list
   or omitted for units that do not depend on generated code. Authoring this
   field at plan time makes the dependency reviewable before dispatch.
+- `produces_driver_helper` — OPTIONAL. A string or list of strings naming the
+  symbol(s) this WU adds or materially modifies in the driver (`loop.py`,
+  `lint_plan.py`, or adjacent scripts). Recommended for any `implementation` WU
+  whose body mentions driver-wiring keywords (`loop.py`, `MODEL_BY_TYPE`,
+  `fire_terminal_flips`, `squash_commit`, etc.). Lint emits a WARN when an
+  `implementation` WU mentions those keywords but this field is absent or empty —
+  allowing a reviewer to tell at a glance what the WU produces without reading
+  the full body. Authors set it at draft/arm time. Example:
+  `produces_driver_helper: ["assert_terminal_flips_fired"]` or as a plain string
+  `produces_driver_helper: detect_driver_wiring`. See FEAT-2026-0017.
 - `oracle_env` — OPTIONAL. The environment in which the WU's verifying oracle
   runs. Four accepted forms:
   - `macos_local` — developer macOS shell (APFS, BSD utils).
