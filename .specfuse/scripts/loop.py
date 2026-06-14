@@ -457,6 +457,27 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     return failure_class, "unknown"
 
 
+def detect_spinning_signature_repeat(
+    current: tuple[str | None, str | None],
+    prior: tuple[str | None, str | None] | None,
+) -> bool:
+    """Return True iff the same (failure_class, failure_signature) repeats.
+
+    Returns False when prior is None (first failure — nothing to compare).
+    Returns False when either element of current is None.
+    Returns False when current or prior is the no_gate_marker sentinel to
+    avoid false-positive halts on parser-opaque failures (AC4).
+    """
+    _SENTINEL = ("other", "no_gate_marker")
+    if prior is None:
+        return False
+    if current[0] is None or current[1] is None:
+        return False
+    if current == _SENTINEL or prior == _SENTINEL:
+        return False
+    return current == prior
+
+
 def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     """Return the last max_chars of failure-relevant lines from gate stdout.
 
@@ -2381,6 +2402,7 @@ def run(
                              "duration_seconds": 0.0}
 
                 failure_note = None
+                prior_failure_signature: tuple[str | None, str | None] | None = None
                 for attempt in range(1, MAX_ATTEMPTS + 1):
                     backend.set_wu(wu, "attempts", attempt)
                     print(f"   [{time.strftime('%H:%M:%S')}] attempt "
@@ -2617,6 +2639,31 @@ def run(
                         agent_status="complete",
                         agent_blocked_reason=None,
                     ))
+                    # T04: halt early when same (class, signature) repeats.
+                    if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                        wu_events.append(build_event("human_escalation", wu.wu_id, {
+                            "reason": "spinning_signature_repeat",
+                            "failure_class": _fc,
+                            "failure_signature": _fs,
+                            "attempts": attempt,
+                            "attempts_usage": attempts_usage,
+                        }))
+                        reset_preserving_events(head_before, events_path)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(spinning_signature_repeat, attempt {attempt})"
+                            f"\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   BLOCKED — spinning signature repeat at "
+                              f"attempt {attempt}/{MAX_ATTEMPTS}")
+                        blocked = True
+                        break
+                    if (_fc, _fs) != ("other", "no_gate_marker"):
+                        prior_failure_signature = (_fc, _fs)
                     flush_events(events_path, wu_events)
                     wu_events.clear()
                     reset_preserving_events(head_before, events_path)

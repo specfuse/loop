@@ -2,12 +2,16 @@
 id: FEAT-2026-0016/T04
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 generated_surfaces: []
 produces_driver_helper:
   - detect_spinning_signature_repeat
+duration_seconds: 340.285
+cost_usd: 0.762675
+input_tokens: 26
+output_tokens: 13391
 ---
 
 # Spinning-detector active driver hook on repeated `failure_signature`

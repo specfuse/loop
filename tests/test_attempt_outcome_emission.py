@@ -400,5 +400,49 @@ class TestCumulativeFoldOnRearm(unittest.TestCase):
         self.assertIn("reason", payload)
 
 
+# --------------------------------------------------------------------------- #
+# TestDetectSpinningSignatureRepeat                                            #
+# --------------------------------------------------------------------------- #
+
+
+class TestDetectSpinningSignatureRepeat(unittest.TestCase):
+
+    def test_detect_spinning_signature_repeat_true_on_match(self):
+        result = loop.detect_spinning_signature_repeat(
+            ("tests", "test_foo"), ("tests", "test_foo"),
+        )
+        self.assertTrue(result)
+
+    def test_detect_spinning_signature_repeat_false_on_none_prior(self):
+        result = loop.detect_spinning_signature_repeat(
+            ("tests", "test_foo"), None,
+        )
+        self.assertFalse(result)
+
+    def test_detect_spinning_signature_repeat_false_on_null_element(self):
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                (None, "test_foo"), ("tests", "test_foo"),
+            )
+        )
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                ("tests", None), ("tests", "test_foo"),
+            )
+        )
+
+    def test_detect_spinning_signature_repeat_false_on_no_gate_marker_current(self):
+        result = loop.detect_spinning_signature_repeat(
+            ("other", "no_gate_marker"), ("tests", "test_foo"),
+        )
+        self.assertFalse(result)
+
+    def test_detect_spinning_signature_repeat_false_on_no_gate_marker_prior(self):
+        result = loop.detect_spinning_signature_repeat(
+            ("tests", "test_foo"), ("other", "no_gate_marker"),
+        )
+        self.assertFalse(result)
+
+
 if __name__ == "__main__":
     unittest.main()
