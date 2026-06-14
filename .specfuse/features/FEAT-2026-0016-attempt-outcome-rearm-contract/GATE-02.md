@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: open
+status: awaiting_review
 cost_budget_usd: 12.00  # raised at arm time from 9.50 — gate-1 ratio 1.62× × $7.40 plan ≈ $12; T04 spec revised with no_gate_marker defense per GATE-02-REVIEW open-verification #5
 ---
 
