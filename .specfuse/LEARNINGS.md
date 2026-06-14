@@ -1247,3 +1247,41 @@ promoted here.
   pre-dispatch ordering) — the hygiene WU's own cost is what
   determines whether the gate's recursive-dogfood verdict
   agrees with itself across the fix boundary.
+
+- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Closing-deliverable WUs
+  whose acceptance criteria check "is this new file in the diff?"
+  must combine `git diff --name-only HEAD` with
+  `git ls-files --others --exclude-standard`. `git diff` alone
+  omits untracked files, so the AC fails spuriously on the very
+  file the WU just created. T03's AC7e shipped with the broken
+  single-command form and blocked correctly on first attempt; the
+  agent diagnosed it with a direct LEARNINGS cite to
+  `[driver/files_changed-guard]`. The same broken pattern existed
+  in this WU's AC6 and was fixed pre-emptively (commit 3f77530).
+  Generalizing rule: every closing-deliverable WU spec that
+  produces a NEW file at the feature-folder root must use the
+  combined `{ git diff --name-only HEAD; git ls-files --others
+  --exclude-standard; }` form in its existence-check AC.
+  Promoting to authoring-work-units §X (closing-deliverable AC
+  patterns) is a candidate gate-3 docs task.
+
+- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Standardized event
+  payload contracts deserve a single emission helper, and the
+  feature spec that introduces the contract carries a structural
+  bootstrap gap that the retrospective must call out by name.
+  T01 introduced `emit_attempt_outcome(...)` and migrated four
+  legacy emission sites + added three new ones in one attempt;
+  the spec's §10 helper-duplication pre-flight grep caught zero
+  collisions, validating the "one helper, all sites" pattern.
+  But because the driver runs the OLD code while dispatching the
+  WU that ships the NEW code, T01's own events.jsonl lines lack
+  the new payload fields — the first WU whose events carry the
+  full v1 payload is T03 (the NEXT WU after T01 lands). Rule:
+  any feature whose gate 1 ships an event-payload contract
+  extension must (a) name the bootstrap gap explicitly in the
+  WU spec ("this WU's own events lack the new fields, by
+  design"), and (b) reconcile post-hoc in the retrospective by
+  pointing to the first WU whose events carry the new shape.
+  This pattern was first documented in `[FEAT-2026-0006/G1-CLOSE]`
+  and is now confirmed across two features — promote to a
+  drafting-time checklist item.
