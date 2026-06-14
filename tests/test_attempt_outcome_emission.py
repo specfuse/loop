@@ -444,5 +444,172 @@ class TestDetectSpinningSignatureRepeat(unittest.TestCase):
         self.assertFalse(result)
 
 
+# --------------------------------------------------------------------------- #
+# TestSummarizeAttemptFailureClasses                                           #
+# --------------------------------------------------------------------------- #
+
+
+def _make_attempt_outcome_event(
+    wu_id: str,
+    outcome: str,
+    failure_class: str | None = None,
+    failure_signature: str | None = None,
+) -> dict:
+    return {
+        "event_type": "attempt_outcome",
+        "correlation_id": wu_id,
+        "timestamp": "2026-01-01T00:00:00+00:00",
+        "source": "driver",
+        "source_version": "test",
+        "payload": {
+            "attempt": 1,
+            "outcome": outcome,
+            "failure_class": failure_class,
+            "failure_signature": failure_signature,
+        },
+    }
+
+
+def _write_events(path: Path, events: list) -> None:
+    import json as _json
+    with path.open("w") as fh:
+        for evt in events:
+            fh.write(_json.dumps(evt) + "\n")
+
+
+class TestSummarizeAttemptFailureClasses(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._root = Path(self._tmp.name)
+        self._events_path = self._root / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_summarize_failure_classes_empty_when_all_passed(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "passed"),
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T02", "passed"),
+        ])
+        result = loop.summarize_attempt_failure_classes(self._root)
+        self.assertEqual(result, loop._NO_FAILURES_SENTINEL)
+
+    def test_summarize_failure_classes_groups_by_class(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_foo_bar"),
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_foo_bar"),
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_baz"),
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T02", "failed", "lint", "E501"),
+        ])
+        result = loop.summarize_attempt_failure_classes(self._root)
+        self.assertIn("### Failure-class breakdown", result)
+        self.assertIn("| tests | 3 | test_foo_bar |", result)
+        self.assertIn("| lint | 1 | E501 |", result)
+        self.assertIn("| **total** | **4** | — |", result)
+        # tests row must appear before lint row (count desc)
+        self.assertLess(result.index("| tests |"), result.index("| lint |"))
+
+    def test_summarize_failure_classes_filters_by_gate(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_a"),
+            _make_attempt_outcome_event("FEAT-2026-9999/G2-T01", "failed", "lint", "E501"),
+        ])
+        result = loop.summarize_attempt_failure_classes(self._root, gate_n=2)
+        self.assertNotIn("tests", result)
+        self.assertIn("| lint | 1 | E501 |", result)
+
+    def test_summarize_failure_classes_no_events_file_returns_sentinel(self):
+        result = loop.summarize_attempt_failure_classes(self._root)
+        self.assertEqual(result, loop._NO_FAILURES_SENTINEL)
+
+
+# --------------------------------------------------------------------------- #
+# TestAssertFailureClassBreakdownWhenFailuresPresent                           #
+# --------------------------------------------------------------------------- #
+
+
+def _make_close_wu(wu_file: Path, wu_id: str = "FEAT-2026-9999/G1-CLOSE") -> "loop.WorkUnit":
+    wu_file.write_text(
+        f"---\nid: {wu_id}\ntype: close\nmodel: sonnet\nstatus: pending\nattempts: 0\n"
+        f"verdict: met\n---\n\n# Close WU\n"
+    )
+    return loop.WorkUnit(
+        wu_id=wu_id,
+        file=wu_file,
+        depends_on=[],
+        type="close",
+        model="sonnet",
+        effort="medium",
+        status="pending",
+        attempts=0,
+        title="Close WU",
+        body="",
+        verdict="met",
+    )
+
+
+class TestAssertFailureClassBreakdownWhenFailuresPresent(unittest.TestCase):
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self._root = Path(self._tmp.name)
+        self._wu_file = self._root / "G1-CLOSE.md"
+        self._wu = _make_close_wu(self._wu_file)
+        self._retro = self._root / "RETROSPECTIVE.md"
+        self._events_path = self._root / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_guard_passes_when_no_failures(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "passed"),
+        ])
+        self._retro.write_text("## Cost analysis\n\nsome content\n")
+        ok, reason = loop.assert_failure_class_breakdown_when_failures_present(
+            self._wu, self._root, self._root, "HEAD",
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "")
+
+    def test_guard_fails_when_failures_present_but_heading_absent(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_foo"),
+        ])
+        self._retro.write_text("## Cost analysis\n\nsome content\n")
+        ok, reason = loop.assert_failure_class_breakdown_when_failures_present(
+            self._wu, self._root, self._root, "HEAD",
+        )
+        self.assertFalse(ok)
+        self.assertIn("assert_failure_class_breakdown_when_failures_present", reason)
+        self.assertIn("1", reason)
+        self.assertIn("### Failure-class breakdown", reason)
+
+    def test_guard_passes_when_failures_present_and_heading_present(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_foo"),
+        ])
+        self._retro.write_text(
+            "## Cost analysis\n\nsome content\n\n### Failure-class breakdown\n\n| ... |\n"
+        )
+        ok, reason = loop.assert_failure_class_breakdown_when_failures_present(
+            self._wu, self._root, self._root, "HEAD",
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "")
+
+    def test_guard_passes_when_retro_absent(self):
+        _write_events(self._events_path, [
+            _make_attempt_outcome_event("FEAT-2026-9999/G1-T01", "failed", "tests", "test_foo"),
+        ])
+        # No RETROSPECTIVE.md written
+        ok, reason = loop.assert_failure_class_breakdown_when_failures_present(
+            self._wu, self._root, self._root, "HEAD",
+        )
+        self.assertTrue(ok)
+        self.assertEqual(reason, "")
+
+
 if __name__ == "__main__":
     unittest.main()

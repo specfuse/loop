@@ -1894,6 +1894,146 @@ def assert_cost_analysis_section_when_met(
     )
 
 
+_NO_FAILURES_SENTINEL = "### Failure-class breakdown\n\n(no non-passing attempts in scope)\n"
+
+
+def summarize_attempt_failure_classes(
+    feature_dir: Path,
+    gate_n: int | None = None,
+) -> str:
+    """Render a '### Failure-class breakdown' markdown table from events.jsonl.
+
+    Reads attempt_outcome events whose outcome != 'passed'.  When gate_n is
+    provided, restricts to events whose correlation_id belongs to that gate
+    (resolved via _gate_number_from_wu_id).  Returns _NO_FAILURES_SENTINEL when
+    no non-passing attempts match the filter.
+
+    Pure function — reads events.jsonl; no writes, no side effects.
+    Malformed JSONL lines are skipped (legacy-event tolerance, AC5).
+    """
+    events_path = feature_dir / "events.jsonl"
+    if not events_path.exists():
+        return _NO_FAILURES_SENTINEL
+
+    non_passing: list[dict] = []
+    for raw in events_path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            evt = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if evt.get("event_type") != "attempt_outcome":
+            continue
+        payload = evt.get("payload") or {}
+        if payload.get("outcome") == "passed":
+            continue
+        if gate_n is not None:
+            cid = evt.get("correlation_id", "")
+            if _gate_number_from_wu_id(cid) != gate_n:
+                continue
+        non_passing.append(payload)
+
+    if not non_passing:
+        return _NO_FAILURES_SENTINEL
+
+    # Group by failure_class; collect signatures for dominant-sig resolution.
+    class_counts: dict[str, int] = {}
+    class_signatures: dict[str, list[str]] = {}
+    for p in non_passing:
+        fc = str(p.get("failure_class") or "null")
+        sig = str(p.get("failure_signature") or "")
+        class_counts[fc] = class_counts.get(fc, 0) + 1
+        class_signatures.setdefault(fc, []).append(sig)
+
+    def _dominant(sigs: list[str]) -> str:
+        freq: dict[str, int] = {}
+        for s in sigs:
+            freq[s] = freq.get(s, 0) + 1
+        return max(freq, key=lambda k: (freq[k], -sigs.index(k)))
+
+    # Sort: count descending, class ascending for ties.
+    rows = sorted(
+        class_counts.items(),
+        key=lambda item: (-item[1], item[0]),
+    )
+
+    lines = [
+        "### Failure-class breakdown",
+        "",
+        "| failure_class | non-passed attempts | dominant signature |",
+        "|---------------|---------------------|--------------------|",
+    ]
+    total = 0
+    for fc, count in rows:
+        dom = _dominant(class_signatures[fc])
+        lines.append(f"| {fc} | {count} | {dom} |")
+        total += count
+    lines.append(f"| **total** | **{total}** | — |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def assert_failure_class_breakdown_when_failures_present(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-f / close-intermediate-d) RETROSPECTIVE.md has '### Failure-class breakdown'
+    when non-passing attempt_outcome events exist for the gate.
+
+    Returns (True, "") when:
+    - RETROSPECTIVE.md is absent (assert_retrospective_exists fires first for 'close';
+      assert_retrospective_gate_section fires first for 'close-intermediate').
+    - No non-passing attempts exist in events.jsonl for the gate.
+    - The heading is present.
+
+    Returns (False, reason) when non-passing attempts exist but the heading is absent.
+    """
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists():
+        return True, ""
+
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    summary = summarize_attempt_failure_classes(feature_dir, gate_n)
+
+    if summary == _NO_FAILURES_SENTINEL:
+        return True, ""
+
+    if re.search(r"^#{3} Failure-class breakdown\b", retro.read_text(), re.MULTILINE):
+        return True, ""
+
+    # Count non-passing attempts for the error message.
+    events_path = feature_dir / "events.jsonl"
+    count = 0
+    if events_path.exists():
+        for raw in events_path.read_text(encoding="utf-8").splitlines():
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                evt = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if evt.get("event_type") != "attempt_outcome":
+                continue
+            payload = evt.get("payload") or {}
+            if payload.get("outcome") == "passed":
+                continue
+            if gate_n is not None:
+                cid = evt.get("correlation_id", "")
+                if _gate_number_from_wu_id(cid) != gate_n:
+                    continue
+            count += 1
+
+    gate_label = f"gate {gate_n}" if gate_n is not None else "all gates"
+    return (
+        False,
+        f"assert_failure_class_breakdown_when_failures_present: {count} "
+        f"non-passing attempt(s) in {gate_label} but '### Failure-class breakdown' "
+        f"subsection absent from RETROSPECTIVE.md",
+    )
+
+
 def assert_retrospective_gate_section(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -1988,11 +2128,13 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_doc_or_roadmap_diff,
         assert_verdict_well_formed,
         assert_cost_analysis_section_when_met,
+        assert_failure_class_breakdown_when_failures_present,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,
         assert_learnings_appended_or_noop,
         assert_doc_or_roadmap_diff,
+        assert_failure_class_breakdown_when_failures_present,
     ],
     "plan-next": [
         assert_gate_review_exists,

@@ -2,13 +2,17 @@
 id: FEAT-2026-0016/T07
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 generated_surfaces: []
 produces_driver_helper:
   - summarize_attempt_failure_classes
   - assert_failure_class_breakdown_when_failures_present
+duration_seconds: 388.941
+cost_usd: 1.11728
+input_tokens: 43
+output_tokens: 15757
 ---
 
 # Close-ceremony `## Cost analysis` — `### Failure-class breakdown` subsection
