@@ -2,11 +2,15 @@
 id: FEAT-2026-0016/T08
 type: implementation
 effort: medium
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 1.20
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 189.821
+cost_usd: 0.403617
+input_tokens: 18
+output_tokens: 8621
 ---
 
 # `/learnings-suggest` skill — cluster `failure_signature` across features, surface candidate LEARNINGS entries
