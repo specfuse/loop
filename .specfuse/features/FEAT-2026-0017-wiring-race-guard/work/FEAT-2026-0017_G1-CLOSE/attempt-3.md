@@ -1,0 +1,1 @@
+assert_verdict_well_formed: verdict 'not_set' absent or not in VERDICT_VALUES (['met', 'met_locally', 'not_met', 'partially_met'])

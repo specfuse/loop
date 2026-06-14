@@ -272,6 +272,13 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                             "roadmap"], check=True)
 
             def fake_dispatch(wu, failure_note, cost_tracking=True):
+                # Simulate a real close-WU agent: write RETROSPECTIVE.md with
+                # the "nothing generalizes" sentinel so closing-deliverable
+                # assertions pass. Required since the diff-only-touches-wu
+                # bypass was removed (FEAT-2026-0017/G1-CLOSE-attempt-3 fix).
+                (fdir / "RETROSPECTIVE.md").write_text(
+                    "# Retrospective\n\nNothing generalizes from this gate.\n"
+                )
                 return ("", {"input_tokens": 10, "output_tokens": 5, "cost_usd": 0.001})
 
             def fake_verify(wu, feature_dir, cfg=None):

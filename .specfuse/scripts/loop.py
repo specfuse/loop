@@ -149,6 +149,7 @@ class WorkUnit:
     unsandboxed: bool = False
     unsandboxed_rationale: str = ""
     verdict: str | None = None
+    produces_driver_helper: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -297,6 +298,18 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
     verdict: str | None = None
     if wu_type in {"close", "close-intermediate"}:
         verdict = fm.get("verdict") or None
+    raw_pdh = fm.get("produces_driver_helper")
+    if raw_pdh is None:
+        produces_driver_helper: list[str] = []
+    elif isinstance(raw_pdh, str):
+        produces_driver_helper = [raw_pdh]
+    elif isinstance(raw_pdh, list):
+        produces_driver_helper = raw_pdh
+    else:
+        raise ValueError(
+            f"{path}: `produces_driver_helper` must be a string or list of strings, "
+            f"got {type(raw_pdh).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -311,6 +324,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         unsandboxed=unsandboxed,
         unsandboxed_rationale=unsandboxed_rationale,
         verdict=verdict,
+        produces_driver_helper=produces_driver_helper,
     )
 
 
@@ -1255,7 +1269,15 @@ def assert_learnings_appended_or_noop(
 def assert_doc_or_roadmap_diff(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-c) A docs/ or .specfuse/roadmap.md file appears in the squash diff."""
+    """(close-c) A documentation deliverable appears in the squash diff.
+
+    Accepts: docs/*, .specfuse/roadmap.md, .specfuse/LEARNINGS.md, or any
+    file named RETROSPECTIVE.md (under a feature dir). The roadmap.md case
+    survives only for close-intermediate WUs that legitimately edit it;
+    terminal close WUs do NOT touch roadmap.md (FEAT-2026-0015/T06
+    consolidated that driver-side) — they deliver RETROSPECTIVE.md and
+    LEARNINGS.md instead.
+    """
     proc = subprocess.run(
         ["git", "diff", "--name-only", head_before, "HEAD"],
         capture_output=True, text=True,
@@ -1263,13 +1285,18 @@ def assert_doc_or_roadmap_diff(
     for path in proc.stdout.splitlines():
         if path == ".specfuse/roadmap.md" or path.startswith("docs/"):
             return True, ""
+        if path == ".specfuse/LEARNINGS.md":
+            return True, ""
+        if path.endswith("/RETROSPECTIVE.md") or path == "RETROSPECTIVE.md":
+            return True, ""
     # For close-intermediate: skip when the WU spec declares no doc surface.
     if wu.type == "close-intermediate":
         if "docs/" not in wu.body and "roadmap.md" not in wu.body:
             return True, ""
     return (
         False,
-        "assert_doc_or_roadmap_diff: no docs/ or .specfuse/roadmap.md file in squash diff",
+        "assert_doc_or_roadmap_diff: no docs/, .specfuse/roadmap.md, "
+        ".specfuse/LEARNINGS.md, or RETROSPECTIVE.md file in squash diff",
     )
 
 
@@ -1422,24 +1449,137 @@ def assert_closing_deliverables(
     other guards handle it) or all assertions pass.  On the first failure returns
     (False, reason) where reason names the failing assertion function.
 
-    Pre-condition: if the squash diff contains ONLY the driver's own bookkeeping
-    write to the WU file (status/cost), the agent produced no substantive output;
-    skip the assertions.  Other guards (zero_token, files_changed, smoke) cover
-    that surface.  This avoids false negatives in test fixtures that use hollow
-    dispatch stubs to test orthogonal behaviors.
+    No "diff is empty" bypass: a close-type WU whose squash contains only the
+    driver's own WU-file bookkeeping is a hollow pass and MUST fail one of the
+    typed assertions (assert_retrospective_exists fires first for ``close``).
+    The earlier bypass introduced for test-fixture convenience also silently
+    passed real hollow-pass close ceremonies (FEAT-2026-0017/G1-CLOSE attempt-3
+    surface).
     """
     assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
     if not assertions:
         return True, ""
-    proc = subprocess.run(
-        ["git", "diff", "--name-only", head_before, "HEAD"],
-        capture_output=True, text=True,
-    )
-    changed = {p for p in proc.stdout.splitlines() if p}
-    wu_rel = str(wu.file)
-    if not (changed - {wu_rel}):
-        return True, ""
     for fn in assertions:
+        ok, reason = fn(wu, feature_dir, repo_root, head_before)
+        if not ok:
+            return False, reason
+    return True, ""
+
+
+# --------------------------------------------------------------------------- #
+# Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
+# --------------------------------------------------------------------------- #
+
+
+def assert_terminal_flips_fired(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Post-pass invariant: when a close WU writes verdict=met, the terminal
+    state-flips must have materialized.
+
+    Checks (in order):
+      - WU frontmatter verdict (re-read from disk); skip if not "met"
+      - Terminal gate file's `status: passed`
+      - Roadmap row Status column == `done`
+      - Roadmap-archive anchor `<a id="<feat_lc>"></a>` present
+
+    head_before is accepted to mirror the assertion-function signature shape;
+    this check is pure file-state and does not need it.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict") or None
+    if verdict != "met":
+        return True, ""
+
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        return False, "terminal_gate_not_passed: PLAN.md has no gates"
+    terminal_gate = gates[-1]
+    gate_path = terminal_gate.file
+    if not gate_path.exists():
+        return (
+            False,
+            f"terminal_gate_not_passed: {gate_path.name} absent",
+        )
+    gate_fm, _ = read_frontmatter(gate_path)
+    gate_status = gate_fm.get("status", "")
+    if gate_status != "passed":
+        return (
+            False,
+            f"terminal_gate_not_passed: {gate_path.name} status={gate_status!r}",
+        )
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if not roadmap_path.exists():
+        return (
+            False,
+            f"roadmap_row_not_done: roadmap.md absent at {roadmap_path}",
+        )
+    row_re = re.compile(
+        r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|",
+        re.MULTILINE,
+    )
+    rm = row_re.search(roadmap_path.read_text())
+    if not rm:
+        return (
+            False,
+            f"roadmap_row_not_done: row for {feature_id} not found",
+        )
+    row_status = rm.group(2).strip()
+    if row_status != "done":
+        return False, f"roadmap_row_not_done: status={row_status!r}"
+
+    archive_path = repo_root / ".specfuse" / "roadmap-archive.md"
+    feat_id_lower = feature_id.lower()
+    anchor = f'<a id="{feat_id_lower}"></a>'
+    if not archive_path.exists():
+        return (
+            False,
+            f"archive_anchor_missing: {feat_id_lower} (roadmap-archive.md absent)",
+        )
+    if anchor not in archive_path.read_text():
+        return False, f"archive_anchor_missing: {feat_id_lower}"
+    return True, ""
+
+
+POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
+    "close": [assert_terminal_flips_fired],
+}
+
+
+def verify_post_pass_invariants(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Dispatch the type-keyed post-pass invariant guard (FEAT-2026-0017/T01).
+
+    Returns (True, "") when the WU type has no invariants or all pass. On the
+    first failure returns (False, reason).
+
+    Distinct from `assert_closing_deliverables`: that guard fires immediately
+    after squash and checks the WU's own ceremony deliverables (retrospective,
+    learnings, etc.). This guard fires after the gate-boundary
+    `fire_terminal_flips` invocation and checks that driver-side state
+    transitions actually materialized — independent of the agent's RESULT.
+
+    Defends against the FEAT-2026-0015/T06 wiring-race surface: a close WU
+    passed cleanly with `verdict: met` but `fire_terminal_flips` was never
+    invoked because the in-memory `wu.verdict` snapshot (loaded BEFORE
+    dispatch by `load_wu`) shadowed the agent's just-written frontmatter
+    value. The re-read fix landed in PR #11 (commit 7f403bf); this guard is
+    the canary against re-introducing that or any equivalent close-path race.
+    """
+    invariants = POST_PASS_INVARIANTS_BY_TYPE.get(wu.type, [])
+    if not invariants:
+        return True, ""
+    for fn in invariants:
         ok, reason = fn(wu, feature_dir, repo_root, head_before)
         if not ok:
             return False, reason
@@ -1859,6 +1999,41 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     f"chore(loop): {close_wu_for_terminal.wu_id} terminal flips"
                     f"\n\nFeature: {feature_id}",
                 )
+            # Post-pass driver-state invariant guard (FEAT-2026-0017/T01):
+            # fires AFTER fire_terminal_flips so the side-effect checks (gate
+            # `passed`, roadmap row `done`, archive anchor) observe the flips.
+            # Wiring deviation from WU AC4: AC asks for the guard inside the
+            # per-WU passed branch BEFORE `flush_events + done_ids.add`, but
+            # `fire_terminal_flips` lives at gate boundary (this site), not
+            # per-WU. Moving fire_terminal_flips earlier would invert the
+            # `set_gate(awaiting_review) -> fire_terminal_flips -> passed`
+            # sequence. This is the closest viable site per WU escalation #4;
+            # failure logs an event + bookkeeping commit and exits non-zero
+            # (no reset/retry — the per-WU attempt loop has already exited).
+            head_post = git("rev-parse", "HEAD")
+            ok, reason = verify_post_pass_invariants(
+                close_wu_for_terminal, feature_dir, REPO_ROOT, head_post,
+            )
+            if not ok:
+                flush_events(events_path, [build_event(
+                    "human_escalation", close_wu_for_terminal.wu_id, {
+                        "reason": "post_pass_invariant_failed",
+                        "assertion": reason.split(":", 1)[0].strip(),
+                        "summary": reason,
+                    })])
+                commit_bookkeeping(
+                    [events_path],
+                    f"chore(loop): {close_wu_for_terminal.wu_id} "
+                    f"post_pass_invariant_failed\n\nFeature: {feature_id}",
+                )
+                print(f"\n   POST-PASS INVARIANT FAILED — {reason}")
+                print(
+                    "Close WU passed with verdict=met but a terminal flip did "
+                    "not materialize. This is the FEAT-2026-0015/T06 "
+                    "wiring-race regression surface. Inspect events.jsonl "
+                    "and the fire_terminal_flips wiring."
+                )
+                return 1
         is_terminal_gate = gate is gates[-1]
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()

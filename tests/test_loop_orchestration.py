@@ -63,6 +63,10 @@ def _minimal_git_repo(root: Path) -> None:
     """Init a git repo at `root` with one initial commit."""
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     subprocess.run(
+        ["git", "-C", str(root), "config", "commit.gpgSign", "false"],
+        check=True,
+    )
+    subprocess.run(
         ["git", "-C", str(root), "config", "user.email", "test@example.com"],
         check=True,
     )
