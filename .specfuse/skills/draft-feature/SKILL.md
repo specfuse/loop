@@ -139,6 +139,14 @@ For gate 1 only:
   section body. **Delegate the per-WU craft** to
   [`../authoring-work-units/SKILL.md`](../authoring-work-units/SKILL.md) —
   read its rules and apply them; don't restate them here.
+- **Operator-script trigger.** If a proposed WU emits a committed
+  executable for human operators (a `.sh` script, a helper installed
+  on PATH, a runbook whose body is shell to be copy-pasted), apply
+  `/authoring-work-units` §11: the WU's Acceptance must include
+  `shellcheck` clean, `bash -n` parses, and at least one bats
+  happy-path test with external commands stubbed. Surface this in
+  the proposal so the user can confirm or skip on the
+  pure-markdown-runbook exception.
 - Closing WUs for gate 1 follow the shape decided in step 4:
   - **Gate 1 is non-terminal**: generate 2 closing WUs mechanically —
     `G1-CLOSE-INTERMEDIATE` (file `WU-90-gate-1-close-intermediate.md`,
