@@ -1269,7 +1269,15 @@ def assert_learnings_appended_or_noop(
 def assert_doc_or_roadmap_diff(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-c) A docs/ or .specfuse/roadmap.md file appears in the squash diff."""
+    """(close-c) A documentation deliverable appears in the squash diff.
+
+    Accepts: docs/*, .specfuse/roadmap.md, .specfuse/LEARNINGS.md, or any
+    file named RETROSPECTIVE.md (under a feature dir). The roadmap.md case
+    survives only for close-intermediate WUs that legitimately edit it;
+    terminal close WUs do NOT touch roadmap.md (FEAT-2026-0015/T06
+    consolidated that driver-side) — they deliver RETROSPECTIVE.md and
+    LEARNINGS.md instead.
+    """
     proc = subprocess.run(
         ["git", "diff", "--name-only", head_before, "HEAD"],
         capture_output=True, text=True,
@@ -1277,13 +1285,18 @@ def assert_doc_or_roadmap_diff(
     for path in proc.stdout.splitlines():
         if path == ".specfuse/roadmap.md" or path.startswith("docs/"):
             return True, ""
+        if path == ".specfuse/LEARNINGS.md":
+            return True, ""
+        if path.endswith("/RETROSPECTIVE.md") or path == "RETROSPECTIVE.md":
+            return True, ""
     # For close-intermediate: skip when the WU spec declares no doc surface.
     if wu.type == "close-intermediate":
         if "docs/" not in wu.body and "roadmap.md" not in wu.body:
             return True, ""
     return (
         False,
-        "assert_doc_or_roadmap_diff: no docs/ or .specfuse/roadmap.md file in squash diff",
+        "assert_doc_or_roadmap_diff: no docs/, .specfuse/roadmap.md, "
+        ".specfuse/LEARNINGS.md, or RETROSPECTIVE.md file in squash diff",
     )
 
 

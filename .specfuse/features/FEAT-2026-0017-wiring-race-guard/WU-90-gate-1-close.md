@@ -3,7 +3,7 @@ id: FEAT-2026-0017/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 1.20
 oracle_env: macos_local
@@ -15,10 +15,11 @@ prior_attempts:
     duration_seconds: 87.011
     cost_usd: 0.90931
     notes: "Refused verdict: met because T01 hollow-passed (loop.py unchanged, three declared symbols absent). Existence check per authoring-work-units §9 caught it. Re-armed after T01 escalated to Opus 4.7 with hardened body."
-duration_seconds: 839.536
-cost_usd: 4.97415
-input_tokens: 91
-output_tokens: 48087
+  - attempts: 3
+    outcome: blocked_pre_existing_methodology_bug
+    duration_seconds: 839.536
+    cost_usd: 4.97415
+    notes: "Spun on assert_doc_or_roadmap_diff guard requiring docs/ or roadmap.md touch in squash, but WU body forbids roadmap.md edit (FEAT-2026-0015/T06 consolidated driver-side) and scaffold has no docs/. T07 guard contract contradicts T06 consolidation. Hygiene-fix applied: guard now also accepts .specfuse/LEARNINGS.md and RETROSPECTIVE.md (the real close-ceremony documentation deliverables). 30 closing-deliverable guard tests still OK. Re-armed."
 ---
 
 # Gate 1 close — terminal close ceremony (NEW contract; recursive dogfood)
