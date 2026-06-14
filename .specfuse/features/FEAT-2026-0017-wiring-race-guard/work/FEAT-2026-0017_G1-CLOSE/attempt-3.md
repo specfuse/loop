@@ -1,0 +1,1 @@
+assert_doc_or_roadmap_diff: no docs/ or .specfuse/roadmap.md file in squash diff
