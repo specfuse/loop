@@ -458,27 +458,44 @@ if [[ $DRY_RUN -eq 0 ]]; then
   fi
 fi
 
-# --- lock-file gitignore (both modes) ------------------------------------ #
-# Ensure .specfuse/.loop.lock is never committed in the target repo.
-# This is a targeted ignore of just the lock file — not .specfuse/ itself,
-# which must remain tracked (the driver uses git as its state backend).
-LOCK_IGNORE_LINE=".specfuse/.loop.lock"
+# --- runtime-artifact gitignore (both modes) ----------------------------- #
+# Ignore loop runtime artifacts that should never land in the target repo:
+#   - .specfuse/.loop.lock              process lock from the loop driver
+#   - .specfuse/.scratch-*              scratch dirs from preflight/dry-run
+#   - .specfuse/scripts/__pycache__/    Python bytecode from loop.py imports
+# Targeted ignores only — NOT .specfuse/ itself, which must remain tracked
+# (the driver uses git as its state backend).
+LOOP_IGNORE_LINES=(
+  ".specfuse/.loop.lock"
+  ".specfuse/.scratch-*"
+  ".specfuse/scripts/__pycache__/"
+)
 GITIGNORE_FILE="$TARGET/.gitignore"
+missing_lines=()
+for line in "${LOOP_IGNORE_LINES[@]}"; do
+  if [[ ! -f "$GITIGNORE_FILE" ]] || ! grep -qxF "$line" "$GITIGNORE_FILE" 2>/dev/null; then
+    missing_lines+=("$line")
+  fi
+done
 if [[ $DRY_RUN -eq 1 ]]; then
-  if [[ ! -f "$GITIGNORE_FILE" ]]; then
-    echo "  would create $TARGET/.gitignore containing '$LOCK_IGNORE_LINE'"
-  elif ! grep -qxF "$LOCK_IGNORE_LINE" "$GITIGNORE_FILE" 2>/dev/null; then
-    echo "  would add '$LOCK_IGNORE_LINE' to $TARGET/.gitignore"
+  if [[ ${#missing_lines[@]} -eq 0 ]]; then
+    echo "  $TARGET/.gitignore already has all loop runtime-artifact ignores — left alone"
+  elif [[ ! -f "$GITIGNORE_FILE" ]]; then
+    echo "  would create $TARGET/.gitignore with loop runtime-artifact ignores:"
+    for line in "${missing_lines[@]}"; do echo "    $line"; done
   else
-    echo "  $TARGET/.gitignore already has '$LOCK_IGNORE_LINE' — left alone"
+    echo "  would add to $TARGET/.gitignore:"
+    for line in "${missing_lines[@]}"; do echo "    $line"; done
   fi
 else
-  if [[ ! -f "$GITIGNORE_FILE" ]]; then
-    printf '%s\n' "$LOCK_IGNORE_LINE" > "$GITIGNORE_FILE"
-    echo "Added $LOCK_IGNORE_LINE to $TARGET/.gitignore (created)."
-  elif ! grep -qxF "$LOCK_IGNORE_LINE" "$GITIGNORE_FILE" 2>/dev/null; then
-    printf '\n%s\n' "$LOCK_IGNORE_LINE" >> "$GITIGNORE_FILE"
-    echo "Added $LOCK_IGNORE_LINE to $TARGET/.gitignore."
+  if [[ ${#missing_lines[@]} -gt 0 ]]; then
+    if [[ ! -f "$GITIGNORE_FILE" ]]; then
+      printf '%s\n' "${missing_lines[@]}" > "$GITIGNORE_FILE"
+      echo "Created $TARGET/.gitignore with loop runtime-artifact ignores."
+    else
+      { printf '\n'; printf '%s\n' "${missing_lines[@]}"; } >> "$GITIGNORE_FILE"
+      echo "Added ${#missing_lines[@]} loop runtime-artifact ignore(s) to $TARGET/.gitignore."
+    fi
   fi
 fi
 
