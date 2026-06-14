@@ -2,11 +2,15 @@
 id: FEAT-2026-0016/T06
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 193.916
+cost_usd: 0.401285
+input_tokens: 15
+output_tokens: 8269
 ---
 
 # `/unblock-wu` mandatory re-arm rationale + `re_arm_history` write

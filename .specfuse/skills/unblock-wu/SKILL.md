@@ -82,6 +82,16 @@ being touched.
 
 ### 3. Per-WU re-arm / abandon / skip
 
+> **Write-ordering invariant (BEFORE driver dispatch).** For `r` and
+> `u` choices, the frontmatter write — `status: pending`, `attempts: 0`,
+> incremented `re_arm_count`, and appended `re_arm_history` entry — MUST
+> complete before the operator runs `loop.py`. The driver's
+> `detect_rearm_dispatch` reads `re_arm_count` from disk on the first
+> dispatch of the new cycle; if the write has not landed, the cumulative
+> fold misfires. The "Print the resume command" step (§5) follows this
+> write; do not print the resume command before the frontmatter write is
+> confirmed.
+
 For each candidate, ask:
 
 ```
@@ -89,15 +99,46 @@ Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
   — FEAT-YYYY-NNNN/TNN ?
   attempts: <N>  cost: <$X>  duration: <Ys>
   blocked_reason: "<...>"
-  what changed?  (free text — required for r and u)
+  re-arm rationale (required for r and u — one line):
 ```
 
-- **Re-arm sandboxed (default)** — confirm what changed (free text
-  is the human audit moment; `attempts` reset is the machine audit
-  signal — `events.jsonl` already carries the prior escalation).
-  Flip `status: blocked_human` → `pending`, `attempts: N` →
-  `attempts: 0`. WU dispatches under the normal claude-p sandbox
-  on next run.
+- **Re-arm sandboxed (default)** — prompt the operator for a one-line
+  rationale. If the operator submits an empty string or whitespace-only
+  input, print:
+
+  ```
+  re-arm rationale required — type a one-line reason or choose s/a
+  ```
+
+  and re-prompt the same WU. Do NOT proceed to any frontmatter write
+  with an empty rationale. A non-empty rationale is the audit signal;
+  `events.jsonl` already carries the prior escalation context.
+
+  On accept of a non-empty rationale (trimmed), perform ONE frontmatter
+  write that atomically sets all of the following:
+
+  1. `status: blocked_human` → `pending`
+  2. `attempts: N` → `attempts: 0`
+  3. `re_arm_count`: read existing value (default `0` when absent),
+     write back `re_arm_count + 1`.
+  4. Append to `re_arm_history` list (initialise to `[]` when absent):
+
+     ```yaml
+     -
+       timestamp: <ISO 8601 UTC, e.g. 2026-06-15T12:34:56+00:00>
+       prior_status: blocked_human
+       prior_attempts: <int — the WU's pre-re-arm `attempts`>
+       prior_cost_usd: <float — the WU's pre-re-arm `cost_usd`, default 0.0 when absent>
+       prior_duration_seconds: <float — the WU's pre-re-arm `duration_seconds`, default 0.0>
+       reason: "<operator's one-line rationale, trimmed>"
+     ```
+
+  The `reason` field in the new `re_arm_history` entry is the string the
+  driver's `re_arm_dispatched` event reads via `re_arm_history[-1].reason`.
+  A re-arm without this write produces a `re_arm_dispatched` event with
+  `reason: ""` — treat that as a bug in the skill execution, not expected
+  behaviour. WU dispatches under the normal claude-p sandbox on next run.
+
 - **Re-arm UNSANDBOXED** — sandbox-escape escalation. Use ONLY when
   diagnosis pinpoints the sandbox itself as the block (e.g. `gh
   auth status` succeeds in the operator shell but fails inside
@@ -110,17 +151,29 @@ Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
      is written to the WU frontmatter — it is the durable audit
      signal, not a per-run comment). The rationale must name the
      specific blocked surface: "gh CLI auth requires unsandboxed
-     subprocess" beats "needs unsandboxed".
+     subprocess" beats "needs unsandboxed". Apply the same
+     mandatory-rationale rule as the sandboxed branch: empty or
+     whitespace-only input prints `re-arm rationale required — type
+     a one-line reason or choose s/a` and re-prompts.
   3. Surface the security implication: an unsandboxed agent has
      full shell. The `Do not touch` clause + driver `git reset
      --hard` on failed attempts contain blast radius but do not
      eliminate it. Require explicit yes/no.
-  4. On yes: write `unsandboxed: true` AND `unsandboxed_rationale:
-     "<one-line>"` to the WU frontmatter. Flip `status: pending`,
-     `attempts: 0`. Driver will refuse to dispatch if rationale is
-     missing — both fields are mandatory. The driver emits an
-     `unsandboxed_dispatch` event in `events.jsonl` before each
-     attempt.
+  4. On yes: perform ONE frontmatter write that atomically sets:
+     - `unsandboxed: true`
+     - `unsandboxed_rationale: "<one-line>"` (the rationale the
+       operator typed — unchanged, not truncated)
+     - `status: pending`, `attempts: 0`
+     - `re_arm_count`: incremented by 1 (same rule as sandboxed)
+     - `re_arm_history`: append one entry with the same five-field
+       shape as the sandboxed branch. The `reason` field is THE
+       SAME rationale string the operator typed — one input, two
+       homes: `unsandboxed_rationale` for the driver's sandbox gate;
+       `re_arm_history[-1].reason` for the cross-cycle audit trail.
+     Driver will refuse to dispatch if `unsandboxed_rationale` is
+     missing — both `unsandboxed` fields are mandatory. The driver
+     emits an `unsandboxed_dispatch` event in `events.jsonl` before
+     each attempt.
   5. Append a learning entry to `.specfuse/LEARNINGS.md` (if not
      already there) tagged with the sandbox-trigger pattern so
      future WU drafts anticipate this surface at plan time rather
@@ -130,10 +183,13 @@ Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
   it. If abandoning makes the gate uncloseable (a substantive WU
   whose deliverable is required), warn the user but do not block —
   the user owns that call. (For full feature-level abandon, use
-  `/abandon-feature` instead.)
+  `/abandon-feature` instead.) Does NOT write `re_arm_history` and
+  does NOT increment `re_arm_count` — abandon is not a re-arm.
 - **Skip** — leave at `blocked_human`, move to next. If any skipped
   WUs remain at the end, the driver will halt again at the same
-  point on next run; tell the user so explicitly.
+  point on next run; tell the user so explicitly. Does NOT write
+  `re_arm_history` and does NOT increment `re_arm_count` — skip is
+  not a re-arm.
 
 ### 4. Reopen the gate (if needed)
 
@@ -171,6 +227,19 @@ flips wrote.
 - **Does not run the loop.** Prints the command; the user runs it.
 
 ## Version
+
+**v0.2.** Mandatory rationale on `r` and `u` re-arm choices: empty
+or whitespace-only input is rejected with `re-arm rationale required
+— type a one-line reason or choose s/a` and the same WU is
+re-prompted. On accept, the skill writes a `re_arm_history` entry
+(five fields: `timestamp`, `prior_status`, `prior_attempts`,
+`prior_cost_usd`, `prior_duration_seconds`, `reason`) and increments
+`re_arm_count` atomically with the existing `status`/`attempts`
+flip. The `reason` field feeds the driver's `re_arm_dispatched`
+event via `re_arm_history[-1].reason`. Abandon (`a`) and skip (`s`)
+are unchanged — they are not re-arms and do not touch these fields.
+Write ordering: frontmatter write BEFORE the resume command is
+printed (see §3 invariant note).
 
 **v0.1.** Five steps; re-arm / abandon / skip is the entire per-WU
 decision vocabulary today. Expected to grow once real recoveries
