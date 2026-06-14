@@ -1146,3 +1146,46 @@ promoted here.
   5, +$0.10 per lint-clean fixture directory, +$0.20 per
   historical-feature-folder read). Treat re-dispatch cost as
   full-cycle cost, not delta cost, when budgeting attempts.
+
+- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Effort bands do not see
+  wiring-site count; price multi-site driver-wiring per site.**
+  Gate 2's three driver-wiring WUs split clean on the site axis:
+  T05 wired ONE new site backed by T04's already-paid-for
+  scaffolding and came in at 1.21× plan (`xhigh` $2.20). T04
+  wired one site PLUS the FEAT-2026-0017 ordering invariant
+  (stub-retro before `fire_terminal_flips`; post-flip
+  `assert_terminal_flips_fired` must hold) and came in at 1.64×
+  plan ($4.10). T06 was priced as `medium` ($0.80) but actually
+  hooked into BOTH wiring sites T04 and T05 introduced, added a
+  PLAN.md frontmatter field, defined precedence ordering between
+  the CLI flag and the frontmatter, and shipped tests for each —
+  same single-site-pricing-of-multi-site-work shape as gate 1's
+  T02 (a 2.86× miss). Reproducible signal: count the distinct
+  call-sites or files the WU's AC actually mutates; an
+  `implementation/medium` band that touches ≥ 2 distinct wiring
+  sites belongs at `high` with a per-extra-site surcharge
+  (rough heuristic: +$0.40 per additional wiring site beyond the
+  first, +$0.30 per orchestration-invariant the WU must preserve).
+  Re-using a sibling WU's scaffolding (T05 ← T04) is the cheap
+  case; introducing or coordinating sites is the expensive case.
+  Rule: when an AC body names ≥ 2 file paths the WU must mutate,
+  or ≥ 2 already-shipped helpers the WU must call into, raise
+  the band; effort alone will price single-site work.
+
+- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Driver-wiring
+  implementation WUs default to 2 attempts in practice; budget
+  accordingly.** Every substantive gate-2 WU (T04, T05, T06)
+  needed exactly 2 attempts. None escalated to `blocked_human`;
+  none replanned. The first attempt commonly lands code that
+  fails an AC-level verifier — symbol-existence check (AC8 in
+  driver-wiring WUs), an integration test, or a post-pass
+  invariant guard — and the re-dispatch lands clean. Combined
+  with the gate-1 finding that re-dispatch cost is full-cycle
+  cost (not delta cost), this means an honest cost plan for
+  driver-wiring WUs should assume 2× the single-attempt cost,
+  not 1× plus a small retry margin. Rule: when authoring a WU
+  whose AC includes a symbol-existence guard (`produces_driver_
+  helper`) or a multi-site integration assertion, set
+  `planned_cost_usd` to 1.5–2× the single-attempt estimate;
+  prefer over-budgeting on the planning line to under-budgeting
+  and learning it from a 1.6× post-hoc ratio.

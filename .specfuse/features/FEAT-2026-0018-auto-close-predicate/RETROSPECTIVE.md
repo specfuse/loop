@@ -50,6 +50,68 @@ events; all substantive WUs landed in ≤ 2 attempts.
   events.jsonl. Reading-history-as-fixture has a cache-amplified
   cost that the planner did not model.
 
+## Gate 2 — driver wiring + force-full-close + auto_close_disabled override
+
+Gate 2 wired the gate-1 module into `loop.py`. Three substantive WUs:
+T04 (terminal-gate path — `maybe_auto_close_terminal`,
+`write_stub_retrospective_terminal`, `mark_close_wu_auto_closed`),
+T05 (intermediate-gate path option A —
+`maybe_auto_close_intermediate`,
+`append_stub_retrospective_intermediate`), and T06 (operator escapes
+— `--force-full-close <feature-id>` CLI flag and `auto_close_disabled:
+true` PLAN.md frontmatter override — `resolve_auto_close_override`).
+All three landed in 2 attempts. No blocked_human escalations; no
+replan events. Gate-2 budget was raised at arm time from $9.00 →
+$16.00 anchored to the gate-1 actual ratio (2.14×) applied to a
+gate-2 plan dominated by two `xhigh` driver-wiring WUs.
+
+### T04 — Terminal-gate wiring
+
+- Attempts: 2 (first 710 s, $2.39; second 781 s, $1.71).
+- Blockers: first attempt did not satisfy the AC8 symbol-existence
+  check (one of the three required `produces_driver_helper` symbols
+  did not resolve, or its call-site lacked the named helper); the
+  re-dispatch landed clean.
+- Surprises: T04 ships 3 driver helpers
+  (`maybe_auto_close_terminal`, `write_stub_retrospective_terminal`,
+  `mark_close_wu_auto_closed`) plus the FEAT-2026-0017 invariant-guard
+  interaction (stub-retro write must happen BEFORE
+  `fire_terminal_flips`, after which `assert_terminal_flips_fired`
+  must still pass). That ordering invariant was the highest-density
+  acceptance criterion in the gate and added a meaningful slice of
+  the cycle's spend.
+
+### T05 — Intermediate-gate wiring (option A)
+
+- Attempts: 2 (first 613 s, $1.68; second 428 s, $0.98).
+- Blockers: first attempt's AC8 symbol check or test gate did not
+  pass; re-dispatch landed clean. Attempt-2 cost was 58% of
+  attempt-1 (closer to a true delta than T01's near-parity in
+  gate 1) — the second wiring site had a leaner spec footprint
+  on re-dispatch.
+- Surprises: cheapest of the three. Re-using T04's predicate-call
+  site + stub-frontmatter helper + event-emission pattern paid off
+  exactly as the WU's "depends_on: T04" rationale predicted; the
+  second wiring site is materially cheaper than the first when the
+  shared scaffolding already exists.
+
+### T06 — `--force-full-close` flag + `auto_close_disabled` override
+
+- Attempts: 2 (first 488 s, $1.34; second 395 s, $0.95).
+- Blockers: first attempt did not satisfy a verifier — most likely
+  the AC8 symbol-existence check on `resolve_auto_close_override`,
+  or the integration assertion that BOTH wiring sites (T04 and T05)
+  honour the override. Re-dispatch landed clean.
+- Surprises: 2.86× plan on a `medium` effort band — the largest
+  ratio of gate 2. T06 was planned as a small CLI add ($0.80) but
+  hooked into two pre-existing wiring sites, added a frontmatter
+  field with PLAN.md-mutation semantics, and shipped tests for both
+  override paths plus the precedence ordering (CLI flag vs
+  frontmatter vs default). Multi-site touch + lint cleanliness on
+  the override + tests is structurally a `high` effort, not
+  `medium`. Same shape as T02 in gate 1 (effort band priced single-
+  site work; AC implied multi-site shipping).
+
 ## Cost analysis
 
 Substantive WUs in scope (per T01 AC7, closing-WU types are
@@ -64,6 +126,10 @@ criterion 4 (≤ 2×) from PLAN.md "Predicate v1".
 | T02 | $1.50 | $4.181495 | 2.788× | +178.8% | FAIL | FAIL |
 | T03 | $0.80 | $2.471325 | 3.089× | +208.9% | FAIL | FAIL |
 | **gate 1 sub-total (substantive)** | **$4.10** | **$9.50741** | **2.319×** | **+131.9%** | — | — |
+| T04 | $2.50 | $4.096069 | 1.638× | +63.8% | FAIL | pass |
+| T05 | $2.20 | $2.653762 | 1.206× | +20.6% | pass | pass |
+| T06 | $0.80 | $2.286465 | 2.858× | +185.8% | FAIL | FAIL |
+| **gate 2 sub-total (substantive)** | **$5.50** | **$9.036296** | **1.643×** | **+64.3%** | — | — |
 
 Original gate budget (GATE-01.md): $8.00. Substantive spend
 $9.50741 already exceeds the original budget by 18.8% **before**
@@ -81,7 +147,19 @@ would NOT auto-close under its own predicate. Meta-confirmation:
 the predicate this feature ships correctly identifies this
 gate as off-plan — close-intermediate ceremony was warranted.
 
-### Variance > 50% rationale (all three substantive WUs)
+Original gate-2 budget was $9.00; raised to $16.00 at arm time
+anchored to gate-1's actual ratio (2.14× of original $4.10 plan).
+Substantive gate-2 spend $9.04 is 56.5% of the raised budget; the
+$16.00 ceiling was correctly sized — gate 2 came in under the
+adjusted budget despite T06's 2.86× WU-level miss. Predicate-v1
+self-evaluation against gate-2 data (criterion 3 ≤ 1.5×, criterion
+4 ≤ 2×, criterion 6 ≤ budget): T04 trips criterion 3; T06 trips
+criteria 3 and 4; criterion 6 holds. Gate 2 would NOT auto-close
+under its own predicate. Meta-confirmation: the predicate this
+feature ships correctly identifies gate 2 as off-plan —
+close-intermediate ceremony was warranted.
+
+### Variance > 50% rationale — gate 1 (all three substantive WUs)
 
 Three independent WUs each overran ≥ 1.5×, and two exceeded 2×.
 Treating these as three independent estimation misses
@@ -112,6 +190,40 @@ band only (`implementation/high` → $1.80, `implementation/medium`
 count, fixture count, history-folder reads). The estimates
 were off by a factor proportional to the unmodeled inputs.
 
+### Variance > 50% rationale — gate 2 (T04 and T06; T05 within band)
+
+T05 came in 1.21× plan and needs no rationale. T04 and T06 both
+miss, and the pattern is structural — not estimation noise on three
+independent estimates, but two instances of one cause.
+
+- **T04 (+63.8%).** Two attempts. Three driver helpers shipped
+  (`maybe_auto_close_terminal`, `write_stub_retrospective_terminal`,
+  `mark_close_wu_auto_closed`) plus the FEAT-2026-0017 ordering
+  invariant — stub-retro write must happen BEFORE
+  `fire_terminal_flips`, AND `assert_terminal_flips_fired` must
+  still observe true terminal flips on the auto-close path. The
+  `xhigh` effort band ($2.50) captures the wiring footprint, but
+  not the invariant-interaction surface. The re-dispatch landed
+  the AC-driven fix; attempt-2 cost ($1.71) was a meaningful
+  fraction of attempt-1 ($2.39), confirming the gate-1 finding
+  that re-dispatch is not "fix-delta" cost.
+- **T06 (+185.8%).** Two attempts. Priced as `implementation/
+  medium` ($0.80) — "small CLI add" shape. Actually shipped: CLI
+  flag, frontmatter override, integration into BOTH wiring sites
+  T04 and T05 introduced, precedence ordering between the two
+  override paths, and tests for each. Same misclassification
+  shape as gate 1's T02 (single-site pricing of multi-site work).
+  T06 would have been priced correctly at `implementation/high`
+  with an explicit per-wiring-site surcharge.
+
+Shared cause across T04 and T06: the planner saw "one feature
+WU" and priced one piece of wiring. Both WUs actually wired into
+multiple sites (T04: stub-retro write + flips + auto_close
+frontmatter on close WU; T06: override at both T04 and T05
+sites). Effort bands do not see site count. T05 was on-band
+precisely because its wiring re-used T04's scaffolding — a single
+new site backed by an already-paid-for foundation.
+
 ## Notes on docs/roadmap
 
 Gate 1 ships an internal module with no operator-facing surface:
@@ -119,7 +231,17 @@ no skill changes, no docs/methodology updates, no roadmap row
 edits required. The `assert_doc_or_roadmap_diff` close-guard is
 satisfied by this RETROSPECTIVE.md write per FEAT-2026-0015/T07.
 
+Gate 2 wired the gate-1 module into `loop.py` and added two
+operator-facing surfaces (`--force-full-close <feature-id>` and
+the `auto_close_disabled: true` PLAN.md frontmatter override).
+Operator-facing docs for these surfaces belong to gate 3's docs
+WU (T10 in PLAN.md). For this WU, the `assert_doc_or_roadmap_diff`
+close-guard is satisfied by this RETROSPECTIVE.md write per
+FEAT-2026-0015/T07.
+
 ## Lessons promoted
 
-One durable lesson appended to `.specfuse/LEARNINGS.md` under
-this gate's tag — see entry tagged `[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE]`.
+One durable lesson per gate appended to `.specfuse/LEARNINGS.md`
+under each gate's tag — see entries tagged
+`[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE]` and
+`[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE]`.
