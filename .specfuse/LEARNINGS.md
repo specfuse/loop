@@ -1247,3 +1247,108 @@ promoted here.
   pre-dispatch ordering) — the hygiene WU's own cost is what
   determines whether the gate's recursive-dogfood verdict
   agrees with itself across the fix boundary.
+
+- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Closing-deliverable WUs
+  whose acceptance criteria check "is this new file in the diff?"
+  must combine `git diff --name-only HEAD` with
+  `git ls-files --others --exclude-standard`. `git diff` alone
+  omits untracked files, so the AC fails spuriously on the very
+  file the WU just created. T03's AC7e shipped with the broken
+  single-command form and blocked correctly on first attempt; the
+  agent diagnosed it with a direct LEARNINGS cite to
+  `[driver/files_changed-guard]`. The same broken pattern existed
+  in this WU's AC6 and was fixed pre-emptively (commit 3f77530).
+  Generalizing rule: every closing-deliverable WU spec that
+  produces a NEW file at the feature-folder root must use the
+  combined `{ git diff --name-only HEAD; git ls-files --others
+  --exclude-standard; }` form in its existence-check AC.
+  Promoting to authoring-work-units §X (closing-deliverable AC
+  patterns) is a candidate gate-3 docs task.
+
+- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Standardized event
+  payload contracts deserve a single emission helper, and the
+  feature spec that introduces the contract carries a structural
+  bootstrap gap that the retrospective must call out by name.
+  T01 introduced `emit_attempt_outcome(...)` and migrated four
+  legacy emission sites + added three new ones in one attempt;
+  the spec's §10 helper-duplication pre-flight grep caught zero
+  collisions, validating the "one helper, all sites" pattern.
+  But because the driver runs the OLD code while dispatching the
+  WU that ships the NEW code, T01's own events.jsonl lines lack
+  the new payload fields — the first WU whose events carry the
+  full v1 payload is T03 (the NEXT WU after T01 lands). Rule:
+  any feature whose gate 1 ships an event-payload contract
+  extension must (a) name the bootstrap gap explicitly in the
+  WU spec ("this WU's own events lack the new fields, by
+  design"), and (b) reconcile post-hoc in the retrospective by
+  pointing to the first WU whose events carry the new shape.
+  This pattern was first documented in `[FEAT-2026-0006/G1-CLOSE]`
+  and is now confirmed across two features — promote to a
+  drafting-time checklist item.
+
+- [FEAT-2026-0016/G3-CLOSE] A driver helper that buckets
+  attempt-level events into gates by parsing the
+  `correlation_id` suffix must resolve **both** substantive-WU
+  IDs (`TNN`) and closing-WU IDs (`G<n>-…`). T07's
+  `summarize_attempt_failure_classes(feature_dir, gate_n=N)`
+  delegates to `_gate_number_from_wu_id`, which currently
+  matches only `G<n>-…` segments — substantive-WU IDs return
+  `None` and are silently filtered out when `gate_n` is set.
+  Observed at gate-3 close: T08 had one non-passing
+  `attempt_outcome` (sandbox block, correctly diagnosed), the
+  helper returned the `(no non-passing attempts in scope)`
+  sentinel for `gate_n=3`, the close-guard
+  `assert_failure_class_breakdown_when_failures_present`
+  passed via the sentinel route, and the recursive-dogfood
+  retrospective surfaced the gap. Rule: any helper that takes
+  a `gate_n` parameter and resolves it from a `correlation_id`
+  must load the gate-WU membership from `PLAN.md`'s
+  `gates[].work_units[].id` graph (the authoritative source —
+  the same shape that `WU-90-gate-N-close.md` AC10c's
+  existence check derives). Corollary: the close-guard tied
+  to such a helper is only as load-bearing as the helper's
+  bucketing fidelity — when planning a helper-backed guard,
+  invariant-test the bucketing against a fixture mixing
+  substantive-WU and closing-WU events, not just one or the
+  other.
+
+- [FEAT-2026-0016/G3-CLOSE] Skill-adding WUs that need to
+  create discovery surfaces under `.claude/skills/` cannot
+  use a dispatched session to make the symlink, even with
+  `unsandboxed: true` on the WU. Claude Code's sandbox lists
+  `.claude/skills` under `denyWithinAllow`, which is a deny
+  rule inside an allow scope — it survives `unsandboxed: true`.
+  Observed at T08's first attempt: agent correctly diagnosed
+  the boundary and emitted `status: blocked`; operator created
+  the symlink manually from the main Claude Code session
+  (which carries different sandbox permissions) and re-armed.
+  Rule: skill-adding WU specs must split the work into
+  (a) agent-side authoring of `.specfuse/skills/<name>/SKILL.md`
+  and (b) operator-side symlink creation at
+  `.claude/skills/<name>` — call out the split explicitly in
+  the WU spec so the agent does not waste an attempt
+  rediscovering the sandbox boundary. Equivalently, the WU
+  spec can mark the symlink as a pre-dispatch operator
+  prerequisite (analogous to how some test-fixture WUs
+  pre-stage data).
+
+- [FEAT-2026-0016/G3-CLOSE] Data-layer-first-then-consumers
+  feature shape paid off cleanly in this feature's three-gate
+  arc. Gate 1 shipped the contract surface (T01 emission +
+  T02 frontmatter + T03 tests) in 3 substantive WUs / 3
+  attempts / one spec-defect re-arm; gate 2 shipped three
+  consumers (T04 / T05 / T06) in 3 substantive WUs / 3
+  attempts / **zero** re-arms; gate 3 shipped the close-
+  ceremony helper + skill + docs (T07 / T08 / T09) in 3
+  substantive WUs / 4 attempts / one sandbox-boundary re-arm.
+  Total feature substantive spend $9.04 against $13.20
+  planned (-32% under plan). Rule: when a feature's
+  `roadmap_goal` describes a contract + ≥ 2 consumers,
+  default to a 3-gate arc with the contract isolated in gate
+  1, consumer wiring in gate 2, and close-ceremony / skills /
+  docs in gate 3 — the alternative ("mix data + consumers in
+  one gate to ship faster") sacrifices the bootstrap-gap
+  discipline that lets the data-layer's own retrospective be
+  reviewed before consumers commit to its shape. Document this
+  shape in the next `authoring-work-units` revision as the
+  default for contract-shaped features.

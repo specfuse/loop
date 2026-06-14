@@ -2,14 +2,18 @@
 id: FEAT-2026-0016/T01
 type: implementation
 effort: xhigh
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 generated_surfaces: []
 produces_driver_helper:
   - emit_attempt_outcome
   - parse_gate_failure_signature
   - extract_failure_excerpt
+duration_seconds: 714.14
+cost_usd: 1.865663
+input_tokens: 48
+output_tokens: 34451
 ---
 
 # Complete + standardize `attempt_outcome` event emission across all dispatch outcomes
