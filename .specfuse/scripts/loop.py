@@ -413,6 +413,138 @@ def flush_events(events_path: Path, events: list) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Attempt-outcome event helpers (FEAT-2026-0016/T01)                         #
+# --------------------------------------------------------------------------- #
+
+
+def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
+    """Extract (failure_class, failure_signature) from gate runner stdout.
+
+    Scans for '### <gate>: FAIL' markers and maps them to a failure class.
+    Returns ('other', 'no_gate_marker') when no marker is found.
+    Both returned values are non-empty strings.
+    """
+    _GATE_CLASS_MAP = {
+        "tests": "tests",
+        "lint": "lint",
+        "security": "security",
+        "coverage": "coverage",
+    }
+    marker_re = re.compile(r"^### (\w+): FAIL", re.MULTILINE)
+    m = marker_re.search(stdout)
+    if not m:
+        return "other", "no_gate_marker"
+    gate_name = m.group(1)
+    failure_class = _GATE_CLASS_MAP.get(gate_name, "other")
+    after_lines = stdout[m.end():].splitlines()[:50]
+    after_text = "\n".join(after_lines)
+    _SIG_PATTERNS: dict[str, re.Pattern[str]] = {
+        "tests": re.compile(r"^FAIL: (test_\S+)", re.MULTILINE),
+        "lint": re.compile(r"\b([A-Z]\d{3,4})\b"),
+        "security": re.compile(r"Issue: \[(B\d+)"),
+        "coverage": re.compile(r"^([^\s]+\.py)\s+\d+\s+\d+", re.MULTILINE),
+    }
+    pattern = _SIG_PATTERNS.get(failure_class)
+    if pattern:
+        sm = pattern.search(after_text)
+        if sm:
+            sig = sm.group(1)
+            return failure_class, sig if sig else "unknown"
+    for line in after_lines:
+        stripped = line.strip()
+        if stripped:
+            return failure_class, stripped[:100]
+    return failure_class, "unknown"
+
+
+def detect_spinning_signature_repeat(
+    current: tuple[str | None, str | None],
+    prior: tuple[str | None, str | None] | None,
+) -> bool:
+    """Return True iff the same (failure_class, failure_signature) repeats.
+
+    Returns False when prior is None (first failure — nothing to compare).
+    Returns False when either element of current is None.
+    Returns False when current or prior is the no_gate_marker sentinel to
+    avoid false-positive halts on parser-opaque failures (AC4).
+    """
+    _SENTINEL = ("other", "no_gate_marker")
+    if prior is None:
+        return False
+    if current[0] is None or current[1] is None:
+        return False
+    if current == _SENTINEL or prior == _SENTINEL:
+        return False
+    return current == prior
+
+
+def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
+    """Return the last max_chars of failure-relevant lines from gate stdout.
+
+    Relevant lines contain FAIL, Error, Exception, or Traceback.
+    Falls back to the last max_chars of all stdout when no such lines exist.
+    Trims to a UTF-8 safe boundary.
+    """
+    _KW = re.compile(r"FAIL|Error|Exception|Traceback", re.IGNORECASE)
+    relevant = [ln for ln in stdout.splitlines() if _KW.search(ln)]
+    text = "\n".join(relevant) if relevant else stdout
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_chars:
+        return text
+    return encoded[-max_chars:].decode("utf-8", errors="ignore")
+
+
+def emit_attempt_outcome(
+    wu: WorkUnit,
+    attempt: int,
+    outcome: str,
+    usage: dict,
+    *,
+    failure_class: str | None = None,
+    failure_signature: str | None = None,
+    failure_excerpt: str | None = None,
+    files_touched: list[str] | None = None,
+    agent_status: str | None = None,
+    agent_blocked_reason: str | None = None,
+    extras: dict | None = None,
+) -> dict:
+    """Build a standardized attempt_outcome event dict (v1 payload shape).
+
+    # T01's own events lack standardized payload; bootstrap gap
+
+    Caller appends the returned dict to wu_events; flush_events runs at
+    the existing flush point.  This helper does NOT call flush_events
+    itself — preserves the 'one flush per outcome-cycle' invariant.
+
+    extras: optional additional fields merged into the payload last.
+    Used to preserve outcome-specific fields (e.g. assertion, summary)
+    that are not part of the standard schema.
+    """
+    payload: dict = {
+        "attempt": attempt,
+        "outcome": outcome,
+        "duration_seconds": usage.get("duration_seconds", 0.0),
+        "cost_usd": usage.get("cost_usd", 0.0),
+        "input_tokens": usage.get("input_tokens", 0),
+        "output_tokens": usage.get("output_tokens", 0),
+        "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
+        "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+        "model": wu.model,
+        "effort": wu.effort,
+        "failure_class": failure_class,
+        "failure_signature": failure_signature,
+        "failure_excerpt": failure_excerpt,
+        "files_touched": files_touched if files_touched is not None else [],
+        "agent_status": agent_status,
+        "agent_blocked_reason": agent_blocked_reason,
+        "re_arm_count": getattr(wu, "re_arm_count", 0),
+    }
+    if extras:
+        payload.update(extras)
+    return build_event("attempt_outcome", wu.wu_id, payload)
+
+
+# --------------------------------------------------------------------------- #
 # Git                                                                          #
 # --------------------------------------------------------------------------- #
 
@@ -420,6 +552,29 @@ def flush_events(events_path: Path, events: list) -> None:
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], capture_output=True, text=True,
                           check=True).stdout.strip()
+
+
+def git_diff_names(head_before: str, head_after: str) -> list[str]:
+    """Return file paths changed between two refs via git diff --name-only.
+
+    When head_after is 'HEAD', also appends untracked files from
+    git ls-files --others --exclude-standard (per [driver/files_changed-guard]
+    LEARNINGS). Returns an empty list on any git error.
+    """
+    try:
+        names = subprocess.run(
+            ["git", "diff", "--name-only", head_before, head_after],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip().splitlines()
+        if head_after == "HEAD":
+            untracked = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip().splitlines()
+            names = names + [f for f in untracked if f]
+        return [f for f in names if f]
+    except subprocess.CalledProcessError:
+        return []
 
 
 def require_git_ready() -> None:
@@ -500,6 +655,59 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     backend.set_wu(wu, "cost_usd", round(cum_usage["cost_usd"], 6))
     backend.set_wu(wu, "input_tokens", cum_usage["input_tokens"])
     backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
+
+
+def detect_rearm_dispatch(wu: WorkUnit) -> bool:
+    """Return True when wu is a re-arm dispatch whose prior cycle's cost has
+    not yet been folded into the cumulative accumulators.
+
+    Reads re_arm_count and cost_usd from the WU's on-disk frontmatter because
+    load_wu does not load those fields into the WorkUnit object.
+    Returns False for first-time dispatches (re_arm_count absent or 0) and for
+    re-arms where cost was already folded (cost_usd == 0 after a prior fold).
+    """
+    fm, _ = read_frontmatter(wu.file)
+    re_arm_count = fm.get("re_arm_count", 0)
+    if not isinstance(re_arm_count, int) or re_arm_count <= 0:
+        return False
+    cost_usd = fm.get("cost_usd", 0)
+    return isinstance(cost_usd, (int, float)) and float(cost_usd) > 0
+
+
+def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
+    """Fold the prior dispatch cycle's cost/token/duration into cumulative fields.
+
+    Called once per re-arm before the new cycle's attempt loop begins.
+    Reads per-cycle fields (cost_usd, duration_seconds, input_tokens,
+    output_tokens) written by the prior write_cost_to_wu call, accumulates
+    them into cumulative_* counterparts (initialising to 0 when absent), then
+    resets the per-cycle fields so the new cycle's write_cost_to_wu starts
+    from zero.
+
+    Backward-compatible: existing WUs with no cumulative_* fields initialise
+    from 0 — no KeyError on first re-arm of a WU that pre-dates this contract.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    prior_cost = float(fm.get("cost_usd") or 0)
+    prior_duration = float(fm.get("duration_seconds") or 0)
+    prior_input = int(fm.get("input_tokens") or 0)
+    prior_output = int(fm.get("output_tokens") or 0)
+
+    cum_cost = float(fm.get("cumulative_cost_usd") or 0) + prior_cost
+    cum_duration = float(fm.get("cumulative_duration_seconds") or 0) + prior_duration
+    cum_input = int(fm.get("cumulative_input_tokens") or 0) + prior_input
+    cum_output = int(fm.get("cumulative_output_tokens") or 0) + prior_output
+
+    backend.set_wu(wu, "cumulative_cost_usd", round(cum_cost, 6))
+    backend.set_wu(wu, "cumulative_duration_seconds", round(cum_duration, 3))
+    backend.set_wu(wu, "cumulative_input_tokens", cum_input)
+    backend.set_wu(wu, "cumulative_output_tokens", cum_output)
+
+    # Reset per-cycle fields so the new cycle's write_cost_to_wu starts clean.
+    backend.set_wu(wu, "cost_usd", 0.0)
+    backend.set_wu(wu, "duration_seconds", 0.0)
+    backend.set_wu(wu, "input_tokens", 0)
+    backend.set_wu(wu, "output_tokens", 0)
 
 
 def gate_budget_usd(gate_file: Path) -> float | None:
@@ -1686,6 +1894,146 @@ def assert_cost_analysis_section_when_met(
     )
 
 
+_NO_FAILURES_SENTINEL = "### Failure-class breakdown\n\n(no non-passing attempts in scope)\n"
+
+
+def summarize_attempt_failure_classes(
+    feature_dir: Path,
+    gate_n: int | None = None,
+) -> str:
+    """Render a '### Failure-class breakdown' markdown table from events.jsonl.
+
+    Reads attempt_outcome events whose outcome != 'passed'.  When gate_n is
+    provided, restricts to events whose correlation_id belongs to that gate
+    (resolved via _gate_number_from_wu_id).  Returns _NO_FAILURES_SENTINEL when
+    no non-passing attempts match the filter.
+
+    Pure function — reads events.jsonl; no writes, no side effects.
+    Malformed JSONL lines are skipped (legacy-event tolerance, AC5).
+    """
+    events_path = feature_dir / "events.jsonl"
+    if not events_path.exists():
+        return _NO_FAILURES_SENTINEL
+
+    non_passing: list[dict] = []
+    for raw in events_path.read_text(encoding="utf-8").splitlines():
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            evt = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if evt.get("event_type") != "attempt_outcome":
+            continue
+        payload = evt.get("payload") or {}
+        if payload.get("outcome") == "passed":
+            continue
+        if gate_n is not None:
+            cid = evt.get("correlation_id", "")
+            if _gate_number_from_wu_id(cid) != gate_n:
+                continue
+        non_passing.append(payload)
+
+    if not non_passing:
+        return _NO_FAILURES_SENTINEL
+
+    # Group by failure_class; collect signatures for dominant-sig resolution.
+    class_counts: dict[str, int] = {}
+    class_signatures: dict[str, list[str]] = {}
+    for p in non_passing:
+        fc = str(p.get("failure_class") or "null")
+        sig = str(p.get("failure_signature") or "")
+        class_counts[fc] = class_counts.get(fc, 0) + 1
+        class_signatures.setdefault(fc, []).append(sig)
+
+    def _dominant(sigs: list[str]) -> str:
+        freq: dict[str, int] = {}
+        for s in sigs:
+            freq[s] = freq.get(s, 0) + 1
+        return max(freq, key=lambda k: (freq[k], -sigs.index(k)))
+
+    # Sort: count descending, class ascending for ties.
+    rows = sorted(
+        class_counts.items(),
+        key=lambda item: (-item[1], item[0]),
+    )
+
+    lines = [
+        "### Failure-class breakdown",
+        "",
+        "| failure_class | non-passed attempts | dominant signature |",
+        "|---------------|---------------------|--------------------|",
+    ]
+    total = 0
+    for fc, count in rows:
+        dom = _dominant(class_signatures[fc])
+        lines.append(f"| {fc} | {count} | {dom} |")
+        total += count
+    lines.append(f"| **total** | **{total}** | — |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def assert_failure_class_breakdown_when_failures_present(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-f / close-intermediate-d) RETROSPECTIVE.md has '### Failure-class breakdown'
+    when non-passing attempt_outcome events exist for the gate.
+
+    Returns (True, "") when:
+    - RETROSPECTIVE.md is absent (assert_retrospective_exists fires first for 'close';
+      assert_retrospective_gate_section fires first for 'close-intermediate').
+    - No non-passing attempts exist in events.jsonl for the gate.
+    - The heading is present.
+
+    Returns (False, reason) when non-passing attempts exist but the heading is absent.
+    """
+    retro = feature_dir / "RETROSPECTIVE.md"
+    if not retro.exists():
+        return True, ""
+
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    summary = summarize_attempt_failure_classes(feature_dir, gate_n)
+
+    if summary == _NO_FAILURES_SENTINEL:
+        return True, ""
+
+    if re.search(r"^#{3} Failure-class breakdown\b", retro.read_text(), re.MULTILINE):
+        return True, ""
+
+    # Count non-passing attempts for the error message.
+    events_path = feature_dir / "events.jsonl"
+    count = 0
+    if events_path.exists():
+        for raw in events_path.read_text(encoding="utf-8").splitlines():
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                evt = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if evt.get("event_type") != "attempt_outcome":
+                continue
+            payload = evt.get("payload") or {}
+            if payload.get("outcome") == "passed":
+                continue
+            if gate_n is not None:
+                cid = evt.get("correlation_id", "")
+                if _gate_number_from_wu_id(cid) != gate_n:
+                    continue
+            count += 1
+
+    gate_label = f"gate {gate_n}" if gate_n is not None else "all gates"
+    return (
+        False,
+        f"assert_failure_class_breakdown_when_failures_present: {count} "
+        f"non-passing attempt(s) in {gate_label} but '### Failure-class breakdown' "
+        f"subsection absent from RETROSPECTIVE.md",
+    )
+
+
 def assert_retrospective_gate_section(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -1780,11 +2128,13 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_doc_or_roadmap_diff,
         assert_verdict_well_formed,
         assert_cost_analysis_section_when_met,
+        assert_failure_class_breakdown_when_failures_present,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,
         assert_learnings_appended_or_noop,
         assert_doc_or_roadmap_diff,
+        assert_failure_class_breakdown_when_failures_present,
     ],
     "plan-next": [
         assert_gate_review_exists,
@@ -2150,6 +2500,9 @@ def run(
                     # Fall through to existing close-WU dispatch path
 
                 head_before = git("rev-parse", "HEAD")
+                _is_rearm = detect_rearm_dispatch(wu)
+                if _is_rearm:
+                    fold_cumulative_on_rearm(wu, backend)
                 backend.set_wu(wu, "status", "in_progress")
                 # Events and per-attempt notes are buffered in memory during the
                 # WU's lifecycle and flushed at outcome time. This prevents the
@@ -2157,8 +2510,22 @@ def run(
                 # wiping appended events / status flips — anything that should
                 # be durable is either committed in the squash (PASS) or in a
                 # bookkeeping commit (BLOCKED/SPINNING).
+                _wu_fm_rearm, _ = read_frontmatter(wu.file)
+                re_arm_count = int(_wu_fm_rearm.get("re_arm_count") or 0)
                 wu_events = [build_event("task_started", wu.wu_id,
-                                         {"type": wu.type, "model": wu.model})]
+                                         {"type": wu.type, "model": wu.model,
+                                          "re_arm_count": re_arm_count})]
+                if _is_rearm:
+                    _rearm_history = _wu_fm_rearm.get("re_arm_history") or []
+                    _rearm_reason = ""
+                    if isinstance(_rearm_history, list) and _rearm_history:
+                        _last_entry = _rearm_history[-1]
+                        if isinstance(_last_entry, dict):
+                            _rearm_reason = str(_last_entry.get("reason", ""))
+                    wu_events.append(build_event("re_arm_dispatched", wu.wu_id, {
+                        "re_arm_count": re_arm_count,
+                        "reason": _rearm_reason,
+                    }))
                 if wu.unsandboxed:
                     # Audit signal: WU opted out of the claude -p sandbox.
                     # Event logged before first attempt so the trail exists
@@ -2177,6 +2544,7 @@ def run(
                              "duration_seconds": 0.0}
 
                 failure_note = None
+                prior_failure_signature: tuple[str | None, str | None] | None = None
                 for attempt in range(1, MAX_ATTEMPTS + 1):
                     backend.set_wu(wu, "attempts", attempt)
                     print(f"   [{time.strftime('%H:%M:%S')}] attempt "
@@ -2208,9 +2576,9 @@ def run(
                         # RESULT parsing, buffer an event, reset the tree, and
                         # treat as a failed attempt for the purposes of the
                         # attempt loop — counter already incremented at top.
-                        wu_events.append(build_event(
-                            "attempt_outcome", wu.wu_id,
-                            {"outcome": "zero_token_skip", "attempt": attempt},
+                        wu_events.append(emit_attempt_outcome(
+                            wu, attempt, "zero_token_skip",
+                            attempts_usage[-1],
                         ))
                         reset_preserving_events(head_before, events_path)
                         print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
@@ -2226,6 +2594,13 @@ def run(
                         reset_preserving_events(head_before, events_path)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
+                        wu_events.append(emit_attempt_outcome(
+                            wu, attempt, "blocked",
+                            attempts_usage[-1],
+                            files_touched=git_diff_names(head_before, "HEAD"),
+                            agent_status="blocked",
+                            agent_blocked_reason=payload,
+                        ))
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "agent_reported_blocked",
                             "blocked_reason": payload,
@@ -2266,12 +2641,10 @@ def run(
                             )
                             if not smoke_ok:
                                 reset_preserving_events(head_before, events_path)
-                                wu_events.append(build_event(
-                                    "attempt_outcome", wu.wu_id, {
-                                        "outcome": "smoke_import_failed",
-                                        "attempt": attempt,
-                                        "summary": smoke_summary,
-                                    },
+                                wu_events.append(emit_attempt_outcome(
+                                    wu, attempt, "smoke_import_failed",
+                                    attempts_usage[-1],
+                                    extras={"summary": smoke_summary},
                                 ))
                                 attempt_notes.append((attempt, smoke_summary))
                                 failure_note = smoke_summary
@@ -2285,10 +2658,10 @@ def run(
                         )
                         if not closing_ok:
                             reset_preserving_events(head_before, events_path)
-                            wu_events.append(build_event(
-                                "attempt_outcome", wu.wu_id, {
-                                    "outcome": "closing_deliverable_missing",
-                                    "attempt": attempt,
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "closing_deliverable_missing",
+                                attempts_usage[-1],
+                                extras={
                                     "assertion": closing_summary.split(":", 1)[0].strip(),
                                     "summary": closing_summary,
                                 },
@@ -2349,6 +2722,13 @@ def run(
                                     {"gate": gate.number, "warns": list(_warns),
                                      "blocking": False},
                                 ))
+                        wu_events.append(emit_attempt_outcome(
+                            wu, attempt, "passed",
+                            attempts_usage[-1],
+                            files_touched=git_diff_names(head_before, sha) if sha else [],
+                            agent_status="complete",
+                            agent_blocked_reason=None,
+                        ))
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
@@ -2370,11 +2750,10 @@ def run(
                             + "\nEither actually modify them, or correct the "
                               "files_changed list to match what you really edited."
                         )
-                        wu_events.append(build_event(
-                            "attempt_outcome", wu.wu_id,
-                            {"outcome": "files_changed_mismatch",
-                             "attempt": attempt,
-                             "unchanged_paths": list(payload)},
+                        wu_events.append(emit_attempt_outcome(
+                            wu, attempt, "files_changed_mismatch",
+                            attempts_usage[-1],
+                            extras={"unchanged_paths": list(payload)},
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
@@ -2390,6 +2769,45 @@ def run(
                     # attempts; on eventual PASS they're discarded as scratch.
                     attempt_notes.append((attempt, payload))
                     failure_note = payload
+                    _fc, _fs = parse_gate_failure_signature(payload)
+                    _ex = extract_failure_excerpt(payload)
+                    wu_events.append(emit_attempt_outcome(
+                        wu, attempt, "failed",
+                        attempts_usage[-1],
+                        failure_class=_fc,
+                        failure_signature=_fs,
+                        failure_excerpt=_ex,
+                        files_touched=git_diff_names(head_before, "HEAD"),
+                        agent_status="complete",
+                        agent_blocked_reason=None,
+                    ))
+                    # T04: halt early when same (class, signature) repeats.
+                    if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                        wu_events.append(build_event("human_escalation", wu.wu_id, {
+                            "reason": "spinning_signature_repeat",
+                            "failure_class": _fc,
+                            "failure_signature": _fs,
+                            "attempts": attempt,
+                            "attempts_usage": attempts_usage,
+                        }))
+                        reset_preserving_events(head_before, events_path)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(spinning_signature_repeat, attempt {attempt})"
+                            f"\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   BLOCKED — spinning signature repeat at "
+                              f"attempt {attempt}/{MAX_ATTEMPTS}")
+                        blocked = True
+                        break
+                    if (_fc, _fs) != ("other", "no_gate_marker"):
+                        prior_failure_signature = (_fc, _fs)
+                    flush_events(events_path, wu_events)
+                    wu_events.clear()
                     reset_preserving_events(head_before, events_path)
                     print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
                 else:

@@ -5,8 +5,10 @@ slug: attempt-outcome-rearm-contract
 branch: feat/FEAT-2026-0016-attempt-outcome-rearm-contract
 roadmap_goal: Every dispatched attempt emits one `attempt_outcome` event with structured failure metadata, and re-arm cycles carry cumulative audit fields, so /gate-status, the predicate, the spinning-detector hook, and close-ceremony cost analysis read events.jsonl directly instead of re-parsing driver stdout.
 autonomy_default: review
-status: planned
+status: done
 planned_cost_usd: 20.10
+actual_cost_usd: 23.20
+verdict: met_locally
 ---
 
 # Plan: Per-attempt outcome events + re-arm contract + audit trail
@@ -193,20 +195,42 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Drafted by G1-PLAN at gate-1 close.
+      - id: FEAT-2026-0016/T04
+        file: WU-04-spinning-detector-driver-hook.md
+        depends_on: []
+      - id: FEAT-2026-0016/T05
+        file: WU-05-gate-status-per-attempt-surface.md
+        depends_on: []
+      - id: FEAT-2026-0016/T06
+        file: WU-06-unblock-wu-rationale-history.md
+        depends_on: []
       - id: FEAT-2026-0016/G2-CLOSE-INTERMEDIATE
         file: WU-90-gate-2-close-intermediate.md
-        depends_on: []   # G1-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0016/T04
+          - FEAT-2026-0016/T05
+          - FEAT-2026-0016/T06
       - id: FEAT-2026-0016/G2-PLAN
         file: WU-91-gate-2-plan-next.md
         depends_on: [FEAT-2026-0016/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Drafted by G2-PLAN at gate-2 close.
+      - id: FEAT-2026-0016/T07
+        file: WU-07-close-ceremony-cost-analysis.md
+        depends_on: []
+      - id: FEAT-2026-0016/T08
+        file: WU-08-learnings-suggest-skill.md
+        depends_on: []
+      - id: FEAT-2026-0016/T09
+        file: WU-09-docs-and-roadmap-archive.md
+        depends_on: []
       - id: FEAT-2026-0016/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []   # G2-PLAN sets real depends_on
+        depends_on:
+          - FEAT-2026-0016/T07
+          - FEAT-2026-0016/T08
+          - FEAT-2026-0016/T09
 ```
 
 ## Notes

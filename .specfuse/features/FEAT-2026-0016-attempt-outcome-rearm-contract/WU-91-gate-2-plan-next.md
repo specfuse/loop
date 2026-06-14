@@ -2,10 +2,14 @@
 id: FEAT-2026-0016/G2-PLAN
 type: plan-next
 effort: high
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
+duration_seconds: 672.649
+cost_usd: 4.78056
+input_tokens: 62
+output_tokens: 39619
 ---
 
 # Gate 2 plan-next — drafted by G1-PLAN at arm time
