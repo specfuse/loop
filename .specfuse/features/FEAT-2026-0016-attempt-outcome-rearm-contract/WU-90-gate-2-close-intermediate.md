@@ -2,10 +2,12 @@
 id: FEAT-2026-0016/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
 effort: medium
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.20
 generated_surfaces: []
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Gate 2 close-intermediate — drafted by G1-PLAN at arm time

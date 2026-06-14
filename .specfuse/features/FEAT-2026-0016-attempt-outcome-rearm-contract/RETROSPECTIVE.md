@@ -113,3 +113,15 @@ The true cumulative gate-1 substantive spend is $5.21. Worth flagging
 for a future predicate v2 refinement: aggregate `prior_attempts[*].cost_usd`
 into cost-ratio criteria so blocked-then-recovered cycles count
 correctly. Out of scope for this gate.)
+
+## Gate 2 — auto-closed (predicate=v1)
+
+On-plan intermediate close; full close-intermediate ceremony
+skipped per `evaluate_auto_close`. `plan-next` WU dispatched
+to draft gate 3.
+
+- feature_id: FEAT-2026-0016
+- predicate_version: v1
+- gate_total_cost: $1.43
+- gate_budget: $12.00
+- reasons: [] (auto=True)
