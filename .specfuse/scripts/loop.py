@@ -1461,6 +1461,126 @@ def assert_closing_deliverables(
 
 
 # --------------------------------------------------------------------------- #
+# Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
+# --------------------------------------------------------------------------- #
+
+
+def assert_terminal_flips_fired(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Post-pass invariant: when a close WU writes verdict=met, the terminal
+    state-flips must have materialized.
+
+    Checks (in order):
+      - WU frontmatter verdict (re-read from disk); skip if not "met"
+      - Terminal gate file's `status: passed`
+      - Roadmap row Status column == `done`
+      - Roadmap-archive anchor `<a id="<feat_lc>"></a>` present
+
+    head_before is accepted to mirror the assertion-function signature shape;
+    this check is pure file-state and does not need it.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict") or None
+    if verdict != "met":
+        return True, ""
+
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        return False, "terminal_gate_not_passed: PLAN.md has no gates"
+    terminal_gate = gates[-1]
+    gate_path = terminal_gate.file
+    if not gate_path.exists():
+        return (
+            False,
+            f"terminal_gate_not_passed: {gate_path.name} absent",
+        )
+    gate_fm, _ = read_frontmatter(gate_path)
+    gate_status = gate_fm.get("status", "")
+    if gate_status != "passed":
+        return (
+            False,
+            f"terminal_gate_not_passed: {gate_path.name} status={gate_status!r}",
+        )
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if not roadmap_path.exists():
+        return (
+            False,
+            f"roadmap_row_not_done: roadmap.md absent at {roadmap_path}",
+        )
+    row_re = re.compile(
+        r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|",
+        re.MULTILINE,
+    )
+    rm = row_re.search(roadmap_path.read_text())
+    if not rm:
+        return (
+            False,
+            f"roadmap_row_not_done: row for {feature_id} not found",
+        )
+    row_status = rm.group(2).strip()
+    if row_status != "done":
+        return False, f"roadmap_row_not_done: status={row_status!r}"
+
+    archive_path = repo_root / ".specfuse" / "roadmap-archive.md"
+    feat_id_lower = feature_id.lower()
+    anchor = f'<a id="{feat_id_lower}"></a>'
+    if not archive_path.exists():
+        return (
+            False,
+            f"archive_anchor_missing: {feat_id_lower} (roadmap-archive.md absent)",
+        )
+    if anchor not in archive_path.read_text():
+        return False, f"archive_anchor_missing: {feat_id_lower}"
+    return True, ""
+
+
+POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
+    "close": [assert_terminal_flips_fired],
+}
+
+
+def verify_post_pass_invariants(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """Dispatch the type-keyed post-pass invariant guard (FEAT-2026-0017/T01).
+
+    Returns (True, "") when the WU type has no invariants or all pass. On the
+    first failure returns (False, reason).
+
+    Distinct from `assert_closing_deliverables`: that guard fires immediately
+    after squash and checks the WU's own ceremony deliverables (retrospective,
+    learnings, etc.). This guard fires after the gate-boundary
+    `fire_terminal_flips` invocation and checks that driver-side state
+    transitions actually materialized — independent of the agent's RESULT.
+
+    Defends against the FEAT-2026-0015/T06 wiring-race surface: a close WU
+    passed cleanly with `verdict: met` but `fire_terminal_flips` was never
+    invoked because the in-memory `wu.verdict` snapshot (loaded BEFORE
+    dispatch by `load_wu`) shadowed the agent's just-written frontmatter
+    value. The re-read fix landed in PR #11 (commit 7f403bf); this guard is
+    the canary against re-introducing that or any equivalent close-path race.
+    """
+    invariants = POST_PASS_INVARIANTS_BY_TYPE.get(wu.type, [])
+    if not invariants:
+        return True, ""
+    for fn in invariants:
+        ok, reason = fn(wu, feature_dir, repo_root, head_before)
+        if not ok:
+            return False, reason
+    return True, ""
+
+
+# --------------------------------------------------------------------------- #
 # The loop                                                                    #
 # --------------------------------------------------------------------------- #
 
@@ -1873,6 +1993,41 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
                     f"chore(loop): {close_wu_for_terminal.wu_id} terminal flips"
                     f"\n\nFeature: {feature_id}",
                 )
+            # Post-pass driver-state invariant guard (FEAT-2026-0017/T01):
+            # fires AFTER fire_terminal_flips so the side-effect checks (gate
+            # `passed`, roadmap row `done`, archive anchor) observe the flips.
+            # Wiring deviation from WU AC4: AC asks for the guard inside the
+            # per-WU passed branch BEFORE `flush_events + done_ids.add`, but
+            # `fire_terminal_flips` lives at gate boundary (this site), not
+            # per-WU. Moving fire_terminal_flips earlier would invert the
+            # `set_gate(awaiting_review) -> fire_terminal_flips -> passed`
+            # sequence. This is the closest viable site per WU escalation #4;
+            # failure logs an event + bookkeeping commit and exits non-zero
+            # (no reset/retry — the per-WU attempt loop has already exited).
+            head_post = git("rev-parse", "HEAD")
+            ok, reason = verify_post_pass_invariants(
+                close_wu_for_terminal, feature_dir, REPO_ROOT, head_post,
+            )
+            if not ok:
+                flush_events(events_path, [build_event(
+                    "human_escalation", close_wu_for_terminal.wu_id, {
+                        "reason": "post_pass_invariant_failed",
+                        "assertion": reason.split(":", 1)[0].strip(),
+                        "summary": reason,
+                    })])
+                commit_bookkeeping(
+                    [events_path],
+                    f"chore(loop): {close_wu_for_terminal.wu_id} "
+                    f"post_pass_invariant_failed\n\nFeature: {feature_id}",
+                )
+                print(f"\n   POST-PASS INVARIANT FAILED — {reason}")
+                print(
+                    "Close WU passed with verdict=met but a terminal flip did "
+                    "not materialize. This is the FEAT-2026-0015/T06 "
+                    "wiring-race regression surface. Inspect events.jsonl "
+                    "and the fire_terminal_flips wiring."
+                )
+                return 1
         is_terminal_gate = gate is gates[-1]
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()

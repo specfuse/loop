@@ -3,8 +3,8 @@ id: FEAT-2026-0017/T01
 type: implementation
 model: claude-opus-4-7
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces_driver_helper:
   - POST_PASS_INVARIANTS_BY_TYPE
@@ -28,6 +28,10 @@ prior_attempts:
     duration_seconds: 1579.077
     cost_usd: 11.081799
     notes: "Opus correctly diagnosed and refused: pre-existing 20 errors in tests/test_loop_files_changed_guard.py + tests/test_loop_orchestration.py whose _init_git helpers lacked gpgSign-false setup. Reproduces on main. Out of WU scope. Also flagged AC4 wiring as structural deviation (Escalation trigger 4) for operator review. Hygiene-fix applied operator-side: gpgSign-false line added to both helpers; 40 tests OK. Re-armed."
+duration_seconds: 637.097
+cost_usd: 4.105709
+input_tokens: 55
+output_tokens: 40964
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
