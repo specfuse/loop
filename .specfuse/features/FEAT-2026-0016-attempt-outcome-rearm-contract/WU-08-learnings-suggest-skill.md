@@ -2,8 +2,8 @@
 id: FEAT-2026-0016/T08
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.20
 generated_surfaces: []
 produces_driver_helper: []
@@ -13,10 +13,10 @@ prior_attempts:
     outcome: blocked_sandbox_denyWithinAllow
     duration_seconds: 189.821
     notes: "Agent correctly diagnosed: `.claude/skills` is in Claude Code's sandbox `denyWithinAllow` list, so even with `unsandboxed: true` on the WU, the dispatched session cannot create the symlink at .claude/skills/learnings-suggest. Operator created the symlink manually (out-of-loop) via `cd .claude/skills && ln -s ../../.specfuse/skills/learnings-suggest learnings-suggest` from the main Claude Code session (which has different sandbox permissions). Re-arming T08 to retry the substantive skill file authoring. The symlink-creation step in AC may need to be re-scoped as 'operator-side, not agent-side' for this WU and similar future skill-adding WUs."
-duration_seconds: 189.821
-cost_usd: 0.403617
-input_tokens: 18
-output_tokens: 8621
+duration_seconds: 205.704
+cost_usd: 0.326999
+input_tokens: 9
+output_tokens: 9065
 ---
 
 # `/learnings-suggest` skill — cluster `failure_signature` across features, surface candidate LEARNINGS entries
