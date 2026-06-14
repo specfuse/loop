@@ -1,7 +1,7 @@
 ---
 gate: 3
 status: open
-cost_budget_usd: 5.50
+cost_budget_usd: 7.00  # raised at arm time from 5.50 — gate-1 ratio 1.62× × $4.20 plan ≈ $6.80, buffer to $7
 ---
 
 # Gate 3 — Close-ceremony cost analysis + LEARNINGS auto-suggester + docs (drafted by G2-PLAN)
