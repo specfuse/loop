@@ -1045,6 +1045,81 @@ def execute_unit_attempt(
 
 
 # --------------------------------------------------------------------------- #
+# Roadmap row parser (header-name based) — issue #15                          #
+# --------------------------------------------------------------------------- #
+
+
+def _parse_roadmap_row(roadmap_text: str, feature_id: str) -> dict | None:
+    """Find feature_id's row in roadmap.md and return columns mapped by header name.
+
+    Looks up the first markdown table header row containing a 'Status' cell,
+    parses column names by name (not by positional index), then finds the
+    feature_id data row after the header. Tolerates any column count and any
+    ordering, including project-specific columns like 'Priority' or 'Budget'.
+
+    Returns a dict on success:
+        'columns':    {col_name: stripped_value, ...}
+        'cell_spans': {col_name: (start, end), ...} absolute offsets into
+                      roadmap_text spanning the BETWEEN-PIPES content (suitable
+                      for whole-cell rewrites).
+        'row_span':   (start, end) absolute offsets of the full row line.
+
+    Returns None if no table header containing 'Status' is found, or if no
+    feature_id row exists after that header.
+    """
+    # Locate the table header — a line `| col1 | col2 | ... |` whose cells
+    # include the literal 'Status'. The header row appears immediately above
+    # the markdown separator line; we use 'Status' in its cells as the marker.
+    header_re = re.compile(r"^\|([^\n]*)\|\s*$", re.MULTILINE)
+    header_m = None
+    col_names: list[str] = []
+    for m in header_re.finditer(roadmap_text):
+        cells = [c.strip() for c in m.group(1).split("|")]
+        if "Status" in cells:
+            header_m = m
+            col_names = cells
+            break
+    if header_m is None:
+        return None
+
+    # Locate the feature_id data row AFTER the header.
+    row_re = re.compile(
+        r"^\|\s*" + re.escape(feature_id) + r"\s*\|[^\n]*$",
+        re.MULTILINE,
+    )
+    row_m = row_re.search(roadmap_text, pos=header_m.end())
+    if not row_m:
+        return None
+
+    row_text = row_m.group(0)
+    row_start_abs = row_m.start()
+
+    # Pipe positions inside the row identify cell boundaries.
+    pipes = [i for i, ch in enumerate(row_text) if ch == "|"]
+    if len(pipes) < len(col_names) + 1:
+        # Malformed row — fewer cells than the header declares.
+        return None
+
+    columns: dict[str, str] = {}
+    cell_spans: dict[str, tuple[int, int]] = {}
+    for col_idx, col_name in enumerate(col_names):
+        cell_start_rel = pipes[col_idx] + 1
+        cell_end_rel = pipes[col_idx + 1]
+        raw = row_text[cell_start_rel:cell_end_rel]
+        columns[col_name] = raw.strip()
+        cell_spans[col_name] = (
+            row_start_abs + cell_start_rel,
+            row_start_abs + cell_end_rel,
+        )
+
+    return {
+        "columns": columns,
+        "cell_spans": cell_spans,
+        "row_span": (row_start_abs, row_m.end()),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Auto-archive helper                                                         #
 # --------------------------------------------------------------------------- #
 
@@ -1063,22 +1138,17 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     back_link = f'[→ archive](roadmap-archive.md#{feat_id_lower})'
     marker = "<!-- Archived sections appended below -->"
 
-    # Step 1 — read and validate table row
+    # Step 1 — read and validate table row (header-name based; issue #15)
     if not roadmap_path.exists():
         return f"refused: {roadmap_path} not found"
     roadmap_text = roadmap_path.read_text()
 
-    row_re = re.compile(
-        r'^\|\s*' + re.escape(feature_id) + r'\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|[^\n]*$',
-        re.MULTILINE,
-    )
-    row_m = row_re.search(roadmap_text)
-    if not row_m:
+    parsed = _parse_roadmap_row(roadmap_text, feature_id)
+    if parsed is None:
         return f"refused: {feature_id} not found in roadmap"
 
-    # Columns: Title(1) | Status(2) | Folder(3) | Detail(4)
-    status = row_m.group(2).strip()
-    detail = row_m.group(4).strip()
+    status = parsed["columns"].get("Status", "")
+    detail = parsed["columns"].get("Detail", "")
 
     if "roadmap-archive.md#" in detail:
         return "already archived"
@@ -1103,12 +1173,12 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
     archive_path.write_text(new_archive)
 
-    # Step 4 — update Detail cell with back-link
-    detail_start = row_m.start(4) - row_m.start(0)
-    detail_end = row_m.end(4) - row_m.start(0)
-    old_row = row_m.group(0)
-    new_row = old_row[:detail_start] + f' {back_link} ' + old_row[detail_end:]
-    roadmap_text = roadmap_text[:row_m.start()] + new_row + roadmap_text[row_m.end():]
+    # Step 4 — update Detail cell with back-link (skip if column absent; issue #15)
+    if "Detail" in parsed["cell_spans"]:
+        detail_start, detail_end = parsed["cell_spans"]["Detail"]
+        roadmap_text = (
+            roadmap_text[:detail_start] + f" {back_link} " + roadmap_text[detail_end:]
+        )
 
     # Step 5 — remove inline section (re-search since row update shifted offsets)
     section_m2 = section_re.search(roadmap_text)
@@ -1166,29 +1236,29 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
             roadmap_path,
         )
     else:
+        # Header-name based parsing — tolerates projects with extra columns
+        # (e.g. Priority). See issue #15.
         roadmap_text = roadmap_path.read_text()
-        row_re = re.compile(
-            r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|[^\n]*$",
-            re.MULTILINE,
-        )
-        row_m = row_re.search(roadmap_text)
-        if not row_m:
+        parsed = _parse_roadmap_row(roadmap_text, feature_id)
+        if parsed is None:
             logging.warning(
                 "fire_terminal_flips: %s not found in roadmap.md — skipping row flip",
                 feature_id,
             )
         else:
-            current_row_status = row_m.group(2).strip()
+            current_row_status = parsed["columns"].get("Status", "")
+            status_start, status_end = parsed["cell_spans"]["Status"]
             if current_row_status == "done":
                 logging.info(
                     "fire_terminal_flips: roadmap row for %s already done — skipping",
                     feature_id,
                 )
             elif current_row_status == "active":
+                status_cell = roadmap_text[status_start:status_end]
                 new_roadmap = (
-                    roadmap_text[: row_m.start(2)]
-                    + row_m.group(2).replace("active", "done", 1)
-                    + roadmap_text[row_m.end(2):]
+                    roadmap_text[:status_start]
+                    + status_cell.replace("active", "done", 1)
+                    + roadmap_text[status_end:]
                 )
                 roadmap_path.write_text(new_roadmap)
                 modified.add(roadmap_path)
