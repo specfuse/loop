@@ -2,13 +2,17 @@
 id: FEAT-2026-0016/T02
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.80
 generated_surfaces: []
 produces_driver_helper:
   - fold_cumulative_on_rearm
   - detect_rearm_dispatch
+duration_seconds: 470.968
+cost_usd: 1.029735
+input_tokens: 25
+output_tokens: 26615
 ---
 
 # Re-arm WU frontmatter contract + driver cumulative-fold logic

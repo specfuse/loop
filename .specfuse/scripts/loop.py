@@ -636,6 +636,59 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
 
 
+def detect_rearm_dispatch(wu: WorkUnit) -> bool:
+    """Return True when wu is a re-arm dispatch whose prior cycle's cost has
+    not yet been folded into the cumulative accumulators.
+
+    Reads re_arm_count and cost_usd from the WU's on-disk frontmatter because
+    load_wu does not load those fields into the WorkUnit object.
+    Returns False for first-time dispatches (re_arm_count absent or 0) and for
+    re-arms where cost was already folded (cost_usd == 0 after a prior fold).
+    """
+    fm, _ = read_frontmatter(wu.file)
+    re_arm_count = fm.get("re_arm_count", 0)
+    if not isinstance(re_arm_count, int) or re_arm_count <= 0:
+        return False
+    cost_usd = fm.get("cost_usd", 0)
+    return isinstance(cost_usd, (int, float)) and float(cost_usd) > 0
+
+
+def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
+    """Fold the prior dispatch cycle's cost/token/duration into cumulative fields.
+
+    Called once per re-arm before the new cycle's attempt loop begins.
+    Reads per-cycle fields (cost_usd, duration_seconds, input_tokens,
+    output_tokens) written by the prior write_cost_to_wu call, accumulates
+    them into cumulative_* counterparts (initialising to 0 when absent), then
+    resets the per-cycle fields so the new cycle's write_cost_to_wu starts
+    from zero.
+
+    Backward-compatible: existing WUs with no cumulative_* fields initialise
+    from 0 — no KeyError on first re-arm of a WU that pre-dates this contract.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    prior_cost = float(fm.get("cost_usd") or 0)
+    prior_duration = float(fm.get("duration_seconds") or 0)
+    prior_input = int(fm.get("input_tokens") or 0)
+    prior_output = int(fm.get("output_tokens") or 0)
+
+    cum_cost = float(fm.get("cumulative_cost_usd") or 0) + prior_cost
+    cum_duration = float(fm.get("cumulative_duration_seconds") or 0) + prior_duration
+    cum_input = int(fm.get("cumulative_input_tokens") or 0) + prior_input
+    cum_output = int(fm.get("cumulative_output_tokens") or 0) + prior_output
+
+    backend.set_wu(wu, "cumulative_cost_usd", round(cum_cost, 6))
+    backend.set_wu(wu, "cumulative_duration_seconds", round(cum_duration, 3))
+    backend.set_wu(wu, "cumulative_input_tokens", cum_input)
+    backend.set_wu(wu, "cumulative_output_tokens", cum_output)
+
+    # Reset per-cycle fields so the new cycle's write_cost_to_wu starts clean.
+    backend.set_wu(wu, "cost_usd", 0.0)
+    backend.set_wu(wu, "duration_seconds", 0.0)
+    backend.set_wu(wu, "input_tokens", 0)
+    backend.set_wu(wu, "output_tokens", 0)
+
+
 def gate_budget_usd(gate_file: Path) -> float | None:
     """Return the optional cumulative-cost ceiling declared on a GATE.md.
 
@@ -2284,6 +2337,9 @@ def run(
                     # Fall through to existing close-WU dispatch path
 
                 head_before = git("rev-parse", "HEAD")
+                _is_rearm = detect_rearm_dispatch(wu)
+                if _is_rearm:
+                    fold_cumulative_on_rearm(wu, backend)
                 backend.set_wu(wu, "status", "in_progress")
                 # Events and per-attempt notes are buffered in memory during the
                 # WU's lifecycle and flushed at outcome time. This prevents the
@@ -2291,8 +2347,22 @@ def run(
                 # wiping appended events / status flips — anything that should
                 # be durable is either committed in the squash (PASS) or in a
                 # bookkeeping commit (BLOCKED/SPINNING).
+                _wu_fm_rearm, _ = read_frontmatter(wu.file)
+                re_arm_count = int(_wu_fm_rearm.get("re_arm_count") or 0)
                 wu_events = [build_event("task_started", wu.wu_id,
-                                         {"type": wu.type, "model": wu.model})]
+                                         {"type": wu.type, "model": wu.model,
+                                          "re_arm_count": re_arm_count})]
+                if _is_rearm:
+                    _rearm_history = _wu_fm_rearm.get("re_arm_history") or []
+                    _rearm_reason = ""
+                    if isinstance(_rearm_history, list) and _rearm_history:
+                        _last_entry = _rearm_history[-1]
+                        if isinstance(_last_entry, dict):
+                            _rearm_reason = str(_last_entry.get("reason", ""))
+                    wu_events.append(build_event("re_arm_dispatched", wu.wu_id, {
+                        "re_arm_count": re_arm_count,
+                        "reason": _rearm_reason,
+                    }))
                 if wu.unsandboxed:
                     # Audit signal: WU opted out of the claude -p sandbox.
                     # Event logged before first attempt so the trail exists
