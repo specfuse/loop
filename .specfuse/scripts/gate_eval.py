@@ -15,8 +15,10 @@ tests landed.
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -374,3 +376,128 @@ def evaluate_auto_close(feature_dir: Path, gate_id: int) -> AutoCloseDecision:
         feature_id=feature_id,
         predicate_version=PREDICATE_VERSION,
     )
+
+
+# ---------------------------------------------------------------------------
+# CLI helpers (T03)
+# ---------------------------------------------------------------------------
+
+
+def _resolve_feature_dir(feature_id: str, repo_root: Path) -> "Path | None":
+    """Resolve a feature ID (full, partial numeric, or slug) to a feature directory.
+
+    Returns None on no match; raises ValueError on ambiguous partial match.
+    """
+    features_dir = repo_root / ".specfuse" / "features"
+    if not features_dir.is_dir():
+        return None
+
+    candidates = sorted(d for d in features_dir.iterdir() if d.is_dir())
+
+    # Priority 1: exact directory name
+    exact = [d for d in candidates if d.name == feature_id]
+    if len(exact) == 1:
+        return exact[0]
+
+    # Priority 2: name starts with "<feature_id>-" (full FEAT-YYYY-NNNN prefix)
+    prefix = [d for d in candidates if d.name.startswith(feature_id + "-")]
+    if len(prefix) == 1:
+        return prefix[0]
+    if len(prefix) > 1:
+        raise ValueError(f"ambiguous: {[d.name for d in prefix]}")
+
+    # Priority 3: partial numeric (0017) or slug suffix match
+    partial: list[Path] = []
+    for d in candidates:
+        name = d.name
+        parts = name.split("-")
+        # FEAT-YYYY-NNNN-slug → parts[2] is the NNNN part
+        if len(parts) >= 4:
+            nnnn = parts[2]
+            slug = "-".join(parts[3:])
+            if nnnn == feature_id or slug == feature_id:
+                partial.append(d)
+        elif feature_id in name:
+            partial.append(d)
+
+    if len(partial) == 0:
+        return None
+    if len(partial) == 1:
+        return partial[0]
+    raise ValueError(f"ambiguous: {[d.name for d in partial]}")
+
+
+def _format_decision(decision: AutoCloseDecision) -> str:
+    """Render an AutoCloseDecision to the canonical block shape."""
+    lines: list[str] = []
+    gate_str = f"G{decision.gate_id:02d}"
+    lines.append(f"  {gate_str}  auto={decision.auto}")
+    if decision.reasons:
+        lines.append("    reasons:")
+        for r in decision.reasons:
+            lines.append(f"      - {r}")
+    lines.append("    metrics:")
+    total = decision.metrics.get("gate_total_cost", 0.0)
+    budget = decision.metrics.get("gate_budget")
+    lines.append(f"      gate_total_cost: ${total:.2f}")
+    budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
+    lines.append(f"      gate_budget: {budget_str}")
+    return "\n".join(lines)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="gate_eval.py",
+        description=f"Specfuse gate-close predicate CLI (predicate={PREDICATE_VERSION})",
+    )
+    subparsers = parser.add_subparsers(dest="command")
+
+    bt = subparsers.add_parser(
+        "backtest",
+        help="Evaluate the auto-close predicate against a feature directory",
+    )
+    bt.add_argument("feature_id", help="Feature ID (full FEAT-YYYY-NNNN, partial 0017, or slug)")
+    bt.add_argument(
+        "--gate",
+        type=int,
+        metavar="N",
+        default=None,
+        help="Restrict evaluation to gate N",
+    )
+
+    args = parser.parse_args()
+
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
+
+    # backtest subcommand
+    repo_root = Path(__file__).resolve().parent.parent.parent
+
+    try:
+        feature_dir = _resolve_feature_dir(args.feature_id, repo_root)
+    except ValueError as exc:
+        print(f"ambiguous feature ID: {exc}")
+        sys.exit(0)
+
+    if feature_dir is None:
+        print(f"no feature matches: {args.feature_id}")
+        sys.exit(0)
+
+    plan = _read_plan_metrics(feature_dir)
+    fm = plan["frontmatter"]
+    feature_id = fm.get("feature_id", feature_dir.name)
+    gates = plan["gates"]
+
+    gate_ids = [g["gate"] for g in gates if isinstance(g.get("gate"), int)]
+    if args.gate is not None:
+        gate_ids = [gid for gid in gate_ids if gid == args.gate]
+
+    print(f"{feature_id}  predicate={PREDICATE_VERSION}")
+    for gate_id in gate_ids:
+        decision = evaluate_auto_close(feature_dir, gate_id)
+        print(_format_decision(decision))
+
+
+if __name__ == "__main__":
+    main()

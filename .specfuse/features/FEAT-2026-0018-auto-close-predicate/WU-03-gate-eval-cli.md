@@ -2,14 +2,18 @@
 id: FEAT-2026-0018/T03
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.80
 generated_surfaces: []
 produces_driver_helper:
   - main
   - _format_decision
   - _resolve_feature_dir
+duration_seconds: 820.468
+cost_usd: 2.471325
+input_tokens: 61
+output_tokens: 33223
 ---
 
 # CLI backtest entrypoint + calibration regression
