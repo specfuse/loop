@@ -2,8 +2,8 @@
 id: FEAT-2026-0016/T03
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
 produces_driver_helper: []
@@ -14,10 +14,10 @@ prior_attempts:
     duration_seconds: 280.018
     cost_usd: 0.835044
     notes: "AC7e used `git diff --name-only HEAD` which excludes untracked files. New test file IS untracked so check spuriously fails. Agent correctly diagnosed + proposed fix. Same class as LEARNINGS [driver/files_changed-guard]. Spec revised: AC7e now uses combined `{ git diff --name-only HEAD; git ls-files --others --exclude-standard; }`. G1-CLOSE-INTERMEDIATE AC6 had same broken pattern (creates RETROSPECTIVE.md); also fixed pre-emptively."
-duration_seconds: 280.018
-cost_usd: 0.835044
-input_tokens: 5319
-output_tokens: 15826
+duration_seconds: 659.659
+cost_usd: 1.475623
+input_tokens: 28
+output_tokens: 39736
 ---
 
 # Unit tests for attempt_outcome emission + re-arm cumulative-fold logic
