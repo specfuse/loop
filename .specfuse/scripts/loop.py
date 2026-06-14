@@ -1449,22 +1449,15 @@ def assert_closing_deliverables(
     other guards handle it) or all assertions pass.  On the first failure returns
     (False, reason) where reason names the failing assertion function.
 
-    Pre-condition: if the squash diff contains ONLY the driver's own bookkeeping
-    write to the WU file (status/cost), the agent produced no substantive output;
-    skip the assertions.  Other guards (zero_token, files_changed, smoke) cover
-    that surface.  This avoids false negatives in test fixtures that use hollow
-    dispatch stubs to test orthogonal behaviors.
+    No "diff is empty" bypass: a close-type WU whose squash contains only the
+    driver's own WU-file bookkeeping is a hollow pass and MUST fail one of the
+    typed assertions (assert_retrospective_exists fires first for ``close``).
+    The earlier bypass introduced for test-fixture convenience also silently
+    passed real hollow-pass close ceremonies (FEAT-2026-0017/G1-CLOSE attempt-3
+    surface).
     """
     assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
     if not assertions:
-        return True, ""
-    proc = subprocess.run(
-        ["git", "diff", "--name-only", head_before, "HEAD"],
-        capture_output=True, text=True,
-    )
-    changed = {p for p in proc.stdout.splitlines() if p}
-    wu_rel = str(wu.file)
-    if not (changed - {wu_rel}):
         return True, ""
     for fn in assertions:
         ok, reason = fn(wu, feature_dir, repo_root, head_before)

@@ -570,6 +570,50 @@ class TestCloseAssertions(unittest.TestCase):
             self.assertTrue(ok, f"Expected pass; got reason: {reason!r}")
             self.assertEqual(reason, "")
 
+    def test_close_fails_when_diff_only_touches_wu_file(self):
+        """FEAT-2026-0017/G1-CLOSE attempt-3 regression: a close-type WU whose
+        squash diff contains ONLY the WU's own frontmatter (driver bookkeeping)
+        must NOT silently pass; an earlier 'diff-is-empty' bypass made hollow
+        close ceremonies look successful. Guard must fall through to the typed
+        assertions, which fail because no RETROSPECTIVE.md was written."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git(root)
+            (root / "feature").mkdir()
+            wu_rel = "feature/WU-close.md"
+            (root / wu_rel).write_text(
+                "---\nid: FEAT-9999/G1-CLOSE\nstatus: pending\nattempts: 0\n---\n"
+            )
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "commit", "-q", "-m", "init"], check=True,
+            )
+            head_before = _git(root, "rev-parse", "HEAD")
+            # Hollow squash: only the WU file gets modified (driver bookkeeping shape).
+            (root / wu_rel).write_text(
+                "---\nid: FEAT-9999/G1-CLOSE\nstatus: done\nattempts: 3\n---\n"
+            )
+            subprocess.run(["git", "-C", str(root), "add", wu_rel], check=True)
+            subprocess.run(
+                ["git", "-C", str(root), "commit", "-q", "-m", "squash"], check=True,
+            )
+            fdir = root / "feature"
+            wu = _make_wu(
+                file=root / wu_rel,
+                wu_type="close",
+                verdict="not_set",
+            )
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(root)
+                ok, reason = loop.assert_closing_deliverables(
+                    wu, fdir, root, head_before,
+                )
+            finally:
+                os.chdir(old_cwd)
+            self.assertFalse(ok, "diff-only-touches-wu hollow pass must NOT pass")
+            self.assertIn("assert_retrospective_exists", reason)
+
     def test_close_fails_when_retrospective_missing(self):
         """close: fails immediately when RETROSPECTIVE.md absent."""
         with tempfile.TemporaryDirectory() as tmp:
