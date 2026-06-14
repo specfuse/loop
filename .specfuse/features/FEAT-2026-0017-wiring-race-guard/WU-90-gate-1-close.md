@@ -3,7 +3,7 @@ id: FEAT-2026-0017/G1-CLOSE
 type: close
 model: claude-opus-4-7
 effort: high
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 1.20
 oracle_env: macos_local
@@ -20,6 +20,10 @@ prior_attempts:
     duration_seconds: 839.536
     cost_usd: 4.97415
     notes: "Spun on assert_doc_or_roadmap_diff guard requiring docs/ or roadmap.md touch in squash, but WU body forbids roadmap.md edit (FEAT-2026-0015/T06 consolidated driver-side) and scaffold has no docs/. T07 guard contract contradicts T06 consolidation. Hygiene-fix applied: guard now also accepts .specfuse/LEARNINGS.md and RETROSPECTIVE.md (the real close-ceremony documentation deliverables). 30 closing-deliverable guard tests still OK. Re-armed."
+duration_seconds: 705.545
+cost_usd: 4.700944
+input_tokens: 82
+output_tokens: 42858
 ---
 
 # Gate 1 close — terminal close ceremony (NEW contract; recursive dogfood)
