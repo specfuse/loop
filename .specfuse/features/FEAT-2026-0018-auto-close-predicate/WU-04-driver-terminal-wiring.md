@@ -2,14 +2,18 @@
 id: FEAT-2026-0018/T04
 type: implementation
 effort: xhigh
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 generated_surfaces: []
 produces_driver_helper:
   - maybe_auto_close_terminal
   - write_stub_retrospective_terminal
   - mark_close_wu_auto_closed
+duration_seconds: 1490.444
+cost_usd: 4.096069
+input_tokens: 96
+output_tokens: 75525
 ---
 
 # Driver integration at terminal gate boundary

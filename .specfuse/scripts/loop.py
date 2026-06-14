@@ -57,6 +57,7 @@ from pathlib import Path
 # `_miniyaml.py` for the grammar and the fail-loud rejections.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _miniyaml  # noqa: E402
+from gate_eval import evaluate_auto_close, AutoCloseDecision  # noqa: E402
 
 SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
@@ -1218,6 +1219,143 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
 
 
 # --------------------------------------------------------------------------- #
+# Terminal auto-close helpers (FEAT-2026-0018/T04)                           #
+# --------------------------------------------------------------------------- #
+
+
+def write_stub_retrospective_terminal(
+    feature_dir: Path,
+    gate_number: int,
+    decision: AutoCloseDecision,
+) -> None:
+    """Write (or append) the auto-close stub section to RETROSPECTIVE.md.
+
+    Satisfies both assert_retrospective_exists (non-empty file) and
+    assert_retrospective_gate_section (^#{1,3} Gate N heading).
+    """
+    retro = feature_dir / "RETROSPECTIVE.md"
+    metrics = decision.metrics
+    budget = metrics.get("gate_budget")
+    budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
+    total_cost = metrics.get("gate_total_cost", 0.0)
+    section = (
+        f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
+        f"On-plan close; full retrospective ceremony skipped per\n"
+        f"`evaluate_auto_close`.\n\n"
+        f"- feature_id: {decision.feature_id}\n"
+        f"- predicate_version: {decision.predicate_version}\n"
+        f"- gate_total_cost: ${total_cost:.2f}\n"
+        f"- gate_budget: {budget_str}\n"
+        f"- reasons: [] (auto=True)\n"
+    )
+    if retro.exists():
+        with retro.open("a") as fh:
+            fh.write("\n" + section)
+    else:
+        retro.write_text(section)
+
+
+def mark_close_wu_auto_closed(
+    wu: "WorkUnit | None",
+    decision: AutoCloseDecision,
+) -> None:
+    """Flip close-WU frontmatter fields for the auto-close path.
+
+    Sets status=done, verdict=met (so assert_terminal_flips_fired fires),
+    auto_close=true, auto_close_reasons=[] for downstream discoverability.
+    No-op when wu is None (legacy gate without a close WU).
+    """
+    if wu is None:
+        return
+    write_frontmatter_field(wu.file, "status", "done")
+    write_frontmatter_field(wu.file, "verdict", "met")
+    write_frontmatter_field(wu.file, "auto_close", "true")
+    write_frontmatter_field(wu.file, "auto_close_reasons", "[]")
+
+
+def maybe_auto_close_terminal(
+    feature_dir: Path,
+    feature_id: str,
+    gate: "GateNode",
+    gates: "list[GateNode]",
+    events_path: Path,
+    close_wu_for_terminal: "WorkUnit | None",
+    repo_root: Path = REPO_ROOT,
+) -> tuple[bool, AutoCloseDecision]:
+    """Evaluate the auto-close predicate for the terminal gate.
+
+    Returns (True, decision) when predicate fires and the auto path was taken.
+    Returns (False, decision) when predicate refuses; caller falls through to
+    the existing close-WU dispatch path unchanged.
+    """
+    decision = evaluate_auto_close(feature_dir, gate.number)
+    if not decision.auto:
+        return False, decision
+    write_stub_retrospective_terminal(feature_dir, gate.number, decision)
+    mark_close_wu_auto_closed(close_wu_for_terminal, decision)
+    metrics = decision.metrics
+    flush_events(events_path, [build_event(
+        "auto_close_decision", feature_id, {
+            "gate": gate.number,
+            "auto": True,
+            "reasons": decision.reasons,
+            "predicate_version": decision.predicate_version,
+            "metrics": {
+                "gate_total_cost": metrics.get("gate_total_cost", 0.0),
+                "gate_budget": metrics.get("gate_budget"),
+                "blocked_human_events": metrics.get("blocked_human_events", []),
+                "replan_events": metrics.get("replan_events", []),
+            },
+        },
+    )])
+    return True, decision
+
+
+def _fire_and_verify_terminal_flips(
+    close_wu: "WorkUnit",
+    feature_dir: Path,
+    events_path: Path,
+    feature_id: str,
+) -> int:
+    """Fire terminal state flips and run the post-pass invariant guard.
+
+    Returns 0 on success, 1 when the guard fires. Called from both the
+    auto-close path and the normal close-WU path; factored here to avoid
+    duplicating the fire+verify block across both branches (FEAT-2026-0018/T04).
+    """
+    flip_paths = fire_terminal_flips(close_wu, feature_dir, REPO_ROOT)
+    if flip_paths:
+        commit_bookkeeping(
+            flip_paths,
+            f"chore(loop): {close_wu.wu_id} terminal flips"
+            f"\n\nFeature: {feature_id}",
+        )
+    head_post = git("rev-parse", "HEAD")
+    ok, reason = verify_post_pass_invariants(close_wu, feature_dir, REPO_ROOT, head_post)
+    if not ok:
+        flush_events(events_path, [build_event(
+            "human_escalation", close_wu.wu_id, {
+                "reason": "post_pass_invariant_failed",
+                "assertion": reason.split(":", 1)[0].strip(),
+                "summary": reason,
+            })])
+        commit_bookkeeping(
+            [events_path],
+            f"chore(loop): {close_wu.wu_id} "
+            f"post_pass_invariant_failed\n\nFeature: {feature_id}",
+        )
+        print(f"\n   POST-PASS INVARIANT FAILED — {reason}")
+        print(
+            "Close WU passed with verdict=met but a terminal flip did "
+            "not materialize. This is the FEAT-2026-0015/T06 "
+            "wiring-race regression surface. Inspect events.jsonl "
+            "and the fire_terminal_flips wiring."
+        )
+        return 1
+    return 0
+
+
+# --------------------------------------------------------------------------- #
 # Closing-ceremony deliverable guards (FEAT-2026-0015/T07)                   #
 # --------------------------------------------------------------------------- #
 
@@ -2011,50 +2149,37 @@ def run(feature_arg: str | None, dry_run: bool) -> int:
             [gate.file, events_path],
             f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
         )
-        if close_wu_for_terminal is not None:
-            flip_paths = fire_terminal_flips(close_wu_for_terminal, feature_dir, REPO_ROOT)
-            if flip_paths:
+        # FEAT-2026-0018/T04 — terminal auto-close branch
+        is_terminal_gate = gate is gates[-1]
+        auto_closed = False
+        if is_terminal_gate and close_wu_for_terminal is not None:
+            auto_closed, decision = maybe_auto_close_terminal(
+                feature_dir, feature_id, gate, gates,
+                events_path, close_wu_for_terminal, repo_root=REPO_ROOT,
+            )
+            if auto_closed:
                 commit_bookkeeping(
-                    flip_paths,
-                    f"chore(loop): {close_wu_for_terminal.wu_id} terminal flips"
-                    f"\n\nFeature: {feature_id}",
+                    [feature_dir / "RETROSPECTIVE.md",
+                     close_wu_for_terminal.file,
+                     events_path],
+                    f"chore(loop): {close_wu_for_terminal.wu_id} "
+                    f"auto-closed (predicate=v1)\n\n"
+                    f"Feature: {feature_id}",
                 )
+                rc = _fire_and_verify_terminal_flips(
+                    close_wu_for_terminal, feature_dir, events_path, feature_id,
+                )
+                if rc:
+                    return rc
+        if close_wu_for_terminal is not None and not auto_closed:
             # Post-pass driver-state invariant guard (FEAT-2026-0017/T01):
             # fires AFTER fire_terminal_flips so the side-effect checks (gate
             # `passed`, roadmap row `done`, archive anchor) observe the flips.
-            # Wiring deviation from WU AC4: AC asks for the guard inside the
-            # per-WU passed branch BEFORE `flush_events + done_ids.add`, but
-            # `fire_terminal_flips` lives at gate boundary (this site), not
-            # per-WU. Moving fire_terminal_flips earlier would invert the
-            # `set_gate(awaiting_review) -> fire_terminal_flips -> passed`
-            # sequence. This is the closest viable site per WU escalation #4;
-            # failure logs an event + bookkeeping commit and exits non-zero
-            # (no reset/retry — the per-WU attempt loop has already exited).
-            head_post = git("rev-parse", "HEAD")
-            ok, reason = verify_post_pass_invariants(
-                close_wu_for_terminal, feature_dir, REPO_ROOT, head_post,
+            rc = _fire_and_verify_terminal_flips(
+                close_wu_for_terminal, feature_dir, events_path, feature_id,
             )
-            if not ok:
-                flush_events(events_path, [build_event(
-                    "human_escalation", close_wu_for_terminal.wu_id, {
-                        "reason": "post_pass_invariant_failed",
-                        "assertion": reason.split(":", 1)[0].strip(),
-                        "summary": reason,
-                    })])
-                commit_bookkeeping(
-                    [events_path],
-                    f"chore(loop): {close_wu_for_terminal.wu_id} "
-                    f"post_pass_invariant_failed\n\nFeature: {feature_id}",
-                )
-                print(f"\n   POST-PASS INVARIANT FAILED — {reason}")
-                print(
-                    "Close WU passed with verdict=met but a terminal flip did "
-                    "not materialize. This is the FEAT-2026-0015/T06 "
-                    "wiring-race regression surface. Inspect events.jsonl "
-                    "and the fire_terminal_flips wiring."
-                )
-                return 1
-        is_terminal_gate = gate is gates[-1]
+            if rc:
+                return rc
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()
             and read_frontmatter(feature_dir / ref["file"])[0].get("type") == "close"
