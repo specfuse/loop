@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: awaiting_review
+status: open  # reopened for T11H hygiene + G3-CLOSE re-run per gate-3 recursive-dogfood evidence (terminal wiring relocation)
 cost_budget_usd: 8.00  # raised from 4.50 per G2-PLAN GATE-03-REVIEW open-verification #1 — gate-2 ratio 1.64×, gate 3 substantives + close projected ~$6 with buffer
 ---
 

@@ -2,11 +2,17 @@
 id: FEAT-2026-0018/G3-CLOSE
 type: close
 effort: high
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 1.50
 generated_surfaces: []
-verdict: met_locally
+prior_attempts:
+  - attempts: 1
+    model: claude-opus-4-7
+    outcome: passed_verdict_met_locally
+    duration_seconds: 458.426
+    cost_usd: 2.408081
+    notes: "G3-CLOSE first pass set verdict=met_locally because T04's wiring at loop.py:2310 (post-loop) failed to skip this WU's dispatch even though predicate returned auto=True for gate 3. Agent diagnosed the wire-site bug in RETROSPECTIVE.md. T11H relocates the wiring to mirror T05's pre-dispatch pattern. Re-armed post-T11H to allow predicate auto-fire path to exercise itself."
 duration_seconds: 458.426
 cost_usd: 2.408081
 input_tokens: 25

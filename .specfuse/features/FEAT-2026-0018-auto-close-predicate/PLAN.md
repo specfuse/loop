@@ -171,6 +171,12 @@ gates:
       - id: FEAT-2026-0018/T10
         file: WU-10-docs-methodology-auto-close.md
         depends_on: [FEAT-2026-0018/T09]
+      # T11H hygiene WU — relocate T04 terminal wiring (post-loop → in-loop)
+      # per gate-3 recursive-dogfood evidence. [FEAT-2026-0003/G4-LESSONS]
+      # gate-extension test: bounded scope, contiguous proof, disciplined trigger.
+      - id: FEAT-2026-0018/T11H
+        file: WU-11-T04-wiring-relocation-hygiene.md
+        depends_on: [FEAT-2026-0018/T10]
       - id: FEAT-2026-0018/G3-CLOSE
         file: WU-90-gate-3-close.md
         depends_on:
@@ -178,6 +184,7 @@ gates:
           - FEAT-2026-0018/T08
           - FEAT-2026-0018/T09
           - FEAT-2026-0018/T10
+          - FEAT-2026-0018/T11H
 ```
 
 ## Notes
