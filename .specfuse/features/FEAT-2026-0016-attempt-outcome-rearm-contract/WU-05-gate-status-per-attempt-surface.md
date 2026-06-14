@@ -2,11 +2,15 @@
 id: FEAT-2026-0016/T05
 type: implementation
 effort: medium
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.20
 generated_surfaces: []
 produces_driver_helper: []
+duration_seconds: 111.877
+cost_usd: 0.266951
+input_tokens: 9
+output_tokens: 3472
 ---
 
 # `/gate-status` per-attempt + re-arm surfacing from events.jsonl
