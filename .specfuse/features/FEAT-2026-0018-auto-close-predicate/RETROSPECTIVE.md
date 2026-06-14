@@ -245,3 +245,271 @@ One durable lesson per gate appended to `.specfuse/LEARNINGS.md`
 under each gate's tag — see entries tagged
 `[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE]` and
 `[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE]`.
+
+## Gate 3 — plan-next-draft lint + /wrap-feature trim + /migrate-to-auto-close + docs
+
+Gate 3 shipped four substantive WUs and the terminal close (this WU).
+Recursive-dogfood gate per PLAN.md §Notes — the gate whose evidence
+the predicate this feature ships was supposed to evaluate against
+itself. All four substantive WUs landed in **single attempts** with
+no blockers; gate-3 substantive spend was **$2.34 / $2.90 planned
+(0.81×, -19.2%)** — the only gate of this feature that came in
+under plan. Mirror of gates 1 and 2: same effort-band model that
+under-priced multi-site driver wiring (T02, T06) **over-prices
+template-following skill WUs** (T09, T10 specifically). Bands are
+blind to spec density in both directions.
+
+### T07 — plan-next-draft lint pass + driver hook (warn-only v1)
+
+- Attempts: 1 (463.86 s, $1.28).
+- Blockers: none.
+- Surprises: priced as `implementation/medium` ($1.00); came in at
+  +28.4%. T07 extended `lint_plan.py` with a draft-plan-next-WU lint
+  pass AND wired a driver hook between plan-next squash and the next
+  dispatch (`from lint_plan import lint_plan_next_draft`,
+  `plan_next_draft_lint` event emission at warn-only). Two-site touch
+  (lint module + driver) priced as one-site; matches T06's gate-2
+  shape but milder because the warn-only contract removed the
+  block-on-error wiring this WU would otherwise have shipped.
+
+### T08 — /wrap-feature skill trim (push + PR + CI + next-pick only)
+
+- Attempts: 1 (178.30 s, $0.42).
+- Blockers: none.
+- Surprises: priced as `implementation/low` ($0.40); came in at
+  +6.1%, the cleanest band-match of the gate. Prose-only skill trim
+  (no Python, no tests, no driver wiring) — the `low` band exists
+  for exactly this shape and priced it correctly.
+
+### T09 — /migrate-to-auto-close skill (new skill, opt-in surface)
+
+- Attempts: 1 (140.71 s, $0.35).
+- Blockers: none.
+- Surprises: priced as `implementation/medium` ($1.20); came in at
+  **-70.9% UNDER plan** (0.29×). Single-file SKILL.md authored from
+  an established template — the existing `/wrap-feature`,
+  `/abandon-feature`, `/arm-gate` skills gave the agent a complete
+  pattern to follow; the "new skill" effort-band default assumed a
+  novel authoring task and over-priced by 3.4×. Inverse polarity of
+  the T02 / T06 misclassifications: same effort-band-blindness bug,
+  same magnitude, opposite sign. The planner's effort-band model has
+  no signal for "is this skill a fresh design vs a templated
+  pattern."
+
+### T10 — docs/methodology.md auto-close section + /draft-feature template tweak
+
+- Attempts: 1 (161.74 s, $0.29).
+- Blockers: none.
+- Surprises: priced as `docs/low` ($0.30); came in at -4.5%. Clean
+  band-match; docs/low correctly captures a prose-only methodology
+  patch + a small template edit. Same `low`-band correctness as T08.
+
+### Predicate self-check (recursive-dogfood)
+
+Verbatim output of `python3 .specfuse/scripts/gate_eval.py backtest
+FEAT-2026-0018 --gate 3`:
+
+```
+FEAT-2026-0018  predicate=v1
+  G03  auto=True
+    metrics:
+      gate_total_cost: $2.34
+      gate_budget: $8.00
+```
+
+And the full-feature backtest (`backtest FEAT-2026-0018`, all gates):
+
+```
+FEAT-2026-0018  predicate=v1
+  G01  auto=False
+    reasons:
+      - per_wu_cost_overrun: T01 actual=$2.85 planned=$1.80 ratio=1.59x
+      - per_wu_cost_overrun: T02 actual=$4.18 planned=$1.50 ratio=2.79x
+      - per_wu_hard_overrun: T02 actual=$4.18 planned=$1.50 ratio=2.79x
+      - per_wu_cost_overrun: T03 actual=$2.47 planned=$0.80 ratio=3.09x
+      - per_wu_hard_overrun: T03 actual=$2.47 planned=$0.80 ratio=3.09x
+      - plan_next_overrun: G1-PLAN actual=$2.50 planned=$1.50 ratio=1.67x
+      - gate_budget_exceeded: total=$14.54 budget=$14.00
+    metrics:
+      gate_total_cost: $14.54
+      gate_budget: $14.00
+  G02  auto=False
+    reasons:
+      - per_wu_cost_overrun: T04 actual=$4.10 planned=$2.50 ratio=1.64x
+      - per_wu_cost_overrun: T06 actual=$2.29 planned=$0.80 ratio=2.86x
+      - per_wu_hard_overrun: T06 actual=$2.29 planned=$0.80 ratio=2.86x
+      - plan_next_overrun: G2-PLAN actual=$4.02 planned=$1.50 ratio=2.68x
+      - gate_budget_exceeded: total=$16.03 budget=$16.00
+    metrics:
+      gate_total_cost: $16.03
+      gate_budget: $16.00
+  G03  auto=True
+    metrics:
+      gate_total_cost: $2.34
+      gate_budget: $8.00
+```
+
+**Recursive-dogfood result.** The predicate this feature ships
+correctly identifies gates 1 and 2 as off-plan (each naming the
+specific WU cost overruns + plan-next overrun + gate-budget
+exceedance that drove the call) AND correctly identifies gate 3 as
+on-plan (substantive spend $2.34 well under the $8.00 budget; every
+WU within both ≤ 1.5× and ≤ 2× ceilings). The predicate refuses
+its own development gates and accepts its own dogfood gate —
+self-consistent, exactly as the PLAN.md Notes anticipated. This is
+the META-CONFIRMATION the gate exists to produce.
+
+**Auto-close path: which path fired.** This RETROSPECTIVE.md
+section was written by the ceremony path (G3-CLOSE dispatched and
+the agent authored the section in full). The auto-close stub path
+(`write_stub_retrospective_terminal`) DID NOT fire pre-dispatch
+even though the predicate's gate-3 verdict was `auto=True`. Two
+candidate explanations, neither falsifiable from the artifacts
+alone:
+
+1. **Operator-forced ceremony.** The operator passed
+   `--force-full-close FEAT-2026-0018` (T06's escape) deliberately
+   so the recursive-dogfood gate would produce a documented
+   ceremony retrospective regardless of predicate verdict — the
+   load-bearing audit value of the recursive dogfood is in this
+   document, and that document only exists if the close WU
+   dispatches. No `auto_close_decision` event with `override: true`
+   appears in `events.jsonl`, which is consistent with the operator
+   passing the flag at dispatch invocation rather than via PLAN.md
+   frontmatter (the latter would emit the `override: true` event;
+   the former relies on argparse and the override branch at
+   loop.py:2329 only emits when `_override_active` is set in the
+   gate loop, which requires the override to be visible to
+   `_override_ns`).
+
+2. **Wiring-site asymmetry.** Inspection of `loop.py` shows the
+   intermediate auto-close branch (`maybe_auto_close_intermediate`,
+   loop.py:1991) fires **inside** the WU dispatch loop **before**
+   the close-intermediate WU is dispatched — correctly skipping
+   dispatch when predicate auto=True. The terminal auto-close
+   branch (`maybe_auto_close_terminal`, loop.py:2310) fires
+   **after** the WU dispatch loop completes, gated on
+   `close_wu_for_terminal is not None` — a value only populated at
+   loop.py:2180 **after** the close WU has dispatched successfully.
+   Consequence: on a terminal gate where predicate auto=True, the
+   close WU dispatches anyway and `write_stub_retrospective_terminal`
+   appends a duplicate `## Gate N — auto-closed` section AFTER the
+   real retro the close WU just authored (the stub-writer is not
+   idempotent — it has no `re.search(... auto-closed, ...)` guard
+   like the intermediate variant at loop.py:1345).
+
+Either explanation is consistent with the observed state (this WU
+dispatched, no `auto_close_decision` event in `events.jsonl` at
+G3-CLOSE invocation time). If a duplicate `## Gate 3 — auto-closed`
+stub appears below the `# Feature-arc verdict` block AFTER this WU
+squashes, explanation #2 is confirmed and T04 has a follow-up bug:
+the terminal auto-close hook needs to move from loop.py:2310
+(post-loop) into the WU dispatch loop pre-dispatch position,
+mirroring loop.py:1991. Either way the predicate's verdict ran
+true; the asymmetry (if real) is in WHEN it is consulted on the
+terminal path, not in WHETHER it works.
+
+## Cost analysis
+
+(extending the gate-1+gate-2 table above with gate-3 rows)
+
+| WU | planned_cost_usd | cost_usd | ratio | delta | criterion 3 (≤ 1.5×) | criterion 4 (≤ 2×) |
+|----|------------------|----------|-------|-------|----------------------|---------------------|
+| T07 | $1.00 | $1.28429295 | 1.284× | +28.4% | pass | pass |
+| T08 | $0.40 | $0.42439110 | 1.061× | +6.1% | pass | pass |
+| T09 | $1.20 | $0.34964175 | 0.291× | -70.9% | pass | pass |
+| T10 | $0.30 | $0.28660095 | 0.955× | -4.5% | pass | pass |
+| **gate 3 sub-total (substantive)** | **$2.90** | **$2.34492675** | **0.809×** | **-19.2%** | — | — |
+| **FEATURE sub-total (substantive only, gates 1+2+3)** | **$12.50** | **$20.88862950** | **1.671×** | **+67.1%** | — | — |
+
+Gate-3 budget (GATE-03.md) was raised to $8.00 at arm time from the
+original $4.50 anchor — G2-PLAN's GATE-03-REVIEW open-verification
+#1 projected substantives + close near $6.00 with buffer. Actual
+substantive spend $2.34 is **29.3% of the raised budget** — gate 3
+came in massively under both the raised budget AND the original
+$4.50 anchor. Criterion 6 (`gate total ≤ cost_budget_usd`) holds
+with $5.66 of headroom against the raised budget.
+
+Predicate-v1 self-evaluation against gate-3's own data (criterion
+3 ≤ 1.5×, criterion 4 ≤ 2×, criterion 6 ≤ budget): every
+substantive WU within both ceilings; criterion 6 holds with wide
+margin. **Gate 3 would auto-close under its own predicate** — the
+backtest CLI output above confirms it (`G03  auto=True`). Together
+with gate 1 and gate 2's correct `auto=False` calls, the recursive
+dogfood is the meta-confirmation: the predicate this feature
+ships, evaluated against this feature's own per-gate evidence,
+returns the right verdict for every gate of this feature.
+
+### Variance > 50% rationale — gate 3 (T09 only)
+
+T07, T08, and T10 came in within band (+28%, +6%, -4%) and need no
+rationale. T09's -70.9% under-plan IS variance > 50% in magnitude
+and warrants the same scrutiny as the over-plan misses in gates 1
+and 2.
+
+- **T09 (-70.9%).** Single attempt. Priced as `implementation/
+  medium` ($1.20) on the "new skill" effort-band default. Actual
+  shape: a single new SKILL.md authored from an established
+  template (the existing `/wrap-feature`, `/abandon-feature`,
+  `/arm-gate`, `/migrate-to-auto-close` family already establishes
+  the pattern). The agent had a complete template surface to copy
+  from; no novel design, no Python, no tests, no driver wiring. A
+  template-following skill is structurally `low` ($0.40), not
+  `medium` ($1.20). Same effort-band-blindness shape as gates 1
+  and 2's misclassifications — the model has no signal for "is
+  this skill a fresh design vs. a templated pattern" — but here
+  with **inverse polarity**: bands over-price when the work
+  follows an established pattern AND under-price when the work
+  hides multi-site or invariant-interaction surface. The fix is
+  the same in both directions: price by spec density (file count,
+  symbol count, invariant count, template-vs-novel signal), not
+  effort band default.
+
+## Notes on docs/roadmap (gate 3)
+
+T10 already shipped `docs/methodology.md` updates and the
+`/draft-feature` template tweak in its own commit
+(`3efb900: feat: docs/methodology.md auto-close section +
+/draft-feature template tweak`). The cumulative gate-3 diff
+satisfies `assert_doc_or_roadmap_diff` independently of this WU's
+commit. The roadmap row for FEAT-2026-0018 will be auto-flipped to
+`done` by `fire_terminal_flips` once this WU's `verdict: met` (see
+frontmatter; see also escalation §3 note below — actual verdict is
+`met_locally`) is read post-squash.
+
+## Lessons promoted (gate 3)
+
+One durable lesson appended to `.specfuse/LEARNINGS.md` under tag
+`[FEAT-2026-0018/G3-CLOSE]` — see entry on the predicate as a
+self-calibrating planner-quality oracle. No second lesson promoted:
+T09's effort-band miss is the same shape already captured by the
+G1-CLOSE-INTERMEDIATE and G2-CLOSE-INTERMEDIATE entries; promoting
+a third would duplicate without adding rule-shape generality.
+
+# Feature-arc verdict
+
+**Verdict: `met_locally`.**
+
+The roadmap_goal — "Replace AI-judgment gate close with deterministic
+predicate that auto-flips on-plan gates (terminal + intermediate) and
+skips reflective WUs, preserving full ceremony for off-plan cases" —
+lands as specified for the intermediate-gate path and for the
+predicate itself: gate-1 and gate-2 close-intermediate WUs evaluated
+predicate=False before dispatch and correctly ran ceremony; the
+predicate ships, backtest CLI ships with calibration regression,
+recursive-dogfood self-evaluation runs true for all three gates of
+this feature. Hedged to `met_locally` rather than `met` because the
+terminal-gate auto-close path's WIRING-SITE position (loop.py:2310,
+post-loop) means the predicate's `auto=True` verdict on gate 3 did
+NOT skip this WU's dispatch — either because the operator
+deliberately forced ceremony to document the recursive dogfood (the
+audit value of THIS document IS the deliverable; see §"Auto-close
+path: which path fired" above) or because the terminal hook is
+positioned analogously to where it would need to move into the
+dispatch loop to mirror the intermediate path. Both deliverables
+ship (T04 helpers exist; intermediate path is exercised on every
+gate close); the terminal path's pre-dispatch skip behavior is the
+scope-deferred item — explicitly documented in this retrospective
+so a follow-up feature has a falsifiable anchor to land the
+loop.py:2310 → in-loop relocation against, IF #2 is the explanation
+(no-op if #1).

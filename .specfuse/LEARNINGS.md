@@ -1189,3 +1189,30 @@ promoted here.
   `planned_cost_usd` to 1.5–2× the single-attempt estimate;
   prefer over-budgeting on the planning line to under-budgeting
   and learning it from a 1.6× post-hoc ratio.
+
+- **[FEAT-2026-0018/G3-CLOSE] A predicate that scores planner output
+  is itself the planner-quality oracle once shipped — run it against the
+  feature it shipped in at close ceremony.** FEAT-2026-0018 shipped
+  `gate_eval.py` (deterministic on-plan / off-plan predicate against
+  per-gate cost ratios, hard-overrun ceiling, plan-next overrun, and
+  gate-budget exceedance). At G3-CLOSE, running `gate_eval.py backtest
+  FEAT-2026-0018` against this feature itself returned `G01 auto=False`
+  + `G02 auto=False` + `G03 auto=True` — every verdict matched the
+  retrospective evidence the human had already written: gates 1 and 2
+  documented multi-WU effort-band misclassifications + plan-next
+  overruns + budget exceedances; gate 3 came in clean (single-attempt
+  per WU, 0.81× plan substantive, well under raised budget). The
+  predicate refused its own development gates and accepted its own
+  dogfood gate, self-consistent. This is more than a sanity check: it
+  promotes the predicate from "thing the close ceremony runs" to "thing
+  the close ceremony USES as its planner-quality verdict." Rule: any
+  feature that ships a verifier scoring planner output (cost-ratio gate,
+  schema lint, drift detector, prediction calibration) must include a
+  recursive self-evaluation in its close ceremony — run the verifier
+  against the FEATURE'S OWN per-gate evidence and paste the verbatim
+  output into the retrospective. When verdicts agree with the human-
+  written narrative, that 'self-consistent' note is the
+  load-bearing audit signal future planners read at draft-feature
+  time. When verdicts disagree, the disagreement itself is the
+  feature's first real escaped-bug evidence — promote it to a
+  blocking lesson before shipping the next feature.
