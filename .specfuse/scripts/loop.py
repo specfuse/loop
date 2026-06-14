@@ -1531,6 +1531,24 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
 # --------------------------------------------------------------------------- #
 
 
+def _already_auto_closed(wu_file: Path) -> bool:
+    """Return True iff the WU's on-disk frontmatter already shows it has been
+    auto-closed (status=done AND auto_close truthy).
+
+    Idempotency guard for both maybe_auto_close_intermediate and
+    maybe_auto_close_terminal — prevents the duplicate `auto_close_decision`
+    event and duplicate bookkeeping commit observed in issue #23 when the
+    dispatch loop re-enters with a stale in-memory wu.status.
+    """
+    if not wu_file.is_file():
+        return False
+    fm, _ = read_frontmatter(wu_file)
+    if fm.get("status") != DONE:
+        return False
+    auto = fm.get("auto_close")
+    return auto in (True, "true", "True")
+
+
 def write_stub_retrospective_terminal(
     feature_dir: Path,
     gate_number: int,
@@ -1610,7 +1628,20 @@ def maybe_auto_close_terminal(
     Returns (True, decision) when predicate fires and the auto path was taken.
     Returns (False, decision) when predicate refuses; caller falls through to
     the existing close-WU dispatch path unchanged.
+
+    Idempotent: a second call after the WU has already been auto-closed on
+    disk short-circuits without re-emitting events (see
+    `maybe_auto_close_intermediate` and issue #23 for the rationale).
     """
+    if close_wu_for_terminal is not None and _already_auto_closed(close_wu_for_terminal.file):
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=["already_auto_closed"],
+            metrics={},
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version="v1",
+        )
     decision = evaluate_auto_close(feature_dir, gate.number)
     if not decision.auto:
         return False, decision
@@ -1695,7 +1726,24 @@ def maybe_auto_close_intermediate(
     the existing close-intermediate dispatch unchanged.
     Caller is responsible for dispatching plan_next_wu afterward (AC4).
     Does NOT set verdict: met — close-intermediate has no terminal verdict.
+
+    Idempotent: a second call after the WU has already been auto-closed on
+    disk (status=done AND auto_close=true) short-circuits with
+    (False, decision_with_auto=False) and emits NO `auto_close_decision`
+    event. Prevents the double-fire observed in #23 where the dispatch
+    loop re-entered with a stale in-memory wu.status and called this
+    helper again, appending a duplicate event + producing a duplicate
+    bookkeeping commit.
     """
+    if close_intermediate_wu is not None and _already_auto_closed(close_intermediate_wu.file):
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=["already_auto_closed"],
+            metrics={},
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version="v1",
+        )
     decision = evaluate_auto_close(feature_dir, gate.number)
     if not decision.auto:
         return False, decision
@@ -2450,6 +2498,14 @@ def run(
                             f"chore(loop): {wu.wu_id} auto-closed "
                             f"(predicate=v1)\n\nFeature: {feature_id}",
                         )
+                        # Mirror the on-disk status flip into the in-memory
+                        # WorkUnit so ready()'s u.status in DISPATCHABLE filter
+                        # excludes it on the next while-loop pass — without
+                        # this, the same WU re-appears in pending, the helper
+                        # is called a second time, and (absent its idempotency
+                        # guard) a duplicate auto_close_decision event +
+                        # duplicate bookkeeping commit are produced (issue #23).
+                        wu.status = DONE
                         done_ids.add(wu.wu_id)
                         continue
                 elif wu.type == "close-intermediate" and _override_active:
@@ -2484,6 +2540,9 @@ def run(
                         )
                         # Terminal flips fire in post-loop after set_gate(awaiting_review)
                         _terminal_auto_closed_wu = wu
+                        # See intermediate branch above: mirror disk → memory
+                        # so ready() filters this WU on the next pass (issue #23).
+                        wu.status = DONE
                         done_ids.add(wu.wu_id)
                         continue
                 elif (wu.type == "close" and gate is gates[-1]
