@@ -24,11 +24,19 @@ Frontmatter notes (single-repo):
   Three closing shapes (FEAT-2026-0015):
   - `close-intermediate` (non-terminal gate): folds RETRO+LESSONS+DOCS into one
     session; must be paired with a separate `plan-next` WU immediately after.
-    Use for any gate that is not the final gate.
+    Use for any gate that is not the final gate. Its appended `## Gate N`
+    section in `RETROSPECTIVE.md` must include both a `## Cost analysis`
+    subsection AND a `## What the loop did NOT verify` subsection (same
+    contract as the terminal `close` WU above).
   - `close` (terminal gate): collapses retrospective + lessons + docs + terminal
     verdict into one session. Must produce `RETROSPECTIVE.md`, append durable
     entries to `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal
-    feature-arc verdict.
+    feature-arc verdict. `RETROSPECTIVE.md` must include both a `## Cost
+    analysis` section AND a `## What the loop did NOT verify` section
+    enumerating every deferred / `met_locally` acceptance criterion (write
+    "(nothing — every acceptance criterion was verified in-loop)" when the
+    list is empty so the explicit count is visible). See the `/draft-feature`
+    skill for the AC-bullet wording the close-WU body should carry.
   - Legacy four-WU sequence `[retrospective, lessons, docs, plan-next]`: accepted
     by lint but emits WARN. Prefer `close-intermediate` + `plan-next` for new
     features.
