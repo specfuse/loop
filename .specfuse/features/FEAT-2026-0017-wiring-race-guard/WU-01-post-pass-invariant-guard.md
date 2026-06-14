@@ -16,6 +16,12 @@ prior_attempts:
     outcome: hollow_pass_x3
     initial_commit: 514beee
     notes: "Sonnet 4.6 hollow-passed 3 times. Squash modified only WU-01 frontmatter. loop.py wiring + symbols absent every attempt. tests/test_loop_post_pass_invariant.py written (untracked, survived reset). Detected by G1-CLOSE existence check. Escalating to Opus 4.7 + planned_cost raised 1.50 to 3.50."
+  - attempts: 3
+    model: claude-opus-4-7
+    outcome: tests_fail_env_signing
+    duration_seconds: 1943.08
+    cost_usd: 11.947744
+    notes: "Opus 4.7 wrote substantive loop.py + 293-line test file. Tests failed all 3 attempts because new tempdir-git tests omitted 'git config commit.gpgSign false' setup (operator's global commit.gpgsign=true with SSH signing). Driver reset wiped loop.py edits each attempt; test file survived as untracked. Driver then crashed during spinning-detected commit_bookkeeping (same signing flake). Fix: repo-local commit.gpgsign=false set + WU body now mandates the gpgSign-false setup pattern."
 ---
 
 # Post-pass driver-state invariant guard (close-type WUs)
@@ -112,7 +118,17 @@ all git; edit files only.
    - Print `   POST-PASS INVARIANT FAILED attempt N/3 — <reason>`.
    - `continue` to the next attempt iteration (count as failed for
      spinning detection).
-5. New tests in `tests/test_loop_post_pass_invariant.py`:
+5. New tests in `tests/test_loop_post_pass_invariant.py`. **Tempdir-
+   git setup pattern (mandatory).** Any test that creates a tempdir
+   git repo MUST run `git config commit.gpgSign false` immediately
+   after `git init`, BEFORE the first `git commit`. The operator's
+   global git config has SSH commit-signing enabled, and signing
+   fails inside subprocesses that can't reach ssh-agent → tests
+   fail with `subprocess.CalledProcessError` exit 128 on commit.
+   Pattern reference: `tests/_workspace.py:36`,
+   `tests/test_closing_deliverable_guard.py:76`. Failure to follow
+   this is the documented attempts 4-6 failure mode (see
+   `prior_attempts` entry 2). Sub-tests:
    - `test_close_with_verdict_met_passes_when_flips_fire`: integration
      stub — close WU passes, gate=passed, row=done, archive anchor
      present. Guard returns `(True, "")`.
