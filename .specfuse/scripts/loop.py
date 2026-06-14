@@ -1303,21 +1303,41 @@ def assert_doc_or_roadmap_diff(
 def assert_verdict_well_formed(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-d) verdict frontmatter field is present and in VERDICT_VALUES."""
-    if wu.verdict is None or wu.verdict not in VERDICT_VALUES:
+    """(close-d) verdict frontmatter field is present and in VERDICT_VALUES.
+
+    Re-reads frontmatter from disk: the agent writes `verdict:` DURING
+    dispatch, but `wu.verdict` was populated by `load_wu` BEFORE dispatch.
+    Without the re-read, the agent's verdict write is invisible and the
+    assertion spins to MAX_ATTEMPTS, rolling back all artifacts on each
+    attempt (issue #12). Mirrors the re-read at the terminal-flip path
+    (FEAT-2026-0015/G2-CLOSE). Updates wu.verdict in-memory so downstream
+    checks see the post-squash value.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict")
+    if verdict is None or verdict not in VERDICT_VALUES:
         return (
             False,
-            f"assert_verdict_well_formed: verdict {wu.verdict!r} absent or not in "
+            f"assert_verdict_well_formed: verdict {verdict!r} absent or not in "
             f"VERDICT_VALUES ({sorted(VERDICT_VALUES)})",
         )
+    wu.verdict = verdict
     return True, ""
 
 
 def assert_cost_analysis_section_when_met(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-e) When verdict=='met', RETROSPECTIVE.md must have a '## Cost analysis' header."""
-    if wu.verdict != "met":
+    """(close-e) When verdict=='met', RETROSPECTIVE.md must have a '## Cost analysis' header.
+
+    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
+    the agent writes `verdict:` during dispatch and `wu.verdict` from
+    `load_wu` is stale. Independent re-read keeps this assertion robust
+    even if invoked outside the canonical close-d → close-e ordering.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict")
+    if verdict != "met":
         return True, ""
     retro = feature_dir / "RETROSPECTIVE.md"
     if retro.exists():
