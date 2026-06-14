@@ -2,10 +2,15 @@
 id: FEAT-2026-0016/G3-CLOSE
 type: close
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 generated_surfaces: []
+verdict: met_locally
+duration_seconds: 419.02
+cost_usd: 3.586944
+input_tokens: 54
+output_tokens: 24355
 ---
 
 # Gate 3 close — terminal: retro + lessons + docs + feature-arc verdict
