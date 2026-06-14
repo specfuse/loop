@@ -33,6 +33,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0015) |
 | FEAT-2026-0016 | Re-arm contract + audit trail               | planned  | — | — |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
+| FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | planned  | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
