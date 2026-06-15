@@ -34,6 +34,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-2026-0016) |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
+| FEAT-2026-0019 | Plugin distribution via specfuse Claude Code plugin + marketplace | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -289,6 +290,41 @@ Likely shape: one substantive WU to ship the new WU types +
 templates + lint, one substantive WU to ship the type-keyed guard
 table + tests, then closing ceremony (using the new contract for
 recursive dogfood).
+
+## FEAT-2026-0019 — Plugin distribution via specfuse Claude Code plugin + marketplace
+
+**Why.** Specfuse Claude assets (skills, hooks, cavecrew subagents)
+currently distribute via a `.specfuse/skills/` symlink-into-`.claude/skills/`
+trick scaffolded by `init.sh`. That doesn't scale to a second product
+(orchestrator), bypasses Claude Code's native plugin precedence and
+hot-reload, and forces every consumer through the bash installer. Plugin
+schema spike confirmed the native path supports hooks, subagents, hot
+reload, project-local override, and headless install — green light to
+migrate.
+
+**Goal.** Package Specfuse Claude assets as a Claude Code plugin named
+`specfuse`, published via marketplace at the `specfuse/specfuse` common
+repo. Driver + scaffold stay pip-installable. `specfuse` CLI gains `init`,
+`upgrade`, and `plugin sync` subcommands. Vendor plugin tree inside the
+pypi package for offline install. `specfuse upgrade` syncs both scaffold
+and plugin; driver startup check fails loud on plugin/driver version skew
+with the fix command in the error. Skills migrate to `/specfuse:`
+namespace; caveman hooks move from user `settings.json` into the plugin's
+`hooks.json`. `init.sh` ships a deprecation banner in v1.0 and is deleted
+in v1.1. Core plugin extraction deferred until orchestrator lands.
+
+**Benefits.** Native marketplace install/update (`/plugin install
+specfuse@specfuse` + `/plugin update`), versioned plugin releases with hot
+reload (no session restart), preserved project-local skill overrides,
+offline install via vendored tree, single `specfuse upgrade` command
+bridges pip → plugin, foundation for multi-product distribution
+(orchestrator + future products reuse marketplace), elimination of
+symlink-tree maintenance. Risks tracked: wheel size growth from vendored
+plugin, CI dual-publish race (pypi + marketplace PR), migration of
+existing symlink installs, namespace break for current `/arm-gate`-style
+invocations.
+
+**Status: planned.**
 
 ## Notes
 
