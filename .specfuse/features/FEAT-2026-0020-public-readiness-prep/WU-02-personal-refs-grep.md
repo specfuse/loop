@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 1.20
+duration_seconds: 221.721
+cost_usd: 0.472695
+input_tokens: 13
+output_tokens: 14145
 ---
 
 # Grep main for personal/internal references; triage in AUDIT.md §personal-refs
