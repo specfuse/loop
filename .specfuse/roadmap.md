@@ -35,7 +35,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
 | FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
-| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | planned | — | — |
+| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | active | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | planned | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
