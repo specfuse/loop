@@ -121,6 +121,77 @@ acceptance_criteria:
 """
 
 
+class TestParserEquivalenceOnSameIndentSequences(unittest.TestCase):
+    """Regression for specfuse/loop#35 — a block sequence at the SAME indent
+    as its parent mapping key is valid YAML 1.2 (§8.2.1) and is the default
+    shape in `kubectl` / Helm-adjacent configs that operators copy into
+    `verification.yml`. Before the fix, _miniyaml rejected this form, the
+    driver crashed mid-`verify_fn`, and the WU was left at `status:
+    in_progress` with no recovery skill that matched the state.
+
+    Equivalence with pyyaml is the contract under test.
+    """
+
+    def _eq(self, label: str, text: str):
+        actual = miniyaml.parse(text)
+        expected = yaml.safe_load(text)
+        self.assertEqual(actual, expected,
+                         f"miniyaml/pyyaml mismatch on {label}\n"
+                         f"  miniyaml: {actual!r}\n"
+                         f"  pyyaml:   {expected!r}")
+
+    def test_top_level_key_with_same_indent_sequence(self):
+        self._eq("top-level key, sequence at indent 0", """\
+cluster-verify:
+- name: cluster-preflight
+  command: bash scripts/cluster-preflight.sh
+- name: verify-argocd
+  command: bash charts/argocd/verify-argocd.sh
+""")
+
+    def test_mixed_same_indent_and_deeper_indent_siblings(self):
+        # `plannext` uses 2-space (deeper) sequence; `cluster-verify` uses
+        # same-indent. Same file, both shapes — the verification.yml
+        # crash-repro.
+        self._eq("mixed deeper + same-indent siblings", """\
+plannext:
+  - name: plan-lint
+    command: "python3 .specfuse/scripts/lint_plan.py {feature_dir}"
+
+cluster-verify:
+- name: cluster-preflight
+  command: bash scripts/cluster-preflight.sh
+- name: verify-argocd
+  command: bash charts/argocd/verify-argocd.sh
+
+script:
+  - name: shellcheck
+    command: shellcheck scripts/foo.sh
+""")
+
+    def test_sibling_mapping_key_after_same_indent_sequence(self):
+        # After the same-indent sequence ends, the next top-level mapping
+        # key must still parse normally.
+        self._eq("sibling key after same-indent sequence", """\
+a:
+- 1
+- 2
+b: hello
+""")
+
+    def test_nested_same_indent_sequence_inside_inline_mapping(self):
+        # Tighter case — same-indent under a key whose enclosing context is
+        # a sub-mapping at indent 2. The fix must work at any indent, not
+        # just at the root.
+        self._eq("nested same-indent sequence at indent 2", """\
+outer:
+  inner:
+  - a
+  - b
+  next-key: value
+""")
+
+
 class TestParserEquivalenceOnResultBlocks(unittest.TestCase):
 
     def test_blocked_result_block(self):
