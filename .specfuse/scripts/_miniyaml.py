@@ -34,7 +34,10 @@ on a missing gate set — silent misparses are worse than crashes.
     (scalar) or on subsequent more-indented lines (mapping/sequence).
   * **Block sequence** (`- item`). Items can be scalars or mappings. A
     mapping-item's first key sits inline after `- `; subsequent keys must
-    align to the column where the first key began (`indent + 2`).
+    align to the column where the first key began (`indent + 2`). A block
+    sequence may sit at the **same** indent as its parent mapping key
+    (YAML 1.2 §8.2.1 — the `kubectl`/Helm style) or at a deeper indent;
+    both forms parse identically.
   * **Scalars:**
       - **bare strings** — everything from `: ` to end-of-line (with trailing
         whitespace stripped, and a trailing ` # ...` comment removed). May
@@ -286,14 +289,27 @@ def _resolve_value(
 ) -> tuple[Any, int]:
     """Given the rhs of a `key:` line, return (value, new_pos).
 
-    If rhs is empty, look for a deeper-indented block on subsequent lines
-    (a sequence or sub-mapping); if none, the value is None.
+    If rhs is empty, look for the value on subsequent lines:
+      * a block sequence at the **same** indent as the parent key (YAML 1.2
+        §8.2.1 — `kubectl`-style and many human-edited configs use this); OR
+      * any block (sequence or sub-mapping) at a **deeper** indent.
+    If neither, the value is None.
+
+    Same-indent extension applies only to sequences. A sub-mapping at the
+    same indent is genuinely ambiguous with a sibling mapping key, so that
+    case stays an error.
     """
     if rhs is None or rhs == "":
-        if pos < len(lines) and lines[pos].indent > enclosing_indent:
-            child_indent = lines[pos].indent
-            value, pos = _parse_block(lines, pos, child_indent)
-            return value, pos
+        if pos < len(lines):
+            nxt = lines[pos]
+            if (nxt.indent == enclosing_indent
+                    and (nxt.content == "-" or nxt.content.startswith("- "))):
+                value, pos = _parse_sequence(lines, pos, enclosing_indent)
+                return value, pos
+            if nxt.indent > enclosing_indent:
+                child_indent = nxt.indent
+                value, pos = _parse_block(lines, pos, child_indent)
+                return value, pos
         return None, pos
     return _parse_scalar(rhs, lineno), pos
 
