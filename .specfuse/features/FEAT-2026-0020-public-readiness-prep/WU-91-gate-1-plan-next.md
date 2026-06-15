@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0020/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 1.80
+duration_seconds: 455.457
+cost_usd: 2.760707
+input_tokens: 9075
+output_tokens: 36172
 ---
 
 # Gate 1 plan-next — draft gate 2's substantive WUs

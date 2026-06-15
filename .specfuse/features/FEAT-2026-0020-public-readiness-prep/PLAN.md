@@ -79,12 +79,62 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      # Substantive WUs drafted by G1-PLAN (status: draft until armed). Hygiene-file
+      # and detector WUs do not block each other (gate 1 is the barrier) → depends_on: [].
+      - id: FEAT-2026-0020/T01
+        file: WU-01-readme-polish.md
+        depends_on: []
+      - id: FEAT-2026-0020/T02
+        file: WU-02-contributing.md
+        depends_on: []
+      - id: FEAT-2026-0020/T03
+        file: WU-03-security-and-conduct.md
+        depends_on: []
+      - id: FEAT-2026-0020/T04
+        file: WU-04-github-templates.md
+        depends_on: []
+      - id: FEAT-2026-0020/T05
+        file: WU-05-dependabot.md
+        depends_on: []
+      - id: FEAT-2026-0020/T06
+        file: WU-06-leak-scan-script.md
+        depends_on: []
+      # T07 wires the T06 detector into its callers (pre-commit hook + CI gate).
+      - id: FEAT-2026-0020/T07
+        file: WU-07-leak-scan-wiring.md
+        depends_on:
+          - FEAT-2026-0020/T06
+      # T08 (FLIP-CHECKLIST) references every hygiene + guard WU's output.
+      - id: FEAT-2026-0020/T08
+        file: WU-08-flip-checklist.md
+        depends_on:
+          - FEAT-2026-0020/T01
+          - FEAT-2026-0020/T02
+          - FEAT-2026-0020/T03
+          - FEAT-2026-0020/T04
+          - FEAT-2026-0020/T05
+          - FEAT-2026-0020/T06
+          - FEAT-2026-0020/T07
+      # T09 = operator runs the checklist (blocked_human by design); depends on the checklist.
+      - id: FEAT-2026-0020/T09
+        file: WU-09-flip-rehearsal.md
+        depends_on:
+          - FEAT-2026-0020/T08
       # --- closing sequence: 1-WU close (terminal gate) ---
-      # Scaffold this now so lint can identify gate 1 as non-terminal.
-      # G1-PLAN fills in the substantive WUs above this entry when gate 1 completes.
+      # Scaffold pre-existed gate 1; G1-PLAN set real depends_on across every
+      # substantive gate-2 WU. Identity (id/file) unchanged.
       - id: FEAT-2026-0020/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []   # G1-PLAN will set real depends_on when it drafts gate 2
+        depends_on:
+          - FEAT-2026-0020/T01
+          - FEAT-2026-0020/T02
+          - FEAT-2026-0020/T03
+          - FEAT-2026-0020/T04
+          - FEAT-2026-0020/T05
+          - FEAT-2026-0020/T06
+          - FEAT-2026-0020/T07
+          - FEAT-2026-0020/T08
+          - FEAT-2026-0020/T09
 ```
 
 ## Notes
