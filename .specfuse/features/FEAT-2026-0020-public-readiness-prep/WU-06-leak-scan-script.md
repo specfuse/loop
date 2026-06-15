@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T06
+id: FEAT-2026-0020/T15
 type: implementation
 status: draft
 attempts: 0
@@ -27,7 +27,7 @@ leaked cross-poll folder; without an automated guard the same leaks recur on the
 commit (`GATE-02.md` Required deliverable rationale; LEARNINGS
 `[FEAT-2026-0020/history-scrub/*]`). This WU factors the pattern-matching out of
 `scrub-history.sh --verify-only`'s `build_pattern`/`verify` logic into a reusable Python
-detector so the same logic backs all three surfaces. Correlation ID `FEAT-2026-0020/T06`.
+detector so the same logic backs all three surfaces. Correlation ID `FEAT-2026-0020/T15`.
 
 Grounding: `history-scrub/scrub-history.sh` (the existing `--verify-only` pattern logic to
 factor out), `history-scrub/replace-text.txt` (the literal mappings — these contain the

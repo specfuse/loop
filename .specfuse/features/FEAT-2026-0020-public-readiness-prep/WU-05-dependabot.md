@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T05
+id: FEAT-2026-0020/T14
 type: implementation
 status: draft
 attempts: 0
@@ -21,7 +21,7 @@ GitHub-Actions and pip dependency ecosystems on a weekly schedule.
 (`.github/workflows/ci.yml`, pinned `actions/checkout@v6`, `actions/setup-python@v6`) and a
 Python project installed via `pip install -e '.[dev]'` (so `pyproject.toml` is the manifest
 Dependabot's `pip` ecosystem reads). Once public, automated dependency PRs keep both
-current. Correlation ID `FEAT-2026-0020/T05`. The **package-ecosystem identifiers**
+current. Correlation ID `FEAT-2026-0020/T14`. The **package-ecosystem identifiers**
 (`github-actions`, `pip`) and the schedule schema are a cross-surface contract with
 Dependabot's documented config format (`/authoring-work-units` §8) — use the documented
 identifiers, do not invent.

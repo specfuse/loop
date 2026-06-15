@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T02
+id: FEAT-2026-0020/T11
 type: implementation
 status: draft
 attempts: 0
@@ -23,7 +23,7 @@ develops itself through its own loop methodology (the dogfood expectation).
 the missing contributor-onboarding surfaces — how tests run (`scripts/smoke-test.sh`,
 `code` gates from `.specfuse/verification.yml`), the PR-scoping convention, and an explicit
 note that substantive changes go through a Specfuse feature folder (`.specfuse/features/`)
-rather than ad-hoc commits. Correlation ID `FEAT-2026-0020/T02`. Grounding: existing
+rather than ad-hoc commits. Correlation ID `FEAT-2026-0020/T11`. Grounding: existing
 `CONTRIBUTING.md`, `.github/workflows/ci.yml`, `.specfuse/verification.yml`,
 `docs/methodology.md`, the `/fix-bug` skill (1 bug = 1 branch = 1 PR).
 

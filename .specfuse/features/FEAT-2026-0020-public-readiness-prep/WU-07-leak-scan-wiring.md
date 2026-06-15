@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T07
+id: FEAT-2026-0020/T16
 type: implementation
 status: draft
 attempts: 0
@@ -19,11 +19,11 @@ repo-tracked `pre-commit` hook that runs `leak_scan --staged` and blocks on a hi
 a `leak-scan` entry to `.specfuse/verification.yml`'s `code` set (mirrored into
 `scripts/smoke-test.sh` and `.github/workflows/ci.yml` per the three-surface sync rule).
 
-**Context.** Part of FEAT-2026-0020 gate 2; depends on WU-06 (`FEAT-2026-0020/T06`), which
+**Context.** Part of FEAT-2026-0020 gate 2; depends on WU-06 (`FEAT-2026-0020/T15`), which
 ships `.specfuse/scripts/leak_scan.py` with `scan_staged()`. This WU is the "three callers"
 half of `GATE-02.md`'s Required deliverable: (b) CI gate and (a) pre-commit hook. The
 history-audit caller (c) already exists as `scrub-history.sh --verify-only`. Correlation ID
-`FEAT-2026-0020/T07`.
+`FEAT-2026-0020/T16`.
 
 Constraints carried from `GATE-02.md` and the learnings:
 - The hook must be **read-only, fast, sandbox-safe** — no heavy/destructive work (memory

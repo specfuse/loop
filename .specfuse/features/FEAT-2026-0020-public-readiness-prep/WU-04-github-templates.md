@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T04
+id: FEAT-2026-0020/T13
 type: implementation
 status: draft
 attempts: 0
@@ -20,7 +20,7 @@ issue templates (bug report, feature request, methodology question) and a single
 
 **Context.** Part of FEAT-2026-0020 gate 2. `.github/` currently holds only `workflows/`;
 this WU adds the contributor-facing templates GitHub surfaces in the issue/PR UI on the
-public flip. Correlation ID `FEAT-2026-0020/T04`. The issue-template **field names and the
+public flip. Correlation ID `FEAT-2026-0020/T13`. The issue-template **field names and the
 form schema** (`name:`, `about:`/`description:`, `labels:`, body structure) are a
 cross-surface contract with GitHub's template format (`/authoring-work-units` §8) — use the
 documented GitHub schema, do not invent field keys. Markdown (`.md` front-matter) templates

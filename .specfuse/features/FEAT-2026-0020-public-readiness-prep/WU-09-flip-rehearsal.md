@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T09
+id: FEAT-2026-0020/T18
 type: implementation
 status: draft
 attempts: 0
@@ -20,7 +20,7 @@ outcome as a dated rehearsal log. The visibility flip itself is NOT performed he
 verifies readiness and is a **designed human checkpoint**.
 
 **Context.** Terminal substantive WU of FEAT-2026-0020 gate 2; depends on WU-08
-(`FEAT-2026-0020/T08`), which writes the checklist. The flip is operator-side (GitHub UI),
+(`FEAT-2026-0020/T17`), which writes the checklist. The flip is operator-side (GitHub UI),
 and the pre-flip gating includes steps the loop structurally cannot reach (the `gh`
 issue/PR surface — `RETROSPECTIVE.md` §"What the loop did NOT verify" entry 4; the GitHub
 edit-history residual, entry 6; the destructive phase-2 history rewrite, entry 5). A
@@ -28,7 +28,7 @@ dispatched `claude -p` session cannot run these, so this WU is expected to termi
 `blocked_human` until the operator records the rehearsal — that is the intended shape, not a
 failure (`PLAN.md` "Notes": autonomy is `supervised`; destructive/flip ops are operator-side).
 
-Correlation ID `FEAT-2026-0020/T09`. Grounding: `FLIP-CHECKLIST.md` (T08 output),
+Correlation ID `FEAT-2026-0020/T18`. Grounding: `FLIP-CHECKLIST.md` (T08 output),
 `RETROSPECTIVE.md` open actions, `history-scrub/RUNBOOK.md`.
 
 Binding rules in `.specfuse/rules/` apply — `security-boundaries.md` (`gh`-auth from a

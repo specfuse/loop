@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T03
+id: FEAT-2026-0020/T12
 type: implementation
 status: draft
 attempts: 0
@@ -19,7 +19,7 @@ note) and `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, unmodified) at the rep
 
 **Context.** Part of FEAT-2026-0020 gate 2. Both are small, standard, single-file OSS
 hygiene artifacts; per `/authoring-work-units` §6 sizing they bundle cleanly into one WU.
-Correlation ID `FEAT-2026-0020/T03`. SECURITY.md's disclosure channel is an
+Correlation ID `FEAT-2026-0020/T12`. SECURITY.md's disclosure channel is an
 **operator-decision** flagged in `GATE-02-REVIEW.md` (GitHub Security Advisories vs a
 direct email fallback) — the operator confirms the exact channel text at arming; this WU
 implements the confirmed choice. CODE_OF_CONDUCT.md is the Contributor Covenant 2.1

@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T01
+id: FEAT-2026-0020/T10
 type: implementation
 status: draft
 attempts: 0
@@ -22,7 +22,7 @@ understand the loop and run the bundled example in under a minute.
 private to public ahead of FEAT-2026-0019's first PyPi tag; `README.md` is the public
 front door. It already carries a strong "Why it exists" / "How it works" narrative
 (see the file); this WU adds the missing fast-orientation surfaces, not a rewrite. The
-correlation ID is `FEAT-2026-0020/T01`. Grounding: existing `README.md`,
+correlation ID is `FEAT-2026-0020/T10`. Grounding: existing `README.md`,
 `docs/methodology.md`, `scripts/smoke-test.sh`, `.specfuse/scripts/loop.py --dry-run`.
 
 Binding rules in `.specfuse/rules/` (`result-contract.md`, `never-touch.md`,

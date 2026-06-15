@@ -81,60 +81,60 @@ gates:
     work_units:
       # Substantive WUs drafted by G1-PLAN (status: draft until armed). Hygiene-file
       # and detector WUs do not block each other (gate 1 is the barrier) → depends_on: [].
-      - id: FEAT-2026-0020/T01
+      - id: FEAT-2026-0020/T10
         file: WU-01-readme-polish.md
         depends_on: []
-      - id: FEAT-2026-0020/T02
+      - id: FEAT-2026-0020/T11
         file: WU-02-contributing.md
         depends_on: []
-      - id: FEAT-2026-0020/T03
+      - id: FEAT-2026-0020/T12
         file: WU-03-security-and-conduct.md
         depends_on: []
-      - id: FEAT-2026-0020/T04
+      - id: FEAT-2026-0020/T13
         file: WU-04-github-templates.md
         depends_on: []
-      - id: FEAT-2026-0020/T05
+      - id: FEAT-2026-0020/T14
         file: WU-05-dependabot.md
         depends_on: []
-      - id: FEAT-2026-0020/T06
+      - id: FEAT-2026-0020/T15
         file: WU-06-leak-scan-script.md
         depends_on: []
       # T07 wires the T06 detector into its callers (pre-commit hook + CI gate).
-      - id: FEAT-2026-0020/T07
+      - id: FEAT-2026-0020/T16
         file: WU-07-leak-scan-wiring.md
         depends_on:
-          - FEAT-2026-0020/T06
+          - FEAT-2026-0020/T15
       # T08 (FLIP-CHECKLIST) references every hygiene + guard WU's output.
-      - id: FEAT-2026-0020/T08
+      - id: FEAT-2026-0020/T17
         file: WU-08-flip-checklist.md
         depends_on:
-          - FEAT-2026-0020/T01
-          - FEAT-2026-0020/T02
-          - FEAT-2026-0020/T03
-          - FEAT-2026-0020/T04
-          - FEAT-2026-0020/T05
-          - FEAT-2026-0020/T06
-          - FEAT-2026-0020/T07
+          - FEAT-2026-0020/T10
+          - FEAT-2026-0020/T11
+          - FEAT-2026-0020/T12
+          - FEAT-2026-0020/T13
+          - FEAT-2026-0020/T14
+          - FEAT-2026-0020/T15
+          - FEAT-2026-0020/T16
       # T09 = operator runs the checklist (blocked_human by design); depends on the checklist.
-      - id: FEAT-2026-0020/T09
+      - id: FEAT-2026-0020/T18
         file: WU-09-flip-rehearsal.md
         depends_on:
-          - FEAT-2026-0020/T08
+          - FEAT-2026-0020/T17
       # --- closing sequence: 1-WU close (terminal gate) ---
       # Scaffold pre-existed gate 1; G1-PLAN set real depends_on across every
       # substantive gate-2 WU. Identity (id/file) unchanged.
       - id: FEAT-2026-0020/G2-CLOSE
         file: WU-90-gate-2-close.md
         depends_on:
-          - FEAT-2026-0020/T01
-          - FEAT-2026-0020/T02
-          - FEAT-2026-0020/T03
-          - FEAT-2026-0020/T04
-          - FEAT-2026-0020/T05
-          - FEAT-2026-0020/T06
-          - FEAT-2026-0020/T07
-          - FEAT-2026-0020/T08
-          - FEAT-2026-0020/T09
+          - FEAT-2026-0020/T10
+          - FEAT-2026-0020/T11
+          - FEAT-2026-0020/T12
+          - FEAT-2026-0020/T13
+          - FEAT-2026-0020/T14
+          - FEAT-2026-0020/T15
+          - FEAT-2026-0020/T16
+          - FEAT-2026-0020/T17
+          - FEAT-2026-0020/T18
 ```
 
 ## Notes

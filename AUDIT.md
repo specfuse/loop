@@ -82,11 +82,11 @@ git log --all --format='%H %s%n%b' | grep -nE '\.local\b'
 | 19 | private-repo-id: `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-03-cross-pollination-check.md:22,37` | `false-positive` | (none — cross-pollination WU's own prompt names these as the target pattern) |
 | 20 | `/Users/`, `example-org` | `AUDIT.md` (§personal-refs table cells, remediation-command column, escalation-note body) | `false-positive` | (none — audit document quoting historical findings and redaction actions; meta-reference, not a live leak) |
 | 21 | `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/events.jsonl:5,6` | `false-positive` | (none — events.jsonl records blocked_reason text that named the private org as context for the escalation; audit trail should not be redacted) |
-| 22 | `/Users/`, `example-org` | commit history — `b5d5404` body (lines 7,15,18-20), `7b3267c` body (lines 39,43-46), `20918f4` body (lines 6-7), `63bec507` body (line 3116), `be7785b` body (lines 3682,3824) | `history-rewrite` | `git filter-repo` phase 2 (deferred — same sweep as §cross-poll scrub; operator runs after all gate-1 in-place remediations complete) |
+| 22 | `/Users/`, `example-org` | commit history (pre-scrub: `b5d5404`, `7b3267c`, `20918f4`, `63bec507`, `be7785b` bodies) | `history-rewrite — APPLIED (scrub 2026-06-15)` | `git filter-repo` executed via `history-scrub/scrub-history.sh` (replace-text + replace-message + path removal); cited commits no longer exist; `--verify-only` CLEAN |
 
 **Commit history scan results (post-remediation rescan):**
 
-Working-tree pattern scan produced no matches outside of false-positive locations (rows 11–12, 14, 16, 19–21). Commit-message history, however, contains real hits: remediation commit `b5d5404` records the `<redacted-path>` strings it redacted (in its body); `7b3267c` records the `example-org` substitutions it applied; `20918f4` (re-arm) references both; older dogfood commits (`63bec507`, `be7785b`) contain `example-org/example-app` in context lines. All classified `history-rewrite` (row 22), deferred to phase 2 alongside the §cross-poll scrub. See §cross-poll history-scrub note for the `git filter-repo` command.
+Working-tree pattern scan produced no matches outside of false-positive locations (rows 11–12, 14, 16, 19–21). Commit-message history previously contained real hits (row 22); these have since been **expunged** by the `git filter-repo` scrub (2026-06-15) — the cited commits were rewritten and `scrub-history.sh --verify-only` reports all surfaces CLEAN. Row 22 is now `APPLIED`.
 
 ### Allowlist — intentionally-kept references
 
@@ -377,7 +377,7 @@ insertion (all 31 target files), and §gh-content body edits via `gh issue/pr ed
 | scan | report-path | result-count | residual-after-triage | timestamp | verdict |
 |------|-------------|--------------|-----------------------|-----------|---------|
 | A — secrets (gitleaks) | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/gitleaks-rescan.json` | 0 | 0 | 2026-06-15T11:00 | **clean** |
-| B — personal-refs (grep) | inline (no JSON report) | working-tree: ~25 pattern hits (all covered by triaged rows or post-remediation placeholders); commit-history: 3 lines (row 22 open) | 1 — row 22 (history-rewrite phase 2, deferred) | 2026-06-15T11:00 | **pending-action: 1** |
+| B — personal-refs (grep) | inline (no JSON report) | working-tree: pattern hits all covered by triaged rows / post-remediation placeholders; commit-history: 0 after scrub | 0 | 2026-06-15 (re-checked post-scrub) | **clean** |
 | C — license headers | inline | 31 files scanned | 0 missing | 2026-06-15T11:00 | **clean** |
 
 ### Rescan A detail (secrets)
@@ -416,12 +416,14 @@ All working-tree matches are either triaged false-positives (rows 11, 12, 14, 16
 the post-remediation placeholder form (`example-org` as substituted value, row 17). Zero residual
 private strings in working tree.
 
-Commit-history scan: 3 commit-body lines reference `<redacted-path>` (in commit bodies of
-`b5d5404`, `7b3267c`, `20918f4` — the remediation commits themselves, which document what they
-redacted). These are row 22 (`history-rewrite`, phase 2 deferred). **1 open action remains.**
+Commit-history scan (re-run post-scrub): the row-22 `history-rewrite` action has been
+**executed** — `git filter-repo` (via `history-scrub/scrub-history.sh`) expunged the
+private-org names and `/Users/` paths across all blob contents, commit messages, and file
+paths, and removed the leaked cross-poll folder. The commits this rescan originally cited
+(`b5d5404`, `7b3267c`, `20918f4`) no longer exist (rewritten). `scrub-history.sh --verify-only`
+reports all three surfaces CLEAN. **0 open actions remain.**
 
-**Verdict: pending-action: 1** (row 22 — commit-history rewrite deferred to phase 2 / pre-publish
-sweep).
+**Verdict: clean.**
 
 ### Rescan C detail (license headers)
 
@@ -442,6 +444,12 @@ equivalent) to insert headers into all 24 previously-missing files. **Verdict: c
 
 | row | triage | description | owner |
 |-----|--------|-------------|-------|
-| 22 | history-rewrite | Commit bodies in `b5d5404`, `7b3267c`, `20918f4`, `63bec507`, `be7785b` contain `<redacted-path>` and `example-org` references. Run `git filter-repo` (phase 2 / pre-publish sweep) to expunge. Force-push all branches; invalidate existing clones. | operator (phase 2) |
+| — | — | (none) — the row-22 history-rewrite has been executed; all three scrub surfaces verify clean. | — |
 
-audit verdict: red — see open actions
+**Note — pre-publish re-sweep:** the force-push of the rewritten history is the publish
+mechanism and belongs to the gate-2 `FLIP-CHECKLIST` (a normal PR-merge will NOT replace
+remote's old commits). Gate 2 also lands an automated leak-guard (T15 leak-scan-script +
+T16 leak-scan-wiring) so post-scrub commits cannot reintroduce leaks; the FLIP-CHECKLIST
+runs `scrub-history.sh --verify-only` one final time before the flip.
+
+audit verdict: green

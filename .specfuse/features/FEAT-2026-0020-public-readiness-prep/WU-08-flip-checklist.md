@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0020/T08
+id: FEAT-2026-0020/T17
 type: implementation
 status: draft
 attempts: 0
@@ -21,7 +21,7 @@ its **owner** and its **rollback**.
 **Context.** Final authoring WU of FEAT-2026-0020 gate 2. The visibility flip itself happens
 outside the loop (GitHub UI, human decision); this checklist is what makes the operator's
 flip path explicit enough to run unaided (the feature-arc verdict question in `G2-CLOSE`).
-Correlation ID `FEAT-2026-0020/T08`. Depends on every hygiene + guard WU (T01–T07) because
+Correlation ID `FEAT-2026-0020/T17`. Depends on every hygiene + guard WU (T01–T07) because
 the checklist references their outputs as pre-flip gates: README/CONTRIBUTING/SECURITY/
 CODE_OF_CONDUCT present (T01–T03), issue/PR templates + dependabot landed (T04–T05), the
 leak-scan guard installed + CI gate green (T06–T07), the deferred history-rewrite open
