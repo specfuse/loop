@@ -1352,3 +1352,36 @@ promoted here.
   reviewed before consumers commit to its shape. Document this
   shape in the next `authoring-work-units` revision as the
   default for contract-shaped features.
+
+- [FEAT-2026-0020/history-scrub/three-surfaces] `git filter-repo
+  --replace-text` scrubs ONLY file contents (blobs). It does NOT
+  touch commit messages or file paths/names. A scrub that runs only
+  `--replace-text` looks done (working tree clean) but leaks persist
+  in commit-message bodies and any filename that embeds a private
+  token. Live evidence: first scrub left 35 message residuals + a
+  `SMOKE-INIT-2026-0001-F06.md` filename. Rule: scrub all three
+  surfaces in one pass — `--replace-text` + `--replace-message`
+  (same mapping file) + `--path-rename` (or `--path … --invert-paths`
+  to delete) — and VERIFY each surface separately (a single
+  `git log --all -p | grep` blurs which surface still leaks).
+  Reusable harness lives at
+  `.specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/scrub-history.sh`
+  (gitignored; `--verify-only` audits read-only).
+
+- [FEAT-2026-0020/history-scrub/scope-vs-fixtures] `filter-repo
+  --replace-text` rewrites HEAD's blobs too, so a too-broad mapping
+  silently edits live SOURCE and TEST FIXTURES. Live evidence:
+  blanket-redacting `INIT-2026-0001` — which is the scaffold's own
+  canonical orchestrated correlation-ID sample (in
+  `.specfuse/rules/correlation-ids.md` + 4 test suites), not an
+  org-identifying string — broke 19 tests in one shot. Rules: (1)
+  redact only genuinely-private tokens; a shared/sample identifier
+  that also names a private instance is NOT automatically a leak —
+  classify it. (2) Correct order is redact-working-tree-FIRST (fix
+  any tests in lockstep, commit, suite green), THEN history-scrub —
+  because once HEAD already matches the redacted form, `--replace-text`
+  only rewrites OLD commits and the working tree + tests stay green.
+  (3) Always run the test suite immediately after any history rewrite;
+  blob substitution can break code with zero error output. Recovery
+  path that worked: restore from the PRE-scrub bundle (the first one,
+  pre-pass-1 — not an intermediate), re-scope, re-run.
