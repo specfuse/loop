@@ -24,9 +24,9 @@ Specfuse is three projects (`codegen`, `loop`, `orchestrator`) sharing one gate-
 
 This replaces the older "gates in the PM" design (orchestrator's architecture addendum §A.5). The
 full rationale is in the orchestrator repo:
-- `<redacted-path>` (Model A vs B; B chosen)
-- `<redacted-path>` (how the two surfaces relate)
-- `<redacted-path>` (the ID/label/branch/trailer contract — read this; summarized in §3)
+- `example-org/orchestrator/docs/gate-placement-proposal.md` (Model A vs B; B chosen)
+- `example-org/orchestrator/docs/specfuse-collaboration-charter.md` (how the two surfaces relate)
+- `example-org/orchestrator/docs/naming-convention.md` (the ID/label/branch/trailer contract — read this; summarized in §3)
 
 ## 2. Unit hierarchy + the naming convention (the contract you must honor)
 

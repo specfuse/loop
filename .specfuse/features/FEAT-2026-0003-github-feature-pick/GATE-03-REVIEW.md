@@ -208,7 +208,7 @@ may have already named different labels.
 **Two ways to resolve at review:**
 
 - **Confirm first**: before arming, check the orchestrator's
-  addendum (`<redacted-path>`)
+  addendum (`example-org/orchestrator/docs/`)
   or the orchestrator repo's open issues for whether
   `loop:in-progress` / `loop:complete` are already named OR whether
   different names (e.g. `feature:in-flight`, `feature:done`) are
