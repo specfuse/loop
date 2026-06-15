@@ -65,27 +65,35 @@ pre-existing scaffold.
 
 ## Open verifications (operator decisions before arming)
 
-1. **File-bundle confirmation.** T03 bundles `SECURITY.md` + `CODE_OF_CONDUCT.md` into one
-   WU (both small, standard). Confirm the bundle, or split into two WUs at arming.
-2. **T06 sizing — split or keep.** The leak-guard was split into detector (T06) +
-   wiring (T07) to respect the per-WU sizing rule (`/authoring-work-units` §6). Gate 1's
-   retrospective flagged over-bundling as a sizing risk. Confirm the 2-WU split, or
-   re-bundle / split further (e.g. separate the allowlist) at arming.
-3. **SECURITY.md disclosure channel (legal/maintainer review).** Decide the exact channel
-   text **before** dispatching T03: **GitHub Security Advisories** (private vulnerability
-   reporting, enable in repo settings) **OR** a direct project email fallback **OR** both.
-   The same value fills the Contributor Covenant 2.1 enforcement-contact in T03. T03 blocks
-   if this is unchecked at dispatch (it must not invent an address). ☐ unchecked.
-4. **FLIP-CHECKLIST PyPi-tag scope (cross-feature with FEAT-2026-0019).** Decide whether
-   `FLIP-CHECKLIST.md` (T08) **stops at the GitHub visibility flip** or **includes
-   FEAT-2026-0019's first PyPi tag step**. The roadmap sequencing constraint is "0020 must
-   precede 0019's first PyPi tag" — see Cross-feature note below. T08 blocks if undecided.
-   ☐ unchecked.
-5. **Gate-1 deferred history rewrite (the one open action).** Gate 1 closed `red` because
-   the phase-2 commit-history rewrite (`scrub-history.sh`, `RETROSPECTIVE.md` §"What the
-   loop did NOT verify" entries 5–6) is not yet run. Confirm whether it must be **closed
-   before** the gate-2 flip rehearsal (T09), or accepted as residual risk and documented in
-   the checklist. ☐ unchecked.
+> **Arming note (2026-06-15):** gate-2 WUs were renumbered `T01–T09 → T10–T18` to remove a
+> correlation-id collision with gate-1's `T01–T06`. References to `T0N` below map to
+> `T1(N-1)` (e.g. T03 → T12, T06 → T15, T07 → T16, T08 → T17, T09 → T18). PLAN graph + WU
+> frontmatter are the source of truth.
+
+1. **File-bundle confirmation.** T12 bundles `SECURITY.md` + `CODE_OF_CONDUCT.md` into one
+   WU (both small, standard).
+   **☑ Confirmed (arming): keep bundled.**
+2. **T15 sizing — split or keep.** The leak-guard was split into detector (T15) +
+   wiring (T16) to respect the per-WU sizing rule (`/authoring-work-units` §6).
+   **☑ Confirmed (arming): keep the 2-WU split (T15 detector + T16 wiring).**
+3. **SECURITY.md disclosure channel.** The same value fills the Contributor Covenant 2.1
+   enforcement-contact in T12. T12 blocks if unchecked at dispatch (it must not invent an
+   address).
+   **☑ RESOLVED (arming): GitHub Security Advisories** — private vulnerability reporting
+   (enable in repo Settings → Security → Private vulnerability reporting). No email address
+   exposed. The literal value T12 must use everywhere a contact is required is "report a
+   vulnerability via this repo's GitHub Security Advisories (Security tab → Report a
+   vulnerability)". T12 does NOT block.
+4. **FLIP-CHECKLIST PyPi-tag scope (cross-feature with FEAT-2026-0019).**
+   **☑ RESOLVED (arming): T17's checklist STOPS at the GitHub visibility flip** (+ the
+   force-push of the scrubbed history). PyPi tooling/tag stays in FEAT-2026-0019; T17 does
+   NOT pull 0019 scope in (per GATE-02 escalation trigger 2). T17 does NOT block.
+5. **Gate-1 deferred history rewrite (the one open action).**
+   **☑ RESOLVED (arming): the history rewrite has been EXECUTED** this session via
+   `history-scrub/scrub-history.sh` (`--verify-only` reports all surfaces CLEAN; `AUDIT.md`
+   audit verdict is now `green`). The remaining **force-push** of the rewritten history is a
+   T17 FLIP-CHECKLIST step (the publish mechanism — a normal PR-merge will not replace
+   remote's old commits), NOT a blocker for the T18 rehearsal.
 
 ## Cross-feature note — FEAT-2026-0019 coupling
 
@@ -110,7 +118,7 @@ operator verifies it at arming.
 | Dependabot `package-ecosystem` identifiers (`github-actions`, `pip`) + `schedule` schema | T05 | Dependabot `dependabot.yml` docs | ☐ |
 | Dependabot `pip` `directory:` (assumes `pyproject.toml` at `/`) | T05 | The repo's manifest location | ☐ |
 | `gitleaks protect --staged` invocation shape for the staged surface | T06 | `gitleaks` 8.30.1 CLI (on PATH) | ☐ |
-| SECURITY.md / Covenant contact channel | T03 | Operator decision (Open Verification #3) | ☐ |
+| SECURITY.md / Covenant contact channel | T12 | Operator decision (Open Verification #3) | ☑ GitHub Security Advisories |
 
 ---
 

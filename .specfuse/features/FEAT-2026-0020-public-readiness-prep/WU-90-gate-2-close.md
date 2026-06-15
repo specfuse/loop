@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0020/G2-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 generated_surfaces: []
 oracle_env: macos_local
