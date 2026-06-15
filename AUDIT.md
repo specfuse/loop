@@ -360,3 +360,88 @@ Mirrored commit `7b3267c`'s substitution scheme. Same private-org cluster as
 (`7b3267c`, `b5d5404`) did not reach. See edit-history caveat above — current
 bodies are clean; GitHub edit-history retention is the operator's accepted residual
 risk (org-names only, no credentials).
+
+---
+
+## §verification
+
+**Produced by:** FEAT-2026-0020/T06 (WU-06-post-remediation-rescan)
+
+**Rescans run:** 2026-06-15T11:00 (local, macos_local oracle). All three operator
+remediation phases confirmed complete before rescan: in-place redactions (commits
+`7b3267c`, `b5d5404`), INIT-F06 folder deletion (`7b3267c`), license-header
+insertion (all 31 target files), and §gh-content body edits via `gh issue/pr edit`.
+
+### Rescan table
+
+| scan | report-path | result-count | residual-after-triage | timestamp | verdict |
+|------|-------------|--------------|-----------------------|-----------|---------|
+| A — secrets (gitleaks) | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/gitleaks-rescan.json` | 0 | 0 | 2026-06-15T11:00 | **clean** |
+| B — personal-refs (grep) | inline (no JSON report) | working-tree: ~25 pattern hits (all covered by triaged rows or post-remediation placeholders); commit-history: 3 lines (row 22 open) | 1 — row 22 (history-rewrite phase 2, deferred) | 2026-06-15T11:00 | **pending-action: 1** |
+| C — license headers | inline | 31 files scanned | 0 missing | 2026-06-15T11:00 | **clean** |
+
+### Rescan A detail (secrets)
+
+Command:
+```
+gitleaks detect --source . --log-opts="--all" --report-format json \
+  --report-path .specfuse/features/FEAT-2026-0020-public-readiness-prep/gitleaks-rescan.json
+```
+
+Output: `342 commits scanned. scanned ~7033976 bytes (7.03 MB). no leaks found.` Exit 0.
+`gitleaks-rescan.json` is an empty JSON array `[]`. Zero findings. §secrets had 0 findings
+pre-remediation; post-remediation count unchanged at 0. **Verdict: clean.**
+
+### Rescan B detail (personal-refs)
+
+Working-tree pattern scan re-run using T02's commands:
+- `/Users/` — hits in: `GATE-02.md:32` (`/Users/<user>/` pattern placeholder in WU spec
+  text — meta-reference, same class as row 11/16), `WU-02-personal-refs-grep.md:44` (row 11
+  false-positive), `roadmap.md:460` (row 12 false-positive), `AUDIT.md` (row 20
+  false-positive). No real developer paths present.
+- `@gmail.com` — hits in: `roadmap.md:461` (row 14 false-positive), `AUDIT.md` (row 20). No
+  real addresses.
+- `\.local\b` — hits in: `WU-02-personal-refs-grep.md:48` (row 16 false-positive), `AUDIT.md`
+  (row 20). No real hostnames.
+- `example-org` / `example-app` — hits in: `.specfuse/features/FEAT-2026-0003-github-feature-pick/`
+  (row 17; all occurrences are the post-remediation placeholder form — the original private org
+  name was replaced with `example-org` by commit `7b3267c`), `WU-03-cross-pollination-check.md`
+  (row 19 false-positive), `events.jsonl` (row 21 false-positive), `AUDIT.md` (row 20
+  false-positive), `README.md:134` / `roadmap-archive.md:78,90` / `roadmap.md:469` /
+  `docs/handoff-github-feature-pick.md:27-29,129-130,177,179` (all post-remediation placeholder
+  form of the same `example-org` substitution; covered by the same `redact-in-place — applied`
+  classification as row 17).
+
+All working-tree matches are either triaged false-positives (rows 11, 12, 14, 16, 19, 20, 21) or
+the post-remediation placeholder form (`example-org` as substituted value, row 17). Zero residual
+private strings in working tree.
+
+Commit-history scan: 3 commit-body lines reference `<redacted-path>` (in commit bodies of
+`b5d5404`, `7b3267c`, `20918f4` — the remediation commits themselves, which document what they
+redacted). These are row 22 (`history-rewrite`, phase 2 deferred). **1 open action remains.**
+
+**Verdict: pending-action: 1** (row 22 — commit-history rewrite deferred to phase 2 / pre-publish
+sweep).
+
+### Rescan C detail (license headers)
+
+Command re-run:
+```
+find .specfuse/scripts .specfuse/skills .specfuse/rules .specfuse/templates \
+  -type f \( -name '*.py' -o -name '*.sh' -o -name '*.md' \)
+```
+
+Detection: header present if `Apache License, Version 2.0` OR `SPDX-License-Identifier:
+Apache-2.0` appears in first 30 lines.
+
+Result: **31 files scanned, 31 with header, 0 missing.** T05 found 24 missing (22.6% coverage);
+post-remediation coverage is 31/31 = 100%. Operator ran `insert-license-headers.py` (or
+equivalent) to insert headers into all 24 previously-missing files. **Verdict: clean.**
+
+### Open actions
+
+| row | triage | description | owner |
+|-----|--------|-------------|-------|
+| 22 | history-rewrite | Commit bodies in `b5d5404`, `7b3267c`, `20918f4`, `63bec507`, `be7785b` contain `<redacted-path>` and `example-org` references. Run `git filter-repo` (phase 2 / pre-publish sweep) to expunge. Force-push all branches; invalidate existing clones. | operator (phase 2) |
+
+audit verdict: red — see open actions

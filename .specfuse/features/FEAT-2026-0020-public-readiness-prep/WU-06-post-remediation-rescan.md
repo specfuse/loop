@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
+duration_seconds: 311.602
+cost_usd: 0.79508
+input_tokens: 12
+output_tokens: 13877
 ---
 
 # Re-run T01/T02/T05 scans after operator remediation; record §verification verdict
