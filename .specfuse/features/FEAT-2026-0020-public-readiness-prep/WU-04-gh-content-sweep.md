@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T04
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 2.00
+duration_seconds: 42.693
+cost_usd: 0.16309
+input_tokens: 9
+output_tokens: 1785
 ---
 
 # Pull all PRs + issues via gh CLI; grep for sensitive references; triage in AUDIT.md
