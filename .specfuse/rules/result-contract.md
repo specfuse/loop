@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
 # Rule: the RESULT block contract
 
 Every work-unit session ends with a single fenced `result` block as the very last

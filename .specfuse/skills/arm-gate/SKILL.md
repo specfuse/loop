@@ -3,6 +3,12 @@ name: arm-gate
 description: At a gate boundary — driver halted with `awaiting_review` on the just-completed gate and next gate's WUs in `draft` — walk the drafts, accept / revise / reject each, flip statuses, mark the completed gate `passed`, and print the resume command. The human-review-and-arm checkpoint of the methodology, made fast.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Arm gate (interactive, propose-and-confirm)
 
 This skill is the per-gate human checkpoint of the methodology. The

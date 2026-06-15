@@ -14,6 +14,12 @@ status: open        # open | awaiting_review | passed
 # set it in the successor gate to exercise the brake for the first time.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Gate 1 — <name of the milestone this gate proves>
 
 ## Definition of done

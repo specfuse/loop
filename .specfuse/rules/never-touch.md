@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
 # Rule: never-touch list
 
 Three categories of path are off-limits to every work-unit session, regardless of

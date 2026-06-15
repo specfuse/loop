@@ -3,6 +3,12 @@ name: gate-status
 description: Report where the loop stands on the active feature. Walks the current gate's WU statuses, reads events.jsonl and per-attempt notes for blocked units, and synthesizes a structured diagnosis — what's blocked, likely root cause, options, and a recommended next action. Read-only. Run after the loop driver halts on a blocked WU and you're coming back to figure out what to do.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Gate status (interactive, diagnostic)
 
 This skill is the answer to "where do we stand?" after the loop driver

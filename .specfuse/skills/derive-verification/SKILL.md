@@ -3,6 +3,12 @@ name: derive-verification
 description: Interactively draft a comprehensive `.specfuse/verification.yml` for a target single-repo project by inspecting its CI/CD, tooling manifests, and code — asking the user only what evidence cannot resolve — and reconciling the findings against the Specfuse methodology's five gate categories. Drafts; never auto-writes. Use this when bootstrapping the loop in a project that already has CI or tooling worth deriving gates from.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Derive verification (interactive)
 
 This skill produces a candidate `.specfuse/verification.yml` for a target repo by

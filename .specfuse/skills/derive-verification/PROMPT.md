@@ -1,4 +1,9 @@
 <!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+<!--
 PROMPT.md — the agent instruction for the derive-verification skill.
 
 INTENDED USE: run interactively. Start `claude` in the target repo root and

@@ -3,6 +3,12 @@ name: fix-bug
 description: Triage and fix a reported bug — 1 bug = 1 branch = 1 PR, test-first. Use when the user references a GitHub issue number, asks to fix a bug, or pastes a bug report. Refuses if the work is large/complex/risky and proposes promoting to a feature instead. Triggers — "/fix-bug", "fix issue", "fix bug", "address issue NN", "patch NN", pasting an issue URL.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Fix a reported bug (interactive)
 
 This skill executes the project's bug-fix workflow on a single GitHub

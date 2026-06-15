@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
 # Rule: correlation IDs
 
 Every unit of work in the loop carries a correlation ID that threads it through the
