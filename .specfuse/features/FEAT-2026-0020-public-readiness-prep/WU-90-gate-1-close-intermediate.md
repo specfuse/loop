@@ -1,11 +1,24 @@
 ---
 id: FEAT-2026-0020/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 2
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 1.50
+# verdict: lint (plannext gate, lint_plan.py) requires a VERDICT_VALUES entry on
+# close-type WUs while status is in_progress during dispatch — its exempt set
+# omits in_progress, so the prior verdict-less attempt failed plan-lint. This is a
+# GATE verdict, not the terminal feature-arc verdict (which is G2-CLOSE's per AC6):
+# the driver has no close-intermediate terminal-flip branch (loop.py ~2752 handles
+# only `close`), so a non-`met` value triggers nothing. `partially_met` is honest —
+# gate 1 has 1 open action (the §personal-refs row-22 commit-history rewrite, T06
+# rescan `pending-action: 1`), deferred to the pre-publish sweep.
+verdict: partially_met
+duration_seconds: 669.831
+cost_usd: 4.999493
+input_tokens: 18289
+output_tokens: 46936
 ---
 
 # Gate 1 close-intermediate — retrospective + lessons + docs

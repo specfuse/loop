@@ -1385,3 +1385,35 @@ promoted here.
   blob substitution can break code with zero error output. Recovery
   path that worked: restore from the PRE-scrub bundle (the first one,
   pre-pass-1 — not an intermediate), re-scope, re-run.
+
+- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] Do NOT fold an out-of-loop-only
+  audit surface into the same gate as in-loop-verifiable ones. An audit/
+  remediation WU whose surface the dispatched agent cannot reach at all
+  (e.g. the GitHub issue/PR surface — `gh` returns auth errors inside
+  `claude -p`, the documented `gh`↔claude-p bug) produces ZERO in-loop
+  evidence: both the audit and the fix run in the operator's session. Mixed
+  with deferred-but-post-state-verified surfaces (secrets, working-tree
+  refs, license headers — loop scans, operator fixes, loop re-scans), it
+  inflates the gate's `## What the loop did NOT verify` count past the
+  >2 sizing threshold. Rule: when authoring an audit gate, give any
+  surface the agent cannot reach its OWN gate, OR mark the WU
+  `designated-out-of-loop` at plan time with an operator-journal artifact
+  as the verification proxy. Keeps the in-loop gate's deferred list ≤2 and
+  stops "deferred but verified post-state" being conflated with "the loop
+  never had eyes on this."
+
+- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] A close-intermediate WU that is
+  DISPATCHED (not auto-closed) must carry a hedged `verdict:` in its
+  frontmatter, even though the gate is non-terminal. `lint_plan.py`'s
+  verdict-exempt set for close-type WUs omits `in_progress`/`in_review`,
+  and the driver flips status→`in_progress` at dispatch, so plan-lint
+  (the `plannext` gate set) FAILS mid-dispatch on a verdict-less close
+  WU — even when AC text says "no terminal verdict." The driver has no
+  `close-intermediate` terminal-flip branch (only `close` is read for
+  `verdict_permits_terminal_flips`), so a non-`met` value (`met_locally`/
+  `partially_met`) satisfies the lint while triggering nothing. Rule:
+  author close-intermediate WUs to WRITE a hedged verdict reflecting the
+  honest gate state; reserve `met`/`verdict:`-absence semantics for the
+  auto-close path, which bypasses the in_progress lint window. (Fix the
+  lint exempt-set to include in_progress/in_review only as a separate,
+  deliberate WU — do not weaken a gate from inside a close session.)
