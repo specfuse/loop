@@ -353,8 +353,8 @@ even where the grep produced zero matches.
 Total issues/PRs scanned: **11 / 27**. Findings: **12 items** (27 raw pattern
 matches; 1 false-positive item — pr #38 `/Users/`). Open actions: **0** — all 12
 `edit-via-gh-api` body redactions **applied** by the operator (2026-06-15) and
-verified: `gh issue/pr view <n> --json body` shows 0 residual matches for
-`example|example|exampleEndpoint|INIT-2026-0001` across all 12 items.
+verified: `gh issue/pr view <n> --json body` shows 0 residual matches for the
+private-org identifier set across all 12 items.
 Mirrored commit `7b3267c`'s substitution scheme. Same private-org cluster as
 §personal-refs but on the GitHub surface, which the in-repo redaction commits
 (`7b3267c`, `b5d5404`) did not reach. See edit-history caveat above — current
