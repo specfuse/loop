@@ -2355,6 +2355,23 @@ def run(
     dry_run: bool,
     force_full_close: str | None = None,
 ) -> int:
+    # Fail-fast on a malformed verification.yml BEFORE we touch any WU state.
+    # The per-gate `verify()` call lazy-loads the same file; if it's malformed,
+    # the crash lands mid-WU with `status: in_progress` already on disk,
+    # corrupting the recovery surface (see specfuse/loop#35). Validating once
+    # here collapses that into "bad config, no work started."
+    try:
+        load_verification()
+    except _miniyaml.MiniYAMLError as exc:
+        print(
+            f"loop.py: .specfuse/verification.yml is malformed — {exc}",
+            file=sys.stderr,
+        )
+        print(
+            "Fix the file and re-run. No WUs were touched.",
+            file=sys.stderr,
+        )
+        return 1
     feature_dir = find_feature(feature_arg)
     feat_fm, gates = load_graph(feature_dir)
     feature_id = feat_fm.get("feature_id", feature_dir.name)
