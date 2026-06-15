@@ -7,7 +7,7 @@ AssertionError: ValueError not raised
 FAIL: test_unsandboxed_true_without_rationale_raises (test_loop_unsandboxed.TestLoadWURefusesUnjustified.test_unsandboxed_true_without_rationale_raises)
 ----------------------------------------------------------------------
 Traceback (most recent call last):
-  File "<redacted-path>", line 87, in test_unsandboxed_true_without_rationale_raises
+  File "tests/test_loop_unsandboxed.py", line 87, in test_unsandboxed_true_without_rationale_raises
     with self.assertRaises(ValueError) as cx:
          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
 AssertionError: ValueError not raised
@@ -53,7 +53,7 @@ AssertionError: ValueError not raised
 FAIL: test_unsandboxed_true_without_rationale_raises (test_loop_unsandboxed.TestLoadWURefusesUnjustified.test_unsandboxed_true_without_rationale_raises)
 ----------------------------------------------------------------------
 Traceback (most recent call last):
-  File "<redacted-path>", line 87, in test_unsandboxed_true_without_rationale_raises
+  File "tests/test_loop_unsandboxed.py", line 87, in test_unsandboxed_true_without_rationale_raises
     with self.assertRaises(ValueError) as cx:
          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
 AssertionError: ValueError not raised

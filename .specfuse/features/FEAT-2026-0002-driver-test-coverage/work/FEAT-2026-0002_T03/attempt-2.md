@@ -49,10 +49,10 @@ Files skipped (0):
 $ coverage run --source=.specfuse/scripts -m unittest discover -s tests && coverage report --fail-under=70
     __import__(name)
     ~~~~~~~~~~^^^^^^
-  File "<redacted-path>", line 46, in <module>
+  File "tests/test_validate_event.py", line 46, in <module>
     _spec.loader.exec_module(ve)  # type: ignore[union-attr]
     ~~~~~~~~~~~~~~~~~~~~~~~~^^^^
-  File "<redacted-path>", line 51, in <module>
+  File ".specfuse/scripts/validate-event.py", line 51, in <module>
     sys.exit(2)
     ~~~~~~~~^^^
 SystemExit: 2

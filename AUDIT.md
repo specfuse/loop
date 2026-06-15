@@ -53,8 +53,8 @@ git log --all --format='%H %s%n%b' | grep -nE '\.local\b'
 | 14 | `@gmail.com` | `.specfuse/roadmap.md:460` | `false-positive` | (none — grep pattern example in audit planning text) |
 | 15 | `cbonte99@gmail.com` | (no matches in working tree or commit history) | N/A | (none) |
 | 16 | `\.local\b` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-02-personal-refs-grep.md:29` | `false-positive` | (none — search pattern in this WU's own prompt) |
-| 17 | private-repo-id: `example-org/example-app` | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` — 13 files, ~40 locations (GATE-02-REVIEW.md, GATE-03-REVIEW.md, GATE-04-REVIEW.md, GATE-04.md, PLAN.md, RETROSPECTIVE.md, SMOKE-INIT-2026-0001-F06.md, WU-06, WU-07, WU-97, WU-98, WU-99, WU-100) | **⚠ unclear — operator decide** | keep-as-maintainer-attribution (dogfood history) OR redact-in-place across all FEAT-0003 files |
-| 18 | private-repo-id: `example-org/example-app` | `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/PLAN.md:9,15` and `WU-01:17,20,21` | **⚠ unclear — operator decide** | provenance question owned by WU-03; personal-refs triage: keep as dogfood evidence OR redact-in-place |
+| 17 | private-repo-id: `example-org/example-app` | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` — 13 files, ~40 locations | `redact-in-place — applied (commit 7b3267c)` | substituted `example-org/example-app → example-org/example-app`, `example-org/orchestrator → example-org/orchestrator`, `exampleEndpoint → exampleEndpoint` |
+| 18 | private-repo-id: `example-org/example-app` | `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/PLAN.md:9,15` and `WU-01:17,20,21` | `removed (commit 7b3267c)` | leaked feature folder deleted entirely per FEAT-2026-0020/T03 cross-poll verdict |
 | 19 | private-repo-id: `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-03-cross-pollination-check.md:18,33` | `false-positive` | (none — cross-pollination WU's own prompt names these as the target pattern) |
 
 **Commit history scan results:** 0 matches for all patterns across full `git log --all` history.
@@ -65,27 +65,27 @@ git log --all --format='%H %s%n%b' | grep -nE '\.local\b'
 |-----------|----------|-----------|
 | (none at this time) | — | No maintainer-email attributions or intentional personal references identified. Allowlist to be populated after operator classification of rows 17–18. |
 
-### Escalation note
+### Escalation note — RESOLVED
 
-**Rows 17–18 trigger the escalation condition** ("≥3 matches whose triage classification is
-unclear"). The FEAT-2026-0003 cluster alone contains >40 individual locations in 13 files where
-`example-org/example-app` appears. Classification is ambiguous:
+Rows 17–18 classified `redact-in-place` (and `removed` for the leaked INIT-F06 folder) by the
+operator. Phase-1 remediation applied:
 
-- **keep-as-maintainer-attribution:** These files document the first dogfood run of the loop
-  system against a real orchestrated feature. Keeping them preserves historical context about how
-  the tool was validated.
-- **redact-in-place:** The private org name `example-org` would be visible to any public
-  reader of the OSS repo, which may not be acceptable to that org.
-
-**Operator action required before this WU can be marked complete:**
-1. Decide: keep `example-org/example-app` references in FEAT-0003 files, or redact?
-2. Decide: keep `example-org/example-app` references in INIT-2026-0001-F06 files, or redact?
-   (Note: WU-03 will independently decide provenance; this decision is about personal-refs exposure.)
-3. Update rows 17–18 triage column and run T06 (post-remediation rescan).
+- **Commit `7b3267c`** (`chore(audit): redact example-org / exampleEndpoint refs; delete leaked
+  INIT-F06 folder`): substituted `example-org` → `example-org`, `example-org/example-app` →
+  `example-org/example-app`, `example-org/orchestrator` → `example-org/orchestrator`,
+  `exampleEndpoint` → `exampleEndpoint` across 19 tracked files; deleted
+  `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/`.
+- **Second pass** (this commit): redacted `<redacted-path>` → relative paths and
+  `<redacted-path>)]+` → `<local-path>` across rows 1–10 and 13 in 9 more
+  files (FEAT-2026-0002 + FEAT-2026-0014 + FEAT-2026-0016 attempt logs + work artifacts +
+  FEAT-2026-0011/PLAN.md).
+- **History**: deferred to phase 2 (`git-filter-repo`) after every gate-1 finding is remediated.
+  Old commits on the feature branch still reference the redacted strings; main's first publishable
+  commit is the merge commit of this branch.
 
 ---
 
-Total findings: 19 rows (excluding commit history, which is clean). Open actions: 10 (rows 1–10, 13 are `redact-in-place`; rows 17–18 are blocked pending operator classification).
+Total findings: 19 rows (excluding commit history, which is clean). Open actions: 0 — all rows remediated phase 1 (in-place redaction on `main`). Phase 2 (`git-filter-repo` history rewrite) deferred until every gate-1 audit-class finding is remediated.
 
 ---
 

@@ -20,7 +20,7 @@ closes — the WU bodies need to reference the restructured
 roadmap.md / archive shape that FEAT-2026-0010 lands.
 
 Implements the "Feature Prioritization Guidelines" methodology
-(`<redacted-path> Management/Feature
+(`<local-path> Management/Feature
 Prioritization Guidelines.gdoc`): five 1-10 criteria (CI, BV, TF, COI,
 R), quarterly weights, formula `RS = WCI*CI + WBV*BV + WTF*TF -
 WCOI*COI - WR*R`, normalized to a 0-100 Feature Score.

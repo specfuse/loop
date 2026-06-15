@@ -57,7 +57,7 @@ Reference binding rules: `.specfuse/rules/result-contract.md`,
 
 ```bash
 # Confirm methodology.md section structure (where the new prose attaches)
-grep -nE '^## ' <redacted-path> | head -20
+grep -nE '^## ' docs/methodology.md | head -20
 
 # Locate the existing FEAT-2026-0016 detail section in roadmap.md
 grep -n '^## FEAT-2026-0016' .specfuse/roadmap.md
@@ -135,13 +135,13 @@ grep -nE 'roadmap-archive\.md#feat-2026' .specfuse/roadmap.md | head -5
 
    ```bash
    # a. methodology.md mentions the new event-type contract
-   grep -qE 'Per-attempt outcome events' <redacted-path>
-   grep -qE 'attempt_outcome' <redacted-path>
+   grep -qE 'Per-attempt outcome events' docs/methodology.md
+   grep -qE 'attempt_outcome' docs/methodology.md
 
    # b. methodology.md mentions the re-arm frontmatter additions
-   grep -qE 're_arm_count' <redacted-path>
-   grep -qE 're_arm_history' <redacted-path>
-   grep -qE 'cumulative_cost_usd' <redacted-path>
+   grep -qE 're_arm_count' docs/methodology.md
+   grep -qE 're_arm_history' docs/methodology.md
+   grep -qE 'cumulative_cost_usd' docs/methodology.md
 
    # c. roadmap.md no longer carries the FEAT-2026-0016 detail section
    ! grep -qE '^## FEAT-2026-0016' .specfuse/roadmap.md
