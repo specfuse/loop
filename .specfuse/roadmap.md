@@ -35,6 +35,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
 | FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
+| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -416,6 +417,131 @@ package + green test suite via `pip install -e .`; (2) GitHub Actions
 publish path + first tagged release; (3) Claude Code plugin + marketplace
 PR; (4) bridge command + deprecation of `init.sh` v1.0. Each gate
 independently shippable.
+## FEAT-2026-0020 — Public-readiness prep: secrets audit + OSS hygiene before visibility flip
+
+**Why.** The `specfuse/loop` GitHub repo is currently private. The
+FEAT-2026-0019 distribution plan ships a public PyPi wheel whose
+contents are public source; that's coherent only if the GitHub repo
+also goes public (no privacy is preserved by keeping it private once
+the wheel is on PyPi, and Claude Code marketplace Part B of 0019 likely
+requires public source anyway). The repo carries an Apache-2.0 license
+already, so the legal posture is consistent — but the **hygiene posture
+isn't.** A repo whose `main` history was written under a "this is
+private" assumption can carry artifacts that shouldn't go public:
+accidentally-committed credentials, personal email addresses + machine
+paths embedded in commits, in-flight comments not meant for an external
+audience, cross-pollinated content from other private repos, missing
+contributor-onboarding files. Public-flip + first PyPi tag without
+this audit ships a wheel with embarrassing or sensitive content into a
+non-takedown-friendly channel.
+
+This feature is the one-shot cleanup that makes `main` publishable, so
+0019's first release lands on a public repo whose history is fit for
+the audience.
+
+**Goal.** Two gates. Gate 1 produces a green audit; gate 2 lands the
+public-facing hygiene files + the visibility-flip checklist.
+
+**Gate 1 — Audit.**
+
+- **Secret scan across full git history** — `gitleaks` or `trufflehog`
+  run against every commit on every reachable ref. Every match
+  triaged: ignore (false positive), redact (rewrite history with
+  `git-filter-repo` / BFG), or rotate (real credential leaked → rotate
+  + redact). Acceptance: scan exits clean OR every match has a logged
+  triage decision.
+- **PR + issue content sweep** — read closed PRs and issues for
+  references to internal hostnames, customer names, personal data,
+  private-repo paths, or anything else only-makes-sense-internally.
+  Triage same way. Recent IaC-agent issues (#23-#28, #35) reviewed
+  separately because they're the freshest and most likely to mention
+  consumer-side specifics.
+- **In-repo personal references** — grep `main` for `/Users/`,
+  `@gmail.com` / `@<personal-domain>`, credential filenames, internal
+  Slack channel names, internal product code names. Anything found:
+  redact in-place if on `main`, or rewrite history if older. Includes
+  `.specfuse/LEARNINGS.md`, `CLAUDE.md`, and every commit message on
+  `main` (commit-message rewrites require `git-filter-repo`).
+- **Cross-pollination check** —
+  `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/`
+  is filed under specfuse-loop's feature dir but looks like it leaked
+  in from `example-org`. Confirm with `git log -- <path>`; if
+  it doesn't belong, remove + commit + ensure no in-history secrets.
+- **License-header sweep** — every `*.py` / `*.sh` / `*.md` source
+  file under `.specfuse/scripts/`, `.specfuse/skills/`,
+  `.specfuse/rules/`, `.specfuse/templates/` carries the Apache-2.0
+  header. Spot checks already show most do; this is the mechanical
+  confirm.
+- **Audit report** — `.specfuse/features/FEAT-2026-0020-public-readiness-prep/AUDIT.md`
+  enumerates every finding + triage decision + the fix commit hash
+  (or "no action — false positive"). This file becomes the gate-1
+  RETRO evidence + ships with the repo so the public-facing audit
+  trail is honest.
+
+**Gate 2 — Public hygiene + flip-readiness ceremony.**
+
+- `README.md` polish — first-impression rewrite. 60-second pitch
+  ("Specfuse Loop is a Specfuse-methodology dogfood: a Python
+  driver + Claude Code skills that run features through gates with
+  cost-bounded retries"). Quickstart: `pip install specfuse` (once
+  0019 lands) or current `init.sh`. Link to the worked-example
+  fixture in `.specfuse/features/FEAT-2026-0001-health-endpoint/`.
+- `CONTRIBUTING.md` — how external contributors file issues, propose
+  PRs, run tests (`python3 -m unittest discover -s tests -t .`), and
+  the methodology-dogfood expectation: bug fixes via `/fix-bug`,
+  features via `/draft-feature`.
+- `SECURITY.md` — vulnerability reporting channel (GitHub Security
+  Advisories preferred; email fallback).
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1, no modifications.
+- `.github/ISSUE_TEMPLATE/` — three templates: bug report,
+  feature request, methodology question. Match the shape of the
+  IaC-agent issues (#23-#28) — they're a good worked example of
+  what a good bug report looks like.
+- `.github/pull_request_template.md` — summary + test-plan checklist,
+  matching the shape of PRs #30 / #31 / #32 / #33 / #34 / #36 / #37
+  (already converging on this form).
+- `.github/dependabot.yml` — actions + pip ecosystems, weekly
+  cadence.
+- Branch-protection capture — document the current rules in
+  `CONTRIBUTING.md`'s "How releases happen" section so a public
+  forker can read what's expected.
+- Release-tagging convention — `v0.x.0` semver for the loop driver;
+  couples to 0019's PyPi tag scheme. Document in `CONTRIBUTING.md`.
+- **Flip checklist** — `FLIP-CHECKLIST.md` in the feature folder
+  enumerates every step + the owner + the rollback. Final WU is
+  "operator runs the checklist" — the visibility flip itself happens
+  outside the loop (it's a human decision on a GitHub UI), the loop
+  just confirms readiness.
+
+**Sequencing — must precede 0019's first PyPi tag.**
+
+The PyPi wheel exposes source; if the source repo's history has
+secrets, the wheel may reference them. Sequence:
+
+1. 0020 ships → `main` is publishable.
+2. Operator flips visibility to public (outside the loop).
+3. 0019 ships → first PyPi tag + Claude Code marketplace publish.
+
+A botched 0019 before 0020 means a tagged release with embarrassing
+or sensitive content in a non-takedown-friendly channel. Don't.
+
+**Scope OUT.**
+
+- Marketing pages / website / docs site — separate work, not a
+  flip-blocker.
+- Renaming or rebranding — if the name needs a change, do it
+  before 0020 starts.
+- Anything from FEAT-2026-0019 (distribution surfaces) — that's its
+  own feature.
+- Closed-source private-index path (devpi / CodeArtifact). Out of
+  scope because we're going public; if the public path is wrong,
+  re-evaluate before 0020 starts, not inside it.
+
+**Status: planned.** Two-gate feature, must precede 0019's first
+public release. Likely shape: gate 1 = one substantive WU per audit
+class (secret scan, PR sweep, personal-refs grep, cross-pollination,
+license headers) + closing ceremony; gate 2 = one substantive WU per
+hygiene-file class + the flip-checklist WU + closing ceremony.
 
 ## Notes
 
