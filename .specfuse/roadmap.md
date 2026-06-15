@@ -34,6 +34,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-2026-0016) |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
+| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -289,6 +290,132 @@ Likely shape: one substantive WU to ship the new WU types +
 templates + lint, one substantive WU to ship the type-keyed guard
 table + tests, then closing ceremony (using the new contract for
 recursive dogfood).
+
+## FEAT-2026-0019 — Distribution: PyPi-installable driver + Claude Code plugin marketplace
+
+**Why.** Two distribution gaps, one feature.
+
+1. **Driver + scaffold today** ship via `init.sh` copying
+   `.specfuse/scripts/*.py` (`loop.py`, `lint_plan.py`, `_miniyaml.py`,
+   `gate_eval.py`) into the consumer repo. Upgrade is `init.sh --upgrade`
+   over HTTPS to GitHub. Versioning is "whatever was on `main` at copy
+   time" — no `--version`, no compat check between the scaffold copy and
+   any related tooling, no way for a consumer to pin to a known-good
+   release. Bug fixes (e.g. specfuse/loop#35, the `_miniyaml` crash that
+   left two WUs corrupted) require the operator to re-run the bash
+   installer in each repo. CI environments can't `pip install specfuse`;
+   they shell out to a curl-bash. Drift between the scaffold-copied driver
+   and any package-published one is invisible.
+2. **Claude assets** (skills, hooks, cavecrew subagents) currently
+   distribute via a `.specfuse/skills/` symlink-into-`.claude/skills/`
+   trick that the same `init.sh` performs. That doesn't scale to a second
+   product (orchestrator), bypasses Claude Code's native plugin precedence
+   and hot-reload, and forces every consumer through the bash installer.
+   Plugin schema spike confirmed the native path supports hooks,
+   subagents, hot reload, project-local override, and headless install —
+   green light to migrate.
+
+Both gaps share root cause: bash-installer ownership of state Claude Code
+and Python already have first-class delivery channels for. Fix them in
+one feature so the migration story is coherent.
+
+**Goal — Part A: PyPi-installable driver.**
+
+- Package name `specfuse` on PyPi. `pyproject.toml` at the repo root with
+  `[project.scripts]` entries: `specfuse-loop = specfuse.loop:main` and
+  `specfuse-lint = specfuse.lint_plan:main`. (A top-level `specfuse`
+  console script gates `init` / `upgrade` / `plugin sync` per Part C.)
+- Package layout: `specfuse/` (new top-level dir) ships `loop.py`,
+  `lint_plan.py`, `_miniyaml.py`, `gate_eval.py`, plus a `templates/`
+  data directory (PLAN / GATE / WU templates currently in
+  `.specfuse/templates/`) and a `rules/` data dir (binding rules
+  currently in `.specfuse/rules/`) loaded via `importlib.resources`.
+  Imports inside the package switch from bare `import _miniyaml` to
+  package-relative `from . import _miniyaml`.
+- Driver path resolution: `loop.py` keeps its `SPECFUSE_DIR = Path(".specfuse")`
+  convention for the per-repo state (features, LEARNINGS, verification.yml,
+  roadmap.md) — only the script + template surfaces move into the
+  pip package. State stays in the consumer repo; code stops being
+  copied into it.
+- `.specfuse/scripts/` becomes optional. Two supported configurations:
+  - **Pip mode** (recommended): `pip install specfuse` puts
+    `specfuse-loop` on PATH; consumer's `.specfuse/scripts/` is empty or
+    absent. `specfuse-loop` is invoked directly.
+  - **Vendored mode** (current shape, for environments without pip):
+    `init.sh` continues copying scripts into `.specfuse/scripts/` for
+    repos that need offline / sandboxed execution. The pip path is the
+    default; vendored is the carve-out.
+- Version compat. The driver carries a `DRIVER_VERSION` constant (already
+  present, currently `0.2.0`). A new `MIN_SCAFFOLD_VERSION` field is added
+  to the scaffold's `.specfuse/VERSION` (new file shipped by init).
+  On startup, the driver compares; mismatch → fail-loud with the fix
+  command (`specfuse upgrade <repo>`) in the error.
+- CI publish path. GitHub Actions builds the wheel + sdist, runs the full
+  test suite, then publishes to PyPi on a tag matching `v[0-9]+.*`.
+  Trusted publishing (OIDC) preferred over API tokens.
+
+**Goal — Part B: Claude Code plugin via marketplace.**
+
+Package Specfuse Claude assets as a Claude Code plugin named `specfuse`,
+published via marketplace at the `specfuse/specfuse` common repo. Skills
+migrate to the `/specfuse:` namespace; caveman hooks move from user
+`settings.json` into the plugin's `hooks.json`. `init.sh` ships a
+deprecation banner in v1.0 and is deleted in v1.1. Core plugin
+extraction (assets shared with orchestrator) deferred until orchestrator
+lands.
+
+**Goal — Part C: bridge command.**
+
+Single `specfuse upgrade` CLI command on the pip-installed driver syncs
+both surfaces: pulls the latest pip release of `specfuse`, runs the
+scaffold's `init.sh --upgrade` equivalent in-process, and tells Claude
+Code to `/plugin update specfuse@specfuse`. The bash `init.sh` is
+retained for first-time bootstrap (it has to live somewhere before pip
+is installed) but its body shrinks to "install pip package, hand off to
+`specfuse init`".
+
+**Benefits.**
+
+- **Driver side.** Standard `pip install specfuse` / `pip install -U
+  specfuse` upgrade story. Pinable in `requirements.txt` /
+  `pyproject.toml` of the consumer repo. CI environments install via
+  pip natively (no curl-bash). One source of truth for driver code —
+  no drift between scaffold-copied and package-published versions.
+  Version skew is detected at startup with a clear fix command, not
+  silently masked.
+- **Claude side.** Native marketplace install/update (`/plugin install
+  specfuse@specfuse` + `/plugin update`), versioned plugin releases with
+  hot reload (no session restart), preserved project-local skill
+  overrides, offline install via vendored tree, single `specfuse upgrade`
+  command bridges pip → plugin, foundation for multi-product
+  distribution (orchestrator + future products reuse marketplace),
+  elimination of symlink-tree maintenance.
+
+**Risks tracked.**
+
+- Wheel size growth from vendored plugin tree (mitigation: ship the
+  plugin as a separate optional dep `specfuse[claude]`; default install
+  is driver-only).
+- CI dual-publish race (pypi tag + marketplace PR open simultaneously);
+  publish sequencing in the release workflow.
+- Migration of existing symlink installs — `specfuse init --migrate`
+  detects the legacy layout, removes the symlink + scripts-copy, runs
+  `pip install`, and posts a one-line summary of what changed.
+- Namespace break for current `/arm-gate`-style invocations once skills
+  move to `/specfuse:arm-gate`. Provide one release of aliases before
+  removing.
+- Bootstrap chicken-and-egg: `init.sh` cannot assume pip is present on
+  the operator's machine. v1.0's `init.sh` either uses `python3 -m pip`
+  with a fallback to "ask operator to install pip and re-run", or
+  ships a self-contained `pipx`-style installer.
+- Sandboxed / CI environments that can't reach PyPi: vendored mode
+  (Part A) is the supported carve-out, not the default.
+
+**Status: planned.** Likely 3–4 gates: (1) repackage driver as pip
+package + green test suite via `pip install -e .`; (2) GitHub Actions
+publish path + first tagged release; (3) Claude Code plugin + marketplace
+PR; (4) bridge command + deprecation of `init.sh` v1.0. Each gate
+independently shippable.
 
 ## Notes
 
