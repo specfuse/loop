@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 0.80
+duration_seconds: 175.55
+cost_usd: 0.399444
+input_tokens: 14
+output_tokens: 8699
 ---
 
 # Confirm Apache-2.0 license headers across .specfuse/ source files; record gaps in AUDIT.md

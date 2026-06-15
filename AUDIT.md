@@ -144,3 +144,107 @@ Content references private non-public repo. History-scrub required.
 ### Summary
 
 Total non-`FEAT-*` directories scanned: **1**. Leaked-from-example verdicts: **1**. Operator action required before repo is public-safe.
+
+---
+
+## §licenses
+
+**Produced by:** FEAT-2026-0020/T05 (WU-05-license-header-sweep)
+
+### Repo-root LICENSE verdict
+
+`LICENSE` present at repo root. Content: Apache License, Version 2.0 (confirmed by first two lines). **Identity: ✓ Apache-2.0.**
+
+---
+
+### Proposed header templates
+
+Header blocks to insert, by file type. Templates defined once; table references them by name.
+
+**`[PY-HEADER]`** — for `.py` files. Insert at top (or after shebang line 1 if present):
+
+```
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+```
+
+**`[MD-NOFM-HEADER]`** — for `.md` files without YAML frontmatter. Insert at very top of file:
+
+```
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+```
+
+**`[MD-FM-HEADER]`** — for `.md` files with YAML frontmatter (`---` opener). Insert after the closing `---` line, before the body:
+
+```
+
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+```
+
+---
+
+### Findings table
+
+Scan command:
+
+```
+find .specfuse/scripts .specfuse/skills .specfuse/rules .specfuse/templates \
+  -type f \( -name '*.py' -o -name '*.sh' -o -name '*.md' \)
+```
+
+Detection: header present if `Apache License, Version 2.0` OR `SPDX-License-Identifier: Apache-2.0` appears in first 30 lines.
+
+| file | has-header | proposed-header-block |
+|------|------------|----------------------|
+| `.specfuse/rules/correlation-ids.md` | ✗ | `[MD-NOFM-HEADER]` |
+| `.specfuse/rules/never-touch.md` | ✗ | `[MD-NOFM-HEADER]` |
+| `.specfuse/rules/result-contract.md` | ✗ | `[MD-NOFM-HEADER]` |
+| `.specfuse/rules/security-boundaries.md` | ✗ | `[MD-NOFM-HEADER]` |
+| `.specfuse/scripts/_miniyaml.py` | ✓ | — |
+| `.specfuse/scripts/adopt_feature.py` | ✓ | — |
+| `.specfuse/scripts/gate_eval.py` | ✓ | — |
+| `.specfuse/scripts/gh_backend.py` | ✓ | — |
+| `.specfuse/scripts/gh_features.py` | ✓ | — |
+| `.specfuse/scripts/lint_plan.py` | ✓ | — |
+| `.specfuse/scripts/loop.py` | ✓ | — |
+| `.specfuse/scripts/validate-event.py` | ✗ | `[PY-HEADER]` (insert after shebang line 1) |
+| `.specfuse/skills/abandon-feature/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/adopt-feature/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/arm-gate/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/authoring-work-units/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/derive-verification/PROMPT.md` | ✗ | `[MD-NOFM-HEADER]` |
+| `.specfuse/skills/derive-verification/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/draft-feature/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/feature-conversion/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/fix-bug/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/gate-status/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/learnings-suggest/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/migrate-to-auto-close/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/pick-feature/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/unblock-wu/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/verification/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/skills/wrap-feature/SKILL.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/templates/GATE.template.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/templates/PLAN.template.md` | ✗ | `[MD-FM-HEADER]` |
+| `.specfuse/templates/WU.template.md` | ✗ | `[MD-FM-HEADER]` |
+
+**Total files scanned: 31. Missing headers: 24. Coverage: 22.6%.**
+
+### Escalation — coverage below 80% threshold
+
+Coverage 22.6% is well below the ≥80% operator-pre-approved threshold. 24 files missing headers across `.specfuse/rules/` (4), `.specfuse/scripts/` (1), `.specfuse/skills/` (17), `.specfuse/templates/` (3). Scale and uniformity suggest script-insert is the correct remediation strategy, not hand-edit. **Operator decision required before T06 (header insertion) is dispatched.**
+
+Options:
+1. **Script-insert (recommended):** Write a one-shot script that iterates the 24 missing files, detects frontmatter vs. no-frontmatter vs. shebang, and inserts the appropriate template. T06 runs the script and verifies.
+2. **Hand-edit:** Edit each of 24 files individually. Feasible but tedious and error-prone at this count.
+3. **Exclude .md files:** If per-file headers in documentation/skill files are considered excessive, update scope to `.py`/`.sh` only — reduces missing count to 1 (`validate-event.py`), coverage becomes 7/8 = 87.5%. Operator call.
