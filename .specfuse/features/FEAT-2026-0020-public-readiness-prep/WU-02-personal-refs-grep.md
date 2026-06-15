@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0020/T02
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 1.20
@@ -9,6 +9,17 @@ duration_seconds: 221.721
 cost_usd: 0.472695
 input_tokens: 13
 output_tokens: 14145
+unsandboxed: true
+unsandboxed_rationale: "Operator-decision items resolved by commits 7b3267c + b5d5404; AUDIT.md §personal-refs flipped to RESOLVED"
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-06-15T02:40:05+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 0.472695
+    prior_duration_seconds: 221.721
+    reason: "Operator-decision items resolved by commits 7b3267c + b5d5404; AUDIT.md §personal-refs flipped to RESOLVED"
 ---
 
 # Grep main for personal/internal references; triage in AUDIT.md §personal-refs
