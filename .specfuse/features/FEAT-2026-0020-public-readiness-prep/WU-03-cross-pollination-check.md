@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 0.80
+duration_seconds: 102.949
+cost_usd: 0.195512
+input_tokens: 9
+output_tokens: 3478
 ---
 
 # Verify provenance of suspect cross-repo content; record verdict in AUDIT.md
