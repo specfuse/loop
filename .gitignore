@@ -28,3 +28,7 @@ skills-lock.json
 .specfuse/**/work/
 .specfuse/.loop.lock
 *.tmp
+
+# FEAT-2026-0020 gh-content audit dumps — contain private-org refs, must NOT be committed (would leak into public history)
+.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-issues.json
+.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-prs.json

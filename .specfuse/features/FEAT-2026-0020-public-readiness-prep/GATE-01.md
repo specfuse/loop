@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 ---
 
 # Gate 1 — Audit

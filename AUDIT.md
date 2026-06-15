@@ -6,6 +6,30 @@ verifies the result in T06 (post-remediation rescan).
 
 ---
 
+## §secrets
+
+**Produced by:** FEAT-2026-0020/T01 (WU-01-secret-history-scan). Consolidated into
+this canonical AUDIT.md by T04 (originally written to the feature-local copy).
+
+**Tool:** gitleaks v8.30.1 (installed via `brew install gitleaks`)
+
+**Scan command:**
+```
+gitleaks detect --source . --log-opts="--all" --report-format json \
+  --report-path .specfuse/features/FEAT-2026-0020-public-readiness-prep/gitleaks.json
+```
+
+Triage of every finding from `gitleaks.json` (full git history, 261 commits,
+~4.40 MB scanned).
+
+| finding | commit | path | rule | triage | remediation-command |
+|---------|--------|------|------|--------|---------------------|
+| *(none)* | — | — | — | — | — |
+
+Total findings: 0. Open actions: 0.
+
+---
+
 ## §personal-refs
 
 **Produced by:** FEAT-2026-0020/T02 (WU-02-personal-refs-grep)
@@ -253,3 +277,82 @@ Options:
 1. **Script-insert (recommended):** Write a one-shot script that iterates the 24 missing files, detects frontmatter vs. no-frontmatter vs. shebang, and inserts the appropriate template. T06 runs the script and verifies.
 2. **Hand-edit:** Edit each of 24 files individually. Feasible but tedious and error-prone at this count.
 3. **Exclude .md files:** If per-file headers in documentation/skill files are considered excessive, update scope to `.py`/`.sh` only — reduces missing count to 1 (`validate-event.py`), coverage becomes 7/8 = 87.5%. Operator call.
+
+---
+
+## §gh-content
+
+**Produced by:** FEAT-2026-0020/T04 (WU-04-gh-content-sweep)
+
+GitHub issue + PR content is part of the public surface — it lives outside `main`
+but is just as visible once the repo flips public. This section scans every
+open/closed issue and PR (title, body, comments) for the same patterns as
+§personal-refs.
+
+**Dumps:** `.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-issues.json`
+(11 issues) + `gh-prs.json` (27 PRs), produced via:
+
+```
+gh issue list --state all --limit 1000 --json number,title,body,author,comments,createdAt,state
+gh pr   list --state all --limit 1000 --json number,title,body,author,comments,createdAt,state
+```
+
+**Patterns applied (same as T02):** `/Users/`, `cbonte99@gmail\.com`, `@gmail\.com`,
+`\.local\b`, plus the private-org identifiers established by T02/T03
+(`example-org`, `example-iac`, `example`, `exampleEndpoint`,
+`INIT-2026-0001-F06`). No matches in comments; all matches in issue/PR **bodies**.
+
+**Redaction scheme (mirrors commit `7b3267c`):** `example-org/example-iac
+→ example-org/example-iac`, `example-iac → example-iac`, `example-org →
+example-org`, `argocd.example.host → argocd.example.host`, `exampleEndpoint →
+exampleEndpoint`, `INIT-2026-0001-F06 → example-feature`.
+
+> ⚠️ **GitHub retains edit history.** `gh issue edit` / `gh pr edit` change only the
+> *current* body; GitHub keeps prior revisions viewable via the "edited" dropdown,
+> which becomes public when the repo flips. Redaction-via-edit therefore does NOT
+> expunge — it is acceptable for private-org *names* (the operator's call here) but
+> would be INSUFFICIENT for credentials. For true expunge, delete + recreate the
+> issue/PR or contact GitHub support. Analogous to the §personal-refs/§cross-poll
+> `history-rewrite` deferral.
+
+### Findings table
+
+| pattern | issue-or-pr# | match-excerpt | triage | remediation-command |
+|---------|--------------|---------------|--------|---------------------|
+| `example-iac` | issue #12 | `Project: \`example-iac\`, feature FEAT-2026-0019` (+2 more: "Related lessons in example-iac", "example-iac/.specfuse/scripts/loop.py vendored") | `edit-via-gh-api` | redact body → `gh issue edit 12 --body-file <redacted.md>` |
+| `example-iac` | issue #15 | `Both surfaced via \`example-iac\`` (+1: "Any example-iac feature whose roadmap row…") | `edit-via-gh-api` | redact body → `gh issue edit 15 --body-file <redacted.md>` |
+| `example-org/example-iac` | issue #24 | `Resolved on the consumer side via [example-org/example-iac PR #110](https://github.com/example-org/example-iac/pull/110)` (incl. private repo URL) | `edit-via-gh-api` | redact body incl. URL → `gh issue edit 24 --body-file <redacted.md>` |
+| `example-iac` | issue #25 | `\`example-iac\` shipped 3 features on 2026-06-14` | `edit-via-gh-api` | redact body → `gh issue edit 25 --body-file <redacted.md>` |
+| `argocd.example.host` | issue #26 | `\`curl -k https://argocd.example.host/healthz\`` (private internal hostname) | `edit-via-gh-api` | redact body → `gh issue edit 26 --body-file <redacted.md>` |
+| `example-iac` | issue #27 | `\`example-iac\` 2026-06-14 Argo CD session` | `edit-via-gh-api` | redact body → `gh issue edit 27 --body-file <redacted.md>` |
+| `example-iac` | issue #28 | `\`example-iac\` 2026-06-14 Argo CD session: 3 retr…` | `edit-via-gh-api` | redact body → `gh issue edit 28 --body-file <redacted.md>` |
+| `example-org/example-iac` | issue #35 | `\`example-org/example-iac\` FEAT-2026-0030 at \`c0f267a\`` (+ "live example-iac run, FEAT-2026-0030/T05") | `edit-via-gh-api` | redact body → `gh issue edit 35 --body-file <redacted.md>` |
+| `example-org/example-app`, `INIT-2026-0001-F06` | pr #1 | `all proven live against \`example-org/example-app#287\` = \`INIT-2026-0001/F06\`` + `adopted \`INIT-2026-0001-F06-…\` folder committed` | `edit-via-gh-api` | redact body → `gh pr edit 1 --body-file <redacted.md>` |
+| `example-iac` | pr #14 | `\`example-iac\` FEAT-2026-0019: 6 attempts, ~$14.…` (+1) | `edit-via-gh-api` | redact body → `gh pr edit 14 --body-file <redacted.md>` |
+| `example-iac` | pr #36 | `In the live \`example-iac\` reproducer this happened twice` (+1: "Live verification.yml from example-iac") | `edit-via-gh-api` | redact body → `gh pr edit 36 --body-file <redacted.md>` |
+| `example-org`, `INIT-2026-0001-F06`/`exampleEndpoint` | pr #38 | `looks like a leak from example-org` + `INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec` | `edit-via-gh-api` | redact body → `gh pr edit 38 --body-file <redacted.md>` |
+| `/Users/` | pr #38 | `In-repo personal references grep (\`/Users/\`, personal emails, internal channels)` | `false-positive` | (none — literal pattern name in this feature's own PR description, not a path) |
+
+### Line-by-line review — called-out issues #23–#28, #35
+
+Per WU prompt, these freshest IaC-agent issues get an explicit per-issue verdict
+even where the grep produced zero matches.
+
+| issue | state | grep matches | verdict |
+|-------|-------|--------------|---------|
+| #23 (`loop.py: intermediate auto-close path fires twice…`) | CLOSED | none | **clean** — no private refs; pure upstream bug report. No action. |
+| #24 (`init.sh should propagate __pycache__…`) | CLOSED | `example-org/example-iac` + private PR URL | **redact** (edit-via-gh-api) — see table. |
+| #25 (`Tighten verdict semantics…`) | CLOSED | `example-iac` | **redact** (edit-via-gh-api). 2 comments — both clean. |
+| #26 (`New WU type: post_install_verification…`) | CLOSED | `argocd.example.host` hostname | **redact** (edit-via-gh-api). 2 comments — both clean. |
+| #27 (`operator scripts require shellcheck + bats…`) | CLOSED | `example-iac` | **redact** (edit-via-gh-api). |
+| #28 (`Retrospective template: "What did the loop NOT verify?"`) | CLOSED | `example-iac` | **redact** (edit-via-gh-api). |
+| #35 (`_miniyaml: same-indent block sequences rejected`) | CLOSED | `example-org/example-iac` FEAT-2026-0030 | **redact** (edit-via-gh-api). 1 comment — clean. |
+
+### Summary
+
+Total issues/PRs scanned: **11 / 27**. Findings: **12 items** (27 raw pattern
+matches; 1 false-positive item — pr #38 `/Users/`). Open actions: **12** — all
+`edit-via-gh-api` body redactions, operator-side, mirroring commit `7b3267c`'s
+substitution scheme. Same private-org cluster as §personal-refs but on the GitHub
+surface, which the in-repo redaction commits (`7b3267c`, `b5d5404`) did not reach.
+See edit-history caveat above.

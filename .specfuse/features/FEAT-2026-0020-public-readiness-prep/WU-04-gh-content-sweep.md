@@ -1,14 +1,27 @@
 ---
 id: FEAT-2026-0020/T04
 type: implementation
-status: blocked_human
-attempts: 0
+status: done
+attempts: 1
+completed_out_of_loop: true
+completed_note: "Executed in operator's main Claude session (unsandboxed shell, gh exit 0) rather than via loop.py dispatch — the claude-p subprocess gh-auth bug (LEARNINGS FEAT-2026-0014/T01) made in-loop dispatch unviable. Deliverable verified: symbol-presence + file-presence gates PASS."
 oracle_env: macos_local
 planned_cost_usd: 2.00
 duration_seconds: 42.693
 cost_usd: 0.16309
 input_tokens: 9
 output_tokens: 1785
+unsandboxed: true
+unsandboxed_rationale: "gh CLI auth requires unsandboxed subprocess"
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-06-15T03:10:00+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 0.16309
+    prior_duration_seconds: 42.693
+    reason: "gh CLI auth requires unsandboxed subprocess"
 ---
 
 # Pull all PRs + issues via gh CLI; grep for sensitive references; triage in AUDIT.md
