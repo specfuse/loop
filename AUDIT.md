@@ -37,27 +37,32 @@ git log --all --format='%H %s%n%b' | grep -nE '\.local\b'
 
 | # | pattern | location (file:line OR commit:offset) | triage | remediation-command |
 |---|---------|---------------------------------------|--------|---------------------|
-| 1 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-1.md:64,67` | `redact-in-place` | `sed -i '' 's|<redacted-path>' <file>` |
-| 2 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-2.md:52,55` | `redact-in-place` | same |
-| 3 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-3.md:52,55` | `redact-in-place` | same |
-| 4 | `/Users/` | `.specfuse/features/FEAT-2026-0003-github-feature-pick/GATE-03-REVIEW.md:211` | `redact-in-place` | `sed -i '' 's|<redacted-path>' <file>` |
-| 5 | `/Users/` | `.specfuse/features/FEAT-2026-0011-scoring-framework/PLAN.md:23` | `redact-in-place` | `sed -i '' 's|<redacted-path>)]*|<local-path>|g' <file>` |
-| 6 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-1.md:10,56` | `redact-in-place` | `sed -i '' 's|<redacted-path>' <file>` |
-| 7 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-2.md:10,56` | `redact-in-place` | same |
-| 8 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-3.md:10,56` | `redact-in-place` | same |
-| 9 | `/Users/` | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/WU-09-docs-and-roadmap-archive.md:60,138,139,142,143,144` | `redact-in-place` | `sed -i '' 's|<redacted-path>' <file>` |
-| 10 | `/Users/` | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/events.jsonl:39,40` | `redact-in-place` | edit blocked_reason JSON strings to replace `<redacted-path>` with relative path |
-| 11 | `/Users/` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-02-personal-refs-grep.md:25` | `false-positive` | (none — search pattern in this WU's own prompt) |
+| 1 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-1.md:64,67` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>' <file>` |
+| 2 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-2.md:52,55` | `redact-in-place — applied (commit b5d5404)` | same |
+| 3 | `/Users/` | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/work/FEAT-2026-0002_T03/attempt-3.md:52,55` | `redact-in-place — applied (commit b5d5404)` | same |
+| 4 | `/Users/` | `.specfuse/features/FEAT-2026-0003-github-feature-pick/GATE-03-REVIEW.md:211` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>' <file>` |
+| 5 | `/Users/` | `.specfuse/features/FEAT-2026-0011-scoring-framework/PLAN.md:23` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>)]*|<local-path>|g' <file>` |
+| 6 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-1.md:10,56` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>' <file>` |
+| 7 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-2.md:10,56` | `redact-in-place — applied (commit b5d5404)` | same |
+| 8 | `/Users/` | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/work/FEAT-2026-0014_T01/attempt-3.md:10,56` | `redact-in-place — applied (commit b5d5404)` | same |
+| 9 | `/Users/` | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/WU-09-docs-and-roadmap-archive.md:60,138,139,142,143,144` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>' <file>` |
+| 10 | `/Users/` | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/events.jsonl:39,40` | `redact-in-place — applied (commit b5d5404)` | edit blocked_reason JSON strings to replace `<redacted-path>` with relative path |
+| 11 | `/Users/` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-02-personal-refs-grep.md:44` | `false-positive` | (none — search pattern in this WU's own prompt) |
 | 12 | `/Users/` | `.specfuse/roadmap.md:459` | `false-positive` | (none — grep pattern example in audit planning text) |
-| 13 | `/Users/` | `docs/handoff-github-feature-pick.md:27,28,29` | `redact-in-place` | `sed -i '' 's|<redacted-path>' docs/handoff-github-feature-pick.md` |
+| 13 | `/Users/` | `docs/handoff-github-feature-pick.md:27,28,29` | `redact-in-place — applied (commit b5d5404)` | `sed -i '' 's|<redacted-path>' docs/handoff-github-feature-pick.md` |
 | 14 | `@gmail.com` | `.specfuse/roadmap.md:460` | `false-positive` | (none — grep pattern example in audit planning text) |
 | 15 | `cbonte99@gmail.com` | (no matches in working tree or commit history) | N/A | (none) |
-| 16 | `\.local\b` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-02-personal-refs-grep.md:29` | `false-positive` | (none — search pattern in this WU's own prompt) |
+| 16 | `\.local\b` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-02-personal-refs-grep.md:48` | `false-positive` | (none — search pattern in this WU's own prompt) |
 | 17 | private-repo-id: `example-org/example-app` | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` — 13 files, ~40 locations | `redact-in-place — applied (commit 7b3267c)` | substituted `example-org/example-app → example-org/example-app`, `example-org/orchestrator → example-org/orchestrator`, `exampleEndpoint → exampleEndpoint` |
 | 18 | private-repo-id: `example-org/example-app` | `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/PLAN.md:9,15` and `WU-01:17,20,21` | `removed (commit 7b3267c)` | leaked feature folder deleted entirely per FEAT-2026-0020/T03 cross-poll verdict |
-| 19 | private-repo-id: `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-03-cross-pollination-check.md:18,33` | `false-positive` | (none — cross-pollination WU's own prompt names these as the target pattern) |
+| 19 | private-repo-id: `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/WU-03-cross-pollination-check.md:22,37` | `false-positive` | (none — cross-pollination WU's own prompt names these as the target pattern) |
+| 20 | `/Users/`, `example-org` | `AUDIT.md` (§personal-refs table cells, remediation-command column, escalation-note body) | `false-positive` | (none — audit document quoting historical findings and redaction actions; meta-reference, not a live leak) |
+| 21 | `example-org` | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/events.jsonl:5,6` | `false-positive` | (none — events.jsonl records blocked_reason text that named the private org as context for the escalation; audit trail should not be redacted) |
+| 22 | `/Users/`, `example-org` | commit history — `b5d5404` body (lines 7,15,18-20), `7b3267c` body (lines 39,43-46), `20918f4` body (lines 6-7), `63bec507` body (line 3116), `be7785b` body (lines 3682,3824) | `history-rewrite` | `git filter-repo` phase 2 (deferred — same sweep as §cross-poll scrub; operator runs after all gate-1 in-place remediations complete) |
 
-**Commit history scan results:** 0 matches for all patterns across full `git log --all` history.
+**Commit history scan results (post-remediation rescan):**
+
+Working-tree pattern scan produced no matches outside of false-positive locations (rows 11–12, 14, 16, 19–21). Commit-message history, however, contains real hits: remediation commit `b5d5404` records the `<redacted-path>` strings it redacted (in its body); `7b3267c` records the `example-org` substitutions it applied; `20918f4` (re-arm) references both; older dogfood commits (`63bec507`, `be7785b`) contain `example-org/example-app` in context lines. All classified `history-rewrite` (row 22), deferred to phase 2 alongside the §cross-poll scrub. See §cross-poll history-scrub note for the `git filter-repo` command.
 
 ### Allowlist — intentionally-kept references
 
@@ -85,7 +90,7 @@ operator. Phase-1 remediation applied:
 
 ---
 
-Total findings: 19 rows (excluding commit history, which is clean). Open actions: 0 — all rows remediated phase 1 (in-place redaction on `main`). Phase 2 (`git-filter-repo` history rewrite) deferred until every gate-1 audit-class finding is remediated.
+Total findings: 22 rows (19 working-tree + row 20 AUDIT.md meta + row 21 events.jsonl + row 22 commit-history). Open actions: 1 — row 22 (`history-rewrite`, phase 2 deferred). All working-tree rows remediated phase 1 (in-place redaction, commits 7b3267c + b5d5404). Phase 2 (`git filter-repo`) deferred until every gate-1 audit-class finding is remediated.
 
 ---
 
