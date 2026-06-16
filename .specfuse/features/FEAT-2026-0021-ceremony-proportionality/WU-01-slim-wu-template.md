@@ -2,10 +2,14 @@
 id: FEAT-2026-0021/T01
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 generated_surfaces: []
+duration_seconds: 158.802
+cost_usd: 0.343998
+input_tokens: 8
+output_tokens: 3826
 ---
 
 # Slim the WU template's frontmatter notes; nudge acceptance criteria toward assertions
