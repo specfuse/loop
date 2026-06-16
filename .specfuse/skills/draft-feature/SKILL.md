@@ -222,6 +222,14 @@ For gate 1 only:
   time, where the lessons WU runs, is the methodology's last chance
   to catch the gap before the close commit.
 
+  **Do NOT add a "flip `PLAN.md status` to `done`" acceptance criterion to
+  the terminal `close` WU.** The driver owns the terminal PLAN flip:
+  `fire_terminal_flips` (loop.py) flips `PLAN.md status -> done` — gated on
+  `verdict_permits_terminal_flips` — as part of the same modified-paths set it
+  uses for the terminal gate and roadmap row, on BOTH the dispatched-close and
+  the agent-less auto-close path (FEAT-2026-0023/T01, closes #49). A manual
+  agent flip is redundant; the agent need not write `PLAN.md status` at all.
+
   Cost tables feed `evaluate_auto_close` at gate close. A WU's
   `planned_cost_usd` is the threshold the predicate's per-WU ratio check
   measures against (criteria 3 + 4 in PLAN.md's Predicate v1). Honest
