@@ -98,6 +98,21 @@ class TestAllowlist(unittest.TestCase):
         user_hits = [h for h in hits if "user-path" in h]
         self.assertEqual(user_hits, [])
 
+    def test_github_config_address_not_flagged(self):
+        # git@github.com is the canonical public git config address, not a
+        # secret. It self-poisons via captured leak-scan FINDINGS in
+        # events.jsonl (FEAT-2026-0024); the default allowlist must exempt it.
+        text = "  line 97: email: 'git@github.com'"
+        hits = scan_text(text, allowlist=DEFAULT_ALLOWLIST)
+        email_hits = [h for h in hits if "email" in h]
+        self.assertEqual(email_hits, [])
+
+    def test_github_config_address_flagged_without_allowlist(self):
+        # Confirms the regex still matches it absent the allowlist — the
+        # exemption is what makes it pass, not a regex gap.
+        hits = scan_text("contact git@github.com", allowlist=frozenset())
+        self.assertTrue(any("email" in h for h in hits))
+
 
 # ---------------------------------------------------------------------------
 # Email detection

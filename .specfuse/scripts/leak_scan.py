@@ -49,6 +49,15 @@ _PRIVATE_HOST_RE = re.compile(
 # address at those domains (test@example.com, git@example.org, ...). Without
 # this, every new test that initializes a tmp git repo trips the email regex on
 # the pre-commit hook. See FEAT-2026-0023/T03.
+# git@github.com is the canonical public git remote/config address (it is the
+# fixed SSH user for github.com — never a private secret). The module note below
+# already lists it as a known false positive on the repo gate. It also reaches
+# the STAGED surface via driver bookkeeping: when a squash is rejected, the
+# leak-scan FINDINGS text — which QUOTES the offending match — is captured into
+# events.jsonl as the attempt-failure note; the next bookkeeping commit then
+# re-scans that audit log and re-trips on the quoted address (a self-poison).
+# Allowlisting it stops both the direct hit and the captured-error replay.
+# See FEAT-2026-0024 (the bookkeeping-commit crash this unblocked).
 # ---------------------------------------------------------------------------
 
 DEFAULT_ALLOWLIST: frozenset[str] = frozenset({
@@ -56,6 +65,7 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset({
     "example.com",
     "example.org",
     "example.net",
+    "git@github.com",
 })
 
 # ---------------------------------------------------------------------------
