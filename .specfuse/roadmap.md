@@ -38,7 +38,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | done | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | [→ archive](roadmap-archive.md#feat-2026-0021) |
 | FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
-| FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | planned | — | — |
+| FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | active | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
