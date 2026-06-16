@@ -3,10 +3,14 @@ id: FEAT-2026-0022/T02
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces_driver_helper: assert_declared_deliverables
+duration_seconds: 491.397
+cost_usd: 2.890176
+input_tokens: 9604
+output_tokens: 25290
 ---
 
 <!--

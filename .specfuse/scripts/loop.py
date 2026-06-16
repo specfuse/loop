@@ -2294,6 +2294,35 @@ def assert_implementation_touched_files(
     )
 
 
+def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
+    """Deliverable-presence gate (FEAT-2026-0022/T02).
+
+    Verify every path the WU declared in ``produces:`` exists on disk and is
+    non-empty (``test -s`` semantics: ``Path(p).exists()`` and
+    ``Path(p).stat().st_size > 0``). Returns ``(True, "")`` when ``wu.produces``
+    is empty — the opt-out: an undeclared ``produces:`` means no gate, exactly
+    as ``verify_files_changed``'s absence opt-out (loop.py:994) — or when every
+    declared path exists and is non-empty. On the first offending path returns
+    ``(False, summary)`` naming that path and whether it was absent or empty.
+
+    A path that exists but is zero-length is treated as missing: an empty
+    deliverable is a hollow deliverable. This catches the partial-bundle hollow
+    pass (FEAT-2026-0020/T12: SECURITY.md present, bundled CODE_OF_CONDUCT.md
+    absent). The check is file-level only; symbol-level checks are out of scope
+    (PLAN Scope OUT).
+    """
+    if not wu.produces:
+        return True, ""
+    for raw in wu.produces:
+        path = str(raw)
+        p = Path(path)
+        if not p.exists():
+            return False, f"declared deliverable absent: {path}"
+        if p.stat().st_size == 0:
+            return False, f"declared deliverable empty: {path}"
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -2821,6 +2850,33 @@ def run(
                             print(
                                 f"   CLOSING DELIVERABLE MISSING attempt "
                                 f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
+                            )
+                            continue
+                        # Deliverable-presence gate (FEAT-2026-0022/T02):
+                        # fires after smoke and closing-deliverable guards,
+                        # before the empty-files catch-all so the named-path
+                        # diagnostic wins. Every path the WU declared in
+                        # `produces:` must exist on disk and be non-empty; an
+                        # absent or zero-length declared deliverable refuses the
+                        # pass (the partial-bundle hollow pass,
+                        # FEAT-2026-0020/T12). Opt-out: a WU with empty
+                        # `produces:` never fires this — existing behavior for
+                        # every current WU is unchanged.
+                        deliv_ok, deliv_summary = assert_declared_deliverables(wu)
+                        if not deliv_ok:
+                            reset_preserving_events(head_before, events_path)
+                            missing = deliv_summary.split(": ", 1)[-1]
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "deliverable_missing",
+                                attempts_usage[-1],
+                                extras={"summary": deliv_summary,
+                                        "missing": missing},
+                            ))
+                            attempt_notes.append((attempt, deliv_summary))
+                            failure_note = deliv_summary
+                            print(
+                                f"   DELIVERABLE MISSING attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {deliv_summary}"
                             )
                             continue
                         # Empty-files escalation (FEAT-2026-0022/T03): compute
