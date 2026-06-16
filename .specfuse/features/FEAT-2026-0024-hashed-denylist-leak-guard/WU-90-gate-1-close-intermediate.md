@@ -1,12 +1,14 @@
 ---
 id: FEAT-2026-0024/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
+status: done
 attempts: 0
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 2.00
 verdict: partially_met
+auto_close: true
+auto_close_reasons: []
 ---
 
 <!--
