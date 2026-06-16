@@ -101,6 +101,17 @@ Frontmatter notes (single-repo):
   the full body. Authors set it at draft/arm time. Example:
   `produces_driver_helper: ["assert_terminal_flips_fired"]` or as a plain string
   `produces_driver_helper: detect_driver_wiring`. See FEAT-2026-0017.
+- `produces` — OPTIONAL. A string or list of file paths this WU is contracted
+  to produce. Each path must exist and be non-empty at WU completion or the
+  driver blocks the WU (enforced by FEAT-2026-0022's presence gate, T02).
+  Distinct from `files_changed` (the RESULT block's post-hoc runtime claim of
+  what the session touched, checked against the git diff) and from
+  `produces_driver_helper` (driver symbols, lint-only, never machine-enforced):
+  `produces` is the author-declared deliverable contract set at WU-draft time
+  and IS machine-enforced against disk. Lint emits a WARN when an
+  `implementation` WU declares none (non-blocking; exit code 0). Authors set it
+  at draft/arm time. Example: `produces: docs/report.md` or
+  `produces: ["src/a.py", "src/b.py"]`. See FEAT-2026-0022.
 - `oracle_env` — OPTIONAL. The environment in which the WU's verifying oracle
   runs. Four accepted forms:
   - `macos_local` — developer macOS shell (APFS, BSD utils).

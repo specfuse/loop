@@ -424,6 +424,38 @@ mechanical enforcement.
 
 ---
 
+## 13. `produces:` — declare named-file deliverables so the driver enforces presence
+
+When a WU's deliverable is one or more **named files**, declare them in the
+`produces:` frontmatter field. The driver runs a machine-enforced presence
+gate (`assert_declared_deliverables`) before accepting `complete`: each path
+in `produces:` must exist on disk and be non-empty (`test -s`), or the
+attempt records `deliverable_missing` and does not reach `done`. This closes
+the zero-deliverable and partial-bundle hollow-pass shapes that body-level
+`test -s` checks never caught — a WU body presence check is advisory; only
+`produces:` is run.
+
+- `produces: docs/report.md` for a single deliverable, or
+  `produces: ["src/a.py", "src/b.py"]` to list every bundled file.
+- **Prefer one deliverable per WU.** A bundled WU (N files in one WU) is a
+  hollow-pass amplifier — if it lists only some of its files, the missing
+  ones pass silently. When you must bundle, `produces:` MUST name *every*
+  file, not the convenient subset (the FEAT-2026-0020/T12 failure:
+  `SECURITY.md` shipped, bundled `CODE_OF_CONDUCT.md` did not).
+- `produces:` is opt-in and file-level only — it does not assert symbols
+  inside a file (that is `produces_driver_helper`, lint-only) and is not
+  retrofitted onto existing WUs.
+- Independent of `produces:`, every `implementation` WU is subject to the
+  empty-files escalation: a WU that touches zero deliverable files records
+  `no_deliverable_files` and blocks, regardless of whether it declared
+  `produces:`.
+
+> *Prevents:* the zero-deliverable and partial-bundle hollow passes
+> ([FEAT-2026-0020/G2/hollow-pass-presence-gates]) the no-code-written
+> guard ([FEAT-2026-0008/G1-CLOSE]) left open. See FEAT-2026-0022.
+
+---
+
 ## Haiku — when (and when not)
 
 `model: haiku` is opt-in only — never a default in `MODEL_BY_TYPE`. Use it

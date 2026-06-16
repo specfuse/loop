@@ -238,7 +238,15 @@ When the user has accepted the structure:
   awaiting `plan-next`).
 - Write the WU files for gate 1 in the accepted forms.
 - Append a one-line row to `.specfuse/roadmap.md` (status `planned`
-  until the user flips it to `active` themselves).
+  until the user flips it to `active` themselves), **and** an inline
+  `## FEAT-YYYY-NNNN — <title>` detail section (place it among the other
+  detail sections, before `## Notes`) capturing the goal, shape, and scope
+  boundary. The detail section is not optional cosmetics: `auto_archive_feature`
+  moves it into `roadmap-archive.md` and writes the `<a id="feat-yyyy-nnnn">`
+  anchor the terminal-close post-pass invariant (`assert_terminal_flips_fired`)
+  requires. A row without a detail section forces the driver to synthesize a
+  stub at archive time (it no longer halts, since FEAT-2026-0022, but the stub
+  carries no real record). Write the real section now.
 - Run `python3 .specfuse/scripts/lint_plan.py
   .specfuse/features/<new-folder>`. Report PASS or the errors. If it
   fails, point at the `/feature-conversion` skill to walk the diff

@@ -42,6 +42,22 @@ _ROADMAP_DONE = textwrap.dedent("""\
     Some content here.
     """)
 
+_ROADMAP_DONE_NO_SECTION = textwrap.dedent("""\
+    ---
+    project: test
+    ---
+
+    # Roadmap
+
+    | Feature ID | Title | Status | Folder | Detail |
+    |------------|-------|--------|--------|--------|
+    | FEAT-2026-9999 | Test feature | done | — | — |
+
+    ## Notes
+
+    Unrelated trailing content.
+    """)
+
 _ROADMAP_PLANNED = textwrap.dedent("""\
     ---
     project: test
@@ -132,6 +148,36 @@ class TestAutoArchiveFeature(unittest.TestCase):
                 archive_snap,
                 "roadmap-archive.md must be unchanged on second call",
             )
+
+    def test_row_only_done_synthesizes_anchor(self):
+        """done row with NO inline section → 'archived', anchor + stub still written.
+
+        Regression for FEAT-2026-0022: a feature drafted via /draft-feature has
+        a roadmap row but no inline detail section. Without the synthesize path,
+        auto_archive_feature returned 'already archived' WITHOUT writing the
+        anchor, leaving assert_terminal_flips_fired unsatisfiable and halting
+        the driver on archive_anchor_missing.
+        """
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            repo = _make_repo(tmp, roadmap=_ROADMAP_DONE_NO_SECTION)
+            result = loop.auto_archive_feature("FEAT-2026-9999", repo)
+            self.assertEqual(result, "archived")
+
+            roadmap_text = (repo / ".specfuse" / "roadmap.md").read_text()
+            archive_text = (repo / ".specfuse" / "roadmap-archive.md").read_text()
+
+            # Back-link replaced the '—' Detail cell.
+            self.assertIn(
+                '[→ archive](roadmap-archive.md#feat-2026-9999)',
+                roadmap_text,
+            )
+            # The anchor the post-pass invariant demands is present.
+            self.assertIn('<a id="feat-2026-9999"></a>', archive_text)
+            # A stub heading was synthesized in the archive.
+            self.assertIn('## FEAT-2026-9999 — Test feature', archive_text)
+            # Unrelated roadmap content untouched (nothing wrongly stripped).
+            self.assertIn('## Notes', roadmap_text)
+            self.assertIn('Unrelated trailing content.', roadmap_text)
 
     def test_refused_planned_status(self):
         """planned row returns 'refused: status=planned' and makes zero file edits."""

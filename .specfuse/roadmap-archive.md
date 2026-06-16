@@ -43,6 +43,27 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0022"></a>
+## FEAT-2026-0022 — Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation
+
+**Goal.** The driver refuses to commit an implementation WU as `done` when a
+declared deliverable is absent or empty, or when the WU touched zero files —
+closing the zero/partial-deliverable hollow-pass class FEAT-2026-0008/0015 left
+open. Filed from GitHub issue #41 and LEARNINGS
+`[FEAT-2026-0020/G2/hollow-pass-presence-gates]` (T16 passed `done` touching
+zero files at ~$1.48; T12 created `SECURITY.md` but not the bundled
+`CODE_OF_CONDUCT.md`).
+
+**Shape.** Single terminal gate, three driver-side guards + `close`, mirroring
+FEAT-2026-0008. T01 adds the `produces:` WU frontmatter field (parse +
+`WorkUnit.produces` + advisory lint WARN). T02 (`assert_declared_deliverables`)
+blocks a `complete` whose declared `produces:` path is absent or empty. T03
+(`assert_implementation_touched_files`) blocks an `implementation` WU whose
+attempt touched zero deliverable files, independent of `produces:`.
+
+**Scope OUT.** Symbol-level presence (`grep -q`), retrofitting `produces:` onto
+existing WUs, broadening the verification contract, cost levers.
+
 
 <a id="feat-2026-0003"></a>
 ## FEAT-2026-0003 — GitHub feature-pick for the loop

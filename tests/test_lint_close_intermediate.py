@@ -45,8 +45,19 @@ def _write_plan(feature_dir: Path, gates_yaml: str) -> None:
     )
 
 
-def _write_wu(feature_dir: Path, filename: str, wu_id: str, wu_type: str) -> None:
-    """Minimal WU file; status: done bypasses mandatory-section check."""
+def _write_wu(
+    feature_dir: Path,
+    filename: str,
+    wu_id: str,
+    wu_type: str,
+    produces: str | None = None,
+) -> None:
+    """Minimal WU file; status: done bypasses mandatory-section check.
+
+    `produces` declares the FEAT-2026-0022 deliverable field so implementation
+    WUs in zero-WARN fixtures don't trip the advisory produces WARN.
+    """
+    produces_line = f"produces: {produces}\n" if produces else ""
     (feature_dir / filename).write_text(
         "---\n"
         f"id: {wu_id}\n"
@@ -55,6 +66,7 @@ def _write_wu(feature_dir: Path, filename: str, wu_id: str, wu_type: str) -> Non
         "status: done\n"
         "attempts: 1\n"
         "planned_cost_usd: 0.00\n"
+        f"{produces_line}"
         "---\n"
         "\n"
         f"# {filename}\n"
@@ -94,10 +106,12 @@ class TestCloseIntermediateShapes(unittest.TestCase):
                 "        file: WU-90-close.md\n"
                 "        depends_on: [FEAT-2026-9002/T04]"
             ))
-            _write_wu(feature, "WU-01-impl.md", "FEAT-2026-9002/T01", "implementation")
+            _write_wu(feature, "WU-01-impl.md", "FEAT-2026-9002/T01", "implementation",
+                      produces="src/a.py")
             _write_wu(feature, "WU-02-close-int.md", "FEAT-2026-9002/T02", "close-intermediate")
             _write_wu(feature, "WU-03-plan-next.md", "FEAT-2026-9002/T03", "plan-next")
-            _write_wu(feature, "WU-04-impl.md", "FEAT-2026-9002/T04", "implementation")
+            _write_wu(feature, "WU-04-impl.md", "FEAT-2026-9002/T04", "implementation",
+                      produces="src/b.py")
             _write_wu(feature, "WU-90-close.md", "FEAT-2026-9002/G2-CLOSE", "close")
 
             captured = io.StringIO()

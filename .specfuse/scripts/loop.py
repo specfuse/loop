@@ -151,6 +151,12 @@ class WorkUnit:
     unsandboxed_rationale: str = ""
     verdict: str | None = None
     produces_driver_helper: list[str] = field(default_factory=list)
+    # OPTIONAL author-declared deliverable contract. Names the file path(s) this
+    # WU is contracted to yield. Distinct from `files_changed` (RESULT-block
+    # runtime claim) and `produces_driver_helper` (driver symbols, lint-only):
+    # `produces` names files and IS machine-enforced by FEAT-2026-0022/T02's
+    # presence gate (each path must exist and be non-empty at completion).
+    produces: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -311,6 +317,18 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `produces_driver_helper` must be a string or list of strings, "
             f"got {type(raw_pdh).__name__!r}"
         )
+    raw_produces = fm.get("produces")
+    if raw_produces is None:
+        produces: list[str] = []
+    elif isinstance(raw_produces, str):
+        produces = [raw_produces]
+    elif isinstance(raw_produces, list):
+        produces = raw_produces
+    else:
+        raise ValueError(
+            f"{path}: `produces` must be a string or list of strings, "
+            f"got {type(raw_produces).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -326,6 +344,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         unsandboxed_rationale=unsandboxed_rationale,
         verdict=verdict,
         produces_driver_helper=produces_driver_helper,
+        produces=produces,
     )
 
 
@@ -1369,9 +1388,26 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         re.MULTILINE,
     )
     section_m = section_re.search(roadmap_text)
-    if not section_m:
-        return "already archived"
-    section_text = section_m.group(1).rstrip('\n') + '\n'
+    had_inline_section = section_m is not None
+    if had_inline_section:
+        section_text = section_m.group(1).rstrip('\n') + '\n'
+    else:
+        # Row-only feature: a roadmap table row exists (status done/abandoned,
+        # Detail still '—' — the back-link case already returned at Step 1) but
+        # there is no inline `## FEAT-ID` detail section to move. /draft-feature
+        # emits a table row without a detail section, so an auto-closed feature
+        # drafted that way reaches here. Returning "already archived" without
+        # writing the anchor leaves assert_terminal_flips_fired unsatisfiable
+        # and halts the driver on archive_anchor_missing (FEAT-2026-0022
+        # surfaced this live). Synthesize a minimal stub section so the anchor
+        # and back-link still materialize.
+        title = parsed["columns"].get("Title", "").strip()
+        heading = f"## {feature_id}" + (f" — {title}" if title else "")
+        section_text = (
+            f"{heading}\n\n"
+            "_No inline detail section was recorded for this feature; "
+            "stub written at archive time._\n"
+        )
 
     # Step 3 — append anchor + section to archive after marker.
     # Auto-create the archive file if a project never shipped it (the
@@ -1406,11 +1442,14 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
             roadmap_text[:detail_start] + f" {back_link} " + roadmap_text[detail_end:]
         )
 
-    # Step 5 — remove inline section (re-search since row update shifted offsets)
-    section_m2 = section_re.search(roadmap_text)
-    if section_m2:
-        roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
-        roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
+    # Step 5 — remove inline section (re-search since row update shifted
+    # offsets). Only when one actually existed to move; a synthesized stub
+    # was never in roadmap.md, so there is nothing to strip.
+    if had_inline_section:
+        section_m2 = section_re.search(roadmap_text)
+        if section_m2:
+            roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
+            roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
     return "archived"
@@ -2238,6 +2277,72 @@ def assert_closing_deliverables(
     return True, ""
 
 
+def assert_implementation_touched_files(
+    wu: WorkUnit,
+    touched: list[str],
+) -> tuple[bool, str]:
+    """Empty-files escalation for implementation WUs (FEAT-2026-0022/T03).
+
+    A hard, ``produces:``-independent gate on the ``files_touched`` signal
+    every WU already produces. Returns ``(True, "")`` when ``wu.type`` is not
+    ``implementation`` (close/plan-next/etc. produce reflective artifacts
+    gated by ``assert_closing_deliverables``), or when ``touched`` — after
+    removing the WU's own file and any ``events.jsonl`` entry — still names a
+    file. Otherwise returns ``(False, summary)``: an ``implementation`` WU that
+    produced no deliverable file diff cannot be ``done``.
+
+    This closes the zero-deliverable hollow pass from the other side of
+    ``verify_files_changed`` (which opts out when the agent claims nothing):
+    regardless of what the agent claimed, the squash diff must name a real
+    deliverable. ``touched`` MUST be derived from the post-squash ``sha`` so the
+    WU's own status flip is present — the filter strips it; without that strip
+    the guard never fires and is a silent no-op (escalation trigger 2).
+    """
+    if wu.type != "implementation":
+        return True, ""
+    wu_name = wu.file.name
+    deliverables = [
+        t for t in touched
+        if Path(t).name not in (wu_name, "events.jsonl")
+    ]
+    if deliverables:
+        return True, ""
+    return (
+        False,
+        f"implementation WU {wu.wu_id} produced no deliverable files: the "
+        f"squash diff names only its own WU file and/or events.jsonl",
+    )
+
+
+def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
+    """Deliverable-presence gate (FEAT-2026-0022/T02).
+
+    Verify every path the WU declared in ``produces:`` exists on disk and is
+    non-empty (``test -s`` semantics: ``Path(p).exists()`` and
+    ``Path(p).stat().st_size > 0``). Returns ``(True, "")`` when ``wu.produces``
+    is empty — the opt-out: an undeclared ``produces:`` means no gate, exactly
+    as ``verify_files_changed``'s absence opt-out (loop.py:994) — or when every
+    declared path exists and is non-empty. On the first offending path returns
+    ``(False, summary)`` naming that path and whether it was absent or empty.
+
+    A path that exists but is zero-length is treated as missing: an empty
+    deliverable is a hollow deliverable. This catches the partial-bundle hollow
+    pass (FEAT-2026-0020/T12: SECURITY.md present, bundled CODE_OF_CONDUCT.md
+    absent). The check is file-level only; symbol-level checks are out of scope
+    (PLAN Scope OUT).
+    """
+    if not wu.produces:
+        return True, ""
+    for raw in wu.produces:
+        path = str(raw)
+        p = Path(path)
+        if not p.exists():
+            return False, f"declared deliverable absent: {path}"
+        if p.stat().st_size == 0:
+            return False, f"declared deliverable empty: {path}"
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -2767,6 +2872,57 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
                             )
                             continue
+                        # Deliverable-presence gate (FEAT-2026-0022/T02):
+                        # fires after smoke and closing-deliverable guards,
+                        # before the empty-files catch-all so the named-path
+                        # diagnostic wins. Every path the WU declared in
+                        # `produces:` must exist on disk and be non-empty; an
+                        # absent or zero-length declared deliverable refuses the
+                        # pass (the partial-bundle hollow pass,
+                        # FEAT-2026-0020/T12). Opt-out: a WU with empty
+                        # `produces:` never fires this — existing behavior for
+                        # every current WU is unchanged.
+                        deliv_ok, deliv_summary = assert_declared_deliverables(wu)
+                        if not deliv_ok:
+                            reset_preserving_events(head_before, events_path)
+                            missing = deliv_summary.split(": ", 1)[-1]
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "deliverable_missing",
+                                attempts_usage[-1],
+                                extras={"summary": deliv_summary,
+                                        "missing": missing},
+                            ))
+                            attempt_notes.append((attempt, deliv_summary))
+                            failure_note = deliv_summary
+                            print(
+                                f"   DELIVERABLE MISSING attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {deliv_summary}"
+                            )
+                            continue
+                        # Empty-files escalation (FEAT-2026-0022/T03): compute
+                        # the post-squash touched-paths list ONCE here and reuse
+                        # it for the passed event below. An implementation WU
+                        # whose squash names only its own WU file + events.jsonl
+                        # produced no deliverable — refuse the pass, MAX_ATTEMPTS
+                        # exhaustion escalates via existing machinery.
+                        touched = git_diff_names(head_before, sha) if sha else []
+                        impl_ok, impl_summary = assert_implementation_touched_files(
+                            wu, touched,
+                        )
+                        if not impl_ok:
+                            reset_preserving_events(head_before, events_path)
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "no_deliverable_files",
+                                attempts_usage[-1],
+                                extras={"summary": impl_summary},
+                            ))
+                            attempt_notes.append((attempt, impl_summary))
+                            failure_note = impl_summary
+                            print(
+                                f"   NO DELIVERABLE FILES attempt "
+                                f"{attempt}/{MAX_ATTEMPTS}"
+                            )
+                            continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
@@ -2819,7 +2975,7 @@ def run(
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "passed",
                             attempts_usage[-1],
-                            files_touched=git_diff_names(head_before, sha) if sha else [],
+                            files_touched=touched,
                             agent_status="complete",
                             agent_blocked_reason=None,
                         ))

@@ -5,7 +5,7 @@ slug: deliverable-presence-gate
 branch: feat/FEAT-2026-0022-deliverable-presence-gate
 roadmap_goal: The driver refuses to commit an implementation WU as `done` when a declared deliverable is absent or empty, or when the WU touched zero files — closing the zero/partial-deliverable hollow-pass class FEAT-2026-0008/0015 left open.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 7.00
 ---
 

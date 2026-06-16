@@ -37,9 +37,9 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
 | FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | planned | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | — |
+| FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
-
 
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 
@@ -132,7 +132,6 @@ estimates' grounding (revision log captures the change).
 
 **Status: planned.** Depends on FEAT-2026-0010 landing first (table
 shape needs to be ready to carry the new column shape).
-
 
 ## Verdict-state ↔ PLAN.md coupling
 
