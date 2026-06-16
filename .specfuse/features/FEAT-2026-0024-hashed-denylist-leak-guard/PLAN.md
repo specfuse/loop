@@ -5,7 +5,7 @@ slug: hashed-denylist-leak-guard
 branch: feat/FEAT-2026-0024-hashed-denylist-leak-guard
 roadmap_goal: CI catches re-introduction of private org-names (not just gitleaks secrets) in both tracked files and GitHub issue/PR bodies, without committing the literal private strings to the public repo.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 16.00
 ---
 

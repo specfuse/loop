@@ -43,6 +43,45 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0024"></a>
+## FEAT-2026-0024 — Hashed denylist + issue/PR-body leak guard
+
+**Why.** Closes the two leak-guard surface gaps FEAT-2026-0020's review
+surfaced (GitHub issues #45, #46), both rooted in LEARNINGS
+`[FEAT-2026-0020/G2/leak-guard-surface-asymmetry]`. (1) `leak_scan.py`'s
+denylist (`leak_denylist.txt`) is gitignored — committing the literals to a
+public repo would re-leak them — so in CI the `--all` gate enforces gitleaks
+secrets only, NOT org-name re-introduction. (2) The pre-commit hook scans git
+commits only; GitHub issue/PR titles, bodies, and comments are a separate
+public surface it can't see — exactly where the FEAT-2026-0020 leaks landed.
+
+**Goal.** Two gates. Gate 1 (#45): a committed, salted-SHA-256 hashed denylist
+(`leak_denylist.hashes`) that CI loads, giving `scan_repo`/`--all` org-name
+coverage without exposing the literals; a `leak_scan.py --hash-denylist`
+generator keeps it in sync with the gitignored plaintext. Gate 2 (#46): a
+GitHub Action triggered on `issues` + `pull_request` (open/edit) that runs the
+scanner + hashed denylist over titles/bodies/comments and fails/comments on a
+hit.
+
+**Shape.** Hashing can't substring-match, so the chosen design normalizes each
+literal (lowercase, strip non-alphanumeric) and matches via a char-sliding
+window at a committed distinct-length set — preserving the plaintext denylist's
+substring fidelity (`acmewidget` ⊂ `AcmeWidgetApp`) while leaking only a
+handful of small integers, never content. Honest caveat: low-entropy names + a
+public salt = obfuscation, not secrecy; the guard catches accidental
+re-introduction. Gate-1 substantive WUs are `opus`/`high`, red-test-first
+(leak-guard correctness path). `autonomy: review` halts at the gate boundary.
+
+**Scope OUT.** Expunging GitHub edit-history (GitHub retains body revisions —
+the Action stops new leaks only; documented limitation). Replacing the plaintext
+denylist (stays as local-convenience source). Hashing the pre-commit `--staged`
+surface (plaintext present locally). `act`/Docker Action emulation in-loop
+(gate-2 live trigger is operator-verified post-merge). Cost levers.
+
+**Status: planned.** Two gates, both independently shippable; gate 2 consumes
+gate 1's committed hashed denylist. `planned_cost_usd: 11.50` covers the five
+WUs that exist now; `plan-next` revises when gate 2's Action WUs are drafted.
+
 <a id="feat-2026-0023"></a>
 ## FEAT-2026-0023 — Lifecycle integration test + consolidate terminal-state ownership
 
