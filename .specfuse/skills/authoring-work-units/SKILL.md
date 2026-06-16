@@ -59,6 +59,14 @@ the symbols it introduces, the files in `generated_surfaces` /
   wrong shape; narrow the scope, or move the check to a repo-wide
   hygiene WU / the `code` gate set.
 
+- **Terminal `close` WUs: do not add a "flip `PLAN.md status` to `done`"
+  criterion.** The driver owns the terminal PLAN flip — `fire_terminal_flips`
+  (loop.py) flips `PLAN.md status -> done`, gated on
+  `verdict_permits_terminal_flips`, on BOTH the dispatched-close and the
+  agent-less auto-close path (FEAT-2026-0023/T01, closes #49). The agent need
+  not, and a manual flip is redundant; gating lives with the driver so a hedged
+  verdict leaves PLAN `active`.
+
 > *Prevents:* a throwaway "grep returns zero hits" criterion blocking on a
 > stale roadmap pointer the WU never touched (real failure logged in
 > `.specfuse/LEARNINGS.md` under `[meta/first-live-use]`); also prevents

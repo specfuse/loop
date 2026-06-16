@@ -3,11 +3,15 @@ id: FEAT-2026-0023/T01
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces: tests/test_terminal_flip_ownership.py
 produces_driver_helper: apply_terminal_flips
+duration_seconds: 424.455
+cost_usd: 3.361127
+input_tokens: 9635
+output_tokens: 25147
 ---
 
 <!--

@@ -1565,6 +1565,52 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
                     current_row_status,
                 )
 
+    # PLAN.md status -> done (FEAT-2026-0023/T01, closes #49). Consolidate the
+    # terminal PLAN flip into this one driver-side owner so BOTH the dispatched-
+    # close path (loop.run's close branch) and the auto-close path
+    # (_fire_and_verify_terminal_flips) get it for free — previously only the
+    # dispatched path's *agent* flipped PLAN.md, so the agent-less auto-close
+    # path left it `active`. Idempotent: a no-op when already `done`. Gated on
+    # verdict_permits_terminal_flips so a hedged/non-met close does NOT flip PLAN
+    # to done. Verdict is re-read from disk (not wu.verdict) to mirror
+    # assert_terminal_flips_fired: the auto-close path writes verdict=met to the
+    # WU file via mark_close_wu_auto_closed but leaves the in-memory wu.verdict
+    # None, so disk is the authoritative source for both paths.
+    # Re-read verdict from disk only when the WU file exists. The legacy 4-WU
+    # close sequence reaches here with a plan-next WU that carries no verdict
+    # field (and whose file may be a synthetic stub in tests); a missing file or
+    # a non-met verdict simply skips the PLAN flip, leaving legacy behavior
+    # unchanged (those features flip PLAN via the plan-next agent, as before).
+    disk_verdict = None
+    if wu.file.is_file():
+        wu_fm, _ = read_frontmatter(wu.file)
+        disk_verdict = wu_fm.get("verdict") or None
+    if not verdict_permits_terminal_flips(disk_verdict):
+        logging.info(
+            "fire_terminal_flips: verdict %r does not permit terminal flips"
+            " — skipping PLAN.md flip for %s",
+            disk_verdict,
+            wu.wu_id,
+        )
+    else:
+        plan_path = feature_dir / "PLAN.md"
+        if not plan_path.exists():
+            logging.warning(
+                "fire_terminal_flips: PLAN.md absent at %s — skipping PLAN flip",
+                plan_path,
+            )
+        else:
+            plan_fm, _ = read_frontmatter(plan_path)
+            current_plan_status = plan_fm.get("status", "")
+            if current_plan_status == "done":
+                logging.info(
+                    "fire_terminal_flips: PLAN.md for %s already done — skipping",
+                    feature_id,
+                )
+            else:
+                write_frontmatter_field(plan_path, "status", "done")
+                modified.add(plan_path)
+
     archive_result = auto_archive_feature(feature_id, repo_root)
     if archive_result == "archived":
         modified.add(roadmap_path)
