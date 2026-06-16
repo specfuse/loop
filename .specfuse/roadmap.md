@@ -37,6 +37,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
 | FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | planned | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | — |
+| FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | active | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 

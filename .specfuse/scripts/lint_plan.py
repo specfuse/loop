@@ -394,6 +394,20 @@ def lint(feature_dir: Path) -> list[str]:
                         f"driver. See authoring-work-units §9 + FEAT-2026-0017."
                     )
 
+            # Deliverable-presence declaration WARN (FEAT-2026-0022/T01).
+            # Advisory: an implementation WU should declare the file path(s) it
+            # is contracted to yield via `produces:`, which T02's presence gate
+            # enforces against disk. Closing types are exempt (gated on
+            # implementation above). Non-blocking; never appends to errs.
+            if wu_type_val == "implementation":
+                produces = wfm.get("produces")
+                produces_empty = not produces  # None, [], "", or missing all count
+                if produces_empty:
+                    print(
+                        f"WARN: {wfile}: implementation WU declares no "
+                        f"'produces:' deliverable list. See FEAT-2026-0022."
+                    )
+
         # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]
         if closing_found == ["close"]:

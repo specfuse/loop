@@ -151,6 +151,12 @@ class WorkUnit:
     unsandboxed_rationale: str = ""
     verdict: str | None = None
     produces_driver_helper: list[str] = field(default_factory=list)
+    # OPTIONAL author-declared deliverable contract. Names the file path(s) this
+    # WU is contracted to yield. Distinct from `files_changed` (RESULT-block
+    # runtime claim) and `produces_driver_helper` (driver symbols, lint-only):
+    # `produces` names files and IS machine-enforced by FEAT-2026-0022/T02's
+    # presence gate (each path must exist and be non-empty at completion).
+    produces: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -311,6 +317,18 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `produces_driver_helper` must be a string or list of strings, "
             f"got {type(raw_pdh).__name__!r}"
         )
+    raw_produces = fm.get("produces")
+    if raw_produces is None:
+        produces: list[str] = []
+    elif isinstance(raw_produces, str):
+        produces = [raw_produces]
+    elif isinstance(raw_produces, list):
+        produces = raw_produces
+    else:
+        raise ValueError(
+            f"{path}: `produces` must be a string or list of strings, "
+            f"got {type(raw_produces).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -326,6 +344,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         unsandboxed_rationale=unsandboxed_rationale,
         verdict=verdict,
         produces_driver_helper=produces_driver_helper,
+        produces=produces,
     )
 
 
