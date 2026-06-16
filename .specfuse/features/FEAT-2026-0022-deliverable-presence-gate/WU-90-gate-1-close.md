@@ -3,11 +3,15 @@ id: FEAT-2026-0022/G1-CLOSE
 type: close
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
-verdict: pending
+verdict: met
 oracle_env: macos_local
+duration_seconds: 234.156
+cost_usd: 1.631805
+input_tokens: 9214
+output_tokens: 14060
 ---
 
 <!--

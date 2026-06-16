@@ -1463,3 +1463,34 @@ promoted here.
   high-confidence checks (gitignored literal denylist + gitleaks secrets).
   Verified: `--all` exits 0 on the clean tree; `--staged` blocks a planted
   path. Generalize: heuristic regexes belong on diffs, not whole-tree gates.
+
+## FEAT-2026-0022/G1-CLOSE — deliverable presence is now machine-enforced
+
+- [FEAT-2026-0022/G1-CLOSE] The advisory→enforced promotion that
+  [FEAT-2026-0020/G2/hollow-pass-presence-gates] filed as a loop bug is
+  shipped. Three independent driver-side guards now sit in the
+  parse→squash→advance pipeline: `WorkUnit.produces` (parsed field +
+  advisory lint WARN), `assert_declared_deliverables` (each `produces:`
+  path must exist + be non-empty before `complete` is accepted, else
+  `deliverable_missing`), and `assert_implementation_touched_files` (an
+  `implementation` WU touching zero deliverable files records
+  `no_deliverable_files` and blocks). This closes the two shapes the
+  no-code-written guard ([FEAT-2026-0008/G1-CLOSE]) left open:
+  zero-deliverable (T16) and partial-bundle (T12). Rule: a body-level
+  `test -s` presence check is advisory and worthless on its own — the
+  only presence check that runs is the one the driver runs. Promote
+  named-file deliverables to `produces:` so they are enforced, not
+  attested.
+
+- [FEAT-2026-0022/G1-CLOSE] Recursive-dogfood close validated a third
+  time (after [FEAT-2026-0008/G1-CLOSE], [FEAT-2026-0015/G2-CLOSE]): a
+  feature whose purpose is to ship hollow-pass guards must audit that
+  its OWN three WUs did not hollow-pass the guards they add. Live
+  recursive validation here went past existence — the close ran
+  `test_deliverable_presence_gate` (10) and `test_empty_files_escalation`
+  (6) and confirmed both the BLOCK path (`deliverable_missing` /
+  `no_deliverable_files` fire and escalate to `blocked_human` after
+  MAX_ATTEMPTS) and the clean path (a satisfied deliverable does NOT
+  block). Existence + green tests + asserted block-outcomes is the
+  three-layer audit; existence alone would have missed a guard that
+  parses but never fires.
