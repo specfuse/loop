@@ -5,7 +5,7 @@ slug: ceremony-proportionality
 branch: feat/FEAT-2026-0021-ceremony-proportionality
 roadmap_goal: Make closing-ceremony weight proportional to feature size and slim the WU authoring surface — authoring-layer only, driver (loop.py) frozen, with a captured baseline so savings can be measured before any driver hardening.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 3.50
 ---
 
