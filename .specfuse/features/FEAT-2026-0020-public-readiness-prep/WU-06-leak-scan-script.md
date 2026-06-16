@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0020/T15
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 2.50
 produces_driver_helper: ["scan_text", "scan_staged", "load_allowlist"]
+duration_seconds: 624.311
+cost_usd: 1.484337
+input_tokens: 3899
+output_tokens: 36734
 ---
 
 <!--
