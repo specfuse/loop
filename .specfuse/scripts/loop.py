@@ -2257,6 +2257,43 @@ def assert_closing_deliverables(
     return True, ""
 
 
+def assert_implementation_touched_files(
+    wu: WorkUnit,
+    touched: list[str],
+) -> tuple[bool, str]:
+    """Empty-files escalation for implementation WUs (FEAT-2026-0022/T03).
+
+    A hard, ``produces:``-independent gate on the ``files_touched`` signal
+    every WU already produces. Returns ``(True, "")`` when ``wu.type`` is not
+    ``implementation`` (close/plan-next/etc. produce reflective artifacts
+    gated by ``assert_closing_deliverables``), or when ``touched`` — after
+    removing the WU's own file and any ``events.jsonl`` entry — still names a
+    file. Otherwise returns ``(False, summary)``: an ``implementation`` WU that
+    produced no deliverable file diff cannot be ``done``.
+
+    This closes the zero-deliverable hollow pass from the other side of
+    ``verify_files_changed`` (which opts out when the agent claims nothing):
+    regardless of what the agent claimed, the squash diff must name a real
+    deliverable. ``touched`` MUST be derived from the post-squash ``sha`` so the
+    WU's own status flip is present — the filter strips it; without that strip
+    the guard never fires and is a silent no-op (escalation trigger 2).
+    """
+    if wu.type != "implementation":
+        return True, ""
+    wu_name = wu.file.name
+    deliverables = [
+        t for t in touched
+        if Path(t).name not in (wu_name, "events.jsonl")
+    ]
+    if deliverables:
+        return True, ""
+    return (
+        False,
+        f"implementation WU {wu.wu_id} produced no deliverable files: the "
+        f"squash diff names only its own WU file and/or events.jsonl",
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -2786,6 +2823,30 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
                             )
                             continue
+                        # Empty-files escalation (FEAT-2026-0022/T03): compute
+                        # the post-squash touched-paths list ONCE here and reuse
+                        # it for the passed event below. An implementation WU
+                        # whose squash names only its own WU file + events.jsonl
+                        # produced no deliverable — refuse the pass, MAX_ATTEMPTS
+                        # exhaustion escalates via existing machinery.
+                        touched = git_diff_names(head_before, sha) if sha else []
+                        impl_ok, impl_summary = assert_implementation_touched_files(
+                            wu, touched,
+                        )
+                        if not impl_ok:
+                            reset_preserving_events(head_before, events_path)
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "no_deliverable_files",
+                                attempts_usage[-1],
+                                extras={"summary": impl_summary},
+                            ))
+                            attempt_notes.append((attempt, impl_summary))
+                            failure_note = impl_summary
+                            print(
+                                f"   NO DELIVERABLE FILES attempt "
+                                f"{attempt}/{MAX_ATTEMPTS}"
+                            )
+                            continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
@@ -2838,7 +2899,7 @@ def run(
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "passed",
                             attempts_usage[-1],
-                            files_touched=git_diff_names(head_before, sha) if sha else [],
+                            files_touched=touched,
                             agent_status="complete",
                             agent_blocked_reason=None,
                         ))
