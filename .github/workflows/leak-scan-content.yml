@@ -1,0 +1,42 @@
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# Content leak-scan: run the T03 content-scan runner on the issue/PR/comment
+# event payload GitHub Actions writes to $GITHUB_EVENT_PATH, and fail the check
+# on any finding (a non-zero runner exit fails the job). This guards the
+# public-surface text — issue/PR title + body and the triggering comment — that
+# the file-commit leak-scan gate (ci.yml) never sees.
+#
+# Default behavior is FAIL THE CHECK: it needs only `contents: read`, no write
+# scope, no token-scope risk. Posting a comment naming the offending field is an
+# operator-confirmable enhancement (pull-requests/issues: write), tracked in
+# GATE-02-REVIEW.md Open Verifications, not built here. See
+# docs/leak-scan-content-action.md for the guard's scope and the
+# edit-history-not-expunged limitation.
+
+name: leak-scan-content
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  leak-scan-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Scan the event payload for leaks
+        run: python3 .specfuse/scripts/leak_scan_content.py

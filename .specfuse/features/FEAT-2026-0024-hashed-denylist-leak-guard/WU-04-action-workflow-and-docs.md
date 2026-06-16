@@ -3,11 +3,15 @@ id: FEAT-2026-0024/T04
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: github_actions_ci
 produces: [".github/workflows/leak-scan-content.yml", "docs/leak-scan-content-action.md"]
+duration_seconds: 132.527
+cost_usd: 0.720689
+input_tokens: 8795
+output_tokens: 5865
 ---
 
 <!--
