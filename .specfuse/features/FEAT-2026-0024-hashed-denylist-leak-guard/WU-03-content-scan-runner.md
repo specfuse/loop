@@ -3,11 +3,15 @@ id: FEAT-2026-0024/T03
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces: [".specfuse/scripts/leak_scan_content.py", "tests/test_leak_scan_content.py"]
+duration_seconds: 236.17
+cost_usd: 1.238651
+input_tokens: 8938
+output_tokens: 10824
 ---
 
 <!--
