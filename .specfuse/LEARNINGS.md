@@ -1352,3 +1352,114 @@ promoted here.
   reviewed before consumers commit to its shape. Document this
   shape in the next `authoring-work-units` revision as the
   default for contract-shaped features.
+
+- [FEAT-2026-0020/history-scrub/three-surfaces] `git filter-repo
+  --replace-text` scrubs ONLY file contents (blobs). It does NOT
+  touch commit messages or file paths/names. A scrub that runs only
+  `--replace-text` looks done (working tree clean) but leaks persist
+  in commit-message bodies and any filename that embeds a private
+  token. Live evidence: first scrub left 35 message residuals + a
+  `SMOKE-INIT-2026-0001-F06.md` filename. Rule: scrub all three
+  surfaces in one pass — `--replace-text` + `--replace-message`
+  (same mapping file) + `--path-rename` (or `--path … --invert-paths`
+  to delete) — and VERIFY each surface separately (a single
+  `git log --all -p | grep` blurs which surface still leaks).
+  Reusable harness lives at
+  `.specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/scrub-history.sh`
+  (gitignored; `--verify-only` audits read-only).
+
+- [FEAT-2026-0020/history-scrub/scope-vs-fixtures] `filter-repo
+  --replace-text` rewrites HEAD's blobs too, so a too-broad mapping
+  silently edits live SOURCE and TEST FIXTURES. Live evidence:
+  blanket-redacting `INIT-2026-0001` — which is the scaffold's own
+  canonical orchestrated correlation-ID sample (in
+  `.specfuse/rules/correlation-ids.md` + 4 test suites), not an
+  org-identifying string — broke 19 tests in one shot. Rules: (1)
+  redact only genuinely-private tokens; a shared/sample identifier
+  that also names a private instance is NOT automatically a leak —
+  classify it. (2) Correct order is redact-working-tree-FIRST (fix
+  any tests in lockstep, commit, suite green), THEN history-scrub —
+  because once HEAD already matches the redacted form, `--replace-text`
+  only rewrites OLD commits and the working tree + tests stay green.
+  (3) Always run the test suite immediately after any history rewrite;
+  blob substitution can break code with zero error output. Recovery
+  path that worked: restore from the PRE-scrub bundle (the first one,
+  pre-pass-1 — not an intermediate), re-scope, re-run.
+
+- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] Do NOT fold an out-of-loop-only
+  audit surface into the same gate as in-loop-verifiable ones. An audit/
+  remediation WU whose surface the dispatched agent cannot reach at all
+  (e.g. the GitHub issue/PR surface — `gh` returns auth errors inside
+  `claude -p`, the documented `gh`↔claude-p bug) produces ZERO in-loop
+  evidence: both the audit and the fix run in the operator's session. Mixed
+  with deferred-but-post-state-verified surfaces (secrets, working-tree
+  refs, license headers — loop scans, operator fixes, loop re-scans), it
+  inflates the gate's `## What the loop did NOT verify` count past the
+  >2 sizing threshold. Rule: when authoring an audit gate, give any
+  surface the agent cannot reach its OWN gate, OR mark the WU
+  `designated-out-of-loop` at plan time with an operator-journal artifact
+  as the verification proxy. Keeps the in-loop gate's deferred list ≤2 and
+  stops "deferred but verified post-state" being conflated with "the loop
+  never had eyes on this."
+
+- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] A close-intermediate WU that is
+  DISPATCHED (not auto-closed) must carry a hedged `verdict:` in its
+  frontmatter, even though the gate is non-terminal. `lint_plan.py`'s
+  verdict-exempt set for close-type WUs omits `in_progress`/`in_review`,
+  and the driver flips status→`in_progress` at dispatch, so plan-lint
+  (the `plannext` gate set) FAILS mid-dispatch on a verdict-less close
+  WU — even when AC text says "no terminal verdict." The driver has no
+  `close-intermediate` terminal-flip branch (only `close` is read for
+  `verdict_permits_terminal_flips`), so a non-`met` value (`met_locally`/
+  `partially_met`) satisfies the lint while triggering nothing. Rule:
+  author close-intermediate WUs to WRITE a hedged verdict reflecting the
+  honest gate state; reserve `met`/`verdict:`-absence semantics for the
+  auto-close path, which bypasses the in_progress lint window. (Fix the
+  lint exempt-set to include in_progress/in_review only as a separate,
+  deliberate WU — do not weaken a gate from inside a close session.)
+
+- [FEAT-2026-0020/G2/hollow-pass-presence-gates] The driver enforces the
+  `code` gate set (test suite) but does NOT machine-run the per-WU
+  file/symbol-presence checks written in WU bodies. Two gate-2 WUs passed
+  `done` with deliverables absent: T12 created SECURITY.md but not the
+  bundled CODE_OF_CONDUCT.md (its own `test -s CODE_OF_CONDUCT.md` gate was
+  never run); T16 touched ZERO files (no hook, no CI gate) yet passed, at
+  $1.48 cost. The FEAT-2026-0008/0015 hollow-pass guards did not catch
+  zero-deliverable or partial-bundle passes. Rules: (1) a WU's body
+  presence/symbol checks must be promoted to machine-enforced gates the
+  driver actually runs before accepting `complete` — filed as a loop bug.
+  (2) Until then, run `/gate-status` before any gate close and spot-check
+  that each `done` WU's named deliverable files exist on disk; `done` is
+  not evidence of a deliverable. (3) A bundled WU (N files in one WU) is a
+  hollow-pass amplifier — prefer one deliverable per WU, or assert every
+  bundled file in a single machine gate.
+
+- [FEAT-2026-0020/G2/out-of-loop-completion] When the loop cannot reliably
+  produce + verify a deliverable (here: hollow passes the driver won't
+  catch; a `gh`/`claude -p` auth surface; a CLI the prior WU never shipped),
+  completing out-of-loop with REAL re-run verification beats re-dispatching
+  the same WU body — a re-dispatch bets on the same gap. Acceptable for the
+  loop's own repo; record it explicitly: set `completed_out_of_loop: true` +
+  `completed_note` on the WU, and log it in the retrospective's "What the
+  loop did NOT verify". Four WUs finished this way across FEAT-2026-0020
+  (gate-1 T04; gate-2 T12/T16/T18 + the T15 CLI gap).
+
+- [FEAT-2026-0020/G2/policy-text-content-filter] Generating standard
+  policy/community text inline (Contributor Covenant 2.1, whose
+  unacceptable-behavior list enumerates harassment/abuse terms) can trip the
+  model OUTPUT content-filter and hard-block the turn ("Output blocked by
+  content filtering policy"). Fix: do not generate such text inline — fetch
+  it from its canonical source (raw.githubusercontent.com is allowlisted)
+  and post-process in shell so the body never passes through model output.
+  Applies to any vendored license/policy/CoC boilerplate.
+
+- [FEAT-2026-0020/G2/leak-guard-surface-asymmetry] A leak detector needs
+  DIFFERENT scopes per caller. Structural regexes (user-path / email /
+  private-host) are right on a DIFF (a newly-introduced path is suspicious)
+  but false-positive as an absolute repo gate (doc placeholders like
+  `/Users/<user>/`, the detector's own test fixtures, config addresses like
+  git@github.com). So: pre-commit (`--staged`) runs the full structural +
+  denylist + secrets scan on the diff; the CI gate (`--all`) runs only the
+  high-confidence checks (gitignored literal denylist + gitleaks secrets).
+  Verified: `--all` exits 0 on the clean tree; `--staged` blocks a planted
+  path. Generalize: heuristic regexes belong on diffs, not whole-tree gates.

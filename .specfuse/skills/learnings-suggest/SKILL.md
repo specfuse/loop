@@ -3,6 +3,12 @@ name: learnings-suggest
 description: Scan attempt_outcome events across features, cluster non-passing attempts by (failure_class, failure_signature), and surface clusters above a configurable threshold as candidate LEARNINGS entries for the operator to promote. Read-only — does NOT auto-append to LEARNINGS.md.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Learnings suggest (interactive, diagnostic)
 
 Run interactively. This skill scans `attempt_outcome` events across every

@@ -24,9 +24,9 @@ Specfuse is three projects (`codegen`, `loop`, `orchestrator`) sharing one gate-
 
 This replaces the older "gates in the PM" design (orchestrator's architecture addendum §A.5). The
 full rationale is in the orchestrator repo:
-- `<redacted-path>` (Model A vs B; B chosen)
-- `<redacted-path>` (how the two surfaces relate)
-- `<redacted-path>` (the ID/label/branch/trailer contract — read this; summarized in §3)
+- `example-org/orchestrator/docs/gate-placement-proposal.md` (Model A vs B; B chosen)
+- `example-org/orchestrator/docs/specfuse-collaboration-charter.md` (how the two surfaces relate)
+- `example-org/orchestrator/docs/naming-convention.md` (the ID/label/branch/trailer contract — read this; summarized in §3)
 
 ## 2. Unit hierarchy + the naming convention (the contract you must honor)
 
@@ -45,11 +45,11 @@ initiative      orchestrator top; cross-repo            INIT-YYYY-NNNN
   - `specfuse:feature` — marks a loop-pickable feature issue. **This is your pick query.**
   - `initiative:INIT-YYYY-NNNN` — present only on orchestrated features; absent ⇒ component-local.
   - `type:<task-type>` — implementation / qa_authoring / qa_execution / qa_curation / (closing types).
-- Issue **title**: `[example-init/F03] <summary>`. Issue **body** = the five-section work-unit
+- Issue **title**: `[INIT-2026-0001/F03] <summary>`. Issue **body** = the five-section work-unit
   contract (Context / Acceptance criteria / Do not touch / Verification / Escalation triggers) —
   same five sections methodology §4 already defines.
-- **Branch/PR:** one branch + one PR **per feature** (`feat/example-init-F03-<slug>`); squash one
-  commit per work unit onto it; trailer `Feature: example-init/F03/T01`.
+- **Branch/PR:** one branch + one PR **per feature** (`feat/INIT-2026-0001-F03-<slug>`); squash one
+  commit per work unit onto it; trailer `Feature: INIT-2026-0001/F03/T01`.
 
 ## 3. What to build
 
@@ -65,14 +65,14 @@ A GitHub feature-pick capability for the loop. Behaviorally:
    programmatically from `.specfuse/scripts/`.
 
 2. **Adopt:** turn a picked issue into a loop feature folder under `.specfuse/features/`,
-   using the issue ID as the feature ID (`example-init/FNN` → folder on disk).
+   using the issue ID as the feature ID (`INIT-2026-0001/FNN` → folder on disk).
    **Shipped (gate 2):**
 
    - CLI: `python3 .specfuse/scripts/adopt_feature.py <repo> <issue-number>`
    - Interactive: `/adopt-feature` skill (enumerates candidates, accepts pick, runs script)
 
    The script names the folder `{encoded-id}-{slug}` where slashes are replaced with
-   dashes (`example-init/FNN` → `example-init-FNN-<slug>`; `FEAT-YYYY-NNNN` stays
+   dashes (`INIT-2026-0001/FNN` → `INIT-2026-0001-FNN-<slug>`; `FEAT-YYYY-NNNN` stays
    unchanged). It writes: `PLAN.md` (frontmatter + 3-gate skeleton with empty work-unit
    lists for gates 2 and 3), `GATE-01.md`, `GATE-02.md`, `WU-01-<slug>.md` (seeded
    verbatim with the raw issue body), and gate-1 closing WUs 90–93 (generic placeholder
@@ -139,9 +139,9 @@ A GitHub feature-pick capability for the loop. Behaviorally:
    body embedded verbatim by `adopt_feature.py` now lints clean. Existing bold-headed
    WU bodies remain clean (regression guard). Fix option 1 was implemented: broadening
    `lint_plan.py` (loop-side, smallest blast radius). The adopted
-   `example-feature-…` folder exits `lint_plan.py` with status 0.
+   `INIT-2026-0001-F06-…` folder exits `lint_plan.py` with status 0.
 
-   Evidence: `SMOKE-example-feature.md` (smoke journal), `RETROSPECTIVE.md §T08`,
+   Evidence: `SMOKE-INIT-2026-0001-F06.md` (smoke journal), `RETROSPECTIVE.md §T08`,
    and commit `c19870e`.
 
 ### Decisions already locked (don't re-litigate)
@@ -173,11 +173,11 @@ been single-gate; this is the unproven thing gating everything downstream. Two b
 
 ## 5. Smoke test target
 
-**Completed (gate 3, 2026-06-06).** The smoke against `example-feature` —
+**Completed (gate 3, 2026-06-06).** The smoke against `INIT-2026-0001/F06` —
 `example-org/example-app` issue #287 — was run out-of-loop by the human operator.
 
-- **`example-feature`** — "Conform exampleEndpoint to validated spec" — `example-org/example-app`
-  issue #287, labels `specfuse:feature` + `initiative:example-init` + `type:implementation` +
+- **`INIT-2026-0001/F06`** — "Conform exampleEndpoint to validated spec" — `example-org/example-app`
+  issue #287, labels `specfuse:feature` + `initiative:INIT-2026-0001` + `type:implementation` +
   `autonomy:review` + `state:ready`. Discovery, adopt, and report-back all PASS. Lint finding
   (ATX heading format gap) noted — see §3.4 for details and the follow-on fix options.
 

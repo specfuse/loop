@@ -26,7 +26,7 @@ feature's `RETROSPECTIVE.md` (both gate-1 and gate-2 sections), the root
 that emits feature start/complete signals the orchestrator can observe (issue
 label transitions), selected behind the existing `Backend` seam in
 `.specfuse/scripts/loop.py` without forking the driver; then one real
-orchestrated feature (`example-feature` — example-org/example-app issue #287,
+orchestrated feature (`INIT-2026-0001/F06` — example-org/example-app issue #287,
 autonomy `review`) is dispatched end-to-end as the smoke test. You draft; you
 do not arm.
 
@@ -54,7 +54,7 @@ do not arm.
      implies the goal itself should change, flag it LOUDLY as an
      escalation.
    - **Open questions** — what you could not resolve, each mapped to the
-     WU it affects (e.g. is the smoke target still `example-feature` or
+     WU it affects (e.g. is the smoke target still `INIT-2026-0001/F06` or
      did `example-org/example-app#287` change?).
 4. Terminal case: gate 3 is the LAST gate in the skeleton. Gate 3's
    `plan-next` will therefore have no further gate to draft — the WU may

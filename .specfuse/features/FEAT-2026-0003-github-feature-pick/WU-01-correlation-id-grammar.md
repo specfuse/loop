@@ -26,9 +26,9 @@ differs. The naming contract is in
 - Component-local (today, unchanged): `FEAT-YYYY-NNNN`, task-level
   `FEAT-YYYY-NNNN/(TNN[H…] | G<n>-(RETRO|LESSONS|DOCS|PLAN))`.
 - Orchestrated (new): feature-level `INIT-YYYY-NNNN/FNN` (e.g.
-  `example-feature`); task-level `INIT-YYYY-NNNN/FNN/(TNN[H…] |
-  G<n>-(RETRO|LESSONS|DOCS|PLAN))` (e.g. `example-feature/T01`,
-  `example-feature/G1-RETRO`). Origin is read from the ID root: `INIT-…` =
+  `INIT-2026-0001/F06`); task-level `INIT-YYYY-NNNN/FNN/(TNN[H…] |
+  G<n>-(RETRO|LESSONS|DOCS|PLAN))` (e.g. `INIT-2026-0001/F06/T01`,
+  `INIT-2026-0001/F06/G1-RETRO`). Origin is read from the ID root: `INIT-…` =
   orchestrated, `FEAT-…` = component-local.
 
 Files to edit: `.specfuse/rules/correlation-ids.md` (the rule),
@@ -39,17 +39,17 @@ see `TestHygieneIdAdmitted` for the shape). Reference the binding rules under
 `never-touch.md`, `security-boundaries.md`.
 
 **Acceptance criteria.**
-1. `lint_plan.CORRELATION_ID_RE` matches `example-feature` (orchestrated
+1. `lint_plan.CORRELATION_ID_RE` matches `INIT-2026-0001/F06` (orchestrated
    feature-level).
-2. It matches each of `example-feature/T01`, `example-feature/T02H`,
-   `example-feature/T02H1`, and `example-feature/G1-RETRO` (orchestrated
+2. It matches each of `INIT-2026-0001/F06/T01`, `INIT-2026-0001/F06/T02H`,
+   `INIT-2026-0001/F06/T02H1`, and `INIT-2026-0001/F06/G1-RETRO` (orchestrated
    task-level: substantive, hygiene, hygiene-ordinal, closing).
 3. It still matches every existing `FEAT-…` shape — `FEAT-2026-0042`,
    `FEAT-2026-0042/T07`, `FEAT-2026-0042/T02H`, `FEAT-2026-0042/G1-RETRO`
    (regression; the worked-example fixture must still lint clean).
-4. It rejects malformed orchestrated IDs: `example-init/F6` (single-digit
-   feature ordinal), `example-feature/T1` (single-digit task ordinal),
-   `example-init/f06` (lowercase), and `example-init` (orchestrated root
+4. It rejects malformed orchestrated IDs: `INIT-2026-0001/F6` (single-digit
+   feature ordinal), `INIT-2026-0001/F06/T1` (single-digit task ordinal),
+   `INIT-2026-0001/f06` (lowercase), and `INIT-2026-0001` (orchestrated root
    with no `/FNN` feature segment — a bare initiative is not a loop feature ID).
 5. `.specfuse/rules/correlation-ids.md` documents both grammars, the
    origin-from-ID-root rule, and the updated combined regex, keeping the

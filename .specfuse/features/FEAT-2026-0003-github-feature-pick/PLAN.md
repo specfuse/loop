@@ -38,7 +38,7 @@ files own their own status; GATE files own gate status.
 - **Gate 3 — report back + smoke.** A `GitHubBackend(Backend)` emits feature
   start/complete signals the orchestrator can observe (issue label transitions),
   selected behind the existing `Backend` seam without forking the driver; then
-  one real orchestrated feature (`example-feature`, example-org/example-app
+  one real orchestrated feature (`INIT-2026-0001/F06`, example-org/example-app
   #287, autonomy `review`) is dispatched end-to-end as the smoke test.
   *(Drafted by gate 2's plan-next.)*
 - **Gate 4 — adopted-folder lint admits orchestrator issue bodies.** Gate 3's
@@ -47,7 +47,7 @@ files own their own status; GATE files own gate status.
   ATX (`## Context`) headings, so an adopted folder fails the linter on
   WU-01 despite being structurally complete. Gate 4 broadens the linter's
   section detector to accept both heading styles, re-verifies the existing
-  adopted `example-feature-…` folder lints clean, and closes the roadmap
+  adopted `INIT-2026-0001-F06-…` folder lints clean, and closes the roadmap
   goal end-to-end. *(Drafted by gate 3's plan-next as terminal-case branch B;
   WUs themselves to be authored by gate 4's plan-next when armed.)*
 

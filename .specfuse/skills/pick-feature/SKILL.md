@@ -3,6 +3,12 @@ name: pick-feature
 description: Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, loop.py if gate 1 is detailed). The human picks; the skill executes the pick.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Pick a feature (interactive)
 
 This skill helps you decide which planned feature to pull next on a

@@ -29,7 +29,7 @@ class TestCloseIntermediateIdAdmitted(unittest.TestCase):
 
     def test_correlation_id_re_accepts_init_g1_close_intermediate(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/G1-CLOSE-INTERMEDIATE"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/G1-CLOSE-INTERMEDIATE"))
 
     def test_correlation_id_re_rejects_unknown_suffix(self):
         # Alternation must not open a gap — CLOSE-FOO is not a valid suffix.

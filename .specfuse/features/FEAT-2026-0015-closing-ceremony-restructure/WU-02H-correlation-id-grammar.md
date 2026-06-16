@@ -83,7 +83,7 @@ all git; edit files only.
      existing `FEAT-2026-0042/G1-CLOSE` still matches (no
      regression).
    - `test_correlation_id_re_accepts_init_g1_close_intermediate` —
-     `example-feature/G1-CLOSE-INTERMEDIATE` truthy.
+     `INIT-2026-0001/F06/G1-CLOSE-INTERMEDIATE` truthy.
    - `test_correlation_id_re_rejects_unknown_suffix` —
      `FEAT-2026-0042/G1-CLOSE-FOO` falsy (defensive — confirms
      alternation didn't open a gap).

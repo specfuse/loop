@@ -74,7 +74,7 @@ completed in one attempt with no escalations. GATE-02 status: `passed`.
 hooks (`on_feature_start`, `on_gate_passed`, `on_feature_complete`) and a `make_backend(feat_fm)`
 factory (T05); `GitHubBackend(Backend)` label-transition backend in `gh_backend.py` using the
 canonical `state:ready → state:in-progress → state:done` scheme, factory selects it when
-`source_issue_url` is present in PLAN.md frontmatter (T06); live smoke of `example-feature`
+`source_issue_url` is present in PLAN.md frontmatter (T06); live smoke of `INIT-2026-0001/F06`
 (`example-org/example-app#287`) run out-of-loop by human operator — discovery, adopt, and
 report-back all PASS, `#287` fully restored post-smoke (T07). **Finding:** the adopted folder
 failed `lint_plan.py` because orchestrator issue bodies use `## ATX` headings; the linter only
@@ -83,13 +83,13 @@ recognised `**bold**`/plain. Fix delivered in gate 4. GATE-03 status: `passed`.
 **Gate 4 (passed).** ATX-heading linter fix: broadened `lint_plan.py`'s mandatory-section
 detector to a union pattern (`^(?:#+\s*|\**)`) that accepts both Markdown ATX headings
 (`## Context`) and the existing bold-preamble (`**Context.**`) form (T08). The adopted
-`example-feature-…` folder now passes `lint_plan.py` exit-0, and existing bold-headed WU
+`INIT-2026-0001-F06-…` folder now passes `lint_plan.py` exit-0, and existing bold-headed WU
 bodies remain clean (regression guard). GATE-04 status: `passed`.
 
 **Status: done.** All four gates passed. All four pipeline mechanisms — discover, adopt,
 report-back, lint-clean grind — are proven live against `example-org/example-app#287`. The
 `roadmap_goal` is met. See `RETROSPECTIVE.md §Feature-arc retrospective` and
-`SMOKE-example-feature.md`.
+`SMOKE-INIT-2026-0001-F06.md`.
 
 <a id="feat-2026-0004"></a>
 ## FEAT-2026-0004 — Single-driver working-tree lock

@@ -143,41 +143,41 @@ class TestOrchestratedIdAdmitted(unittest.TestCase):
 
     def test_orchestrated_feature_level_validates(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06"))
 
     def test_orchestrated_task_substantive_validates(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/T01"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/T01"))
 
     def test_orchestrated_task_hygiene_validates(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/T02H"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/T02H"))
 
     def test_orchestrated_task_hygiene_ordinal_validates(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/T02H1"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/T02H1"))
 
     def test_orchestrated_task_closing_validates(self):
         self.assertIsNotNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/G1-RETRO"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/G1-RETRO"))
 
     def test_single_digit_feature_ordinal_rejected(self):
         # F6 is malformed — feature ordinals are zero-padded to 2 digits.
         self.assertIsNone(
-            lint_plan.CORRELATION_ID_RE.match("example-init/F6"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F6"))
 
     def test_single_digit_task_ordinal_rejected(self):
         self.assertIsNone(
-            lint_plan.CORRELATION_ID_RE.match("example-feature/T1"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/F06/T1"))
 
     def test_lowercase_feature_ordinal_rejected(self):
         self.assertIsNone(
-            lint_plan.CORRELATION_ID_RE.match("example-init/f06"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001/f06"))
 
     def test_bare_initiative_id_rejected(self):
         # INIT-YYYY-NNNN with no /FNN is an initiative ID, not a loop feature ID.
         self.assertIsNone(
-            lint_plan.CORRELATION_ID_RE.match("example-init"))
+            lint_plan.CORRELATION_ID_RE.match("INIT-2026-0001"))
 
 
 class TestLintCliContract(unittest.TestCase):

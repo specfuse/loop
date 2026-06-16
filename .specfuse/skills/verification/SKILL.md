@@ -3,6 +3,12 @@ name: specfuse-verification
 description: Run and report Specfuse work-unit verification gates before declaring a task done. Use this skill whenever you are executing a Specfuse work unit and need to confirm the work is actually complete — running tests, coverage, linting, compiler-warning, and security-scan gates and reporting structured evidence. Use it even when the work "looks done"; declaring complete without running the gates is the single most common failure mode and this skill exists to prevent it.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Specfuse verification
 
 The discipline: **state intent, act, verify, report.** This skill covers the *verify*

@@ -3,6 +3,12 @@ name: abandon-feature
 description: Cleanly abandon the active feature when retry isn't worth it. Flips every non-`done` WU to `abandoned`, every non-`passed` gate to `passed`, PLAN.md `status: active` → `abandoned`, and the roadmap row's status column to `abandoned`. Single up-front confirmation surfaces all four surfaces before any write.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Abandon feature (interactive, single-confirm)
 
 The escape hatch for the loop driver. Use when a feature has hit a

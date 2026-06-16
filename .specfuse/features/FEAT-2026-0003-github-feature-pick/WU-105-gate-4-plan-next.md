@@ -17,7 +17,7 @@ closure. Draft a gate 5 ONLY if gate-4 evidence shows the roadmap goal is still 
 AND a bounded gate-5 scope is identifiable (escalation, not default).
 
 **Context.** Read PLAN.md (`roadmap_goal`), `RETROSPECTIVE.md` (all gate sections incl.
-gate 4), `SMOKE-example-feature.md`, the root `.specfuse/LEARNINGS.md`, and
+gate 4), `SMOKE-INIT-2026-0001-F06.md`, the root `.specfuse/LEARNINGS.md`, and
 `GATE-04-REVIEW.md`. Gate 4 fixed the ATX-heading lint gap that was the only mechanism
 blocking the roadmap goal at gate-3 close. If T08 landed and the adopted folder now
 lints clean, all four pipeline mechanisms (discover / adopt / report-back / lint-clean)

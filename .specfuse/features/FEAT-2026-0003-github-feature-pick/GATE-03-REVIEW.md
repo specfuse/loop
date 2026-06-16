@@ -101,11 +101,11 @@ GATE-02-REVIEW.md decision on the URL recording.
 ### T07's smoke does NOT grind #287's code
 
 T07 verifies adopt + label transitions against a real GitHub issue.
-It does NOT actually grind the code change `example-feature` ("Conform
+It does NOT actually grind the code change `INIT-2026-0001/F06` ("Conform
 exampleEndpoint to validated spec") asks for — that work lives in
 `example-org/example-app`'s tree, not this repo's. T07's deliverable is
-a smoke journal (`SMOKE-example-feature.md`) plus the adopted feature
-folder (`example-feature-<slug>/`) — both inside this repo as
+a smoke journal (`SMOKE-INIT-2026-0001-F06.md`) plus the adopted feature
+folder (`INIT-2026-0001-F06-<slug>/`) — both inside this repo as
 verification artifacts.
 
 The grind of #287's code is downstream of this feature — it happens
@@ -188,7 +188,7 @@ ground, and dispatch logic could diverge.
   tracker but moves the production-issue risk out of the loop's
   automated dispatch path.
 
-I went with "accept" because the WU spec named `example-feature`
+I went with "accept" because the WU spec named `INIT-2026-0001/F06`
 (== #287) explicitly as the smoke target, and creating a test issue
 adds a new artifact the orchestrator-side proof would have to
 account for. The call is yours.
@@ -208,7 +208,7 @@ may have already named different labels.
 **Two ways to resolve at review:**
 
 - **Confirm first**: before arming, check the orchestrator's
-  addendum (`<redacted-path>`)
+  addendum (`example-org/orchestrator/docs/`)
   or the orchestrator repo's open issues for whether
   `loop:in-progress` / `loop:complete` are already named OR whether
   different names (e.g. `feature:in-flight`, `feature:done`) are
@@ -284,9 +284,9 @@ escalation needed** at gate 3 arming time.
 
 ### Q1. Is `example-org/example-app#287` still the smoke target? (affects T07)
 
-The handoff brief and GATE-02-REVIEW.md both name `example-feature`
+The handoff brief and GATE-02-REVIEW.md both name `INIT-2026-0001/F06`
 == issue #287. **I did not verify the issue still exists with all
-four expected labels** (`specfuse:feature`, `initiative:example-init`,
+four expected labels** (`specfuse:feature`, `initiative:INIT-2026-0001`,
 `type:implementation`, `autonomy:review`) before drafting T07. The
 verification belongs in T07's safety preamble — but if the human
 already knows the issue moved (closed, re-labelled, transferred),

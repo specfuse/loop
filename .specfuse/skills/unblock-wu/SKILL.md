@@ -3,6 +3,12 @@ name: unblock-wu
 description: Re-arm one or more `blocked_human` work units after a fix (credentials, spec ambiguity, missing dep, etc.) so the loop driver retries them. Flips each WU `status: blocked_human` → `pending` and `attempts: 0`; if the WU's gate is `awaiting_review` (driver left it stuck after the block), flips the gate back to `open`. Per-WU propose-and-confirm. Prints the resume command.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Unblock work unit (interactive, propose-and-confirm)
 
 Counterpart to `/arm-gate`. `/arm-gate` is for gate-boundary draft

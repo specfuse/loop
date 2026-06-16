@@ -1,5 +1,7 @@
 # Specfuse Loop
 
+**For engineers using AI coding agents** — a local-first driver that structures features as verified, work-unit sequences so each agent session runs focused on one task instead of accumulating context drift.
+
 A small, local-first executor for the **Plan + Work Unit** pattern in a single
 repository. You plan a feature as a sequence of *gates*, each a batch of
 self-contained *work units* with explicit acceptance criteria and verification.
@@ -131,7 +133,7 @@ first real multi-gate feature) have passed:
 - **Gate 3 (report-back + smoke):** `GitHubBackend(Backend)` in `gh_backend.py`
   transitions `state:ready → state:in-progress → state:done` on the GitHub issue as
   the loop grinds; `make_backend(feat_fm)` selects it automatically for adopted
-  features. Live smoke of `example-feature` (`example-org/example-app#287`):
+  features. Live smoke of `INIT-2026-0001/F06` (`example-org/example-app#287`):
   discovery, adopt, and report-back all PASS; issue fully restored post-smoke.
 - **Gate 4 (lint fix):** `lint_plan.py`'s mandatory-section detector broadened to a
   union pattern accepting both ATX headings (`## Context`) and the existing

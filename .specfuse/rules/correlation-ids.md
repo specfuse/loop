@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
 # Rule: correlation IDs
 
 Every unit of work in the loop carries a correlation ID that threads it through the
@@ -44,14 +49,14 @@ Two namespaces, four canonical shapes:
   - `INIT-YYYY-NNNN` is the initiative ID, assigned by the orchestrator. `YYYY`
     is the initiative's creation year; `NNNN` is a zero-padded four-digit ordinal.
   - `FNN` is a zero-padded two-digit feature ordinal within the initiative.
-  - Example: `example-feature`.
+  - Example: `INIT-2026-0001/F06`.
   - A bare `INIT-YYYY-NNNN` (no `/FNN` feature segment) is an initiative ID —
     it is **not** a loop feature ID and must be rejected as malformed.
 - **Task-level:** `INIT-YYYY-NNNN/FNN/<task-id>`
   - The feature-level orchestrated ID, a literal `/`, then the same `<task-id>`
     shapes as component-local: `TNN`, `TNNH[N…]`, or `G<n>-<NAME>`.
-  - Examples: `example-feature/T01`, `example-feature/T02H`,
-    `example-feature/G1-RETRO`.
+  - Examples: `INIT-2026-0001/F06/T01`, `INIT-2026-0001/F06/T02H`,
+    `INIT-2026-0001/F06/G1-RETRO`.
 
 **Origin is read from the ID root.** `INIT-…` = orchestrated (linked to an
 initiative in the orchestrator). `FEAT-…` = component-local (standalone feature).

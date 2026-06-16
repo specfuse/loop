@@ -19,7 +19,7 @@ feature as `done` if all three gates passed.
 
 **Context.** Read the gate-3 commits and the gate-3 section of
 `RETROSPECTIVE.md` plus the smoke journal
-`SMOKE-example-feature.md`. Update repo docs to describe the
+`SMOKE-INIT-2026-0001-F06.md`. Update repo docs to describe the
 delivered state-backend mechanism (how the loop signals a
 feature's start/complete via GitHub issue labels), how
 `make_backend(feat_fm)` selects between local and GitHub
@@ -66,7 +66,7 @@ re-edit them here.
 `gh_backend.py`), `.specfuse/skills/`, binding rules under
 `.specfuse/rules/`, templates under `.specfuse/templates/`,
 generated directories, secrets, `.git/`. This unit documents;
-it does not change code or skills. `SMOKE-example-feature.md`
+it does not change code or skills. `SMOKE-INIT-2026-0001-F06.md`
 is owned by T07 — do not edit.
 
 **Verification.** The `doc` gates in

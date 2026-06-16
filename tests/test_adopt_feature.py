@@ -60,9 +60,9 @@ _MISSING_ESCALATION_BODY = (
 )
 
 _ORCHESTRATED_CANDIDATE = {
-    "feature_id": "example-feature",
+    "feature_id": "INIT-2026-0001/F06",
     "title": "Conform exampleEndpoint to validated spec",
-    "initiative": "example-init",
+    "initiative": "INIT-2026-0001",
     "task_type": "implementation",
     "autonomy": "review",
     "url": "https://github.com/example/repo/issues/42",
@@ -83,7 +83,7 @@ _FEAT_CANDIDATE = {
 
 
 # ---------------------------------------------------------------------------
-# AC8a — orchestrated candidate (example-feature, with initiative)
+# AC8a — orchestrated candidate (INIT-2026-0001/F06, with initiative)
 # ---------------------------------------------------------------------------
 
 class TestOrchestratedCandidate(unittest.TestCase):
@@ -97,12 +97,12 @@ class TestOrchestratedCandidate(unittest.TestCase):
 
     def test_folder_name(self):
         slug = make_slug(_ORCHESTRATED_CANDIDATE["title"])
-        self.assertEqual(self.folder.name, f"example-feature-{slug}")
+        self.assertEqual(self.folder.name, f"INIT-2026-0001-F06-{slug}")
 
     def test_plan_frontmatter_initiative_present(self):
         fm, _ = read_frontmatter(self.folder / "PLAN.md")
         self.assertIn("initiative", fm)
-        self.assertEqual(fm["initiative"], "example-init")
+        self.assertEqual(fm["initiative"], "INIT-2026-0001")
 
     def test_plan_frontmatter_required_keys(self):
         fm, _ = read_frontmatter(self.folder / "PLAN.md")
@@ -112,7 +112,7 @@ class TestOrchestratedCandidate(unittest.TestCase):
     def test_wu01_frontmatter_id(self):
         slug = make_slug(_ORCHESTRATED_CANDIDATE["title"])
         fm, _ = read_frontmatter(self.folder / f"WU-01-{slug}.md")
-        self.assertEqual(fm["id"], "example-feature/T01")
+        self.assertEqual(fm["id"], "INIT-2026-0001/F06/T01")
 
     def test_wu01_body_has_five_sections(self):
         slug = make_slug(_ORCHESTRATED_CANDIDATE["title"])
@@ -239,7 +239,7 @@ class TestCLIMain(unittest.TestCase):
             sys.argv = saved
         printed = out.getvalue().strip()
         slug = make_slug(_ORCHESTRATED_CANDIDATE["title"])
-        expected_name = f"example-feature-{slug}"
+        expected_name = f"INIT-2026-0001-F06-{slug}"
         self.assertIn(expected_name, printed)
         self.assertTrue((self.root / expected_name).exists())
 

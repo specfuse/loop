@@ -1,3 +1,8 @@
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
 # Rule: security boundaries
 
 Every session operates inside a privilege model that is narrower than "do whatever

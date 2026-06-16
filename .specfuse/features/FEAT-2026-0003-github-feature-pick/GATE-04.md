@@ -12,7 +12,7 @@ status: passed
   issue body embedded verbatim by `adopt_feature.py` lints clean — without
   weakening the rejection of a body that genuinely lacks a section.
 - `lint_plan.py` over the existing adopted folder
-  `.specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec/`
+  `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/`
   (written by gate 3's T07 smoke) exits 0 — the gate-3 finding is resolved.
 - A retrospective exists; generalizable lessons are promoted; docs/roadmap
   reflect that all four pipeline mechanisms (discover / adopt / report-back /

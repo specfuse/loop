@@ -10,7 +10,7 @@ status: passed
 <Drafted by gate 2's plan-next. The milestone: a `GitHubBackend(Backend)`
 emits feature start/complete signals the orchestrator can observe (issue label
 transitions), selected behind the existing `Backend` seam without forking the
-driver; then one real orchestrated feature (`example-feature`,
+driver; then one real orchestrated feature (`INIT-2026-0001/F06`,
 example-org/example-app #287) is dispatched end-to-end as the smoke test.>
 
 ## Reflection notes

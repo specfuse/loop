@@ -39,10 +39,10 @@ gh_features = _load_gh_features()
 
 _ORCHESTRATED = {
     "number": 42,
-    "title": "[example-feature] Conform exampleEndpoint to validated spec",
+    "title": "[INIT-2026-0001/F06] Conform exampleEndpoint to validated spec",
     "labels": [
         {"name": "specfuse:feature"},
-        {"name": "initiative:example-init"},
+        {"name": "initiative:INIT-2026-0001"},
         {"name": "type:implementation"},
         {"name": "autonomy:review"},
     ],
@@ -86,7 +86,7 @@ class TestOrchestratedIssue(unittest.TestCase):
         self.candidate = next(c for c in candidates if c["number"] == 42)
 
     def test_feature_id(self):
-        self.assertEqual(self.candidate["feature_id"], "example-feature")
+        self.assertEqual(self.candidate["feature_id"], "INIT-2026-0001/F06")
 
     def test_title_is_summary_without_bracket_tag(self):
         self.assertEqual(
@@ -94,7 +94,7 @@ class TestOrchestratedIssue(unittest.TestCase):
         )
 
     def test_initiative_extracted(self):
-        self.assertEqual(self.candidate["initiative"], "example-init")
+        self.assertEqual(self.candidate["initiative"], "INIT-2026-0001")
 
     def test_task_type_extracted(self):
         self.assertEqual(self.candidate["task_type"], "implementation")
@@ -209,7 +209,7 @@ class TestCLIMain(unittest.TestCase):
         first = output.splitlines()[0]
         parts = first.split("\t")
         self.assertEqual(len(parts), 4)
-        self.assertEqual(parts[0], "example-feature")
+        self.assertEqual(parts[0], "INIT-2026-0001/F06")
         self.assertEqual(parts[1], "implementation")
         self.assertEqual(parts[2], "review")
         self.assertIn("issues/42", parts[3])

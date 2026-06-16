@@ -18,7 +18,7 @@ adopted orchestrator-issue folder lints clean.
 
 **Context.** This is `FEAT-2026-0003/T08`, the sole substantive WU of gate 4 —
 the terminal-case escalation gate `G3-PLAN` appended to fix the finding the live
-smoke surfaced (`SMOKE-example-feature.md`, `GATE-04-REVIEW.md`). The gap:
+smoke surfaced (`SMOKE-INIT-2026-0001-F06.md`, `GATE-04-REVIEW.md`). The gap:
 orchestrator-dispatched `specfuse:feature` issue bodies use ATX section headings
 (`## Context`, `## Acceptance criteria`, …) — confirmed in the orchestrator's
 `shared/templates/work-unit-issue.md` and in live issue #287 — but
@@ -47,7 +47,7 @@ target), so `lint_plan.py` is NOT off-limits here — but nothing else under
    fixture `FEAT-2026-0001-health-endpoint` and this feature's own WUs, must keep
    linting clean).
 3. `python3 .specfuse/scripts/lint_plan.py
-   .specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec`
+   .specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec`
    exits 0 (the folder the gate-3 smoke adopted, which previously failed lint on
    all five sections, now passes).
 4. New test cases in `tests/test_lint_correlation_id.py` (or a new
@@ -57,7 +57,7 @@ target), so `lint_plan.py` is NOT off-limits here — but nothing else under
 
 **Do not touch.** `loop.py`, `gh_features.py`, `adopt_feature.py`,
 `gh_backend.py`, `_miniyaml.py`, any binding rule under `.specfuse/rules/`, any
-skill, the adopted `example-feature-…` folder's contents (lint it, do not edit
+skill, the adopted `INIT-2026-0001-F06-…` folder's contents (lint it, do not edit
 it — editing it to pass would defeat the test), generated dirs, secrets, `.git/`.
 The driver owns all git — edit files only. This WU touches exactly two files:
 `.specfuse/scripts/lint_plan.py` and the test file.

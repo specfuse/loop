@@ -71,7 +71,7 @@ widening with lifecycle hooks), T06 (`GitHubBackend` implementation
    integration glitch".
 
 **Do not touch.** Source code, gate-3 implementation WUs (T05,
-T06, T07) including `SMOKE-example-feature.md`, any binding
+T06, T07) including `SMOKE-INIT-2026-0001-F06.md`, any binding
 rule under `.specfuse/rules/`, any skill, generated directories,
 secrets, `.git/`. This unit only reads history and writes
 `RETROSPECTIVE.md`.

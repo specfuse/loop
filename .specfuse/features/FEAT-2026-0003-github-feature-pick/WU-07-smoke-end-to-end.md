@@ -5,24 +5,24 @@ model: claude-sonnet-4-6
 status: done
 ---
 
-# Live end-to-end smoke — adopt example-feature and observe label transitions
+# Live end-to-end smoke — adopt INIT-2026-0001/F06 and observe label transitions
 
 **Objective.** Run the only step gates 1-2 could not: a *live*
 end-to-end pass against the real target issue
-`example-org/example-app#287` (initiative `example-feature`,
-labels `specfuse:feature` + `initiative:example-init` +
+`example-org/example-app#287` (initiative `INIT-2026-0001/F06`,
+labels `specfuse:feature` + `initiative:INIT-2026-0001` +
 `type:implementation` + `autonomy:review`). Verify discovery,
 adopt, and `GitHubBackend` label transitions all work against the
-real GitHub API. Produce a smoke journal (`SMOKE-example-feature.md`)
+real GitHub API. Produce a smoke journal (`SMOKE-INIT-2026-0001-F06.md`)
 documenting observed behaviour. This is the WU the prior gates
 deferred — separated per `[FEAT-2026-0003/G1-LESSONS]`
 offline-first so T05/T06 land deterministically and this one
 isolates the network-bound risk.
 
 **Context.** Handoff brief §5 names the smoke target:
-*"example-feature — 'Conform exampleEndpoint to validated spec'
+*"INIT-2026-0001/F06 — 'Conform exampleEndpoint to validated spec'
 — example-org/example-app issue #287, label specfuse:feature +
-initiative:example-init, type:implementation, autonomy review.
+initiative:INIT-2026-0001, type:implementation, autonomy review.
 Small, mostly-already-implemented conformance task — a low-risk
 first dispatch."* This WU does NOT grind #287's actual code (the
 fix work happens in `example-org/example-app`'s loop, not here).
@@ -58,7 +58,7 @@ mutates real GitHub state — issue labels on a real production
 issue. Two safety rules override the acceptance criteria:
 
 1. If `#287`'s current labels include anything OUTSIDE the
-   expected set (`specfuse:feature`, `initiative:example-init`,
+   expected set (`specfuse:feature`, `initiative:INIT-2026-0001`,
    `type:implementation`, `autonomy:review`, `state:ready`), STOP
    and block. (`state:ready` is the canonical pre-pickup lifecycle
    state and is expected; see the label scheme in `WU-06`.) Do NOT
@@ -70,7 +70,7 @@ issue. Two safety rules override the acceptance criteria:
    re-authenticate; do NOT swap credentials).
 
 **Acceptance criteria.**
-1. A new file `SMOKE-example-feature.md` exists in the feature
+1. A new file `SMOKE-INIT-2026-0001-F06.md` exists in the feature
    folder (`.specfuse/features/FEAT-2026-0003-github-feature-pick/`)
    with these top-level sections, each populated with actual
    evidence (not placeholders):
@@ -97,7 +97,7 @@ issue. Two safety rules override the acceptance criteria:
      specification diverge from observation?
 2. The adopted feature folder produced by step 3 above is
    committed alongside the journal (it lives at
-   `.specfuse/features/example-feature-<slug>/`) — this is
+   `.specfuse/features/INIT-2026-0001-F06-<slug>/`) — this is
    evidence the adopt step succeeded, and it is the artifact a
    reviewer can spot-check. `lint_plan.py` on the adopted folder
    exits 0 (catches the malformed-body assumption flagged in
@@ -116,7 +116,7 @@ issue. Two safety rules override the acceptance criteria:
 - `example-org/example-app`'s repo or any file under it. The
   WU operates on the GitHub issue (labels) — not the repo's
   code, branches, or tracker beyond those labels.
-- The adopted folder `example-feature-<slug>/` MAY be
+- The adopted folder `INIT-2026-0001-F06-<slug>/` MAY be
   produced, but it is NOT dispatched / armed / ground here.
   Adopt + lint + leave-it. Do not run `loop.py` against it.
 - `.specfuse/scripts/` — gate-1/gate-2/T05/T06 code is frozen
@@ -128,15 +128,15 @@ issue. Two safety rules override the acceptance criteria:
 - The driver owns git. Do not run `git`.
 
 Numeric bound: **at most two new artifacts** in this repo —
-`SMOKE-example-feature.md` and the adopted folder
-`example-feature-<slug>/` (with the contents adopt_feature.py
+`SMOKE-INIT-2026-0001-F06.md` and the adopted folder
+`INIT-2026-0001-F06-<slug>/` (with the contents adopt_feature.py
 emits — script-generated content not authored by this WU).
 
 **Verification.** The `code` gate set in
 `.specfuse/verification.yml` (it must continue to pass — this
 WU adds no code so nothing should break it), PLUS a manual
 check: `python3 .specfuse/scripts/lint_plan.py
-.specfuse/features/example-feature-<slug>/` exits 0.
+.specfuse/features/INIT-2026-0001-F06-<slug>/` exits 0.
 Per `[FEAT-2026-0003/G2-LESSONS]` on prose-artifact gates: the
 journal's verification IS human review at PR time; the
 acceptance criteria above are the falsifiable checklist.

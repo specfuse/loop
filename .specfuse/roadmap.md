@@ -35,7 +35,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
 | FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
-| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | planned | — | — |
+| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | planned | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
@@ -464,7 +464,7 @@ public-facing hygiene files + the visibility-flip checklist.
   `.specfuse/LEARNINGS.md`, `CLAUDE.md`, and every commit message on
   `main` (commit-message rewrites require `git-filter-repo`).
 - **Cross-pollination check** —
-  `.specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec/`
+  `.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/`
   is filed under specfuse-loop's feature dir but looks like it leaked
   in from `example-org`. Confirm with `git log -- <path>`; if
   it doesn't belong, remove + commit + ensure no in-history secrets.

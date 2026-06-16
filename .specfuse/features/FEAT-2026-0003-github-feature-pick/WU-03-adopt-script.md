@@ -21,8 +21,8 @@ the issue body's five sections, recording the source issue URL and the
 build (the "write path — adopt"). Step 2 of the capability in
 [`docs/handoff-github-feature-pick.md`](../../../docs/handoff-github-feature-pick.md)
 §3: "turn a picked issue into a loop feature folder under `.specfuse/features/`,
-using the issue ID as the feature ID (`example-init/F03` → a folder/PLAN the
-loop can run; pick a filesystem-safe encoding, e.g. `example-init-F03-<slug>`).
+using the issue ID as the feature ID (`INIT-2026-0001/F03` → a folder/PLAN the
+loop can run; pick a filesystem-safe encoding, e.g. `INIT-2026-0001-F03-<slug>`).
 The issue body's five sections seed the feature's gate-1 authoring; record the
 source issue URL + the `initiative:` label." Gate 1 already shipped
 `gh_features.list_features` (`.specfuse/scripts/gh_features.py`) returning
@@ -100,9 +100,9 @@ used by `gh_features.py` (default runner shells `gh`; tests inject a stub).
    `subprocess` with an argument list (no `shell=True`) wherever it shells out,
    and never read or echo `GH_TOKEN`.
 8. `tests/test_adopt_feature.py` covers: (a) an orchestrated candidate
-   (`example-feature`, with `initiative` set) → asserts folder name is
-   `example-feature-<slug>`, `PLAN.md` frontmatter contains the `initiative`
-   key, `WU-01-<slug>.md` frontmatter `id` is `example-feature/T01`, and the
+   (`INIT-2026-0001/F06`, with `initiative` set) → asserts folder name is
+   `INIT-2026-0001-F06-<slug>`, `PLAN.md` frontmatter contains the `initiative`
+   key, `WU-01-<slug>.md` frontmatter `id` is `INIT-2026-0001/F06/T01`, and the
    body contains the headings `Context`, `Acceptance criteria`, `Do not touch`,
    `Verification`, `Escalation triggers`; (b) a component-local candidate
    (`FEAT-2027-0001`, no initiative) → asserts the `initiative` key is absent

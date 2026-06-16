@@ -78,7 +78,7 @@ shape to the live path. The `_default_runner` used an argument list (`["gh",
 "issue", "list", ...]`) with `check=True` — bandit-clean as required.
 
 The `_extract_label_value` helper is reusable and correctly handles labels
-structured as `{"name": "initiative:example-init"}`.
+structured as `{"name": "initiative:INIT-2026-0001"}`.
 
 ### What failed / concerns
 
@@ -403,7 +403,7 @@ runs last in the closing sequence so it can consume both retrospective and
 lessons before drafting gate 3).
 
 Will draft gate 3's WUs ("report back + smoke": `GitHubBackend(Backend)` label
-transitions + end-to-end smoke of `example-feature`), populate PLAN.md's
+transitions + end-to-end smoke of `INIT-2026-0001/F06`), populate PLAN.md's
 gate 3 work_units list, and write `GATE-03-REVIEW.md` weighted toward doubt.
 Applies the offline-first gate principle: gate 3 should separate offline backend
 wiring from the live `gh` smoke call into distinct WUs, mirroring gate 1's
@@ -475,7 +475,7 @@ concerns from GATE-02-REVIEW.md all resolved at the levels G1-PLAN predicted:
    was added from Q4 of the review document — confirming the review process is
    read and actionable, not ceremonial.
 
-The open questions from GATE-02-REVIEW.md — whether `example-feature` still
+The open questions from GATE-02-REVIEW.md — whether `INIT-2026-0001/F06` still
 has the expected labels (Q1), whether the 5-candidate cap is right (Q2), whether
 the 90+ closing-WU convention gets promoted to a binding rule (Q3), and whether
 a malformed-body test is needed (Q4) — were handled as follows: Q3 and Q4 were
@@ -517,7 +517,7 @@ The events.jsonl gate-3 slice:
 | gate_reached (gate 3) | 02:32:47 | Fired after T05+T06; T07 is out-of-loop |
 
 T07 is not in events.jsonl (human-run, no driver events). The evidence record
-is the smoke journal `SMOKE-example-feature.md` and the commit sequence on
+is the smoke journal `SMOKE-INIT-2026-0001-F06.md` and the commit sequence on
 the feature branch:
 
 - `c15b400` — feat: Widen the Backend seam (T05)
@@ -641,7 +641,7 @@ explicit pre-arm verification step in its WU spec.
 ## T07 — Live end-to-end smoke (out-of-loop, human-operated)
 
 **Status:** done (human-operated, out-of-loop by gate-3 arming decision)  
-**Evidence:** `SMOKE-example-feature.md`
+**Evidence:** `SMOKE-INIT-2026-0001-F06.md`
 
 ### What worked
 
@@ -650,7 +650,7 @@ example-org/example-app` returned 13 `specfuse:feature` candidates. Issue #287
 was parsed correctly:
 
 ```
-example-feature	implementation	review	https://github.com/example-org/example-app/issues/287
+INIT-2026-0001/F06	implementation	review	https://github.com/example-org/example-app/issues/287
 ```
 
 All four fields (`feature_id`, `task_type`, `autonomy`, `url`) were correctly
@@ -660,10 +660,10 @@ extracted from title + labels.
 example-org/example-app 287` created:
 
 ```
-.specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec/
+.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/
 ```
 
-The filesystem-safe `example-feature` → `example-feature` slug encoding
+The filesystem-safe `INIT-2026-0001/F06` → `INIT-2026-0001-F06` slug encoding
 worked. The folder, WU-01 (with issue body embedded), and closing-sequence WUs
 were written.
 
@@ -685,7 +685,7 @@ residue.**
 ### What failed / concerns
 
 **Adopted-folder lint — FAIL (section-heading format gap).** `lint_plan.py
-.specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec`
+.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec`
 reported 5 missing sections: `Context`, `Acceptance criteria`, `Do not touch`,
 `Verification`, `Escalation triggers`.
 
@@ -961,12 +961,12 @@ GitHub issues (specfuse:feature) and grind it through its gate cycle,
 alongside today's locally-authored features."*
 
 Four mechanisms compose the goal. Three proved out live against
-`example-org/example-app#287` (`example-feature`):
+`example-org/example-app#287` (`INIT-2026-0001/F06`):
 
 | Mechanism | Status | Evidence |
 |---|---|---|
-| Pick (discovery) | ✓ | `SMOKE-example-feature.md` — 13 features enumerated, #287 row parsed correctly |
-| Adopt (scaffold) | ✓ | Smoke journal — `example-feature-conform-exampleEndpoint-to-validated-spec/` written, body embedded |
+| Pick (discovery) | ✓ | `SMOKE-INIT-2026-0001-F06.md` — 13 features enumerated, #287 row parsed correctly |
+| Adopt (scaffold) | ✓ | Smoke journal — `INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/` written, body embedded |
 | Report back | ✓ | Smoke journal — `state:ready → in-progress → done → ready` fired exactly, fully reverted, no residue |
 | **Grind through the gate cycle** | ✗ | Adopted folder fails `lint_plan.py`: WU-01 reports 5 missing sections because #287's body uses ATX (`## Context`) headings, the linter's section detector matches only `^(\**)<section>` |
 
@@ -984,7 +984,7 @@ capability that demos in three steps and stalls on the fourth, contradicting
 its own roadmap statement.
 
 **Why gate 4 (not FEAT-2026-0004).** The fix is one regex widening + tests
-+ one re-smoke against the already-adopted `example-feature-…` folder
++ one re-smoke against the already-adopted `INIT-2026-0001-F06-…` folder
 (no second `gh` mutation of #287 required). Smaller than any of gates 1-3.
 Closing it inside this feature's branch keeps the proof contiguous: the
 smoke journal that produced the finding, the adopted folder under verification,
@@ -1074,14 +1074,14 @@ The gap is specific and the fix is bounded; gate 4's plan-next (when
 authored) will draft its own WUs. From this terminal-case position, the
 load-bearing observations the gate-4 author should consume:
 
-1. **Recommended fix path** (from `SMOKE-example-feature.md` Outcome
+1. **Recommended fix path** (from `SMOKE-INIT-2026-0001-F06.md` Outcome
    §): broaden `lint_plan.py` section detection to accept both ATX
    (`^#+\s*<section>`) and the existing bold/plain (`^(\**)<section>`)
    patterns. Smallest blast radius; touches one regex constant + tests.
    Alternatives (normalise in `adopt_feature.py`, change the orchestrator
    template) are documented but disfavoured.
-2. **Re-smoke target** (from `SMOKE-example-feature.md` §Adopt step):
-   `example-feature-conform-exampleEndpoint-to-validated-spec/` already
+2. **Re-smoke target** (from `SMOKE-INIT-2026-0001-F06.md` §Adopt step):
+   `INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/` already
    exists on this branch from T07. Re-running `lint_plan.py` against that
    folder is the offline verification — no second `gh issue edit 287` is
    required for the lint fix itself.
@@ -1180,7 +1180,7 @@ The WU touched exactly two files as declared: `lint_plan.py` and the test file.
 
 ### Whether the adopted folder lints clean
 
-The gate-3 smoke left `example-feature-conform-exampleEndpoint-to-validated-spec/`
+The gate-3 smoke left `INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/`
 on the branch with `lint_plan.py` reporting 5 missing-section errors — all five
 sections (`Context`, `Acceptance criteria`, `Do not touch`, `Verification`,
 `Escalation triggers`) were present in issue #287's body as ATX headings but
@@ -1190,7 +1190,7 @@ T08's AC 3 required:
 
 ```
 python3 .specfuse/scripts/lint_plan.py \
-  .specfuse/features/example-feature-conform-exampleEndpoint-to-validated-spec
+  .specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec
 ```
 
 to exit 0. The WU completed with `status: done` in its first and only attempt,
@@ -1254,7 +1254,7 @@ regex widening + tests + re-lint of the existing adopted folder — smaller than
 any of gates 1-3") was accurate.
 
 **Contiguous proof.** The smoke journal that produced the finding
-(`SMOKE-example-feature.md`), the adopted folder the fix is verified
+(`SMOKE-INIT-2026-0001-F06.md`), the adopted folder the fix is verified
 against, and the linter commit all live on one branch and one PR. A
 `FEAT-2026-0004` would have re-entered the same evidence, re-confirmed the
 same finding, and severed the "this regex caused that lint failure, and this
@@ -1325,14 +1325,14 @@ GitHub issues (specfuse:feature) and grind it through its gate cycle,
 alongside today's locally-authored features."*
 
 All four mechanisms that compose the goal are now proven live against
-`example-org/example-app#287` (`example-feature`):
+`example-org/example-app#287` (`INIT-2026-0001/F06`):
 
 | Mechanism | Status | Evidence |
 |---|---|---|
-| Pick (discovery) | ✓ | Gate 3 smoke — 13 candidates enumerated, #287 row parsed correctly (`SMOKE-example-feature.md` §Discovery) |
-| Adopt (scaffold) | ✓ | Gate 3 smoke — `example-feature-conform-exampleEndpoint-to-validated-spec/` written, body embedded, slug encoding worked (`SMOKE-example-feature.md` §Adopt) |
-| Report back | ✓ | Gate 3 smoke — `state:ready → in-progress → done → ready` fired exactly against the live GitHub API, fully reverted, no residue (`SMOKE-example-feature.md` §Label transitions) |
-| **Grind (lint-clean)** | **✓** | **Gate 4 T08 — `lint_plan.py` ATX-heading widening landed in commit `c19870e`; the already-adopted `example-feature-…` folder now exits lint 0 (T08 AC 3, verified by the driver as a precondition for `status: complete`)** |
+| Pick (discovery) | ✓ | Gate 3 smoke — 13 candidates enumerated, #287 row parsed correctly (`SMOKE-INIT-2026-0001-F06.md` §Discovery) |
+| Adopt (scaffold) | ✓ | Gate 3 smoke — `INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec/` written, body embedded, slug encoding worked (`SMOKE-INIT-2026-0001-F06.md` §Adopt) |
+| Report back | ✓ | Gate 3 smoke — `state:ready → in-progress → done → ready` fired exactly against the live GitHub API, fully reverted, no residue (`SMOKE-INIT-2026-0001-F06.md` §Label transitions) |
+| **Grind (lint-clean)** | **✓** | **Gate 4 T08 — `lint_plan.py` ATX-heading widening landed in commit `c19870e`; the already-adopted `INIT-2026-0001-F06-…` folder now exits lint 0 (T08 AC 3, verified by the driver as a precondition for `status: complete`)** |
 
 The pipeline is whole. The capability demonstrably picks an
 orchestrator-dispatched feature, scaffolds it into a dispatchable folder,

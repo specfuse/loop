@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
 """Validate component-repo event log entries against the orchestrator's event schema.
 
 This is the component-repo copy of the orchestrator's scripts/validate-event.py.

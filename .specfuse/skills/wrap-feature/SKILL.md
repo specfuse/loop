@@ -3,6 +3,12 @@ name: wrap-feature
 description: Finalize a feature after its close ceremony — push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Supports both auto-close and full-ceremony features. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
 ---
 
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+-->
+
+
 # Wrap feature (interactive, post-close finalization)
 
 > **As of FEAT-2026-0015/T06, terminal flips are driver-side; /wrap-feature

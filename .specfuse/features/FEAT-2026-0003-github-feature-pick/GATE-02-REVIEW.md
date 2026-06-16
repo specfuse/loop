@@ -52,7 +52,7 @@ gate 2. Mitigated by stating the bound explicitly in T03's "Do not touch"
 ### Filesystem encoding: `INIT-YYYY-NNNN/FNN` → `INIT-YYYY-NNNN-FNN`
 
 The handoff brief calls this out as "pick a filesystem-safe encoding, e.g.
-`example-init-F03-<slug>`" (§3.2). Single `/` → `-`. T03 AC 1 nails it
+`INIT-2026-0001-F03-<slug>`" (§3.2). Single `/` → `-`. T03 AC 1 nails it
 down so two adopt runs of the same issue do not produce different folder
 names. Source: handoff §3.2 example.
 
@@ -189,11 +189,11 @@ existing skeleton. No escalation needed.
 
 ## Open questions (mapped to WUs)
 
-### Q1. Should the `example-feature` smoke target be re-validated before gate 3? (affects G2-PLAN, then gate-3 smoke WU)
+### Q1. Should the `INIT-2026-0001/F06` smoke target be re-validated before gate 3? (affects G2-PLAN, then gate-3 smoke WU)
 
-The handoff brief names `example-feature` (example-org/example-app #287)
+The handoff brief names `INIT-2026-0001/F06` (example-org/example-app #287)
 as the smoke target. I did not verify the issue still exists or still has
-labels `specfuse:feature` + `initiative:example-init` + `type:implementation`
+labels `specfuse:feature` + `initiative:INIT-2026-0001` + `type:implementation`
 + `autonomy:review`. If the issue moved or its labels drifted, gate 3's
 drafting will discover it. G2-PLAN's Context names this — it should re-check
 before drafting gate 3's smoke WU.

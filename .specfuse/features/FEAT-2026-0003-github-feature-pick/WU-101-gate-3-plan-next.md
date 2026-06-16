@@ -27,7 +27,7 @@ gate 3's evidence demands it.
 `roadmap_goal`), this feature's `RETROSPECTIVE.md` (gate-1,
 gate-2, gate-3 sections), the root `.specfuse/LEARNINGS.md`
 (all three `[FEAT-2026-0003/...]` entry sets), the gate-3
-smoke journal `SMOKE-example-feature.md`, and the handoff
+smoke journal `SMOKE-INIT-2026-0001-F06.md`, and the handoff
 brief `docs/handoff-github-feature-pick.md` §6 ("Out of scope
 here"). The terminal-case decision the human flagged at gate-3
 arming time is in `GATE-03-REVIEW.md` "Terminal-case handling"
@@ -54,7 +54,7 @@ poller cannot actually consume them), gate 4 might be needed.
      question Q4 that became T03 AC 8e; a gate-3 review
      question that became T05/T06/T07's structure).
    - Whether the `roadmap_goal` is met. Cite specific
-     evidence from `SMOKE-example-feature.md`.
+     evidence from `SMOKE-INIT-2026-0001-F06.md`.
 2. PLAN.md's `gates:` graph is unchanged (no new gate
    appended). Gate 3's `work_units` already populated by
    THIS very plan-next WU's earlier write — do not edit

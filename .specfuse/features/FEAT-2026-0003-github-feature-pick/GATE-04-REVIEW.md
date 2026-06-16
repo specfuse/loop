@@ -20,7 +20,7 @@ roadmap goal explicitly partial.
 
 ## The gap, precisely named
 
-`SMOKE-example-feature.md` ran four live mechanisms; three passed,
+`SMOKE-INIT-2026-0001-F06.md` ran four live mechanisms; three passed,
 one failed:
 
 | Mechanism | Status |
@@ -135,7 +135,7 @@ values before locking gate 4's substantive WU ACs.
 
 ### Q1. Does the gate-4 fix belong in `lint_plan.py` or in `adopt_feature.py`?
 
-Three options were enumerated in `SMOKE-example-feature.md`:
+Three options were enumerated in `SMOKE-INIT-2026-0001-F06.md`:
 
 1. Broaden `lint_plan.py` section detection — smallest, loop-side;
    makes adopted folders lint clean. **Recommended.**
@@ -182,7 +182,7 @@ note it as a potential gap.
 Gate 4 fixes a single bounded gap: `lint_plan.py`'s section detector
 must accept ATX headings so an adopted orchestrator-issue-body lints
 clean. The fix is roughly one regex widening + tests + a re-lint of
-the existing `example-feature-…` folder. Smaller than any prior
+the existing `INIT-2026-0001-F06-…` folder. Smaller than any prior
 gate in this feature.
 
 **The decision is binary.** Arm gate 4 (G3-PLAN's recommendation) OR

@@ -15,7 +15,7 @@ output_tokens: 9458
 of gate 4 — the escalation gate that fixed the ATX-heading lint gap.
 
 **Context.** Read this feature's `events.jsonl` (gate 4 slice), the gate-4 commit(s),
-`SMOKE-example-feature.md` (the finding's origin), and `GATE-04-REVIEW.md`. Gate 4
+`SMOKE-INIT-2026-0001-F06.md` (the finding's origin), and `GATE-04-REVIEW.md`. Gate 4
 was an appended escalation gate (terminal-case branch B), so the retrospective should
 note whether the escalation was warranted and whether the fix fully closed the gap.
 
