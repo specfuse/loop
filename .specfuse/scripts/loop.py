@@ -953,6 +953,16 @@ def reset_preserving_events(head_before: str, events_path: Path) -> None:
         events_path.write_text(saved)
 
 
+class SquashCommitError(RuntimeError):
+    """Raised when squash_commit's `git commit` is rejected (non-zero exit).
+
+    The usual cause is a pre-commit hook (e.g. the leak-scan hook) rejecting the
+    squash. The message carries git's stderr/stdout — which `capture_output`
+    would otherwise swallow — so the caller can record an actionable failure
+    note instead of crashing on a bare CalledProcessError. See issue #51.
+    """
+
+
 def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
     if git("rev-parse", "HEAD") != head_before:
         git("reset", "--soft", head_before)  # fold away any commits the agent made
@@ -960,7 +970,16 @@ def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
         return None
     git("add", "-A")
     msg = f"feat: {wu.title}\n\nFeature: {wu.wu_id}"
-    subprocess.run(["git", "commit", "-m", msg], check=True, capture_output=True)
+    res = subprocess.run(
+        ["git", "commit", "-m", msg], capture_output=True, text=True,
+    )
+    if res.returncode != 0:
+        raise SquashCommitError(
+            f"git commit for {wu.wu_id} was rejected (exit {res.returncode}) — "
+            f"usually a pre-commit hook rejecting the squash.\n"
+            f"--- git stderr ---\n{res.stderr.strip()}\n"
+            f"--- git stdout ---\n{res.stdout.strip()}"
+        )
     return git("rev-parse", "HEAD")
 
 
@@ -2976,7 +2995,28 @@ def run(
                         # reset.
                         backend.set_wu(wu, "status", DONE)
                         write_cost_to_wu(backend, wu, cum_usage)
-                        sha = squash_commit(wu, head_before)
+                        try:
+                            sha = squash_commit(wu, head_before)
+                        except SquashCommitError as exc:
+                            # The squash commit was rejected (typically a
+                            # pre-commit hook). Treat as a failed attempt rather
+                            # than crashing the driver (issue #51): reset the
+                            # tree — which also discards the premature DONE flip
+                            # written just above — record the failure with git's
+                            # stderr, and retry within budget (MAX_ATTEMPTS
+                            # exhaustion escalates to blocked_human).
+                            reset_preserving_events(head_before, events_path)
+                            summary = str(exc)
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "squash_commit_failed",
+                                attempts_usage[-1],
+                                extras={"summary": summary},
+                            ))
+                            attempt_notes.append((attempt, summary))
+                            failure_note = summary
+                            print(f"   SQUASH COMMIT REJECTED attempt "
+                                  f"{attempt}/{MAX_ATTEMPTS}")
+                            continue
                         # Smoke-import runner (FEAT-2026-0008/T03): after a
                         # successful verify() AND squash, run each
                         # `python3 -c "from X import Y"` line declared in the WU
