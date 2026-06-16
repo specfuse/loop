@@ -15,6 +15,7 @@ Correlation ID: FEAT-2026-0020/T15
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -76,6 +77,107 @@ def load_denylist() -> list[str]:
         if stripped and not stripped.startswith("#"):
             entries.append(stripped)
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Hashed denylist (FEAT-2026-0024/T01) — committed, CI/Action surface.
+#
+# The plaintext denylist (above) is gitignored and absent on surfaces where the
+# repo is checked out without operator-local files (CI, the gate-2 Action). The
+# hashed denylist is a COMMITTED `leak_denylist.hashes` file: salted SHA-256 of
+# normalized private-org literals, generated from the plaintext one by T02's
+# `--hash-denylist`. It catches ACCIDENTAL re-introduction; with low-entropy
+# names + a public salt it is obfuscation, not secrecy (see PLAN.md). This WU
+# ships the core primitives only; T02 wires them into scan_repo + the generator.
+# ---------------------------------------------------------------------------
+
+_HASHED_DENYLIST_PATH = Path(__file__).parent / "leak_denylist.hashes"
+
+# Committed default salt. The value actually used to MATCH is the one read from
+# the `.hashes` header (load_hashed_denylist), so regenerating the file with a
+# fresh salt stays self-consistent. This constant is the generator's default
+# when no salt is supplied and a documented fallback; it is intentionally public.
+_DEFAULT_DENYLIST_SALT = "specfuse-leak-denylist-v1"
+
+
+def normalize_token(s: str) -> str:
+    """Lowercase *s* and strip every non-``[a-z0-9]`` character.
+
+    The single normalizer shared by the generator (T02) and the matcher below,
+    so both agree on what a "literal" is. ``Acme-Widget_IAC`` -> ``acmewidgetiac``.
+    """
+    return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+
+def hash_token(normalized: str, salt: str) -> str:
+    """Return the salted SHA-256 hex digest of an already-normalized token.
+
+    Deterministic: same (normalized, salt) -> same digest. Callers normalize
+    with :func:`normalize_token` first; this function does not re-normalize.
+    """
+    return hashlib.sha256((salt + normalized).encode("utf-8")).hexdigest()
+
+
+def load_hashed_denylist(
+    path: Path | None = None,
+) -> tuple[str, frozenset[int], frozenset[str]]:
+    """Parse a ``leak_denylist.hashes`` file into ``(salt, lengths, hashes)``.
+
+    Header lines ``# salt: <hex>`` and ``# lengths: <comma-ints>`` are parsed;
+    any other comment/blank line is skipped; every remaining line is a hash.
+    Missing file -> ``("", frozenset(), frozenset())`` (mirrors load_denylist's
+    absent-file behavior — no crash on surfaces that have not generated one).
+    """
+    target = path if path is not None else _HASHED_DENYLIST_PATH
+    if not target.exists():
+        return ("", frozenset(), frozenset())
+    salt = ""
+    lengths: set[int] = set()
+    hashes: set[str] = set()
+    for line in target.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            body = stripped[1:].strip()
+            if body.startswith("salt:"):
+                salt = body[len("salt:"):].strip()
+            elif body.startswith("lengths:"):
+                for part in body[len("lengths:"):].split(","):
+                    part = part.strip()
+                    if part:
+                        lengths.add(int(part))
+            continue
+        hashes.add(stripped)
+    return (salt, frozenset(lengths), frozenset(hashes))
+
+
+def hashed_denylist_hits(
+    line: str,
+    salt: str,
+    lengths: frozenset[int],
+    hashes: frozenset[str],
+) -> bool:
+    """True if a normalized substring of *line* hashes into the denylist set.
+
+    Char-sliding-window match (PLAN.md "The hashing design"): normalize the
+    line, then for each committed length ``L`` slide an ``L``-char window and
+    hash each window with *salt*. This preserves the plaintext denylist's
+    substring fidelity — a 10-char window over ``acmewidgetapp`` yields
+    ``acmewidget``, the mid-atom substring an atom-n-gram approach would miss.
+    Empty *lengths*/*hashes* -> never matches.
+    """
+    if not hashes or not lengths:
+        return False
+    norm = normalize_token(line)
+    n = len(norm)
+    for length in lengths:
+        if length <= 0 or length > n:
+            continue
+        for start in range(n - length + 1):
+            if hash_token(norm[start:start + length], salt) in hashes:
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
