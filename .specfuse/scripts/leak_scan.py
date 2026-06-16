@@ -42,9 +42,20 @@ _PRIVATE_HOST_RE = re.compile(
 # Default allowlist — canonical samples that must never be flagged.
 # INIT-2026-0001 is the reference orchestrated-initiative ID per
 # .specfuse/rules/correlation-ids.md; it appears in docs and tests legitimately.
+# example.com / .org / .net are RFC 2606 reserved-for-documentation domains:
+# they are never real secrets and appear pervasively as git-author fixtures in
+# the test suite (e.g. tests/_workspace.py). A substring match exempts any
+# address at those domains (test@example.com, git@example.org, ...). Without
+# this, every new test that initializes a tmp git repo trips the email regex on
+# the pre-commit hook. See FEAT-2026-0023/T03.
 # ---------------------------------------------------------------------------
 
-DEFAULT_ALLOWLIST: frozenset[str] = frozenset({"INIT-2026-0001"})
+DEFAULT_ALLOWLIST: frozenset[str] = frozenset({
+    "INIT-2026-0001",
+    "example.com",
+    "example.org",
+    "example.net",
+})
 
 # ---------------------------------------------------------------------------
 # Optional literal denylist — loaded from a gitignored file, never inlined.

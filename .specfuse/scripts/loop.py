@@ -610,7 +610,75 @@ def require_git_ready() -> None:
                  "(e.g., `git commit --allow-empty -m 'init'`).")
 
 
-def ensure_feature_branch(feat_fm: dict) -> None:
+class FeatureBranchError(RuntimeError):
+    """Raised when the feature branch cannot be entered safely.
+
+    Carries an actionable, human-readable message — including git's own
+    captured stderr when a checkout fails — instead of letting a bare
+    subprocess.CalledProcessError (which swallows stderr) escape main().
+    """
+
+
+def _tracked_dirty_paths() -> set[str]:
+    """Paths with TRACKED, uncommitted changes (staged or unstaged), repo-relative.
+
+    Untracked files (porcelain `??`) are excluded: they never block a create
+    (`checkout -B`) and carry harmlessly, so counting them would spuriously
+    flag a leftover events.jsonl as an "unexpected" change. The dirty-tree
+    failure in #48 is tracked local modifications ("your local changes would
+    be overwritten by checkout"), which is exactly what this set captures.
+    """
+    out = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    paths: set[str] = set()
+    for line in out.splitlines():
+        if not line.strip():
+            continue
+        if line[:2] == "??":
+            continue  # untracked — carries harmlessly, never blocks checkout
+        path = line[3:]
+        if " -> " in path:  # rename: "old -> new"
+            path = path.split(" -> ", 1)[1]
+        paths.add(path.strip().strip('"'))
+    return paths
+
+
+def _expected_flip_paths(feature_dir: "Path | None") -> set[str]:
+    """The paths /pick-feature legitimately leaves dirty before the loop runs:
+    `.specfuse/roadmap.md` and the active feature's `PLAN.md`.
+    """
+    expected = {".specfuse/roadmap.md"}
+    if feature_dir is not None:
+        try:
+            top = subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            rel = (Path(feature_dir) / "PLAN.md").resolve().relative_to(
+                Path(top).resolve()
+            )
+            expected.add(str(rel))
+        except (subprocess.CalledProcessError, ValueError):
+            pass  # can't resolve PLAN path — fall back to roadmap-only
+    return expected
+
+
+def _checked_checkout(checkout_args: list[str], action: str) -> str:
+    """Run a `git checkout ...` guarded: on non-zero exit raise FeatureBranchError
+    carrying git's stderr, instead of a bare CalledProcessError that hides it.
+    """
+    proc = subprocess.run(
+        ["git", *checkout_args], capture_output=True, text=True,
+    )
+    if proc.returncode != 0:
+        stderr = proc.stderr.strip() or proc.stdout.strip() or "(no git output)"
+        raise FeatureBranchError(f"{action} failed: {stderr}")
+    return proc.stdout.strip()
+
+
+def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> None:
     """Ensure HEAD is on the feature's declared branch, creating it if needed.
 
     The methodology assigns each feature its own branch (PLAN.md frontmatter's
@@ -618,7 +686,22 @@ def ensure_feature_branch(feat_fm: dict) -> None:
     branch the user happened to be on, violating per-feature isolation.
 
     Idempotent: no-op if already on the declared branch. If the branch
-    doesn't exist locally, creates it from the current HEAD (`git checkout -B`).
+    doesn't exist locally, creates it from the current HEAD (`git checkout -B`),
+    which carries the expected /pick-feature flips (roadmap.md + PLAN.md) onto
+    the new branch.
+
+    Robust to the two real-world states that used to crash with a bare
+    CalledProcessError (#48):
+
+    * **Dirty tree.** Tracked changes confined to the expected /pick-feature
+      flips are carried onto a freshly created branch. Tracked changes to any
+      OTHER path stop the driver with a message naming them (silently moving
+      unrelated edits onto a feature branch is worse than failing loudly).
+    * **Stale divergent branch.** A pre-existing branch that is not an ancestor
+      of HEAD is surfaced rather than silently checked out; resolution policy
+      (reuse / recreate / abort) is left to the human.
+
+    Any checkout failure raises FeatureBranchError carrying git's stderr.
     """
     branch = feat_fm.get("branch")
     if not branch:
@@ -634,10 +717,34 @@ def ensure_feature_branch(feat_fm: dict) -> None:
         capture_output=True, text=True,
     ).returncode == 0
     if exists:
-        git("checkout", branch)
+        # Surface a stale branch that diverged from the current base instead of
+        # silently reusing it. `merge-base --is-ancestor B HEAD` exits 0 iff B
+        # is an ancestor of HEAD (i.e. HEAD already contains B — safe to reuse).
+        is_ancestor = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", branch, "HEAD"],
+            capture_output=True, text=True,
+        ).returncode == 0
+        if not is_ancestor:
+            raise FeatureBranchError(
+                f"branch '{branch}' exists and diverges from HEAD (not an "
+                f"ancestor). Refusing to silently check out a stale branch; "
+                f"resolve manually (rebase, recreate, or delete it) and re-run."
+            )
+        _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
-        git("checkout", "-B", branch)
+        # Create-from-HEAD carries the working tree onto the new branch. Only
+        # the expected /pick-feature flips may ride along; anything else stops.
+        dirty = _tracked_dirty_paths()
+        unexpected = dirty - _expected_flip_paths(feature_dir)
+        if unexpected:
+            raise FeatureBranchError(
+                "working tree has uncommitted changes to unexpected paths: "
+                + ", ".join(sorted(unexpected))
+                + f". Refusing to carry them onto new branch '{branch}'. "
+                "Commit or stash them first, then re-run."
+            )
+        _checked_checkout(["checkout", "-B", branch], f"create of branch '{branch}'")
         print(f"Created feature branch '{branch}' from '{current}'.")
 
 
@@ -2576,7 +2683,7 @@ def run(
             )
             return 1
         require_git_ready()
-        ensure_feature_branch(feat_fm)
+        ensure_feature_branch(feat_fm, feature_dir)
 
     try:
 
