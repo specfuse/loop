@@ -3,12 +3,16 @@ id: FEAT-2026-0024/T02
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces_driver_helper: scan_repo
 produces: [".specfuse/scripts/leak_scan.py", ".specfuse/scripts/leak_denylist.hashes", "tests/test_hashed_denylist_ci.py"]
+duration_seconds: 736.182
+cost_usd: 3.271526
+input_tokens: 24271
+output_tokens: 40023
 ---
 
 <!--

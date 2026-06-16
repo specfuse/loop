@@ -80,7 +80,7 @@ files only.
    not exist (`ImportError`). Issue #45's "a known literal hashes-and-matches"
    acceptance, made executable.
 2. `normalize_token(s: str) -> str` exists and returns the lowercase
-   `[a-z0-9]`-only form. Tested: `normalize_token("Resto-Manager_IAC")
+   `[a-z0-9]`-only form. Tested: `normalize_token("Acme-Widget_IAC")
    == "acmewidgetiac"`.
 3. `hash_token(normalized: str, salt: str) -> str` exists and returns the
    salted SHA-256 hex digest (`hashlib.sha256((salt + normalized).encode())
