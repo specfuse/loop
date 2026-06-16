@@ -2,10 +2,14 @@
 id: FEAT-2026-0021/T02
 type: implementation
 effort: low
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 generated_surfaces: []
+duration_seconds: 157.15
+cost_usd: 0.349002
+input_tokens: 12
+output_tokens: 4012
 ---
 
 # Add the ceremony-proportionality size rule to draft-feature and methodology
