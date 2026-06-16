@@ -3,11 +3,15 @@ id: FEAT-2026-0023/T02
 type: implementation
 model: opus
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces: tests/test_lifecycle_integration.py
 oracle_env: macos_local
+duration_seconds: 585.488
+cost_usd: 4.304767
+input_tokens: 9494
+output_tokens: 34829
 ---
 
 <!--
