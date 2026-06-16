@@ -43,6 +43,64 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0023"></a>
+## FEAT-2026-0023 — Lifecycle integration test + consolidate terminal-state ownership
+
+**Why.** Three driver bugs surfaced in a single session (2026-06-16), all of
+the same shape — **seam bugs at handoffs between subsystems**, none catchable
+by the existing 749 unit tests because unit tests stub the handoffs:
+
+- **#47** (fixed in #47) — `/draft-feature` emits a roadmap row only;
+  `auto_archive_feature` assumed an inline detail section, so an auto-closed
+  drafted feature halted on `archive_anchor_missing`.
+- **#48** — `ensure_feature_branch` crashes with a raw traceback when a dirty
+  working tree (the `/pick-feature` status flips) or a stale pre-existing
+  branch blocks the checkout.
+- **#49** — terminal **auto-close** leaves `PLAN.md status: active`: the normal
+  close path relies on the close WU's *agent* to flip PLAN.md, and the
+  auto-close path runs no agent while `fire_terminal_flips` never touches
+  PLAN.md.
+
+Root pattern: the methodology's machinery (auto-close predicate 0018,
+draft-feature skill, archive automation 0010) grew faster than its integration
+coverage, and the gaps only execute at real feature boundaries — rare events
+that the first true end-to-end **autonomous** runs (`autonomy: auto` / predicate
+close) finally exercised without a human silently papering over each seam.
+
+**Goal.** Close the class, not the three instances.
+
+1. **End-to-end lifecycle integration test.** A test harness that drives a
+   synthetic feature through the full lifecycle in one run — draft → pick →
+   loop dispatch → terminal close (BOTH the dispatched-close and the
+   auto-close-predicate paths) → archive → wrap-ready — and asserts the
+   terminal invariant holds: `PLAN.md=done`, `GATE=passed`, roadmap row `done`,
+   archive anchor present, RETROSPECTIVE present. Parameterized over close path
+   (normal vs auto-close) and feature shape (single-gate vs multi-gate;
+   row-only vs detail-section). This is the layer that would have caught all
+   three bugs before they hit a live run.
+
+2. **Consolidate terminal-state ownership.** Today the PLAN/GATE/roadmap/archive
+   flips are scattered across the close WU's agent, `fire_terminal_flips`, and
+   `auto_archive_feature` — #49 exists precisely because one flip lived in the
+   agent for one path and nowhere for the other. Make a single driver-side
+   function the authoritative owner of every terminal flip (PLAN.md included),
+   called identically by both close paths, idempotent, with the hedged-verdict
+   revert kept consistent. Subsumes the #49 fix.
+
+3. **Harden the branch seam (#48).** `ensure_feature_branch` surfaces git's
+   stderr instead of a traceback, carries expected `/pick-feature` flips onto
+   the new branch, and detects a stale/divergent existing branch. May fold in
+   here or ship as the standalone #48 bug fix — decide at draft time.
+
+**Scope OUT.** New lifecycle *features* (this adds test + refactor coverage of
+the existing lifecycle, not new behavior). Rewriting the auto-close predicate
+itself (0018 stands). The per-bug hotfixes that are cheaper as standalone bug
+branches (#48 especially) if they're needed before this feature is pulled.
+
+**Status: planned.** Likely single gate: WU per lifecycle-path test +
+terminal-ownership consolidation WU + closing ceremony. Pull before the next
+feature that exercises an untested close-path combination.
+
 <a id="feat-2026-0021"></a>
 ## FEAT-2026-0021 — Ceremony proportionality + slim WU template
 

@@ -5,7 +5,7 @@ slug: lifecycle-integration-test
 branch: feat/FEAT-2026-0023-lifecycle-integration-test
 roadmap_goal: Close the close/branch-path seam-bug class — one driver-side owner for every terminal flip (PLAN+GATE+roadmap+archive) called by both close paths, a hardened branch seam, and an end-to-end lifecycle integration test that would have caught all three bugs (#47/#48/#49) before they hit a live run.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 8.50
 ---
 
