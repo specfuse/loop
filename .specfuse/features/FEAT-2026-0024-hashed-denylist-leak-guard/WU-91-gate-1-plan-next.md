@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0024/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 2
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 2.00
+duration_seconds: 820.065
+cost_usd: 5.234128
+input_tokens: 19516
+output_tokens: 60120
 ---
 
 <!--

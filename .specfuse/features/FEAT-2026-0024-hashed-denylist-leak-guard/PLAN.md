@@ -127,13 +127,21 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      # Substantive WUs drafted by G1-PLAN (issue #46, the issue/PR-body Action).
+      # T03 (runner) depends on nothing — gate 1 is the barrier and the committed
+      # hashed denylist already exists; T04 (workflow + docs) wires T03. Docs are
+      # bundled into T04 (a standalone `docs`-type WU mid-gate would collide with
+      # the closing-sequence detector in lint_plan.py).
+      - id: FEAT-2026-0024/T03
+        file: WU-03-content-scan-runner.md
+        depends_on: []
+      - id: FEAT-2026-0024/T04
+        file: WU-04-action-workflow-and-docs.md
+        depends_on: [FEAT-2026-0024/T03]
       # --- closing sequence: 1-WU close (terminal gate) ---
-      # Scaffold now so lint identifies gate 1 as non-terminal.
-      # G1-PLAN fills in gate 2's substantive WUs (the issue/PR-body Action)
-      # above this entry when gate 1 completes.
       - id: FEAT-2026-0024/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []   # G1-PLAN sets real depends_on when it drafts gate 2
+        depends_on: [FEAT-2026-0024/T03, FEAT-2026-0024/T04]
 ```
 
 ## Notes
