@@ -3,12 +3,12 @@ id: FEAT-2026-0024/G2-CLOSE
 type: close
 model: opus
 effort: high
-status: draft
+status: pending
 attempts: 0
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 2.50
-verdict: met
+verdict: partially_met
 ---
 
 <!--

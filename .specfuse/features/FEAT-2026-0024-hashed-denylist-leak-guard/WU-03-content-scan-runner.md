@@ -3,7 +3,7 @@ id: FEAT-2026-0024/T03
 type: implementation
 model: opus
 effort: high
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 oracle_env: macos_local
