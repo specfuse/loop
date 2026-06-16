@@ -40,6 +40,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
 | FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
+| FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -544,6 +545,40 @@ public release. Likely shape: gate 1 = one substantive WU per audit
 class (secret scan, PR sweep, personal-refs grep, cross-pollination,
 license headers) + closing ceremony; gate 2 = one substantive WU per
 hygiene-file class + the flip-checklist WU + closing ceremony.
+
+## FEAT-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
+
+**Why.** `.specfuse/LEARNINGS.md` is append-only and loaded **whole** into
+planning context by `/draft-feature`, `/pick-feature`, `plan-next`, and
+`/authoring-work-units`. After ~20 features it is already ~86 entries / ~24k
+tokens (~4 entries/feature, growing unbounded). The driver enforces appends
+(`assert_learnings_appended_or_noop`) but nothing prunes: there is no
+archival/compaction counterpart the way `roadmap.md` has `roadmap-archive.md` +
+`auto_archive_feature`, and `learnings-suggest` only ADDS candidates. Left
+unchecked this inflates every planning session's context cost and dilutes signal
+as superseded/duplicate rules accumulate. Surfaced reviewing FEAT-2026-0024
+(whose `LEARNINGS.template.md` split already separated portable methodology
+wisdom from this repo's feature-specific history).
+
+**Goal.** A curation/archival mechanism that bounds the planning-loaded LEARNINGS
+to the active, durable set: (1) a `LEARNINGS-archive.md` + a curation step that
+moves feature-specific or obsolete entries out of the planning-loaded file
+(mirroring `auto_archive_feature`); (2) promotion of broadly-applicable rules
+into the binding `.specfuse/rules/*.md` (curated, small, always-loaded), leaving
+LEARNINGS as a staging area; (3) a `/learnings-curate` skill — the
+read/compaction counterpart to `learnings-suggest` — that merges duplicates,
+retires superseded entries, and flags promotion candidates for the operator;
+(4) later, indexed retrieval so consumers load only the relevant slice instead
+of the whole file.
+
+**Benefits.** Planning-context cost stays bounded as the repo scales to hundreds
+of features. Higher signal — a curated durable set beats append-only sprawl when
+the planner (human or agent) is hunting the rule that applies. Durable rules
+graduate into binding contracts. Portable methodology wisdom stays cleanly
+separated from feature-specific history. Closes the missing half of the
+methodology's feedback loop: today it can only grow, never compact.
+
+**Status: planned.**
 
 ## Notes
 
