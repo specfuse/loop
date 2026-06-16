@@ -1373,7 +1373,25 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         return "already archived"
     section_text = section_m.group(1).rstrip('\n') + '\n'
 
-    # Step 3 — append anchor + section to archive after marker
+    # Step 3 — append anchor + section to archive after marker.
+    # Auto-create the archive file if a project never shipped it (the
+    # roadmap-archive skill requires it to pre-exist; the unattended driver
+    # must not crash on its absence — see FileNotFoundError on read_text).
+    if not archive_path.exists():
+        project = ""
+        fm = re.match(r'^---\n(.*?)\n---', roadmap_text, re.DOTALL)
+        if fm:
+            pm = re.search(r'^project:\s*(.+)$', fm.group(1), re.MULTILINE)
+            if pm:
+                project = pm.group(1).strip()
+        header = (
+            (f"---\nproject: {project}\n---\n\n" if project else "")
+            + "# Archived feature details\n\n"
+            "This file holds the detail sections for features whose status has "
+            "reached `done` or `abandoned`.\n\n"
+            f"{marker}\n"
+        )
+        archive_path.write_text(header)
     archive_text = archive_path.read_text()
     if marker not in archive_text:
         return "refused: archive marker absent"
