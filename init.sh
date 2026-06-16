@@ -83,7 +83,25 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.specfuse"
 DEST="$TARGET/.specfuse"
 
 # The versioned scaffold — we own these; --upgrade overlays them.
-VERSIONED_ITEMS=(scripts templates rules skills verification.yml.example README.md)
+# NOTE: `scripts` is deliberately NOT here — it is deployed file-by-file via an
+# explicit allowlist (DEPLOYABLE_SCRIPTS) so specfuse-internal tooling never
+# ships to targets. See deploy_scripts() and issue #55.
+VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md)
+
+# scripts/ allowlist — ONLY these files are deployed to a target project. The
+# driver + its helpers + the GitHub/feature tooling. A new script under
+# .specfuse/scripts/ is NOT shipped unless added here — internal-by-default.
+DEPLOYABLE_SCRIPTS=(
+  loop.py lint_plan.py _miniyaml.py gate_eval.py
+  gh_backend.py gh_features.py adopt_feature.py validate-event.py
+)
+
+# specfuse-loop-internal files under scripts/ that must NEVER reach a target:
+# the leak-guard scanners (unwired without the hook/workflow/gates init does not
+# ship) and the denylist data (this repo's own private identifiers). Pruned on
+# --upgrade to clean targets a pre-#55 init populated. See issue #55 and the
+# leak_guard_specfuse_internal note.
+INTERNAL_SCRIPT_FILES=(leak_scan.py leak_scan_content.py leak_denylist.txt leak_denylist.hashes)
 
 # User-authored — we ship seeds in INIT mode but NEVER touch on --upgrade.
 USER_AUTHORED=(LEARNINGS.md verification.yml roadmap.md features)
@@ -122,6 +140,37 @@ overlay_item() {
   else
     cp "$src" "$dst"
   fi
+}
+
+# deploy_scripts — copy ONLY the allowlisted scripts (DEPLOYABLE_SCRIPTS) into
+# DEST/scripts, then remove any specfuse-internal files (INTERNAL_SCRIPT_FILES)
+# a prior (pre-#55) init may have copied. Replaces the old wholesale
+# `cp -R scripts/.`, which swept the leak-guard tooling + denylist data into
+# every target. Idempotent; honors $DRY_RUN. Issue #55.
+deploy_scripts() {
+  local src="$SRC_DIR/scripts"
+  local dst="$DEST/scripts"
+  local f
+  if [[ $DRY_RUN -eq 1 ]]; then
+    for f in "${DEPLOYABLE_SCRIPTS[@]}"; do
+      local verb="update"
+      [[ -e "$dst/$f" ]] || verb="add"
+      echo "  would $verb: .specfuse/scripts/$f"
+    done
+    for f in "${INTERNAL_SCRIPT_FILES[@]}"; do
+      [[ -e "$dst/$f" ]] && echo "  would remove (specfuse-internal): .specfuse/scripts/$f"
+    done
+    return 0
+  fi
+  mkdir -p "$dst"
+  for f in "${DEPLOYABLE_SCRIPTS[@]}"; do
+    cp "$src/$f" "$dst/$f"
+  done
+  # Prune internal files (covers targets a pre-#55 init populated) + bytecode.
+  for f in "${INTERNAL_SCRIPT_FILES[@]}"; do
+    rm -f "$dst/$f"
+  done
+  find "$dst" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 }
 
 # Detect ci-check.sh in the target and write .specfuse/verification.yml.
@@ -297,11 +346,16 @@ if [[ $UPGRADE -eq 0 ]]; then
     cp -r "$SRC_DIR/$item" "$DEST/$item"
   done
 
+  # scripts/ ships via the explicit allowlist (internal tooling excluded).
+  deploy_scripts
+
   # Strip any compiled-Python noise that may have been copied with scripts/.
   find "$DEST" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 
-  # Seed user-authored files (INIT only — never on --upgrade).
-  cp "$SRC_DIR/LEARNINGS.md" "$DEST/LEARNINGS.md"
+  # Seed user-authored files (INIT only — never on --upgrade). LEARNINGS is
+  # seeded from the TEMPLATE (generic methodology lessons), not this repo's own
+  # LEARNINGS.md (which carries specfuse-loop's FEAT-2026-* history). Issue #55.
+  cp "$SRC_DIR/LEARNINGS.template.md" "$DEST/LEARNINGS.md"
   CI_CHECK_PATH=""
   seed_verification_yml
   cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
@@ -336,6 +390,10 @@ else
     overlay_item "$item"
   done
 
+  # scripts/ ships via the allowlist; also prunes internal files a pre-#55
+  # init left behind in this target.
+  deploy_scripts
+
   # Seed any user-authored files that are missing — happens when the
   # orchestrator or a partial init created .specfuse/ bare.
   if [[ $DRY_RUN -eq 1 ]]; then
@@ -347,7 +405,7 @@ else
   else
     CI_CHECK_PATH=""
     if [[ ! -f "$DEST/LEARNINGS.md" ]]; then
-      cp "$SRC_DIR/LEARNINGS.md" "$DEST/LEARNINGS.md"
+      cp "$SRC_DIR/LEARNINGS.template.md" "$DEST/LEARNINGS.md"
       echo "Seeded missing: .specfuse/LEARNINGS.md"
     fi
     if [[ ! -f "$DEST/verification.yml" ]]; then
