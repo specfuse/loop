@@ -236,6 +236,31 @@ For each gate, in order:
 The final gate has no next gate to plan; `plan-next` instead signals feature
 completion.
 
+### Ceremony proportionality
+
+Closing ceremony cost should scale with feature size. A feature whose
+**planned substantive** WU count (types `implementation`, `qa_authoring`,
+`qa_execution`, `qa_curation`) is **≤ 4** drafts as a **single gate** with
+a **single terminal `close` WU** — no `close-intermediate`, no `plan-next`.
+This is the proportional shape: small features do not pay multi-WU closing
+overhead sized for large ones.
+
+**Planned count is the key.** The threshold is evaluated against the WUs
+declared at planning time, not the WUs that actually ran. A feature whose
+scope is revised mid-execution is an off-plan feature by definition.
+
+**Off-plan safety net.** The decision rule is authoring-layer only. A
+single-gate feature whose gate goes off-plan (blocked WU, replan event,
+cost overrun) still receives the full close ceremony via the `gate_eval`
+auto-close predicate (§3 "Deterministic auto-close path"): the predicate
+disables auto-close and the driver dispatches the closing WU as a normal
+reflective session. Ceremony proportionality trades reflection only on
+features that stay small **and** on-plan. The `gate_eval.py` predicate is
+the safety net; this rule does not replace it.
+
+The canonical threshold is **4** (stated here, in `docs/methodology.md`;
+referenced, not re-defined, in `.specfuse/skills/draft-feature/SKILL.md`).
+
 ### Fresh context per dispatch
 
 Each WU is executed by a new session. All durable state lives in the PLAN, the

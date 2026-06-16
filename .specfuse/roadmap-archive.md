@@ -43,6 +43,11 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0021"></a>
+## FEAT-2026-0021 — Ceremony proportionality + slim WU template
+
+_No inline detail section was recorded for this feature; stub written at archive time._
+
 <a id="feat-2026-0022"></a>
 ## FEAT-2026-0022 — Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation
 

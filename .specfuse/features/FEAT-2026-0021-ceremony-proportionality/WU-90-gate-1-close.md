@@ -2,10 +2,13 @@
 id: FEAT-2026-0021/G1-CLOSE
 type: close
 effort: high
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.50
 generated_surfaces: []
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Terminal close — ceremony proportionality + slim WU template

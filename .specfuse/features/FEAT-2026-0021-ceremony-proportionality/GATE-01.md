@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open        # open | awaiting_review | passed
+status: passed
 cost_budget_usd: 6.0
 ---
 

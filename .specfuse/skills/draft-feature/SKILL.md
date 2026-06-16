@@ -113,6 +113,21 @@ Also ask, once, the universal framing trio:
 
 ### 4. Propose the gate skeleton
 
+#### Size rule — ceremony proportionality
+
+Before sketching the gate count, tally planned substantive WUs (types
+`implementation`, `qa_authoring`, `qa_execution`, `qa_curation`).
+When **planned substantive WU count ≤ 4**, draft a **single gate** with a
+**single terminal close** WU (type `close`) — no `close-intermediate`, no `plan-next`.
+The canonical threshold is stated in `docs/methodology.md §6 "Ceremony
+proportionality"` (one fact, one home); reference it, do not redefine it.
+
+Off-plan escape: a single-gate feature whose gate goes off-plan (blocked WU,
+replan, cost overrun) still receives the full close ceremony via the
+`gate_eval` auto-close predicate — the predicate disables auto-close and the
+driver dispatches the close WU as a normal reflective session. This rule
+trades reflection only on features that stay small and on-plan.
+
 Drawing on the answers, propose N gates (typically 2–4 for a major
 initiative). For each gate:
 

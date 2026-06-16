@@ -19,139 +19,36 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 <!--
 Frontmatter notes (single-repo):
 
-- `id` — the task-level correlation ID. Pattern and surfaces are defined in
-  `.specfuse/rules/correlation-ids.md`. The driver and the linter both read this
-  field; if it disagrees with the matching entry in PLAN.md's graph, the unit is
-  rejected.
-- `type` — drives which gate set in `.specfuse/verification.yml` the driver runs
-  (`implementation` → `code`; `retrospective`/`lessons`/`docs` → `doc`;
-  `plan-next` → `plannext`; `close` → `plannext`). Same concept as the
-  orchestrator's `task_type`, kept under the loop's existing field name.
-  Three closing shapes (FEAT-2026-0015):
-  - `close-intermediate` (non-terminal gate): folds RETRO+LESSONS+DOCS into one
-    session; must be paired with a separate `plan-next` WU immediately after.
-    Use for any gate that is not the final gate. Its appended `## Gate N`
-    section in `RETROSPECTIVE.md` must include both a `## Cost analysis`
-    subsection AND a `## What the loop did NOT verify` subsection (same
-    contract as the terminal `close` WU above).
-  - `close` (terminal gate): collapses retrospective + lessons + docs + terminal
-    verdict into one session. Must produce `RETROSPECTIVE.md`, append durable
-    entries to `LEARNINGS.md`, reconcile docs and roadmap, and write the terminal
-    feature-arc verdict. `RETROSPECTIVE.md` must include both a `## Cost
-    analysis` section AND a `## What the loop did NOT verify` section
-    enumerating every deferred / `met_locally` acceptance criterion (write
-    "(nothing — every acceptance criterion was verified in-loop)" when the
-    list is empty so the explicit count is visible). See the `/draft-feature`
-    skill for the AC-bullet wording the close-WU body should carry.
-  - Legacy four-WU sequence `[retrospective, lessons, docs, plan-next]`: accepted
-    by lint but emits WARN. Prefer `close-intermediate` + `plan-next` for new
-    features.
-- `model` — OPTIONAL. The Claude model the driver dispatches this unit with.
-  When absent, defaults to `MODEL_BY_TYPE[type]` in `loop.py` (`sonnet` for
-  implementation/retrospective/lessons/docs; `opus` for plan-next/close). Three
-  family aliases are accepted: `sonnet`, `opus`, `haiku` — each resolves to
-  the latest model in that family at dispatch time (CLI-side, not loop-side).
-  Full model IDs (e.g. `claude-opus-4-7`, `claude-sonnet-4-6`) pin a specific
-  release. Omit to accept the type-keyed default; set only to override.
-- `effort` — OPTIONAL. Controls the thinking budget passed to `claude -p`
-  via `--effort`. Five levels: `low`, `medium`, `high`, `xhigh`, `max`.
-  When absent, defaults to `EFFORT_BY_TYPE[type]` in `loop.py` (`medium` for
-  implementation; `low` for retrospective/lessons/docs; `high` for
-  plan-next/close). `low`/`medium` also enable a terseness directive in the
-  dispatched session; `high`+ leave it off.
-- `status` — the unit's lifecycle position. `draft` is what `plan-next` writes
-  for the next gate's units; the human arms them by flipping to `pending`. The
-  driver writes `in_progress`, `done`, and `blocked_human`. Other values are
-  reserved for future use; the linter accepts them but the driver doesn't write
-  them today.
-- `attempts` — incremented by the driver per fresh dispatch (max 3 before
-  escalation). Authors leave it at `0`; the driver owns the counter.
-- `cost_usd`, `input_tokens`, `output_tokens` — written by the driver at
-  outcome time (PASS / BLOCKED / SPINNING) when cost tracking is enabled
-  in `.specfuse/verification.yml` (top-level `cost_tracking: true`,
-  default). Cumulative across the run's attempts on this WU. Authors
-  leave them off; the driver owns them. Per-attempt breakdown lives in
-  `events.jsonl`'s outcome event payload.
-- `duration_seconds` — written by the driver at outcome time (PASS /
-  BLOCKED / SPINNING), always, regardless of the `cost_tracking` setting.
-  Wall-clock seconds (monotonic, rounded to 3 decimals) summed across all
-  attempts on this WU. Authors leave it off; the driver owns it.
-  Per-attempt duration also appears in `events.jsonl`'s outcome event
-  payload, in the `attempts_usage` list alongside cost/token fields.
-- `planned_cost_usd` — OPTIONAL. The operator's estimated cost for this work
-  unit at draft time, in USD. Used by the close WU's `## Cost analysis`
-  section to compare planned vs actual spend. Lint emits a WARN when this
-  field is absent on active or draft WUs (non-blocking; exit code 0). Sealed
-  WUs (status=`done` AND PLAN.md status=`done`) are skipped silently.
-  See PLAN.md `roadmap_goal` § "Planned-cost capture". The driver's
-  `cost_usd` field (written at outcome time) is the actual; this field is
-  the plan. Authors set it at draft/arm time; the driver never overwrites it.
-- `generated_surfaces` — OPTIONAL. Lists paths inside this repo to generated
-  files (`_generated/`, `gen-src/`, or the repo's declared equivalent) that
-  this unit's acceptance depends on existing and behaving correctly. Empty list
-  or omitted for units that do not depend on generated code. Authoring this
-  field at plan time makes the dependency reviewable before dispatch.
-- `produces_driver_helper` — OPTIONAL. A string or list of strings naming the
-  symbol(s) this WU adds or materially modifies in the driver (`loop.py`,
-  `lint_plan.py`, or adjacent scripts). Recommended for any `implementation` WU
-  whose body mentions driver-wiring keywords (`loop.py`, `MODEL_BY_TYPE`,
-  `fire_terminal_flips`, `squash_commit`, etc.). Lint emits a WARN when an
-  `implementation` WU mentions those keywords but this field is absent or empty —
-  allowing a reviewer to tell at a glance what the WU produces without reading
-  the full body. Authors set it at draft/arm time. Example:
-  `produces_driver_helper: ["assert_terminal_flips_fired"]` or as a plain string
-  `produces_driver_helper: detect_driver_wiring`. See FEAT-2026-0017.
-- `produces` — OPTIONAL. A string or list of file paths this WU is contracted
-  to produce. Each path must exist and be non-empty at WU completion or the
-  driver blocks the WU (enforced by FEAT-2026-0022's presence gate, T02).
-  Distinct from `files_changed` (the RESULT block's post-hoc runtime claim of
-  what the session touched, checked against the git diff) and from
-  `produces_driver_helper` (driver symbols, lint-only, never machine-enforced):
-  `produces` is the author-declared deliverable contract set at WU-draft time
-  and IS machine-enforced against disk. Lint emits a WARN when an
-  `implementation` WU declares none (non-blocking; exit code 0). Authors set it
-  at draft/arm time. Example: `produces: docs/report.md` or
-  `produces: ["src/a.py", "src/b.py"]`. See FEAT-2026-0022.
-- `oracle_env` — OPTIONAL. The environment in which the WU's verifying oracle
-  runs. Four accepted forms:
-  - `macos_local` — developer macOS shell (APFS, BSD utils).
-  - `linux_docker` — Docker container (Linux kernel, glibc).
-  - `github_actions_ci` — GitHub Actions runner (Ubuntu image unless narrowed).
-  - Any operator-named string (e.g. `windows_powershell`, `alpine_musl`) for
-    environments not covered above; the operator is responsible for matching it
-    to the goal environment at close time.
-  Lint emits a WARN when the Acceptance criteria section mentions oracle-like
-  verbs (test loop, audit, run N times, oracle, e2e, integration test, etc.) but
-  this field is absent. The WARN is non-blocking. Set this field to suppress it
-  and to make the target environment explicit for reviewers and T07 env-parity
-  enforcement. Rationale: LEARNINGS [FEAT-2026-0013/G1-CLOSE] — "oracle
-  environment must match goal environment" (macOS-local audits hide Linux races).
+AUTHOR-SET FIELDS — fill or override these at draft/arm time:
+- `id` — task-level correlation ID. Pattern in `.specfuse/rules/correlation-ids.md`. Driver and
+  linter both read this; must match the PLAN.md graph entry.
+- `type` — drives which gate set the driver runs (`implementation` → `code`; `retrospective` /
+  `lessons` / `docs` → `doc`; `plan-next` / `close` → `plannext`). Closing shapes: `close`
+  (terminal gate, collapses RETRO+LESSONS+DOCS+verdict), `close-intermediate` (non-terminal,
+  pair with a `plan-next` WU). Legacy four-WU sequence accepted but emits WARN.
+- `status` — lifecycle position. Authors set `pending`; driver writes `in_progress`, `done`,
+  `blocked_human`. `draft` = unarmed (next gate's WUs); flip to `pending` to arm.
+- `model` — OPTIONAL. Claude model alias (`sonnet` | `opus` | `haiku`) or full model ID to pin
+  a release. Absent → type-keyed default in `loop.py`.
+- `effort` — OPTIONAL. Thinking budget for `claude -p`. Levels: `low` | `medium` | `high` |
+  `xhigh` | `max`. Absent → type-keyed default. `low`/`medium` add a terseness directive.
+- `planned_cost_usd` — OPTIONAL. Estimated USD at draft time. Compared against actual in close
+  WU's cost analysis. Lint WARN when absent on active/draft WUs (non-blocking).
+- `generated_surfaces` — OPTIONAL. Paths to generated files this unit's acceptance depends on.
+- `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
+  `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions
+  oracle-like verbs but this field is absent.
+- `produces_driver_helper` — OPTIONAL. Symbol(s) this WU adds or modifies in the driver
+  (`loop.py`, `lint_plan.py`, adjacent scripts). Lint WARN when body mentions driver-wiring
+  keywords but field is absent. See FEAT-2026-0017.
+- `produces` — OPTIONAL. File path(s) this WU must produce; machine-enforced by the driver's
+  presence gate (FEAT-2026-0022). Lint WARN when absent on `implementation` WUs.
 
-- `re_arm_count` — OPTIONAL. Integer count of `/unblock-wu` re-arms applied to
-  this WU. Written by `/unblock-wu` (T06 of FEAT-2026-0016) on each re-arm;
-  incremented from 0 on first re-arm. Default: absent (treated as 0 by the
-  driver). Read by the driver's `detect_rearm_dispatch` and `task_started` /
-  `attempt_outcome` event payloads for dashboard cross-arm grouping.
-- `re_arm_history` — OPTIONAL. Ordered list of re-arm records, each a dict with
-  at least a `reason` key (the operator-supplied rationale). Appended by
-  `/unblock-wu` (T06 of FEAT-2026-0016) on each re-arm. Default: absent
-  (treated as empty list). Read by the driver to populate the `reason` field of
-  the `re_arm_dispatched` event.
-- `cumulative_cost_usd` — OPTIONAL. Running total of `cost_usd` across all
-  re-arm cycles. Written by the driver's `fold_cumulative_on_rearm` helper at
-  the start of each re-arm dispatch; absent until the first re-arm. Default: 0.
-  Read by `/gate-status` (T05) and close-ceremony cost analysis (T07) to report
-  the true multi-cycle spend. Authors leave it off; the driver owns it.
-- `cumulative_duration_seconds` — OPTIONAL. Running total of `duration_seconds`
-  across all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm
-  dispatch time. Default: 0. Read alongside `cumulative_cost_usd` for cost
-  analysis. Authors leave it off; the driver owns it.
-- `cumulative_input_tokens` — OPTIONAL. Running total of `input_tokens` across
-  all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm dispatch
-  time. Default: 0. Authors leave it off; the driver owns it.
-- `cumulative_output_tokens` — OPTIONAL. Running total of `output_tokens` across
-  all re-arm cycles. Written by `fold_cumulative_on_rearm` at re-arm dispatch
-  time. Default: 0. Authors leave it off; the driver owns it.
+DRIVER-OWNED FIELDS — the driver writes these at outcome time; authors leave them absent:
+<!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,
+     cumulative_cost_usd, cumulative_duration_seconds, cumulative_input_tokens,
+     cumulative_output_tokens, re_arm_count, re_arm_history -->
+<!-- Full field semantics in docs/methodology.md §2 and events.jsonl outcome payloads. -->
 
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
 here — see `docs/methodology.md` §2 (one fact, one home).
@@ -172,12 +69,12 @@ ground it. Enough for a cold session to orient. Reference the binding rules in
 `security-boundaries.md`, `correlation-ids.md`) and the verification skill rather
 than restating them.
 
-**Acceptance criteria.** Explicit, testable statements of done. Write them so the
-verification gates — and a reviewer — can judge them objectively. Avoid compound
-criteria ("X and also Y"); split them so a single failure attributes to a single
-line. For `implementation` WUs that introduce new behavior, the first criterion
-names a scoped test (`tests/<path>::<test_name>` or runner-equivalent nodeid)
-that **fails on HEAD before this WU runs**, and a later criterion asserts the
+**Acceptance criteria.** Explicit, testable statements of done. Prefer assertion-shaped,
+machine-checkable criteria — each AC phrased so a single grep, command, or test can
+judge it true or false. Avoid compound criteria ("X and also Y"); split them so a single
+failure attributes to a single line. For `implementation` WUs that introduce new behavior,
+the first criterion names a scoped test (`tests/<path>::<test_name>` or runner-equivalent
+nodeid) that **fails on HEAD before this WU runs**, and a later criterion asserts the
 same test **passes after the WU's edits**. The red→green proof is the loop's
 cheapest hollow-pass guard; see `/authoring-work-units` §12 for the contract and
 the carve-outs (refactor, migration, pure-data → explicit `Red-test exempt:
