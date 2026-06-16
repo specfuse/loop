@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0024-hashed-denylist-leak-guard
 roadmap_goal: CI catches re-introduction of private org-names (not just gitleaks secrets) in both tracked files and GitHub issue/PR bodies, without committing the literal private strings to the public repo.
 autonomy_default: review
 status: active
-planned_cost_usd: 11.50
+planned_cost_usd: 16.00
 ---
 
 <!--
@@ -155,10 +155,9 @@ gates:
   FEAT-2026-0022's Notes: the changes sit in the leak-guard correctness path,
   and a false-negative regression silently re-opens the leak surface this
   feature exists to close. Each is red-test-first (`/authoring-work-units` §12).
-- **`planned_cost_usd: 11.50` covers the five WUs that exist now** (gate-1 T01
-  $2.50 + T02 $2.50 + G1-CLOSE-INTERMEDIATE $2.00 + G1-PLAN $2.00 + G2-CLOSE
-  $2.50). Gate 2's substantive WUs do not exist yet — `plan-next` drafts them
-  and will revise this number. The lint Σ-check passes against the five present
-  WUs.
+- **`planned_cost_usd: 16.00` is the full feature total** (gate-1 T01 $2.50 +
+  T02 $2.50 + G1-CLOSE-INTERMEDIATE $2.00 + G1-PLAN $2.00; gate-2 T03 $2.50 +
+  T04 $2.00 + G2-CLOSE $2.50). Reconciled up from the $11.50 draft estimate once
+  `plan-next` drafted gate 2's substantive WUs (T03, T04), per the lint Σ-check.
 - **Dependencies live here, not in WU frontmatter.** WU file numbers track the
   correlation sub-ID; closing units use the reserved 90+ range.

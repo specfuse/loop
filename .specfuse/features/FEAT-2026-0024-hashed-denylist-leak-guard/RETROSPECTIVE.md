@@ -171,3 +171,25 @@ the honest verdict while the live Action is unconfirmed is `partially_met`, not
 `met` — the driver holds the `PLAN.md status -> done`, gate `passed`, roadmap
 row, and archive flips until the operator confirms the live run. No raced-close
 conflict: `roadmap.md` row 42 still reads `active`.
+
+## Operator verdict upgrade (2026-06-16) — partially_met → met
+
+The operator upgraded the verdict from `partially_met` to `met` and authorized
+the terminal flips. Rationale:
+
+- Every in-loop deliverable is present and verified: #45 fully met + in-loop
+  (T01/T02 tests, `leak-scan --all` clean); #46's runner is unit-tested
+  (planted hit → non-zero, clean → 0, fail-closed) and its workflow is
+  schema-valid YAML wired to the issue/PR/comment open+edit triggers.
+- The single deferred oracle — the *live* GitHub Actions run flagging a planted
+  string in a real issue/PR body — is **inherently post-merge**: the workflow
+  fires only from the default branch after merge, so it cannot be confirmed
+  in-loop by construction. This matches the
+  `[FEAT-2026-0020/G2/out-of-loop-completion]` precedent (WUs closed `met`
+  with a logged post-merge oracle), not the FEAT-2026-0013 case the
+  verdict-coupling rule guards against (a deferred oracle that could *fail* and
+  reverse the verdict; here the risk is low and the deliverables are built+tested).
+- The post-merge confirmation step remains tracked in `## What the loop did NOT
+  verify`: after merge, open a test issue with a planted placeholder denylist
+  string and confirm the `leak-scan-content` check fails. If it does not, a
+  follow-up bugfix PR addresses the workflow wiring — no state reversal needed.
