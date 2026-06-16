@@ -1388,9 +1388,26 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         re.MULTILINE,
     )
     section_m = section_re.search(roadmap_text)
-    if not section_m:
-        return "already archived"
-    section_text = section_m.group(1).rstrip('\n') + '\n'
+    had_inline_section = section_m is not None
+    if had_inline_section:
+        section_text = section_m.group(1).rstrip('\n') + '\n'
+    else:
+        # Row-only feature: a roadmap table row exists (status done/abandoned,
+        # Detail still '—' — the back-link case already returned at Step 1) but
+        # there is no inline `## FEAT-ID` detail section to move. /draft-feature
+        # emits a table row without a detail section, so an auto-closed feature
+        # drafted that way reaches here. Returning "already archived" without
+        # writing the anchor leaves assert_terminal_flips_fired unsatisfiable
+        # and halts the driver on archive_anchor_missing (FEAT-2026-0022
+        # surfaced this live). Synthesize a minimal stub section so the anchor
+        # and back-link still materialize.
+        title = parsed["columns"].get("Title", "").strip()
+        heading = f"## {feature_id}" + (f" — {title}" if title else "")
+        section_text = (
+            f"{heading}\n\n"
+            "_No inline detail section was recorded for this feature; "
+            "stub written at archive time._\n"
+        )
 
     # Step 3 — append anchor + section to archive after marker.
     # Auto-create the archive file if a project never shipped it (the
@@ -1425,11 +1442,14 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
             roadmap_text[:detail_start] + f" {back_link} " + roadmap_text[detail_end:]
         )
 
-    # Step 5 — remove inline section (re-search since row update shifted offsets)
-    section_m2 = section_re.search(roadmap_text)
-    if section_m2:
-        roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
-        roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
+    # Step 5 — remove inline section (re-search since row update shifted
+    # offsets). Only when one actually existed to move; a synthesized stub
+    # was never in roadmap.md, so there is nothing to strip.
+    if had_inline_section:
+        section_m2 = section_re.search(roadmap_text)
+        if section_m2:
+            roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
+            roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
     return "archived"
