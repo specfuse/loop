@@ -14,9 +14,11 @@ Correlation ID: FEAT-2026-0020/T15
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -156,3 +158,117 @@ def _get_staged_diff() -> str:
 def scan_staged() -> list[str]:
     """Scan the current staged diff for leaks."""
     return scan_text(_get_staged_diff())
+
+
+# ---------------------------------------------------------------------------
+# CI-surface scan (whole repo)
+# ---------------------------------------------------------------------------
+#
+# The structural regexes (user-path / email / private-host) are heuristics
+# tuned for DIFFS — a *newly introduced* path or address is worth a human
+# glance. Applied to the whole tree they false-positive on doc placeholders
+# (`/Users/<user>/`), the detector's own test fixtures (`build-server.internal`),
+# and config addresses (`git@github.com`). So the CI gate runs only the
+# high-confidence checks: the operator denylist (gitignored literal private-org
+# names) and gitleaks secret detection. The pre-commit hook still runs the full
+# structural scan on the staged diff.
+
+
+def _list_tracked_files(root: Path) -> list[str]:
+    proc = subprocess.run(  # nosec B603 – list args, no shell
+        ["git", "-C", str(root), "ls-files"],
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout.splitlines() if proc.returncode == 0 else []
+
+
+def _check_gitleaks_dir(path: Path) -> list[str]:
+    """Run gitleaks over an on-disk directory; return RuleID hit strings."""
+    proc = subprocess.run(  # nosec B603 – list args, no shell
+        [
+            "gitleaks",
+            "detect",
+            "--source",
+            str(path),
+            "--no-git",
+            "--report-format",
+            "json",
+            "--report-path",
+            "-",
+            "--exit-code",
+            "1",
+            "--redact",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        return []
+    try:
+        findings = json.loads(proc.stdout)
+        if isinstance(findings, list):
+            return [f"secret:{f.get('RuleID', 'unknown')}" for f in findings]
+    except (json.JSONDecodeError, AttributeError):
+        pass
+    return ["gitleaks:secrets-detected"]
+
+
+def scan_repo(root: str = ".") -> list[str]:
+    """CI-surface scan of all git-tracked files: denylist + gitleaks secrets.
+
+    Deliberately omits the structural regexes (see module note) to stay
+    false-positive-free as an absolute repo gate.
+    """
+    root_path = Path(root)
+    denylist = load_denylist()
+    hits: list[str] = []
+    for rel in _list_tracked_files(root_path):
+        fpath = root_path / rel
+        try:
+            text = fpath.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            low = line.lower()
+            for entry in denylist:
+                if entry.lower() in low:
+                    hits.append(f"{rel}:{lineno}: denylist: {entry!r}")
+    hits.extend(_check_gitleaks_dir(root_path))
+    return hits
+
+
+# ---------------------------------------------------------------------------
+# CLI — wired by the pre-commit hook (--staged) and the CI gate (--all)
+# ---------------------------------------------------------------------------
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Leak scanner (FEAT-2026-0020). Exit 1 on any finding."
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--staged",
+        action="store_true",
+        help="scan the staged diff (full structural + denylist + secrets) — pre-commit",
+    )
+    group.add_argument(
+        "--all",
+        action="store_true",
+        help="scan all tracked files (denylist + gitleaks secrets) — CI gate",
+    )
+    args = parser.parse_args(argv)
+
+    hits = scan_staged() if args.staged else scan_repo()
+    if hits:
+        print("leak-scan: FINDINGS")
+        for h in hits:
+            print("  " + h)
+        return 1
+    print("leak-scan: clean")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

@@ -57,5 +57,11 @@ echo "==> [gate: coverage] coverage --fail-under=90"
 coverage run --source=.specfuse/scripts -m unittest discover -s tests \
   && coverage report --fail-under=90
 
+echo "==> [gate: leak-scan] leak_scan --all"
+"$PYTHON" .specfuse/scripts/leak_scan.py --all
+
+echo "==> [gate: leak-scan-hook] bats"
+bats tests/leak_scan_hook.bats
+
 echo
 echo "smoke test: OK"

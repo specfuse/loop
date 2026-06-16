@@ -9,7 +9,8 @@ duration_seconds: 156.092
 cost_usd: 0.34832
 input_tokens: 9
 output_tokens: 5945
----
+completed_out_of_loop: true
+completed_note: "Loop dispatch HOLLOW-PASSED (touched 0 deliverable files; $1.48 for nothing). Completed out-of-loop 2026-06-16: built .specfuse/hooks/pre-commit, added leak-scan + leak-scan-hook gates to verification.yml + smoke-test.sh, bats install to ci.yml, tests/leak_scan_hook.bats. Also added the missing CLI (main/--staged/--all, scan_repo) to leak_scan.py — T15 shipped the API but no CLI, so T16's escalation-trigger-1 should have fired instead of hollow-passing. Verified: hook blocks planted leak + passes clean; --all exits 0 on clean tree; bats 3/3; suite 726 OK; coverage 93%; ruff clean."
 
 <!--
 Copyright 2026 Specfuse Contributors

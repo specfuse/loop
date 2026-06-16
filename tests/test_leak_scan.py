@@ -310,5 +310,106 @@ class TestScanStaged(unittest.TestCase):
         self.assertEqual(diff, "diff --git a/file.py b/file.py\n")
 
 
+# ---------------------------------------------------------------------------
+# CI-surface scan (scan_repo) + helpers
+# ---------------------------------------------------------------------------
+
+
+class TestListTrackedFiles(unittest.TestCase):
+    def test_success_returns_lines(self):
+        mock_proc = MagicMock(returncode=0, stdout="a.py\nb.md\n")
+        with patch("subprocess.run", return_value=mock_proc):
+            files = _mod._list_tracked_files(Path("."))
+        self.assertEqual(files, ["a.py", "b.md"])
+
+    def test_git_failure_returns_empty(self):
+        mock_proc = MagicMock(returncode=128, stdout="")
+        with patch("subprocess.run", return_value=mock_proc):
+            self.assertEqual(_mod._list_tracked_files(Path(".")), [])
+
+
+class TestCheckGitleaksDir(unittest.TestCase):
+    def test_clean_returns_empty(self):
+        with patch("subprocess.run", return_value=MagicMock(returncode=0, stdout="[]")):
+            self.assertEqual(_mod._check_gitleaks_dir(Path(".")), [])
+
+    def test_findings_parsed(self):
+        mock_proc = MagicMock(returncode=1, stdout=json.dumps([{"RuleID": "aws-key"}]))
+        with patch("subprocess.run", return_value=mock_proc):
+            self.assertEqual(_mod._check_gitleaks_dir(Path(".")), ["secret:aws-key"])
+
+    def test_invalid_json_falls_back(self):
+        mock_proc = MagicMock(returncode=1, stdout="not json")
+        with patch("subprocess.run", return_value=mock_proc):
+            self.assertEqual(
+                _mod._check_gitleaks_dir(Path(".")), ["gitleaks:secrets-detected"]
+            )
+
+
+class TestScanRepo(unittest.TestCase):
+    def test_denylist_hit_reported_with_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "f.txt").write_text("contains ACME-PRIVATE here", encoding="utf-8")
+            with patch.object(_mod, "_list_tracked_files", return_value=["f.txt"]), patch.object(
+                _mod, "load_denylist", return_value=["ACME-PRIVATE"]
+            ), patch.object(_mod, "_check_gitleaks_dir", return_value=[]):
+                hits = _mod.scan_repo(d)
+        self.assertTrue(any("denylist" in h and "f.txt" in h for h in hits))
+
+    def test_clean_repo_returns_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "f.txt").write_text("nothing here", encoding="utf-8")
+            with patch.object(_mod, "_list_tracked_files", return_value=["f.txt"]), patch.object(
+                _mod, "load_denylist", return_value=["ACME-PRIVATE"]
+            ), patch.object(_mod, "_check_gitleaks_dir", return_value=[]):
+                self.assertEqual(_mod.scan_repo(d), [])
+
+    def test_unreadable_file_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            with patch.object(_mod, "_list_tracked_files", return_value=["missing.txt"]), patch.object(
+                _mod, "load_denylist", return_value=["X"]
+            ), patch.object(_mod, "_check_gitleaks_dir", return_value=[]):
+                self.assertEqual(_mod.scan_repo(d), [])
+
+    def test_gitleaks_hits_appended(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "f.txt").write_text("clean", encoding="utf-8")
+            with patch.object(_mod, "_list_tracked_files", return_value=["f.txt"]), patch.object(
+                _mod, "load_denylist", return_value=[]
+            ), patch.object(_mod, "_check_gitleaks_dir", return_value=["secret:aws-key"]):
+                self.assertEqual(_mod.scan_repo(d), ["secret:aws-key"])
+
+
+# ---------------------------------------------------------------------------
+# CLI (main)
+# ---------------------------------------------------------------------------
+
+
+class TestMain(unittest.TestCase):
+    def test_staged_clean_returns_zero(self):
+        with patch.object(_mod, "scan_staged", return_value=[]):
+            self.assertEqual(_mod.main(["--staged"]), 0)
+
+    def test_staged_hits_returns_one(self):
+        with patch.object(_mod, "scan_staged", return_value=["line 1: email: 'x@y.z'"]):
+            self.assertEqual(_mod.main(["--staged"]), 1)
+
+    def test_all_clean_returns_zero(self):
+        with patch.object(_mod, "scan_repo", return_value=[]):
+            self.assertEqual(_mod.main(["--all"]), 0)
+
+    def test_all_hits_returns_one(self):
+        with patch.object(_mod, "scan_repo", return_value=["secret:aws-key"]):
+            self.assertEqual(_mod.main(["--all"]), 1)
+
+    def test_no_mode_is_error(self):
+        with self.assertRaises(SystemExit):
+            _mod.main([])
+
+    def test_both_modes_is_error(self):
+        with self.assertRaises(SystemExit):
+            _mod.main(["--staged", "--all"])
+
+
 if __name__ == "__main__":
     unittest.main()

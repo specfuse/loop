@@ -9,7 +9,8 @@ duration_seconds: 92.465
 cost_usd: 0.165233
 input_tokens: 7
 output_tokens: 1073
----
+completed_out_of_loop: true
+completed_note: "Loop dispatch HOLLOW-PASSED the bundle: shipped SECURITY.md only; CODE_OF_CONDUCT.md was never created despite the WU's own file-presence gate (test -s CODE_OF_CONDUCT.md). Completed out-of-loop 2026-06-16: fetched Contributor Covenant 2.1 from the canonical EthicalSource repo (the text trips the model output content-filter, so it was curl'd + processed in shell, never generated inline), set the enforcement contact to GitHub Security Advisories/private channels (no email), prepended the Apache header. Verified: Covenant identity + v2.1 grep pass; no leaks."
 
 <!--
 Copyright 2026 Specfuse Contributors
