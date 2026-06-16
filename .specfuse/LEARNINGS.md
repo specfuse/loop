@@ -1494,3 +1494,39 @@ promoted here.
   block). Existence + green tests + asserted block-outcomes is the
   three-layer audit; existence alone would have missed a guard that
   parses but never fires.
+
+## FEAT-2026-0023/G1-CLOSE — seam bugs need an integration layer; terminal flips need ONE owner
+
+- [FEAT-2026-0023/G1-CLOSE] Three driver bugs (#47 row-only archive
+  anchor, #48 `ensure_feature_branch` raw traceback, #49 auto-close
+  leaves `PLAN.md status: active`) were one class: **seam bugs at
+  handoffs between subsystems, none catchable by unit tests because unit
+  tests stub the handoffs.** They only execute at real feature
+  boundaries — rare events the first true autonomous runs finally
+  exercised. Rule: when a bug lives in the gap between two subsystems,
+  the durable fix is not another unit test on either side — it is an
+  end-to-end integration test that stubs ONLY the agent boundary and
+  drives the real driver through the whole lifecycle (draft → pick →
+  loop → terminal close on BOTH paths → archive). `test_lifecycle_integration.py`
+  is that layer; it would have caught all three. This is the
+  driver-side analogue of the deliverable-presence layering in
+  [FEAT-2026-0022/G1-CLOSE] and the no-code-written guard in
+  [FEAT-2026-0008/G1-CLOSE]: each closes a CLASS by adding the layer
+  that runs at the real boundary, not by patching one instance.
+
+- [FEAT-2026-0023/G1-CLOSE] Terminal-state flips must have exactly ONE
+  driver-side owner called identically by every close path. #49 existed
+  because two paths diverged: the dispatched-close path relied on the
+  close WU's *agent* to flip `PLAN.md`, while the agent-less auto-close
+  path ran no agent and `fire_terminal_flips` never touched PLAN. Fix
+  (T01): fold the PLAN flip into `fire_terminal_flips` alongside the
+  gate/roadmap/archive flips, gated on `verdict_permits_terminal_flips`,
+  reading the verdict from disk (not in-memory `wu.verdict`, which the
+  auto-close path leaves None). Corollary, now enforced in the
+  `draft-feature` and `authoring-work-units` skills: do NOT add a "flip
+  PLAN.md to done" acceptance criterion to a terminal `close` WU — the
+  agent flip is redundant and re-opens the divergence. Recursive-dogfood
+  close validated a fourth time: this feature's own close audited that
+  its three WUs did not hollow-pass — single `fire_terminal_flips`
+  definition, no competing PLAN-status writer, all three guard tests
+  present and green (14 tests OK).
