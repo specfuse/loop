@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: open        # open | awaiting_review | passed
+status: awaiting_review
 cost_budget_usd: 8.0
 # Per-gate cumulative-cost ceiling. The implementing gate (gate 1) omits this;
 # the successor gate sets it to exercise the brake for the first time, per the
