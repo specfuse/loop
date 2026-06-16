@@ -21,6 +21,25 @@ dependency on the other two.
   Changes to those contracts are coordinated, not unilateral — see
   `docs/methodology.md`.
 
+## First-time setup (install the leak-prevention guard)
+
+Run once per fresh clone to install the pre-commit leak-scan hook and seed the
+gitignored org-name denylist:
+
+```bash
+bash scripts/setup.sh
+```
+
+This sets `core.hooksPath` to `.specfuse/hooks` (so the `pre-commit` hook runs
+the leak scanner on every commit) and creates `.specfuse/scripts/leak_denylist.txt`
+— a **gitignored** file where you list any private org / repo / hostname strings
+this clone must never commit. The hook blocks commits that introduce secrets,
+`/Users/<user>/` paths, emails, private hostnames, or a denylisted string.
+Emergency bypass: `git commit --no-verify` (CI still enforces the secrets gate).
+
+> The denylist is gitignored on purpose — committing the literal private strings
+> to a public repo would re-leak them. Each clone keeps its own.
+
 ## Running tests and gates locally
 
 Install dev dependencies once:

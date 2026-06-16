@@ -146,7 +146,7 @@ bash .specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/scrub
 
 # (d) leaked folder gone from all history — expect no output before "exit=0"
 git log --all --oneline \
-  -- '.specfuse/features/INIT-2026-0001-F06-conform-publishroster-to-validated-spec'
+  -- '.specfuse/features/INIT-2026-0001-F06-conform-exampleEndpoint-to-validated-spec'
 echo "exit=$?"
 
 # (e) working tree still passes tests
