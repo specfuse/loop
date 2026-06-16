@@ -1,0 +1,55 @@
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# Content leak-scan: run the T03 content-scan runner on the issue/PR/comment
+# event payload GitHub Actions writes to $GITHUB_EVENT_PATH, and fail the check
+# on any finding (a non-zero runner exit fails the job). This guards the
+# public-surface text — issue/PR title + body and the triggering comment — that
+# the file-commit leak-scan gate (ci.yml) never sees.
+#
+# Default behavior is FAIL THE CHECK: it needs only `contents: read`, no write
+# scope, no token-scope risk. Posting a comment naming the offending field is an
+# operator-confirmable enhancement (pull-requests/issues: write), tracked in
+# GATE-02-REVIEW.md Open Verifications, not built here. See
+# docs/leak-scan-content-action.md for the guard's scope and the
+# edit-history-not-expunged limitation.
+
+name: leak-scan-content
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  leak-scan-content:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      # The runner reuses leak_scan.scan_text, which shells out to `gitleaks`
+      # for secret detection. Without the binary it raises FileNotFoundError and
+      # the job crashes. Mirror ci.yml's install (apt, with a release-binary
+      # fallback) so this Action enforces the same scan the commit gate does.
+      - name: Install gitleaks (secret-scan dependency)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gitleaks || {
+            # gitleaks not in apt on all runners — fall back to the release binary.
+            curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+              | sudo tar -xz -C /usr/local/bin gitleaks
+          }
+
+      - name: Scan the event payload for leaks
+        run: python3 .specfuse/scripts/leak_scan_content.py

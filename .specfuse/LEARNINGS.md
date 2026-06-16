@@ -1530,3 +1530,48 @@ promoted here.
   its three WUs did not hollow-pass — single `fire_terminal_flips`
   definition, no competing PLAN-status writer, all three guard tests
   present and green (14 tests OK).
+
+## FEAT-2026-0024/G2-CLOSE — a leak-guard feature can poison its own loop bookkeeping
+
+- [FEAT-2026-0024/G2-CLOSE] A leak-scan pre-commit hook scanning the loop's OWN
+  bookkeeping diff will flag structural-hit strings the driver itself recorded
+  into `events.jsonl`. During this feature, `G1-PLAN` attempt 1 died with
+  `squash_commit_failed`: the pre-commit `leak-scan` hook rejected the
+  bookkeeping squash on `email: 'git@github.com'` — a config address the driver
+  had embedded in a `failure_excerpt` it wrote into `events.jsonl` when T02's
+  attempt 1 failed. The leak-guard feature thus poisoned its own loop
+  bookkeeping, costing a full re-attempt (+$3.23). This is the
+  `[FEAT-2026-0020/G2/leak-guard-surface-asymmetry]` insight one level up the
+  stack: that entry says heuristic structural regexes belong on *diffs*, not
+  whole-tree gates, because diffs of doc/config/fixture content carry benign
+  hits (`git@github.com`, `/Users/<user>/`); here the *diff being committed is
+  the driver's own event log*, whose `failure_excerpt` field faithfully captures
+  whatever the failing gate printed — including a structural hit. Rule: any
+  bookkeeping commit a driver makes to a leak-scanned tree must be exempt from
+  the structural pre-commit scan over driver-owned state (`events.jsonl`,
+  attempt notes), OR the driver must redact structural-hit patterns from
+  `failure_excerpt` before persisting them. The CI `--all` gate already excludes
+  structural regexes for exactly this false-positive class; the pre-commit hook
+  over bookkeeping needs the same carve-out. Fixed driver-side in commit
+  `02db0af` ("stop bookkeeping-commit crash on leak-scan self-poison");
+  cataloged here so future leak-guard / log-recording features expect the
+  self-poison and do not re-pay the re-attempt.
+
+- [FEAT-2026-0024/G2-CLOSE] When a feature's headline acceptance can only run in
+  an external execution environment (a live GitHub Action firing on a real
+  issue/PR event), split the deliverable at the unit-testable seam and ship the
+  oracle as operator-deferred — do NOT manufacture in-loop confidence with
+  `act`/Docker emulation. Gate 2 shipped the behavioral runner
+  (`leak_scan_content.py`, fully unit-tested over fixture event JSON) separately
+  from its thin Action wrapper (`leak-scan-content.yml`), so the close honestly
+  reports `partially_met`: surface built + seam verified in-loop, live trigger
+  operator-confirmed post-merge. This is the
+  `[FEAT-2026-0020/G2/out-of-loop-completion]` and
+  `[FEAT-2026-0014/T01/gh-claudeP-broken]` precedents applied at design time
+  rather than discovered at block time. Rule: for any WU whose true oracle is an
+  external-environment trigger, (a) carve out a pure, importable runner that
+  carries the behavioral test, (b) mark the live trigger operator-deferred in the
+  PLAN's oracle section and the close WU's `## What the loop did NOT verify`, and
+  (c) set the close verdict to `partially_met`/`met_locally` so the driver holds
+  the terminal flips until the operator confirms — never `met` on an unconfirmed
+  live oracle.

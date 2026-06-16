@@ -15,6 +15,7 @@ Correlation ID: FEAT-2026-0020/T15
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -48,6 +49,15 @@ _PRIVATE_HOST_RE = re.compile(
 # address at those domains (test@example.com, git@example.org, ...). Without
 # this, every new test that initializes a tmp git repo trips the email regex on
 # the pre-commit hook. See FEAT-2026-0023/T03.
+# git@github.com is the canonical public git remote/config address (it is the
+# fixed SSH user for github.com — never a private secret). The module note below
+# already lists it as a known false positive on the repo gate. It also reaches
+# the STAGED surface via driver bookkeeping: when a squash is rejected, the
+# leak-scan FINDINGS text — which QUOTES the offending match — is captured into
+# events.jsonl as the attempt-failure note; the next bookkeeping commit then
+# re-scans that audit log and re-trips on the quoted address (a self-poison).
+# Allowlisting it stops both the direct hit and the captured-error replay.
+# See FEAT-2026-0024 (the bookkeeping-commit crash this unblocked).
 # ---------------------------------------------------------------------------
 
 DEFAULT_ALLOWLIST: frozenset[str] = frozenset({
@@ -55,6 +65,7 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset({
     "example.com",
     "example.org",
     "example.net",
+    "git@github.com",
 })
 
 # ---------------------------------------------------------------------------
@@ -76,6 +87,170 @@ def load_denylist() -> list[str]:
         if stripped and not stripped.startswith("#"):
             entries.append(stripped)
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Hashed denylist (FEAT-2026-0024/T01) — committed, CI/Action surface.
+#
+# The plaintext denylist (above) is gitignored and absent on surfaces where the
+# repo is checked out without operator-local files (CI, the gate-2 Action). The
+# hashed denylist is a COMMITTED `leak_denylist.hashes` file: salted SHA-256 of
+# normalized private-org literals, generated from the plaintext one by T02's
+# `--hash-denylist`. It catches ACCIDENTAL re-introduction; with low-entropy
+# names + a public salt it is obfuscation, not secrecy (see PLAN.md). This WU
+# ships the core primitives only; T02 wires them into scan_repo + the generator.
+# ---------------------------------------------------------------------------
+
+_HASHED_DENYLIST_PATH = Path(__file__).parent / "leak_denylist.hashes"
+
+# Committed default salt. The value actually used to MATCH is the one read from
+# the `.hashes` header (load_hashed_denylist), so regenerating the file with a
+# fresh salt stays self-consistent. This constant is the generator's default
+# when no salt is supplied and a documented fallback; it is intentionally public.
+_DEFAULT_DENYLIST_SALT = "specfuse-leak-denylist-v1"
+
+
+def normalize_token(s: str) -> str:
+    """Lowercase *s* and strip every non-``[a-z0-9]`` character.
+
+    The single normalizer shared by the generator (T02) and the matcher below,
+    so both agree on what a "literal" is. ``Acme-Widget_IAC`` -> ``acmewidgetiac``.
+    """
+    return re.sub(r"[^a-z0-9]+", "", s.lower())
+
+
+def hash_token(normalized: str, salt: str) -> str:
+    """Return the salted SHA-256 hex digest of an already-normalized token.
+
+    Deterministic: same (normalized, salt) -> same digest. Callers normalize
+    with :func:`normalize_token` first; this function does not re-normalize.
+    """
+    return hashlib.sha256((salt + normalized).encode("utf-8")).hexdigest()
+
+
+def load_hashed_denylist(
+    path: Path | None = None,
+) -> tuple[str, frozenset[int], frozenset[str]]:
+    """Parse a ``leak_denylist.hashes`` file into ``(salt, lengths, hashes)``.
+
+    Header lines ``# salt: <hex>`` and ``# lengths: <comma-ints>`` are parsed;
+    any other comment/blank line is skipped; every remaining line is a hash.
+    Missing file -> ``("", frozenset(), frozenset())`` (mirrors load_denylist's
+    absent-file behavior — no crash on surfaces that have not generated one).
+    """
+    target = path if path is not None else _HASHED_DENYLIST_PATH
+    if not target.exists():
+        return ("", frozenset(), frozenset())
+    salt = ""
+    lengths: set[int] = set()
+    hashes: set[str] = set()
+    for line in target.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            body = stripped[1:].strip()
+            if body.startswith("salt:"):
+                salt = body[len("salt:"):].strip()
+            elif body.startswith("lengths:"):
+                for part in body[len("lengths:"):].split(","):
+                    part = part.strip()
+                    if part:
+                        lengths.add(int(part))
+            continue
+        hashes.add(stripped)
+    return (salt, frozenset(lengths), frozenset(hashes))
+
+
+def hashed_denylist_hits(
+    line: str,
+    salt: str,
+    lengths: frozenset[int],
+    hashes: frozenset[str],
+) -> bool:
+    """True if a normalized substring of *line* hashes into the denylist set.
+
+    Char-sliding-window match (PLAN.md "The hashing design"): normalize the
+    line, then for each committed length ``L`` slide an ``L``-char window and
+    hash each window with *salt*. This preserves the plaintext denylist's
+    substring fidelity — a 10-char window over ``acmewidgetapp`` yields
+    ``acmewidget``, the mid-atom substring an atom-n-gram approach would miss.
+    Empty *lengths*/*hashes* -> never matches.
+    """
+    if not hashes or not lengths:
+        return False
+    norm = normalize_token(line)
+    n = len(norm)
+    for length in lengths:
+        if length <= 0 or length > n:
+            continue
+        for start in range(n - length + 1):
+            if hash_token(norm[start:start + length], salt) in hashes:
+                return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Generator (FEAT-2026-0024/T02) — `--hash-denylist` writes the committed
+# `leak_denylist.hashes` from the gitignored plaintext. Deterministic so CI can
+# regenerate and diff. The caveat below is written verbatim into every generated
+# header (AC6) so a reader of the committed file understands the guarantee.
+# ---------------------------------------------------------------------------
+
+_OBFUSCATION_CAVEAT = (
+    "# Obfuscation, not secrecy. Low-entropy org names + a committed public salt\n"
+    "# mean these digests stop trivial rainbow-table lookup but do NOT hide the\n"
+    "# names from anyone who already has the plaintext. This guard exists to catch\n"
+    "# ACCIDENTAL re-introduction of private org names, not to withstand a targeted\n"
+    "# brute force. Generated by leak_scan.py --hash-denylist; do not hand-edit."
+)
+
+
+def generate_hashed_denylist(
+    entries: list[str], salt: str = _DEFAULT_DENYLIST_SALT,
+) -> str:
+    """Render the `.hashes` file text for *entries* in the T01 format.
+
+    Each entry is normalized with :func:`normalize_token`; entries whose
+    normalization is empty are dropped. The header carries `# salt:`,
+    `# lengths:` (distinct normalized lengths, ascending) and the obfuscation
+    caveat; the body is one :func:`hash_token` digest per distinct normalized
+    literal, sorted so the same plaintext always regenerates byte-identically.
+    """
+    normed = [n for n in (normalize_token(e) for e in entries) if n]
+    lengths = sorted({len(n) for n in normed})
+    digests = sorted({hash_token(n, salt) for n in normed})
+    lines = [
+        f"# salt: {salt}",
+        f"# lengths: {','.join(str(length) for length in lengths)}",
+        _OBFUSCATION_CAVEAT,
+        *digests,
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def write_hashed_denylist(
+    plaintext_path: Path | None = None,
+    out_path: Path | None = None,
+    salt: str = _DEFAULT_DENYLIST_SALT,
+) -> int:
+    """Read the plaintext denylist, write its hashed form, return the count.
+
+    Parses `leak_denylist.txt` (gitignored plaintext) with the same
+    comment/blank-skipping rule as :func:`load_denylist`, normalizes each
+    literal, and writes `leak_denylist.hashes`. A missing plaintext file writes
+    an empty-set file (header only) and returns 0 — never re-leaks literals.
+    """
+    src = plaintext_path if plaintext_path is not None else _DENYLIST_PATH
+    dst = out_path if out_path is not None else _HASHED_DENYLIST_PATH
+    entries: list[str] = []
+    if src.exists():
+        for line in src.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                entries.append(stripped)
+    dst.write_text(generate_hashed_denylist(entries, salt), encoding="utf-8")
+    return len(entries)
 
 
 # ---------------------------------------------------------------------------
@@ -229,10 +404,16 @@ def scan_repo(root: str = ".") -> list[str]:
     """CI-surface scan of all git-tracked files: denylist + gitleaks secrets.
 
     Deliberately omits the structural regexes (see module note) to stay
-    false-positive-free as an absolute repo gate.
+    false-positive-free as an absolute repo gate. The hashed denylist
+    (FEAT-2026-0024/T02) adds org-name coverage that survives in CI where the
+    plaintext denylist is gitignored-absent: the committed `leak_denylist.hashes`
+    is loaded once and each tracked line is sliding-window matched against it.
+    Additive — the plaintext `denylist` check stays as a local-convenience
+    supplement, and an absent `.hashes` contributes nothing (no crash).
     """
     root_path = Path(root)
     denylist = load_denylist()
+    salt, lengths, hashes = load_hashed_denylist()
     hits: list[str] = []
     for rel in _list_tracked_files(root_path):
         fpath = root_path / rel
@@ -245,6 +426,8 @@ def scan_repo(root: str = ".") -> list[str]:
             for entry in denylist:
                 if entry.lower() in low:
                     hits.append(f"{rel}:{lineno}: denylist: {entry!r}")
+            if hashes and hashed_denylist_hits(line, salt, lengths, hashes):
+                hits.append(f"{rel}:{lineno}: denylist-hash")
     hits.extend(_check_gitleaks_dir(root_path))
     return hits
 
@@ -269,7 +452,17 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="scan all tracked files (denylist + gitleaks secrets) — CI gate",
     )
+    group.add_argument(
+        "--hash-denylist",
+        action="store_true",
+        help="regenerate committed leak_denylist.hashes from the gitignored plaintext",
+    )
     args = parser.parse_args(argv)
+
+    if args.hash_denylist:
+        count = write_hashed_denylist()
+        print(f"leak-scan: wrote {count} hashed denylist entr{'y' if count == 1 else 'ies'}")
+        return 0
 
     hits = scan_staged() if args.staged else scan_repo()
     if hits:

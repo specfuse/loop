@@ -896,6 +896,21 @@ def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
     return gate_spent_usd(plan, gate, feature_dir) >= budget
 
 
+class BookkeepingCommitError(RuntimeError):
+    """Raised when commit_bookkeeping's `git commit` is rejected (non-zero exit).
+
+    Sibling of SquashCommitError (issue #51) for the driver's bookkeeping
+    commits (gate status flips + events.jsonl audit). Before this, the
+    bookkeeping commit used `check=True` and a pre-commit hook rejection escaped
+    run()/main() as a bare CalledProcessError with git's stderr swallowed — an
+    unhandled traceback. It now raises this readable error carrying git's
+    stderr instead. Surfaced FEAT-2026-0024: a leak-scan FINDINGS line quoting
+    `git@github.com` was captured into events.jsonl and re-tripped the hook on
+    the awaiting_review bookkeeping commit (the address is now allowlisted; this
+    guard remains so a genuine bookkeeping leak fails loud, not cryptic).
+    """
+
+
 def commit_bookkeeping(paths: list, message: str) -> str | None:
     """Stage specific paths and create a chore(loop) bookkeeping commit.
 
@@ -919,7 +934,16 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     git("add", "-f", *existing)
     if not git("status", "--porcelain"):
         return None  # all paths were already in their committed state
-    subprocess.run(["git", "commit", "-m", message], check=True, capture_output=True)
+    res = subprocess.run(
+        ["git", "commit", "-m", message], capture_output=True, text=True,
+    )
+    if res.returncode != 0:
+        raise BookkeepingCommitError(
+            f"bookkeeping commit was rejected (exit {res.returncode}) — "
+            f"usually a pre-commit hook rejecting the staged bookkeeping state.\n"
+            f"--- git stderr ---\n{res.stderr.strip()}\n"
+            f"--- git stdout ---\n{res.stdout.strip()}"
+        )
     return git("rev-parse", "HEAD")
 
 
