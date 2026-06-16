@@ -21,14 +21,78 @@ dependency on the other two.
   Changes to those contracts are coordinated, not unilateral — see
   `docs/methodology.md`.
 
+## Running tests and gates locally
+
+Install dev dependencies once:
+
+```bash
+python3 -m pip install -e '.[dev]'
+```
+
+Run everything CI runs — scaffold integrity check plus all `code` gates — with
+one command:
+
+```bash
+./scripts/smoke-test.sh
+```
+
+Or run individual gates from `.specfuse/verification.yml` directly:
+
+```bash
+# Unit tests
+python3 -m unittest discover -s tests -v
+
+# Lint
+ruff check .specfuse/scripts tests scripts
+
+# Security scan (medium+ severity)
+bandit -r .specfuse/scripts -ll
+
+# Coverage (must stay ≥ 90 %)
+coverage run --source=.specfuse/scripts -m unittest discover -s tests \
+  && coverage report --fail-under=90
+```
+
+`scripts/smoke-test.sh`, `.specfuse/verification.yml`, and
+`.github/workflows/ci.yml` all declare the same commands. If you change one,
+change all three — drift breaks the verification-as-oracle property.
+
 ## Before opening a PR
 
-- Run `python .specfuse/scripts/lint_plan.py .specfuse/features/<feature>` on
+- **Branch from `main`.** Name your branch something descriptive
+  (`fix/lint-discovery`, `feat/gate-timeout`).
+- **Reference an issue.** Mention the issue number in the PR description
+  (`closes #N` or `re: #N`). For design-touching changes, open the issue first
+  and discuss before coding.
+- **Scope one change per PR.** A PR that changes the loop driver *and* the
+  methodology contract is two PRs. Mixing unrelated changes makes review and
+  revert harder.
+- Run `python3 .specfuse/scripts/lint_plan.py .specfuse/features/<feature>` on
   any feature folder you touched.
-- Run `python .specfuse/scripts/loop.py --dry-run` against the bundled example
+- Run `python3 .specfuse/scripts/loop.py --dry-run` against the bundled example
   and confirm it still walks the gate in dependency order.
-- Keep changes scoped. A PR that changes the loop driver and the methodology
-  contract at once is two PRs.
+- Run `./scripts/smoke-test.sh` and confirm it exits `0` before pushing.
+
+## How this repo develops itself
+
+Specfuse Loop is developed using its own methodology — every non-trivial change
+goes through the gate-cycle process it ships.
+
+**Substantive changes (new features, API changes, methodology updates)** are
+planned as a Specfuse feature: a folder under `.specfuse/features/` with a
+`PLAN.md` that defines gates and work units. The driver runs each work unit, the
+gates verify it, and a human reviews and arms each gate boundary before the next
+one opens. If you want to propose a significant change, open an issue first — the
+maintainers will determine whether it needs a full feature folder or can be a
+simple bug-fix PR.
+
+**Bug fixes** follow the 1-bug-1-branch-1-PR rule: one branch, one PR, no
+feature folder. Write a test that reproduces the bug first, then fix it. Keep
+the scope tight — refactoring unrelated code in the same PR is out of scope.
+
+This self-dogfooding means `.specfuse/features/` is also the audit trail for how
+the repo itself has evolved. See `docs/methodology.md` for the full gate-cycle
+contract.
 
 ## Reporting
 

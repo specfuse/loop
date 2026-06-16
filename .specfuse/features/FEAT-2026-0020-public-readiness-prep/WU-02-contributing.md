@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0020/T11
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 0.50
+duration_seconds: 108.15
+cost_usd: 0.235013
+input_tokens: 9
+output_tokens: 3004
 ---
 
 <!--
