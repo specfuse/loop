@@ -113,8 +113,8 @@ operator verifies it at arming.
 
 | Contract value | Drafted in | Authoritative source | Status |
 |----------------|-----------|----------------------|--------|
-| Issue-template front-matter keys (`name`, `about`/`description`, `labels`) + optional issue-forms `.yml` schema | T04 | GitHub issue-template / issue-forms docs | ☐ |
-| Any `labels:` referenced by issue/PR templates (must exist or be created GitHub-side) | T04 | The repo's GitHub label set | ☐ |
+| Issue-template front-matter keys (`name`, `about`/`description`, `labels`) + optional issue-forms `.yml` schema | T04 | GitHub issue-template / issue-forms docs | ☑ Used `.md` front-matter with `name:`, `about:`, `labels:` — matches documented GitHub schema |
+| Any `labels:` referenced by issue/PR templates (must exist or be created GitHub-side) | T04 | The repo's GitHub label set | ⚠ **Operator action required:** templates reference `bug`, `enhancement`, `question` — all GitHub default labels. Verify they have not been deleted from the repo's label set before the public flip. No custom label namespace invented. |
 | Dependabot `package-ecosystem` identifiers (`github-actions`, `pip`) + `schedule` schema | T05 | Dependabot `dependabot.yml` docs | ☐ |
 | Dependabot `pip` `directory:` (assumes `pyproject.toml` at `/`) | T05 | The repo's manifest location | ☐ |
 | `gitleaks protect --staged` invocation shape for the staged surface | T06 | `gitleaks` 8.30.1 CLI (on PATH) | ☐ |
