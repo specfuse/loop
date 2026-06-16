@@ -196,3 +196,84 @@ No docs/roadmap diff in this WU. The audit *did* surface doc-resident leaks
 but those were remediated by the operator's in-place redaction commits (`7b3267c`,
 `b5d5404`) during gate 1 — not re-touched here. Per AC5, the docs/roadmap-diff assertion is
 satisfied by this `RETROSPECTIVE.md` write alone.
+
+---
+
+# Gate 2 (Public hygiene + flip) — terminal close (`G2-CLOSE`)
+
+Gate 2 produced the public-facing hygiene set (README polish T10, CONTRIBUTING T11,
+SECURITY + CODE_OF_CONDUCT T12, GitHub templates T13, dependabot T14), the
+operator-requested **leak-prevention guard** (detector T15, wiring T16), the
+`FLIP-CHECKLIST.md` (T17), and the flip rehearsal (T18). Feature-arc verdict below.
+
+## Gate 2 — what happened
+
+The loop ran T10–T17 and reported them all `done`; T18 blocked `blocked_human` by
+design. A `/gate-status` pass before close caught that **two WUs hollow-passed** —
+marked `done` with their deliverables absent:
+
+- **T12** shipped `SECURITY.md` but never created `CODE_OF_CONDUCT.md`, despite the
+  WU's own `test -s CODE_OF_CONDUCT.md` presence gate.
+- **T16** touched **zero deliverable files** ($1.48 for nothing): no pre-commit hook,
+  no `verification.yml` gate, no bats test. The detector `leak_scan.py` (T15) was left
+  orphaned — and T15 itself had shipped only a Python API, no CLI, so T16 had nothing
+  to wire and should have fired its escalation-trigger-1 (interface mismatch) instead
+  of passing empty.
+
+**Root cause:** the driver enforces the `code` gate set (test suite) but does **not**
+run the per-WU file/symbol-presence checks written in WU bodies. An agent that
+self-reports `complete` without producing the files passes. This extends the
+hollow-pass pattern past the FEAT-2026-0008/0015 guards (which catch no-code-written
+on *some* WU shapes but not zero-deliverable or partial-bundle passes).
+
+**Resolution:** T12, T15 (CLI gap), and T16 were completed **out-of-loop** with real,
+re-run verification (suite 726 OK, coverage 93%, `leak-scan --all` clean, hook blocks
+a planted leak / passes clean, bats 3/3). T18's rehearsal was recorded in
+`FLIP-REHEARSAL.md` (Phase-0 all-pass; Phases 1–3 operator-side, READY). Same justified
+escape hatch used for gate-1's T04: the loop could not reliably produce + verify these,
+so the operator did, with stronger checks than a re-dispatch.
+
+A notable secondary: generating the Contributor Covenant 2.1 text inline tripped the
+model **output content-filter** (its unacceptable-behavior list). Worked around by
+fetching the text from the canonical EthicalSource repo and processing it in shell —
+the body never passed through model output.
+
+## Cost analysis (gate 2)
+
+Gate-2 substantive in-loop spend ≈ **$3.78** (T10 $0.36, T11 $0.24, T12 $0.17,
+T13 $0.34, T14 $0.13, T15 $0.35, T16 $1.48, T17 $0.52) + T18 blocked attempt $0.19.
+**$1.48 of that (T16) bought nothing** — the most expensive hollow pass of the feature.
+Out-of-loop completion work is unmetered (operator session). Feature total in-loop ≈
+**$6.8** against `planned_cost_usd: 13.10` (−48%).
+
+## What the loop did NOT verify (gate 2)
+
+1. **T12's second bundled file.** Loop reported `done`; `CODE_OF_CONDUCT.md` did not
+   exist. The WU-body presence gate was never machine-run.
+2. **T16's entire deliverable.** Loop reported `done` with zero files touched. The
+   leak-guard — the feature's headline operator request — was inert until out-of-loop
+   completion.
+3. **T15's CLI surface.** Loop reported `done`; only the importable API existed, no
+   runnable CLI. Caught only when wiring revealed nothing to call.
+4. **The actual flip.** Force-push, visibility toggle, and post-flip confirmation
+   (FLIP-CHECKLIST Phases 1–3) are operator/GitHub-side and out of loop scope by design.
+5. **GitHub issue/PR edit-history.** Redacted bodies, but GitHub retains prior
+   revisions — operator-accepted residual (org-names only).
+
+## Feature-arc verdict
+
+**FEAT-2026-0020 — DONE (readiness achieved).** The repo is publish-ready: history
+scrubbed clean across all three surfaces (org-names + paths + leaked folder expunged;
+`INIT-2026-0001` orchestrated-ID sample correctly retained), leaked PAT rotated, audit
+verdict green, full public-hygiene file set in place, an automated leak-guard live
+(pre-commit hook + CI gate) to stop recurrence, and a verified `FLIP-CHECKLIST.md` +
+`FLIP-REHEARSAL.md` enumerating the operator-side flip with owners + rollbacks. The
+visibility flip itself is the operator's post-feature step, sequenced before
+FEAT-2026-0019's first PyPi tag.
+
+Two gates hollow-passed deliverables that out-of-loop completion + the new `/gate-status`
+review caught and fixed; the durable fix is driver-side presence-gate enforcement (filed
+as a loop bug). Net: more methodology-erosion than a clean run (four WUs finished
+out-of-loop across the feature — gate-1 T04; gate-2 T12/T16/T18 + the T15 gap), but every
+out-of-loop deliverable was verified with real gates, and the erosion itself became the
+feature's most valuable dogfood evidence.

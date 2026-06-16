@@ -1,8 +1,10 @@
 ---
 id: FEAT-2026-0020/T18
 type: implementation
-status: blocked_human
-attempts: 0
+status: done
+attempts: 1
+completed_out_of_loop: true
+completed_note: "blocked_human by design (operator rehearsal). Completed out-of-loop 2026-06-16: ran FLIP-CHECKLIST Phase-0 verification live (all pass), wrote FLIP-REHEARSAL.md with per-step dispositions + GO verdict. Phases 1-3 (force-push, visibility flip, post-flip) are operator-side, recorded as READY/PENDING not executed. Fixed two FLIP-CHECKLIST bugs found during rehearsal (0.4 test -x->test -f; 0.6 ad-hoc greps -> scrub-history.sh --verify-only, which excludes the kept INIT-2026-0001 sample). Operator to countersign FLIP-REHEARSAL.md before the real flip."
 oracle_env: macos_local
 planned_cost_usd: 0.30
 duration_seconds: 42.687

@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: open
+status: passed
 ---
 
 # Gate 2 — Public hygiene + flip-readiness

@@ -1,8 +1,10 @@
 ---
 id: FEAT-2026-0020/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+completed_out_of_loop: true
+completed_note: "Terminal close performed out-of-loop 2026-06-16 (gate 2 had two hollow passes the loop couldn't be trusted to close cleanly). Wrote gate-2 + feature-arc terminal verdict in RETROSPECTIVE.md (incl. Cost analysis + What the loop did NOT verify), promoted 4 lessons to LEARNINGS.md, flipped PLAN status active->done, GATE-02 open->passed, roadmap row active->done. Feature verdict: DONE (readiness achieved); visibility flip is operator-side per FLIP-CHECKLIST.md."
 generated_surfaces: []
 oracle_env: macos_local
 planned_cost_usd: 2.00

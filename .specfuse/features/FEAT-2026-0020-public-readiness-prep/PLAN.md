@@ -5,7 +5,7 @@ slug: public-readiness-prep
 branch: feat/FEAT-2026-0020-public-readiness-prep
 roadmap_goal: Make `main` publishable before FEAT-2026-0019's first PyPi tag — audit history + content for secrets / personal-refs / cross-pollination / license gaps, then land OSS hygiene files + a visibility-flip checklist.
 autonomy_default: supervised
-status: active
+status: done
 planned_cost_usd: 13.10
 ---
 

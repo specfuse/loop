@@ -85,12 +85,13 @@ Expected output includes: `bug`, `enhancement`, `question`.
 
 ### Step 0.4 — Leak-scan guard installed and CI gate green (gate-2 T15–T16)
 
-Verify the leak-scan detector script exists and is executable, the pre-commit
-hook is wired, and the CI gate passes:
+Verify the leak-scan detector script exists, the pre-commit hook is wired, and
+the CI gate passes. (The detector is invoked via `python3 leak_scan.py`, not run
+directly, so it is checked with `test -f`, not `test -x`.)
 
 ```bash
-# Detector present and executable
-test -x .specfuse/scripts/leak_scan.py && echo "OK  leak_scan.py" || echo "MISSING"
+# Detector present
+test -f .specfuse/scripts/leak_scan.py && echo "OK  leak_scan.py" || echo "MISSING"
 
 # Pre-commit hook target exists
 test -f .specfuse/hooks/pre-commit && echo "OK  pre-commit hook" || echo "MISSING"
@@ -136,18 +137,12 @@ The `git filter-repo` phase-2 rewrite was executed prior to this checklist
 (recorded in `GATE-02-REVIEW.md` Open Verification #5). Verify each scrub
 surface is clean before force-pushing:
 
-```bash
-# (a) commit MESSAGES — expect no output
-git log --all --format='%H %s%n%b' \
-  | grep -inE 'resto-manager|restomanager|publishroster|init-2026-0001|/Users/'
-
-# (b) file PATHS/names in history — expect no output
-git log --all --pretty=format: --name-only | sort -u \
-  | grep -iE 'init-2026-0001|restomanager|resto-manager|publishroster'
-
-# (c) blob CONTENTS across all history — expect no output
-git grep -inE 'resto-manager-iac|RestoManagerApp|restomanager|publishroster|INIT-2026-0001' \
-  $(git rev-list --all) 2>/dev/null | head
+# Canonical check — org-only patterns across all three history surfaces.
+# Use the scrub harness, NOT ad-hoc greps: it omits INIT-2026-0001, which is
+# the scaffold's KEPT orchestrated-ID sample (allowlisted in leak_scan.py and
+# present in correlation-ids.md + tests by design — NOT a leak).
+bash .specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/scrub-history.sh --verify-only
+# Expect: "RESULT: history is CLEAN." (exit 0)
 
 # (d) leaked folder gone from all history — expect no output before "exit=0"
 git log --all --oneline \
