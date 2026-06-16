@@ -1,5 +1,7 @@
 # Specfuse Loop
 
+**For engineers using AI coding agents** — a local-first driver that structures features as verified, work-unit sequences so each agent session runs focused on one task instead of accumulating context drift.
+
 A small, local-first executor for the **Plan + Work Unit** pattern in a single
 repository. You plan a feature as a sequence of *gates*, each a batch of
 self-contained *work units* with explicit acceptance criteria and verification.
