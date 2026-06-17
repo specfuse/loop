@@ -47,13 +47,6 @@ DEPLOYABLE="loop.py lint_plan.py _miniyaml.py gate_eval.py gh_backend.py gh_feat
   printf 'stale\n' > "$TARGET/.specfuse/scripts/leak_scan.py"
   printf 'stale\n' > "$TARGET/.specfuse/scripts/leak_denylist.hashes"
   printf 'stale\n' > "$TARGET/.specfuse/scripts/leak_denylist.txt"
-  # Drop the copied skills/ before re-upgrading: two skills (roadmap-add,
-  # roadmap-archive) are symlinks into .claude, and overwriting an existing
-  # symlink via `cp -R` fails on macOS ("unlink: Operation not permitted").
-  # That is a separate, pre-existing init bug (filed independently); removing
-  # skills/ lets the overlay recreate them cleanly so this test isolates the
-  # scripts-prune behavior under test.
-  rm -rf "$TARGET/.specfuse/skills"
   run bash "$REPO/init.sh" --upgrade "$TARGET"
   [ "$status" -eq 0 ]
   for f in $INTERNAL; do
