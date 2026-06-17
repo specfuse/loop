@@ -9,6 +9,12 @@ written or executed, not a one-off observation. De-duplicate against what is her
 Feature-specific observations stay in that feature's `RETROSPECTIVE.md` and are not
 promoted here.
 
+This file is loaded **whole** into every planning session, so it must stay bounded.
+The `lessons` step and `/learnings-suggest` ADD entries; `/learnings-curate` is the
+compaction counterpart — it merges duplicates, retires superseded entries into
+`LEARNINGS-archive.md`, and promotes broadly-applicable rules into
+`.specfuse/rules/*.md`. Run it when this file grows large enough to dilute signal.
+
 ## Format
 
 ```

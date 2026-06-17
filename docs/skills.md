@@ -110,7 +110,14 @@ auto-closes a clean gate or halts at the gate boundary for review.
   flags a feature as `FAIL`. Interactive, lint-driven.
 - **`/learnings-suggest`** — scan `attempt_outcome` events across features,
   cluster non-passing attempts, and surface recurring patterns as candidate
-  `LEARNINGS.md` entries. Read-only — you promote.
+  `LEARNINGS.md` entries. Read-only — you promote. The *additive* half.
+- **`/learnings-curate`** — the *compaction* half. `LEARNINGS.md` is loaded whole
+  into every planning session, so it must stay bounded. This skill clusters
+  duplicate / superseded / over-broad entries and, on your per-cluster accept,
+  merges duplicates, retires superseded entries into `LEARNINGS-archive.md`, and
+  promotes methodology-wide rules into `.specfuse/rules/*.md`. Mirrors
+  `roadmap-archive` for the lessons feedback loop. It never archives an entry just
+  because its origin feature is done — provenance is not scope.
 - **`/adopt-feature`** — scaffold a dispatchable feature folder from a GitHub
   `specfuse:feature` issue (orchestrator integration). Pairs with
   `.specfuse/scripts/gh_features.py` (discover candidates) and
