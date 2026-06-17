@@ -10,7 +10,7 @@ on both surfaces.
 > **Authoring note.** While the gate cycle is being proven, the loop is its
 > near-term author: the loop runs real features first, and what it learns
 > revises these contracts before they are folded into the orchestrator's frozen
-> baselines. See [`architecture-addendum-gates-and-iterative-planning.md`](architecture-addendum-gates-and-iterative-planning.md)
+> baselines. See [`concepts/architecture-addendum-gates-and-iterative-planning.md`](concepts/architecture-addendum-gates-and-iterative-planning.md)
 > for how the cycle maps onto the orchestrator's state machine and agent roles.
 
 ---

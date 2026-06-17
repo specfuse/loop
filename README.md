@@ -32,7 +32,7 @@ work. The loop's bet is that the leverage is in the *planning*: if you remove
 ambiguity up front — crisp work units with hard boundaries and machine-checkable
 verification — then execution can run with a fresh agent per unit, re-grounding
 from durable files each time rather than accumulating context drift. It is the
-[Ralph loop](docs/ralph-lineage.md) idea applied at work-unit granularity, with
+[Ralph loop](docs/concepts/ralph-lineage.md) idea applied at work-unit granularity, with
 the planning rigor Ralph's bare task list lacks.
 
 ## How it works (in one minute)
@@ -106,9 +106,13 @@ specfuse-loop/
 ├── LICENSE  NOTICE  CONTRIBUTING.md  README.md  .gitignore
 ├── init.sh                      scaffold .specfuse/ into a target repo
 ├── docs/
+│   ├── getting-started.md       narrated first-feature + operator walkthrough
 │   ├── methodology.md           the gate-cycle contract (shared with the orchestrator)
-│   ├── architecture-addendum-gates-and-iterative-planning.md
-│   └── ralph-lineage.md         why the loop exists; the Ralph / Gas Town lineage
+│   ├── skills.md                the skills catalog, ordered by lifecycle phase
+│   ├── concepts/                why it exists; orchestrator mapping
+│   │   ├── ralph-lineage.md     the Ralph / Gas Town lineage
+│   │   └── architecture-addendum-gates-and-iterative-planning.md
+│   └── dev/                     internal working notes (not user-facing)
 └── .specfuse/                   canonical scaffold + worked example
     ├── README.md
     ├── roadmap.template.md  verification.yml.example  LEARNINGS.md
@@ -119,46 +123,28 @@ specfuse-loop/
     └── features/FEAT-2026-0001-health-endpoint/   (the worked example)
 ```
 
+`init.sh` also ships the durable docs — `methodology.md`, `skills.md`, and
+`concepts/` — into a target's `.specfuse/docs/`, so an initialized repo is
+self-documenting without this checkout.
+
 ## Status
 
-Early. The driver, linter, parsing, dependency ordering, draft/arm gating, and
-verification wiring are tested. All four gates of `FEAT-2026-0003` (the loop's
-first real multi-gate feature) have passed:
+Early but exercised. The driver, linter, parsing, dependency ordering, draft/arm
+gating, the deterministic auto-close predicate, and verification wiring are all
+tested, and the loop dogfoods itself — its own `.specfuse/features/` holds 20+
+features taken through the full gate cycle, including multi-gate features whose
+forward-design model (each gate's `plan-next` drafts the next) has held across
+four consecutive gates.
 
-- **Gate 1 (read path):** `plan-next` drafts a gate you would actually arm — both
-  implementation WUs completed in one attempt with no escalations; the plan held.
-- **Gate 2 (adopt path):** `adopt_feature.py` and the `/adopt-feature` skill — a
-  human can go from a GitHub `specfuse:feature` issue to a dispatchable loop-feature
-  folder in one command; both WUs completed in one attempt.
-- **Gate 3 (report-back + smoke):** `GitHubBackend(Backend)` in `gh_backend.py`
-  transitions `state:ready → state:in-progress → state:done` on the GitHub issue as
-  the loop grinds; `make_backend(feat_fm)` selects it automatically for adopted
-  features. Live smoke of `INIT-2026-0001/F06` (`example-org/example-app#287`):
-  discovery, adopt, and report-back all PASS; issue fully restored post-smoke.
-- **Gate 4 (lint fix):** `lint_plan.py`'s mandatory-section detector broadened to a
-  union pattern accepting both ATX headings (`## Context`) and the existing
-  bold-preamble (`**Context.**`) form; adopted orchestrator-issue folders now pass
-  the linter without breaking existing WU bodies.
+What works today: single-feature and orchestrator-dispatched features; adopting a
+GitHub `specfuse:feature` issue into a dispatchable folder; GitHub issue-label
+state transitions for adopted features; per-gate auto-close on clean runs with a
+full-ceremony fallback when a gate goes off-plan; and a single-driver working-tree
+lock so two drivers can't corrupt one checkout.
 
-The multi-gate forward-design model (each gate's `plan-next` drafts the next) is
-proven across four gates.
-
-`FEAT-2026-0004` (single-driver working-tree lock) gate 1 has passed: `loop.py`
-acquires a non-blocking exclusive `fcntl.flock` on `.specfuse/.loop.lock` before
-any git mutation; a contending driver exits non-zero immediately; the lock
-auto-releases on process exit including SIGKILL. `init.sh` adds the targeted
-gitignore line to every repo it initializes. Closing sequence in progress.
-
-`FEAT-2026-0007` (dispatch cost controls) gate 1 substantive WUs are done.
-Delivered: model-family aliases (`sonnet`/`opus`/`haiku` resolve to the latest
-model at dispatch), per-WU `effort:` tier wired to `claude -p --effort`, tier-gated
-caveman terseness directive (active when effort is `low` or `medium`), and
-failure-note size cap (200-line / 8000-char head+tail truncation). One gap: the
-retry escalation ladder (T04) was marked complete but no production code was
-written — `effort_for_attempt` / `terseness_for_attempt` are absent from `loop.py`.
-The T04 gap is documented in `RETROSPECTIVE.md` and produced two new
-`[FEAT-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`. Gate 1 closing sequence
-in progress; gate 2 WUs drafted by G1-PLAN.
+Expect rough edges. The interfaces (WU contract, RESULT block, correlation-ID
+scheme, `verification.yml` shape) are stable; tooling around them is still
+hardening.
 
 ## License
 

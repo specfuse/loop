@@ -79,7 +79,8 @@ if [[ $DRY_RUN -eq 1 && $UPGRADE -eq 0 ]]; then
   exit 2
 fi
 
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.specfuse"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$REPO_ROOT/.specfuse"
 DEST="$TARGET/.specfuse"
 
 # The versioned scaffold — we own these; --upgrade overlays them.
@@ -105,6 +106,18 @@ INTERNAL_SCRIPT_FILES=(leak_scan.py leak_scan_content.py leak_denylist.txt leak_
 
 # User-authored — we ship seeds in INIT mode but NEVER touch on --upgrade.
 USER_AUTHORED=(LEARNINGS.md verification.yml roadmap.md features)
+
+# Durable docs shipped into a target's .specfuse/docs/ so an initialized repo is
+# self-documenting without this checkout. Paths are relative to REPO_ROOT/docs.
+# Internal working notes under docs/dev/ are deliberately excluded. Versioned —
+# overlaid on --upgrade like the rest of the scaffold.
+DEPLOYABLE_DOCS=(
+  getting-started.md
+  methodology.md
+  skills.md
+  concepts/ralph-lineage.md
+  concepts/architecture-addendum-gates-and-iterative-planning.md
+)
 
 # --- helpers -------------------------------------------------------------- #
 
@@ -171,6 +184,28 @@ deploy_scripts() {
     rm -f "$dst/$f"
   done
   find "$dst" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
+}
+
+# deploy_docs — copy the allowlisted durable docs (DEPLOYABLE_DOCS) from
+# REPO_ROOT/docs into DEST/docs, preserving subpaths. Makes a target repo
+# self-documenting (methodology, skills catalog, concepts) without this checkout.
+# Versioned: runs in both INIT and --upgrade. Honors $DRY_RUN.
+deploy_docs() {
+  local src="$REPO_ROOT/docs"
+  local dst="$DEST/docs"
+  local f
+  if [[ $DRY_RUN -eq 1 ]]; then
+    for f in "${DEPLOYABLE_DOCS[@]}"; do
+      local verb="update"
+      [[ -e "$dst/$f" ]] || verb="add"
+      echo "  would $verb: .specfuse/docs/$f"
+    done
+    return 0
+  fi
+  for f in "${DEPLOYABLE_DOCS[@]}"; do
+    mkdir -p "$dst/$(dirname "$f")"
+    cp "$src/$f" "$dst/$f"
+  done
 }
 
 # Detect ci-check.sh in the target and write .specfuse/verification.yml.
@@ -349,6 +384,9 @@ if [[ $UPGRADE -eq 0 ]]; then
   # scripts/ ships via the explicit allowlist (internal tooling excluded).
   deploy_scripts
 
+  # durable docs ship into .specfuse/docs/ so the target is self-documenting.
+  deploy_docs
+
   # Strip any compiled-Python noise that may have been copied with scripts/.
   find "$DEST" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
 
@@ -393,6 +431,9 @@ else
   # scripts/ ships via the allowlist; also prunes internal files a pre-#55
   # init left behind in this target.
   deploy_scripts
+
+  # durable docs — overlaid like the rest of the versioned scaffold.
+  deploy_docs
 
   # Seed any user-authored files that are missing — happens when the
   # orchestrator or a partial init created .specfuse/ bare.

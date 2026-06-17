@@ -7,6 +7,11 @@ gate's work units are already drafted and waiting for your review. The same core
 into the Specfuse Orchestrator for multi-repo work; the environment-specific parts are
 isolated behind a seam (see the end of this file).
 
+> **New here?** `init.sh` ships the durable docs into `.specfuse/docs/`. Start with
+> [`docs/getting-started.md`](docs/getting-started.md) (install → first feature →
+> operating a run), then [`docs/skills.md`](docs/skills.md) and
+> [`docs/methodology.md`](docs/methodology.md).
+
 ## Layout
 
 ```
