@@ -1,9 +1,10 @@
 ---
 id: FEAT-2026-0019/G4-CLOSE
 type: close
-status: draft
+status: done
 attempts: 0
 planned_cost_usd: 1.50
+verdict: met
 ---
 
 <!--

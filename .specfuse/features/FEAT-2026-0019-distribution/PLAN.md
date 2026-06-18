@@ -5,7 +5,7 @@ slug: distribution
 branch: feat/FEAT-2026-0019-distribution
 roadmap_goal: Replace the curl-bash / init.sh-copy install with a PyPI-installable driver and a native Claude Code plugin, so consumers pip install the code and install Claude assets from a marketplace — one source of truth, versioned, pinnable.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 11.50
 ---
 

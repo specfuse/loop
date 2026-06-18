@@ -1,6 +1,6 @@
 ---
 gate: 4
-status: open
+status: passed
 ---
 
 <!--

@@ -115,3 +115,48 @@ Interactive; cost folded into the live session. No autonomous dispatch.
 - **Dogfood cutover + skill sync** — this repo still uses `.claude/skills/` symlinks;
   cutover to the published plugin, retiring the symlinks, and a `.specfuse/skills/`
   → plugin sync step are gate 4 (with init.sh deprecation).
+
+## Gate 4 — Bridge + deprecate (terminal)
+
+Completed interactively. The `specfuse` umbrella CLI (option a) landed in the
+specfuse/specfuse repo: a PEP 420 namespace contributor (`specfuse.cli`, no
+`specfuse/__init__.py`) that composes with the driver's `specfuse.loop`; console
+script `specfuse` with `upgrade` (pip-upgrade + point at `/plugin update`) and `init`
+(ensure driver + print bootstrap). Loop side: init.sh deprecation banner (v1.0;
+removed v1.1), `scripts/sync-skills.sh` (canonical skills → plugin, addressing the
+gate-3 drift defer), and README pip/plugin forward-path docs.
+
+Surprise: the umbrella's `specfuse init` cannot fully scaffold a new repo from pip —
+templates/rules still live in init.sh, not in package data. The bridge owns pip ↔
+plugin; pip-native scaffold-data delivery is a follow-up feature.
+
+Also: the CLI's pip `runner` was first bound as a default arg (`runner=subprocess.run`),
+which `mock.patch` couldn't override (default captured at def-time) — a real pip call
+fired in a test. Fixed by resolving the runner inside the function.
+
+### Cost analysis
+Interactive across gates 1–4; per-WU costs not tracked (only the abandoned gate-1
+autonomous T02 attempt, ~$5.63, is in events.jsonl). The interactive path delivered
+all four gates green where the per-WU loop dispatch could not pass gate 1 at all.
+
+### What the loop did NOT verify (terminal)
+- **Actual PyPI publish** of `specfuse-loop` and `specfuse` — operator configures the
+  trusted publisher + pushes the `v*` tags; `release.yml` runs the publish.
+- **Live marketplace install** — `/plugin marketplace add specfuse/specfuse` + install
+  in a fresh Claude Code session (validator passes; live run is operator-side).
+- **pip-native `specfuse init`** scaffolding (templates/rules as package data) —
+  deferred to a follow-up feature; until then init.sh is the scaffold bootstrap.
+- **Dogfood cutover** — this repo still uses `.claude/skills/` symlinks; retiring them
+  for the published plugin is operator-side once the plugin is installed.
+
+## Terminal verdict — verdict: met
+
+The feature's goal — a PyPI-installable driver + a Claude Code plugin marketplace,
+replacing the curl-bash/symlink install — is delivered and verified to the limit of
+what the loop can verify: `specfuse.loop` package + console scripts (gate 1), tag-
+triggered OIDC release pipeline + version-skew guard (gate 2), `specfuse/specfuse`
+marketplace + plugin validated (gate 3), `specfuse` umbrella CLI + init.sh
+deprecation + skill-sync (gate 4). The remaining steps are external/operator-owned
+(PyPI publish, live plugin install) or an explicitly-scoped follow-up (pip-native
+scaffolding). Recommend a follow-up feature: **scaffold-data in the pip package** so
+`specfuse init` fully replaces init.sh (enabling its v1.1 deletion).
