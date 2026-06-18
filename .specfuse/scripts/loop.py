@@ -157,6 +157,11 @@ class WorkUnit:
     # `produces` names files and IS machine-enforced by FEAT-2026-0022/T02's
     # presence gate (each path must exist and be non-empty at completion).
     produces: list[str] = field(default_factory=list)
+    # OPTIONAL extra verification gate sets, unioned onto the WU-type-selected set
+    # by verify(). Names index into verification.yml the same way the type sets do
+    # (e.g. `extra_gates: [live-verify]`). A name absent from verification.yml is a
+    # CONFIGURATION ERROR, never a silent pass. See issue #62.
+    extra_gates: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -329,6 +334,18 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `produces` must be a string or list of strings, "
             f"got {type(raw_produces).__name__!r}"
         )
+    raw_extra_gates = fm.get("extra_gates")
+    if raw_extra_gates is None:
+        extra_gates: list[str] = []
+    elif isinstance(raw_extra_gates, str):
+        extra_gates = [raw_extra_gates]
+    elif isinstance(raw_extra_gates, list):
+        extra_gates = [str(g) for g in raw_extra_gates]
+    else:
+        raise ValueError(
+            f"{path}: `extra_gates` must be a string or list of strings, "
+            f"got {type(raw_extra_gates).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -345,6 +362,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         verdict=verdict,
         produces_driver_helper=produces_driver_helper,
         produces=produces,
+        extra_gates=extra_gates,
     )
 
 
@@ -1328,6 +1346,29 @@ def verify(wu: WorkUnit, feature_dir: Path,
             f".specfuse/verification.yml for work-unit type '{wu.type}'. "
             f"This is not a work-unit failure — fix verification.yml and re-run."
         )
+    # Union any author-declared extra_gates sets onto the type-selected set,
+    # deduping by gate name so a set shared between the type default and an extra
+    # entry is not run twice (issue #62). An extra_gates name absent from
+    # verification.yml is a CONFIGURATION ERROR — same class as an empty type set,
+    # never a silent pass.
+    gate_set = list(gate_set)
+    seen_names = {g["name"] for g in gate_set}
+    for extra_name in wu.extra_gates:
+        if extra_name == set_name:
+            continue  # already the type-selected set
+        extra_set = cfg.get(extra_name)
+        if not extra_set:
+            return False, (
+                f"CONFIGURATION ERROR: work unit declares `extra_gates: "
+                f"[{extra_name}]` but no '{extra_name}' gates are configured in "
+                f".specfuse/verification.yml. This is not a work-unit failure — "
+                f"fix verification.yml (or the WU's extra_gates) and re-run."
+            )
+        for gate in extra_set:
+            if gate["name"] in seen_names:
+                continue
+            seen_names.add(gate["name"])
+            gate_set.append(gate)
     results, ok_all = [], True
     for gate in gate_set:
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
