@@ -72,17 +72,29 @@ In a target single-repo project:
 cloning to enable the pre-push hook (runs `scripts/smoke-test.sh` — same
 checks CI runs — before each `git push`). Bypass with `git push --no-verify`.
 
-```bash
-# from the specfuse-loop checkout
-./init.sh /path/to/your-project
+The driver installs from PyPI and the skills from the Claude Code marketplace:
 
-# then, in your project — no install step; the loop is stdlib-only
+```bash
+pip install specfuse-loop                       # the driver: `specfuse-loop` on PATH
+# in Claude Code: skills under the /specfuse: namespace
+#   /plugin marketplace add specfuse/specfuse
+#   /plugin install specfuse@specfuse
+
+# scaffold a target repo's .specfuse/ state (templates, rules, verification.yml)
+./init.sh /path/to/your-project                 # legacy installer (v1.0; removed in v1.1)
+
 cd /path/to/your-project
-$EDITOR .specfuse/verification.yml      # match the `code` gates to your stack
+$EDITOR .specfuse/verification.yml              # match the `code` gates to your stack
 # author your first feature folder under .specfuse/features/ from .specfuse/templates/
-python .specfuse/scripts/loop.py --dry-run
-python .specfuse/scripts/loop.py
+specfuse-loop --dry-run                          # or: python .specfuse/scripts/loop.py --dry-run
+specfuse-loop
 ```
+
+> **Distribution (FEAT-2026-0019).** Code ships via pip (`specfuse-loop`), the
+> `specfuse` umbrella CLI bridges pip ↔ plugin (`specfuse upgrade`), and Claude
+> assets ship via the [`specfuse/specfuse`](https://github.com/specfuse/specfuse)
+> marketplace. `init.sh` remains the scaffold bootstrap (laying down `.specfuse/`
+> state) until pip-native scaffolding lands; it prints a deprecation banner.
 
 > **One driver per working tree.** The driver holds an exclusive advisory lock on
 > `.specfuse/.loop.lock` for the duration of a run; a second driver targeting the
