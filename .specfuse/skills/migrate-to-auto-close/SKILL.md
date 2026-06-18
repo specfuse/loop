@@ -1,6 +1,6 @@
 ---
 name: migrate-to-auto-close
-description: Scan a Specfuse project's `.specfuse/features/` for features whose PLAN.md predates the deterministic auto-close predicate (FEAT-2026-0018). For each feature, surface eligibility for auto-close on its remaining gates, the predicate's verdict on already-passed gates (read-only), and a recommended action — without auto-rewriting any PLAN.md. Opt-in per feature. Triggers: /migrate-to-auto-close, "migrate to auto-close", "audit auto-close eligibility".
+description: "Scan a Specfuse project's `.specfuse/features/` for features whose PLAN.md predates the deterministic auto-close predicate (FEAT-2026-0018). For each feature, surface eligibility for auto-close on its remaining gates, the predicate's verdict on already-passed gates (read-only), and a recommended action \u2014 without auto-rewriting any PLAN.md. Opt-in per feature. Triggers: /migrate-to-auto-close, \"migrate to auto-close\", \"audit auto-close eligibility\"."
 ---
 
 <!--

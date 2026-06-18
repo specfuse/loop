@@ -1,6 +1,6 @@
 ---
 name: roadmap-archive
-description: Move a done or abandoned feature's detail section from .specfuse/roadmap.md to .specfuse/roadmap-archive.md, updating the Detail cell with a back-link. Invoke on /roadmap-archive <FEAT-ID>, /roadmap-archive --auto, or when the user asks to archive a done or abandoned feature.
+description: "Move a done or abandoned feature's detail section from .specfuse/roadmap.md to .specfuse/roadmap-archive.md, updating the Detail cell with a back-link. Invoke on /roadmap-archive <FEAT-ID>, /roadmap-archive --auto, or when the user asks to archive a done or abandoned feature."
 ---
 
 # roadmap-archive

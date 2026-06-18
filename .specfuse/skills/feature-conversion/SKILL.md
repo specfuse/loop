@@ -1,6 +1,6 @@
 ---
 name: feature-conversion
-description: Bring an existing Specfuse feature folder into conformance with the current scaffold's structural contract. Runs after `init.sh --upgrade` flags a feature as FAIL in the health report. Interactive only — drafts edits per lint error and asks before writing. Lint-driven; will not propose changes the linter doesn't require.
+description: "Bring an existing Specfuse feature folder into conformance with the current scaffold's structural contract. Runs after `init.sh --upgrade` flags a feature as FAIL in the health report. Interactive only \u2014 drafts edits per lint error and asks before writing. Lint-driven; will not propose changes the linter doesn't require."
 ---
 
 <!--

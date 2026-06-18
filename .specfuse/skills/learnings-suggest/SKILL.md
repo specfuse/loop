@@ -1,6 +1,6 @@
 ---
 name: learnings-suggest
-description: Scan attempt_outcome events across features, cluster non-passing attempts by (failure_class, failure_signature), and surface clusters above a configurable threshold as candidate LEARNINGS entries for the operator to promote. Read-only — does NOT auto-append to LEARNINGS.md.
+description: "Scan attempt_outcome events across features, cluster non-passing attempts by (failure_class, failure_signature), and surface clusters above a configurable threshold as candidate LEARNINGS entries for the operator to promote. Read-only \u2014 does NOT auto-append to LEARNINGS.md."
 ---
 
 <!--

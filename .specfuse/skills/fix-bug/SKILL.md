@@ -1,6 +1,6 @@
 ---
 name: fix-bug
-description: Triage and fix a reported bug — 1 bug = 1 branch = 1 PR, test-first. Use when the user references a GitHub issue number, asks to fix a bug, or pastes a bug report. Refuses if the work is large/complex/risky and proposes promoting to a feature instead. Triggers — "/fix-bug", "fix issue", "fix bug", "address issue NN", "patch NN", pasting an issue URL.
+description: "Triage and fix a reported bug \u2014 1 bug = 1 branch = 1 PR, test-first. Use when the user references a GitHub issue number, asks to fix a bug, or pastes a bug report. Refuses if the work is large/complex/risky and proposes promoting to a feature instead. Triggers \u2014 \"/fix-bug\", \"fix issue\", \"fix bug\", \"address issue NN\", \"patch NN\", pasting an issue URL."
 ---
 
 <!--

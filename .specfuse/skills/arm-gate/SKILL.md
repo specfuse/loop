@@ -1,6 +1,6 @@
 ---
 name: arm-gate
-description: At a gate boundary — driver halted with `awaiting_review` on the just-completed gate and next gate's WUs in `draft` — walk the drafts, accept / revise / reject each, flip statuses, mark the completed gate `passed`, and print the resume command. The human-review-and-arm checkpoint of the methodology, made fast.
+description: "At a gate boundary \u2014 driver halted with `awaiting_review` on the just-completed gate and next gate's WUs in `draft` \u2014 walk the drafts, accept / revise / reject each, flip statuses, mark the completed gate `passed`, and print the resume command. The human-review-and-arm checkpoint of the methodology, made fast."
 ---
 
 <!--

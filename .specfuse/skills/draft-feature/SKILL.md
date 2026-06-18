@@ -1,6 +1,6 @@
 ---
 name: draft-feature
-description: Interactively draft a Specfuse feature — its gate skeleton, gate 1's work units, and the matching files — for a major initiative in a Specfuse-integrated project. Reads roadmap, LEARNINGS, recent feature exemplars, binding rules, and the project itself; asks framing questions wearing multiple hats; proposes and only writes on accept. The drafting counterpart to authoring-work-units (per-WU craft) and feature-conversion (post-hoc fixes). Lean v0.1; expected to grow as real features are drafted with it.
+description: "Interactively draft a Specfuse feature \u2014 its gate skeleton, gate 1's work units, and the matching files \u2014 for a major initiative in a Specfuse-integrated project. Reads roadmap, LEARNINGS, recent feature exemplars, binding rules, and the project itself; asks framing questions wearing multiple hats; proposes and only writes on accept. The drafting counterpart to authoring-work-units (per-WU craft) and feature-conversion (post-hoc fixes). Lean v0.1; expected to grow as real features are drafted with it."
 ---
 
 <!--

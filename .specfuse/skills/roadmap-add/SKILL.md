@@ -1,6 +1,6 @@
 ---
 name: roadmap-add
-description: Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN ID by scanning three sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless).
+description: "Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN ID by scanning three sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless)."
 ---
 
 # roadmap-add

@@ -1,6 +1,6 @@
 ---
 name: adopt-feature
-description: List a GitHub repo's open `specfuse:feature` issues as a numbered pick list, accept the human's explicit choice, and scaffold a dispatchable loop-feature folder via adopt_feature.py — the "pick a GitHub issue and grind it" entrypoint for any Specfuse-integrated project.
+description: "List a GitHub repo's open `specfuse:feature` issues as a numbered pick list, accept the human's explicit choice, and scaffold a dispatchable loop-feature folder via adopt_feature.py \u2014 the \"pick a GitHub issue and grind it\" entrypoint for any Specfuse-integrated project."
 ---
 
 <!--

@@ -1,6 +1,6 @@
 ---
 name: wrap-feature
-description: Finalize a feature after its close ceremony — push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Supports both auto-close and full-ceremony features. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable.
+description: "Finalize a feature after its close ceremony \u2014 push the feature branch, open a PR, optionally watch CI, and point at the next feature pick. Supports both auto-close and full-ceremony features. Refuses to run on features whose PLAN.md is not yet `done`. Single-confirm for the push and PR steps; gracefully degrades when `gh` is unavailable."
 ---
 
 <!--
