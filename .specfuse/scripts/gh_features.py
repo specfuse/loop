@@ -1,98 +1,26 @@
-#!/usr/bin/env python3
+#\!/usr/bin/env python3
 #
-# Copyright 2026 Specfuse contributors
+# Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""Discovery: list a repo's open specfuse:feature GitHub issues as loop-feature candidates."""
+"""Shim — re-exports specfuse.loop.gh_features. Canonical code lives in the package.
 
-from __future__ import annotations
+This file ships in the scaffold for dogfood (`python .specfuse/scripts/gh_features.py`)
+and back-compat imports. It path-inserts the repo root so `specfuse.loop` resolves
+from source even when the package is not pip-installed in the running interpreter.
+"""
+import sys as _sys
+from pathlib import Path as _Path
 
-import json
-import re
-import subprocess
-import sys
-from typing import Any, Optional
+_root = _Path(__file__).resolve().parents[2]
+if str(_root) not in _sys.path:
+    _sys.path.insert(0, str(_root))
 
-# Matches [INIT-YYYY-NNNN/FNN] or [FEAT-YYYY-NNNN] at the start of a title.
-_TITLE_RE = re.compile(
-    r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|FEAT-\d{4}-\d{4}))\]\s*(?P<summary>.*)$"
-)
+from specfuse.loop import gh_features as _m  # noqa: E402
 
+# Mirror the package module's public namespace so importlib-loaded shims and
+# `from gh_features import X` back-compat both resolve every symbol.
+globals().update({k: v for k, v in vars(_m).items() if not k.startswith("__")})
 
-def _default_runner(repo: str) -> list:
-    """Shell out to gh and return parsed JSON issue list. Not called in tests."""
-    result = subprocess.run(
-        [
-            "gh", "issue", "list",
-            "--repo", repo,
-            "--label", "specfuse:feature",
-            "--state", "open",
-            "--json", "number,title,labels,url,body",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return json.loads(result.stdout)
-
-
-def _extract_label_value(labels: list, prefix: str) -> Optional[str]:
-    for label in labels:
-        name = label.get("name", "")
-        if name.startswith(prefix):
-            return name[len(prefix):]
-    return None
-
-
-def list_features(repo: str, runner: Any = None) -> list:
-    """Return loop-feature candidates for open specfuse:feature issues in repo.
-
-    runner: callable(repo: str) -> list[dict]. Defaults to shelling out to gh.
-    Issues whose titles lack a parseable [<id>] tag are skipped with a warning.
-    """
-    if runner is None:
-        runner = _default_runner
-
-    issues = runner(repo)
-    candidates = []
-
-    for issue in issues:
-        title = issue.get("title", "")
-        m = _TITLE_RE.match(title)
-        if not m:
-            print(
-                f"WARNING: skipping issue #{issue.get('number')}: "
-                f"no [<id>] tag in title: {title!r}",
-                file=sys.stderr,
-            )
-            continue
-
-        labels = issue.get("labels", [])
-        candidates.append({
-            "feature_id": m.group("id"),
-            "title": m.group("summary").strip(),
-            "initiative": _extract_label_value(labels, "initiative:"),
-            "task_type": _extract_label_value(labels, "type:"),
-            "autonomy": _extract_label_value(labels, "autonomy:") or "review",
-            "url": issue.get("url", ""),
-            "number": issue.get("number"),
-            "body": issue.get("body", ""),
-        })
-
-    return candidates
-
-
-def main(_runner: Any = None) -> None:
-    """CLI entrypoint. _runner is injectable for tests."""
-    if len(sys.argv) != 2:
-        print(f"Usage: {sys.argv[0]} <owner/repo>", file=sys.stderr)
-        sys.exit(1)
-
-    repo = sys.argv[1]
-    candidates = list_features(repo, runner=_runner)
-    for c in candidates:
-        print(f"{c['feature_id']}\t{c['task_type']}\t{c['autonomy']}\t{c['url']}")
-
-
-if __name__ == "__main__":
-    main()
+if __name__ == "__main__":  # pragma: no cover
+    _sys.exit(_m.main() if hasattr(_m, "main") else 0)

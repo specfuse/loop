@@ -123,12 +123,19 @@ _SCHEMA_TMPDIR_OBJ = tempfile.TemporaryDirectory()
 _SCHEMA_ROOT = Path(_SCHEMA_TMPDIR_OBJ.name)
 _populate_schema_dir(_SCHEMA_ROOT)
 
+# Set the schema-root env BEFORE importing the package: validate_event resolves
+# SCHEMA_ROOT into a module-level constant at import time.
 os.environ["SPECFUSE_SCHEMA_ROOT"] = str(_SCHEMA_ROOT)
 
-_mod_spec = importlib.util.spec_from_file_location("validate_event_under_test", SCRIPT)
-_ve_mod = importlib.util.module_from_spec(_mod_spec)
-sys.modules["validate_event_under_test"] = _ve_mod
-_mod_spec.loader.exec_module(_ve_mod)
+# The driver code lives in the specfuse.loop package now (FEAT-2026-0019); the
+# .specfuse/scripts/validate-event.py shim re-exports it. Import the package
+# directly so in-process mock.patch.object(ve, ...) patches the same module the
+# functions read their globals from. `SCRIPT` (above) is still used by the
+# subprocess tests, which exercise the shim end-to-end. If the package was already
+# imported by an earlier test (stale SCHEMA_ROOT), reload it now that the env is set.
+import importlib as _importlib  # noqa: E402
+import specfuse.loop.validate_event as _ve_mod  # noqa: E402
+_ve_mod = _importlib.reload(_ve_mod)
 
 ve = _ve_mod  # brevity alias
 
