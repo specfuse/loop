@@ -87,3 +87,31 @@ No autonomous dispatch, so no per-WU `planned_cost_usd` reconciliation applies.
 - **The wheel build in CI** — built and inspected once locally (sandbox-off); the
   standing verification is `release.yml`'s build+install+test job on tag. Local
   rebuild needs network and was deferred.
+
+## Gate 3 — Plugin
+
+Completed interactively. Created the separate **`specfuse/specfuse`** umbrella repo
+(public, Apache-2.0) as a Claude Code marketplace + the `specfuse` plugin shipping
+the 18 gate-cycle skills (namespaced `/specfuse:`). Loop-side change: quoted all
+skill `description:` frontmatter (commit `dfee510`).
+
+Surprise: `claude plugin validate` (strict JS YAML parser) rejected skills whose
+unquoted `description` contained a `: ` — Claude Code's lenient skill loader had
+accepted them all along, so the bug was invisible until the plugin context. Caught
+by the validator, not by any loop test. Fix: quote every description as a JSON
+double-quoted YAML scalar.
+
+Decisions refining roadmap Part B: dropped the "caveman hooks → plugin hooks.json"
+line (caveman is external/personal; the public plugin ships skills only), and
+hard-cut to `/specfuse:` with no back-compat aliases (no external consumers of the
+bare names yet).
+
+### Cost analysis
+Interactive; cost folded into the live session. No autonomous dispatch.
+
+### What the loop did NOT verify
+- **Live marketplace install** — validator passes; actually adding the marketplace
+  + installing in a fresh Claude Code session is an operator step.
+- **Dogfood cutover + skill sync** — this repo still uses `.claude/skills/` symlinks;
+  cutover to the published plugin, retiring the symlinks, and a `.specfuse/skills/`
+  → plugin sync step are gate 4 (with init.sh deprecation).
