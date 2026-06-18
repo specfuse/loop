@@ -64,3 +64,26 @@ A feature that migrates the verification harness the driver uses to gate itself 
 be split into separately-gated WUs: each WU's oracle is the very thing mid-migration,
 so no WU passes alone. Author such features as a single atomic change (or run them
 interactively), not as a per-WU loop sequence.
+
+## Gate 2 — Publish
+
+Completed interactively (commit `f4f1d02`). Delivered the tag-triggered `release.yml`
+(build → test-against-artifact → OIDC publish), the `check_scaffold_version()` startup
+guard + `.specfuse/VERSION` stamping via init.sh, and scoped the wheel to `specfuse*`.
+
+Surprise: setuptools auto-discovery swept `tests/`, `docs/`, `scripts/` into the first
+wheel — `packages.find` had to be scoped to `specfuse*`. Caught by inspecting the
+built wheel's top-level, not by any test; `release.yml`'s artifact step is the
+standing guard.
+
+### Cost analysis
+Gate authored interactively (cost folded into the live session, not per-WU tracked).
+No autonomous dispatch, so no per-WU `planned_cost_usd` reconciliation applies.
+
+### What the loop did NOT verify
+- **Real PyPI publish** — only OIDC-trusted-publishing *wiring* is in `release.yml`;
+  the actual publish needs the operator to configure the trusted publisher on
+  pypi.org for `specfuse-loop` and push a `v*` tag.
+- **The wheel build in CI** — built and inspected once locally (sandbox-off); the
+  standing verification is `release.yml`'s build+install+test job on tag. Local
+  rebuild needs network and was deferred.

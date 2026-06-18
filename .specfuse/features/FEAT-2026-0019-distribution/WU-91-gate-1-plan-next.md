@@ -2,7 +2,7 @@
 id: FEAT-2026-0019/G1-PLAN
 type: plan-next
 effort: high
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 2.50
 ---
