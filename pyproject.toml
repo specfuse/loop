@@ -55,4 +55,9 @@ specfuse-loop = "specfuse.loop.loop:main"
 specfuse-lint = "specfuse.loop.lint_plan:main"
 
 [tool.setuptools.packages.find]
+# Ship ONLY the specfuse namespace package. Without this scope, setuptools'
+# auto-discovery sweeps tests/, docs/, and scripts/ into the wheel. The driver's
+# data (templates, rules, features) lives in the consumer's `.specfuse/`, not in
+# the wheel, so the package is pure code.
+include = ["specfuse*"]
 namespaces = true

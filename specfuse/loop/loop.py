@@ -59,6 +59,12 @@ REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
 DRIVER_VERSION = "0.2.0"
+# Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
+# version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
+# the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
+# this only when a scaffold-format change makes an older `.specfuse/` undriveable.
+MIN_SCAFFOLD_VERSION = "0.2.0"
+SCAFFOLD_VERSION_PATH = SPECFUSE_DIR / "VERSION"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
 
 # How to launch a fresh agent. {model} and {effort} are filled per WU; prompt is piped on stdin.
@@ -3441,6 +3447,43 @@ def run(
             lock_fd.close()
 
 
+def _parse_version(s: str) -> tuple[int, ...]:
+    """Lenient dotted-int parse for version compare. Non-numeric leading junk in a
+    component (e.g. a `-rc1` suffix) is dropped; missing components count as 0. No
+    third-party `packaging` dependency — the driver stays stdlib-only."""
+    parts: list[int] = []
+    for tok in str(s).strip().split("."):
+        m = re.match(r"\d+", tok)
+        parts.append(int(m.group()) if m else 0)
+    return tuple(parts) or (0,)
+
+
+def check_scaffold_version(scaffold_path: Path | None = None,
+                           driver_min: str = MIN_SCAFFOLD_VERSION) -> str:
+    """Fail loud (SystemExit) if the consumer's `.specfuse/VERSION` is missing, empty,
+    or older than this driver supports. The scaffold declares its own version; the
+    driver requires it to be >= MIN_SCAFFOLD_VERSION. Returns the scaffold version
+    string on success. `scaffold_path` is injectable for testing."""
+    path = scaffold_path or SCAFFOLD_VERSION_PATH
+    if not path.exists():
+        sys.exit(
+            f"ERROR: {path} is missing — this scaffold predates driver version "
+            f"checking. Run `specfuse upgrade` (or ./init.sh --upgrade <repo>) to "
+            f"stamp it. Driver {DRIVER_VERSION} requires scaffold >= {driver_min}."
+        )
+    raw = path.read_text().strip()
+    if not raw:
+        sys.exit(f"ERROR: {path} is empty. Run `specfuse upgrade` to restamp it.")
+    raw = raw.splitlines()[0].strip()
+    if _parse_version(raw) < _parse_version(driver_min):
+        sys.exit(
+            f"ERROR: scaffold version {raw} is older than this driver requires "
+            f"(driver {DRIVER_VERSION} needs scaffold >= {driver_min}). Run "
+            f"`specfuse upgrade` (or ./init.sh --upgrade <repo>) to update the scaffold."
+        )
+    return raw
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
     ap.add_argument("--feature", help="Feature dir name under .specfuse/features/ "
@@ -3453,6 +3496,7 @@ def main() -> int:
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+    check_scaffold_version()
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
 
 

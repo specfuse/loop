@@ -87,7 +87,7 @@ DEST="$TARGET/.specfuse"
 # NOTE: `scripts` is deliberately NOT here — it is deployed file-by-file via an
 # explicit allowlist (DEPLOYABLE_SCRIPTS) so specfuse-internal tooling never
 # ships to targets. See deploy_scripts() and issue #55.
-VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md)
+VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md VERSION)
 
 # scripts/ allowlist — ONLY these files are deployed to a target project. The
 # driver + its helpers + the GitHub/feature tooling. A new script under
