@@ -81,7 +81,27 @@ gates:
         depends_on: [FEAT-2026-0026/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []   # drafted by gate 1's plan-next (specfuse init)
+    work_units:
+      - id: FEAT-2026-0026/T04
+        file: WU-04-init-specfuse-core.md
+        depends_on: [FEAT-2026-0026/T02]
+      - id: FEAT-2026-0026/T05
+        file: WU-05-claude-wiring-gitignore.md
+        depends_on: [FEAT-2026-0026/T04]
+      - id: FEAT-2026-0026/T06
+        file: WU-06-init-integration-tests.md
+        depends_on:
+          - FEAT-2026-0026/T04
+          - FEAT-2026-0026/T05
+      - id: FEAT-2026-0026/G2-CLOSE-INTERMEDIATE
+        file: WU-92-gate-2-close-intermediate.md
+        depends_on:
+          - FEAT-2026-0026/T04
+          - FEAT-2026-0026/T05
+          - FEAT-2026-0026/T06
+      - id: FEAT-2026-0026/G2-PLAN
+        file: WU-93-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0026/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
