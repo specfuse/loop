@@ -2,12 +2,16 @@
 id: FEAT-2026-0026/T06
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - tests/test_init_integration.py
+duration_seconds: 489.771
+cost_usd: 1.011799
+input_tokens: 1128
+output_tokens: 22758
 ---
 
 <!--
