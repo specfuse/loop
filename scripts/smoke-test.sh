@@ -48,13 +48,13 @@ echo "==> [gate: tests] unittest"
 "$PYTHON" -m unittest discover -s tests -v -b
 
 echo "==> [gate: lint] ruff"
-ruff check .specfuse/scripts tests scripts
+ruff check specfuse .specfuse/scripts tests scripts
 
 echo "==> [gate: security] bandit"
-bandit -r .specfuse/scripts -ll
+bandit -r specfuse .specfuse/scripts -ll
 
 echo "==> [gate: coverage] coverage --fail-under=90"
-coverage run --source=.specfuse/scripts -m unittest discover -s tests \
+coverage run --source=specfuse -m unittest discover -s tests \
   && coverage report --fail-under=90
 
 echo "==> [gate: leak-scan] leak_scan --all"

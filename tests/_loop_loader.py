@@ -27,13 +27,25 @@ def load_module(relpath: str, module_name: str):
     return mod
 
 
+# The driver code now lives in the `specfuse.loop` package (FEAT-2026-0019); the
+# `.specfuse/scripts/*.py` files are thin shims over it. Tests import the package
+# directly so they exercise the canonical code and monkeypatching takes effect on
+# the same module the driver runs. `load_module` remains for any test that still
+# needs to exec a script file by path.
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+
 def load_loop():
-    return load_module(".specfuse/scripts/loop.py", "loop_under_test")
+    import specfuse.loop.loop as m
+    return m
 
 
 def load_lint():
-    return load_module(".specfuse/scripts/lint_plan.py", "lint_plan_under_test")
+    import specfuse.loop.lint_plan as m
+    return m
 
 
 def load_miniyaml():
-    return load_module(".specfuse/scripts/_miniyaml.py", "miniyaml_under_test")
+    import specfuse.loop._miniyaml as m
+    return m

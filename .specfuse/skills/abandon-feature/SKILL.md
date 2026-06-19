@@ -1,6 +1,6 @@
 ---
 name: abandon-feature
-description: Cleanly abandon the active feature when retry isn't worth it. Flips every non-`done` WU to `abandoned`, every non-`passed` gate to `passed`, PLAN.md `status: active` → `abandoned`, and the roadmap row's status column to `abandoned`. Single up-front confirmation surfaces all four surfaces before any write.
+description: "Cleanly abandon the active feature when retry isn't worth it. Flips every non-`done` WU to `abandoned`, every non-`passed` gate to `passed`, PLAN.md `status: active` \u2192 `abandoned`, and the roadmap row's status column to `abandoned`. Single up-front confirmation surfaces all four surfaces before any write."
 ---
 
 <!--

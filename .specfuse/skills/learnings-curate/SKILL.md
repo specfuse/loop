@@ -1,6 +1,6 @@
 ---
 name: learnings-curate
-description: Compaction counterpart to learnings-suggest. Scan .specfuse/LEARNINGS.md, cluster near-duplicate and superseded entries, and propose-and-confirm three moves per cluster — merge duplicates, retire superseded entries into LEARNINGS-archive.md, and flag broadly-applicable rules for promotion into .specfuse/rules/*.md — to bound the planning-loaded LEARNINGS set. Writes only on explicit operator accept. Use when LEARNINGS.md has grown large enough to inflate planning-context cost or dilute signal.
+description: "Compaction counterpart to learnings-suggest. Scan .specfuse/LEARNINGS.md, cluster near-duplicate and superseded entries, and propose-and-confirm three moves per cluster \u2014 merge duplicates, retire superseded entries into LEARNINGS-archive.md, and flag broadly-applicable rules for promotion into .specfuse/rules/*.md \u2014 to bound the planning-loaded LEARNINGS set. Writes only on explicit operator accept. Use when LEARNINGS.md has grown large enough to inflate planning-context cost or dilute signal."
 ---
 
 <!--

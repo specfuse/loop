@@ -1,6 +1,6 @@
 ---
 name: gate-status
-description: Report where the loop stands on the active feature. Walks the current gate's WU statuses, reads events.jsonl and per-attempt notes for blocked units, and synthesizes a structured diagnosis — what's blocked, likely root cause, options, and a recommended next action. Read-only. Run after the loop driver halts on a blocked WU and you're coming back to figure out what to do.
+description: "Report where the loop stands on the active feature. Walks the current gate's WU statuses, reads events.jsonl and per-attempt notes for blocked units, and synthesizes a structured diagnosis \u2014 what's blocked, likely root cause, options, and a recommended next action. Read-only. Run after the loop driver halts on a blocked WU and you're coming back to figure out what to do."
 ---
 
 <!--

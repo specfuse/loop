@@ -87,7 +87,7 @@ DEST="$TARGET/.specfuse"
 # NOTE: `scripts` is deliberately NOT here — it is deployed file-by-file via an
 # explicit allowlist (DEPLOYABLE_SCRIPTS) so specfuse-internal tooling never
 # ships to targets. See deploy_scripts() and issue #55.
-VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md)
+VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md VERSION)
 
 # scripts/ allowlist — ONLY these files are deployed to a target project. The
 # driver + its helpers + the GitHub/feature tooling. A new script under
@@ -365,6 +365,26 @@ EOF
   fi
 }
 
+# deprecation_banner — printed after init/upgrade. init.sh is the LEGACY install
+# path (v1.0): scheduled for removal in v1.1 once pip-native scaffolding lands. The
+# driver now ships on PyPI and the skills via the Claude Code marketplace.
+deprecation_banner() {
+  cat <<'BANNER'
+
+────────────────────────────────────────────────────────────────────────────
+NOTE: init.sh is the legacy install path (v1.0) and will be removed in v1.1.
+The forward path:
+  • Driver:  pip install specfuse-loop      (run `specfuse-loop` instead of
+             python .specfuse/scripts/loop.py)
+  • CLI:     pip install specfuse           (`specfuse upgrade` / `specfuse init`)
+  • Skills:  /plugin marketplace add specfuse/specfuse
+             /plugin install specfuse@specfuse     (skills become /specfuse:*)
+Your `.specfuse/` state (features, LEARNINGS, roadmap, verification.yml) is
+unaffected — only how the code + skills are delivered changes.
+────────────────────────────────────────────────────────────────────────────
+BANNER
+}
+
 # --- INIT mode ------------------------------------------------------------ #
 
 if [[ $UPGRADE -eq 0 ]]; then
@@ -402,6 +422,7 @@ if [[ $UPGRADE -eq 0 ]]; then
   echo "Scaffolded Specfuse Loop into $DEST"
   echo
   wire_claude_code
+  deprecation_banner
   echo
 
 # --- UPGRADE mode --------------------------------------------------------- #
@@ -494,6 +515,7 @@ else
   fi
   wire_claude_code
   echo
+  [[ $DRY_RUN -eq 0 ]] && deprecation_banner
 
   # --- feature health report ---------------------------------------------- #
   # Lint every existing feature folder against the new scaffold's structural

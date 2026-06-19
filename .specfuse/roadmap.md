@@ -34,13 +34,14 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-2026-0016) |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
-| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | planned | — | — |
+| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | done | — | — |
 | FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | done | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | [→ archive](roadmap-archive.md#feat-2026-0021) |
 | FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
 | FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
+| FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -415,7 +416,7 @@ is installed) but its body shrinks to "install pip package, hand off to
 - Sandboxed / CI environments that can't reach PyPi: vendored mode
   (Part A) is the supported carve-out, not the default.
 
-**Status: planned.** Likely 3–4 gates: (1) repackage driver as pip
+**Status: done.** Likely 3–4 gates: (1) repackage driver as pip
 package + green test suite via `pip install -e .`; (2) GitHub Actions
 publish path + first tagged release; (3) Claude Code plugin + marketplace
 PR; (4) bridge command + deprecation of `init.sh` v1.0. Each gate
@@ -579,6 +580,38 @@ separated from feature-specific history. Closes the missing half of the
 methodology's feedback loop: today it can only grow, never compact.
 
 **Status: planned.**
+
+## FEAT-2026-0026 — Scaffold-data in the pip package: `specfuse init` replaces init.sh
+
+**Why.** FEAT-2026-0019 shipped the pip driver (`specfuse-loop`), the `specfuse`
+umbrella CLI, and the Claude Code plugin — but `specfuse init` cannot yet scaffold a
+new repo from pip alone: the scaffold data (`templates/`, `rules/`,
+`verification.yml.example`, `roadmap.template.md`, `LEARNINGS.template.md`) still lives
+in the loop repo and ships only via the bash `init.sh`. So `init.sh` remains the
+bootstrap and carries a v1.0 deprecation banner it cannot yet honor — v1.1 cannot
+delete it until pip-native scaffolding exists. Surfaced in FEAT-2026-0019's gate-4
+retrospective (terminal verdict's recommended follow-up).
+
+**Goal.** Ship the scaffold data inside the `specfuse-loop` (or `specfuse`) package and
+have `specfuse init <repo>` lay down a target's `.specfuse/` from package resources,
+fully replacing `init.sh`.
+
+- Package the templates/rules/examples as package data, loaded via
+  `importlib.resources` (no reliance on a source checkout).
+- `specfuse init` writes `.specfuse/` (templates, rules, verification.yml seed,
+  roadmap + LEARNINGS seeds, `.specfuse/VERSION` stamp) and wires `.claude/` — the
+  `init.sh` behavior, in-process and pip-delivered.
+- `specfuse upgrade` overlays the versioned scaffold from the installed package
+  version (the `--upgrade` path), so upgrades follow `pip install -U`.
+- Delete `init.sh` (v1.1) once parity is proven; keep a thin curl-bash bootstrap only
+  for the no-pip first-touch case if still needed.
+
+**Benefits.** `init.sh`'s deprecation becomes real (v1.1 deletion unblocked). One
+delivery channel (pip) for both code and scaffold; offline/sandboxed installs work
+from the wheel; version-skew between scaffold and driver collapses to the package
+version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
+
+**Status: planned.** Depends on FEAT-2026-0019 (the package + CLI it extends).
 
 ## Notes
 

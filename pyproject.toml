@@ -50,8 +50,14 @@ Source = "https://github.com/specfuse/loop"
 [tool.ruff]
 target-version = "py310"
 
-# The loop driver and linter are invoked as scripts from a target repo's
-# .specfuse/scripts/ directory rather than installed as console entry points.
-# This file exists to declare the runtime dependency (PyYAML) cleanly.
-[tool.setuptools]
-py-modules = []
+[project.scripts]
+specfuse-loop = "specfuse.loop.loop:main"
+specfuse-lint = "specfuse.loop.lint_plan:main"
+
+[tool.setuptools.packages.find]
+# Ship ONLY the specfuse namespace package. Without this scope, setuptools'
+# auto-discovery sweeps tests/, docs/, and scripts/ into the wheel. The driver's
+# data (templates, rules, features) lives in the consumer's `.specfuse/`, not in
+# the wheel, so the package is pure code.
+include = ["specfuse*"]
+namespaces = true

@@ -1,6 +1,6 @@
 ---
 name: authoring-work-units
-description: How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Lean; eight evidence-backed rules, one per spot a real run has tripped on.
+description: "How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Lean; eight evidence-backed rules, one per spot a real run has tripped on."
 ---
 
 <!--

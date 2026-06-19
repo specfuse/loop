@@ -1,6 +1,6 @@
 ---
 name: derive-verification
-description: Interactively draft a comprehensive `.specfuse/verification.yml` for a target single-repo project by inspecting its CI/CD, tooling manifests, and code — asking the user only what evidence cannot resolve — and reconciling the findings against the Specfuse methodology's five gate categories. Drafts; never auto-writes. Use this when bootstrapping the loop in a project that already has CI or tooling worth deriving gates from.
+description: "Interactively draft a comprehensive `.specfuse/verification.yml` for a target single-repo project by inspecting its CI/CD, tooling manifests, and code \u2014 asking the user only what evidence cannot resolve \u2014 and reconciling the findings against the Specfuse methodology's five gate categories. Drafts; never auto-writes. Use this when bootstrapping the loop in a project that already has CI or tooling worth deriving gates from."
 ---
 
 <!--

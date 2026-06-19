@@ -1581,3 +1581,15 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   (c) set the close verdict to `partially_met`/`met_locally` so the driver holds
   the terminal flips until the operator confirms — never `met` on an unconfirmed
   live oracle.
+
+- [FEAT-2026-0019/G1] A feature that migrates the verification harness the driver
+  itself runs to gate work (the test loader, `verification.yml` gate set, packaging
+  of the driver code) cannot be decomposed into separately-gated loop WUs: each WU's
+  exit oracle is the very surface being migrated, so no WU can pass alone and the
+  driver thrashes (here: one T02 attempt burned ~$5.63 / 49 min on
+  `ModuleNotFoundError: No module named 'specfuse'` before abandonment). Author such
+  "harness migration" features as a SINGLE atomic change, or complete them
+  interactively; do not split package-extraction + shim + test/coverage migration
+  into three dispatched WUs gated by the half-migrated harness. Tell at draft time:
+  if a WU edits `verification.yml`, the test loader, or how the driver's own code is
+  imported, its sibling WUs share a broken oracle until all land together.

@@ -1,6 +1,6 @@
 ---
 name: specfuse-verification
-description: Run and report Specfuse work-unit verification gates before declaring a task done. Use this skill whenever you are executing a Specfuse work unit and need to confirm the work is actually complete — running tests, coverage, linting, compiler-warning, and security-scan gates and reporting structured evidence. Use it even when the work "looks done"; declaring complete without running the gates is the single most common failure mode and this skill exists to prevent it.
+description: "Run and report Specfuse work-unit verification gates before declaring a task done. Use this skill whenever you are executing a Specfuse work unit and need to confirm the work is actually complete \u2014 running tests, coverage, linting, compiler-warning, and security-scan gates and reporting structured evidence. Use it even when the work \"looks done\"; declaring complete without running the gates is the single most common failure mode and this skill exists to prevent it."
 ---
 
 <!--

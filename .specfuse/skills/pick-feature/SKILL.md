@@ -1,6 +1,6 @@
 ---
 name: pick-feature
-description: Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, loop.py if gate 1 is detailed). The human picks; the skill executes the pick.
+description: "Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, loop.py if gate 1 is detailed). The human picks; the skill executes the pick."
 ---
 
 <!--
