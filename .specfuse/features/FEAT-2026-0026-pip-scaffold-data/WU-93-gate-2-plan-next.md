@@ -2,9 +2,13 @@
 id: FEAT-2026-0026/G2-PLAN
 type: plan-next
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
+duration_seconds: 313.888
+cost_usd: 2.152223
+input_tokens: 9415
+output_tokens: 24314
 ---
 
 <!--

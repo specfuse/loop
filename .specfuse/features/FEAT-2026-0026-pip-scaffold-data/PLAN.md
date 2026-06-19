@@ -105,10 +105,25 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Terminal close scaffolded now; gate 2's plan-next sets real depends_on.
+      - id: FEAT-2026-0026/T07
+        file: WU-07-upgrade-specfuse-core.md
+        depends_on: [FEAT-2026-0026/T04]
+      - id: FEAT-2026-0026/T08
+        file: WU-08-init-sh-shim.md
+        depends_on:
+          - FEAT-2026-0026/T04
+          - FEAT-2026-0026/T05
+          - FEAT-2026-0026/T07
+      - id: FEAT-2026-0026/T09
+        file: WU-09-upgrade-integration-tests.md
+        depends_on: [FEAT-2026-0026/T07]
+      # Terminal gate: single G3-CLOSE collapses retro+lessons+docs+verdict.
       - id: FEAT-2026-0026/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0026/T07
+          - FEAT-2026-0026/T08
+          - FEAT-2026-0026/T09
 ```
 
 ## Notes
