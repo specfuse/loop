@@ -1,0 +1,11 @@
+# Loop gitignore additions — written by specfuse init / specfuse upgrade.
+# Un-ignore .specfuse/ in case the repo's root .gitignore already ignores it;
+# the loop driver uses git as its state backend and silently misbehaves when
+# .specfuse/ is untracked.
+!.specfuse/
+# Ignore per-feature work/ scratch directories (large, ephemeral).
+.specfuse/**/work/
+# Ignore loop runtime artifacts.
+.specfuse/.loop.lock
+.specfuse/.scratch-*
+.specfuse/scripts/__pycache__/

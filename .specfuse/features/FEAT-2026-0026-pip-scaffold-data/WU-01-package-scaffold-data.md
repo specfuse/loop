@@ -1,12 +1,16 @@
 ---
 id: FEAT-2026-0026/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/data/VERSION
   - pyproject.toml
+duration_seconds: 285.068
+cost_usd: 0.999448
+input_tokens: 32
+output_tokens: 11644
 ---
 
 <!--

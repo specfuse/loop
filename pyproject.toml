@@ -56,8 +56,12 @@ specfuse-lint = "specfuse.loop.lint_plan:main"
 
 [tool.setuptools.packages.find]
 # Ship ONLY the specfuse namespace package. Without this scope, setuptools'
-# auto-discovery sweeps tests/, docs/, and scripts/ into the wheel. The driver's
-# data (templates, rules, features) lives in the consumer's `.specfuse/`, not in
-# the wheel, so the package is pure code.
+# auto-discovery sweeps tests/, docs/, and scripts/ into the wheel.
 include = ["specfuse*"]
 namespaces = true
+
+[tool.setuptools.package-data]
+# Include the scaffold seed so `specfuse init` / `specfuse upgrade` can copy
+# templates, rules, and other seed files out of the wheel without needing the
+# loop source repo on disk.
+"specfuse.loop" = ["data/**/*", "data/*"]
