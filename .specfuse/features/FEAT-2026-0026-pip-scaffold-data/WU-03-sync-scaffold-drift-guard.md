@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0026/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - scripts/sync-scaffold.sh
   - tests/test_scaffold_data_in_sync.py
+duration_seconds: 513.539
+cost_usd: 1.317362
+input_tokens: 130
+output_tokens: 22015
 ---
 
 <!--

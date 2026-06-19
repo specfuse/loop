@@ -1,0 +1,71 @@
+# Copyright 2026 Specfuse Contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# Drift guard: every file in specfuse/loop/data/ must byte-match its canonical
+# .specfuse/ counterpart. Fails CI if the two trees diverge.
+# Run scripts/sync-scaffold.sh to restore parity.
+
+import pathlib
+import unittest
+
+REPO_ROOT = pathlib.Path(__file__).parent.parent
+CANONICAL = REPO_ROOT / ".specfuse"
+PACKAGE_DATA = REPO_ROOT / "specfuse" / "loop" / "data"
+
+# Explicit manifest — every file the sync script manages.
+TRACKED = {
+    "VERSION",
+    "gitignore.snippet",
+    "verification.yml.example",
+    "roadmap.template.md",
+    "LEARNINGS.template.md",
+    "templates/GATE.template.md",
+    "templates/PLAN.template.md",
+    "templates/WU.template.md",
+    "rules/correlation-ids.md",
+    "rules/never-touch.md",
+    "rules/result-contract.md",
+    "rules/security-boundaries.md",
+}
+
+
+class TestScaffoldDataInSync(unittest.TestCase):
+    def test_package_data_matches_canonical(self):
+        """Each tracked file in specfuse/loop/data/ must byte-match .specfuse/."""
+        mismatches = []
+        for rel in sorted(TRACKED):
+            canonical_path = CANONICAL / rel
+            package_path = PACKAGE_DATA / rel
+            if not canonical_path.exists():
+                mismatches.append(f"canonical missing: {rel}")
+                continue
+            if not package_path.exists():
+                mismatches.append(f"package copy missing: {rel}")
+                continue
+            if canonical_path.read_bytes() != package_path.read_bytes():
+                mismatches.append(f"content differs: {rel}")
+        if mismatches:
+            self.fail(
+                "Scaffold data out of sync with canonical sources.\n"
+                "Run: scripts/sync-scaffold.sh\n\n"
+                "Diffs:\n" + "\n".join(f"  {m}" for m in mismatches)
+            )
+
+    def test_no_orphan_files_in_package_data(self):
+        """No files in specfuse/loop/data/ that are absent from the sync manifest."""
+        actual = {
+            str(p.relative_to(PACKAGE_DATA))
+            for p in PACKAGE_DATA.rglob("*")
+            if p.is_file()
+        }
+        orphans = actual - TRACKED
+        if orphans:
+            self.fail(
+                "Unexpected files in specfuse/loop/data/ not in sync manifest.\n"
+                "Add them to scripts/sync-scaffold.sh and the TRACKED set here:\n"
+                + "\n".join(f"  {p}" for p in sorted(orphans))
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

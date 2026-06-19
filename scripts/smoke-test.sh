@@ -63,5 +63,8 @@ echo "==> [gate: leak-scan] leak_scan --all"
 echo "==> [gate: leak-scan-hook] bats"
 bats tests/leak_scan_hook.bats
 
+echo "==> [gate: sync-scaffold-bats] bats"
+bats tests/sync_scaffold.bats
+
 echo
 echo "smoke test: OK"
