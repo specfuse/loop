@@ -68,7 +68,7 @@ jobs:
           test "$TAG" = "$DRV" || { echo "::error::tag v$TAG != DRIVER_VERSION $DRV"; exit 1; }
 
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dist
           path: dist/
@@ -82,7 +82,7 @@ jobs:
       id-token: write   # OIDC — required for trusted publishing; no API token
     steps:
       - name: Download dist artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: dist
           path: dist/
