@@ -2,7 +2,7 @@
 id: FEAT-2026-0026/T05
 type: implementation
 effort: high
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 produces:
@@ -51,10 +51,13 @@ HEAD (functions absent) and passes after this WU; paired with
      appended if the file exists, created if not;
    - `.claude/CLAUDE.md` containing the `@.specfuse/rules/...` import block for all four
      binding rules;
-   - `.claude/settings.json` with the loop-script Bash allowlist;
-   - `.claude/settings.json` (or the documented plugin-config location) with
-     `extraKnownMarketplaces` for the `specfuse/specfuse` marketplace and `enabledPlugins`
-     enabling `specfuse@specfuse`.
+   - `.claude/settings.json` with the **pip-command** Bash allowlist
+     (`Bash(specfuse-loop:*)`, `Bash(specfuse-lint:*)`) — NOT init.sh's legacy
+     `.specfuse/scripts/*.py` paths; a 0026-scaffolded repo is pip-native with no
+     vendored scripts (OQ3 resolved at arm time);
+   - `.claude/settings.json` plugin config with this **authoritative shape** (OQ2
+     resolved — verified against Claude Code docs this session, do not invent):
+     `{"extraKnownMarketplaces": {"specfuse": {"source": {"source": "github", "repo": "specfuse/specfuse"}}}, "enabledPlugins": {"specfuse@specfuse": true}}`.
 3. **Merge-safe.** Re-running against a target that already has each surface does **not**
    duplicate lines or clobber user content: existing `.gitignore` lines are not
    re-appended; an existing `CLAUDE.md` that already imports the rules is left alone (or a
@@ -69,6 +72,10 @@ HEAD (functions absent) and passes after this WU; paired with
    replaces the bridge); a test confirms no symlink is created.
 6. The red test (AC1) and `test_wiring_writes_all_surfaces` pass after the edits; `code`
    gates stay green (coverage ≥ 90 on `specfuse/`).
+7. **Orchestrator (OQ6 resolved).** `specfuse/loop/scaffold.py` gains
+   `init(target, *, ci_check=None)` that calls `init_specfuse(target, ci_check=ci_check)`
+   then `wire_claude(target)` — one entry point so callers (tests, the cross-repo
+   `specfuse` CLI) don't duplicate the sequence. A test covers the combined flow.
 
 **Do not touch.** This repo's own `.claude/`, `.gitignore`, and `.specfuse/` (tests write
 to `tmp_path` only — never the repo root); `specfuse/loop/data/` content; the driver
@@ -79,10 +86,9 @@ the red→green proof (AC1, AC6); the idempotency/merge-safe test (AC3); the
 JSON-validity + plugin-identifier test (AC4); the no-symlink assertion (AC5). See
 `.specfuse/skills/verification/SKILL.md`.
 
-**Escalation triggers.** If the canonical plugin-config schema (which JSON file,
-`extraKnownMarketplaces` vs `enabledPlugins` exact shapes) cannot be determined from the
-seed or `init.sh` and would have to be invented, emit `status: blocked` and name the
-schema gap — a wrong plugin-config shape silently breaks skill discovery in the
-scaffolded repo. If the settings allowlist should reference the pip commands
-(`specfuse-loop`/`specfuse-lint`) instead of `init.sh`'s legacy script paths, surface it
-(it is an open question logged in GATE-02-REVIEW.md) rather than deciding unilaterally.
+**Escalation triggers.** The plugin-config schema (AC2) and the allowlist target (pip
+commands, AC2) are resolved at arm time — use them as given; do not re-invent or
+re-litigate. If, while implementing, the resolved plugin-config shape is rejected by
+`claude plugin`/Claude Code as malformed (i.e. the pinned schema is wrong despite the
+doc check), emit `status: blocked` with the exact error rather than guessing an
+alternative shape — a wrong shape silently breaks skill discovery in the scaffolded repo.

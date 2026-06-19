@@ -2,7 +2,7 @@
 id: FEAT-2026-0026/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
 effort: medium
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 1.50
 ---
