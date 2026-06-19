@@ -42,6 +42,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | planned | — | — |
+| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -611,7 +612,62 @@ delivery channel (pip) for both code and scaffold; offline/sandboxed installs wo
 from the wheel; version-skew between scaffold and driver collapses to the package
 version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
 
+**Gate sketch (drafted at /draft-feature time).**
+- G1 — package the scaffold seed (templates, rules, examples, roadmap/LEARNINGS
+  templates, gitignore lines, VERSION) + a resource-loading API via
+  `importlib.resources`. Decision: `specfuse-loop` owns the data; the umbrella CLI
+  calls into it.
+- G2 — `specfuse init <repo>` writes a fresh `.specfuse/` (+ `.gitignore`, VERSION
+  stamp, `.claude` wiring) from package resources — parity with `init.sh` INIT.
+- G3 — `specfuse upgrade <repo>` overlays versioned files (parity with `--upgrade`:
+  preserve user-authored, prune internal, stamp); deprecate then delete `init.sh`
+  (v1.1).
+
 **Status: planned.** Depends on FEAT-2026-0019 (the package + CLI it extends).
+Packaging/harness-coupled — per LEARNINGS `[FEAT-2026-0019/G1]`, expect to run this
+interactively (atomic), not per-WU loop dispatch.
+
+## FEAT-2026-0027 — Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run
+
+**Why.** Even with FEAT-2026-0026, adopting/upgrading a project is still manual:
+the user runs `specfuse init`/`upgrade` and separately installs the Claude plugin.
+The leverage is to make a plain `specfuse-loop` run self-provision the project to the
+installed driver's version — create the scaffold if absent, upgrade it if older
+(never downgrade), and write the Claude plugin auto-provision config — so adoption is
+"install specfuse globally, run it in any repo, done."
+
+**Goal.** A version-gated auto-sync on driver run, plus diagnosis and onboarding.
+
+- **Auto-sync decision tree** (on `specfuse-loop` run, comparing the installed
+  scaffold version to `.specfuse/VERSION`): missing → auto-**create**; older with no
+  local edits to versioned files → auto-**overlay** + stamp; older WITH local edits →
+  **prompt / defer** to `specfuse upgrade` (never silently revert edits); equal →
+  no-op (no diff noise); newer → **warn + refuse** (never downgrade; suggest
+  `pipx upgrade specfuse-loop`). Never auto-commit — working-tree only, "review with
+  git diff".
+- **Local-edit detection** via a shipped-file hash manifest (new artifact) so the
+  overlay can tell pristine versioned files from user-customized ones.
+- **`.claude/settings.json` plugin config** — write/refresh `extraKnownMarketplaces`
+  + `enabledPlugins` (merge-safe, preserving other keys) so Claude Code auto-installs
+  `specfuse@specfuse` on trust. The driver writes config; Claude Code performs the
+  install (it cannot run `/plugin` itself). Warn on plugin/driver version drift.
+- **`specfuse doctor`** — read-only: driver version, scaffold version, plugin
+  install/enable state, drift, recommended action. Diagnosis without mutation.
+- **First-run prompt** — `specfuse-loop` in a bare repo offers to scaffold at the
+  installed version. `--no-autosync` flag + `.specfuse/` config toggle for manual
+  control; `specfuse upgrade` remains the explicit can-clobber path.
+
+**Gate sketch.** G1 auto-sync engine (decision tree + hash-manifest detection +
+toggles). G2 `.claude` plugin-config writing + version-drift warning. G3
+`specfuse doctor` + first-run prompt.
+
+**Benefits.** "Install once globally, run anywhere" adoption; projects converge to the
+installed version automatically and safely; the never-downgrade rule protects projects
+configured by a newer specfuse; the plugin provisions without manual `/plugin`
+commands.
+
+**Status: planned.** Depends on FEAT-2026-0026 (needs package scaffold data +
+in-process init/upgrade). Also packaging/harness-coupled — expect interactive.
 
 ## Notes
 
