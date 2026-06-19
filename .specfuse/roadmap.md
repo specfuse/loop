@@ -41,7 +41,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
-| FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | planned | — | — |
+| FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | active | — | — |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
@@ -623,7 +623,7 @@ version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
   preserve user-authored, prune internal, stamp); deprecate then delete `init.sh`
   (v1.1).
 
-**Status: planned.** Depends on FEAT-2026-0019 (the package + CLI it extends).
+**Status: active.** Depends on FEAT-2026-0019 (the package + CLI it extends).
 Packaging/harness-coupled — per LEARNINGS `[FEAT-2026-0019/G1]`, expect to run this
 interactively (atomic), not per-WU loop dispatch.
 
