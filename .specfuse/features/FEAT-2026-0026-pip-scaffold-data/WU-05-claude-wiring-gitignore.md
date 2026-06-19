@@ -2,12 +2,16 @@
 id: FEAT-2026-0026/T05
 type: implementation
 effort: high
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/scaffold.py
   - tests/test_scaffold_wiring.py
+duration_seconds: 411.441
+cost_usd: 0.879894
+input_tokens: 1122
+output_tokens: 24541
 ---
 
 <!--
