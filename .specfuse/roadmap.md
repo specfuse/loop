@@ -43,6 +43,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | planned | — | — |
+| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -616,13 +617,53 @@ installed driver's version — create the scaffold if absent, upgrade it if olde
 toggles). G2 `.claude` plugin-config writing + version-drift warning. G3
 `specfuse doctor` + first-run prompt.
 
+**Legacy migration (added from FEAT-2026-0026's gate-3 review).** A repo scaffolded by
+the old `init.sh` carries `.specfuse/scripts/` (vendored driver) and `.specfuse/skills/`
+(relative symlinks) that the pip-native model replaces with the package + plugin.
+FEAT-2026-0026's `specfuse upgrade` deliberately **leaves these intact** (deleting
+user-adjacent dirs is a migration-semantics call). This feature owns the migration:
+`specfuse init --migrate` (or an upgrade flag) that detects the legacy layout and prunes
+the vendored `scripts/` + skill symlinks once the plugin is wired — opt-in, never silent.
+
 **Benefits.** "Install once globally, run anywhere" adoption; projects converge to the
 installed version automatically and safely; the never-downgrade rule protects projects
 configured by a newer specfuse; the plugin provisions without manual `/plugin`
-commands.
+commands; legacy init.sh repos migrate cleanly to pip-native.
 
 **Status: planned.** Depends on FEAT-2026-0026 (needs package scaffold data +
-in-process init/upgrade). Also packaging/harness-coupled — expect interactive.
+in-process init/upgrade) and FEAT-2026-0028 (the umbrella CLI must call the scaffold
+API before auto-sync can drive it). Also packaging/harness-coupled — expect interactive.
+
+## FEAT-2026-0028 — Umbrella CLI → scaffold-API wiring + docs in the pip seed
+
+**Why.** FEAT-2026-0026 shipped `specfuse.loop.scaffold` (`init_specfuse`,
+`upgrade_specfuse`, `wire_claude`, `init`) and made `init.sh` a thin shim delegating to
+`specfuse init`/`upgrade`. But the umbrella `specfuse` CLI's `init`/`upgrade` subcommands
+still print curl-bash / pip-only guidance (FEAT-2026-0019's stubs) — they do **not** call
+the new scaffold API. So `specfuse init`/`upgrade` and the init.sh shim do not actually
+scaffold end-to-end yet. Surfaced as the required follow-up in FEAT-2026-0026's gate-3
+review (the terminal gate auto-closed, so it was captured in PR #68, not the stub
+retrospective). This **gates real adoption** — including the first external IaC project test.
+
+Also: FEAT-2026-0026's package seed ships `templates/`, `rules/`, examples, `VERSION` —
+but **no `docs/`**, whereas `init.sh` ships the methodology docs via `deploy_docs`. A
+pip-scaffolded repo is missing `.specfuse/docs/`. Close the parity gap in the same feature.
+
+**Goal.**
+- Rewire `specfuse/specfuse` `cli.py`: `cmd_init` → `specfuse.loop.scaffold.init(target,
+  ci_check=...)`; `cmd_upgrade` → `upgrade_specfuse(target)` then the pip-upgrade + plugin
+  hint. Wire `--dry-run`. Verify against the real (no longer stub) API.
+- Add `docs/` (methodology + concepts, the `deploy_docs` set) to the pip seed so
+  `specfuse init`/`upgrade` lay down `.specfuse/docs/`; extend the drift guard.
+- Release coordination: depends on a published `specfuse-loop` carrying `scaffold.py`
+  (FEAT-2026-0026 merged → released), then a `specfuse` umbrella release.
+
+**Benefits.** `specfuse init`/`upgrade` and the init.sh shim actually scaffold from pip
+end-to-end — the last gap before `init.sh` can be deleted (v1.1) and before
+FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adoption test.
+
+**Status: planned.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
+Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 ## Notes
 
