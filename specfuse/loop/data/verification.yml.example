@@ -1,0 +1,53 @@
+# .specfuse/verification.yml
+#
+# Verification gates for THIS repository, grouped into sets selected by work-unit
+# type (see GATES_FOR_TYPE in loop.py and the verification skill). The driver runs
+# these itself as the exit oracle. {feature_dir} is substituted with the active
+# feature's folder path at run time.
+#
+# Keep the `code` set in lock-step with your GitHub branch-protection checks — if
+# they drift, an agent can pass locally and still be unmergeable.
+#
+# AUTHORING RULE: gate commands SHOULD be self-contained. Avoid `--no-build`,
+# `--no-restore`, or any equivalent "skip-build" flag — those make the gate run
+# against whatever binaries are on disk, and stale artifacts can make a gate pass
+# falsely. If a build step is genuinely required before tests are runnable, fold
+# it into the command as a pipeline (e.g. `dotnet build && dotnet test --no-build`)
+# so the build is part of the gate.
+#
+# COST TRACKING (top-level, optional, default true). When true, the driver
+# requests JSON output from `claude -p` and records per-WU cumulative cost
+# (USD) and token counts on the WU's frontmatter (cost_usd, input_tokens,
+# output_tokens), plus a per-attempt breakdown in events.jsonl's
+# `task_completed` / `human_escalation` events. Set to false to disable
+# entirely (no --output-format=json, no frontmatter writes, no usage in
+# events). Privacy note: when true, cost data is committed to the repo as
+# part of the WU squash and chore(loop) bookkeeping commits. If the repo
+# is public or shared with parties who shouldn't see per-feature spend,
+# set this to false.
+#
+# cost_tracking: true
+
+code:
+  - name: tests
+    command: "pytest -q"
+  - name: coverage
+    command: "coverage report --fail-under=90"
+  - name: warnings
+    command: "python -W error -c 'pass'"     # replace with your build's -Werror equivalent
+  - name: lint
+    command: "ruff check ."
+  - name: security
+    command: "bandit -r src -ll"             # or your OWASP-aligned scanner
+
+# Reflective units (retrospective, lessons, docs): the artifact exists / something
+# changed. Tighten as you like.
+doc:
+  - name: artifact-changed
+    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
+
+# plan-next: structural integrity of what it drafted. The linter is the real check;
+# a malformed next-gate draft fails here, where you are already reviewing.
+plannext:
+  - name: plan-lint
+    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"

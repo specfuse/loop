@@ -43,6 +43,15 @@ code:
     # §11 operator-script gate: the pre-commit hook's bats happy-path.
     command: "bats tests/leak_scan_hook.bats"
 
+  - name: sync-scaffold-bats
+    # §11 operator-script gate: sync-scaffold.sh happy-path via bats.
+    # The drift-guard test (test_scaffold_data_in_sync.py) runs under 'tests'.
+    command: "bats tests/sync_scaffold.bats"
+
+  - name: init-sh-shim-bats
+    # §11 operator-script gate: init.sh thin-shim happy-path + absent-CLI error.
+    command: "bats tests/init_sh_shim.bats"
+
   # warnings: CONSCIOUSLY DROPPED.
   # Python has no compiler-warnings analogue; this gate assumes a compiled
   # stack (warnings-as-errors at build time) and is N/A for a pure-Python

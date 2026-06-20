@@ -1,373 +1,24 @@
 #!/usr/bin/env bash
 #
-# Copyright 2026 Specfuse contributors
+# Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# init.sh — scaffold the Specfuse Loop into a target single-repo project.
+# init.sh — thin shim: delegates to the specfuse pip CLI.
 #
-# Two modes:
-#   ./init.sh /path/to/target-repo
-#       INIT mode (default). Copies the canonical .specfuse/ scaffold into
-#       a target that does NOT yet have a .specfuse/ directory. Refuses if
-#       one already exists — use --upgrade for that case.
+# This is the v1.0 legacy install path; scheduled for removal in v1.1.
+# The bash copy/overlay logic now lives in the specfuse package (scaffold.py).
 #
-#   ./init.sh --upgrade [--dry-run] /path/to/target-repo
-#       UPGRADE mode. Updates the versioned scaffold IN PLACE (scripts/,
-#       templates/, rules/, skills/, README.md, verification.yml.example).
-#       Leaves user-authored files alone (LEARNINGS.md, verification.yml,
-#       roadmap.md, features/). Files the target added that we don't ship
-#       (e.g. custom skills, custom rules) are also preserved — we overlay,
-#       we don't replace the tree.
+# Two modes (same surface as the old script):
+#   ./init.sh [--] /path/to/target-repo
+#       Delegates to: specfuse init <target>
 #
-#       --dry-run prints what WOULD change without writing.
-#
-# After running, in the target repo:
-#   - edit .specfuse/verification.yml so the `code` gates match your stack
-#     (and your branch protection, if any)
-#   - author your first feature folder under .specfuse/features/ from the
-#     templates in .specfuse/templates/
-#   - python .specfuse/scripts/loop.py --dry-run
+#   ./init.sh --upgrade [--dry-run] [--] /path/to/target-repo
+#       Delegates to: specfuse upgrade [--dry-run] <target>
 
 set -euo pipefail
 
-# --- argument parsing ----------------------------------------------------- #
+# --- deprecation banner ------------------------------------------------------- #
 
-UPGRADE=0
-DRY_RUN=0
-TARGET=""
-
-usage() {
-  cat >&2 <<'USAGE'
-usage:
-  ./init.sh                     /path/to/target-repo
-  ./init.sh --upgrade [--dry-run] /path/to/target-repo
-
-INIT mode (default): scaffold into a target without an existing .specfuse/.
-UPGRADE mode: overlay versioned-scaffold updates onto an existing .specfuse/,
-              preserving user-authored files (LEARNINGS.md, verification.yml,
-              roadmap.md, features/) and any files the user added.
---dry-run     With --upgrade, list what would change without writing.
-USAGE
-}
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --upgrade)   UPGRADE=1; shift ;;
-    --dry-run)   DRY_RUN=1; shift ;;
-    -h|--help)   usage; exit 0 ;;
-    --)          shift; TARGET="${1:-}"; shift || true; break ;;
-    -*)          echo "error: unknown flag '$1'" >&2; usage; exit 2 ;;
-    *)
-      if [[ -z "$TARGET" ]]; then
-        TARGET="$1"; shift
-      else
-        echo "error: unexpected extra argument '$1'" >&2; usage; exit 2
-      fi
-      ;;
-  esac
-done
-
-if [[ -z "$TARGET" ]]; then
-  usage; exit 2
-fi
-if [[ ! -d "$TARGET" ]]; then
-  echo "error: target '$TARGET' is not a directory" >&2
-  exit 2
-fi
-if [[ $DRY_RUN -eq 1 && $UPGRADE -eq 0 ]]; then
-  echo "error: --dry-run only applies to --upgrade" >&2
-  exit 2
-fi
-
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC_DIR="$REPO_ROOT/.specfuse"
-DEST="$TARGET/.specfuse"
-
-# The versioned scaffold — we own these; --upgrade overlays them.
-# NOTE: `scripts` is deliberately NOT here — it is deployed file-by-file via an
-# explicit allowlist (DEPLOYABLE_SCRIPTS) so specfuse-internal tooling never
-# ships to targets. See deploy_scripts() and issue #55.
-VERSIONED_ITEMS=(templates rules skills verification.yml.example README.md VERSION)
-
-# scripts/ allowlist — ONLY these files are deployed to a target project. The
-# driver + its helpers + the GitHub/feature tooling. A new script under
-# .specfuse/scripts/ is NOT shipped unless added here — internal-by-default.
-DEPLOYABLE_SCRIPTS=(
-  loop.py lint_plan.py _miniyaml.py gate_eval.py
-  gh_backend.py gh_features.py adopt_feature.py validate-event.py
-)
-
-# specfuse-loop-internal files under scripts/ that must NEVER reach a target:
-# the leak-guard scanners (unwired without the hook/workflow/gates init does not
-# ship) and the denylist data (this repo's own private identifiers). Pruned on
-# --upgrade to clean targets a pre-#55 init populated. See issue #55 and the
-# leak_guard_specfuse_internal note.
-INTERNAL_SCRIPT_FILES=(leak_scan.py leak_scan_content.py leak_denylist.txt leak_denylist.hashes)
-
-# User-authored — we ship seeds in INIT mode but NEVER touch on --upgrade.
-USER_AUTHORED=(LEARNINGS.md verification.yml roadmap.md features)
-
-# Durable docs shipped into a target's .specfuse/docs/ so an initialized repo is
-# self-documenting without this checkout. Paths are relative to REPO_ROOT/docs.
-# Internal working notes under docs/dev/ are deliberately excluded. Versioned —
-# overlaid on --upgrade like the rest of the scaffold.
-DEPLOYABLE_DOCS=(
-  getting-started.md
-  methodology.md
-  skills.md
-  concepts/ralph-lineage.md
-  concepts/architecture-addendum-gates-and-iterative-planning.md
-)
-
-# --- helpers -------------------------------------------------------------- #
-
-# overlay_item <item> — copy SRC_DIR/<item> onto DEST/<item>, additively.
-# Files in DEST that aren't in SRC are preserved; files in both are
-# overwritten. Honors $DRY_RUN.
-overlay_item() {
-  local item="$1"
-  local src="$SRC_DIR/$item"
-  local dst="$DEST/$item"
-  if [[ ! -e "$src" ]]; then
-    return
-  fi
-  if [[ $DRY_RUN -eq 1 ]]; then
-    if [[ -d "$src" ]]; then
-      while IFS= read -r f; do
-        local rel="${f#$src/}"
-        local verb="update"
-        [[ -e "$dst/$rel" ]] || verb="add"
-        echo "  would $verb: ${dst#$TARGET/}/$rel"
-      done < <(find "$src" -type f -not -name '__pycache__' -not -path '*/__pycache__/*')
-    else
-      local verb="update"
-      [[ -e "$dst" ]] || verb="add"
-      echo "  would $verb: ${dst#$TARGET/}"
-    fi
-    return
-  fi
-  if [[ -d "$src" ]]; then
-    mkdir -p "$dst"
-    # cp -r src/. dst/ overlays contents without nesting; preserves dst extras.
-    cp -R "$src/." "$dst/"
-  else
-    cp "$src" "$dst"
-  fi
-}
-
-# deploy_scripts — copy ONLY the allowlisted scripts (DEPLOYABLE_SCRIPTS) into
-# DEST/scripts, then remove any specfuse-internal files (INTERNAL_SCRIPT_FILES)
-# a prior (pre-#55) init may have copied. Replaces the old wholesale
-# `cp -R scripts/.`, which swept the leak-guard tooling + denylist data into
-# every target. Idempotent; honors $DRY_RUN. Issue #55.
-deploy_scripts() {
-  local src="$SRC_DIR/scripts"
-  local dst="$DEST/scripts"
-  local f
-  if [[ $DRY_RUN -eq 1 ]]; then
-    for f in "${DEPLOYABLE_SCRIPTS[@]}"; do
-      local verb="update"
-      [[ -e "$dst/$f" ]] || verb="add"
-      echo "  would $verb: .specfuse/scripts/$f"
-    done
-    for f in "${INTERNAL_SCRIPT_FILES[@]}"; do
-      [[ -e "$dst/$f" ]] && echo "  would remove (specfuse-internal): .specfuse/scripts/$f"
-    done
-    return 0
-  fi
-  mkdir -p "$dst"
-  for f in "${DEPLOYABLE_SCRIPTS[@]}"; do
-    cp "$src/$f" "$dst/$f"
-  done
-  # Prune internal files (covers targets a pre-#55 init populated) + bytecode.
-  for f in "${INTERNAL_SCRIPT_FILES[@]}"; do
-    rm -f "$dst/$f"
-  done
-  find "$dst" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-}
-
-# deploy_docs — copy the allowlisted durable docs (DEPLOYABLE_DOCS) from
-# REPO_ROOT/docs into DEST/docs, preserving subpaths. Makes a target repo
-# self-documenting (methodology, skills catalog, concepts) without this checkout.
-# Versioned: runs in both INIT and --upgrade. Honors $DRY_RUN.
-deploy_docs() {
-  local src="$REPO_ROOT/docs"
-  local dst="$DEST/docs"
-  local f
-  if [[ $DRY_RUN -eq 1 ]]; then
-    for f in "${DEPLOYABLE_DOCS[@]}"; do
-      local verb="update"
-      [[ -e "$dst/$f" ]] || verb="add"
-      echo "  would $verb: .specfuse/docs/$f"
-    done
-    return 0
-  fi
-  for f in "${DEPLOYABLE_DOCS[@]}"; do
-    mkdir -p "$dst/$(dirname "$f")"
-    cp "$src/$f" "$dst/$f"
-  done
-}
-
-# Detect ci-check.sh in the target and write .specfuse/verification.yml.
-# Sets CI_CHECK_PATH to the relative path found (empty if none).
-# Reads globals: $TARGET, $SRC_DIR, $DEST.
-seed_verification_yml() {
-  CI_CHECK_PATH=""
-  for candidate in ci-check.sh ci-checks.sh script/ci-check.sh script/ci-checks.sh scripts/ci-check.sh scripts/ci-checks.sh; do
-    if [[ -f "$TARGET/$candidate" ]]; then
-      CI_CHECK_PATH="$candidate"
-      break
-    fi
-  done
-  if [[ -n "$CI_CHECK_PATH" ]]; then
-    cat > "$DEST/verification.yml" <<EOF
-# .specfuse/verification.yml — auto-configured from $CI_CHECK_PATH
-#
-# $CI_CHECK_PATH was detected in the repo. The code gate delegates
-# to it so your Specfuse verification stays in sync with CI automatically.
-# Replace or extend if you need gate-level granularity (e.g. split tests
-# from lint so the driver can report which check failed).
-#
-# See verification.yml.example for the full field reference.
-
-code:
-  - name: ci-check
-    command: "bash $CI_CHECK_PATH"
-
-# Reflective units (retrospective, lessons, docs): the artifact exists /
-# something changed. Tighten as you like.
-doc:
-  - name: artifact-changed
-    command: "git -C {feature_dir} diff --quiet HEAD -- . && exit 1 || exit 0"
-
-# plan-next: structural integrity of what it drafted.
-plannext:
-  - name: plan-lint
-    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
-EOF
-  else
-    cp "$DEST/verification.yml.example" "$DEST/verification.yml"
-  fi
-}
-
-# Claude Code wiring: make the loop's scaffold-shipped skills discoverable,
-# import the binding rules into session context, and allowlist the loop
-# scripts so dispatch isn't gated on per-invocation permission prompts.
-#
-# Claude Code only auto-discovers skills directly under `.claude/skills/`
-# (not arbitrary subdirs), so we bridge with relative symlinks from there
-# into `.specfuse/skills/`. Binding rules under `.specfuse/rules/` are
-# imported into `.claude/CLAUDE.md` via Claude Code's `@path` syntax so
-# they load at session start.
-#
-# Idempotent and conservative: existing user files are NEVER overwritten;
-# we create-if-missing, and if a file already exists without our additions
-# we print a paste-in snippet rather than mutate it. Honors $DRY_RUN.
-wire_claude_code() {
-  local claude_dir="$TARGET/.claude"
-  local rel_claude="${claude_dir#$TARGET/}"  # ".claude" for printing
-
-  # --- 1. symlinks for skill discovery ---
-  local linked=0 already=0
-  local want=()
-  for d in "$DEST/skills"/*/; do
-    [[ -d "$d" ]] || continue
-    local name=$(basename "$d")
-    local link="$claude_dir/skills/$name"
-    if [[ -e "$link" || -L "$link" ]]; then
-      already=$((already + 1))
-    else
-      want+=("$name")
-      linked=$((linked + 1))
-    fi
-  done
-  if [[ $DRY_RUN -eq 1 ]]; then
-    if [[ $linked -gt 0 ]]; then
-      echo "  would link $linked skill(s) into $rel_claude/skills/:"
-      for n in "${want[@]}"; do
-        echo "    $rel_claude/skills/$n -> ../../.specfuse/skills/$n"
-      done
-    fi
-    [[ $already -gt 0 ]] && echo "  $rel_claude/skills/: $already already present (left alone)"
-  else
-    mkdir -p "$claude_dir/skills"
-    if [[ $linked -gt 0 ]]; then
-      for n in "${want[@]}"; do
-        ln -s "../../.specfuse/skills/$n" "$claude_dir/skills/$n"
-      done
-      echo "Claude Code skills: linked $linked into $rel_claude/skills/."
-    elif [[ $already -gt 0 ]]; then
-      echo "Claude Code skills: $rel_claude/skills/ already has all $already (left alone)."
-    fi
-  fi
-
-  # --- 2. CLAUDE.md — @import binding rules ---
-  local claude_md="$claude_dir/CLAUDE.md"
-  local rel_md="$rel_claude/CLAUDE.md"
-  local rules_block='## Specfuse binding rules (read before any work-unit dispatch)
-@.specfuse/rules/result-contract.md
-@.specfuse/rules/correlation-ids.md
-@.specfuse/rules/never-touch.md
-@.specfuse/rules/security-boundaries.md'
-  if [[ ! -f "$claude_md" ]]; then
-    if [[ $DRY_RUN -eq 1 ]]; then
-      echo "  would create $rel_md with the binding-rules @import block"
-    else
-      mkdir -p "$claude_dir"
-      printf '# Project notes\n\n%s\n' "$rules_block" > "$claude_md"
-      echo "Claude Code rules: created $rel_md with the binding-rules @import block."
-    fi
-  elif grep -q '@\.specfuse/rules/' "$claude_md" 2>/dev/null; then
-    [[ $DRY_RUN -eq 1 ]] && echo "  $rel_md already imports the binding rules" \
-                         || echo "Claude Code rules: $rel_md already imports the binding rules — left alone."
-  else
-    if [[ $DRY_RUN -eq 1 ]]; then
-      echo "  $rel_md exists but doesn't import the binding rules (would print paste-in snippet)"
-    else
-      echo "Claude Code rules: $rel_md exists but doesn't import the binding rules."
-      echo "  Append this block to wire them up:"
-      printf '%s\n' "$rules_block" | sed 's/^/    /'
-    fi
-  fi
-
-  # --- 3. settings.json — permissions allowlist ---
-  local settings="$claude_dir/settings.json"
-  local rel_settings="$rel_claude/settings.json"
-  if [[ ! -f "$settings" ]]; then
-    if [[ $DRY_RUN -eq 1 ]]; then
-      echo "  would create $rel_settings with the loop-script allowlist"
-    else
-      mkdir -p "$claude_dir"
-      cat > "$settings" <<'EOF'
-{
-  "permissions": {
-    "allow": [
-      "Bash(python3 .specfuse/scripts/loop.py:*)",
-      "Bash(python3 .specfuse/scripts/lint_plan.py:*)"
-    ]
-  }
-}
-EOF
-      echo "Claude Code permissions: created $rel_settings with the loop-script allowlist."
-    fi
-  elif grep -q '\.specfuse/scripts/loop\.py' "$settings" 2>/dev/null; then
-    [[ $DRY_RUN -eq 1 ]] && echo "  $rel_settings already allows the loop scripts" \
-                         || echo "Claude Code permissions: $rel_settings already allows the loop scripts — left alone."
-  else
-    if [[ $DRY_RUN -eq 1 ]]; then
-      echo "  $rel_settings exists but doesn't allow the loop scripts (would print paste-in snippet)"
-    else
-      echo "Claude Code permissions: $rel_settings exists but doesn't allow the loop scripts."
-      echo "  Add these to its permissions.allow array:"
-      echo '    "Bash(python3 .specfuse/scripts/loop.py:*)",'
-      echo '    "Bash(python3 .specfuse/scripts/lint_plan.py:*)"'
-    fi
-  fi
-}
-
-# deprecation_banner — printed after init/upgrade. init.sh is the LEGACY install
-# path (v1.0): scheduled for removal in v1.1 once pip-native scaffolding lands. The
-# driver now ships on PyPI and the skills via the Claude Code marketplace.
 deprecation_banner() {
   cat <<'BANNER'
 
@@ -385,268 +36,64 @@ unaffected — only how the code + skills are delivered changes.
 BANNER
 }
 
-# --- INIT mode ------------------------------------------------------------ #
+# --- argument parsing --------------------------------------------------------- #
 
-if [[ $UPGRADE -eq 0 ]]; then
-  if [[ -e "$DEST" ]]; then
-    echo "error: '$DEST' already exists." >&2
-    echo "  To update the versioned scaffold in place, run:" >&2
-    echo "      ./init.sh --upgrade $TARGET" >&2
-    echo "  (or --upgrade --dry-run $TARGET to preview)" >&2
-    exit 1
-  fi
+UPGRADE=0
+DRY_RUN=0
+TARGET=""
 
-  mkdir -p "$DEST"
-  for item in "${VERSIONED_ITEMS[@]}"; do
-    cp -r "$SRC_DIR/$item" "$DEST/$item"
-  done
+usage() {
+  cat >&2 <<'USAGE'
+usage:
+  ./init.sh                       /path/to/target-repo
+  ./init.sh --upgrade [--dry-run] /path/to/target-repo
 
-  # scripts/ ships via the explicit allowlist (internal tooling excluded).
-  deploy_scripts
+INIT mode (default): scaffold into a target without an existing .specfuse/.
+UPGRADE mode: overlay versioned-scaffold updates onto an existing .specfuse/,
+              preserving user-authored files and any files you added.
+--dry-run     With --upgrade, preview what would change without writing.
 
-  # durable docs ship into .specfuse/docs/ so the target is self-documenting.
-  deploy_docs
+Both modes delegate to the specfuse pip CLI (pip install specfuse).
+USAGE
+}
 
-  # Strip any compiled-Python noise that may have been copied with scripts/.
-  find "$DEST" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-
-  # Seed user-authored files (INIT only — never on --upgrade). LEARNINGS is
-  # seeded from the TEMPLATE (generic methodology lessons), not this repo's own
-  # LEARNINGS.md (which carries specfuse-loop's FEAT-2026-* history). Issue #55.
-  cp "$SRC_DIR/LEARNINGS.template.md" "$DEST/LEARNINGS.md"
-  CI_CHECK_PATH=""
-  seed_verification_yml
-  cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
-  mkdir -p "$DEST/features"
-
-  echo "Scaffolded Specfuse Loop into $DEST"
-  echo
-  wire_claude_code
-  deprecation_banner
-  echo
-
-# --- UPGRADE mode --------------------------------------------------------- #
-
-else
-  if [[ ! -d "$DEST" ]]; then
-    echo "error: '$DEST' does not exist — nothing to upgrade." >&2
-    echo "  To set up a new project, run without --upgrade:" >&2
-    echo "      ./init.sh $TARGET" >&2
-    exit 1
-  fi
-
-  if [[ $DRY_RUN -eq 1 ]]; then
-    echo "DRY RUN — no files will be written."
-    echo "Would upgrade versioned scaffold in $DEST:"
-    echo
-  else
-    echo "Upgrading versioned scaffold in $DEST"
-    echo "(user-authored files preserved: LEARNINGS.md, verification.yml, roadmap.md, features/)"
-    echo
-  fi
-
-  for item in "${VERSIONED_ITEMS[@]}"; do
-    overlay_item "$item"
-  done
-
-  # scripts/ ships via the allowlist; also prunes internal files a pre-#55
-  # init left behind in this target.
-  deploy_scripts
-
-  # durable docs — overlaid like the rest of the versioned scaffold.
-  deploy_docs
-
-  # Seed any user-authored files that are missing — happens when the
-  # orchestrator or a partial init created .specfuse/ bare.
-  if [[ $DRY_RUN -eq 1 ]]; then
-    [[ ! -f "$DEST/LEARNINGS.md" ]]     && echo "  would seed missing: .specfuse/LEARNINGS.md"
-    [[ ! -f "$DEST/verification.yml" ]] && echo "  would seed missing: .specfuse/verification.yml"
-    [[ ! -f "$DEST/roadmap.md" ]]       && echo "  would seed missing: .specfuse/roadmap.md"
-    [[ ! -d "$DEST/features" ]]         && echo "  would seed missing: .specfuse/features/"
-    true  # ensure set -e doesn't trigger on the last [[ ]] above being false
-  else
-    CI_CHECK_PATH=""
-    if [[ ! -f "$DEST/LEARNINGS.md" ]]; then
-      cp "$SRC_DIR/LEARNINGS.template.md" "$DEST/LEARNINGS.md"
-      echo "Seeded missing: .specfuse/LEARNINGS.md"
-    fi
-    if [[ ! -f "$DEST/verification.yml" ]]; then
-      seed_verification_yml
-      echo "Seeded missing: .specfuse/verification.yml"
-    fi
-    if [[ ! -f "$DEST/roadmap.md" ]]; then
-      cp "$SRC_DIR/roadmap.template.md" "$DEST/roadmap.md"
-      echo "Seeded missing: .specfuse/roadmap.md"
-    fi
-    if [[ ! -d "$DEST/features" ]]; then
-      mkdir -p "$DEST/features"
-      echo "Seeded missing: .specfuse/features/"
-    fi
-  fi
-
-  if [[ $DRY_RUN -eq 0 ]]; then
-    find "$DEST" -name '__pycache__' -type d -prune -exec rm -rf {} + 2>/dev/null || true
-    echo
-    echo "Upgrade complete. Preserved user-authored files:"
-    for f in "${USER_AUTHORED[@]}"; do
-      if [[ -e "$DEST/$f" ]]; then
-        echo "  $DEST/$f"
-      fi
-    done
-    if git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-      echo
-      echo "Tip: review the update with"
-      echo "    git -C $TARGET diff -- .specfuse"
-      echo "and revert any clobbered local customizations to versioned files."
-    else
-      echo
-      echo "Tip: this directory is not a git working tree, so any local edits"
-      echo "you had to versioned files (rules/, skills/, etc.) have been"
-      echo "overwritten without a diff trail. Consider tracking .specfuse/"
-      echo "with git before the next upgrade."
-    fi
-  fi
-  echo
-
-  # Claude Code wiring — symlinks, CLAUDE.md, settings allowlist.
-  # In dry-run, this lists what would change without writing.
-  if [[ $DRY_RUN -eq 1 ]]; then
-    echo "Claude Code wiring (would happen):"
-  fi
-  wire_claude_code
-  echo
-  [[ $DRY_RUN -eq 0 ]] && deprecation_banner
-
-  # --- feature health report ---------------------------------------------- #
-  # Lint every existing feature folder against the new scaffold's structural
-  # contract (the linter that --upgrade is bringing in). Useful both live
-  # ("which features still pass post-upgrade?") and dry-run ("which features
-  # WOULD break if I upgrade?") — we run the SOURCE linter against the
-  # destination's features in both cases, so the answer doesn't depend on
-  # whether the overlay has happened yet.
-  shopt -s nullglob
-  feature_dirs=("$DEST"/features/*/)
-  shopt -u nullglob
-  if [[ ${#feature_dirs[@]} -gt 0 ]]; then
-    echo "Feature health (each feature lint-checked against the new scaffold):"
-    any_failed=0
-    for f in "${feature_dirs[@]}"; do
-      name=$(basename "$f")
-      if [[ ! -f "$f/PLAN.md" ]]; then
-        echo "  SKIP $name  (no PLAN.md — not a feature folder)"
-        continue
-      fi
-      if output=$(python3 "$SRC_DIR/scripts/lint_plan.py" "$f" 2>&1); then
-        echo "  OK   $name"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --upgrade)  UPGRADE=1; shift ;;
+    --dry-run)  DRY_RUN=1; shift ;;
+    -h|--help)  usage; exit 0 ;;
+    --)         shift; TARGET="${1:-}"; shift || true; break ;;
+    -*)         echo "error: unknown flag '$1'" >&2; usage; exit 2 ;;
+    *)
+      if [[ -z "$TARGET" ]]; then
+        TARGET="$1"; shift
       else
-        echo "  FAIL $name"
-        echo "$output" | sed 's/^/       /'
-        any_failed=1
+        echo "error: unexpected extra argument '$1'" >&2; usage; exit 2
       fi
-    done
-    if [[ $any_failed -eq 1 ]]; then
-      echo
-      echo "One or more features failed structural lint against the new scaffold."
-      echo "To review the diagnostics and apply per-error edits interactively,"
-      echo "run the feature-conversion skill in a Claude session:"
-      echo "    claude"
-      echo "    > run the feature-conversion skill against <feature-folder>"
-      echo "The skill drafts edits per lint error and asks before writing — see"
-      echo "    .specfuse/skills/feature-conversion/SKILL.md"
-    fi
-    echo
-  fi
-fi
-
-# --- gitignore guard (both modes) ---------------------------------------- #
-# The loop uses git as its state backend (status writes via frontmatter edits,
-# the squashed per-WU commit, and the `doc` gate's `git diff` check). If
-# `.specfuse/` is gitignored in the target repo, those writes are invisible
-# to git and the loop silently misbehaves. Warn loudly.
-if [[ $DRY_RUN -eq 0 ]]; then
-  if git -C "$TARGET" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    if git -C "$TARGET" check-ignore -q .specfuse 2>/dev/null; then
-      echo "WARNING: .specfuse/ is gitignored in $TARGET — the loop will not work."
-      echo "  The driver uses git as its state backend (per-WU status writes, one"
-      echo "  squashed commit per work unit, and the 'doc' gate's git-diff check)."
-      echo "  With .specfuse/ ignored, those writes are invisible to git and the"
-      echo "  loop misbehaves. Un-ignore .specfuse/ in your .gitignore. You may"
-      echo "  keep the runtime noise paths ignored, e.g.:"
-      echo "      !.specfuse/"
-      echo "      .specfuse/**/work/"
-      echo
-    fi
-  fi
-fi
-
-# --- runtime-artifact gitignore (both modes) ----------------------------- #
-# Ignore loop runtime artifacts that should never land in the target repo:
-#   - .specfuse/.loop.lock              process lock from the loop driver
-#   - .specfuse/.scratch-*              scratch dirs from preflight/dry-run
-#   - .specfuse/scripts/__pycache__/    Python bytecode from loop.py imports
-# Targeted ignores only — NOT .specfuse/ itself, which must remain tracked
-# (the driver uses git as its state backend).
-LOOP_IGNORE_LINES=(
-  ".specfuse/.loop.lock"
-  ".specfuse/.scratch-*"
-  ".specfuse/scripts/__pycache__/"
-)
-GITIGNORE_FILE="$TARGET/.gitignore"
-missing_lines=()
-for line in "${LOOP_IGNORE_LINES[@]}"; do
-  if [[ ! -f "$GITIGNORE_FILE" ]] || ! grep -qxF "$line" "$GITIGNORE_FILE" 2>/dev/null; then
-    missing_lines+=("$line")
-  fi
+      ;;
+  esac
 done
-if [[ $DRY_RUN -eq 1 ]]; then
-  if [[ ${#missing_lines[@]} -eq 0 ]]; then
-    echo "  $TARGET/.gitignore already has all loop runtime-artifact ignores — left alone"
-  elif [[ ! -f "$GITIGNORE_FILE" ]]; then
-    echo "  would create $TARGET/.gitignore with loop runtime-artifact ignores:"
-    for line in "${missing_lines[@]}"; do echo "    $line"; done
+
+if [[ -z "$TARGET" ]]; then
+  usage; exit 2
+fi
+
+# --- delegate to the specfuse pip CLI ----------------------------------------- #
+
+if ! command -v specfuse >/dev/null 2>&1; then
+  echo "error: 'specfuse' not found on PATH." >&2
+  echo "  Install it with: pip install specfuse" >&2
+  exit 1
+fi
+
+deprecation_banner
+
+if [[ $UPGRADE -eq 1 ]]; then
+  if [[ $DRY_RUN -eq 1 ]]; then
+    exec specfuse upgrade --dry-run "$TARGET"
   else
-    echo "  would add to $TARGET/.gitignore:"
-    for line in "${missing_lines[@]}"; do echo "    $line"; done
+    exec specfuse upgrade "$TARGET"
   fi
 else
-  if [[ ${#missing_lines[@]} -gt 0 ]]; then
-    if [[ ! -f "$GITIGNORE_FILE" ]]; then
-      printf '%s\n' "${missing_lines[@]}" > "$GITIGNORE_FILE"
-      echo "Created $TARGET/.gitignore with loop runtime-artifact ignores."
-    else
-      { printf '\n'; printf '%s\n' "${missing_lines[@]}"; } >> "$GITIGNORE_FILE"
-      echo "Added ${#missing_lines[@]} loop runtime-artifact ignore(s) to $TARGET/.gitignore."
-    fi
-  fi
-fi
-
-# --- closing instructions (INIT only) ------------------------------------ #
-if [[ $UPGRADE -eq 0 ]]; then
-  echo "Next:"
-  echo "  1. cd $TARGET"
-  if [[ -n "$CI_CHECK_PATH" ]]; then
-    echo "  2. review .specfuse/verification.yml  (auto-configured from $CI_CHECK_PATH)"
-  else
-    echo "  2. edit .specfuse/verification.yml  (match the 'code' gates to your stack)"
-  fi
-  echo "  3. author your first feature folder under .specfuse/features/ from .specfuse/templates/"
-  echo "  4. python .specfuse/scripts/loop.py --dry-run"
-  echo
-  echo "The loop driver and linter have no runtime dependencies — stock Python 3"
-  echo "is all you need. (You'll need whatever tools your gates in verification.yml"
-  echo "call, of course — installed however your stack does it.)"
-  echo
-  if [[ -z "$CI_CHECK_PATH" ]]; then
-    echo "Optional — to auto-draft .specfuse/verification.yml from this repo's CI and"
-    echo "tooling for your review (instead of editing the example by hand in step 2):"
-    echo "    claude                     # start an interactive session in this repo"
-    echo "    > run the derive-verification skill"
-    echo "    # (or, equivalently, paste the contents of"
-    echo "    #  .specfuse/skills/derive-verification/PROMPT.md into the session)"
-    echo "Run INTERACTIVELY — the skill asks batched questions (coverage threshold,"
-    echo "canonical test command, which gates to add/drop) and needs your answers."
-    echo "Piping the prompt via 'claude -p < ...' consumes stdin so the skill cannot"
-    echo "ask, and falls back to a gap-riddled non-interactive draft. The skill"
-    echo "drafts; it does not write the file. Review and copy yourself."
-  fi
+  exec specfuse init "$TARGET"
 fi
