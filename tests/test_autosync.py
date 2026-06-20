@@ -132,7 +132,12 @@ class TestAutoSyncOlderModified(unittest.TestCase):
                     return_value=["rules/result-contract.md"],
                 ):
                     with patch("specfuse.loop.loop._scaffold.upgrade_specfuse"):
-                        auto_sync(target)
+                        # Force the non-interactive (skip+warn) branch — this test
+                        # asserts modified files are preserved, NOT the TTY prompt
+                        # (covered in test_autosync_consent.py). Without pinning
+                        # isatty, a TTY-attached gate runner hits real input() and hangs.
+                        with patch("sys.stdin.isatty", return_value=False):
+                            auto_sync(target)
 
             self.assertEqual(modified_file.read_bytes(), user_content)
 
@@ -149,7 +154,8 @@ class TestAutoSyncOlderModified(unittest.TestCase):
                     return_value=["rules/result-contract.md"],
                 ):
                     with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
-                        auto_sync(target, dry_run=True)
+                        with patch("sys.stdin.isatty", return_value=False):
+                            auto_sync(target, dry_run=True)
 
             mock_upgrade.assert_not_called()
 

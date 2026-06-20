@@ -67,6 +67,10 @@ DRIVER_VERSION = "0.2.0"
 MIN_SCAFFOLD_VERSION = "0.2.0"
 SCAFFOLD_VERSION_PATH = SPECFUSE_DIR / "VERSION"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
+# Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
+# FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
+# stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
+GATE_TIMEOUT_SECONDS = 900
 
 # How to launch a fresh agent. {model} and {effort} are filled per WU; prompt is piped on stdin.
 CLAUDE_CMD = ["claude", "-p", "--model", "{model}", "--effort", "{effort}"]
@@ -1378,12 +1382,23 @@ def verify(wu: WorkUnit, feature_dir: Path,
         # verification.yml and routinely use shell features (pipes, &&, glob,
         # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
         # is the project's own config, not untrusted external data.
-        proc = subprocess.run(  # nosec B602
-            command, shell=True, capture_output=True, text=True,
-        )
-        ok = proc.returncode == 0
+        try:
+            proc = subprocess.run(  # nosec B602
+                command, shell=True, capture_output=True, text=True,
+                timeout=GATE_TIMEOUT_SECONDS,
+            )
+            ok = proc.returncode == 0
+            tail = (proc.stdout + proc.stderr).strip().splitlines()[-15:]
+        except subprocess.TimeoutExpired as exc:
+            ok = False
+            partial = (exc.stdout or "") + (exc.stderr or "")
+            if isinstance(partial, bytes):
+                partial = partial.decode("utf-8", "replace")
+            tail = partial.strip().splitlines()[-10:] + [
+                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed — "
+                f"likely a hang (e.g. a test blocked on input()/stdin)."
+            ]
         ok_all = ok_all and ok
-        tail = (proc.stdout + proc.stderr).strip().splitlines()[-15:]
         results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
                        f"```\n$ {command}\n" + "\n".join(tail) + "\n```")
     return ok_all, "\n\n".join(results)
