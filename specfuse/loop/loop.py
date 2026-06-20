@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -200,10 +201,31 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     return fm, body
 
 
+class WorkUnitFileMissingError(RuntimeError):
+    """Raised when a frontmatter write targets a file that has vanished.
+
+    Crash-hardening for #71: a per-attempt `git reset --hard` can delete an
+    untracked-then-swept feature folder mid-run, after which the driver's next
+    `set_wu(...)` → `write_frontmatter_field(...)` hit a bare FileNotFoundError
+    (unhandled traceback, no diagnosis). This carries an actionable message —
+    the likely cause (reset removed an uncommitted folder) and the reflog
+    recovery — instead. The pre-flight untracked-folder guard normally prevents
+    reaching this state; this is the defense-in-depth diagnostic.
+    """
+
+
 def write_frontmatter_field(path: Path, key: str, value) -> None:
     """Replace (or insert) a single key in a file's YAML frontmatter, leaving the
     body untouched. This is the whole reason the exploded layout is nicer than one
     shared file: status writes are clean single-file edits, not regex surgery."""
+    if not path.exists():
+        raise WorkUnitFileMissingError(
+            f"frontmatter file {path} is gone — the feature folder may have been "
+            f"removed by `git reset` mid-run (was it committed before the run?). "
+            f"Recover the folder from the reflog "
+            f"(`git checkout <squash-sha> -- {path.parent}`), reset the in-flight "
+            f"WU's status, and commit it before re-running the loop."
+        )
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
         raise ValueError(f"{path} has no frontmatter")
@@ -669,6 +691,48 @@ def _tracked_dirty_paths() -> set[str]:
             path = path.split(" -> ", 1)[1]
         paths.add(path.strip().strip('"'))
     return paths
+
+
+def untracked_feature_files(feature_dir: "Path") -> list[str]:
+    """Untracked, non-ignored files under *feature_dir* (repo-relative paths).
+
+    `git ls-files --others --exclude-standard` lists files git knows nothing
+    about, honoring .gitignore — so the driver-managed gitignored paths
+    (`work/`, etc.) are excluded while genuinely uncommitted feature content
+    (a freshly drafted PLAN/GATE/WU set) is surfaced. Empty list = the folder
+    is fully tracked/committed. See `require_feature_folder_committed`.
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", str(feature_dir)],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+
+def require_feature_folder_committed(feature_dir: "Path") -> None:
+    """Hard-stop if the dispatched feature folder has untracked files (#71).
+
+    The per-attempt `git reset --hard head_before` rolls tracked files back to
+    the pre-attempt base. A brand-new feature folder (all files untracked —
+    `draft-feature` does not commit) passes the tracked-only dirty check, gets
+    swept into the first WU's squash (becoming tracked), and is then DELETED by
+    the next failed attempt's `reset --hard` (the folder is absent from
+    head_before) — taking the WU markdown the driver is mid-read of with it, and
+    crashing on the next frontmatter write. Refuse to start instead: a committed
+    folder is part of head_before and survives every reset.
+    """
+    untracked = untracked_feature_files(feature_dir)
+    if untracked:
+        listed = "\n  ".join(sorted(untracked))
+        sys.exit(
+            f"loop.py: feature folder '{feature_dir}' has untracked files — "
+            f"commit them before running the loop, or the per-attempt "
+            f"`git reset --hard` will delete the folder mid-run (and the driver "
+            f"will crash reading a WU file that no longer exists). Untracked:\n"
+            f"  {listed}\n"
+            f"Fix: `git add {feature_dir} && git commit -m "
+            f"'chore: commit feature folder'`, then re-run."
+        )
 
 
 def _expected_flip_paths(feature_dir: "Path | None") -> set[str]:
@@ -1142,6 +1206,43 @@ def truncate_failure_note(note: str, max_lines: int = 200,
                              - sum(len(ln) + 1 for ln in tail_lines)
     marker = f"\n... [{elided_lines} lines / {elided_chars} chars elided] ...\n"
     return "\n".join(head_lines) + marker + "\n".join(tail_lines)
+
+
+# leak-scan FINDINGS lines quote the offending match via repr, e.g.
+#   line 12: email: 'a@b.com'
+#   src/x.py:4: denylist: 'acme-widget'
+# The category label is plain prose; the quoted token is the secret that
+# re-trips a re-scan. We redact only the quoted token, preserving the label.
+_LEAK_FINDING_RE = re.compile(
+    r"(?P<label>email|user-path|private-host|denylist):\s*"
+    r"(?P<q>['\"])(?P<tok>.*?)(?P=q)"
+)
+
+
+def redact_leak_findings(text: str) -> str:
+    """Redact the quoted match inside captured leak-scan FINDINGS text (#76).
+
+    When a squash (or bookkeeping) commit is rejected by the leak-scan
+    pre-commit hook, git's stderr — which embeds the hook's FINDINGS block and
+    QUOTES the offending token — is captured as the attempt-failure note and
+    flushed into events.jsonl. The next bookkeeping commit re-scans events.jsonl
+    and re-trips on that quoted token, cascading into more failures (the
+    systemic form of the per-token allowlist band-aids). Replacing each quoted
+    match with ``<redacted:sha8>`` keeps the audit signal (which check failed,
+    on which line, and a stable hash to correlate occurrences) while removing
+    the live trigger, so the captured note can never self-poison the log.
+
+    No-op when *text* contains no leak-scan FINDINGS marker, so ordinary
+    failure notes (verify output, tracebacks) pass through untouched.
+    """
+    if "leak-scan" not in text:
+        return text
+
+    def _sub(m: re.Match) -> str:
+        digest = hashlib.sha256(m.group("tok").encode("utf-8")).hexdigest()[:8]
+        return f"{m.group('label')}: '<redacted:{digest}>'"
+
+    return _LEAK_FINDING_RE.sub(_sub, text)
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
@@ -2598,11 +2699,26 @@ def assert_closing_deliverables(
     assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
     if not assertions:
         return True, ""
+    # Aggregate, don't short-circuit (#72). Each assertion fails independently;
+    # returning only the first one forced the agent to discover the requirement
+    # set one rejection at a time. With MAX_ATTEMPTS=3 a close missing >=2
+    # sections spins to a block (and can oscillate — fix A, drop B, regress A).
+    # Run every assertion each attempt and return the complete unmet list so a
+    # single attempt can satisfy them all and a re-fix re-checks everything.
+    failures = []
     for fn in assertions:
         ok, reason = fn(wu, feature_dir, repo_root, head_before)
         if not ok:
-            return False, reason
-    return True, ""
+            failures.append(reason)
+    if not failures:
+        return True, ""
+    if len(failures) == 1:
+        return False, failures[0]
+    bullets = "\n".join(f"  - {r}" for r in failures)
+    return False, (
+        f"{len(failures)} closing deliverables unmet (fix all in one attempt):"
+        f"\n{bullets}"
+    )
 
 
 def assert_implementation_touched_files(
@@ -2858,10 +2974,14 @@ def run(
             )
             return 1
         require_git_ready()
-        # Pre-flight: refuse to start on uncommitted arm-gate / WU-revision
-        # edits (#74). The per-attempt reset --hard would otherwise discard the
-        # armed statuses + AC revisions. Runs before ensure_feature_branch so
-        # the refusal happens before any branch mutation.
+        # Pre-flight guards — both run BEFORE ensure_feature_branch so the
+        # refusal happens before any branch mutation, and both protect against
+        # the per-attempt `git reset --hard` destroying uncommitted state:
+        #   #71 — an untracked feature folder would be swept into a squash then
+        #         deleted by the reset (and crash the next frontmatter write).
+        #   #74 — uncommitted arm-gate / WU-revision edits (armed statuses, AC
+        #         revisions) would be silently discarded by the reset.
+        require_feature_folder_committed(feature_dir)
         require_feature_folder_unmodified(feature_dir)
         ensure_feature_branch(feat_fm, feature_dir)
 
@@ -3167,7 +3287,11 @@ def run(
                             # stderr, and retry within budget (MAX_ATTEMPTS
                             # exhaustion escalates to blocked_human).
                             reset_preserving_events(head_before, events_path)
-                            summary = str(exc)
+                            # Redact any quoted leak-scan match before it lands
+                            # in events.jsonl / the attempt note, so the captured
+                            # FINDINGS text can't re-trip the next bookkeeping
+                            # commit (#76 — the systemic self-poison).
+                            summary = redact_leak_findings(str(exc))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "squash_commit_failed",
                                 attempts_usage[-1],
@@ -3211,11 +3335,19 @@ def run(
                         )
                         if not closing_ok:
                             reset_preserving_events(head_before, events_path)
+                            # `assertion` names the primary (first) failing
+                            # assertion. With aggregation (#72) closing_summary
+                            # may list several; the first `assert_*` token is the
+                            # primary one and keeps the event field queryable.
+                            _assert_m = re.search(r"assert_\w+", closing_summary)
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "closing_deliverable_missing",
                                 attempts_usage[-1],
                                 extras={
-                                    "assertion": closing_summary.split(":", 1)[0].strip(),
+                                    "assertion": (
+                                        _assert_m.group(0) if _assert_m
+                                        else closing_summary.split(":", 1)[0].strip()
+                                    ),
                                     "summary": closing_summary,
                                 },
                             ))
@@ -3537,6 +3669,29 @@ def run(
                 f"  - Resume               python3 .specfuse/scripts/loop.py"
             )
         return 0
+    except BookkeepingCommitError as exc:
+        # A bookkeeping commit (gate/WU status flip + events.jsonl audit) was
+        # rejected — typically the pre-commit leak-scan hook tripping on staged
+        # events content (#75; sibling of squash_commit's #51 rejection
+        # handling). Halt the gate cleanly with an actionable message instead of
+        # letting the error escape run()/main() as a raw traceback. The staged
+        # bookkeeping stays in the working tree (staged-but-uncommitted) for the
+        # operator to inspect; nothing is silently lost.
+        print(
+            "\nloop.py: a bookkeeping commit was rejected — halting the gate "
+            "cleanly (no crash).",
+            file=sys.stderr,
+        )
+        print(str(exc), file=sys.stderr)
+        print(
+            "\nThe gate/WU status flips and the events.jsonl audit are staged "
+            "but uncommitted in the working tree. Inspect the rejecting hook "
+            "above, resolve the cause (e.g. a leak-scan FINDINGS line quoted "
+            "into events.jsonl — see #76), then commit the staged bookkeeping "
+            "manually or re-run the loop.",
+            file=sys.stderr,
+        )
+        return 1
     finally:
         if lock_fd is not None:
             lock_fd.close()
