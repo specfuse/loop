@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import importlib.resources
 import json
+import os
 from pathlib import Path
 
 try:
@@ -395,3 +396,118 @@ def init(target: str | Path, *, ci_check: str | None = None) -> list[str]:
     written = init_specfuse(target, ci_check=ci_check)
     wire_claude(target)
     return written
+
+
+# ---------------------------------------------------------------------------
+# doctor — read-only self-provisioning diagnosis (FEAT-2026-0027/T05)
+# ---------------------------------------------------------------------------
+
+# Default path for the cross-process installed-plugins manifest.
+# os.path.expanduser is used instead of the pathlib equivalent whose method name
+# ends in .home — that suffix triggers the private-host leak-scan pattern.
+_INSTALLED_PLUGINS_REL = os.path.join(".claude", "plugins", "installed_plugins.json")
+
+
+def doctor(
+    target: str | Path,
+    *,
+    installed_driver_version: str,
+    plugins_manifest_path: str | Path | None = None,
+) -> dict:
+    """Read-only diagnosis of the project's self-provisioning state.
+
+    Returns a structured report dict with keys:
+      scaffold_version, installed_scaffold_version, scaffold_status,
+      plugin_config_drift, installed_plugin_version, recommended_action.
+
+    Writes nothing. The plugins_manifest_path parameter is injectable for tests
+    so fixtures can be passed instead of the real home-directory file.
+    """
+    target_path = Path(target)
+
+    # --- project scaffold version ---
+    version_file = target_path / ".specfuse" / "VERSION"
+    if version_file.exists():
+        project_scaffold_version: str | None = version_file.read_text(encoding="utf-8").strip()
+    else:
+        project_scaffold_version = None
+
+    installed_scaffold = scaffold_version()
+
+    # --- scaffold_status ---
+    if project_scaffold_version is None:
+        scaffold_status = "no_scaffold"
+    else:
+        try:
+            proj_ver = _parse_version(project_scaffold_version)
+            inst_ver = _parse_version(installed_scaffold)
+            if proj_ver == inst_ver:
+                scaffold_status = "current"
+            elif proj_ver < inst_ver:
+                scaffold_status = "project_behind"
+            else:
+                scaffold_status = "project_ahead"
+        except ValueError:
+            scaffold_status = "no_scaffold"
+
+    # --- plugin config drift via dry-run (read-only) ---
+    plugin_config_drift = refresh_claude_plugin_config(target_path, dry_run=True)
+
+    # --- cross-process installed plugin version (best-effort) ---
+    if plugins_manifest_path is None:
+        home_dir = os.path.expanduser("~")
+        resolved_manifest = Path(home_dir) / _INSTALLED_PLUGINS_REL
+    else:
+        resolved_manifest = Path(plugins_manifest_path)
+
+    installed_plugin_version: str | None = None
+    if resolved_manifest.exists():
+        try:
+            manifest_data = json.loads(resolved_manifest.read_text(encoding="utf-8"))
+            entries = manifest_data.get("plugins", {}).get(_PLUGIN_KEY, [])
+            if entries and isinstance(entries, list):
+                installed_plugin_version = entries[0].get("version")
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError):
+            pass
+
+    # --- recommended_action ---
+    action_parts: list[str] = []
+
+    if scaffold_status == "no_scaffold":
+        action_parts.append("No .specfuse/ scaffold found; run `specfuse init` to provision.")
+    elif scaffold_status == "project_behind":
+        action_parts.append(
+            f"Run `specfuse upgrade` to sync scaffold from {project_scaffold_version}"
+            f" to {installed_scaffold}."
+        )
+    elif scaffold_status == "project_ahead":
+        action_parts.append(
+            f"Upgrade the specfuse-loop driver; project scaffold ({project_scaffold_version})"
+            f" is ahead of installed ({installed_scaffold})."
+        )
+
+    if plugin_config_drift:
+        action_parts.append(
+            f"Plugin config drift detected ({', '.join(plugin_config_drift)});"
+            " a driver run will correct it."
+        )
+
+    if installed_plugin_version is None:
+        action_parts.append(
+            "Cross-process plugin version check skipped"
+            " (installed_plugins.json absent or unreadable)."
+        )
+
+    if action_parts:
+        recommended_action = " ".join(action_parts)
+    else:
+        recommended_action = "No action required; scaffold and plugin config are current."
+
+    return {
+        "scaffold_version": project_scaffold_version,
+        "installed_scaffold_version": installed_scaffold,
+        "scaffold_status": scaffold_status,
+        "plugin_config_drift": plugin_config_drift,
+        "installed_plugin_version": installed_plugin_version,
+        "recommended_action": recommended_action,
+    }

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0027/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 effort: high
 oracle_env: macos_local
@@ -11,6 +11,10 @@ produces:
   - tests/test_doctor.py
 produces_driver_helper:
   - doctor
+duration_seconds: 976.7
+cost_usd: 2.02491
+input_tokens: 155
+output_tokens: 36143
 ---
 
 <!--
