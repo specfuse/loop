@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0027/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 effort: medium
 oracle_env: macos_local
@@ -11,10 +11,10 @@ produces:
   - tests/test_autosync_firstrun.py
 produces_driver_helper:
   - auto_sync
-duration_seconds: 685.336
-cost_usd: 1.297305
-input_tokens: 54
-output_tokens: 13493
+duration_seconds: 231.931
+cost_usd: 0.516128
+input_tokens: 22
+output_tokens: 5687
 ---
 
 <!--

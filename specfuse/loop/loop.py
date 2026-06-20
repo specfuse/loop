@@ -3531,6 +3531,23 @@ def auto_sync(
         if dry_run:
             print(f"auto_sync [dry-run]: .specfuse/ missing -> would scaffold.init({target})")
             return
+        if sys.stdin.isatty():
+            ans = input(
+                f"auto_sync: no .specfuse/ found in {target}. "
+                f"Scaffold will create it now. Proceed? [Y/n] "
+            ).strip().lower()
+            if ans in ("n", "no"):
+                print(
+                    "auto_sync: scaffold skipped. To suppress this prompt, "
+                    "pass --no-autosync or set 'autosync: false' in .specfuse/config.",
+                    file=sys.stderr,
+                )
+                return
+        else:
+            print(
+                f"auto_sync: no TTY — self-provisioning .specfuse/ in {target}.",
+                file=sys.stderr,
+            )
         _scaffold.init(target)
         _scaffold.refresh_claude_plugin_config(target)  # wire_claude already ran; ensures AC3 call
         return

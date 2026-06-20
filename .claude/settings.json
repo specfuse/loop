@@ -4,5 +4,16 @@
       "Bash(python3 .specfuse/scripts/loop.py:*)",
       "Bash(python3 .specfuse/scripts/lint_plan.py:*)"
     ]
+  },
+  "extraKnownMarketplaces": {
+    "specfuse": {
+      "source": {
+        "source": "github",
+        "repo": "specfuse/specfuse"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "specfuse@specfuse": true
   }
 }
