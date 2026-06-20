@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0027/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 effort: high
 oracle_env: macos_local
@@ -11,6 +11,10 @@ produces:
   - tests/test_migrate_legacy.py
 produces_driver_helper:
   - migrate_legacy
+duration_seconds: 540.539
+cost_usd: 1.291025
+input_tokens: 26
+output_tokens: 23444
 ---
 
 <!--

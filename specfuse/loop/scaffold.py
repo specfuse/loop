@@ -7,7 +7,10 @@ import hashlib
 import importlib.resources
 import json
 import os
+import re
 from pathlib import Path
+
+from . import _miniyaml
 
 try:
     from importlib.resources.abc import Traversable  # Python 3.11+
@@ -511,3 +514,117 @@ def doctor(
         "installed_plugin_version": installed_plugin_version,
         "recommended_action": recommended_action,
     }
+
+
+# ---------------------------------------------------------------------------
+# Legacy migration prune (FEAT-2026-0027/T07)
+# ---------------------------------------------------------------------------
+
+# Matches `.specfuse/scripts/<path>` in a command or allow-list entry, stopping
+# at whitespace, quotes, parens, colons, or brackets — all of which naturally
+# delimit a path reference in shell-style strings or Claude allow patterns.
+_SCRIPTS_REF_RE = re.compile(r'\.specfuse/(scripts/[^\s"\'():\[\]{}]+)')
+
+
+def _collect_commands(obj: object) -> list[str]:
+    """Recursively collect all 'command' string values from parsed verification.yml."""
+    cmds: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "command" and isinstance(v, str):
+                cmds.append(v)
+            else:
+                cmds.extend(_collect_commands(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            cmds.extend(_collect_commands(item))
+    return cmds
+
+
+def _script_refs_from_text(text: str) -> set[str]:
+    return {m.group(1) for m in _SCRIPTS_REF_RE.finditer(text)}
+
+
+def _kept_scripts_from_verification_yml(yml_path: Path) -> set[str]:
+    """Return scripts/ relpaths (relative to .specfuse/) referenced in verification.yml gates.
+
+    Returns empty set when the file is absent.
+    Raises ValueError when the file exists but cannot be parsed.
+    """
+    if not yml_path.exists():
+        return set()
+    text = yml_path.read_text(encoding="utf-8")
+    try:
+        data = _miniyaml.parse(text)
+    except Exception as exc:
+        raise ValueError(f"cannot parse {yml_path}: {exc}") from exc
+    refs: set[str] = set()
+    for cmd in _collect_commands(data):
+        refs.update(_script_refs_from_text(cmd))
+    return refs
+
+
+def _kept_scripts_from_settings_json(settings_path: Path) -> set[str]:
+    """Return scripts/ relpaths (relative to .specfuse/) referenced in the Bash allowlist.
+
+    Returns empty set when the file is absent.
+    Raises ValueError when the file exists but cannot be parsed.
+    """
+    if not settings_path.exists():
+        return set()
+    text = settings_path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(text)
+    except Exception as exc:
+        raise ValueError(f"cannot parse {settings_path}: {exc}") from exc
+    refs: set[str] = set()
+    allow: list = data.get("permissions", {}).get("allow", [])
+    for entry in allow:
+        if isinstance(entry, str):
+            refs.update(_script_refs_from_text(entry))
+    return refs
+
+
+def migrate_legacy(target: str | Path, *, dry_run: bool = False) -> list[str]:
+    """Prune legacy .specfuse/scripts/ and .specfuse/skills/ from a consumer repo.
+
+    The keep-set is derived from the target's .specfuse/verification.yml and
+    .claude/settings.json: every .specfuse/scripts/<path> referenced in gate
+    commands or the Bash allowlist is preserved. All .specfuse/skills/ entries
+    are pruned (replaced by the specfuse@specfuse plugin).
+
+    Returns the sorted list of pruned paths (relative to .specfuse/).
+    With dry_run=True, returns what would be pruned without deleting anything.
+    Raises ValueError if verification.yml or settings.json exists but cannot be parsed.
+    Never touches anything outside .specfuse/scripts/ and .specfuse/skills/.
+    """
+    target_path = Path(target)
+    specfuse_dir = target_path / ".specfuse"
+
+    kept = _kept_scripts_from_verification_yml(specfuse_dir / "verification.yml")
+    kept |= _kept_scripts_from_settings_json(target_path / ".claude" / "settings.json")
+
+    pruned: list[str] = []
+
+    scripts_dir = specfuse_dir / "scripts"
+    if scripts_dir.is_dir():
+        for entry in sorted(scripts_dir.rglob("*")):
+            if not (entry.is_file() or entry.is_symlink()):
+                continue
+            rel = entry.relative_to(specfuse_dir).as_posix()
+            if rel not in kept:
+                pruned.append(rel)
+                if not dry_run:
+                    entry.unlink()
+
+    skills_dir = specfuse_dir / "skills"
+    if skills_dir.is_dir():
+        for entry in sorted(skills_dir.rglob("*")):
+            if not (entry.is_file() or entry.is_symlink()):
+                continue
+            rel = entry.relative_to(specfuse_dir).as_posix()
+            pruned.append(rel)
+            if not dry_run:
+                entry.unlink()
+
+    return sorted(pruned)
