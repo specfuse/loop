@@ -2540,11 +2540,26 @@ def assert_closing_deliverables(
     assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
     if not assertions:
         return True, ""
+    # Aggregate, don't short-circuit (#72). Each assertion fails independently;
+    # returning only the first one forced the agent to discover the requirement
+    # set one rejection at a time. With MAX_ATTEMPTS=3 a close missing >=2
+    # sections spins to a block (and can oscillate — fix A, drop B, regress A).
+    # Run every assertion each attempt and return the complete unmet list so a
+    # single attempt can satisfy them all and a re-fix re-checks everything.
+    failures = []
     for fn in assertions:
         ok, reason = fn(wu, feature_dir, repo_root, head_before)
         if not ok:
-            return False, reason
-    return True, ""
+            failures.append(reason)
+    if not failures:
+        return True, ""
+    if len(failures) == 1:
+        return False, failures[0]
+    bullets = "\n".join(f"  - {r}" for r in failures)
+    return False, (
+        f"{len(failures)} closing deliverables unmet (fix all in one attempt):"
+        f"\n{bullets}"
+    )
 
 
 def assert_implementation_touched_files(
@@ -3148,11 +3163,19 @@ def run(
                         )
                         if not closing_ok:
                             reset_preserving_events(head_before, events_path)
+                            # `assertion` names the primary (first) failing
+                            # assertion. With aggregation (#72) closing_summary
+                            # may list several; the first `assert_*` token is the
+                            # primary one and keeps the event field queryable.
+                            _assert_m = re.search(r"assert_\w+", closing_summary)
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "closing_deliverable_missing",
                                 attempts_usage[-1],
                                 extras={
-                                    "assertion": closing_summary.split(":", 1)[0].strip(),
+                                    "assertion": (
+                                        _assert_m.group(0) if _assert_m
+                                        else closing_summary.split(":", 1)[0].strip()
+                                    ),
                                     "summary": closing_summary,
                                 },
                             ))
