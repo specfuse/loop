@@ -405,6 +405,31 @@ def lint(feature_dir: Path) -> list[str]:
                         f"'produces:' deliverable list. See FEAT-2026-0022."
                     )
 
+            # Bare/non-root-relative produces path WARN (#77). Applies to any
+            # WU type that declares produces (the incident was a close-adjacent
+            # WU). The presence gate (FEAT-2026-0022/T02) resolves each path
+            # relative to the repo root; a bare filename (no '/') almost always
+            # names a file that actually lives in a subdirectory (.specfuse/,
+            # modules/, environments/, the feature dir, …). Resolved from the
+            # root it is absent, so the gate fails identically every attempt and
+            # spins to a 3-attempt block — ~3 wasted sessions on an authoring
+            # typo a static check catches for free.
+            produces_raw = wfm.get("produces")
+            if produces_raw:
+                entries = produces_raw if isinstance(produces_raw, list) else [produces_raw]
+                for entry in entries:
+                    entry_s = str(entry).strip()
+                    if entry_s and "/" not in entry_s:
+                        print(
+                            f"WARN: {wfile}: produces path {entry_s!r} is a bare "
+                            f"filename — produces paths are resolved relative to "
+                            f"the repo root, where this almost never exists (WU "
+                            f"deliverables live under .specfuse/, modules/, "
+                            f"environments/, the feature dir, …). Use a "
+                            f"repo-root-relative path or the presence gate will "
+                            f"fail every attempt and spin to a block. See #77."
+                        )
+
         # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]
         if closing_found == ["close"]:
