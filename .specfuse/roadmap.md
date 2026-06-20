@@ -43,7 +43,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | planned | — | — |
-| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | active | — | — |
+| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 
@@ -662,7 +662,7 @@ pip-scaffolded repo is missing `.specfuse/docs/`. Close the parity gap in the sa
 end-to-end — the last gap before `init.sh` can be deleted (v1.1) and before
 FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adoption test.
 
-**Status: active.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
+**Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 ## Notes

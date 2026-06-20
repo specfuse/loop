@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0028/T04
 type: implementation
-status: draft
+status: done
 attempts: 0
 planned_cost_usd: 1.50
 oracle_env: macos_local

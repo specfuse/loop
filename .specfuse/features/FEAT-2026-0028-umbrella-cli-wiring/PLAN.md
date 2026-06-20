@@ -5,7 +5,7 @@ slug: umbrella-cli-wiring
 branch: feat/FEAT-2026-0028-umbrella-cli-wiring
 roadmap_goal: Make specfuse init/upgrade scaffold end-to-end — rewire the umbrella CLI to call specfuse.loop.scaffold and ship docs/ in the pip seed — the last gap before init.sh deletion and the coordinated release.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 13.75
 ---
 
