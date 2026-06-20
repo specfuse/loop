@@ -225,29 +225,71 @@ def _write_settings_json(target_path: Path) -> None:
         if entry not in allow:
             allow.append(entry)
 
-    marketplaces: dict = data.setdefault("extraKnownMarketplaces", {})
-    if _MARKETPLACE_KEY not in marketplaces:
-        marketplaces[_MARKETPLACE_KEY] = _MARKETPLACE_VALUE
-
-    plugins: dict = data.setdefault("enabledPlugins", {})
-    if _PLUGIN_KEY not in plugins:
-        plugins[_PLUGIN_KEY] = True
-
     new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if new_text != original_text:
         settings_path.write_text(new_text, encoding="utf-8")
+
+
+def refresh_claude_plugin_config(
+    target: str | Path,
+    *,
+    dry_run: bool = False,
+) -> list[str]:
+    """Parse-merge-rewrite .claude/settings.json to re-assert the specfuse plugin config.
+
+    Idempotently ensures:
+    - extraKnownMarketplaces["specfuse"] matches the installed _MARKETPLACE_VALUE
+      (overwrites a drifted value, not just add-if-absent)
+    - enabledPlugins["specfuse@specfuse"] is True (restores if removed)
+
+    All other settings keys are preserved untouched.
+
+    Returns the sorted list of entry names that were changed (or would be changed
+    when dry_run=True). An empty list means the config was already current.
+    """
+    target_path = Path(target)
+    claude_dir = target_path / ".claude"
+    settings_path = claude_dir / "settings.json"
+
+    if settings_path.exists():
+        original_text = settings_path.read_text(encoding="utf-8")
+        data: dict = json.loads(original_text)
+    else:
+        original_text = None
+        data = {}
+
+    changed: list[str] = []
+
+    marketplaces: dict = data.setdefault("extraKnownMarketplaces", {})
+    if marketplaces.get(_MARKETPLACE_KEY) != _MARKETPLACE_VALUE:
+        marketplaces[_MARKETPLACE_KEY] = _MARKETPLACE_VALUE
+        changed.append(f"extraKnownMarketplaces.{_MARKETPLACE_KEY}")
+
+    plugins: dict = data.setdefault("enabledPlugins", {})
+    if plugins.get(_PLUGIN_KEY) is not True:
+        plugins[_PLUGIN_KEY] = True
+        changed.append(f"enabledPlugins.{_PLUGIN_KEY}")
+
+    if not dry_run and changed:
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        settings_path.write_text(new_text, encoding="utf-8")
+
+    return sorted(changed)
 
 
 def wire_claude(target: str | Path) -> None:
     """Write .gitignore snippet, .claude/CLAUDE.md, and .claude/settings.json.
 
     All writes are merge-safe: existing content is preserved and entries are
-    added only when absent.
+    added only when absent. Plugin-config entries are re-asserted to the installed
+    values (not merely additive) via refresh_claude_plugin_config.
     """
     target_path = Path(target)
     _write_gitignore(target_path)
     _write_claude_md(target_path)
     _write_settings_json(target_path)
+    refresh_claude_plugin_config(target_path)
 
 
 def _parse_version(v: str) -> tuple[int, int, int]:

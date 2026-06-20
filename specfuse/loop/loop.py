@@ -3516,6 +3516,7 @@ def auto_sync(
             print(f"auto_sync [dry-run]: .specfuse/ missing -> would scaffold.init({target})")
             return
         _scaffold.init(target)
+        _scaffold.refresh_claude_plugin_config(target)  # wire_claude already ran; ensures AC3 call
         return
 
     installed = _scaffold.scaffold_version()
@@ -3542,7 +3543,20 @@ def auto_sync(
         return
 
     if current_tuple == installed_tuple:
-        return  # no-op
+        if dry_run:
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
+            return
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
+        return
 
     # Older — upgrade needed.
     modified = _scaffold.detect_modified(target)
@@ -3553,8 +3567,19 @@ def auto_sync(
                 f"auto_sync [dry-run]: scaffold {current_str} -> {installed} "
                 f"(no modified files) -> would upgrade_specfuse"
             )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
             return
         _scaffold.upgrade_specfuse(target)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
         return
 
     # Older with modified files.
@@ -3592,6 +3617,11 @@ def auto_sync(
                 f"auto_sync [dry-run]: would overlay {len(modified) - kept} file(s), "
                 f"keep {kept} file(s)"
             )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
             return
 
         saved: dict[str, bytes] = {
@@ -3602,6 +3632,12 @@ def auto_sync(
         _scaffold.upgrade_specfuse(target)
         for rel, content in saved.items():
             (specfuse_dir / rel).write_bytes(content)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
     else:
         # Non-interactive (CI / claude -p): skip modified files + warn; never block.
         print(
@@ -3617,6 +3653,11 @@ def auto_sync(
                 f"auto_sync [dry-run]: would overlay unmodified versioned files "
                 f"({len(modified)} file(s) skipped)"
             )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
             return
 
         saved = {
@@ -3627,6 +3668,12 @@ def auto_sync(
         _scaffold.upgrade_specfuse(target)
         for rel, content in saved.items():
             (specfuse_dir / rel).write_bytes(content)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
 
 
 def main() -> int:

@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0027-self-provisioning-driver
 roadmap_goal: Make a plain specfuse-loop run self-provision the project to the installed driver version — create/overlay .specfuse/ (never downgrade) + refresh the Claude plugin config — so adoption is "install global, run anywhere, done".
 autonomy_default: review
 status: active
-planned_cost_usd: 11.50
+planned_cost_usd: 18.00
 ---
 
 <!--
