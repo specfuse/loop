@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -1084,6 +1085,43 @@ def truncate_failure_note(note: str, max_lines: int = 200,
                              - sum(len(ln) + 1 for ln in tail_lines)
     marker = f"\n... [{elided_lines} lines / {elided_chars} chars elided] ...\n"
     return "\n".join(head_lines) + marker + "\n".join(tail_lines)
+
+
+# leak-scan FINDINGS lines quote the offending match via repr, e.g.
+#   line 12: email: 'a@b.com'
+#   src/x.py:4: denylist: 'acme-widget'
+# The category label is plain prose; the quoted token is the secret that
+# re-trips a re-scan. We redact only the quoted token, preserving the label.
+_LEAK_FINDING_RE = re.compile(
+    r"(?P<label>email|user-path|private-host|denylist):\s*"
+    r"(?P<q>['\"])(?P<tok>.*?)(?P=q)"
+)
+
+
+def redact_leak_findings(text: str) -> str:
+    """Redact the quoted match inside captured leak-scan FINDINGS text (#76).
+
+    When a squash (or bookkeeping) commit is rejected by the leak-scan
+    pre-commit hook, git's stderr — which embeds the hook's FINDINGS block and
+    QUOTES the offending token — is captured as the attempt-failure note and
+    flushed into events.jsonl. The next bookkeeping commit re-scans events.jsonl
+    and re-trips on that quoted token, cascading into more failures (the
+    systemic form of the per-token allowlist band-aids). Replacing each quoted
+    match with ``<redacted:sha8>`` keeps the audit signal (which check failed,
+    on which line, and a stable hash to correlate occurrences) while removing
+    the live trigger, so the captured note can never self-poison the log.
+
+    No-op when *text* contains no leak-scan FINDINGS marker, so ordinary
+    failure notes (verify output, tracebacks) pass through untouched.
+    """
+    if "leak-scan" not in text:
+        return text
+
+    def _sub(m: re.Match) -> str:
+        digest = hashlib.sha256(m.group("tok").encode("utf-8")).hexdigest()[:8]
+        return f"{m.group('label')}: '<redacted:{digest}>'"
+
+    return _LEAK_FINDING_RE.sub(_sub, text)
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
@@ -2540,11 +2578,26 @@ def assert_closing_deliverables(
     assertions = CLOSING_ASSERTIONS_BY_TYPE.get(wu.type, [])
     if not assertions:
         return True, ""
+    # Aggregate, don't short-circuit (#72). Each assertion fails independently;
+    # returning only the first one forced the agent to discover the requirement
+    # set one rejection at a time. With MAX_ATTEMPTS=3 a close missing >=2
+    # sections spins to a block (and can oscillate — fix A, drop B, regress A).
+    # Run every assertion each attempt and return the complete unmet list so a
+    # single attempt can satisfy them all and a re-fix re-checks everything.
+    failures = []
     for fn in assertions:
         ok, reason = fn(wu, feature_dir, repo_root, head_before)
         if not ok:
-            return False, reason
-    return True, ""
+            failures.append(reason)
+    if not failures:
+        return True, ""
+    if len(failures) == 1:
+        return False, failures[0]
+    bullets = "\n".join(f"  - {r}" for r in failures)
+    return False, (
+        f"{len(failures)} closing deliverables unmet (fix all in one attempt):"
+        f"\n{bullets}"
+    )
 
 
 def assert_implementation_touched_files(
@@ -3104,7 +3157,11 @@ def run(
                             # stderr, and retry within budget (MAX_ATTEMPTS
                             # exhaustion escalates to blocked_human).
                             reset_preserving_events(head_before, events_path)
-                            summary = str(exc)
+                            # Redact any quoted leak-scan match before it lands
+                            # in events.jsonl / the attempt note, so the captured
+                            # FINDINGS text can't re-trip the next bookkeeping
+                            # commit (#76 — the systemic self-poison).
+                            summary = redact_leak_findings(str(exc))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "squash_commit_failed",
                                 attempts_usage[-1],
@@ -3148,11 +3205,19 @@ def run(
                         )
                         if not closing_ok:
                             reset_preserving_events(head_before, events_path)
+                            # `assertion` names the primary (first) failing
+                            # assertion. With aggregation (#72) closing_summary
+                            # may list several; the first `assert_*` token is the
+                            # primary one and keeps the event field queryable.
+                            _assert_m = re.search(r"assert_\w+", closing_summary)
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "closing_deliverable_missing",
                                 attempts_usage[-1],
                                 extras={
-                                    "assertion": closing_summary.split(":", 1)[0].strip(),
+                                    "assertion": (
+                                        _assert_m.group(0) if _assert_m
+                                        else closing_summary.split(":", 1)[0].strip()
+                                    ),
                                     "summary": closing_summary,
                                 },
                             ))
