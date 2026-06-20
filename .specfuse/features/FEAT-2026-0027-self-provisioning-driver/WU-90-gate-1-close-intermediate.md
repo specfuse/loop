@@ -2,9 +2,11 @@
 id: FEAT-2026-0027/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
 effort: medium
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.50
+auto_close: true
+auto_close_reasons: []
 ---
 
 <\!--
