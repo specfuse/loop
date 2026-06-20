@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0028-umbrella-cli-wiring
 roadmap_goal: Make specfuse init/upgrade scaffold end-to-end — rewire the umbrella CLI to call specfuse.loop.scaffold and ship docs/ in the pip seed — the last gap before init.sh deletion and the coordinated release.
 autonomy_default: review
 status: active
-planned_cost_usd: 9.00
+planned_cost_usd: 13.75
 ---
 
 <!--
@@ -75,11 +75,28 @@ gates:
         depends_on: [FEAT-2026-0028/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
+    # Gate 2 is INTERACTIVE / CROSS-REPO: its substantive WUs (T03-T05) are
+    # specs for work done by hand in the `specfuse/specfuse` umbrella repo, and
+    # are verified THERE, not by this loop. The loop runs only the structural
+    # lint of these drafts; G2-CLOSE records what the loop could not verify.
     work_units:
-      # Terminal close scaffolded now; gate 1's plan-next sets real depends_on.
+      - id: FEAT-2026-0028/T03
+        file: WU-03-cmd-init-rewire.md
+        depends_on: []
+      - id: FEAT-2026-0028/T04
+        file: WU-04-cmd-upgrade-rewire.md
+        depends_on: []
+      - id: FEAT-2026-0028/T05
+        file: WU-05-dry-run-and-test-sweep.md
+        depends_on:
+          - FEAT-2026-0028/T03
+          - FEAT-2026-0028/T04
       - id: FEAT-2026-0028/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0028/T03
+          - FEAT-2026-0028/T04
+          - FEAT-2026-0028/T05
 ```
 
 ## Notes
