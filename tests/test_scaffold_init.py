@@ -25,6 +25,11 @@ _EXPECTED_TREE = {
     "roadmap.md",
     "LEARNINGS.md",
     "features/.gitkeep",
+    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "docs/concepts/ralph-lineage.md",
+    "docs/getting-started.md",
+    "docs/methodology.md",
+    "docs/skills.md",
 }
 
 # Seed relpaths for versioned files and their target relpaths inside .specfuse/

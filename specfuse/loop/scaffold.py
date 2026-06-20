@@ -59,8 +59,11 @@ _SEED_RENAME: dict[str, str] = {
     "verification.yml.example": "verification.yml",
 }
 
-# Seed files handled by other work units (T05); skip during init
-_SKIP_SEEDS: frozenset[str] = frozenset({"gitignore.snippet"})
+# Seed files handled by other work units; skip during init.
+# - gitignore.snippet: handled by T05 (wire_claude)
+_SKIP_SEEDS: frozenset[str] = frozenset({
+    "gitignore.snippet",
+})
 
 
 def init_specfuse(
@@ -207,11 +210,11 @@ def _parse_version(v: str) -> tuple[int, int, int]:
 
 
 # Seed relpaths overlaid verbatim into .specfuse/<relpath> on upgrade
-_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/")
+_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/", "docs/")
 _VERSIONED_OVERLAY_EXACT: frozenset[str] = frozenset({"verification.yml.example", "VERSION"})
 
 # Versioned directories whose contents are pruned on upgrade
-_VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules")
+_VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules", "docs")
 
 
 def upgrade_specfuse(

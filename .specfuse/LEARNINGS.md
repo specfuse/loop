@@ -1593,3 +1593,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   into three dispatched WUs gated by the half-migrated harness. Tell at draft time:
   if a WU edits `verification.yml`, the test loader, or how the driver's own code is
   imported, its sibling WUs share a broken oracle until all land together.
+
+- [FEAT-2026-0028/G2] A feature gate whose work AND verification live in a SIBLING repo
+  (here: the umbrella `specfuse` CLI in specfuse/specfuse, calling the driver's
+  scaffold API) cannot be loop-dispatched — the driver runs in this repo and its cwd,
+  git, and verification all target it. Draft such a gate's WUs as interactive specs
+  (flag them cross-repo in Context), execute them by hand in the sibling repo, and have
+  the terminal close record the real oracle result (tests run THERE) under "what the
+  loop did NOT verify" with the sibling commit as evidence. Tell at draft time: if a
+  WU's `produces:` paths or its test command live outside this repo, it is a cross-repo
+  interactive WU, not a dispatchable one.
