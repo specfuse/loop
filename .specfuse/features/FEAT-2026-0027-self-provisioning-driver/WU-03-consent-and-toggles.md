@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0027/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/loop.py
   - tests/test_autosync_consent.py
+duration_seconds: 523.755
+cost_usd: 1.326032
+input_tokens: 26
+output_tokens: 20274
 ---
 
 <!--

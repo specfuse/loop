@@ -3474,18 +3474,42 @@ def _parse_version(s: str) -> tuple[int, ...]:
     return tuple(parts) or (0,)
 
 
-def auto_sync(repo: Path | None = None, *, dry_run: bool = False) -> None:
+def auto_sync(
+    repo: Path | None = None,
+    *,
+    dry_run: bool = False,
+    no_autosync: bool = False,
+) -> None:
     """Version-sync .specfuse/ to the installed scaffold on every run.
 
     Decision tree:
+      no_autosync=True / config autosync:false -> skip entirely
       missing .specfuse/           -> scaffold.init (create)
       older, no modified files     -> scaffold.upgrade_specfuse (overlay)
-      older, with modified files   -> partial overlay (skip modified, warn)
+      older, with modified files + TTY  -> prompt per file (overwrite/keep)
+      older, with modified files, no TTY -> partial overlay (skip modified, warn)
       equal                        -> no-op
       newer than installed         -> warn + refuse (never downgrade)
+
+    The .specfuse/config file (optional) is parsed for an ``autosync: false``
+    entry that disables auto-sync project-wide. Absent config means auto-sync
+    is on (default). The ``no_autosync`` parameter takes precedence.
     """
+    if no_autosync:
+        return
+
     target = Path(repo) if repo is not None else REPO_ROOT
     specfuse_dir = target / ".specfuse"
+
+    # Check .specfuse/config for project-level opt-out (absent → on).
+    config_path = specfuse_dir / "config"
+    if config_path.exists():
+        try:
+            cfg = _miniyaml.parse(config_path.read_text(encoding="utf-8")) or {}
+        except Exception:  # noqa: BLE001 — malformed config → treat as absent
+            cfg = {}
+        if cfg.get("autosync") is False:
+            return
 
     if not specfuse_dir.exists():
         if dry_run:
@@ -3533,30 +3557,76 @@ def auto_sync(repo: Path | None = None, *, dry_run: bool = False) -> None:
         _scaffold.upgrade_specfuse(target)
         return
 
-    # Older with modified files — partial overlay, preserve user edits.
-    print(
-        f"WARNING: auto_sync: {len(modified)} modified versioned file(s) skipped during "
-        f"scaffold upgrade ({current_str} -> {installed}). Review manually:",
-        file=sys.stderr,
-    )
-    for f in modified:
-        print(f"  (skipped) {f}", file=sys.stderr)
+    # Older with modified files.
+    if sys.stdin.isatty():
+        # Interactive: prompt the operator per file (or accept bulk answers).
+        files_to_keep: list[str] = []
+        overwrite_all = False
+        keep_all = False
+        for f in modified:
+            if overwrite_all:
+                continue
+            if keep_all:
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
+                continue
+            ans = input(
+                f"auto_sync: '{f}' was locally modified. "
+                f"Overwrite with scaffold {installed}? [y/N/all/keep-all] "
+            ).strip().lower()
+            if ans == "all":
+                overwrite_all = True
+            elif ans == "keep-all":
+                keep_all = True
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
+            elif ans == "y":
+                pass  # upgrade_specfuse will overwrite; do not save
+            else:
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
 
-    if dry_run:
+        if dry_run:
+            kept = len(files_to_keep)
+            print(
+                f"auto_sync [dry-run]: would overlay {len(modified) - kept} file(s), "
+                f"keep {kept} file(s)"
+            )
+            return
+
+        saved: dict[str, bytes] = {
+            rel: (specfuse_dir / rel).read_bytes()
+            for rel in files_to_keep
+            if (specfuse_dir / rel).exists()
+        }
+        _scaffold.upgrade_specfuse(target)
+        for rel, content in saved.items():
+            (specfuse_dir / rel).write_bytes(content)
+    else:
+        # Non-interactive (CI / claude -p): skip modified files + warn; never block.
         print(
-            f"auto_sync [dry-run]: would overlay unmodified versioned files "
-            f"({len(modified)} file(s) skipped)"
+            f"WARNING: auto_sync: {len(modified)} modified versioned file(s) skipped during "
+            f"scaffold upgrade ({current_str} -> {installed}). Review manually:",
+            file=sys.stderr,
         )
-        return
+        for f in modified:
+            print(f"  (skipped) {f}", file=sys.stderr)
 
-    saved: dict[str, bytes] = {
-        rel: (specfuse_dir / rel).read_bytes()
-        for rel in modified
-        if (specfuse_dir / rel).exists()
-    }
-    _scaffold.upgrade_specfuse(target)
-    for rel, content in saved.items():
-        (specfuse_dir / rel).write_bytes(content)
+        if dry_run:
+            print(
+                f"auto_sync [dry-run]: would overlay unmodified versioned files "
+                f"({len(modified)} file(s) skipped)"
+            )
+            return
+
+        saved = {
+            rel: (specfuse_dir / rel).read_bytes()
+            for rel in modified
+            if (specfuse_dir / rel).exists()
+        }
+        _scaffold.upgrade_specfuse(target)
+        for rel, content in saved.items():
+            (specfuse_dir / rel).write_bytes(content)
 
 
 def main() -> int:
@@ -3568,10 +3638,12 @@ def main() -> int:
     ap.add_argument("--force-full-close", metavar="FEATURE_ID",
                     help="Bypass predicate consultation and run the existing close "
                     "path for the named feature. Must match the feature being processed.")
+    ap.add_argument("--no-autosync", action="store_true",
+                    help="Skip auto-sync entirely (no scaffold create or overlay).")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
-    auto_sync(dry_run=args.dry_run)
+    auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
 
 
