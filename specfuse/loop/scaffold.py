@@ -59,8 +59,17 @@ _SEED_RENAME: dict[str, str] = {
     "verification.yml.example": "verification.yml",
 }
 
-# Seed files handled by other work units (T05); skip during init
-_SKIP_SEEDS: frozenset[str] = frozenset({"gitignore.snippet"})
+# Seed files handled by other work units; skip during init.
+# - gitignore.snippet: handled by T05 (wire_claude)
+# - docs/*: handled by T02 (deploy_docs); T01 adds to seed only
+_SKIP_SEEDS: frozenset[str] = frozenset({
+    "gitignore.snippet",
+    "docs/getting-started.md",
+    "docs/methodology.md",
+    "docs/skills.md",
+    "docs/concepts/ralph-lineage.md",
+    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+})
 
 
 def init_specfuse(

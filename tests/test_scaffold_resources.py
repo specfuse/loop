@@ -22,6 +22,11 @@ _EXPECTED_RELPATHS = {
     "rules/never-touch.md",
     "rules/result-contract.md",
     "rules/security-boundaries.md",
+    "docs/getting-started.md",
+    "docs/methodology.md",
+    "docs/skills.md",
+    "docs/concepts/ralph-lineage.md",
+    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
 }
 
 
