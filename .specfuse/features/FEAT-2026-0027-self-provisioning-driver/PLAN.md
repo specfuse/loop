@@ -76,7 +76,19 @@ gates:
         depends_on: [FEAT-2026-0027/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []   # drafted by gate 1's plan-next (plugin-config + drift)
+    work_units:
+      # Gate 2 collapsed to ONE substantive WU: 0026's wire_claude already covers
+      # create/overlay plugin wiring; the only gaps are steady-state refresh +
+      # value-drift correction + the in-repo drift warning. See GATE-02-REVIEW.md.
+      - id: FEAT-2026-0027/T04
+        file: WU-04-plugin-config-refresh.md
+        depends_on: [FEAT-2026-0027/T03]
+      - id: FEAT-2026-0027/G2-CLOSE-INTERMEDIATE
+        file: WU-92-gate-2-close-intermediate.md
+        depends_on: [FEAT-2026-0027/T04]
+      - id: FEAT-2026-0027/G2-PLAN
+        file: WU-93-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0027/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
