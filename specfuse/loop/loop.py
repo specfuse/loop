@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fcntl
+import hashlib
 import json
 import logging
 import os
@@ -1084,6 +1085,43 @@ def truncate_failure_note(note: str, max_lines: int = 200,
                              - sum(len(ln) + 1 for ln in tail_lines)
     marker = f"\n... [{elided_lines} lines / {elided_chars} chars elided] ...\n"
     return "\n".join(head_lines) + marker + "\n".join(tail_lines)
+
+
+# leak-scan FINDINGS lines quote the offending match via repr, e.g.
+#   line 12: email: 'a@b.com'
+#   src/x.py:4: denylist: 'acme-widget'
+# The category label is plain prose; the quoted token is the secret that
+# re-trips a re-scan. We redact only the quoted token, preserving the label.
+_LEAK_FINDING_RE = re.compile(
+    r"(?P<label>email|user-path|private-host|denylist):\s*"
+    r"(?P<q>['\"])(?P<tok>.*?)(?P=q)"
+)
+
+
+def redact_leak_findings(text: str) -> str:
+    """Redact the quoted match inside captured leak-scan FINDINGS text (#76).
+
+    When a squash (or bookkeeping) commit is rejected by the leak-scan
+    pre-commit hook, git's stderr — which embeds the hook's FINDINGS block and
+    QUOTES the offending token — is captured as the attempt-failure note and
+    flushed into events.jsonl. The next bookkeeping commit re-scans events.jsonl
+    and re-trips on that quoted token, cascading into more failures (the
+    systemic form of the per-token allowlist band-aids). Replacing each quoted
+    match with ``<redacted:sha8>`` keeps the audit signal (which check failed,
+    on which line, and a stable hash to correlate occurrences) while removing
+    the live trigger, so the captured note can never self-poison the log.
+
+    No-op when *text* contains no leak-scan FINDINGS marker, so ordinary
+    failure notes (verify output, tracebacks) pass through untouched.
+    """
+    if "leak-scan" not in text:
+        return text
+
+    def _sub(m: re.Match) -> str:
+        digest = hashlib.sha256(m.group("tok").encode("utf-8")).hexdigest()[:8]
+        return f"{m.group('label')}: '<redacted:{digest}>'"
+
+    return _LEAK_FINDING_RE.sub(_sub, text)
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
@@ -3119,7 +3157,11 @@ def run(
                             # stderr, and retry within budget (MAX_ATTEMPTS
                             # exhaustion escalates to blocked_human).
                             reset_preserving_events(head_before, events_path)
-                            summary = str(exc)
+                            # Redact any quoted leak-scan match before it lands
+                            # in events.jsonl / the attempt note, so the captured
+                            # FINDINGS text can't re-trip the next bookkeeping
+                            # commit (#76 — the systemic self-poison).
+                            summary = redact_leak_findings(str(exc))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "squash_commit_failed",
                                 attempts_usage[-1],
