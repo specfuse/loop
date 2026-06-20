@@ -43,6 +43,52 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0026"></a>
+## FEAT-2026-0026 — Scaffold-data in the pip package: `specfuse init` replaces init.sh
+
+**Why.** FEAT-2026-0019 shipped the pip driver (`specfuse-loop`), the `specfuse`
+umbrella CLI, and the Claude Code plugin — but `specfuse init` cannot yet scaffold a
+new repo from pip alone: the scaffold data (`templates/`, `rules/`,
+`verification.yml.example`, `roadmap.template.md`, `LEARNINGS.template.md`) still lives
+in the loop repo and ships only via the bash `init.sh`. So `init.sh` remains the
+bootstrap and carries a v1.0 deprecation banner it cannot yet honor — v1.1 cannot
+delete it until pip-native scaffolding exists. Surfaced in FEAT-2026-0019's gate-4
+retrospective (terminal verdict's recommended follow-up).
+
+**Goal.** Ship the scaffold data inside the `specfuse-loop` (or `specfuse`) package and
+have `specfuse init <repo>` lay down a target's `.specfuse/` from package resources,
+fully replacing `init.sh`.
+
+- Package the templates/rules/examples as package data, loaded via
+  `importlib.resources` (no reliance on a source checkout).
+- `specfuse init` writes `.specfuse/` (templates, rules, verification.yml seed,
+  roadmap + LEARNINGS seeds, `.specfuse/VERSION` stamp) and wires `.claude/` — the
+  `init.sh` behavior, in-process and pip-delivered.
+- `specfuse upgrade` overlays the versioned scaffold from the installed package
+  version (the `--upgrade` path), so upgrades follow `pip install -U`.
+- Delete `init.sh` (v1.1) once parity is proven; keep a thin curl-bash bootstrap only
+  for the no-pip first-touch case if still needed.
+
+**Benefits.** `init.sh`'s deprecation becomes real (v1.1 deletion unblocked). One
+delivery channel (pip) for both code and scaffold; offline/sandboxed installs work
+from the wheel; version-skew between scaffold and driver collapses to the package
+version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
+
+**Gate sketch (drafted at /draft-feature time).**
+- G1 — package the scaffold seed (templates, rules, examples, roadmap/LEARNINGS
+  templates, gitignore lines, VERSION) + a resource-loading API via
+  `importlib.resources`. Decision: `specfuse-loop` owns the data; the umbrella CLI
+  calls into it.
+- G2 — `specfuse init <repo>` writes a fresh `.specfuse/` (+ `.gitignore`, VERSION
+  stamp, `.claude` wiring) from package resources — parity with `init.sh` INIT.
+- G3 — `specfuse upgrade <repo>` overlays versioned files (parity with `--upgrade`:
+  preserve user-authored, prune internal, stamp); deprecate then delete `init.sh`
+  (v1.1).
+
+**Status: active.** Depends on FEAT-2026-0019 (the package + CLI it extends).
+Packaging/harness-coupled — per LEARNINGS `[FEAT-2026-0019/G1]`, expect to run this
+interactively (atomic), not per-WU loop dispatch.
+
 <a id="feat-2026-0024"></a>
 ## FEAT-2026-0024 — Hashed denylist + issue/PR-body leak guard
 

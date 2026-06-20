@@ -5,7 +5,7 @@ slug: pip-scaffold-data
 branch: feat/FEAT-2026-0026-pip-scaffold-data
 roadmap_goal: Ship the scaffold seed inside the pip package so specfuse init/upgrade lay down .specfuse/ from package resources, fully replacing init.sh (unblocking its v1.1 deletion).
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 28.00
 ---
 
