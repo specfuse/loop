@@ -3474,6 +3474,29 @@ def run(
                 f"  - Resume               python3 .specfuse/scripts/loop.py"
             )
         return 0
+    except BookkeepingCommitError as exc:
+        # A bookkeeping commit (gate/WU status flip + events.jsonl audit) was
+        # rejected — typically the pre-commit leak-scan hook tripping on staged
+        # events content (#75; sibling of squash_commit's #51 rejection
+        # handling). Halt the gate cleanly with an actionable message instead of
+        # letting the error escape run()/main() as a raw traceback. The staged
+        # bookkeeping stays in the working tree (staged-but-uncommitted) for the
+        # operator to inspect; nothing is silently lost.
+        print(
+            "\nloop.py: a bookkeeping commit was rejected — halting the gate "
+            "cleanly (no crash).",
+            file=sys.stderr,
+        )
+        print(str(exc), file=sys.stderr)
+        print(
+            "\nThe gate/WU status flips and the events.jsonl audit are staged "
+            "but uncommitted in the working tree. Inspect the rejecting hook "
+            "above, resolve the cause (e.g. a leak-scan FINDINGS line quoted "
+            "into events.jsonl — see #76), then commit the staged bookkeeping "
+            "manually or re-run the loop.",
+            file=sys.stderr,
+        )
+        return 1
     finally:
         if lock_fd is not None:
             lock_fd.close()
