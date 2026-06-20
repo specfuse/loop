@@ -52,6 +52,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import _miniyaml
+from . import scaffold as _scaffold
 from .gate_eval import evaluate_auto_close, AutoCloseDecision
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -3458,30 +3459,89 @@ def _parse_version(s: str) -> tuple[int, ...]:
     return tuple(parts) or (0,)
 
 
-def check_scaffold_version(scaffold_path: Path | None = None,
-                           driver_min: str = MIN_SCAFFOLD_VERSION) -> str:
-    """Fail loud (SystemExit) if the consumer's `.specfuse/VERSION` is missing, empty,
-    or older than this driver supports. The scaffold declares its own version; the
-    driver requires it to be >= MIN_SCAFFOLD_VERSION. Returns the scaffold version
-    string on success. `scaffold_path` is injectable for testing."""
-    path = scaffold_path or SCAFFOLD_VERSION_PATH
-    if not path.exists():
-        sys.exit(
-            f"ERROR: {path} is missing — this scaffold predates driver version "
-            f"checking. Run `specfuse upgrade` (or ./init.sh --upgrade <repo>) to "
-            f"stamp it. Driver {DRIVER_VERSION} requires scaffold >= {driver_min}."
-        )
-    raw = path.read_text().strip()
+def auto_sync(repo: Path | None = None, *, dry_run: bool = False) -> None:
+    """Version-sync .specfuse/ to the installed scaffold on every run.
+
+    Decision tree:
+      missing .specfuse/           -> scaffold.init (create)
+      older, no modified files     -> scaffold.upgrade_specfuse (overlay)
+      older, with modified files   -> partial overlay (skip modified, warn)
+      equal                        -> no-op
+      newer than installed         -> warn + refuse (never downgrade)
+    """
+    target = Path(repo) if repo is not None else REPO_ROOT
+    specfuse_dir = target / ".specfuse"
+
+    if not specfuse_dir.exists():
+        if dry_run:
+            print(f"auto_sync [dry-run]: .specfuse/ missing -> would scaffold.init({target})")
+            return
+        _scaffold.init(target)
+        return
+
+    installed = _scaffold.scaffold_version()
+    version_path = specfuse_dir / "VERSION"
+
+    raw = version_path.read_text(encoding="utf-8").strip() if version_path.exists() else ""
+    raw = raw.splitlines()[0].strip() if raw else ""
+
     if not raw:
-        sys.exit(f"ERROR: {path} is empty. Run `specfuse upgrade` to restamp it.")
-    raw = raw.splitlines()[0].strip()
-    if _parse_version(raw) < _parse_version(driver_min):
-        sys.exit(
-            f"ERROR: scaffold version {raw} is older than this driver requires "
-            f"(driver {DRIVER_VERSION} needs scaffold >= {driver_min}). Run "
-            f"`specfuse upgrade` (or ./init.sh --upgrade <repo>) to update the scaffold."
+        current_tuple: tuple[int, ...] = (0,)
+        current_str = "(missing)"
+    else:
+        current_tuple = _parse_version(raw)
+        current_str = raw
+
+    installed_tuple = _parse_version(installed)
+
+    if current_tuple > installed_tuple:
+        print(
+            f"WARNING: auto_sync: .specfuse/VERSION {current_str} is newer than "
+            f"installed scaffold {installed}. Not downgrading. Update specfuse to continue.",
+            file=sys.stderr,
         )
-    return raw
+        return
+
+    if current_tuple == installed_tuple:
+        return  # no-op
+
+    # Older — upgrade needed.
+    modified = _scaffold.detect_modified(target)
+
+    if not modified:
+        if dry_run:
+            print(
+                f"auto_sync [dry-run]: scaffold {current_str} -> {installed} "
+                f"(no modified files) -> would upgrade_specfuse"
+            )
+            return
+        _scaffold.upgrade_specfuse(target)
+        return
+
+    # Older with modified files — partial overlay, preserve user edits.
+    print(
+        f"WARNING: auto_sync: {len(modified)} modified versioned file(s) skipped during "
+        f"scaffold upgrade ({current_str} -> {installed}). Review manually:",
+        file=sys.stderr,
+    )
+    for f in modified:
+        print(f"  (skipped) {f}", file=sys.stderr)
+
+    if dry_run:
+        print(
+            f"auto_sync [dry-run]: would overlay unmodified versioned files "
+            f"({len(modified)} file(s) skipped)"
+        )
+        return
+
+    saved: dict[str, bytes] = {
+        rel: (specfuse_dir / rel).read_bytes()
+        for rel in modified
+        if (specfuse_dir / rel).exists()
+    }
+    _scaffold.upgrade_specfuse(target)
+    for rel, content in saved.items():
+        (specfuse_dir / rel).write_bytes(content)
 
 
 def main() -> int:
@@ -3496,7 +3556,7 @@ def main() -> int:
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
-    check_scaffold_version()
+    auto_sync(dry_run=args.dry_run)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
 
 
