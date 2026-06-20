@@ -200,10 +200,31 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     return fm, body
 
 
+class WorkUnitFileMissingError(RuntimeError):
+    """Raised when a frontmatter write targets a file that has vanished.
+
+    Crash-hardening for #71: a per-attempt `git reset --hard` can delete an
+    untracked-then-swept feature folder mid-run, after which the driver's next
+    `set_wu(...)` → `write_frontmatter_field(...)` hit a bare FileNotFoundError
+    (unhandled traceback, no diagnosis). This carries an actionable message —
+    the likely cause (reset removed an uncommitted folder) and the reflog
+    recovery — instead. The pre-flight untracked-folder guard normally prevents
+    reaching this state; this is the defense-in-depth diagnostic.
+    """
+
+
 def write_frontmatter_field(path: Path, key: str, value) -> None:
     """Replace (or insert) a single key in a file's YAML frontmatter, leaving the
     body untouched. This is the whole reason the exploded layout is nicer than one
     shared file: status writes are clean single-file edits, not regex surgery."""
+    if not path.exists():
+        raise WorkUnitFileMissingError(
+            f"frontmatter file {path} is gone — the feature folder may have been "
+            f"removed by `git reset` mid-run (was it committed before the run?). "
+            f"Recover the folder from the reflog "
+            f"(`git checkout <squash-sha> -- {path.parent}`), reset the in-flight "
+            f"WU's status, and commit it before re-running the loop."
+        )
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
         raise ValueError(f"{path} has no frontmatter")
@@ -669,6 +690,48 @@ def _tracked_dirty_paths() -> set[str]:
             path = path.split(" -> ", 1)[1]
         paths.add(path.strip().strip('"'))
     return paths
+
+
+def untracked_feature_files(feature_dir: "Path") -> list[str]:
+    """Untracked, non-ignored files under *feature_dir* (repo-relative paths).
+
+    `git ls-files --others --exclude-standard` lists files git knows nothing
+    about, honoring .gitignore — so the driver-managed gitignored paths
+    (`work/`, etc.) are excluded while genuinely uncommitted feature content
+    (a freshly drafted PLAN/GATE/WU set) is surfaced. Empty list = the folder
+    is fully tracked/committed. See `require_feature_folder_committed`.
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", str(feature_dir)],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return [ln.strip() for ln in out.splitlines() if ln.strip()]
+
+
+def require_feature_folder_committed(feature_dir: "Path") -> None:
+    """Hard-stop if the dispatched feature folder has untracked files (#71).
+
+    The per-attempt `git reset --hard head_before` rolls tracked files back to
+    the pre-attempt base. A brand-new feature folder (all files untracked —
+    `draft-feature` does not commit) passes the tracked-only dirty check, gets
+    swept into the first WU's squash (becoming tracked), and is then DELETED by
+    the next failed attempt's `reset --hard` (the folder is absent from
+    head_before) — taking the WU markdown the driver is mid-read of with it, and
+    crashing on the next frontmatter write. Refuse to start instead: a committed
+    folder is part of head_before and survives every reset.
+    """
+    untracked = untracked_feature_files(feature_dir)
+    if untracked:
+        listed = "\n  ".join(sorted(untracked))
+        sys.exit(
+            f"loop.py: feature folder '{feature_dir}' has untracked files — "
+            f"commit them before running the loop, or the per-attempt "
+            f"`git reset --hard` will delete the folder mid-run (and the driver "
+            f"will crash reading a WU file that no longer exists). Untracked:\n"
+            f"  {listed}\n"
+            f"Fix: `git add {feature_dir} && git commit -m "
+            f"'chore: commit feature folder'`, then re-run."
+        )
 
 
 def _expected_flip_paths(feature_dir: "Path | None") -> set[str]:
@@ -2800,6 +2863,11 @@ def run(
             )
             return 1
         require_git_ready()
+        # Pre-flight: refuse to start on an untracked feature folder (#71).
+        # Must run BEFORE ensure_feature_branch so we never carry uncommitted
+        # feature content onto the branch where the per-attempt reset would
+        # later delete it.
+        require_feature_folder_committed(feature_dir)
         ensure_feature_branch(feat_fm, feature_dir)
 
     try:
