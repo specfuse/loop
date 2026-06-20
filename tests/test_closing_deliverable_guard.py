@@ -706,6 +706,14 @@ class TestCloseAssertions(unittest.TestCase):
             root = Path(tmp)
             head_before = _setup_substantive_commit(root, {
                 "feature/agent-output.txt": "some output\n",
+                # WU file on disk: production always has it, and with #72's
+                # aggregation every assertion runs (assert_verdict_well_formed
+                # reads it) instead of short-circuiting at the missing retro.
+                "feature/WU-close.md": (
+                    "---\nid: FEAT-9999/G1-CLOSE\ntype: close\n"
+                    "status: done\nattempts: 1\nverdict: met\n---\n\n"
+                    "# Close ceremony\n"
+                ),
             })
             fdir = root / "feature"
             fdir.mkdir(exist_ok=True)
@@ -724,6 +732,53 @@ class TestCloseAssertions(unittest.TestCase):
                 os.chdir(old_cwd)
             self.assertFalse(ok)
             self.assertIn("assert_retrospective_exists", reason)
+
+    def test_close_aggregates_all_unmet_assertions_issue_72(self):
+        """#72: a close WU missing >=2 required sections must surface the
+        COMPLETE unmet list in one message, not just the first.
+
+        Short-circuiting returned only the first failing assertion, so the
+        agent discovered the requirement set one rejection at a time and a
+        close missing >=2 sections spun to a 3-attempt block. The aggregate
+        lets one attempt satisfy them all.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # RETROSPECTIVE exists & non-empty (retro passes), but: no LEARNINGS
+            # delta + no 'nothing generalizes' note (learnings fails), no
+            # doc/roadmap diff (doc fails), verdict=met with no '## Cost
+            # analysis' section (cost fails). Three independent failures.
+            head_before = _setup_substantive_commit(root, {
+                "feature/RETROSPECTIVE.md": "# Retrospective\n\nObservations only.\n",
+                "feature/WU-close.md": (
+                    "---\nid: FEAT-9999/G1-CLOSE\ntype: close\n"
+                    "status: done\nattempts: 1\nverdict: met\n---\n\n"
+                    "# Close ceremony\n"
+                ),
+            })
+            fdir = root / "feature"
+            fdir.mkdir(exist_ok=True)
+            wu = _make_wu(
+                file=root / "feature/WU-close.md",
+                wu_type="close",
+                verdict="met",
+            )
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(root)
+                ok, reason = loop.assert_closing_deliverables(
+                    wu, fdir, root, head_before,
+                )
+            finally:
+                os.chdir(old_cwd)
+            self.assertFalse(ok)
+            # BOTH unmet assertions named in one aggregated message — not just
+            # the first one the short-circuit would have surfaced. (learnings
+            # fails before cost in CLOSING_ASSERTIONS order, so the old
+            # short-circuit returned only the learnings reason.)
+            self.assertIn("assert_learnings_appended_or_noop", reason)
+            self.assertIn("assert_cost_analysis_section_when_met", reason)
+            self.assertIn("unmet", reason)
 
     def test_close_intermediate_passes_when_gate_section_added(self):
         """close-intermediate: passes when RETROSPECTIVE.md has Gate 1 section."""
