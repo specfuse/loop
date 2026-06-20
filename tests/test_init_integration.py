@@ -43,6 +43,11 @@ _EXPECTED_SPECFUSE_TREE = {
     "roadmap.md",
     "LEARNINGS.md",
     "features/.gitkeep",
+    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "docs/concepts/ralph-lineage.md",
+    "docs/getting-started.md",
+    "docs/methodology.md",
+    "docs/skills.md",
 }
 
 _GITIGNORE_SNIPPET = read_scaffold("gitignore.snippet").decode("utf-8")

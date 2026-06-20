@@ -61,14 +61,8 @@ _SEED_RENAME: dict[str, str] = {
 
 # Seed files handled by other work units; skip during init.
 # - gitignore.snippet: handled by T05 (wire_claude)
-# - docs/*: handled by T02 (deploy_docs); T01 adds to seed only
 _SKIP_SEEDS: frozenset[str] = frozenset({
     "gitignore.snippet",
-    "docs/getting-started.md",
-    "docs/methodology.md",
-    "docs/skills.md",
-    "docs/concepts/ralph-lineage.md",
-    "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
 })
 
 
@@ -216,11 +210,11 @@ def _parse_version(v: str) -> tuple[int, int, int]:
 
 
 # Seed relpaths overlaid verbatim into .specfuse/<relpath> on upgrade
-_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/")
+_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/", "docs/")
 _VERSIONED_OVERLAY_EXACT: frozenset[str] = frozenset({"verification.yml.example", "VERSION"})
 
 # Versioned directories whose contents are pruned on upgrade
-_VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules")
+_VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules", "docs")
 
 
 def upgrade_specfuse(
