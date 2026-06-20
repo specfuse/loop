@@ -1,9 +1,12 @@
 ---
 id: FEAT-2026-0026/G3-CLOSE
 type: close
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.50
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 <!--
