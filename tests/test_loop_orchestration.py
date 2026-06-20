@@ -701,7 +701,7 @@ class TestMainArgparse(unittest.TestCase):
         features_dir.mkdir(parents=True)
         loop.FEATURES_DIR = features_dir
         os.chdir(self._tmp.name)
-        with patch.object(loop, "check_scaffold_version", return_value="0.2.0"):
+        with patch.object(loop, "auto_sync"):
             with patch.object(loop, "run", return_value=0) as mock_run:
                 with patch.object(sys, "argv", ["loop", "--feature", "my-feature"]):
                     result = loop.main()
@@ -714,7 +714,7 @@ class TestMainArgparse(unittest.TestCase):
         features_dir.mkdir(parents=True)
         loop.FEATURES_DIR = features_dir
         os.chdir(self._tmp.name)
-        with patch.object(loop, "check_scaffold_version", return_value="0.2.0"):
+        with patch.object(loop, "auto_sync"):
             with patch.object(loop, "run", return_value=0) as mock_run:
                 with patch.object(sys, "argv", ["loop", "--dry-run"]):
                     loop.main()
@@ -731,7 +731,7 @@ class TestMainArgparse(unittest.TestCase):
             )
         loop.FEATURES_DIR = features_dir
         os.chdir(self._tmp.name)
-        with patch.object(loop, "check_scaffold_version", return_value="0.2.0"):
+        with patch.object(loop, "auto_sync"):
             with patch.object(sys, "argv", ["loop"]):
                 with self.assertRaises(SystemExit) as ctx:
                     loop.main()

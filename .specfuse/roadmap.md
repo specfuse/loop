@@ -42,7 +42,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
-| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | planned | — | — |
+| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`).
@@ -630,7 +630,7 @@ installed version automatically and safely; the never-downgrade rule protects pr
 configured by a newer specfuse; the plugin provisions without manual `/plugin`
 commands; legacy init.sh repos migrate cleanly to pip-native.
 
-**Status: planned.** Depends on FEAT-2026-0026 (needs package scaffold data +
+**Status: done.** Depends on FEAT-2026-0026 (needs package scaffold data +
 in-process init/upgrade) and FEAT-2026-0028 (the umbrella CLI must call the scaffold
 API before auto-sync can drive it). Also packaging/harness-coupled — expect interactive.
 

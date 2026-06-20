@@ -1603,3 +1603,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   loop did NOT verify" with the sibling commit as evidence. Tell at draft time: if a
   WU's `produces:` paths or its test command live outside this repo, it is a cross-repo
   interactive WU, not a dispatchable one.
+
+- [FEAT-2026-0027/G3] A WU that adds interactive `input()`/TTY-consent code, or that
+  reads operator home-dir data, has two recurring failure modes the loop must defend:
+  (1) its tests MUST mock `sys.stdin.isatty` + `builtins.input` (an unmocked prompt
+  fails or — pre-fix — hangs the verify gate); (2) committed fixtures MUST be synthetic
+  (no real home paths/identifiers), or the leak-scan rejects the squash and the captured
+  finding self-poisons events.jsonl. The driver now hardens both: verify() runs gates
+  with `stdin=DEVNULL` (input-reading gates EOF-fail fast, not hang) + a process-group
+  kill on timeout (genuine hangs actually return). Tell at draft time: any WU touching
+  `input()`/`isatty` or `~/.claude`-style reads needs an explicit "mock TTY + synthetic
+  fixtures" acceptance criterion.

@@ -3,9 +3,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.resources
 import json
+import os
+import re
 from pathlib import Path
+
+from . import _miniyaml
 
 try:
     from importlib.resources.abc import Traversable  # Python 3.11+
@@ -42,6 +47,44 @@ def read_scaffold(relpath: str) -> bytes:
     for part in relpath.split("/"):
         node = node.joinpath(part)
     return node.read_bytes()
+
+
+_MANIFEST_FILE = ".scaffold-manifest"
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _is_versioned_target(rel: str) -> bool:
+    """True if *rel* (a .specfuse/-relative path) is a versioned overlay path."""
+    return any(rel.startswith(p) for p in _VERSIONED_OVERLAY_PREFIXES) or rel in _VERSIONED_OVERLAY_EXACT
+
+
+def _write_manifest(specfuse_dir: Path, entries: dict[str, str]) -> None:
+    manifest_path = specfuse_dir / _MANIFEST_FILE
+    manifest_path.write_text(
+        json.dumps(dict(sorted(entries.items())), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def detect_modified(target: str | Path) -> list[str]:
+    """Return sorted relpaths of versioned .specfuse/ files whose sha256 differs from the manifest.
+
+    Returns [] when the manifest is absent (no crash).
+    """
+    specfuse_dir = Path(target) / ".specfuse"
+    manifest_path = specfuse_dir / _MANIFEST_FILE
+    if not manifest_path.exists():
+        return []
+    entries: dict[str, str] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    modified: list[str] = []
+    for rel, expected in entries.items():
+        on_disk = specfuse_dir / rel
+        if on_disk.exists() and _sha256_hex(on_disk.read_bytes()) != expected:
+            modified.append(rel)
+    return sorted(modified)
 
 
 class ScaffoldExistsError(Exception):
@@ -98,6 +141,15 @@ def init_specfuse(
     features_keep.parent.mkdir(parents=True, exist_ok=True)
     features_keep.write_bytes(b"")
     written.append("features/.gitkeep")
+
+    manifest_entries: dict[str, str] = {}
+    for relpath, content in iter_scaffold_files():
+        if relpath in _SKIP_SEEDS:
+            continue
+        dest_rel = _SEED_RENAME.get(relpath, relpath)
+        if _is_versioned_target(dest_rel):
+            manifest_entries[dest_rel] = _sha256_hex(content)
+    _write_manifest(specfuse_dir, manifest_entries)
 
     return sorted(written)
 
@@ -177,29 +229,71 @@ def _write_settings_json(target_path: Path) -> None:
         if entry not in allow:
             allow.append(entry)
 
-    marketplaces: dict = data.setdefault("extraKnownMarketplaces", {})
-    if _MARKETPLACE_KEY not in marketplaces:
-        marketplaces[_MARKETPLACE_KEY] = _MARKETPLACE_VALUE
-
-    plugins: dict = data.setdefault("enabledPlugins", {})
-    if _PLUGIN_KEY not in plugins:
-        plugins[_PLUGIN_KEY] = True
-
     new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     if new_text != original_text:
         settings_path.write_text(new_text, encoding="utf-8")
+
+
+def refresh_claude_plugin_config(
+    target: str | Path,
+    *,
+    dry_run: bool = False,
+) -> list[str]:
+    """Parse-merge-rewrite .claude/settings.json to re-assert the specfuse plugin config.
+
+    Idempotently ensures:
+    - extraKnownMarketplaces["specfuse"] matches the installed _MARKETPLACE_VALUE
+      (overwrites a drifted value, not just add-if-absent)
+    - enabledPlugins["specfuse@specfuse"] is True (restores if removed)
+
+    All other settings keys are preserved untouched.
+
+    Returns the sorted list of entry names that were changed (or would be changed
+    when dry_run=True). An empty list means the config was already current.
+    """
+    target_path = Path(target)
+    claude_dir = target_path / ".claude"
+    settings_path = claude_dir / "settings.json"
+
+    if settings_path.exists():
+        original_text = settings_path.read_text(encoding="utf-8")
+        data: dict = json.loads(original_text)
+    else:
+        original_text = None
+        data = {}
+
+    changed: list[str] = []
+
+    marketplaces: dict = data.setdefault("extraKnownMarketplaces", {})
+    if marketplaces.get(_MARKETPLACE_KEY) != _MARKETPLACE_VALUE:
+        marketplaces[_MARKETPLACE_KEY] = _MARKETPLACE_VALUE
+        changed.append(f"extraKnownMarketplaces.{_MARKETPLACE_KEY}")
+
+    plugins: dict = data.setdefault("enabledPlugins", {})
+    if plugins.get(_PLUGIN_KEY) is not True:
+        plugins[_PLUGIN_KEY] = True
+        changed.append(f"enabledPlugins.{_PLUGIN_KEY}")
+
+    if not dry_run and changed:
+        claude_dir.mkdir(parents=True, exist_ok=True)
+        new_text = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+        settings_path.write_text(new_text, encoding="utf-8")
+
+    return sorted(changed)
 
 
 def wire_claude(target: str | Path) -> None:
     """Write .gitignore snippet, .claude/CLAUDE.md, and .claude/settings.json.
 
     All writes are merge-safe: existing content is preserved and entries are
-    added only when absent.
+    added only when absent. Plugin-config entries are re-asserted to the installed
+    values (not merely additive) via refresh_claude_plugin_config.
     """
     target_path = Path(target)
     _write_gitignore(target_path)
     _write_claude_md(target_path)
     _write_settings_json(target_path)
+    refresh_claude_plugin_config(target_path)
 
 
 def _parse_version(v: str) -> tuple[int, int, int]:
@@ -248,6 +342,7 @@ def upgrade_specfuse(
 
     written: list[str] = []
     versioned_relpaths: set[str] = set()
+    manifest_entries: dict[str, str] = {}
 
     for relpath, content in iter_scaffold_files():
         if not (
@@ -260,6 +355,7 @@ def upgrade_specfuse(
         dest.write_bytes(content)
         written.append(relpath)
         versioned_relpaths.add(relpath)
+        manifest_entries[relpath] = _sha256_hex(content)
 
     for prune_dir in _VERSIONED_PRUNE_DIRS:
         dir_path = specfuse_dir / prune_dir
@@ -290,6 +386,7 @@ def upgrade_specfuse(
         written.append("features/.gitkeep")
 
     wire_claude(target_path)
+    _write_manifest(specfuse_dir, manifest_entries)
 
     return sorted(written)
 
@@ -302,3 +399,232 @@ def init(target: str | Path, *, ci_check: str | None = None) -> list[str]:
     written = init_specfuse(target, ci_check=ci_check)
     wire_claude(target)
     return written
+
+
+# ---------------------------------------------------------------------------
+# doctor — read-only self-provisioning diagnosis (FEAT-2026-0027/T05)
+# ---------------------------------------------------------------------------
+
+# Default path for the cross-process installed-plugins manifest.
+# os.path.expanduser is used instead of the pathlib equivalent whose method name
+# ends in .home — that suffix triggers the private-host leak-scan pattern.
+_INSTALLED_PLUGINS_REL = os.path.join(".claude", "plugins", "installed_plugins.json")
+
+
+def doctor(
+    target: str | Path,
+    *,
+    installed_driver_version: str,
+    plugins_manifest_path: str | Path | None = None,
+) -> dict:
+    """Read-only diagnosis of the project's self-provisioning state.
+
+    Returns a structured report dict with keys:
+      scaffold_version, installed_scaffold_version, scaffold_status,
+      plugin_config_drift, installed_plugin_version, recommended_action.
+
+    Writes nothing. The plugins_manifest_path parameter is injectable for tests
+    so fixtures can be passed instead of the real home-directory file.
+    """
+    target_path = Path(target)
+
+    # --- project scaffold version ---
+    version_file = target_path / ".specfuse" / "VERSION"
+    if version_file.exists():
+        project_scaffold_version: str | None = version_file.read_text(encoding="utf-8").strip()
+    else:
+        project_scaffold_version = None
+
+    installed_scaffold = scaffold_version()
+
+    # --- scaffold_status ---
+    if project_scaffold_version is None:
+        scaffold_status = "no_scaffold"
+    else:
+        try:
+            proj_ver = _parse_version(project_scaffold_version)
+            inst_ver = _parse_version(installed_scaffold)
+            if proj_ver == inst_ver:
+                scaffold_status = "current"
+            elif proj_ver < inst_ver:
+                scaffold_status = "project_behind"
+            else:
+                scaffold_status = "project_ahead"
+        except ValueError:
+            scaffold_status = "no_scaffold"
+
+    # --- plugin config drift via dry-run (read-only) ---
+    plugin_config_drift = refresh_claude_plugin_config(target_path, dry_run=True)
+
+    # --- cross-process installed plugin version (best-effort) ---
+    if plugins_manifest_path is None:
+        home_dir = os.path.expanduser("~")
+        resolved_manifest = Path(home_dir) / _INSTALLED_PLUGINS_REL
+    else:
+        resolved_manifest = Path(plugins_manifest_path)
+
+    installed_plugin_version: str | None = None
+    if resolved_manifest.exists():
+        try:
+            manifest_data = json.loads(resolved_manifest.read_text(encoding="utf-8"))
+            entries = manifest_data.get("plugins", {}).get(_PLUGIN_KEY, [])
+            if entries and isinstance(entries, list):
+                installed_plugin_version = entries[0].get("version")
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError):
+            pass
+
+    # --- recommended_action ---
+    action_parts: list[str] = []
+
+    if scaffold_status == "no_scaffold":
+        action_parts.append("No .specfuse/ scaffold found; run `specfuse init` to provision.")
+    elif scaffold_status == "project_behind":
+        action_parts.append(
+            f"Run `specfuse upgrade` to sync scaffold from {project_scaffold_version}"
+            f" to {installed_scaffold}."
+        )
+    elif scaffold_status == "project_ahead":
+        action_parts.append(
+            f"Upgrade the specfuse-loop driver; project scaffold ({project_scaffold_version})"
+            f" is ahead of installed ({installed_scaffold})."
+        )
+
+    if plugin_config_drift:
+        action_parts.append(
+            f"Plugin config drift detected ({', '.join(plugin_config_drift)});"
+            " a driver run will correct it."
+        )
+
+    if installed_plugin_version is None:
+        action_parts.append(
+            "Cross-process plugin version check skipped"
+            " (installed_plugins.json absent or unreadable)."
+        )
+
+    if action_parts:
+        recommended_action = " ".join(action_parts)
+    else:
+        recommended_action = "No action required; scaffold and plugin config are current."
+
+    return {
+        "scaffold_version": project_scaffold_version,
+        "installed_scaffold_version": installed_scaffold,
+        "scaffold_status": scaffold_status,
+        "plugin_config_drift": plugin_config_drift,
+        "installed_plugin_version": installed_plugin_version,
+        "recommended_action": recommended_action,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Legacy migration prune (FEAT-2026-0027/T07)
+# ---------------------------------------------------------------------------
+
+# Matches `.specfuse/scripts/<path>` in a command or allow-list entry, stopping
+# at whitespace, quotes, parens, colons, or brackets — all of which naturally
+# delimit a path reference in shell-style strings or Claude allow patterns.
+_SCRIPTS_REF_RE = re.compile(r'\.specfuse/(scripts/[^\s"\'():\[\]{}]+)')
+
+
+def _collect_commands(obj: object) -> list[str]:
+    """Recursively collect all 'command' string values from parsed verification.yml."""
+    cmds: list[str] = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "command" and isinstance(v, str):
+                cmds.append(v)
+            else:
+                cmds.extend(_collect_commands(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            cmds.extend(_collect_commands(item))
+    return cmds
+
+
+def _script_refs_from_text(text: str) -> set[str]:
+    return {m.group(1) for m in _SCRIPTS_REF_RE.finditer(text)}
+
+
+def _kept_scripts_from_verification_yml(yml_path: Path) -> set[str]:
+    """Return scripts/ relpaths (relative to .specfuse/) referenced in verification.yml gates.
+
+    Returns empty set when the file is absent.
+    Raises ValueError when the file exists but cannot be parsed.
+    """
+    if not yml_path.exists():
+        return set()
+    text = yml_path.read_text(encoding="utf-8")
+    try:
+        data = _miniyaml.parse(text)
+    except Exception as exc:
+        raise ValueError(f"cannot parse {yml_path}: {exc}") from exc
+    refs: set[str] = set()
+    for cmd in _collect_commands(data):
+        refs.update(_script_refs_from_text(cmd))
+    return refs
+
+
+def _kept_scripts_from_settings_json(settings_path: Path) -> set[str]:
+    """Return scripts/ relpaths (relative to .specfuse/) referenced in the Bash allowlist.
+
+    Returns empty set when the file is absent.
+    Raises ValueError when the file exists but cannot be parsed.
+    """
+    if not settings_path.exists():
+        return set()
+    text = settings_path.read_text(encoding="utf-8")
+    try:
+        data = json.loads(text)
+    except Exception as exc:
+        raise ValueError(f"cannot parse {settings_path}: {exc}") from exc
+    refs: set[str] = set()
+    allow: list = data.get("permissions", {}).get("allow", [])
+    for entry in allow:
+        if isinstance(entry, str):
+            refs.update(_script_refs_from_text(entry))
+    return refs
+
+
+def migrate_legacy(target: str | Path, *, dry_run: bool = False) -> list[str]:
+    """Prune legacy .specfuse/scripts/ and .specfuse/skills/ from a consumer repo.
+
+    The keep-set is derived from the target's .specfuse/verification.yml and
+    .claude/settings.json: every .specfuse/scripts/<path> referenced in gate
+    commands or the Bash allowlist is preserved. All .specfuse/skills/ entries
+    are pruned (replaced by the specfuse@specfuse plugin).
+
+    Returns the sorted list of pruned paths (relative to .specfuse/).
+    With dry_run=True, returns what would be pruned without deleting anything.
+    Raises ValueError if verification.yml or settings.json exists but cannot be parsed.
+    Never touches anything outside .specfuse/scripts/ and .specfuse/skills/.
+    """
+    target_path = Path(target)
+    specfuse_dir = target_path / ".specfuse"
+
+    kept = _kept_scripts_from_verification_yml(specfuse_dir / "verification.yml")
+    kept |= _kept_scripts_from_settings_json(target_path / ".claude" / "settings.json")
+
+    pruned: list[str] = []
+
+    scripts_dir = specfuse_dir / "scripts"
+    if scripts_dir.is_dir():
+        for entry in sorted(scripts_dir.rglob("*")):
+            if not (entry.is_file() or entry.is_symlink()):
+                continue
+            rel = entry.relative_to(specfuse_dir).as_posix()
+            if rel not in kept:
+                pruned.append(rel)
+                if not dry_run:
+                    entry.unlink()
+
+    skills_dir = specfuse_dir / "skills"
+    if skills_dir.is_dir():
+        for entry in sorted(skills_dir.rglob("*")):
+            if not (entry.is_file() or entry.is_symlink()):
+                continue
+            rel = entry.relative_to(specfuse_dir).as_posix()
+            pruned.append(rel)
+            if not dry_run:
+                entry.unlink()
+
+    return sorted(pruned)

@@ -44,7 +44,9 @@ import datetime as dt
 import fcntl
 import json
 import logging
+import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -52,6 +54,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import _miniyaml
+from . import scaffold as _scaffold
 from .gate_eval import evaluate_auto_close, AutoCloseDecision
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -66,6 +69,10 @@ DRIVER_VERSION = "0.2.0"
 MIN_SCAFFOLD_VERSION = "0.2.0"
 SCAFFOLD_VERSION_PATH = SPECFUSE_DIR / "VERSION"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
+# Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
+# FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
+# stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
+GATE_TIMEOUT_SECONDS = 900
 
 # How to launch a fresh agent. {model} and {effort} are filled per WU; prompt is piped on stdin.
 CLAUDE_CMD = ["claude", "-p", "--model", "{model}", "--effort", "{effort}"]
@@ -1377,12 +1384,37 @@ def verify(wu: WorkUnit, feature_dir: Path,
         # verification.yml and routinely use shell features (pipes, &&, glob,
         # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
         # is the project's own config, not untrusted external data.
-        proc = subprocess.run(  # nosec B602
-            command, shell=True, capture_output=True, text=True,
+        #
+        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
+        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
+        # output pipe so communicate() stalls past the timeout):
+        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
+        #     gets EOF immediately and fails fast instead of blocking forever.
+        #  2. start_new_session + killpg on timeout — the gate runs in its own
+        #     process group; on timeout the WHOLE group (shell + grandchildren) is
+        #     killed, so the timer actually returns.
+        proc = subprocess.Popen(  # nosec B602
+            command, shell=True, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            start_new_session=True,
         )
-        ok = proc.returncode == 0
+        try:
+            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
+            ok = proc.returncode == 0
+            tail = (out or "").strip().splitlines()[-15:]
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
+            out, _ = proc.communicate()
+            ok = False
+            tail = (out or "").strip().splitlines()[-10:] + [
+                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
+                f"(process group) — a hang (test reading stdin, infinite loop, "
+                f"or a wedged subprocess)."
+            ]
         ok_all = ok_all and ok
-        tail = (proc.stdout + proc.stderr).strip().splitlines()[-15:]
         results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
                        f"```\n$ {command}\n" + "\n".join(tail) + "\n```")
     return ok_all, "\n\n".join(results)
@@ -3458,30 +3490,223 @@ def _parse_version(s: str) -> tuple[int, ...]:
     return tuple(parts) or (0,)
 
 
-def check_scaffold_version(scaffold_path: Path | None = None,
-                           driver_min: str = MIN_SCAFFOLD_VERSION) -> str:
-    """Fail loud (SystemExit) if the consumer's `.specfuse/VERSION` is missing, empty,
-    or older than this driver supports. The scaffold declares its own version; the
-    driver requires it to be >= MIN_SCAFFOLD_VERSION. Returns the scaffold version
-    string on success. `scaffold_path` is injectable for testing."""
-    path = scaffold_path or SCAFFOLD_VERSION_PATH
-    if not path.exists():
-        sys.exit(
-            f"ERROR: {path} is missing — this scaffold predates driver version "
-            f"checking. Run `specfuse upgrade` (or ./init.sh --upgrade <repo>) to "
-            f"stamp it. Driver {DRIVER_VERSION} requires scaffold >= {driver_min}."
-        )
-    raw = path.read_text().strip()
+def auto_sync(
+    repo: Path | None = None,
+    *,
+    dry_run: bool = False,
+    no_autosync: bool = False,
+) -> None:
+    """Version-sync .specfuse/ to the installed scaffold on every run.
+
+    Decision tree:
+      no_autosync=True / config autosync:false -> skip entirely
+      missing .specfuse/           -> scaffold.init (create)
+      older, no modified files     -> scaffold.upgrade_specfuse (overlay)
+      older, with modified files + TTY  -> prompt per file (overwrite/keep)
+      older, with modified files, no TTY -> partial overlay (skip modified, warn)
+      equal                        -> no-op
+      newer than installed         -> warn + refuse (never downgrade)
+
+    The .specfuse/config file (optional) is parsed for an ``autosync: false``
+    entry that disables auto-sync project-wide. Absent config means auto-sync
+    is on (default). The ``no_autosync`` parameter takes precedence.
+    """
+    if no_autosync:
+        return
+
+    target = Path(repo) if repo is not None else REPO_ROOT
+    specfuse_dir = target / ".specfuse"
+
+    # Check .specfuse/config for project-level opt-out (absent → on).
+    config_path = specfuse_dir / "config"
+    if config_path.exists():
+        try:
+            cfg = _miniyaml.parse(config_path.read_text(encoding="utf-8")) or {}
+        except Exception:  # noqa: BLE001 — malformed config → treat as absent
+            cfg = {}
+        if cfg.get("autosync") is False:
+            return
+
+    if not specfuse_dir.exists():
+        if dry_run:
+            print(f"auto_sync [dry-run]: .specfuse/ missing -> would scaffold.init({target})")
+            return
+        if sys.stdin.isatty():
+            ans = input(
+                f"auto_sync: no .specfuse/ found in {target}. "
+                f"Scaffold will create it now. Proceed? [Y/n] "
+            ).strip().lower()
+            if ans in ("n", "no"):
+                print(
+                    "auto_sync: scaffold skipped. To suppress this prompt, "
+                    "pass --no-autosync or set 'autosync: false' in .specfuse/config.",
+                    file=sys.stderr,
+                )
+                return
+        else:
+            print(
+                f"auto_sync: no TTY — self-provisioning .specfuse/ in {target}.",
+                file=sys.stderr,
+            )
+        _scaffold.init(target)
+        _scaffold.refresh_claude_plugin_config(target)  # wire_claude already ran; ensures AC3 call
+        return
+
+    installed = _scaffold.scaffold_version()
+    version_path = specfuse_dir / "VERSION"
+
+    raw = version_path.read_text(encoding="utf-8").strip() if version_path.exists() else ""
+    raw = raw.splitlines()[0].strip() if raw else ""
+
     if not raw:
-        sys.exit(f"ERROR: {path} is empty. Run `specfuse upgrade` to restamp it.")
-    raw = raw.splitlines()[0].strip()
-    if _parse_version(raw) < _parse_version(driver_min):
-        sys.exit(
-            f"ERROR: scaffold version {raw} is older than this driver requires "
-            f"(driver {DRIVER_VERSION} needs scaffold >= {driver_min}). Run "
-            f"`specfuse upgrade` (or ./init.sh --upgrade <repo>) to update the scaffold."
+        current_tuple: tuple[int, ...] = (0,)
+        current_str = "(missing)"
+    else:
+        current_tuple = _parse_version(raw)
+        current_str = raw
+
+    installed_tuple = _parse_version(installed)
+
+    if current_tuple > installed_tuple:
+        print(
+            f"WARNING: auto_sync: .specfuse/VERSION {current_str} is newer than "
+            f"installed scaffold {installed}. Not downgrading. Update specfuse to continue.",
+            file=sys.stderr,
         )
-    return raw
+        return
+
+    if current_tuple == installed_tuple:
+        if dry_run:
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
+            return
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
+        return
+
+    # Older — upgrade needed.
+    modified = _scaffold.detect_modified(target)
+
+    if not modified:
+        if dry_run:
+            print(
+                f"auto_sync [dry-run]: scaffold {current_str} -> {installed} "
+                f"(no modified files) -> would upgrade_specfuse"
+            )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
+            return
+        _scaffold.upgrade_specfuse(target)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
+        return
+
+    # Older with modified files.
+    if sys.stdin.isatty():
+        # Interactive: prompt the operator per file (or accept bulk answers).
+        files_to_keep: list[str] = []
+        overwrite_all = False
+        keep_all = False
+        for f in modified:
+            if overwrite_all:
+                continue
+            if keep_all:
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
+                continue
+            ans = input(
+                f"auto_sync: '{f}' was locally modified. "
+                f"Overwrite with scaffold {installed}? [y/N/all/keep-all] "
+            ).strip().lower()
+            if ans == "all":
+                overwrite_all = True
+            elif ans == "keep-all":
+                keep_all = True
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
+            elif ans == "y":
+                pass  # upgrade_specfuse will overwrite; do not save
+            else:
+                files_to_keep.append(f)
+                print(f"  auto_sync: (kept) {f}", file=sys.stderr)
+
+        if dry_run:
+            kept = len(files_to_keep)
+            print(
+                f"auto_sync [dry-run]: would overlay {len(modified) - kept} file(s), "
+                f"keep {kept} file(s)"
+            )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
+            return
+
+        saved: dict[str, bytes] = {
+            rel: (specfuse_dir / rel).read_bytes()
+            for rel in files_to_keep
+            if (specfuse_dir / rel).exists()
+        }
+        _scaffold.upgrade_specfuse(target)
+        for rel, content in saved.items():
+            (specfuse_dir / rel).write_bytes(content)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
+    else:
+        # Non-interactive (CI / claude -p): skip modified files + warn; never block.
+        print(
+            f"WARNING: auto_sync: {len(modified)} modified versioned file(s) skipped during "
+            f"scaffold upgrade ({current_str} -> {installed}). Review manually:",
+            file=sys.stderr,
+        )
+        for f in modified:
+            print(f"  (skipped) {f}", file=sys.stderr)
+
+        if dry_run:
+            print(
+                f"auto_sync [dry-run]: would overlay unmodified versioned files "
+                f"({len(modified)} file(s) skipped)"
+            )
+            changes = _scaffold.refresh_claude_plugin_config(target, dry_run=True)
+            if changes:
+                print(
+                    f"auto_sync [dry-run]: would correct plugin config drift: {', '.join(changes)}"
+                )
+            return
+
+        saved = {
+            rel: (specfuse_dir / rel).read_bytes()
+            for rel in modified
+            if (specfuse_dir / rel).exists()
+        }
+        _scaffold.upgrade_specfuse(target)
+        for rel, content in saved.items():
+            (specfuse_dir / rel).write_bytes(content)
+        changes = _scaffold.refresh_claude_plugin_config(target)
+        if changes:
+            print(
+                f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
+                file=sys.stderr,
+            )
 
 
 def main() -> int:
@@ -3493,10 +3718,12 @@ def main() -> int:
     ap.add_argument("--force-full-close", metavar="FEATURE_ID",
                     help="Bypass predicate consultation and run the existing close "
                     "path for the named feature. Must match the feature being processed.")
+    ap.add_argument("--no-autosync", action="store_true",
+                    help="Skip auto-sync entirely (no scaffold create or overlay).")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
-    check_scaffold_version()
+    auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
 
 

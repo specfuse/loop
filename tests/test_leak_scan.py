@@ -152,6 +152,15 @@ class TestPrivateHost(unittest.TestCase):
         host_hits = [h for h in hits if "private-host" in h]
         self.assertEqual(host_hits, [])
 
+    def test_stdlib_dot_home_not_flagged(self):
+        # Regression for #73: `home` was a private-host TLD, so stdlib `Path.home`
+        # / `x.home()` tripped the pattern, rejecting squashes and self-poisoning
+        # events.jsonl with the captured finding text. `.home` is not a real
+        # private TLD; it must not be flagged.
+        for text in ("p = Path.home()", "base = config.home / 'x'", "obj.home"):
+            hits = [h for h in scan_text(text, allowlist=frozenset()) if "private-host" in h]
+            self.assertEqual(hits, [], f"{text!r} should not flag private-host")
+
 
 # ---------------------------------------------------------------------------
 # Denylist loading and detection
