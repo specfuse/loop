@@ -755,6 +755,64 @@ def _expected_flip_paths(feature_dir: "Path | None") -> set[str]:
     return expected
 
 
+def feature_folder_tracked_modifications(feature_dir: "Path") -> list[str]:
+    """Tracked, uncommitted modifications under *feature_dir* (repo-relative).
+
+    Excludes untracked files (`??` — a separate concern) and the paths the
+    driver itself manages or that /pick-feature legitimately leaves dirty:
+    `PLAN.md` (pick-feature's status flip), `events.jsonl` (driver-managed,
+    explicitly preserved across the per-attempt reset), and anything under a
+    gitignored `work/` dir. What remains is human/skill edits to WU and GATE
+    files — exactly arm-gate's status flips and acceptance-criteria revisions.
+    """
+    out = subprocess.run(
+        ["git", "status", "--porcelain", "--", str(feature_dir)],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    mods: list[str] = []
+    for line in out.splitlines():
+        if not line.strip() or line[:2] == "??":
+            continue  # untracked carries separately; not this guard's concern
+        path = line[3:]
+        if " -> " in path:  # rename: "old -> new"
+            path = path.split(" -> ", 1)[1]
+        path = path.strip().strip('"')
+        name = Path(path).name
+        if name in ("PLAN.md", "events.jsonl"):
+            continue
+        if "/work/" in f"/{path}":
+            continue
+        mods.append(path)
+    return mods
+
+
+def require_feature_folder_unmodified(feature_dir: "Path") -> None:
+    """Hard-stop on uncommitted arm-gate / WU-revision edits before dispatch (#74).
+
+    arm-gate (and any manual WU-body revision at a gate boundary) writes
+    UNCOMMITTED working-tree changes: WU status flips (draft → pending), the
+    completed gate's status flip (awaiting_review → passed), and edited
+    acceptance criteria. If the operator then runs the loop and the first
+    dispatched WU's attempt fails, the per-attempt `git reset --hard
+    head_before` DISCARDS those edits — the gate silently reverts to drafts and
+    any AC revision is lost. Refuse to start until they are committed (mirrors
+    #71's pre-flight): a committed arm is part of head_before and survives every
+    reset, making the human checkpoint durable.
+    """
+    mods = feature_folder_tracked_modifications(feature_dir)
+    if mods:
+        listed = "\n  ".join(sorted(mods))
+        sys.exit(
+            f"loop.py: feature folder '{feature_dir}' has uncommitted changes — "
+            f"commit them before running the loop, or the per-attempt "
+            f"`git reset --hard` will discard them (your armed WU statuses and "
+            f"any acceptance-criteria revisions would silently revert). "
+            f"Modified:\n  {listed}\n"
+            f"Fix: `git add {feature_dir} && git commit -m "
+            f"'chore(arm): commit gate edits'`, then re-run."
+        )
+
+
 def _checked_checkout(checkout_args: list[str], action: str) -> str:
     """Run a `git checkout ...` guarded: on non-zero exit raise FeatureBranchError
     carrying git's stderr, instead of a bare CalledProcessError that hides it.
@@ -2916,11 +2974,15 @@ def run(
             )
             return 1
         require_git_ready()
-        # Pre-flight: refuse to start on an untracked feature folder (#71).
-        # Must run BEFORE ensure_feature_branch so we never carry uncommitted
-        # feature content onto the branch where the per-attempt reset would
-        # later delete it.
+        # Pre-flight guards — both run BEFORE ensure_feature_branch so the
+        # refusal happens before any branch mutation, and both protect against
+        # the per-attempt `git reset --hard` destroying uncommitted state:
+        #   #71 — an untracked feature folder would be swept into a squash then
+        #         deleted by the reset (and crash the next frontmatter write).
+        #   #74 — uncommitted arm-gate / WU-revision edits (armed statuses, AC
+        #         revisions) would be silently discarded by the reset.
         require_feature_folder_committed(feature_dir)
+        require_feature_folder_unmodified(feature_dir)
         ensure_feature_branch(feat_fm, feature_dir)
 
     try:
