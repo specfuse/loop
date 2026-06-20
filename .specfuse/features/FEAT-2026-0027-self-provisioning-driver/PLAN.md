@@ -92,10 +92,26 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Terminal close scaffolded now; gate 2's plan-next sets real depends_on.
+      # Terminal gate: doctor + first-run + migrate. Three independent substantive
+      # WUs, each building on gate 2's T04 (plugin-refresh + version surfaces).
+      # doctor/--migrate user-facing CLI is cross-repo (specfuse/specfuse); these
+      # WUs ship the loop-dispatchable scaffold API + first-run prompt. See
+      # GATE-03-REVIEW.md.
+      - id: FEAT-2026-0027/T05
+        file: WU-05-doctor-diagnosis.md
+        depends_on: [FEAT-2026-0027/T04]
+      - id: FEAT-2026-0027/T06
+        file: WU-06-first-run-prompt.md
+        depends_on: [FEAT-2026-0027/T04]
+      - id: FEAT-2026-0027/T07
+        file: WU-07-legacy-migrate-prune.md
+        depends_on: [FEAT-2026-0027/T04]
       - id: FEAT-2026-0027/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0027/T05
+          - FEAT-2026-0027/T06
+          - FEAT-2026-0027/T07
 ```
 
 ## Notes
