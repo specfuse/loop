@@ -2,11 +2,16 @@
 id: FEAT-2026-0026/T09
 type: implementation
 effort: high
-status: pending
+status: done
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - tests/test_upgrade_integration.py
+attempts: 1
+duration_seconds: 421.005
+cost_usd: 0.914567
+input_tokens: 20
+output_tokens: 17372
 ---
 
 <!--
