@@ -44,7 +44,9 @@ import datetime as dt
 import fcntl
 import json
 import logging
+import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -1382,21 +1384,35 @@ def verify(wu: WorkUnit, feature_dir: Path,
         # verification.yml and routinely use shell features (pipes, &&, glob,
         # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
         # is the project's own config, not untrusted external data.
+        #
+        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
+        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
+        # output pipe so communicate() stalls past the timeout):
+        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
+        #     gets EOF immediately and fails fast instead of blocking forever.
+        #  2. start_new_session + killpg on timeout — the gate runs in its own
+        #     process group; on timeout the WHOLE group (shell + grandchildren) is
+        #     killed, so the timer actually returns.
+        proc = subprocess.Popen(  # nosec B602
+            command, shell=True, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            start_new_session=True,
+        )
         try:
-            proc = subprocess.run(  # nosec B602
-                command, shell=True, capture_output=True, text=True,
-                timeout=GATE_TIMEOUT_SECONDS,
-            )
+            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
             ok = proc.returncode == 0
-            tail = (proc.stdout + proc.stderr).strip().splitlines()[-15:]
-        except subprocess.TimeoutExpired as exc:
+            tail = (out or "").strip().splitlines()[-15:]
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                proc.kill()
+            out, _ = proc.communicate()
             ok = False
-            partial = (exc.stdout or "") + (exc.stderr or "")
-            if isinstance(partial, bytes):
-                partial = partial.decode("utf-8", "replace")
-            tail = partial.strip().splitlines()[-10:] + [
-                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed — "
-                f"likely a hang (e.g. a test blocked on input()/stdin)."
+            tail = (out or "").strip().splitlines()[-10:] + [
+                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
+                f"(process group) — a hang (test reading stdin, infinite loop, "
+                f"or a wedged subprocess)."
             ]
         ok_all = ok_all and ok
         results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"

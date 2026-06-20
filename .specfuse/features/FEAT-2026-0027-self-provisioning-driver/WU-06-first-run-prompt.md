@@ -76,6 +76,12 @@ fails on HEAD (create is unconditional) and passes after.
 6. The red test (AC1) passes; new unit tests cover tty-confirm-proceeds,
    tty-decline-aborts-no-writes, non-tty-proceeds-with-notice, and both opt-outs-skip;
    `code` gates green (coverage ≥ 90); `auto_sync` still never runs `git`.
+7. **Tests MUST mock `sys.stdin.isatty` and `builtins.input`** for every case that
+   reaches the prompt path — pin `isatty` True/False explicitly and patch `input`. An
+   unmocked `input()` does NOT hang the gate (the verify runner now uses `stdin=DEVNULL`,
+   so it raises `EOFError` fast) — but an unmocked test still FAILS the gate. Mock both
+   so the suite is deterministic and TTY-independent (same rule that fixed
+   `test_autosync.py`; see `[FEAT-2026-0027/G1]`-adjacent lessons).
 
 **Do not touch.** Gate 1 + gate 2 WUs (T01–T04) and their tests; the overlay / equal /
 never-downgrade branches of `auto_sync` (this WU touches only the **create** branch +
