@@ -2,12 +2,17 @@
 id: FEAT-2026-0026/T08
 type: implementation
 effort: medium
-status: pending
+status: done
 planned_cost_usd: 1.50
 produces:
   - init.sh
   - tests/init_sh_shim.bats
   - .specfuse/verification.yml
+attempts: 1
+duration_seconds: 330.962
+cost_usd: 0.853756
+input_tokens: 865
+output_tokens: 14615
 ---
 
 <!--
