@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0027/T06
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.00
 effort: medium

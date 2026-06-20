@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0027/T07
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 effort: high
@@ -23,8 +23,9 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 **Objective.** Add `scaffold.migrate_legacy(...)`: prune a consumer repo's now-redundant
 legacy `.specfuse/scripts/` and `.specfuse/skills/` copies (delivered today by the
-pip-installed `specfuse-loop` and the `/specfuse:*` plugin), driven by an **explicit
-keep-list** so a live shim the loop still references is never deleted. Returns the pruned
+pip-installed `specfuse-loop` and the `/specfuse:*` plugin), with a **keep-set derived
+from the target's `verification.yml` + `.claude/settings.json`** so a live shim the loop
+still references is never deleted (refuse if those can't be parsed). Returns the pruned
 paths; `dry_run` reports without deleting.
 
 **Context.** This is `FEAT-2026-0027/T07`, gate 3 (terminal). The forward path
@@ -61,16 +62,20 @@ fails on HEAD (no `migrate_legacy` symbol) and passes after.
    (`python3 -m unittest tests.test_migrate_legacy.TestMigrateLegacy.test_keeps_live_shims`
    exits non-zero, or the file does not yet exist — both count as red).
 2. **`migrate_legacy(target, *, dry_run=False) -> list[str]`** added to `scaffold.py`. It
-   prunes legacy `.specfuse/scripts/` and `.specfuse/skills/` entries that are **not** in
-   an explicit module-level keep-list constant (e.g. `_MIGRATE_KEEP`), returning the
-   sorted list of pruned relative paths. The keep-list MUST include every path the loop
-   still references — minimally `.specfuse/scripts/lint_plan.py` and
-   `.specfuse/scripts/leak_scan.py` (and any other path `.specfuse/verification.yml`
-   names). It never touches anything outside `.specfuse/scripts/` and `.specfuse/skills/`.
-3. **Keep-list is a hard guard, not advisory.** If a path in the keep-list would be
-   selected for pruning, `migrate_legacy` raises / refuses rather than deleting it (a test
-   asserts a kept shim survives a real prune and a configured keep-member is never in the
-   returned prune list).
+   prunes legacy `.specfuse/scripts/` and `.specfuse/skills/` entries, returning the
+   sorted list of pruned relative paths. The keep-set is **DERIVED FROM THE TARGET**, not
+   a hardcoded constant (a static list is correct for one repo, wrong for others): scan
+   `<target>/.specfuse/verification.yml` and `<target>/.claude/settings.json` and keep
+   every `.specfuse/scripts/` path either of them references (gate commands + the Bash
+   allowlist). `.specfuse/skills/` entries are pruned freely (the plugin replaces them;
+   gates never reference skills). It never touches anything outside `.specfuse/scripts/`
+   and `.specfuse/skills/`.
+3. **Refuse rather than blind-prune.** If `verification.yml` or `settings.json` exists but
+   cannot be parsed (so the referenced-paths set is unknowable), `migrate_legacy` raises /
+   refuses and prunes NOTHING — better a no-op than deleting a file a gate still calls. A
+   test asserts: (a) a script referenced by `verification.yml` survives a real prune and is
+   never in the returned list; (b) an unparseable `verification.yml` causes a refusal with
+   no deletions.
 4. **`dry_run` deletes nothing.** With `dry_run=True`, `migrate_legacy` returns the same
    prune list it would delete but performs **zero** filesystem deletions (test asserts the
    target tree is byte-identical after a dry-run).

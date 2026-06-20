@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0027/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 effort: high
@@ -84,6 +84,17 @@ fails on HEAD (no `doctor` symbol) and passes after.
    unparseable, `installed_plugin_version` is `None` and `recommended_action` notes the
    diagnosis is partial — `doctor` does not raise. The parameter exists so tests inject a
    fixture manifest rather than depending on the real home file.
+   **LEAK GUARD (hard requirement — a prior attempt's squash was rejected by the
+   pre-commit leak-scan here):** any committed fixture/sample manifest MUST use
+   obviously-synthetic values — fake plugin ids, a fake version like `deadbeef0000` (never
+   a real plugin SHA), and NO absolute home-directory paths (the leak-scan `user-path`
+   pattern flags real home paths) or operator/org identifiers. Do NOT capture the
+   operator's real home `installed_plugins.json` into a test or any committed file, and
+   `doctor` MUST NOT write its diagnosis to a committed path. Real home-dir content trips
+   the leak-scan (`user-path` + denylist/gitleaks) and the squash will be rejected — this
+   is exactly what rejected a prior attempt here. If you cannot construct a synthetic
+   fixture that exercises the parse path, emit `status: blocked` rather than committing
+   real data.
 4. **`recommended_action` maps the state.** `project_behind` → recommend a sync/upgrade;
    `project_ahead` → recommend upgrading the driver (never downgrade); non-empty
    `plugin_config_drift` → note a run will correct it; `installed_plugin_version` `None`
