@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: awaiting_review
+status: passed
 ---
 
 <\!--

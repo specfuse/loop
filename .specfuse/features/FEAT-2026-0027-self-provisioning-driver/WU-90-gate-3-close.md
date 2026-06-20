@@ -1,8 +1,9 @@
 ---
 id: FEAT-2026-0027/G3-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+verdict: met
 planned_cost_usd: 1.50
 ---
 
