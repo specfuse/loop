@@ -11,6 +11,10 @@ produces:
   - tests/test_autosync_firstrun.py
 produces_driver_helper:
   - auto_sync
+duration_seconds: 685.336
+cost_usd: 1.297305
+input_tokens: 54
+output_tokens: 13493
 ---
 
 <!--

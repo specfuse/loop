@@ -33,9 +33,14 @@ _USER_PATH_RE = re.compile(r"/Users/[^/\s]+/")
 # RFC-5321-ish email addresses (broad; intent is to flag unexpected addresses)
 _EMAIL_RE = re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}")
 
-# Hostnames ending in private-network / internal-only TLDs
+# Hostnames ending in private-network / internal-only TLDs.
+# NOTE: `home` is intentionally EXCLUDED — it was never a ratified private TLD, and
+# `.home` collides with the ubiquitous attribute/method suffix (`Path.home`, `x.home()`),
+# which caused false positives that rejected squashes and then self-poisoned via the
+# captured-error replay into events.jsonl (see #73). The retained TLDs are the real
+# reserved/internal ones.
 _PRIVATE_HOST_RE = re.compile(
-    r"\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.(?:local|internal|corp|lan|home|intranet|localdomain)\b",
+    r"\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.(?:local|internal|corp|lan|intranet|localdomain)\b",
     re.IGNORECASE,
 )
 
