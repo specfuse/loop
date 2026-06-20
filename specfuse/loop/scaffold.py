@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.resources
 import json
 from pathlib import Path
@@ -42,6 +43,44 @@ def read_scaffold(relpath: str) -> bytes:
     for part in relpath.split("/"):
         node = node.joinpath(part)
     return node.read_bytes()
+
+
+_MANIFEST_FILE = ".scaffold-manifest"
+
+
+def _sha256_hex(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _is_versioned_target(rel: str) -> bool:
+    """True if *rel* (a .specfuse/-relative path) is a versioned overlay path."""
+    return any(rel.startswith(p) for p in _VERSIONED_OVERLAY_PREFIXES) or rel in _VERSIONED_OVERLAY_EXACT
+
+
+def _write_manifest(specfuse_dir: Path, entries: dict[str, str]) -> None:
+    manifest_path = specfuse_dir / _MANIFEST_FILE
+    manifest_path.write_text(
+        json.dumps(dict(sorted(entries.items())), indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+
+def detect_modified(target: str | Path) -> list[str]:
+    """Return sorted relpaths of versioned .specfuse/ files whose sha256 differs from the manifest.
+
+    Returns [] when the manifest is absent (no crash).
+    """
+    specfuse_dir = Path(target) / ".specfuse"
+    manifest_path = specfuse_dir / _MANIFEST_FILE
+    if not manifest_path.exists():
+        return []
+    entries: dict[str, str] = json.loads(manifest_path.read_text(encoding="utf-8"))
+    modified: list[str] = []
+    for rel, expected in entries.items():
+        on_disk = specfuse_dir / rel
+        if on_disk.exists() and _sha256_hex(on_disk.read_bytes()) != expected:
+            modified.append(rel)
+    return sorted(modified)
 
 
 class ScaffoldExistsError(Exception):
@@ -98,6 +137,15 @@ def init_specfuse(
     features_keep.parent.mkdir(parents=True, exist_ok=True)
     features_keep.write_bytes(b"")
     written.append("features/.gitkeep")
+
+    manifest_entries: dict[str, str] = {}
+    for relpath, content in iter_scaffold_files():
+        if relpath in _SKIP_SEEDS:
+            continue
+        dest_rel = _SEED_RENAME.get(relpath, relpath)
+        if _is_versioned_target(dest_rel):
+            manifest_entries[dest_rel] = _sha256_hex(content)
+    _write_manifest(specfuse_dir, manifest_entries)
 
     return sorted(written)
 
@@ -248,6 +296,7 @@ def upgrade_specfuse(
 
     written: list[str] = []
     versioned_relpaths: set[str] = set()
+    manifest_entries: dict[str, str] = {}
 
     for relpath, content in iter_scaffold_files():
         if not (
@@ -260,6 +309,7 @@ def upgrade_specfuse(
         dest.write_bytes(content)
         written.append(relpath)
         versioned_relpaths.add(relpath)
+        manifest_entries[relpath] = _sha256_hex(content)
 
     for prune_dir in _VERSIONED_PRUNE_DIRS:
         dir_path = specfuse_dir / prune_dir
@@ -290,6 +340,7 @@ def upgrade_specfuse(
         written.append("features/.gitkeep")
 
     wire_claude(target_path)
+    _write_manifest(specfuse_dir, manifest_entries)
 
     return sorted(written)
 

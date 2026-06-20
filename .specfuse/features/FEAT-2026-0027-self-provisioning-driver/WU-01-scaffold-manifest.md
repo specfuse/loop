@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0027/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/scaffold.py
   - tests/test_scaffold_manifest.py
+duration_seconds: 399.616
+cost_usd: 0.815279
+input_tokens: 124
+output_tokens: 9917
 ---
 
 <!--
