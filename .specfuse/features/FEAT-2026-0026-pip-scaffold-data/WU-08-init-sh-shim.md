@@ -2,7 +2,7 @@
 id: FEAT-2026-0026/T08
 type: implementation
 effort: medium
-status: draft
+status: pending
 planned_cost_usd: 1.50
 produces:
   - init.sh

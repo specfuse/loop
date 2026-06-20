@@ -2,11 +2,16 @@
 id: FEAT-2026-0026/T07
 type: implementation
 effort: high
-status: draft
+status: done
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/scaffold.py
   - tests/test_scaffold_upgrade.py
+attempts: 1
+duration_seconds: 453.875
+cost_usd: 0.950461
+input_tokens: 17
+output_tokens: 22843
 ---
 
 <!--

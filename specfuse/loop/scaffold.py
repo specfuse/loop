@@ -48,6 +48,10 @@ class ScaffoldExistsError(Exception):
     """Raised by init_specfuse when .specfuse/ already exists in the target."""
 
 
+class ScaffoldDowngradeError(Exception):
+    """Raised by upgrade_specfuse when target VERSION is newer than the installed seed."""
+
+
 # Seed relpaths that map to a different target name inside .specfuse/
 _SEED_RENAME: dict[str, str] = {
     "roadmap.template.md": "roadmap.md",
@@ -193,6 +197,98 @@ def wire_claude(target: str | Path) -> None:
     _write_gitignore(target_path)
     _write_claude_md(target_path)
     _write_settings_json(target_path)
+
+
+def _parse_version(v: str) -> tuple[int, int, int]:
+    parts = v.strip().split(".")
+    if len(parts) != 3 or not all(p.isdigit() for p in parts):
+        raise ValueError(f"invalid version: {v!r}")
+    return (int(parts[0]), int(parts[1]), int(parts[2]))
+
+
+# Seed relpaths overlaid verbatim into .specfuse/<relpath> on upgrade
+_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/")
+_VERSIONED_OVERLAY_EXACT: frozenset[str] = frozenset({"verification.yml.example", "VERSION"})
+
+# Versioned directories whose contents are pruned on upgrade
+_VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules")
+
+
+def upgrade_specfuse(
+    target: str | Path, *, ci_check: str | None = None
+) -> list[str]:
+    """Overlay versioned seed onto an existing .specfuse/ tree.
+
+    Overwrites versioned files (templates/, rules/, verification.yml.example, VERSION),
+    prunes versioned files the seed no longer ships (scoped to templates/ and rules/),
+    seeds missing user-authored files from templates, and refreshes .claude wiring.
+
+    Returns the sorted list of .specfuse/ relpaths written.
+    Raises ScaffoldDowngradeError if the target VERSION is newer than the installed seed.
+    """
+    target_path = Path(target)
+    specfuse_dir = target_path / ".specfuse"
+
+    target_version_path = specfuse_dir / "VERSION"
+    if target_version_path.exists():
+        raw = target_version_path.read_text(encoding="utf-8").strip()
+        try:
+            target_ver = _parse_version(raw)
+            installed_ver = _parse_version(scaffold_version())
+        except ValueError as exc:
+            raise ValueError(f"malformed .specfuse/VERSION: {raw!r}") from exc
+        if target_ver > installed_ver:
+            raise ScaffoldDowngradeError(
+                f"refusing downgrade: target has VERSION {raw} "
+                f"but installed seed is {scaffold_version()}"
+            )
+
+    written: list[str] = []
+    versioned_relpaths: set[str] = set()
+
+    for relpath, content in iter_scaffold_files():
+        if not (
+            any(relpath.startswith(p) for p in _VERSIONED_OVERLAY_PREFIXES)
+            or relpath in _VERSIONED_OVERLAY_EXACT
+        ):
+            continue
+        dest = specfuse_dir / relpath
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(content)
+        written.append(relpath)
+        versioned_relpaths.add(relpath)
+
+    for prune_dir in _VERSIONED_PRUNE_DIRS:
+        dir_path = specfuse_dir / prune_dir
+        if dir_path.is_dir():
+            for existing in dir_path.rglob("*"):
+                if existing.is_file():
+                    rel = existing.relative_to(specfuse_dir).as_posix()
+                    if rel not in versioned_relpaths:
+                        existing.unlink()
+
+    user_seeds = [
+        ("LEARNINGS.md", "LEARNINGS.template.md"),
+        ("roadmap.md", "roadmap.template.md"),
+        ("verification.yml", "verification.yml.example"),
+    ]
+    for target_rel, seed_rel in user_seeds:
+        dest = specfuse_dir / target_rel
+        if not dest.exists():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(read_scaffold(seed_rel))
+            written.append(target_rel)
+
+    features_dir = specfuse_dir / "features"
+    if not features_dir.exists():
+        gitkeep = features_dir / ".gitkeep"
+        gitkeep.parent.mkdir(parents=True, exist_ok=True)
+        gitkeep.write_bytes(b"")
+        written.append("features/.gitkeep")
+
+    wire_claude(target_path)
+
+    return sorted(written)
 
 
 def init(target: str | Path, *, ci_check: str | None = None) -> list[str]:
