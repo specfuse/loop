@@ -1614,3 +1614,48 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   kill on timeout (genuine hangs actually return). Tell at draft time: any WU touching
   `input()`/`isatty` or `~/.claude`-style reads needs an explicit "mock TTY + synthetic
   fixtures" acceptance criterion.
+
+- [bugs #71/#74] The per-attempt `git reset --hard head_before` destroys ANY uncommitted
+  `.specfuse/features/<active>/` state — and two real flows leave state uncommitted by
+  design: `draft-feature` writes the whole folder UNTRACKED (#71), and `arm-gate` writes
+  tracked-but-uncommitted status flips + AC revisions (#74). The old pre-flight dirty
+  check caught only tracked modifications, so an all-untracked folder slipped through, got
+  swept into the first squash (now tracked), then was deleted by the next failed attempt's
+  reset — crashing the subsequent frontmatter write with a bare FileNotFoundError. The
+  driver now pre-flights both: `require_feature_folder_committed` (untracked) +
+  `require_feature_folder_unmodified` (tracked-uncommitted, excluding PLAN.md/events.jsonl/
+  work/), each a hard-stop before `ensure_feature_branch`. Operator rule: commit the
+  feature folder AND any arm-gate edits before running the loop — a committed folder is in
+  `head_before` and survives every reset. Tell at authoring time: any state a skill writes
+  but does not commit is one failed attempt away from being erased.
+
+- [bugs #75/#76] A leak-scan pre-commit hook rejection is a cascading failure, not a point
+  failure: the hook's FINDINGS text QUOTES the offending token; the driver captured that
+  into events.jsonl as the attempt note; the next bookkeeping commit re-scanned the log and
+  re-tripped on the quoted token (self-poison, #76); and the resulting BookkeepingCommitError
+  propagated uncaught out of run() as a raw traceback (#75). Fixes: `redact_leak_findings`
+  scrubs the quoted match to `<redacted:sha8>` before capture (keeps audit signal, kills the
+  trigger), and run() catches BookkeepingCommitError → graceful halt. General rule: any text
+  captured from a rejected-commit stderr into a re-scanned audit surface must be redacted at
+  capture, and every commit the driver makes (squash AND bookkeeping) needs a rejection
+  handler — the squash path having one is not enough.
+
+- [test-authoring/leak-hygiene] Test files that must embed leak-trigger fixtures (emails,
+  `/Users/...` paths, `*.internal` hosts) trip the structural PRE-COMMIT hook
+  (`leak_scan --staged`) but PASS the CI `leak-scan` gate (`leak_scan --all` / `scan_repo` is
+  structural-free — denylist + gitleaks only). Two rules: (1) for INCIDENTAL fixtures (e.g. a
+  tmp-repo `git config user.email`), use an RFC-2606 allowlisted domain — `t@example.com`,
+  not `t@test.com` — and the hook passes clean; (2) for tests that genuinely NEED a tripping
+  token (e.g. a redaction test's input), commit with `git commit --no-verify` and rely on the
+  CI gate — the established `tests/test_leak_scan.py` convention. Tell at authoring time: a WU
+  whose tests carry leak fixtures must say which of the two applies, or it spuriously blocks
+  on the local hook.
+
+- [process/issue-triage] An open GitHub issue is NOT proof the work is undone. Before drafting
+  a feature from one, `git log` for a prior feature that already shipped it: a squash merge
+  whose `closes #N` lived only in a feature-BRANCH commit (not the PR body or a default-branch
+  commit) does not auto-close the issue. Issue #46 ("issue/PR-body leak guard") sat open while
+  FEAT-2026-0024 had shipped the Action + runner + docs the same day — its headline acceptance
+  was also intentionally left as an operator post-merge live-oracle step. Rule: triage
+  open→(read merge history + the feature that names the issue) before assuming a fresh feature
+  is warranted; the fix may be "verify the deferred oracle and close," not "build it again."

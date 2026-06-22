@@ -62,7 +62,7 @@ SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
-DRIVER_VERSION = "0.2.0"
+DRIVER_VERSION = "0.3.0"
 # Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
 # version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
 # the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
