@@ -75,8 +75,8 @@ checks CI runs — before each `git push`). Bypass with `git push --no-verify`.
 The driver installs from PyPI and the skills ship as a Claude Code plugin:
 
 ```bash
-pip install specfuse                            # umbrella CLI; pulls specfuse-loop>=0.3.0
-#   gives you: specfuse, specfuse-loop, specfuse-lint
+pipx install specfuse                           # umbrella CLI; pulls specfuse-loop>=0.3.0
+#   gives you: specfuse, specfuse-loop, specfuse-lint  (or: python3 -m pip install specfuse, in a venv)
 
 # in Claude Code, enable the skills plugin (one-time):
 #   /plugin marketplace add specfuse/specfuse

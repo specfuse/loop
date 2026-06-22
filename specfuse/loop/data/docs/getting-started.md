@@ -15,12 +15,21 @@ each project you want to drive with one command.
 ## 1. Install the tooling and scaffold your project
 
 Install the umbrella package — it pulls the driver (`specfuse-loop>=0.3.0`) as a
-dependency and gives you the `specfuse`, `specfuse-loop`, and `specfuse-lint`
-commands:
+dependency and puts the `specfuse`, `specfuse-loop`, and `specfuse-lint` commands
+on your PATH. It's a command-line app, so **pipx** is the recommended installer
+(isolated environment, no `--break-system-packages` on PEP 668 / externally-
+managed Pythons):
 
 ```bash
-pip install specfuse
+pipx install specfuse           # recommended
+# or, inside a virtualenv you control:
+python3 -m pip install specfuse
 ```
+
+> On Debian/Ubuntu/macOS-Homebrew Pythons a bare `pip install` into the system
+> interpreter is blocked (`externally-managed-environment`). Use `pipx` (or a
+> venv) — that's what puts `specfuse-loop` / `specfuse-lint` on PATH for the gate
+> commands to find.
 
 Enable the skills plugin in Claude Code (one-time):
 

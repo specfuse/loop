@@ -23,7 +23,7 @@ Two jobs:
 
 Exit 0 = clean, 1 = problems (printed).
 
-Usage:  python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-XXXX-slug
+Usage:  specfuse-lint .specfuse/features/FEAT-XXXX-slug
 """
 
 from __future__ import annotations

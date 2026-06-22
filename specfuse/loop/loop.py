@@ -3666,7 +3666,7 @@ def run(
                 f"flip accepted WUs to `pending`,\n"
                 f"                          mark this gate `passed`. "
                 f"Reads {review.name} for planner findings.\n"
-                f"  - Resume               python3 .specfuse/scripts/loop.py"
+                f"  - Resume               specfuse-loop"
             )
         return 0
     except BookkeepingCommitError as exc:
