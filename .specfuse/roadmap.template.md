@@ -15,11 +15,12 @@ Detail a feature's first-gate work units when you are ready to start it; the gat
 after that is drafted for you by the prior gate's plan-next. Until you start a
 feature, a one-line entry here is enough.
 
-| Feature ID     | Title                | Status   | Folder |
-|----------------|----------------------|----------|--------|
-| FEAT-2026-0001 | Health-check endpoint| active   | `features/FEAT-2026-0001-health-endpoint/` |
-| FEAT-2026-0002 | <title>              | planned  | — |
-| FEAT-2026-0003 | <title>              | planned  | — |
+Add your first feature with **`/roadmap-add`** (it auto-picks the next
+`FEAT-YYYY-NNNN` ID and writes the row + detail section), or add a row by hand in
+the canonical column order below.
+
+| Feature ID     | Title | Status | Folder | Detail |
+|----------------|-------|--------|--------|--------|
 
 Status: `planned` → `active` → `done` (or `abandoned`).
 

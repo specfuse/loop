@@ -23,7 +23,7 @@ A feature moves through these phases. The skill for each phase is named.
 ```
 roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1 detailed
                                                             │
-                                                   python loop.py
+                                                   specfuse-loop
                                                             │
                                    ┌────────────────────────┴───────────────┐
                                    ▼                                         ▼

@@ -34,7 +34,7 @@ code:
   - name: coverage
     command: "coverage report --fail-under=90"
   - name: warnings
-    command: "python -W error -c 'pass'"     # replace with your build's -Werror equivalent
+    command: "python3 -W error -c 'pass'"    # replace with your build's -Werror equivalent
   - name: lint
     command: "ruff check ."
   - name: security
@@ -50,4 +50,4 @@ doc:
 # a malformed next-gate draft fails here, where you are already reviewing.
 plannext:
   - name: plan-lint
-    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
+    command: "specfuse-lint {feature_dir}"
