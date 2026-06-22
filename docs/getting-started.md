@@ -6,33 +6,56 @@ the [README](../README.md); for the full contracts see
 [`methodology.md`](methodology.md) and for the interactive operations see
 [`skills.md`](skills.md).
 
-The loop is stdlib-only Python plus Claude Code. There is no install step in your
-target repo — `init.sh` copies a self-contained scaffold in.
+The driver is pure-stdlib Python; it installs from PyPI, and the interactive
+skills ship as a Claude Code plugin. You install the tooling once, then scaffold
+each project you want to drive with one command.
 
 ---
 
-## 1. Install the scaffold
+## 1. Install the tooling and scaffold your project
 
-From your checkout of `specfuse/loop`, point `init.sh` at the repo you want to
-drive:
+Install the umbrella package — it pulls the driver (`specfuse-loop>=0.3.0`) as a
+dependency and gives you the `specfuse`, `specfuse-loop`, and `specfuse-lint`
+commands:
 
 ```bash
-./init.sh /path/to/your-project
+pip install specfuse
 ```
 
-This writes `.specfuse/` (templates, rules, skills, the driver, and the durable
-docs) into your project and wires `.claude/` so Claude Code discovers the skills.
-It refuses if `.specfuse/` already exists — use `./init.sh --upgrade` to update an
-existing install in place without touching your authored files.
+Enable the skills plugin in Claude Code (one-time):
+
+```
+/plugin marketplace add specfuse/specfuse
+/plugin install specfuse@specfuse
+```
+
+Then scaffold the repo you want to drive:
+
+```bash
+specfuse init /path/to/your-project        # add --dry-run to preview, writes nothing
+```
+
+This writes `.specfuse/` (templates, rules, the durable docs, `verification.yml`,
+and an empty `features/`) into your project and merge-safely wires `.claude/`
+(`CLAUDE.md`, `settings.json` enabling the `specfuse@specfuse` plugin) plus a
+`.gitignore` snippet. It refuses if `.specfuse/` already exists — use
+`specfuse upgrade /path/to/your-project` to overlay a newer scaffold in place
+without touching your authored files. (The skills come from the plugin, not from
+files copied into your repo.)
 
 > **Don't gitignore `.specfuse/`.** The loop's durable state lives there and must
-> be committed for the loop to work. `init.sh` warns if it detects the directory
-> is ignored.
+> be committed for the loop to work.
+
+> **Self-provisioning.** Every `specfuse-loop` run first version-syncs `.specfuse/`
+> from the installed package (missing → scaffold, older → overlay, equal → no-op,
+> never downgrades). So `pip install -U specfuse` followed by a run keeps the
+> scaffold current — `specfuse upgrade` is the explicit equivalent. Disable with
+> `--no-autosync` or `autosync: false` in `.specfuse/config`.
 
 ## 2. Match verification to your stack
 
-`init.sh` seeds `.specfuse/verification.yml`. Open it and make the `code` gate set
-run *your* project's checks:
+`specfuse init` seeds `.specfuse/verification.yml`. Open it and make the `code`
+gate set run *your* project's checks:
 
 ```yaml
 code:
@@ -63,10 +86,11 @@ Two ways to create a feature folder under `.specfuse/features/`:
 - **Interactively (recommended):** run **`/pick-feature`** to choose from your
   roadmap, then **`/draft-feature`**. Draft-feature asks framing questions, then
   proposes a gate skeleton and gate 1's work units, writing only on your accept.
-- **By hand:** copy the worked example,
-  `.specfuse/features/FEAT-2026-0001-health-endpoint/`, and adapt it. It's a
-  deliberately small two-unit feature that exercises the whole loop. Or start from
-  the bare templates in `.specfuse/templates/`.
+- **By hand:** start from the bare templates in `.specfuse/templates/`
+  (`PLAN`, `GATE`, `WU`) and fill in a small first feature. (The
+  `specfuse/loop` source repo also carries a worked example,
+  `FEAT-2026-0001-health-endpoint`, if you want a complete reference to copy
+  from.)
 
 A feature folder holds:
 
@@ -81,7 +105,7 @@ Then create the branch named in `PLAN.md`'s frontmatter (`branch:`).
 ## 4. Validate before running
 
 ```bash
-python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0001-health-endpoint
+specfuse-lint .specfuse/features/FEAT-YYYY-NNNN-your-feature
 ```
 
 The linter checks structure: every WU has the five mandatory sections, the closing
@@ -92,8 +116,8 @@ dispatch.
 ## 5. Dry-run, then run
 
 ```bash
-python .specfuse/scripts/loop.py --dry-run     # show the gate walked, in dep order, no dispatch
-python .specfuse/scripts/loop.py               # the real thing
+specfuse-loop --dry-run     # show the gate walked, in dep order, no dispatch
+specfuse-loop               # the real thing
 ```
 
 With no `--feature` flag the driver picks the single `active` feature. For each
@@ -136,7 +160,7 @@ the ones you accept to `pending`, marks the finished gate `passed`, and prints t
 resume command. Read the `GATE-NN-REVIEW.md` the planner wrote first: it's
 weighted toward where the planner was *least* certain.
 
-Then re-run `loop.py`. Repeat until the terminal gate is `done`.
+Then re-run `specfuse-loop`. Repeat until the terminal gate is `done`.
 
 ## 7. Wrap up
 

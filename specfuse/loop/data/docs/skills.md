@@ -10,9 +10,11 @@ to do, and writes only on your explicit go-ahead. None of them dispatch agent
 sessions or run the loop — they manipulate the durable files (`roadmap.md`,
 `PLAN.md`, `GATE-NN.md`, `WU-*.md`, `LEARNINGS.md`) that the driver then acts on.
 
-All skills below ship to a target repo via `init.sh` and appear under
-`.specfuse/skills/` (symlinked into `.claude/skills/` so Claude Code discovers
-them).
+All skills below ship as the `specfuse@specfuse` Claude Code plugin (enable once
+with `/plugin marketplace add specfuse/specfuse` then `/plugin install
+specfuse@specfuse`; `specfuse init` wires the plugin into the repo's
+`.claude/settings.json`). They appear under the `/specfuse:` namespace — no files
+are copied into your repo.
 
 ## The lifecycle, in order
 
@@ -62,9 +64,9 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
 
 ### 3. Run — the driver (not a skill)
 
-`python .specfuse/scripts/loop.py` walks the active gate, dispatches each WU as a
-fresh session, verifies, and commits. It is a script, not a skill. It either
-auto-closes a clean gate or halts at the gate boundary for review.
+`specfuse-loop` (the pip-installed driver) walks the active gate, dispatches each
+WU as a fresh session, verifies, and commits. It is a command, not a skill. It
+either auto-closes a clean gate or halts at the gate boundary for review.
 
 ### 4. Arm — the human checkpoint at each gate
 
@@ -106,7 +108,7 @@ auto-closes a clean gate or halts at the gate boundary for review.
   methodology: 1 bug = 1 branch = 1 PR, test-first. Refuses and proposes
   promoting to a feature if the work is large or risky.
 - **`/feature-conversion`** — bring an existing feature folder into conformance
-  with the current scaffold's structural contract. Runs after `init.sh --upgrade`
+  with the current scaffold's structural contract. Runs after `specfuse upgrade`
   flags a feature as `FAIL`. Interactive, lint-driven.
 - **`/learnings-suggest`** — scan `attempt_outcome` events across features,
   cluster non-passing attempts, and surface recurring patterns as candidate
