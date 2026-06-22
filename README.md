@@ -48,8 +48,8 @@ the planning rigor Ralph's bare task list lacks.
   `.specfuse/scripts/adopt_feature.py <repo> <issue-number>` (or the
   interactive `/adopt-feature` skill) to scaffold a dispatchable feature
   folder from a picked issue.
-- The **driver** (`.specfuse/scripts/loop.py`) walks the current gate's ready
-  work units, dispatches each as a fresh `claude -p` session, runs the unit's
+- The **driver** (`specfuse-loop`, from the pip package) walks the current gate's
+  ready work units, dispatches each as a fresh `claude -p` session, runs the unit's
   verification itself as the exit oracle, and commits one squashed,
   trailer-carrying commit per unit. A failed gate is retried with a fresh
   session carrying the failure evidence, up to three attempts, then escalated.
@@ -72,29 +72,34 @@ In a target single-repo project:
 cloning to enable the pre-push hook (runs `scripts/smoke-test.sh` — same
 checks CI runs — before each `git push`). Bypass with `git push --no-verify`.
 
-The driver installs from PyPI and the skills from the Claude Code marketplace:
+The driver installs from PyPI and the skills ship as a Claude Code plugin:
 
 ```bash
-pip install specfuse-loop                       # the driver: `specfuse-loop` on PATH
-# in Claude Code: skills under the /specfuse: namespace
+pip install specfuse                            # umbrella CLI; pulls specfuse-loop>=0.3.0
+#   gives you: specfuse, specfuse-loop, specfuse-lint
+
+# in Claude Code, enable the skills plugin (one-time):
 #   /plugin marketplace add specfuse/specfuse
 #   /plugin install specfuse@specfuse
 
-# scaffold a target repo's .specfuse/ state (templates, rules, verification.yml)
-./init.sh /path/to/your-project                 # legacy installer (v1.0; removed in v1.1)
+specfuse init /path/to/your-project             # scaffold .specfuse/ + wire .claude/ (--dry-run previews)
 
 cd /path/to/your-project
 $EDITOR .specfuse/verification.yml              # match the `code` gates to your stack
-# author your first feature folder under .specfuse/features/ from .specfuse/templates/
-specfuse-loop --dry-run                          # or: python .specfuse/scripts/loop.py --dry-run
-specfuse-loop
+# author your first feature (in Claude Code: /draft-feature)
+specfuse-loop --dry-run                          # show the gate walk, no dispatch
+specfuse-loop                                    # the real run
 ```
 
-> **Distribution (FEAT-2026-0019).** Code ships via pip (`specfuse-loop`), the
-> `specfuse` umbrella CLI bridges pip ↔ plugin (`specfuse upgrade`), and Claude
-> assets ship via the [`specfuse/specfuse`](https://github.com/specfuse/specfuse)
-> marketplace. `init.sh` remains the scaffold bootstrap (laying down `.specfuse/`
-> state) until pip-native scaffolding lands; it prints a deprecation banner.
+> **Distribution.** Code ships via pip — `specfuse` (umbrella CLI: `init` /
+> `upgrade`) pulls `specfuse-loop` (the driver); Claude assets ship via the
+> [`specfuse/specfuse`](https://github.com/specfuse/specfuse) plugin marketplace.
+> `specfuse init` lays down `.specfuse/` and wires `.claude/`; `specfuse upgrade`
+> overlays a newer scaffold and pip-upgrades both packages. Every `specfuse-loop`
+> run self-provisions (version-syncs `.specfuse/` from the installed package), so
+> an upgrade reaches existing projects on their next run. (`./init.sh` is a
+> deprecated v1.0 shim that delegates to `specfuse init`/`upgrade`; slated for
+> removal.)
 
 > **One driver per working tree.** The driver holds an exclusive advisory lock on
 > `.specfuse/.loop.lock` for the duration of a run; a second driver targeting the
@@ -116,7 +121,7 @@ python .specfuse/scripts/loop.py --dry-run
 ```
 specfuse-loop/
 ├── LICENSE  NOTICE  CONTRIBUTING.md  README.md  .gitignore
-├── init.sh                      scaffold .specfuse/ into a target repo
+├── init.sh                      deprecated v1.0 shim → delegates to `specfuse init`/`upgrade`
 ├── docs/
 │   ├── getting-started.md       narrated first-feature + operator walkthrough
 │   ├── methodology.md           the gate-cycle contract (shared with the orchestrator)
@@ -135,7 +140,7 @@ specfuse-loop/
     └── features/FEAT-2026-0001-health-endpoint/   (the worked example)
 ```
 
-`init.sh` also ships the durable docs — `methodology.md`, `skills.md`, and
+`specfuse init` also ships the durable docs — `methodology.md`, `skills.md`, and
 `concepts/` — into a target's `.specfuse/docs/`, so an initialized repo is
 self-documenting without this checkout.
 

@@ -2,7 +2,7 @@
 
 Start here:
 
-- [`getting-started.md`](getting-started.md) — from `init.sh` to a delivered
+- [`getting-started.md`](getting-started.md) — from `specfuse init` to a delivered
   feature, then how to operate a running loop (diagnose halts, arm gates, unblock
   WUs). Read this first.
 - [`skills.md`](skills.md) — the Claude Code skills catalog, ordered by lifecycle
@@ -13,8 +13,8 @@ Start here:
   vocabulary between the loop and the orchestrator. Reference-grade.
 
 `getting-started.md`, `skills.md`, `methodology.md`, and `concepts/` are also
-shipped into target repos by `init.sh` (under `.specfuse/docs/`), so an
-initialized project is self-documenting.
+shipped into target repos by `specfuse init`/`upgrade` (under `.specfuse/docs/`),
+so an initialized project is self-documenting.
 
 ## Concepts (under `concepts/`)
 
