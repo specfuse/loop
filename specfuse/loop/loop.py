@@ -3156,6 +3156,20 @@ def run(
                 if _is_rearm:
                     fold_cumulative_on_rearm(wu, backend)
                 backend.set_wu(wu, "status", "in_progress")
+                # Stamp the resolved execution metadata into the WU frontmatter so
+                # it is visible when you read the .md (not only on the console /
+                # in events.jsonl): the model + effort it runs with (override or
+                # type default), which verification gate set is its exit oracle,
+                # the driver version that executed it, and when it was dispatched.
+                # Written after head_before so they ride the WU's squash commit;
+                # idempotent on retries/re-arms (same values overwrite cleanly,
+                # started_at refreshes to the latest dispatch).
+                backend.set_wu(wu, "model", wu.model)
+                backend.set_wu(wu, "effort", wu.effort)
+                backend.set_wu(wu, "gate_set", GATES_FOR_TYPE.get(wu.type, "code"))
+                backend.set_wu(wu, "driver_version", DRIVER_VERSION)
+                backend.set_wu(wu, "started_at",
+                               dt.datetime.now(dt.timezone.utc).isoformat())
                 # Events and per-attempt notes are buffered in memory during the
                 # WU's lifecycle and flushed at outcome time. This prevents the
                 # `git reset --hard` between failed attempts from silently
