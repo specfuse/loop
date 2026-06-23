@@ -42,6 +42,9 @@ DRIVER-OWNED FIELDS — the driver writes these at outcome time; authors leave t
 <!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,
      cumulative_cost_usd, cumulative_duration_seconds, cumulative_input_tokens,
      cumulative_output_tokens, re_arm_count, re_arm_history -->
+<!-- driver-stamped at dispatch (resolved execution metadata, visible in this .md):
+     model, effort (override or type default), gate_set (the verification.yml set
+     that is this WU's exit oracle), driver_version, started_at (UTC ISO). -->
 <!-- Full field semantics in docs/methodology.md §2 and events.jsonl outcome payloads. -->
 
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
