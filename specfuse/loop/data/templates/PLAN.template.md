@@ -11,12 +11,6 @@ status: active                  # active | done | abandoned
 # planned_cost_usd: 0.00        # OPTIONAL — sum of WU planned costs; lint warns when missing or when delta from WU sum > 10%
 ---
 
-<!--
-Copyright 2026 Specfuse Contributors
-Licensed under the Apache License, Version 2.0. See LICENSE.
--->
-
-
 # Plan: <short feature title>
 
 <One or two paragraphs of human-facing intent. The work units carry the executable

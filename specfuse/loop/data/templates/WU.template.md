@@ -11,12 +11,6 @@ generated_surfaces: []     # OPTIONAL — paths to generated files this unit's a
 ---
 
 <!--
-Copyright 2026 Specfuse Contributors
-Licensed under the Apache License, Version 2.0. See LICENSE.
--->
-
-
-<!--
 Frontmatter notes (single-repo):
 
 AUTHOR-SET FIELDS — fill or override these at draft/arm time:
