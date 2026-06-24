@@ -81,7 +81,7 @@ class TestFeatureFolderTrackedModifications(unittest.TestCase):
             mods = loop.feature_folder_tracked_modifications(rel)
             self.assertTrue(any("WU-05.md" in m for m in mods))
             with self.assertRaises(SystemExit):
-                loop.require_feature_folder_unmodified(rel)
+                loop.require_feature_folder_unmodified(rel, {"branch": "feat/t"}, "FEAT-2026-9999")
 
     def test_clean_folder_passes(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -91,7 +91,7 @@ class TestFeatureFolderTrackedModifications(unittest.TestCase):
             os.chdir(root)
             rel = fdir.relative_to(root)
             self.assertEqual(loop.feature_folder_tracked_modifications(rel), [])
-            loop.require_feature_folder_unmodified(rel)  # must not raise
+            loop.require_feature_folder_unmodified(rel, {"branch": "feat/t"}, "FEAT-2026-9999")  # must not raise
 
     def test_plan_md_flip_does_not_block(self):
         """pick-feature's PLAN.md status flip is expected, not an arm edit."""
@@ -106,7 +106,7 @@ class TestFeatureFolderTrackedModifications(unittest.TestCase):
             os.chdir(root)
             rel = fdir.relative_to(root)
             self.assertEqual(loop.feature_folder_tracked_modifications(rel), [])
-            loop.require_feature_folder_unmodified(rel)  # must not raise
+            loop.require_feature_folder_unmodified(rel, {"branch": "feat/t"}, "FEAT-2026-9999")  # must not raise
 
     def test_events_jsonl_change_does_not_block(self):
         """events.jsonl is driver-managed (preserved across reset), not an arm edit."""
@@ -118,7 +118,7 @@ class TestFeatureFolderTrackedModifications(unittest.TestCase):
             os.chdir(root)
             rel = fdir.relative_to(root)
             self.assertEqual(loop.feature_folder_tracked_modifications(rel), [])
-            loop.require_feature_folder_unmodified(rel)  # must not raise
+            loop.require_feature_folder_unmodified(rel, {"branch": "feat/t"}, "FEAT-2026-9999")  # must not raise
 
 
 class TestRunRefusesUncommittedArmEdits(unittest.TestCase):
