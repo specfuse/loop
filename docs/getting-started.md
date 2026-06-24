@@ -109,7 +109,16 @@ A feature folder holds:
 | `GATE-NN.md` | one gate's status and definition of done | you / the planner |
 | `WU-*.md` | a single work unit: frontmatter + the prompt a fresh session receives | you / `draft-feature` / `plan-next` |
 
-Then create the branch named in `PLAN.md`'s frontmatter (`branch:`).
+`draft-feature` writes the folder but doesn't commit it or switch branches, so
+the loop will refuse to start until the folder is on its branch and committed.
+Let the driver do both for you:
+
+```bash
+specfuse-loop --prepare      # create the PLAN.md `branch:`, commit the folder, then run
+```
+
+(Or by hand: `git checkout -b <branch>` from `PLAN.md`'s frontmatter, then
+`git add` + `git commit` the feature folder.)
 
 ## 4. Validate before running
 

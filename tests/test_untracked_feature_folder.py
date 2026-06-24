@@ -78,7 +78,7 @@ class TestRequireFeatureFolderCommitted(unittest.TestCase):
             files = loop.untracked_feature_files(rel)
             self.assertTrue(files, "the freshly written folder must read as untracked")
             with self.assertRaises(SystemExit):
-                loop.require_feature_folder_committed(rel)
+                loop.require_feature_folder_committed(rel, {"branch": "feat/t"}, "FEAT-2026-9999")
 
     def test_committed_folder_passes(self):
         """A committed feature folder is a no-op (no exit)."""
@@ -92,7 +92,7 @@ class TestRequireFeatureFolderCommitted(unittest.TestCase):
             os.chdir(root)
             rel = fdir.relative_to(root)
             self.assertEqual(loop.untracked_feature_files(rel), [])
-            loop.require_feature_folder_committed(rel)  # must not raise
+            loop.require_feature_folder_committed(rel, {"branch": "feat/t"}, "FEAT-2026-9999")  # must not raise
 
     def test_gitignored_work_dir_does_not_block(self):
         """Driver-managed gitignored paths (work/) must not count as untracked."""
@@ -111,7 +111,7 @@ class TestRequireFeatureFolderCommitted(unittest.TestCase):
             rel = fdir.relative_to(root)
             self.assertEqual(loop.untracked_feature_files(rel), [],
                              "gitignored work/ must not be flagged")
-            loop.require_feature_folder_committed(rel)  # must not raise
+            loop.require_feature_folder_committed(rel, {"branch": "feat/t"}, "FEAT-2026-9999")  # must not raise
 
 
 class TestWriteFrontmatterFieldHardening(unittest.TestCase):

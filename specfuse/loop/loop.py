@@ -62,7 +62,7 @@ SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
-DRIVER_VERSION = "0.3.2"
+DRIVER_VERSION = "0.3.3"
 # Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
 # version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
 # the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
@@ -709,7 +709,39 @@ def untracked_feature_files(feature_dir: "Path") -> list[str]:
     return [ln.strip() for ln in out.splitlines() if ln.strip()]
 
 
-def require_feature_folder_committed(feature_dir: "Path") -> None:
+def _current_branch() -> str:
+    """The checked-out branch name ('' when detached)."""
+    return git("branch", "--show-current")
+
+
+def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> str:
+    """Actionable next-step block for the two pre-flight guards.
+
+    `draft-feature` writes the feature folder but neither creates the feature's
+    branch nor commits — so the loop refuses to start. The fix is two steps when
+    you're not yet on the feature's branch (create it, then commit), and the
+    `--prepare` flag does both for you. Build a hint that names the real branch
+    and only includes the checkout line when it's actually needed.
+    """
+    branch = feat_fm.get("branch") or f"feat/{feature_id}"
+    on_branch = _current_branch() == branch
+    lines = [
+        "",
+        "Easiest — let the loop create the branch and commit for you:",
+        "    specfuse-loop --prepare",
+        "",
+        "Or do it manually:",
+    ]
+    if not on_branch:
+        lines.append(f"    git checkout -b {branch}")
+    lines.append(f"    git add {feature_dir}")
+    lines.append(f"    git commit -m 'chore: scaffold feature {feature_id}'")
+    return "\n".join(lines)
+
+
+def require_feature_folder_committed(
+    feature_dir: "Path", feat_fm: dict, feature_id: str,
+) -> None:
     """Hard-stop if the dispatched feature folder has untracked files (#71).
 
     The per-attempt `git reset --hard head_before` rolls tracked files back to
@@ -726,12 +758,11 @@ def require_feature_folder_committed(feature_dir: "Path") -> None:
         listed = "\n  ".join(sorted(untracked))
         sys.exit(
             f"loop.py: feature folder '{feature_dir}' has untracked files — "
-            f"commit them before running the loop, or the per-attempt "
-            f"`git reset --hard` will delete the folder mid-run (and the driver "
-            f"will crash reading a WU file that no longer exists). Untracked:\n"
-            f"  {listed}\n"
-            f"Fix: `git add {feature_dir} && git commit -m "
-            f"'chore: commit feature folder'`, then re-run."
+            f"create the feature branch and commit them before running, or the "
+            f"per-attempt `git reset --hard` will delete the folder mid-run (and "
+            f"the driver will crash reading a WU file that no longer exists). "
+            f"Untracked:\n  {listed}\n"
+            + _branch_prep_hint(feature_dir, feat_fm, feature_id)
         )
 
 
@@ -786,7 +817,9 @@ def feature_folder_tracked_modifications(feature_dir: "Path") -> list[str]:
     return mods
 
 
-def require_feature_folder_unmodified(feature_dir: "Path") -> None:
+def require_feature_folder_unmodified(
+    feature_dir: "Path", feat_fm: dict, feature_id: str,
+) -> None:
     """Hard-stop on uncommitted arm-gate / WU-revision edits before dispatch (#74).
 
     arm-gate (and any manual WU-body revision at a gate boundary) writes
@@ -808,9 +841,28 @@ def require_feature_folder_unmodified(feature_dir: "Path") -> None:
             f"`git reset --hard` will discard them (your armed WU statuses and "
             f"any acceptance-criteria revisions would silently revert). "
             f"Modified:\n  {listed}\n"
-            f"Fix: `git add {feature_dir} && git commit -m "
-            f"'chore(arm): commit gate edits'`, then re-run."
+            + _branch_prep_hint(feature_dir, feat_fm, feature_id)
         )
+
+
+def prepare_feature(feat_fm: dict, feature_dir: "Path", feature_id: str) -> None:
+    """`--prepare`: put the feature folder on its declared branch and commit it.
+
+    `draft-feature` leaves the folder uncommitted on whatever branch you were on
+    (usually the default). This creates/checks out the feature's branch (from
+    PLAN.md `branch:`, carrying the untracked folder along) and commits the
+    folder, so the pre-flight guards pass and the run can start. Idempotent: a
+    no-op commit when there is nothing to commit.
+    """
+    branch = feat_fm.get("branch")
+    ensure_feature_branch(feat_fm, feature_dir)
+    git("add", "--", str(feature_dir))
+    staged = git("status", "--porcelain", "--", str(feature_dir))
+    if staged:
+        git("commit", "-m", f"chore: scaffold feature {feature_id}")
+        print(f"Prepared: committed feature folder on branch '{branch}'.")
+    else:
+        print(f"Prepare: feature folder already committed on branch '{branch}'.")
 
 
 def _checked_checkout(checkout_args: list[str], action: str) -> str:
@@ -2921,6 +2973,7 @@ def run(
     feature_arg: str | None,
     dry_run: bool,
     force_full_close: str | None = None,
+    prepare: bool = False,
 ) -> int:
     # Fail-fast on a malformed verification.yml BEFORE we touch any WU state.
     # The per-gate `verify()` call lazy-loads the same file; if it's malformed,
@@ -2974,6 +3027,10 @@ def run(
             )
             return 1
         require_git_ready()
+        # --prepare: create the feature branch + commit the folder up front so
+        # the guards below pass (the do-it-for-me path draft-feature can't take).
+        if prepare:
+            prepare_feature(feat_fm, feature_dir, feature_id)
         # Pre-flight guards — both run BEFORE ensure_feature_branch so the
         # refusal happens before any branch mutation, and both protect against
         # the per-attempt `git reset --hard` destroying uncommitted state:
@@ -2981,8 +3038,8 @@ def run(
         #         deleted by the reset (and crash the next frontmatter write).
         #   #74 — uncommitted arm-gate / WU-revision edits (armed statuses, AC
         #         revisions) would be silently discarded by the reset.
-        require_feature_folder_committed(feature_dir)
-        require_feature_folder_unmodified(feature_dir)
+        require_feature_folder_committed(feature_dir, feat_fm, feature_id)
+        require_feature_folder_unmodified(feature_dir, feat_fm, feature_id)
         ensure_feature_branch(feat_fm, feature_dir)
 
     try:
@@ -3952,11 +4009,17 @@ def main() -> int:
                     "path for the named feature. Must match the feature being processed.")
     ap.add_argument("--no-autosync", action="store_true",
                     help="Skip auto-sync entirely (no scaffold create or overlay).")
+    ap.add_argument("--prepare", action="store_true",
+                    help="Create the active feature's branch (from PLAN.md "
+                    "'branch:') and commit its folder, then run — the do-it-for-me "
+                    "path after /draft-feature, which leaves the folder "
+                    "uncommitted on the current branch.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
     auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
-    return run(args.feature, args.dry_run, force_full_close=args.force_full_close)
+    return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
+               prepare=args.prepare)
 
 
 if __name__ == "__main__":
