@@ -36,6 +36,13 @@ def _init_git(root: Path) -> None:
     subprocess.run(["git", "-C", str(root), "config", "commit.gpgSign", "false"],
                    check=True)
     (root / "README.md").write_text("# fixture\n")
+    specfuse = root / ".specfuse"
+    specfuse.mkdir()
+    (specfuse / "verification.yml").write_text(
+        "code:\n  - name: noop\n    command: \"true\"\n"
+        "doc:\n  - name: noop\n    command: \"true\"\n"
+        "plannext:\n  - name: noop\n    command: \"true\"\n"
+    )
     subprocess.run(["git", "-C", str(root), "add", "."], check=True)
     subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "init"], check=True)
 
@@ -46,7 +53,10 @@ def _write_uncommitted_feature(root: Path) -> Path:
     fdir.mkdir(parents=True)
     (fdir / "PLAN.md").write_text(
         f"---\nfeature_id: {_FEAT_ID}\ntitle: T\nbranch: {_BRANCH}\n"
-        f"roadmap_goal: t\nstatus: active\n---\n\n# Plan\n"
+        f"roadmap_goal: t\nstatus: active\n---\n\n# Plan\n\n```yaml\n"
+        f"gates:\n  - gate: 1\n    file: GATE-01.md\n    work_units:\n"
+        f"      - id: {_FEAT_ID}/T01\n        file: WU-01.md\n"
+        f"        depends_on: []\n```\n"
     )
     (fdir / "GATE-01.md").write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
     (fdir / "WU-01.md").write_text(
@@ -84,6 +94,34 @@ class TestPrepareFeature(unittest.TestCase):
             tracked = subprocess.run(["git", "ls-files", str(rel)],
                                      capture_output=True, text=True).stdout
             self.assertIn("PLAN.md", tracked)
+
+    def test_prepare_only_prepares_then_stops(self):
+        """--prepare-only branches + commits but does NOT dispatch (rc=0)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git(root)
+            _write_uncommitted_feature(root)
+            os.chdir(root)
+
+            called = {"dispatch": False}
+
+            def _no_dispatch(*a, **k):
+                called["dispatch"] = True
+                raise AssertionError("must not dispatch under --prepare-only")
+
+            orig = loop.dispatch
+            loop.dispatch = _no_dispatch
+            try:
+                rc = loop.run(None, dry_run=False, prepare_only=True)
+            finally:
+                loop.dispatch = orig
+
+            self.assertEqual(rc, 0)
+            self.assertFalse(called["dispatch"])
+            self.assertEqual(loop._current_branch(), _BRANCH)
+            # folder committed (tree clean)
+            rel = Path(".specfuse/features") / f"{_FEAT_ID}-thing"
+            self.assertEqual(loop.untracked_feature_files(rel), [])
 
     def test_committed_guard_message_suggests_prepare_and_branch(self):
         """On the default branch, the untracked-folder refusal names --prepare

@@ -62,7 +62,7 @@ SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
-DRIVER_VERSION = "0.3.3"
+DRIVER_VERSION = "0.3.4"
 # Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
 # version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
 # the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
@@ -728,7 +728,8 @@ def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> st
     lines = [
         "",
         "Easiest — let the loop create the branch and commit for you:",
-        "    specfuse-loop --prepare",
+        "    specfuse-loop --prepare        # …then run",
+        "    specfuse-loop --prepare-only   # …then stop, so you can review first",
         "",
         "Or do it manually:",
     ]
@@ -926,9 +927,15 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         ).returncode == 0
         if not is_ancestor:
             raise FeatureBranchError(
-                f"branch '{branch}' exists and diverges from HEAD (not an "
-                f"ancestor). Refusing to silently check out a stale branch; "
-                f"resolve manually (rebase, recreate, or delete it) and re-run."
+                f"branch '{branch}' already exists and has diverged from your "
+                f"current branch '{current}' (it carries commits HEAD does not). "
+                f"Refusing to silently check it out — that could build on a stale "
+                f"base or lose work. Pick one, then re-run:\n"
+                f"  - resume that branch's work:    git checkout {branch}\n"
+                f"  - rebase it onto here:          git checkout {branch} && "
+                f"git rebase {current}\n"
+                f"  - discard it (work not needed): git branch -D {branch}   "
+                f"(the loop recreates it from HEAD)"
             )
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
@@ -2974,6 +2981,7 @@ def run(
     dry_run: bool,
     force_full_close: str | None = None,
     prepare: bool = False,
+    prepare_only: bool = False,
 ) -> int:
     # Fail-fast on a malformed verification.yml BEFORE we touch any WU state.
     # The per-gate `verify()` call lazy-loads the same file; if it's malformed,
@@ -3027,10 +3035,16 @@ def run(
             )
             return 1
         require_git_ready()
-        # --prepare: create the feature branch + commit the folder up front so
-        # the guards below pass (the do-it-for-me path draft-feature can't take).
-        if prepare:
+        # --prepare / --prepare-only: create the feature branch + commit the
+        # folder up front so the guards below pass (the do-it-for-me path
+        # draft-feature can't take). --prepare-only stops after, so you can
+        # review the commit before the loop dispatches anything.
+        if prepare or prepare_only:
             prepare_feature(feat_fm, feature_dir, feature_id)
+        if prepare_only:
+            print("Prepared: feature is on its branch and committed. "
+                  "Re-run `specfuse-loop` to start the gate.")
+            return 0
         # Pre-flight guards — both run BEFORE ensure_feature_branch so the
         # refusal happens before any branch mutation, and both protect against
         # the per-attempt `git reset --hard` destroying uncommitted state:
@@ -4014,12 +4028,16 @@ def main() -> int:
                     "'branch:') and commit its folder, then run — the do-it-for-me "
                     "path after /draft-feature, which leaves the folder "
                     "uncommitted on the current branch.")
+    ap.add_argument("--prepare-only", action="store_true",
+                    help="Like --prepare (create branch + commit the folder) but "
+                    "STOP afterwards without dispatching — review the commit, then "
+                    "re-run `specfuse-loop` to start.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
     auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
-               prepare=args.prepare)
+               prepare=args.prepare, prepare_only=args.prepare_only)
 
 
 if __name__ == "__main__":
