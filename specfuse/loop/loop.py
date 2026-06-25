@@ -62,7 +62,7 @@ SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
-DRIVER_VERSION = "0.3.4"
+DRIVER_VERSION = "0.3.5"
 # Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
 # version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
 # the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
@@ -3531,7 +3531,12 @@ def run(
                         # FEAT-2026-0018/T07 — plan-next-draft lint hook (warn-only v1)
                         if wu.type == "plan-next":
                             try:
-                                from lint_plan import lint_plan_next_draft
+                                # Package-relative + function-local: lint_plan
+                                # imports `from .loop import VERDICT_VALUES`, so a
+                                # module-top import would be circular; the old
+                                # flat (top-level) form broke once the driver
+                                # ships as a pip package (#100).
+                                from .lint_plan import lint_plan_next_draft
                                 _warns = lint_plan_next_draft(feature_dir, gate.number)
                             except Exception as _exc:
                                 _warns = [f"lint_plan_next_draft raised: {_exc}"]
