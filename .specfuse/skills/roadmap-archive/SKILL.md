@@ -12,8 +12,8 @@ with a back-link, and shrinks the hot roadmap file.
 ## When to invoke
 
 - `/roadmap-archive FEAT-2026-0003` — archive one specific feature
-- `/roadmap-archive --auto` — archive every `done`/`abandoned` row whose
-  `Detail` cell is still `—` (batch mode with confirmation)
+- `/roadmap-archive --auto` — archive every `done`/`abandoned` feature that
+  still has an inline detail section (batch mode with confirmation)
 - When the user says "archive feature X", "move X to the archive",
   "clean up the roadmap", or "the roadmap is too long, archive the done features"
 - **Note:** As of FEAT-2026-0010 Gate 2, `loop.py` automatically archives a
@@ -116,8 +116,20 @@ Emit: `FEAT-YYYY-NNNN: archived`
 
 ## Algorithm — `--auto` mode
 
-1. Read `.specfuse/roadmap.md`. Collect every table row where `Status` is
-   `done` or `abandoned` AND `Detail` is `—`.
+1. Read `.specfuse/roadmap.md`. Collect every table row where:
+   - `Status` is `done` or `abandoned`, AND
+   - an inline `## FEAT-id — ` section still exists for it, AND
+   - `Detail` does NOT already contain `roadmap-archive.md#` (a back-link means
+     already archived).
+
+   **Do NOT gate on the `Detail` cell being `—`.** Eligibility is "has
+   un-archived inline prose," not "Detail happens to be `—`." A `Detail` cell
+   holding a **folder path** (e.g. `features/FEAT-…/`, an older convention) is
+   orthogonal to whether the inline prose was archived — gating on `Detail ==
+   —` silently skips those done features and leaves their prose inline forever
+   (#102). Step 4 rewrites whatever the `Detail` cell holds (`—` *or* a folder
+   path) to the back-link; the feature folder stays discoverable at its
+   conventional `.specfuse/features/FEAT-…/` path.
 2. If none match: report `No features eligible for archiving.` and exit.
 3. Print the candidate list, then prompt:
 
