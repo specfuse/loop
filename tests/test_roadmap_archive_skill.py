@@ -104,6 +104,34 @@ def archive_feature(roadmap_path: Path, archive_path: Path, feat_id: str) -> str
     return "archived"
 
 
+def auto_eligible(roadmap_text: str) -> list[str]:
+    """Reference impl of `--auto` eligibility, corrected per #102.
+
+    Eligible = `done`/`abandoned` rows that still have an inline `## FEAT-id — `
+    section and are not already back-linked. NOT gated on the `Detail` cell being
+    `—`: a folder-path Detail (older convention) is orthogonal to whether the
+    inline prose was archived. The buggy rule (`Detail == '—'`) silently skipped
+    folder-path rows, leaving their prose inline forever.
+    """
+    eligible: list[str] = []
+    row_re = re.compile(
+        r"^\| *(FEAT-\d{4}-\d{4}) *\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|",
+        re.MULTILINE,
+    )
+    for m in row_re.finditer(roadmap_text):
+        feat_id = m.group(1).strip()
+        status = m.group(3).strip()
+        detail = m.group(5).strip()
+        if status not in ("done", "abandoned"):
+            continue
+        if "roadmap-archive.md#" in detail:
+            continue  # already archived
+        if re.search(r"^## " + re.escape(feat_id) + r" — ", roadmap_text,
+                     re.MULTILINE):
+            eligible.append(feat_id)
+    return eligible
+
+
 # ---------------------------------------------------------------------------
 # Test fixtures
 # ---------------------------------------------------------------------------
@@ -238,6 +266,85 @@ class TestArchiveFeature(unittest.TestCase):
         archive_feature(self.roadmap, self.archive, "FEAT-2026-0002")
         self.assertEqual(self.roadmap.read_text(), roadmap_snapshot)
         self.assertEqual(self.archive.read_text(), archive_snapshot)
+
+
+_ROADMAP_MIXED = textwrap.dedent("""\
+    ---
+    project: test
+    ---
+
+    # Roadmap
+
+    | Feature ID     | Title         | Status    | Folder | Detail |
+    |----------------|---------------|-----------|--------|--------|
+    | FEAT-2026-0001 | Folder detail | done      | f1     | features/FEAT-2026-0001-x/ |
+    | FEAT-2026-0002 | Dash detail   | done      | —      | —      |
+    | FEAT-2026-0003 | Already arch  | done      | —      | [→ archive](roadmap-archive.md#feat-2026-0003) |
+    | FEAT-2026-0004 | Planned thing | planned   | —      | —      |
+    | FEAT-2026-0005 | Abandoned one | abandoned | f5     | features/FEAT-2026-0005-y/ |
+
+    ## FEAT-2026-0001 — Folder detail
+
+    Prose 1.
+
+    ## FEAT-2026-0002 — Dash detail
+
+    Prose 2.
+
+    ## FEAT-2026-0004 — Planned thing
+
+    Prose 4.
+
+    ## FEAT-2026-0005 — Abandoned one
+
+    Prose 5.
+
+    ## Notes
+
+    Notes.
+""")
+
+
+class TestAutoEligibility(unittest.TestCase):
+    """#102 — --auto must not gate eligibility on Detail == '—'."""
+
+    def test_folder_path_detail_done_feature_is_eligible(self):
+        elig = auto_eligible(_ROADMAP_MIXED)
+        # The #102 regression: folder-path Detail done feature WITH inline prose.
+        self.assertIn("FEAT-2026-0001", elig)
+        self.assertIn("FEAT-2026-0005", elig)  # abandoned + folder-path
+
+    def test_dash_detail_still_eligible(self):
+        self.assertIn("FEAT-2026-0002", auto_eligible(_ROADMAP_MIXED))
+
+    def test_already_archived_excluded(self):
+        self.assertNotIn("FEAT-2026-0003", auto_eligible(_ROADMAP_MIXED))
+
+    def test_planned_excluded(self):
+        self.assertNotIn("FEAT-2026-0004", auto_eligible(_ROADMAP_MIXED))
+
+    def test_full_eligible_set(self):
+        self.assertEqual(
+            sorted(auto_eligible(_ROADMAP_MIXED)),
+            ["FEAT-2026-0001", "FEAT-2026-0002", "FEAT-2026-0005"],
+        )
+
+    def test_old_dash_only_rule_would_skip_folder_paths(self):
+        """Document the bug: gating on Detail == '—' drops the folder-path rows
+        that the corrected rule (auto_eligible) includes."""
+        dash_only = [f for f in auto_eligible(_ROADMAP_MIXED)
+                     if _detail_cell(_ROADMAP_MIXED, f) == "—"]
+        self.assertEqual(dash_only, ["FEAT-2026-0002"])
+        # corrected rule catches 2 more the buggy one missed
+        self.assertEqual(len(auto_eligible(_ROADMAP_MIXED)) - len(dash_only), 2)
+
+
+def _detail_cell(roadmap_text: str, feat_id: str) -> str:
+    m = re.search(
+        r"^\| *" + re.escape(feat_id) + r" *\|[^|]+\|[^|]+\|[^|]+\|([^|]+)\|",
+        roadmap_text, re.MULTILINE,
+    )
+    return m.group(1).strip() if m else ""
 
 
 if __name__ == "__main__":
