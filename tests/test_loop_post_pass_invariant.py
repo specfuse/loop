@@ -69,6 +69,7 @@ def _write_feature_scaffold(
     roadmap_row_status: str = "done",
     archive_anchor_present: bool = True,
     wu_verdict: str = "met",
+    roadmap_priority_column: bool = False,
 ) -> Path:
     """Write a .specfuse scaffold matching the requested post-flip state.
 
@@ -98,11 +99,23 @@ def _write_feature_scaffold(
         f"status: done\nattempts: 1\nverdict: {wu_verdict}\n---\n\n# Close{_WU_BODY}"
     )
 
+    if roadmap_priority_column:
+        # Non-canonical shape: a Priority column sits BEFORE Status, shifting
+        # Status from column 3 to column 4. Exercises header-name parsing.
+        roadmap_table = (
+            f"| Feature ID | Title | Priority | Status | Folder |\n"
+            f"|------------|-------|----------|--------|--------|\n"
+            f"| {feature_id} | Test feature | P2 | {roadmap_row_status} | — |\n\n"
+        )
+    else:
+        roadmap_table = (
+            f"| Feature ID | Title | Status | Folder | Detail |\n"
+            f"|------------|-------|--------|--------|--------|\n"
+            f"| {feature_id} | Test feature | {roadmap_row_status} | — | — |\n\n"
+        )
     (specfuse / "roadmap.md").write_text(
         f"---\nproject: test\n---\n\n# Roadmap\n\n"
-        f"| Feature ID | Title | Status | Folder | Detail |\n"
-        f"|------------|-------|--------|--------|--------|\n"
-        f"| {feature_id} | Test feature | {roadmap_row_status} | — | — |\n\n"
+        f"{roadmap_table}"
         f"## {feature_id} — Test feature\n\nContent.\n"
     )
 
@@ -174,6 +187,46 @@ class TestAssertTerminalFlipsFired(unittest.TestCase):
                 msg=f"unexpected reason: {reason!r}",
             )
             self.assertIn("active", reason)
+
+    def test_close_passes_with_priority_column_roadmap(self):
+        """Issue #104: roadmap with a Priority column before Status.
+
+        Positional parsing read the Priority cell ('P2') as the status and
+        false-escalated roadmap_row_not_done. Header-name parsing must find
+        the real Status column and pass.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            feature_dir = _write_feature_scaffold(
+                root, roadmap_priority_column=True,
+            )
+            wu = _make_close_wu(feature_dir)
+            ok, reason = loop.assert_terminal_flips_fired(
+                wu, feature_dir, root, DUMMY_HEAD,
+            )
+            self.assertTrue(ok, msg=f"unexpected fail: {reason!r}")
+            self.assertEqual(reason, "")
+
+    def test_close_fails_with_priority_column_when_row_active(self):
+        """Priority-column table, row genuinely active → still flagged, and the
+        reason reports the real Status cell, not the Priority token."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            feature_dir = _write_feature_scaffold(
+                root, roadmap_priority_column=True,
+                roadmap_row_status="active",
+            )
+            wu = _make_close_wu(feature_dir)
+            ok, reason = loop.assert_terminal_flips_fired(
+                wu, feature_dir, root, DUMMY_HEAD,
+            )
+            self.assertFalse(ok)
+            self.assertTrue(
+                reason.startswith("roadmap_row_not_done:"),
+                msg=f"unexpected reason: {reason!r}",
+            )
+            self.assertIn("active", reason)
+            self.assertNotIn("P2", reason)
 
     def test_close_with_verdict_met_fails_when_archive_anchor_absent(self):
         """Gate + row done but archive missing the lower-cased anchor."""

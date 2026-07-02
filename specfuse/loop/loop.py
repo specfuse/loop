@@ -2900,17 +2900,13 @@ def assert_terminal_flips_fired(
             False,
             f"roadmap_row_not_done: roadmap.md absent at {roadmap_path}",
         )
-    row_re = re.compile(
-        r"^\|\s*" + re.escape(feature_id) + r"\s*\|([^|]*)\|([^|]*)\|",
-        re.MULTILINE,
-    )
-    rm = row_re.search(roadmap_path.read_text())
-    if not rm:
+    parsed = _parse_roadmap_row(roadmap_path.read_text(), feature_id)
+    if not parsed:
         return (
             False,
             f"roadmap_row_not_done: row for {feature_id} not found",
         )
-    row_status = rm.group(2).strip()
+    row_status = parsed["columns"].get("Status", "").strip()
     if row_status != "done":
         return False, f"roadmap_row_not_done: status={row_status!r}"
 
