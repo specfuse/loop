@@ -53,6 +53,14 @@ exactly one, that's the target. If zero, report "no active feature"
 and stop. If more than one, ask the user which to inspect (or report
 all of them at a high level).
 
+**`deferred` features.** If the only candidate (or the one the user names)
+is `deferred`, don't report "no active feature" as if it were missing.
+Report it as **parked** — blocked on an external decision/dependency,
+non-dispatchable but resumable — and read its PLAN/GATE state anyway so
+you can name *what* it's waiting on (the next gate's arm-gate condition
+usually spells out the external blocker). A human flips it back to
+`active` when the blocker clears; the loop does not auto-resume it.
+
 ### 2. Read the canonical state files
 
 For the active feature folder `.specfuse/features/FEAT-YYYY-NNNN-<slug>/`:

@@ -22,7 +22,9 @@ the canonical column order below.
 | Feature ID     | Title | Status | Folder | Detail |
 |----------------|-------|--------|--------|--------|
 
-Status: `planned` → `active` → `done` (or `abandoned`).
+Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
+pending an external decision/dependency; resumable (a human flips it back to
+`active` when the blocker clears), distinct from `abandoned` (dead).
 
 ## Notes
 

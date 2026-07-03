@@ -18,7 +18,11 @@ on both surfaces.
 ## 1. The unit hierarchy
 
 - **Roadmap** — the master index of features for a repository/project, with each
-  feature's status (`planned → active → done`/`abandoned`).
+  feature's status (`planned → active → done`/`abandoned`). A feature may also be
+  `deferred` — parked pending an external decision or dependency: nothing is
+  loop-dispatchable, so the driver skips it (like `abandoned`), but it stays
+  resumable — a human flips it back to `active` when the blocker clears. `deferred`
+  is distinct from `abandoned` (dead) and `done` (complete).
 - **Feature** — a spec-driven *or directly-authored* unit of value, identified by
   a correlation ID `FEAT-YYYY-NNNN`. A feature owns an ordered list of gates.
 - **Gate** — a milestone partition of a feature: an ordered batch of substantive
