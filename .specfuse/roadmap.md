@@ -44,6 +44,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
+| FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to
@@ -666,6 +667,29 @@ FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adopti
 
 **Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
+
+## FEAT-2026-0029 — One-command Specfuse scaffold upgrade skill
+
+**Why.** Upgrading a project's Specfuse scaffold today means a human hand-runs
+`specfuse upgrade` then repeats the same git choreography every time — branch off
+origin/main, run the upgrade, commit, push, open a PR, merge. It's repetitive,
+easy to get wrong (upgrading a dirty tree, branching off a stale local main), and
+there's no single entrypoint.
+
+**Goal.** A Claude Code skill that performs a scaffold upgrade end-to-end on a
+target project: (1) dry-run mode reports what the upgrade would change without
+writing; (2) live mode opens a chore branch off the latest origin/main, runs
+`specfuse upgrade`, commits, pushes, opens a PR, and merges on green.
+
+**Benefits.** One command replaces a multi-step manual ritual; always branches off
+fresh origin/main (no stale-base bugs); dry-run preview before any write. The
+merge step is gated on BOTH CI-green AND a clean post-upgrade health report — if
+the upgrade flags conformance FAILs, the skill halts before merge and hands off to
+`/feature-conversion` rather than landing a broken scaffold. It wraps the existing
+`specfuse upgrade [--dry-run]` CLI, so it adds orchestration only, not new upgrade
+logic.
+
+**Status: planned.**
 
 ## Notes
 
