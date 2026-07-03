@@ -45,7 +45,9 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 
-Status: `planned` → `active` → `done` (or `abandoned`).
+Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
+pending an external decision/dependency; resumable (a human flips it back to
+`active` when the blocker clears), distinct from `abandoned` (dead).
 
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 

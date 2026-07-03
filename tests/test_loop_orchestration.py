@@ -319,6 +319,27 @@ class TestFindFeatureSelection(unittest.TestCase):
         result = loop.find_feature("FEAT-2026-9502-explicit")
         self.assertEqual(result, fdir)
 
+    def test_deferred_feature_is_not_auto_selected(self):
+        """Issue #106: a `deferred` foldered feature is non-dispatchable — the
+        driver skips it exactly like a non-active feature (parked, resumable)."""
+        self._write_plan("FEAT-2026-9502-deferred", "deferred")
+        with self.assertRaises(SystemExit) as ctx:
+            loop.find_feature(None)
+        self.assertIn("active", str(ctx.exception.code).lower())
+
+    def test_deferred_does_not_count_as_a_second_active(self):
+        """A `deferred` feature alongside one `active` does not trigger the
+        multiple-active disambiguation — deferred is not dispatchable."""
+        active_dir = self._write_plan("FEAT-2026-9502-live", "active")
+        self._write_plan("FEAT-2026-9502-parked", "deferred")
+        self.assertEqual(loop.find_feature(None), active_dir)
+
+    def test_deferred_still_selectable_by_explicit_arg(self):
+        """A human can still target a `deferred` feature explicitly (e.g. to
+        inspect it); only auto-selection skips it."""
+        fdir = self._write_plan("FEAT-2026-9502-parked", "deferred")
+        self.assertEqual(loop.find_feature("FEAT-2026-9502-parked"), fdir)
+
     def test_explicit_arg_without_plan_exits(self):
         """Lines 188-190: explicit dir name with no PLAN.md → sys.exit."""
         orphan = self._features_dir / "FEAT-2026-9502-orphan"

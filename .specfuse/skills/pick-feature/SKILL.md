@@ -44,6 +44,12 @@ comparison but cannot accept your pick.
   NOT auto-demote the existing active — the user owns that
   transition (mark it `done`, `blocked_human`, `abandoned`, or
   leave it parallel).
+- **`deferred` is not a pick candidate — and not an active blocker.**
+  A `deferred` feature is parked pending an external decision/dependency:
+  do NOT offer it in the pick list (it isn't `planned`), and do NOT treat
+  it as the current active that must be finished first (it isn't `active`,
+  nothing is loop-dispatchable). If the user wants to resume one, that's a
+  human flip `deferred` → `active`, not a pick.
 - **Infer first, ask last.** A question is legitimate only when no
   file the skill could read would answer it. Asking "what's the
   goal?" when `roadmap_goal` is set in PLAN frontmatter is a bug.

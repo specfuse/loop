@@ -29,6 +29,11 @@ reused.
 - **Canonical column order only.** The skill writes rows in
   `| ID | Title | Status | Folder | Detail |` order. If the roadmap table header
   does not match that shape exactly, refuse with a clear error naming the mismatch.
+- **New rows are always `planned`.** That's the only status this skill
+  writes. For reference, the full roadmap status vocabulary is
+  `planned | active | deferred | done | abandoned` (`deferred` = parked on
+  an external decision/dependency, resumable); later transitions are owned
+  by /pick-feature, the driver, or a human — not this skill.
 - **No git.** The driver owns all commits. Edit files only.
 - **Interactive mode only confirms once** — the presented next ID, then collects
   fields. It does not re-ask for confirmation before writing.
