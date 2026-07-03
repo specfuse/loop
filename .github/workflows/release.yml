@@ -68,7 +68,7 @@ jobs:
           test "$TAG" = "$DRV" || { echo "::error::tag v$TAG != DRIVER_VERSION $DRV"; exit 1; }
 
       - name: Upload dist artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
