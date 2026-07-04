@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0025-learnings-indexed-retrieval
 roadmap_goal: Indexed retrieval over .specfuse/LEARNINGS.md so planning consumers load only the entries relevant to the feature being planned, instead of the whole (now ~1700-line) file — bounding planning-context cost as the repo scales.
 autonomy_default: review
 status: active
-planned_cost_usd: 7.75
+planned_cost_usd: 8.95
 ---
 
 <!--
@@ -83,15 +83,27 @@ gates:
         depends_on: [FEAT-2026-0025/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    # Gate 2 wires the planning consumers to the gate-1 primitive. Its
-    # SUBSTANTIVE WUs are drafted by gate 1's plan-next (G1-PLAN) at the gate
-    # boundary and inserted BEFORE G2-CLOSE, then human-reviewed and armed.
-    # Only the terminal close is pre-declared (as a draft placeholder) so the
-    # graph is valid and gate 1 reads as non-terminal.
+    # Gate 2 wires the planning consumers to the gate-1 primitive. Drafted by
+    # gate 1's plan-next (G1-PLAN); left `draft` for human review-and-arm.
+    # Scope correction (see GATE-02-REVIEW.md): of the four consumers named in
+    # roadmap_goal, only draft-feature and pick-feature actually load
+    # LEARNINGS.md WHOLE at runtime. authoring-work-units is a static
+    # DISTILLATION of LEARNINGS (no runtime load); plan-next has no durable
+    # skill file (its LEARNINGS reads are authored per-WU). So gate 2 wires the
+    # two real load-whole consumers; the other two are documented as out of
+    # scope rather than drafted against invented surfaces.
     work_units:
+      - id: FEAT-2026-0025/T03
+        file: WU-03-wire-draft-feature.md
+        depends_on: []
+      - id: FEAT-2026-0025/T04
+        file: WU-04-wire-pick-feature.md
+        depends_on: []
       - id: FEAT-2026-0025/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0025/T03
+          - FEAT-2026-0025/T04
 ```
 
 ## Notes
