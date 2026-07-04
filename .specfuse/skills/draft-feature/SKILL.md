@@ -63,8 +63,16 @@ Before any proposal, read what shapes good plans in *this* project:
   `FEAT-YYYY-NNNN` for the current year. The roadmap also reveals
   ordering constraints: a planned feature that this initiative
   conflicts with, supersedes, or unblocks.
-- **`.specfuse/LEARNINGS.md`** — durable rules from past gates that
-  would change how this feature is planned or sized.
+- **LEARNINGS slice, not the whole file.** `PLAN.md` doesn't exist yet at
+  this step, so build a short query from what's already in hand: the
+  one-line feature idea the user gave you, the provisional slug, and any
+  surface names the idea already mentions. Run
+  `python3 .specfuse/scripts/learnings_query.py "<query>" --top 8` and read
+  only the returned bullets — durable rules from past gates that would
+  change how this feature is planned or sized. If the CLI prints the
+  sentinel line `LEARNINGS-LOAD-WHOLE` (small/early-stage repos, too few
+  entries to rank), fall back to reading `.specfuse/LEARNINGS.md` whole.
+  Don't read the whole file otherwise.
 - **`.specfuse/features/*/PLAN.md`** — recent feature exemplars. Read
   one or two to see what good gate-cutting looks like in this project
   (gate count, WU count per gate, typical depends_on shapes).

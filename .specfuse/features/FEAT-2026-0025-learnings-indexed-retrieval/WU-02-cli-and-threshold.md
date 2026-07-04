@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0025/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces: .specfuse/scripts/learnings_query.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T17:38:21.380243+00:00
+duration_seconds: 202.706
+cost_usd: 0.628228
+input_tokens: 13569
+output_tokens: 6530
 ---
 
 # CLI wrapper + load-whole threshold fallback

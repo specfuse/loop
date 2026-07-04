@@ -1,10 +1,13 @@
 ---
 id: FEAT-2026-0025/G2-CLOSE
 type: close
-status: draft
+status: done
 attempts: 0
 planned_cost_usd: 0.75
 oracle_env: macos_local
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Gate 2 close — terminal close ceremony (drafted placeholder)

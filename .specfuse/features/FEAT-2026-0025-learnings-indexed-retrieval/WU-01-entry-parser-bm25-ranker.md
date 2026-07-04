@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0025/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces: .specfuse/scripts/learnings_query.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T17:34:28.600609+00:00
+duration_seconds: 232.6
+cost_usd: 0.841376
+input_tokens: 13538
+output_tokens: 8853
 ---
 
 # LEARNINGS entry parser + stdlib BM25 ranker
