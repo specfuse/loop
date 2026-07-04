@@ -40,9 +40,10 @@ red→green proof lives in T01's helper and T03's deploy bats.)
    branch off `origin/main` (fresh remote base, not stale local main);
    (c) run `specfuse upgrade <target>`; (d) commit; (e) push `--no-verify`;
    (f) open a PR via `gh pr create`; (g) watch CI to green; (h) call
-   `.specfuse/scripts/upgrade_merge_gate.py`'s `decide(...)` with CI status + the
-   post-upgrade health report; (i) on `merge` → squash-merge; on `halt` → STOP and
-   point the operator at `/feature-conversion`, naming the FAIL features.
+   `.specfuse/scripts/upgrade_merge_gate.py` — `collect_reports(<target>)` to run
+   the per-feature scaffold-conformance lint, then `decide(ci_all_green, reports)`;
+   (i) on `merge` → squash-merge; on `halt` → STOP and point the operator at
+   `/feature-conversion`, naming the non-conformant features.
 4. A **Target** subsection documents the path-arg (defaults to cwd), mirroring
    `specfuse upgrade <target>`.
 5. A **Hard rules** section forbids: force-merging past branch protection, merging
