@@ -5,7 +5,7 @@ slug: scaffold-upgrade-skill
 branch: feat/FEAT-2026-0029-scaffold-upgrade-skill
 roadmap_goal: A Claude Code skill that upgrades a target project's Specfuse scaffold end-to-end — dry-run reports what would change; live mode branches off origin/main, runs specfuse upgrade, commits, pushes, opens a PR, and merges on green (gated on a clean post-upgrade health report, else halts and hands off to feature-conversion).
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 6.00
 ---
 
