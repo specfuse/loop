@@ -15,12 +15,15 @@ of the `specfuse` package.
 from __future__ import annotations
 
 import importlib.util
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = REPO_ROOT / ".specfuse" / "scripts"
+LEARNINGS_QUERY_PATH = SCRIPTS_DIR / "learnings_query.py"
 
 
 def _load(name: str):
@@ -142,6 +145,101 @@ class TestParseEntries(unittest.TestCase):
         for entry in entries:
             self.assertTrue(entry["text"])
             self.assertTrue(entry["tag"])
+
+
+def _small_fixture(n_entries: int) -> str:
+    lines = ["## Entries", "", "<!-- lessons work units append below this line -->", ""]
+    for i in range(n_entries):
+        lines.append(f"- [meta/e{i}] Entry number {i} about routers and gates.")
+    return "\n".join(lines) + "\n"
+
+
+class TestShouldLoadWhole(unittest.TestCase):
+    def test_below_threshold_is_true(self):
+        entries = [{"tag": "a", "text": "x"}] * 5
+        self.assertTrue(lq.should_load_whole(entries, threshold=40))
+
+    def test_at_or_above_threshold_is_false(self):
+        entries = [{"tag": "a", "text": "x"}] * 40
+        self.assertFalse(lq.should_load_whole(entries, threshold=40))
+        entries = [{"tag": "a", "text": "x"}] * 41
+        self.assertFalse(lq.should_load_whole(entries, threshold=40))
+
+
+class TestCli(unittest.TestCase):
+    def _run_cli(self, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(LEARNINGS_QUERY_PATH), *args],
+            capture_output=True,
+            text=True,
+        )
+
+    def test_cli_below_threshold_signals_load_whole(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False
+        ) as fixture:
+            fixture.write(_small_fixture(5))
+            fixture_path = fixture.name
+        try:
+            result = self._run_cli(
+                "routers", "--file", fixture_path, "--threshold", "40"
+            )
+        finally:
+            Path(fixture_path).unlink()
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout.strip(), lq.LOAD_WHOLE_SENTINEL)
+
+    def test_cli_at_threshold_returns_ranked_slice(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False
+        ) as fixture:
+            fixture.write(_small_fixture(45))
+            fixture_path = fixture.name
+        try:
+            result = self._run_cli(
+                "routers", "--file", fixture_path, "--threshold", "40", "--top", "3"
+            )
+        finally:
+            Path(fixture_path).unlink()
+        self.assertEqual(result.returncode, 0)
+        lines = [line for line in result.stdout.splitlines() if line.strip()]
+        self.assertNotIn(lq.LOAD_WHOLE_SENTINEL, lines)
+        self.assertEqual(len(lines), 3)
+
+    def test_cli_threshold_zero_forces_slice_on_tiny_file(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False
+        ) as fixture:
+            fixture.write(_small_fixture(2))
+            fixture_path = fixture.name
+        try:
+            result = self._run_cli(
+                "routers", "--file", fixture_path, "--threshold", "0"
+            )
+        finally:
+            Path(fixture_path).unlink()
+        self.assertEqual(result.returncode, 0)
+        self.assertNotEqual(result.stdout.strip(), lq.LOAD_WHOLE_SENTINEL)
+        self.assertEqual(len(result.stdout.strip().splitlines()), 2)
+
+    def test_cli_missing_file_exits_nonzero_with_message(self):
+        result = self._run_cli("routers", "--file", "/nonexistent/path/LEARNINGS.md")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("cannot read", result.stderr)
+
+    def test_cli_top_bounds_count(self):
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".md", delete=False
+        ) as fixture:
+            fixture.write(_small_fixture(45))
+            fixture_path = fixture.name
+        try:
+            result = self._run_cli(
+                "routers", "--file", fixture_path, "--threshold", "40", "--top", "1"
+            )
+        finally:
+            Path(fixture_path).unlink()
+        self.assertEqual(len(result.stdout.strip().splitlines()), 1)
 
 
 if __name__ == "__main__":
