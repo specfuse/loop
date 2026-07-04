@@ -188,6 +188,30 @@ class TestAssertTerminalFlipsFired(unittest.TestCase):
             )
             self.assertIn("active", reason)
 
+    def test_close_row_missing_names_the_fix(self):
+        """#127: when the roadmap row was dropped before dispatch, the reason
+        must point at the recovery (restore + re-commit, dispatch via
+        --prepare), not just report 'not found'."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            feature_dir = _write_feature_scaffold(root)
+            # Drop the row: a header-only roadmap with no row for the feature.
+            (root / ".specfuse" / "roadmap.md").write_text(
+                "---\nproject: test\n---\n\n# Roadmap\n\n"
+                "| Feature ID | Title | Status | Folder | Detail |\n"
+                "|------------|-------|--------|--------|--------|\n"
+            )
+            wu = _make_close_wu(feature_dir)
+            ok, reason = loop.assert_terminal_flips_fired(
+                wu, feature_dir, root, DUMMY_HEAD,
+            )
+            self.assertFalse(ok)
+            self.assertTrue(
+                reason.startswith("roadmap_row_not_done:"),
+                msg=f"unexpected reason: {reason!r}",
+            )
+            self.assertIn("--prepare", reason)
+
     def test_close_passes_with_priority_column_roadmap(self):
         """Issue #104: roadmap with a Priority column before Status.
 
