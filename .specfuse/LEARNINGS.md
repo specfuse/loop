@@ -1659,3 +1659,42 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   was also intentionally left as an operator post-merge live-oracle step. Rule: triage
   open→(read merge history + the feature that names the issue) before assuming a fresh feature
   is warranted; the fix may be "verify the deferred oracle and close," not "build it again."
+
+- [FEAT-2026-0029/G1-CLOSE] A WU that authors a parser/consumer must have its input
+  artifact's existence verified at draft time — not the format, the *existence*.
+  FEAT-2026-0029/T01 was drafted to parse a `specfuse upgrade` "health report" string
+  format that is implemented NOWHERE in the repo (described only in prose in
+  `feature-conversion/SKILL.md`). The agent correctly blocked on attempt 1 rather than
+  invent a grammar, but the block cost a dispatch (~$0.71) that a draft-time check would
+  have avoided; the WU was re-scoped to a Python data-structure contract
+  (`{"feature","ok","detail"}`) consuming `lint_plan.py`'s already-implemented per-feature
+  exit code instead. Rule: before dispatching any WU whose acceptance criteria parse,
+  consume, or extend an artifact produced by another tool, `grep`/`ls` for that artifact
+  in the repo. If it does not exist, the WU's contract must be a code-level data structure
+  against an in-repo signal, NOT a parse of a not-yet-emitted string. "The format is
+  described in prose in a sibling skill" is not "the format exists."
+
+- [FEAT-2026-0029/G1-CLOSE] Sandbox `mktemp -d` denial (`Operation not permitted`) is an
+  environment limit that presents as a test failure and will consume the entire 3-attempt
+  spinning budget if the WU spec doesn't pre-empt it. FEAT-2026-0029/T01's tmp-repo fixture
+  for `collect_reports` spun 3 failed attempts on `mktemp: mkdtemp failed on /var/folders/...:
+  Operation not permitted` before a re-arm found a working tmp-dir strategy — none of it a
+  logic bug. Rule: any WU whose tests build a temp git repo or scratch dir MUST use the
+  repo's established `tempfile.TemporaryDirectory` / `$TMPDIR` fixture pattern and the WU
+  spec should name the sandbox tmp-dir constraint explicitly, so the agent doesn't
+  rediscover the denial under the spinning budget. Pairs with the FEAT-2026-0013 tmp-repo
+  fixture rules (gc.auto=0 + sync barrier + ignore_cleanup_errors).
+
+- [FEAT-2026-0029/G1-CLOSE] Scope a wiring/registration WU's acceptance criteria to the
+  artifact's actual *delivery model*, or it will block on an unrelated, out-of-scope defect
+  in a different delivery path. FEAT-2026-0029/T03 (register a skill) blocked on attempt 1
+  because an AC drove the agent into a `scaffold.py` skill-deploy defect (`init()`/
+  `upgrade_specfuse()` deploy no skills for anyone) — but Specfuse skills ship via the Claude
+  Code **plugin**, not the pip scaffold, so that defect was never on this WU's path. The
+  agent correctly escalated instead of weakening the regression; the fix was to re-scope the
+  WU (commit da81c27) to the plugin skill-delivery model (real dir in `.specfuse/skills/<name>/`
+  + forward `.claude/skills/<name>` discovery symlink). Rule: a WU that wires/registers an
+  artifact must name in its Context which delivery mechanism ships it (plugin vs pip scaffold
+  vs generator) and bound its ACs to that mechanism's surfaces only; an AC that reaches into
+  a sibling delivery path's internals is a mis-scope that will block or force a driver-internals
+  edit.
