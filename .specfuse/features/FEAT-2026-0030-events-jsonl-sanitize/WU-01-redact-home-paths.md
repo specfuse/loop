@@ -32,15 +32,39 @@ repo-internal and is NOT copied into target projects (issue #55, LEARNINGS
 `leak_guard_specfuse_internal`). The redaction MUST be implemented with a
 driver-local regex — do **not** `import` or `subprocess` `leak_scan.py`.
 
+**Load-bearing constraint — commit-safe source (do not skip).** The driver commits
+this WU's staged diff through the repo's pre-commit structural leak-scan **without
+`--no-verify`**. That scan flags the pattern `/Users/<seg>/` (regex
+`/Users/[^/\s]+/`) anywhere in the staged diff — including your new source and test
+files. A naive redaction regex or test fixture will therefore get this WU's own
+commit rejected and halt the gate (the source-code form of the very self-poison
+this feature fixes). So NO contiguous `/Users/<seg>/` (or `/home/<seg>/`) literal
+may appear in the committed source. Concretely:
+
+- **Match regex:** write it so the source contains no literal `/Users/` substring.
+  `re.compile(r"/(?:Users|home)/[^/\s]+/")` matches both macOS and Linux home
+  prefixes at runtime yet contains no `/Users/` literal (it reads `/(?:Users|…`),
+  so it is safe on the staged scan. Do NOT write `r"/Users/[^/\s]+/"` — that
+  literal self-trips.
+- **Test fixtures + assertions:** never embed a contiguous `/Users/<seg>/` literal.
+  Build home-path inputs by concatenation, e.g. `HOME = "/Users/" + "alice/x"`
+  (the trailing quote breaks the segment+slash the scanner needs), and assert
+  absence via the compiled pattern (`assert not PAT.search(out)`), not via a
+  literal `assertNotIn("/Users/alice/x", out)` (which self-trips).
+- Note this differs from `leak_scan.py`'s OWN test files, which embed literals and
+  were committed with `--no-verify` — you cannot rely on that here, because the
+  driver's WU commit does not pass `--no-verify`.
+
 Reference the binding rules under `.specfuse/rules/` (`result-contract.md`,
 `never-touch.md`, `security-boundaries.md`); honor them rather than restating.
 
 **Acceptance criteria.**
 
 1. **Red test (fails on HEAD):** `tests/test_events_redaction.py::test_home_path_redacted_before_flush`
-   builds an event whose `payload` (e.g. an `agent_blocked_reason`) contains
-   `/Users/alice/checkout/x`, calls `flush_events` to a tmp path, reads the written
-   JSONL back, and asserts it contains no substring matching `/Users/<name>/`. It
+   builds an event whose `payload` (e.g. an `agent_blocked_reason`) contains a
+   macOS home path constructed by concatenation (per the commit-safe note above —
+   do not embed the literal), calls `flush_events` to a tmp path, reads the written
+   JSONL back, and asserts the compiled home-path pattern no longer matches it. It
    fails on HEAD because no redaction exists.
 2. A driver-local helper `_redact_home_paths(value)` recursively walks a JSON-ish
    value (dict / list / str / scalar) and, in every string leaf, replaces absolute
@@ -62,6 +86,12 @@ Reference the binding rules under `.specfuse/rules/` (`result-contract.md`,
    `python3 -c "from specfuse.loop.loop import _redact_home_paths, flush_events"`
    exits 0, and the driver source added/edited by this WU contains no reference to
    `leak_scan` (grep-checkable).
+6. **Commit-safe source (enables this WU's own commit):** the files this WU stages
+   (`specfuse/loop/loop.py`, `tests/test_events_redaction.py`) contain no contiguous
+   `/Users/<seg>/` or `/home/<seg>/` literal — verify with the repo hook itself:
+   after staging, `python3 .specfuse/scripts/leak_scan.py --staged` exits 0. (This
+   is the same check the driver's commit will run; if it fails, this WU cannot
+   commit. See the commit-safe note above for the regex/fixture construction.)
 
 **Do not touch.** `.specfuse/scripts/leak_scan.py` (its allowlist and the existing
 `redact_leak_findings` helper are out of scope — do not import, prune, or unify),
