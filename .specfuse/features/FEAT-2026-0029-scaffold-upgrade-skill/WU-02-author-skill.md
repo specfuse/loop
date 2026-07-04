@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0029/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.75
 produces: .specfuse/skills/scaffold-upgrade/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T01:44:15.446955+00:00
+duration_seconds: 146.26
+cost_usd: 0.486704
+input_tokens: 17379
+output_tokens: 4523
 ---
 
 # Author the scaffold-upgrade skill (SKILL.md)
