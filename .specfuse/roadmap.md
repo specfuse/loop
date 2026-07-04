@@ -40,7 +40,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
 | FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
-| FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | planned | — | — |
+| FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | active | — | — |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
