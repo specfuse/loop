@@ -52,6 +52,11 @@ code:
     # §11 operator-script gate: init.sh thin-shim happy-path + absent-CLI error.
     command: "bats tests/init_sh_shim.bats"
 
+  - name: init-skills-bats
+    # Guards the #56 source-repo skill layout (real dir in .specfuse + forward
+    # discovery symlink in .claude). Was silently red + un-run before #121.
+    command: "bats tests/init_skills_idempotent.bats"
+
   # warnings: CONSCIOUSLY DROPPED.
   # Python has no compiler-warnings analogue; this gate assumes a compiled
   # stack (warnings-as-errors at build time) and is N/A for a pure-Python

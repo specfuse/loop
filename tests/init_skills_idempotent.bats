@@ -3,54 +3,35 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# Regression test for issue #56 — every skill must deploy as a real, readable
-# SKILL.md in the target, and init then --upgrade must be idempotent.
+# Regression test for issue #56 — skills must live in the canonical source layout:
+# a REAL dir under .specfuse/skills/<name>/ plus a FORWARD discovery symlink
+# .claude/skills/<name> -> ../../.specfuse/skills/<name> (created by wire_claude_code).
 #
-# roadmap-add / roadmap-archive were committed with an INVERTED symlink: the real
-# dir lived under .claude/skills/ and .specfuse/skills/<name> was a git symlink
-# pointing back into .claude. Consequences: init copied a dangling symlink into
-# the target (skill unavailable), and `cp -R` over the existing symlink on
-# --upgrade failed ("unlink: Operation not permitted" on macOS), aborting the
-# upgrade. The canonical pattern is real-dir-in-.specfuse + a forward discovery
-# symlink in .claude (created by wire_claude_code).
+# roadmap-add / roadmap-archive were once committed with an INVERTED symlink (real
+# dir under .claude/skills/, .specfuse/skills/<name> a git symlink back into
+# .claude), which produced dangling symlinks and aborted `cp -R` on --upgrade.
+#
+# NOTE (issue #121): earlier tests here asserted `init.sh` DEPLOYS skills into a
+# target. That is obsolete — since FEAT-2026-0026 `init.sh` is a thin shim to
+# `specfuse init`, and skill delivery moved to the Claude Code plugin
+# (`/plugin install specfuse@specfuse`); the pip scaffold deliberately does NOT
+# copy skills (see docs/getting-started.md). Those tests were silently red and not
+# run in CI. They are retired; this file now guards only the live invariant — the
+# source-repo symlink layout the plugin publishes from — and IS wired into CI
+# (scripts/smoke-test.sh) and the driver gate set (.specfuse/verification.yml).
 
 setup() {
   REPO="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
-  TARGET="$(mktemp -d)"
-}
-
-teardown() {
-  [ -n "$TARGET" ] && rm -rf "$TARGET"
-}
-
-# The two skills that were inverted, plus a canonical one as a control.
-SKILLS="roadmap-add roadmap-archive arm-gate"
-
-@test "init deploys every skill as a readable SKILL.md in the target" {
-  run bash "$REPO/init.sh" "$TARGET"
-  [ "$status" -eq 0 ]
-  for s in $SKILLS; do
-    # -s follows symlinks; a dangling symlink (the #56 bug) is NOT readable.
-    [ -s "$TARGET/.specfuse/skills/$s/SKILL.md" ]
-  done
-}
-
-@test "init then --upgrade is idempotent with skills present" {
-  run bash "$REPO/init.sh" "$TARGET"
-  [ "$status" -eq 0 ]
-  # Re-run upgrade WITHOUT removing skills/ — the #56 bug aborted here.
-  run bash "$REPO/init.sh" --upgrade "$TARGET"
-  [ "$status" -eq 0 ]
-  for s in $SKILLS; do
-    [ -s "$TARGET/.specfuse/skills/$s/SKILL.md" ]
-  done
 }
 
 @test "source repo holds skill content in .specfuse (real), not .claude" {
-  # .specfuse is the canonical home; .claude/skills/<name> is a discovery symlink.
-  for s in roadmap-add roadmap-archive; do
-    [ ! -L "$REPO/.specfuse/skills/$s" ]               # not a symlink
-    [ -s "$REPO/.specfuse/skills/$s/SKILL.md" ]        # real, non-empty
-    [ -L "$REPO/.claude/skills/$s" ]                   # .claude side IS the symlink
+  # .specfuse is the canonical home; .claude/skills/<name> is a forward discovery
+  # symlink that must RESOLVE to the real, non-empty SKILL.md (a dangling symlink
+  # is the #56 failure mode).
+  for s in roadmap-add roadmap-archive arm-gate; do
+    [ ! -L "$REPO/.specfuse/skills/$s" ]                # .specfuse side is a real dir
+    [ -s "$REPO/.specfuse/skills/$s/SKILL.md" ]         # real, non-empty content
+    [ -L "$REPO/.claude/skills/$s" ]                    # .claude side IS the symlink
+    [ -s "$REPO/.claude/skills/$s/SKILL.md" ]           # ...and it resolves (not dangling)
   done
 }
