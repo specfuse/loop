@@ -44,7 +44,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
-| FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | planned | — | — |
+| FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | active | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to
