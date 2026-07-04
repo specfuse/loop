@@ -45,6 +45,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | active | — | — |
+| FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to
@@ -688,6 +689,38 @@ the upgrade flags conformance FAILs, the skill halts before merge and hands off 
 `/feature-conversion` rather than landing a broken scaffold. It wraps the existing
 `specfuse upgrade [--dry-run]` CLI, so it adds orchestration only, not new upgrade
 logic.
+
+**Status: planned.**
+
+## FEAT-2026-0030 — Driver-side sanitization of agent-authored text before events.jsonl staging
+
+**Why.** The loop driver writes agent-authored free-text (blocked reasons,
+failure notes) into `events.jsonl`, then stages and commits that audit trail. When
+the text happens to contain a token the repo's structural leak-scan flags — e.g. an
+absolute home-directory path (a `~`-expanded checkout location) the agent mentioned
+while explaining where it searched — the pre-commit hook rejects the bookkeeping commit and the gate halts
+mid-run. Observed live on FEAT-2026-0029/T01 (driver 0.3.6): the agent's
+`blocked_reason` quoted a local checkout path, tripping `user-path` findings on
+`events.jsonl` lines 29-30. This is the same failure family as the now-closed #76
+(which redacted the leak hook's *own* FINDINGS text) and #73 (the general form),
+but a distinct, still-uncovered source: **agent-authored** note text, not
+hook-captured FINDINGS. #76's fix does not cover it.
+
+**Goal.** A single driver-side sanitization pass applied to *all* agent-authored
+strings before they are written into `events.jsonl` (or at minimum before the
+bookkeeping commit is staged): redact absolute home-directory prefixes (the
+`~`-expanded macOS and Linux forms) and any other token the structural leak-scan
+flags, to a placeholder,
+preserving the audit signal without re-embedding the trigger. Retires the residual
+per-token allowlist band-aids and closes the systemic self-poison class for note
+text, not just captured-FINDINGS text.
+
+**Benefits.** Bookkeeping commits stop halting the gate on benign local paths that
+leak into agent prose; the audit trail still records *that* and *why* a WU blocked;
+one sanitization chokepoint replaces scattered redaction. Removes a recurring
+operator-recovery chore (manual redact-and-commit) from real runs. Small, driver-
+local (`loop.py`), test-backed (feed a note containing a user path → assert the
+staged events.jsonl passes `leak_scan.py --staged`).
 
 **Status: planned.**
 
