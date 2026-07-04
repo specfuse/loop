@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0029/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.25
 produces: .claude/skills/scaffold-upgrade/SKILL.md
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T03:51:19.194501+00:00
+duration_seconds: 163.722
+cost_usd: 0.346482
+input_tokens: 13430
+output_tokens: 1710
 ---
 
 # Wire and register the scaffold-upgrade skill
