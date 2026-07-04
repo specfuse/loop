@@ -38,6 +38,13 @@ def _init_git(root: Path) -> None:
     (root / "README.md").write_text("# fixture\n")
     specfuse = root / ".specfuse"
     specfuse.mkdir()
+    # A committed roadmap with a header only — draft-feature appends the
+    # feature's row as an UNcommitted edit (see _draft_roadmap_row).
+    (specfuse / "roadmap.md").write_text(
+        "# Roadmap\n\n"
+        "| Feature ID | Title | Status | Folder |\n"
+        "| --- | --- | --- | --- |\n"
+    )
     (specfuse / "verification.yml").write_text(
         "code:\n  - name: noop\n    command: \"true\"\n"
         "doc:\n  - name: noop\n    command: \"true\"\n"
@@ -64,6 +71,13 @@ def _write_uncommitted_feature(root: Path) -> Path:
         "status: pending\nattempts: 0\n---\n\n# WU\n"
     )
     return fdir
+
+
+def _draft_roadmap_row(root: Path) -> None:
+    """Append the feature's roadmap row as an UNcommitted edit, mirroring what
+    /draft-feature writes (folder + roadmap row, no git)."""
+    rm = root / ".specfuse" / "roadmap.md"
+    rm.write_text(rm.read_text() + f"| {_FEAT_ID} | Thing | done | — |\n")
 
 
 def _feat_fm() -> dict:
@@ -94,6 +108,30 @@ class TestPrepareFeature(unittest.TestCase):
             tracked = subprocess.run(["git", "ls-files", str(rel)],
                                      capture_output=True, text=True).stdout
             self.assertIn("PLAN.md", tracked)
+
+    def test_prepare_commits_uncommitted_roadmap_row(self):
+        """#127: draft-feature leaves the roadmap row uncommitted; --prepare must
+        fold it into the scaffold commit. Otherwise the first WU's per-attempt
+        `git reset --hard head_before` discards the row and terminal close fails
+        with roadmap_row_not_done."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _init_git(root)
+            fdir = _write_uncommitted_feature(root)
+            _draft_roadmap_row(root)
+            os.chdir(root)
+            rel = fdir.relative_to(root)
+            loop.prepare_feature(_feat_fm(), rel, _FEAT_ID)
+            # roadmap.md must be clean (row committed, not left dirty)
+            dirty = subprocess.run(
+                ["git", "status", "--porcelain", "--", ".specfuse/roadmap.md"],
+                capture_output=True, text=True).stdout.strip()
+            self.assertEqual(dirty, "", f"roadmap.md left uncommitted: {dirty!r}")
+            # the row survives a per-attempt reset to the scaffold commit
+            subprocess.run(["git", "reset", "--hard", "-q", "HEAD"], check=True)
+            self.assertIn(
+                _FEAT_ID, (root / ".specfuse" / "roadmap.md").read_text(),
+                "roadmap row discarded by reset — not in the scaffold commit")
 
     def test_prepare_only_prepares_then_stops(self):
         """--prepare-only branches + commits but does NOT dispatch (rc=0)."""
