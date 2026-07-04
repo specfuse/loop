@@ -5,7 +5,7 @@ slug: events-jsonl-sanitize
 branch: feat/FEAT-2026-0030-events-jsonl-sanitize
 roadmap_goal: A single driver-side sanitization pass over agent-authored strings before they are written to events.jsonl — redact absolute home-directory paths (macOS /Users/<x>/ and Linux /home/<x>/) so a benign path quoted into a blocked reason no longer trips the pre-commit leak-scan and halts the gate, while preserving the audit signal.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 2.50
 ---
 

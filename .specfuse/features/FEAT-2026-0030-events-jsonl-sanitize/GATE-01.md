@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 ---
 
 # Gate 1 — events.jsonl writes are redacted of absolute home paths
