@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0025/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.60
 produces: .specfuse/skills/pick-feature/SKILL.md
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T18:39:15.406758+00:00
+duration_seconds: 103.631
+cost_usd: 0.317088
+input_tokens: 13588
+output_tokens: 2255
 ---
 
 <!--
