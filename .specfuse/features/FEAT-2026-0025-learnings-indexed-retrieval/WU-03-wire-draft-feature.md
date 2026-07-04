@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0025/T03
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 0.60
 produces: .specfuse/skills/draft-feature/SKILL.md
@@ -20,7 +20,7 @@ LEARNINGS entries relevant to the feature being drafted (via the gate-1
 `learnings_query` CLI), honoring the `load-whole` fallback, instead of reading the
 whole ~1700-line `.specfuse/LEARNINGS.md`.
 
-**Context.** This is `FEAT-2026-0025/T02` → gate 2. Gate 1 shipped
+**Context.** This is `FEAT-2026-0025/T03` → gate 2. Gate 1 shipped
 `.specfuse/scripts/learnings_query.py`, a stdlib CLI:
 `python3 .specfuse/scripts/learnings_query.py "<query>" [--top N] [--threshold K] [--file PATH]`.
 It prints either the top-N ranked `raw` bullets, or the single sentinel line
