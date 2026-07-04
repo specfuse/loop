@@ -2938,7 +2938,12 @@ def assert_terminal_flips_fired(
     if not parsed:
         return (
             False,
-            f"roadmap_row_not_done: row for {feature_id} not found",
+            f"roadmap_row_not_done: row for {feature_id} not found in "
+            f"{roadmap_path}. /draft-feature writes this row but leaves it "
+            f"uncommitted; if it was dropped before dispatch, restore it and "
+            f"re-commit. `specfuse-loop --prepare` folds the row into the "
+            f"scaffold commit — dispatch through it so the row survives the "
+            f"per-attempt reset.",
         )
     row_status = parsed["columns"].get("Status", "").strip()
     if row_status != "done":
