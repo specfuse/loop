@@ -66,5 +66,8 @@ bats tests/leak_scan_hook.bats
 echo "==> [gate: sync-scaffold-bats] bats"
 bats tests/sync_scaffold.bats
 
+echo "==> [gate: init-skills-bats] bats"
+bats tests/init_skills_idempotent.bats
+
 echo
 echo "smoke test: OK"
