@@ -1,15 +1,11 @@
 ---
 id: FEAT-2026-0029/T01
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 1.75
 produces: .specfuse/scripts/upgrade_merge_gate.py
 oracle_env: macos_local
-duration_seconds: 649.057
-cost_usd: 1.548111
-input_tokens: 36813
-output_tokens: 12264
 ---
 
 # Add the merge-safety gate helper for scaffold upgrades
