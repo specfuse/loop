@@ -5,7 +5,7 @@ slug: learnings-indexed-retrieval
 branch: feat/FEAT-2026-0025-learnings-indexed-retrieval
 roadmap_goal: Indexed retrieval over .specfuse/LEARNINGS.md so planning consumers load only the entries relevant to the feature being planned, instead of the whole (now ~1700-line) file — bounding planning-context cost as the repo scales.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 8.95
 ---
 

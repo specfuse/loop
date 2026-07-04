@@ -43,6 +43,41 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0025"></a>
+## FEAT-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
+
+**Why.** `.specfuse/LEARNINGS.md` is append-only and loaded **whole** into
+planning context by `/draft-feature`, `/pick-feature`, `plan-next`, and
+`/authoring-work-units`. After ~20 features it is already ~86 entries / ~24k
+tokens (~4 entries/feature, growing unbounded). The driver enforces appends
+(`assert_learnings_appended_or_noop`) but nothing prunes: there is no
+archival/compaction counterpart the way `roadmap.md` has `roadmap-archive.md` +
+`auto_archive_feature`, and `learnings-suggest` only ADDS candidates. Left
+unchecked this inflates every planning session's context cost and dilutes signal
+as superseded/duplicate rules accumulate. Surfaced reviewing FEAT-2026-0024
+(whose `LEARNINGS.template.md` split already separated portable methodology
+wisdom from this repo's feature-specific history).
+
+**Goal.** A curation/archival mechanism that bounds the planning-loaded LEARNINGS
+to the active, durable set: (1) a `LEARNINGS-archive.md` + a curation step that
+moves feature-specific or obsolete entries out of the planning-loaded file
+(mirroring `auto_archive_feature`); (2) promotion of broadly-applicable rules
+into the binding `.specfuse/rules/*.md` (curated, small, always-loaded), leaving
+LEARNINGS as a staging area; (3) a `/learnings-curate` skill — the
+read/compaction counterpart to `learnings-suggest` — that merges duplicates,
+retires superseded entries, and flags promotion candidates for the operator;
+(4) later, indexed retrieval so consumers load only the relevant slice instead
+of the whole file.
+
+**Benefits.** Planning-context cost stays bounded as the repo scales to hundreds
+of features. Higher signal — a curated durable set beats append-only sprawl when
+the planner (human or agent) is hunting the rule that applies. Durable rules
+graduate into binding contracts. Portable methodology wisdom stays cleanly
+separated from feature-specific history. Closes the missing half of the
+methodology's feedback loop: today it can only grow, never compact.
+
+**Status: planned.**
+
 <a id="feat-2026-0030"></a>
 ## FEAT-2026-0030 — Driver-side sanitization of agent-authored text before events.jsonl staging
 

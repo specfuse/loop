@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: passed
 ---
 
 # Gate 2 — wire the planning consumers (drafted by gate 1's plan-next)
