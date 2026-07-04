@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0029/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.75
 produces: .specfuse/skills/scaffold-upgrade/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T01:44:15.446955+00:00
+duration_seconds: 146.26
+cost_usd: 0.486704
+input_tokens: 17379
+output_tokens: 4523
 ---
 
 # Author the scaffold-upgrade skill (SKILL.md)
@@ -40,9 +49,10 @@ red→green proof lives in T01's helper and T03's deploy bats.)
    branch off `origin/main` (fresh remote base, not stale local main);
    (c) run `specfuse upgrade <target>`; (d) commit; (e) push `--no-verify`;
    (f) open a PR via `gh pr create`; (g) watch CI to green; (h) call
-   `.specfuse/scripts/upgrade_merge_gate.py`'s `decide(...)` with CI status + the
-   post-upgrade health report; (i) on `merge` → squash-merge; on `halt` → STOP and
-   point the operator at `/feature-conversion`, naming the FAIL features.
+   `.specfuse/scripts/upgrade_merge_gate.py` — `collect_reports(<target>)` to run
+   the per-feature scaffold-conformance lint, then `decide(ci_all_green, reports)`;
+   (i) on `merge` → squash-merge; on `halt` → STOP and point the operator at
+   `/feature-conversion`, naming the non-conformant features.
 4. A **Target** subsection documents the path-arg (defaults to cwd), mirroring
    `specfuse upgrade <target>`.
 5. A **Hard rules** section forbids: force-merging past branch protection, merging

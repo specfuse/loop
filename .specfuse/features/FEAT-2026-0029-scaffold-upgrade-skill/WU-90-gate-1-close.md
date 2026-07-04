@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0029/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.25
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.3.6
+started_at: 2026-07-04T03:54:03.110725+00:00
+verdict: met
+duration_seconds: 240.73
+cost_usd: 1.861816
+input_tokens: 13621
+output_tokens: 12295
 ---
 
 # Gate 1 close — terminal close ceremony

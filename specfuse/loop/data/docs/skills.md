@@ -110,6 +110,9 @@ either auto-closes a clean gate or halts at the gate boundary for review.
 - **`/feature-conversion`** — bring an existing feature folder into conformance
   with the current scaffold's structural contract. Runs after `specfuse upgrade`
   flags a feature as `FAIL`. Interactive, lint-driven.
+- **`/scaffold-upgrade`** — dry-run-reports or end-to-end upgrades a target
+  project's Specfuse scaffold via `specfuse upgrade [--dry-run] <target>`,
+  wrapping the git choreography (branch/commit/push/PR/CI/merge-gate) around it.
 - **`/learnings-suggest`** — scan `attempt_outcome` events across features,
   cluster non-passing attempts, and surface recurring patterns as candidate
   `LEARNINGS.md` entries. Read-only — you promote. The *additive* half.

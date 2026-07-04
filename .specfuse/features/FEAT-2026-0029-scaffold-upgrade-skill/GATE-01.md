@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: passed
 ---
 
 # Gate 1 — the scaffold-upgrade skill exists, deploys, and is merge-safe
