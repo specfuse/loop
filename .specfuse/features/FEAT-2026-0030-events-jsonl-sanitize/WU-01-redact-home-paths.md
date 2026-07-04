@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0030/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.75
 produces: tests/test_events_redaction.py
 produces_driver_helper: _redact_home_paths
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.6
+started_at: 2026-07-04T15:36:46.818307+00:00
+duration_seconds: 362.77
+cost_usd: 1.192855
+input_tokens: 13855
+output_tokens: 9853
 ---
 
 # Redact absolute home paths from event payloads at the flush chokepoint
