@@ -880,8 +880,19 @@ def prepare_feature(feat_fm: dict, feature_dir: "Path", feature_id: str) -> None
     """
     branch = feat_fm.get("branch")
     ensure_feature_branch(feat_fm, feature_dir)
-    git("add", "--", str(feature_dir))
-    staged = git("status", "--porcelain", "--", str(feature_dir))
+    # Stage the feature folder AND the roadmap surfaces draft-feature wrote but
+    # left uncommitted (#127). The roadmap row is part of the feature's initial
+    # state; if it isn't folded into this scaffold commit, the first WU's
+    # per-attempt `git reset --hard head_before` discards it and terminal close
+    # fails with roadmap_row_not_done ~20 minutes later. ensure_feature_branch
+    # has already vetted the dirty set down to the expected /pick-feature flips.
+    repo_root = Path(git("rev-parse", "--show-toplevel"))
+    add_paths = [str(feature_dir)]
+    for rel in (".specfuse/roadmap.md", ".specfuse/roadmap-archive.md"):
+        if (repo_root / rel).exists():
+            add_paths.append(str(repo_root / rel))
+    git("add", "--", *add_paths)
+    staged = git("status", "--porcelain", "--", *add_paths)
     if staged:
         git("commit", "-m", f"chore: scaffold feature {feature_id}")
         print(f"Prepared: committed feature folder on branch '{branch}'.")
