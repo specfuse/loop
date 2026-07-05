@@ -1,14 +1,14 @@
 ---
 name: roadmap-add
-description: "Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN ID by scanning three sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless)."
+description: "Append a new planned feature row + detail section to .specfuse/roadmap.md, auto-picking the next FEAT-YYYY-NNNN ID by scanning four sources (roadmap table, PLAN.md files, LEARNINGS/RETROSPECTIVE files, and GitHub issue/PR titles+bodies when reachable). Invoke on /roadmap-add (interactive) or /roadmap-add --id ... --title ... --slug ... --why ... --goal ... --benefits ... (headless)."
 ---
 
 # roadmap-add
 
 Appends one table row and one detail section for a new `planned` feature to
 `.specfuse/roadmap.md`. The next `FEAT-YYYY-NNNN` ID is computed automatically
-from three sources so that IDs reserved in comments or closed folders are not
-reused.
+from four sources so that IDs reserved in comments, closed folders, or GitHub
+issue/PR titles are not reused.
 
 ## When to invoke
 
@@ -67,7 +67,7 @@ Detail section body (five blocks, blank line between each):
 ## Next-ID algorithm
 
 The next ID for the current calendar year is one greater than the highest
-`NNNN` found across **three sources**:
+`NNNN` found across **four sources**:
 
 ### Source (a) — roadmap table rows
 
@@ -87,14 +87,52 @@ Read `.specfuse/LEARNINGS.md`. Read every file matching
 `FEAT-<YYYY>-<NNNN>` anywhere in those files, record the ID and its first
 occurrence (file path + line number).
 
+### Source (d) — GitHub issue and PR titles + bodies
+
+Teams also reserve FEAT IDs directly on GitHub — an issue or PR titled
+`FEAT-<YYYY>-<NNNN>: ...` that never gets a roadmap row. Those IDs are invisible
+to sources (a)–(c), so a purely local scan can hand out an ID already taken on
+GitHub (the collision this skill exists to prevent).
+
+When `gh` is available and authenticated, search the current repo's issues and
+PRs — both open and closed — for `FEAT-<YYYY>-` in the title or body, and record
+each ID with its issue/PR number as the source location:
+
+```
+gh search issues  --repo <owner/repo> "FEAT-<YYYY>-" --json number,title
+gh search prs      --repo <owner/repo> "FEAT-<YYYY>-" --json number,title
+```
+
+(Resolve `<owner/repo>` from `gh repo view --json nameWithOwner -q .nameWithOwner`,
+or `git remote get-url origin`.)
+
+**Degrade gracefully — never hard-fail on this source.** The skill runs offline.
+If `gh` is missing, unauthenticated, or the search errors/times out, print a
+one-line warning and continue with sources (a)–(c) only:
+
+```
+WARN: GitHub not reachable — next-ID scan skipped issue/PR-reserved IDs.
+      An ID reserved only on GitHub could still collide; verify before writing.
+```
+
+When GitHub IS reachable, an issue/PR-reserved ID blocks reuse exactly like a
+roadmap row (see the collision check below).
+
+Scope note: source (d) searches the current repo only. IDs reserved in a
+different repo (cross-repo reservations) are out of scope for the automatic scan.
+
 ### Computing the next ID
 
-1. Collect all `NNNN` ordinals for the current year from sources (a), (b), (c).
+1. Collect all `NNNN` ordinals for the current year from sources (a), (b), (c),
+   and (d) when GitHub was reachable.
 2. If none found: next ordinal is `0001`.
 3. Otherwise: next ordinal is `max(ordinals) + 1`.
 4. **Gap check:** verify the ordinals form a contiguous sequence from `0001` to
-   `max`. If any ordinal is missing (e.g. `0009` absent while `0010` exists),
-   stop immediately:
+   `max`. A GitHub-reserved ID (source d) counts as **present** — it fills its
+   own ordinal and raises `max`; it is never itself reported as the gap. But a
+   reserved ID beyond the local max still exposes the intervening ordinals as
+   genuinely unaccounted (e.g. roadmap reaches `0010`, issue reserves `0016` →
+   `0011`–`0015` are gaps). If any ordinal is missing, stop immediately:
    ```
    ERROR: FEAT-<YYYY> sequence has gap at <NNNN> — resolve before adding.
    Seen ordinals: 0001 0002 0003 0005 0006 ...
@@ -104,12 +142,13 @@ occurrence (file path + line number).
 
 ## Collision check
 
-Before writing, verify the proposed ID does not appear in any of the three
-sources. If it does:
+Before writing, verify the proposed ID does not appear in any of the four
+sources — including, when GitHub is reachable, an issue/PR title or body that
+reserves it. If it does:
 
 ```
 ERROR: <FEAT-YYYY-NNNN> already exists.
-  Source: <filepath>:<lineno>
+  Source: <filepath>:<lineno>   (or: GitHub issue/PR #<n>)
 ```
 
 Stop without writing.
@@ -181,7 +220,7 @@ The `slug` field is for the operator's reference when creating the feature folde
 
 ## Interactive mode
 
-1. **Compute the next ID** using the three-source scan. Present:
+1. **Compute the next ID** using the four-source scan. Present:
    ```
    Next available ID: FEAT-YYYY-NNNN
    (Highest seen: FEAT-YYYY-MMMM in <source>)
