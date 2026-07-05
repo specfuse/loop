@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/orchestrator/schemas/events/spec_validated.schema.json",
+  "title": "spec_validated event payload",
+  "$comment": "Provenance: authored 2026-04-25 in WU 4.4 (spec-validation skill). Fields: feature_correlation_id (required, FEAT-YYYY-NNNN), pass (required, boolean), spec_files_checked (required, array of paths), errors (required, array of structured error objects — empty on pass), validator_version (required, string). The spec_validated event type has existed in event.schema.json since the Phase 1 baseline; this per-type schema is additive, preserving the Phase 1 freeze contract.",
+  "description": "Payload shape for the `spec_validated` event emitted by the specs agent on every validation run (pass or fail). The event is append-only: re-validation after a fix produces a new `spec_validated` event; prior failures are preserved in the event log. Consumers use the most recent `spec_validated` event to determine current validation status. The `errors` array is empty on a clean pass and populated with structured error objects on failure — each object carries enough context (file, line, message, severity) for the spec-validation skill to produce actionable remediation guidance without the human needing to consult raw validator output.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "feature_correlation_id",
+    "pass",
+    "spec_files_checked",
+    "errors",
+    "validator_version"
+  ],
+  "properties": {
+    "feature_correlation_id": {
+      "type": "string",
+      "description": "The feature-level correlation ID of the feature whose specs were validated. Duplicated from the envelope `correlation_id` for payload self-containment — downstream consumers that index payloads without re-reading the envelope benefit from the redundancy.",
+      "pattern": "^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?$"
+    },
+    "pass": {
+      "type": "boolean",
+      "description": "True if all spec files passed validation with zero errors (warnings do not block); false if any file produced at least one error-severity finding."
+    },
+    "spec_files_checked": {
+      "type": "array",
+      "description": "Paths of every spec file the validator checked, relative to the product specs repo root (e.g. `product/specs/inventory-api-bookmarks.yaml`, `product/features/FEAT-2026-0042.md`). Order matches the order the validator processed them. At least one file must be checked — a validation run against zero files is a configuration error, not a pass.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "errors": {
+      "type": "array",
+      "description": "Structured error objects from the validator. Empty array when `pass` is true; at least one element when `pass` is false. Each object identifies the file, line, raw message, and severity of the finding. The spec-validation skill's interpretation table translates each raw message into actionable remediation guidance for the human.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "line",
+          "message",
+          "severity"
+        ],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Path of the spec file that produced this error, relative to the product specs repo root.",
+            "minLength": 1
+          },
+          "line": {
+            "type": "integer",
+            "description": "Line number in the spec file where the error was detected. 0 when the validator does not report line-level granularity for this error type (e.g. a missing top-level field, a cross-file reference error).",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string",
+            "description": "The validator's raw error message. Preserved verbatim for audit — the spec-validation skill interprets this into human-readable guidance but keeps the original for traceability.",
+            "minLength": 1
+          },
+          "severity": {
+            "type": "string",
+            "description": "Severity level reported by the validator. `error` blocks validation (causes `pass: false`); `warning` is advisory and does not block — the validation can still pass with warnings.",
+            "enum": ["error", "warning"]
+          }
+        }
+      }
+    },
+    "validator_version": {
+      "type": "string",
+      "description": "Version string of the Specfuse validator used for this run (e.g. `1.0.0`). Captured at invocation time via the validator's version-reporting mechanism, not cached across runs or eye-read from a config file.",
+      "minLength": 1
+    }
+  }
+}

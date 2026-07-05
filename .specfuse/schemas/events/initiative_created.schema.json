@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/orchestrator/schemas/events/initiative_created.schema.json",
+  "title": "initiative_created event payload",
+  "$comment": "Provenance: authored for the Model-B reframe (docs/naming-convention.md) as the initiative-level counterpart of feature_created. Emitted by the specs agent's initiative-intake skill (renamed from feature-intake) when a new INITIATIVE registry entry is created. Fields mirror feature_created with initiative_title in place of feature_title and an INIT-YYYY-NNNN correlation ID. feature_created is retained for legacy/feature-level use.",
+  "description": "Payload shape for the `initiative_created` event emitted by the specs agent during initiative intake. Captures the human-provided inputs (title, repos, autonomy) alongside the minted initiative correlation ID, duplicated from the envelope for payload self-containment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "initiative_title",
+    "involved_repos",
+    "autonomy_default",
+    "correlation_id"
+  ],
+  "properties": {
+    "initiative_title": {
+      "type": "string",
+      "description": "Human-provided title for the initiative. Free-form prose; used in the initiative registry's Description header. Not a machine identifier — the correlation ID is the stable reference.",
+      "minLength": 1
+    },
+    "involved_repos": {
+      "type": "array",
+      "description": "Component repositories this initiative spans, as `owner/repo` strings. Mirrors the `involved_repos` frontmatter field at creation time.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "autonomy_default": {
+      "type": "string",
+      "description": "Initiative-level autonomy default chosen by the human at intake. One of `auto`, `review`, or `supervised`.",
+      "enum": ["auto", "review", "supervised"]
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "The initiative-level correlation ID minted during intake (INIT-YYYY-NNNN). Matches the envelope `correlation_id` and the registry filename. Duplicated here for payload self-containment.",
+      "pattern": "^INIT-\\d{4}-\\d{4}$"
+    }
+  }
+}

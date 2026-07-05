@@ -304,7 +304,7 @@ def _parse_version(v: str) -> tuple[int, int, int]:
 
 
 # Seed relpaths overlaid verbatim into .specfuse/<relpath> on upgrade
-_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/", "docs/")
+_VERSIONED_OVERLAY_PREFIXES: tuple[str, ...] = ("templates/", "rules/", "docs/", "schemas/")
 _VERSIONED_OVERLAY_EXACT: frozenset[str] = frozenset({"verification.yml.example", "VERSION"})
 
 # Versioned directories whose contents are pruned on upgrade

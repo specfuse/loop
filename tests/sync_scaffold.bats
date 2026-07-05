@@ -15,6 +15,7 @@ setup() {
   mkdir -p \
     "$TESTDIR/.specfuse/templates" \
     "$TESTDIR/.specfuse/rules" \
+    "$TESTDIR/.specfuse/schemas/events" \
     "$TESTDIR/specfuse/loop/data"
   printf 'v0.1\n'        > "$TESTDIR/.specfuse/VERSION"
   printf '!.specfuse/\n' > "$TESTDIR/.specfuse/gitignore.snippet"
@@ -28,6 +29,11 @@ setup() {
   printf 'never\n'       > "$TESTDIR/.specfuse/rules/never-touch.md"
   printf 'result\n'      > "$TESTDIR/.specfuse/rules/result-contract.md"
   printf 'security\n'    > "$TESTDIR/.specfuse/rules/security-boundaries.md"
+  printf '{"event":1}\n' > "$TESTDIR/.specfuse/schemas/event.schema.json"
+  printf '{"e":1}\n'     > "$TESTDIR/.specfuse/schemas/events/initiative_created.schema.json"
+  printf '{"e":2}\n'     > "$TESTDIR/.specfuse/schemas/events/spec_validated.schema.json"
+  printf '{"e":3}\n'     > "$TESTDIR/.specfuse/schemas/events/spec_issue_resolved.schema.json"
+  printf '{"e":4}\n'     > "$TESTDIR/.specfuse/schemas/events/spec_issue_routed.schema.json"
 }
 
 teardown() {

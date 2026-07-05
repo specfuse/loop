@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/orchestrator/schemas/event.schema.json",
+  "title": "Event log entry",
+  "$comment": "Additive history (WU 2.14, F2.4): Phase 1 baseline enum — feature_created, spec_validated, task_graph_drafted, plan_ready, plan_generated, plan_approved, task_created, task_ready, task_started, task_completed, task_blocked, spec_issue_raised, override_applied, override_expired, human_escalation. Phase 2 additions: template_coverage_checked (WU 2.6), feature_state_changed (WU 2.9). Phase 3 additions: test_plan_authored (WU 3.2), qa_execution_completed + qa_execution_failed (WU 3.3), qa_regression_filed + qa_regression_resolved + escalation_resolved (WU 3.4; escalation_resolved is substrate — resolution_kind discriminator, first application retires the Phase 2 orphan inbox file FEAT-2026-0005-plan-review-cycle.md; closes carry-item F2.10), regression_suite_curated (WU 3.5; emitted by the qa-curation skill on curation-PR merge; envelope correlation_id task-level on the qa_curation task; affected_feature_correlation_ids in payload carries the cross-feature fanout). Phase 4 additions: spec_issue_resolved + spec_issue_routed (WU 4.5; emitted by the specs agent's spec-issue-triage skill — spec_issue_resolved when a spec-content fix is applied in /product/, spec_issue_routed when the issue is filed against the generator project). Per-type payload schemas for these types live under shared/schemas/events/. NOTE: plan_reingested was considered in WU 2.14 but deliberately not added — WU 2.11's template_coverage_checked re-chain on every Phase B success already makes Phase B observable in the event log. Reframe migration (docs/naming-convention.md, additive): correlation_id pattern widened from ^FEAT-\\d{4}-\\d{4}(/T\\d{2})?$ to ^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?(/T\\d{2})?$ to carry the initiative/feature/work-unit hierarchy (INIT-YYYY-NNNN[/FNN][/TNN]) alongside the legacy/component-local FEAT- forms; existing FEAT- entries validate unchanged. Per-type payload schemas under events/ broadened their FEAT-only correlation/path patterns the same way.",
+  "description": "A single JSONL entry in a feature's event log. Event log semantics are defined in orchestrator-architecture.md §7.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp",
+    "correlation_id",
+    "event_type",
+    "source",
+    "source_version",
+    "payload"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp with timezone offset (e.g. 2026-04-20T14:32:05Z or 2026-04-20T10:32:05-04:00).",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Correlation ID at any level of the unit hierarchy (docs/naming-convention.md): initiative INIT-YYYY-NNNN, dispatched feature INIT-YYYY-NNNN/FNN, work unit INIT-YYYY-NNNN/FNN/TNN; or the legacy/component-local feature FEAT-YYYY-NNNN and task FEAT-YYYY-NNNN/TNN. Existing FEAT- entries validate unchanged.",
+      "pattern": "^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?(/T\\d{2})?$"
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Minimum event type set from architecture §7.3. New types must be registered in this schema before use.",
+      "enum": [
+        "initiative_created",
+        "feature_created",
+        "spec_validated",
+        "feature_graph_drafted",
+        "task_graph_drafted",
+        "template_coverage_checked",
+        "plan_ready",
+        "plan_generated",
+        "plan_approved",
+        "task_created",
+        "task_ready",
+        "task_started",
+        "task_completed",
+        "task_blocked",
+        "spec_issue_raised",
+        "override_applied",
+        "override_expired",
+        "human_escalation",
+        "feature_state_changed",
+        "test_plan_authored",
+        "qa_execution_completed",
+        "qa_execution_failed",
+        "qa_regression_filed",
+        "qa_regression_resolved",
+        "escalation_resolved",
+        "regression_suite_curated",
+        "spec_issue_resolved",
+        "spec_issue_routed"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "description": "Emitter of the event: a fixed role (`specs`, `pm`, `qa`, `config-steward`, `merge-watcher`), a component agent scoped by repo (`component:<name>`), or `human`. For `component:<name>`, `<name>` is the bare component repository name with no owner prefix — the short form of the git remote (e.g. `component:api-sample`, not `component:acme/api-sample`). This matches the `source: component:<repo>` convention used across roles; the PM and QA agents emit events with `source: pm` and `source: qa` respectively (no repo suffix, since those roles are not scoped by component repo).",
+      "pattern": "^(human|specs|pm|qa|config-steward|merge-watcher|component:[a-z0-9][a-z0-9-]*)$"
+    },
+    "source_version": {
+      "type": "string",
+      "description": "Agent configuration version in effect when the event was emitted. Format is semver-like but not enforced here; `human` events use the orchestration repo commit SHA or `n/a`.",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific structured content. Per-type payload schemas will be added under /shared/schemas/events/ as they stabilize."
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/orchestrator/schemas/events/spec_issue_routed.schema.json",
+  "title": "spec_issue_routed event payload",
+  "$comment": "Provenance: authored 2026-04-25 in WU 4.5 (spec-issue-triage skill). Fields: original_issue_correlation_id (required, task-level FEAT-YYYY-NNNN/TNN — the correlation ID from the triggering task that filed the spec issue), target_project (required, owner/repo of the generator project the issue was filed against), filed_issue_reference (required, GitHub issue reference in owner/repo#N format). Emitted by the specs agent after determining a spec issue is a generator-template problem and filing a GitHub issue against the generator project. The event type is new in Phase 4; per-type schema is authored alongside.",
+  "description": "Payload shape for the `spec_issue_routed` event emitted by the specs agent's spec-issue-triage skill when a spec issue filed by a downstream agent (component, QA) is determined to be a generator-template problem rather than a spec-content problem. The specs agent files a GitHub issue against the generator project and emits this event. The original inbox file is archived to `/inbox/spec-issue/processed/`, never deleted. The generator feedback loop (Phase 5) will consume these issues; Phase 4 only files them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "original_issue_correlation_id",
+    "target_project",
+    "filed_issue_reference"
+  ],
+  "properties": {
+    "original_issue_correlation_id": {
+      "type": "string",
+      "description": "The task-level correlation ID from the triggering task that filed the spec issue (e.g. `FEAT-2026-0042/T09`). Links the routing event back to the original `spec_issue_raised` event and the downstream task that discovered the problem.",
+      "pattern": "^((FEAT-\\d{4}-\\d{4})|(INIT-\\d{4}-\\d{4}/F\\d{2}))/T\\d{2}$"
+    },
+    "target_project": {
+      "type": "string",
+      "description": "The GitHub `owner/repo` identifier of the generator project the issue was filed against (e.g. `acme/specfuse-generator`). Identifies which project owns the template that needs fixing.",
+      "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$"
+    },
+    "filed_issue_reference": {
+      "type": "string",
+      "description": "The GitHub issue reference for the filed generator issue, in `owner/repo#N` format (e.g. `acme/specfuse-generator#42`). This is the durable reference that the generator feedback loop (Phase 5) will track.",
+      "pattern": "^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+#\\d+$"
+    }
+  }
+}

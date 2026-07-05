@@ -8,9 +8,10 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 Three categories of path are off-limits to every work-unit session, regardless of
 unit type. If a unit's acceptance criteria or verification commands appear to
 require modifying something in this list, that is an escalation condition, not a
-license to proceed — emit `status: blocked` per
-[`result-contract.md`](result-contract.md) with a `blocked_reason` naming the
-boundary.
+license to proceed — signal blocked per
+[`verification-discipline.md`](verification-discipline.md), naming the
+boundary. (How "blocked" is signalled is surface-specific — a `status: blocked`
+RESULT on the loop, a `blocked_*` transition on the orchestrator.)
 
 ## 1. Generated code directories
 
@@ -29,7 +30,7 @@ leaves no trace of why.
 
 When a generated file is wrong, the response is to change the spec or the generator
 that produced it, not the file itself. If that is outside this unit's boundary,
-emit `status: blocked` with the spec/generator change named.
+signal blocked with the spec/generator change named.
 
 ## 2. Secrets and credentials
 
@@ -53,9 +54,10 @@ You must not:
 
 ## 3. `.git/` internals
 
-The `.git/` directory is the repository's internal state. The driver owns all git
-operations for work units (see [`result-contract.md`](result-contract.md) rule 1);
-you do not run `git` at all. Beyond that, never write under `.git/` directly:
+The `.git/` directory is the repository's internal state. On the loop surface the
+driver owns all git operations for work units and the session does not run `git`
+at all; on the orchestrator surface an agent may use `git`/`gh` within its unit's
+scope. Either way, never write under `.git/` directly:
 
 - No edits to `.git/hooks/*` to bypass checks. If a hook is failing, the right
   response is to diagnose the underlying issue.
@@ -77,5 +79,5 @@ response to a failing gate is to fix what it is flagging, not to silence it.
 Before writing to any path, confirm it is not in one of the three categories above.
 If you are uncertain whether a path is "generated" or "hand-written," the repo's
 declaration is authoritative; if the declaration is missing or ambiguous, treat
-the path as generated and emit `status: blocked` rather than write. Silence at a
+the path as generated and signal blocked rather than write. Silence at a
 boundary is not permission.

@@ -3,19 +3,20 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""Validate component-repo event log entries against the orchestrator's event schema.
+"""Validate event log entries against the loop's vendored event schema.
 
-This is the component-repo copy of the orchestrator's scripts/validate-event.py.
-Per binding rules (rules/never-touch.md), schema files are NOT duplicated into
-component repos. Instead, this script resolves the schema root from the
-orchestrator at runtime.
+The event schema is the shared Specfuse methodology substrate, consolidated in
+the core at specfuse/methodology/schemas/ and vendored into this package under
+specfuse/loop/data/schemas/ (see scripts/sync-scaffold.sh). This script reads
+that vendored copy — there is no cross-repo path dependency.
 
 Schema-root resolution (first match wins):
-    1. SPECFUSE_SCHEMA_ROOT — absolute path to orchestrator/shared/schemas/
-    2. Relative sibling-repo fallback: this file at .specfuse/scripts/ →
-       <repo>/.specfuse/ → <repo> → <parent> → <parent>/orchestrator/shared/schemas/.
-       Works when the orchestrator and component repos sit as siblings under
-       the same parent directory (the standard local-dev layout).
+    1. SPECFUSE_SCHEMA_ROOT — absolute path to a schemas/ directory (an
+       override/escape hatch; also used by the test suite to point at a
+       self-contained temporary schema root).
+    2. The package's own vendored copy: specfuse/loop/data/schemas/, located via
+       importlib.resources — the same mechanism scaffold.py uses for packaged
+       data.
 
 Supported invocation patterns (only two):
 
@@ -40,6 +41,7 @@ escalation component-agent skills.
 from __future__ import annotations
 
 import argparse
+import importlib.resources
 import json
 import os
 import sys
@@ -55,29 +57,26 @@ except ImportError:
     sys.exit(2)
 
 
-def _resolve_schema_root() -> Path:
-    """Return the orchestrator shared/schemas/ directory.
+def _resolve_schema_root():
+    """Return the schemas/ directory to validate against.
 
     Order:
-        1. $SPECFUSE_SCHEMA_ROOT (absolute path)
-        2. Sibling-repo fallback relative to this file's location:
-           .specfuse/scripts/validate-event.py
-             .parent  = .specfuse/scripts
-             .parent  = .specfuse
-             .parent  = <component-repo>
-             .parent  = <workspace parent>
-           Then / "orchestrator" / "shared" / "schemas".
+        1. $SPECFUSE_SCHEMA_ROOT (absolute path) — override / escape hatch, also
+           used by the test suite to point at a self-contained temporary root.
+        2. The package's own vendored copy: specfuse/loop/data/schemas/, located
+           via importlib.resources (the same mechanism scaffold.py uses). This is
+           a byte-for-byte copy of the methodology core's schemas — no cross-repo
+           path dependency.
+
+    The env branch returns a filesystem Path; the default branch returns an
+    importlib.resources Traversable. Both support the .is_file()/.open()/`/`/
+    .name operations the rest of this module uses.
     """
     env = os.environ.get("SPECFUSE_SCHEMA_ROOT")
     if env:
         return Path(env).expanduser().resolve()
 
-    return (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "orchestrator"
-        / "shared"
-        / "schemas"
-    )
+    return importlib.resources.files("specfuse.loop").joinpath("data", "schemas")
 
 
 SCHEMA_ROOT = _resolve_schema_root()
@@ -89,9 +88,8 @@ def load_validator() -> Draft202012Validator:
     if not SCHEMA_PATH.is_file():
         sys.stderr.write(
             f"error: schema not found at {SCHEMA_PATH}\n"
-            "       set SPECFUSE_SCHEMA_ROOT to the absolute path of\n"
-            "       orchestrator/shared/schemas/ (or place the orchestrator\n"
-            "       repo as a sibling of this component repo).\n"
+            "       the vendored schema ships under specfuse/loop/data/schemas/;\n"
+            "       set SPECFUSE_SCHEMA_ROOT to override the schemas/ directory.\n"
         )
         sys.exit(2)
     with SCHEMA_PATH.open("r", encoding="utf-8") as f:
@@ -213,7 +211,7 @@ _UNSUPPORTED_HINT = (
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Validate events against the orchestrator's event schema.",
+        description="Validate events against the loop's vendored event schema.",
         epilog=_UNSUPPORTED_HINT,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )

@@ -18,6 +18,12 @@ wastes an attempt and teaches the next session nothing.
 
 ## The four-step discipline
 
+This contract is the loop-surface expression of the Specfuse methodology's neutral
+`verification-discipline.md` rule (held in the methodology core): it extends that
+rule's **state intent → act → verify → report** cycle with the loop's concrete
+RESULT-block shape and status vocabulary. The neutral rule is normative on *what*
+the discipline requires; this file is normative on *how* the loop surface reports it.
+
 Every session operates on the same cycle: **state intent, act, verify, report.** The
 RESULT block is step 4, but it is only trustworthy when steps 1–3 ran first.
 

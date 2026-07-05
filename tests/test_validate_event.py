@@ -36,8 +36,10 @@ FEAT_0008_EVENTS = (
 )
 
 # ── Bundled schemas ────────────────────────────────────────────────────────────
-# Mirrors orchestrator/shared/schemas/event.schema.json; source pattern and
-# event_type enum are intentionally identical to pin the documented contract.
+# Mirrors the vendored event schema (specfuse/loop/data/schemas/event.schema.json,
+# itself a byte-for-byte copy of the methodology core); the source pattern is
+# intentionally identical to pin the documented contract — "driver" is absent, so
+# loop-emitted driver events are rejected (see test_driver_event_from_feat_0008).
 
 _ENVELOPE_SCHEMA: dict = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -626,14 +628,17 @@ class TestIterLines(unittest.TestCase):
 
 
 class TestResolveSchemaRoot(unittest.TestCase):
-    """_resolve_schema_root covers the env var branch and the sibling fallback."""
+    """_resolve_schema_root covers the env-var branch and the packaged default."""
 
     def test_env_var_path_used_when_set(self) -> None:
         with mock.patch.dict(os.environ, {"SPECFUSE_SCHEMA_ROOT": "/some/path"}):
             result = ve._resolve_schema_root()
         self.assertEqual(result, Path("/some/path").resolve())
 
-    def test_sibling_fallback_used_when_env_absent(self) -> None:
+    def test_packaged_default_used_when_env_absent(self) -> None:
+        """With no env override, the default resolves to the package's own
+        vendored schemas/ dir (specfuse/loop/data/schemas), located via
+        importlib.resources — no cross-repo path dependency."""
         env_without = {
             k: v
             for k, v in os.environ.items()
@@ -641,13 +646,10 @@ class TestResolveSchemaRoot(unittest.TestCase):
         }
         with mock.patch.dict(os.environ, env_without, clear=True):
             result = ve._resolve_schema_root()
-        expected = (
-            Path(SCRIPT).resolve().parent.parent.parent.parent
-            / "orchestrator"
-            / "shared"
-            / "schemas"
-        )
-        self.assertEqual(result, expected)
+        # The result is an importlib.resources Traversable pointing at the
+        # packaged data/schemas dir; it must expose a real event.schema.json.
+        self.assertEqual(result.name, "schemas")
+        self.assertTrue(result.joinpath("event.schema.json").is_file())
 
 
 class TestValidateEventSubprocess(unittest.TestCase):

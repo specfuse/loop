@@ -35,7 +35,7 @@ class TestManifestWrittenOnInit(unittest.TestCase):
     def test_manifest_covers_versioned_relpaths(self):
         data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
         # All entries must be under versioned prefixes or exact versioned names
-        versioned_prefixes = ("templates/", "rules/", "docs/")
+        versioned_prefixes = ("templates/", "rules/", "docs/", "schemas/")
         versioned_exact = {"VERSION", "verification.yml.example"}
         for rel in data:
             ok = any(rel.startswith(p) for p in versioned_prefixes) or rel in versioned_exact

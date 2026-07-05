@@ -27,6 +27,11 @@ TRACKED = {
     "rules/never-touch.md",
     "rules/result-contract.md",
     "rules/security-boundaries.md",
+    "schemas/event.schema.json",
+    "schemas/events/initiative_created.schema.json",
+    "schemas/events/spec_validated.schema.json",
+    "schemas/events/spec_issue_resolved.schema.json",
+    "schemas/events/spec_issue_routed.schema.json",
 }
 
 # Docs manifest — canonical source is repo docs/, not .specfuse/.
