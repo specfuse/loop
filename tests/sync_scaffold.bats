@@ -16,7 +16,12 @@ setup() {
     "$TESTDIR/.specfuse/templates" \
     "$TESTDIR/.specfuse/rules" \
     "$TESTDIR/.specfuse/schemas/events" \
+    "$TESTDIR/.specfuse/skills/demo" \
+    "$TESTDIR/plugins/specfuse/skills/demo" \
     "$TESTDIR/specfuse/loop/data"
+  # canonical plugin skill + its vendored copy (kept in sync by the script)
+  printf 'demo skill\n' > "$TESTDIR/plugins/specfuse/skills/demo/SKILL.md"
+  printf 'demo skill\n' > "$TESTDIR/.specfuse/skills/demo/SKILL.md"
   printf 'v0.1\n'        > "$TESTDIR/.specfuse/VERSION"
   printf '!.specfuse/\n' > "$TESTDIR/.specfuse/gitignore.snippet"
   printf 'roadmap\n'     > "$TESTDIR/.specfuse/roadmap.template.md"
