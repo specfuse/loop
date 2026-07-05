@@ -5,7 +5,8 @@
 """Reference implementation and tests for the roadmap-add skill algorithm.
 
 The skill appends a new planned feature's table row and detail section to
-roadmap.md, auto-picking the next FEAT-YYYY-NNNN by scanning three sources.
+roadmap.md, auto-picking the next FEAT-YYYY-NNNN by scanning four sources
+(the fourth — GitHub issue/PR-reserved IDs — added for specfuse#16).
 
 Exercises:
   (a) headless mode appends a row and detail section in the right places
@@ -33,19 +34,29 @@ FEAT_ROW_RE = re.compile(r"^\| (FEAT-\d{4}-\d{4})")
 PLAN_FEAT_RE = re.compile(r"^feature_id:\s*(FEAT-\d{4}-\d{4})")
 
 
-def scan_feat_ids(roadmap_path: Path, features_dir: Path, extra_paths: list[Path]) -> dict:
-    """Scan FEAT-YYYY-NNNN IDs from three sources.
+def scan_feat_ids(
+    roadmap_path: Path,
+    features_dir: Path,
+    extra_paths: list[Path],
+    github_reserved: dict[str, str] | None = None,
+) -> dict:
+    """Scan FEAT-YYYY-NNNN IDs from four sources.
 
     Source (a): table rows in roadmap_path (lines matching ``^| FEAT-``).
     Source (b): ``feature_id:`` lines in features_dir/*/PLAN.md.
     Source (c): any occurrence in extra_paths (LEARNINGS.md, RETROSPECTIVE.md).
+    Source (d): GitHub issue/PR titles+bodies — modelled here as an injected
+        ``github_reserved`` map ``{feat_id: "GitHub issue/PR #<n>"}`` so the
+        fold-into-max + collision logic is exercised hermetically (no network).
+        ``None`` models GitHub being unreachable: the skill degrades gracefully
+        and simply omits source (d).
 
-    Returns dict mapping feat_id (str) -> (filepath_str, line_no) for the
+    Returns dict mapping feat_id (str) -> (location_str, line_no) for the
     first occurrence of each ID seen.
     """
     sources: dict[str, tuple[str, int]] = {}
 
-    def record(feat_id: str, filepath: Path, lineno: int) -> None:
+    def record(feat_id: str, filepath, lineno: int) -> None:
         if feat_id not in sources:
             sources[feat_id] = (str(filepath), lineno)
 
@@ -70,6 +81,13 @@ def scan_feat_ids(roadmap_path: Path, features_dir: Path, extra_paths: list[Path
             for lineno, line in enumerate(path.read_text().splitlines(), 1):
                 for m in FEAT_RE.finditer(line):
                     record(m.group(0), path, lineno)
+
+    # (d) GitHub issue/PR-reserved IDs (None = GitHub unreachable, skip source).
+    if github_reserved:
+        for feat_id, ref in github_reserved.items():
+            # location is the issue/PR ref; lineno 0 (not a file line)
+            if feat_id not in sources:
+                sources[feat_id] = (ref, 0)
 
     return sources
 
@@ -449,6 +467,40 @@ class TestNextFeatId(unittest.TestCase):
         self.assertIn("gap", str(ctx.exception).lower())
         self.assertIn("0002", str(ctx.exception))
 
+    # ── Source (d): GitHub issue/PR-reserved IDs (specfuse#16) ──────────────
+
+    def test_github_reserved_id_raises_max(self):
+        """A FEAT ID reserved only on a GitHub issue (no roadmap row) must be
+        folded into the max so the next ID does not collide with it."""
+        # roadmap/plan/learnings top out at 0010; GitHub reserves 0011.
+        gh = {"FEAT-2026-0011": "GitHub issue #345"}
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
+        )
+        feat_id, ordinal = next_feat_id(2026, sources)
+        self.assertEqual(feat_id, "FEAT-2026-0012")
+        self.assertEqual(ordinal, 12)
+
+    def test_github_unreachable_degrades_gracefully(self):
+        """github_reserved=None models GitHub being unreachable: the scan omits
+        source (d) and proceeds on the three local sources — no hard failure."""
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=None
+        )
+        feat_id, _ = next_feat_id(2026, sources)
+        self.assertEqual(feat_id, "FEAT-2026-0011")  # local-only max=0010
+
+    def test_github_reserved_beyond_local_max_surfaces_gap(self):
+        """A reserved ID beyond the local max exposes the intervening ordinals
+        as genuine gaps (roadmap→0010, issue reserves 0016 → 0011–0015 gap)."""
+        gh = {"FEAT-2026-0016": "GitHub issue #345"}
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
+        )
+        with self.assertRaises(ValueError) as ctx:
+            next_feat_id(2026, sources)
+        self.assertIn("gap", str(ctx.exception).lower())
+
 
 class TestCollisionRejection(unittest.TestCase):
     """(c) ID collision is rejected with a message naming the conflicting source."""
@@ -529,6 +581,42 @@ class TestCollisionRejection(unittest.TestCase):
         snapshot = self.roadmap.read_text()
         # Caller would not invoke add_feature on collision; verify snapshot unchanged
         self.assertEqual(self.roadmap.read_text(), snapshot)
+
+    def test_collision_detected_for_github_reserved_id(self):
+        """specfuse#16: an ID reserved only on a GitHub issue/PR (no local
+        source) must be caught by the collision check and name the GitHub ref."""
+        gh = {"FEAT-2026-0016": "GitHub issue #345"}
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
+        )
+        collides, filepath, lineno = check_collision("FEAT-2026-0016", sources)
+        self.assertTrue(collides, "GitHub-reserved ID must collide")
+        self.assertIn("GitHub", filepath)
+
+
+class TestSkillDocumentsGitHubSource(unittest.TestCase):
+    """The skill prose must document source (d) + graceful offline degradation
+    (specfuse#16). Guards against the four-source scan silently regressing to
+    three in the authored SKILL.md."""
+
+    def setUp(self):
+        repo_root = Path(__file__).resolve().parent.parent
+        self.skill = (
+            repo_root / "plugins" / "specfuse" / "skills"
+            / "roadmap-add" / "SKILL.md"
+        ).read_text()
+
+    def test_declares_four_sources(self):
+        self.assertIn("four sources", self.skill)
+
+    def test_documents_github_source(self):
+        self.assertIn("Source (d)", self.skill)
+        self.assertIn("gh search issues", self.skill)
+
+    def test_documents_graceful_degradation(self):
+        # A WARN path so offline runs continue rather than hard-failing.
+        self.assertIn("WARN", self.skill)
+        self.assertIn("offline", self.skill.lower())
 
 
 if __name__ == "__main__":

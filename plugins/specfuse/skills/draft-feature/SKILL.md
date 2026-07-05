@@ -66,7 +66,11 @@ Before any proposal, read what shapes good plans in *this* project:
 
 - **`.specfuse/roadmap.md`** — what's done, what's active, what's
   planned. The new feature's correlation ID is the next sequential
-  `FEAT-YYYY-NNNN` for the current year. The roadmap also reveals
+  `FEAT-YYYY-NNNN` for the current year — computed with the **four-source
+  next-ID scan** from the `roadmap-add` skill (roadmap table, `PLAN.md`
+  files, `LEARNINGS`/`RETROSPECTIVE`, **and GitHub issue/PR titles+bodies
+  when reachable**), so an ID reserved only on a GitHub issue is not reused.
+  Do not derive the ID from the roadmap table alone. The roadmap also reveals
   ordering constraints: a planned feature that this initiative
   conflicts with, supersedes, or unblocks.
 - **LEARNINGS slice, not the whole file.** `PLAN.md` doesn't exist yet at
