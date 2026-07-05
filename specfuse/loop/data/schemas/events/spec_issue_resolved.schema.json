@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/orchestrator/schemas/events/spec_issue_resolved.schema.json",
+  "title": "spec_issue_resolved event payload",
+  "$comment": "Provenance: authored 2026-04-25 in WU 4.5 (spec-issue-triage skill). Fields: original_issue_correlation_id (required, task-level FEAT-YYYY-NNNN/TNN — the correlation ID from the triggering task that filed the spec issue), affected_files (required, array of paths edited in /product/ to resolve the issue), resolution_summary (required, string describing what was fixed and why). Emitted by the specs agent after fixing a spec-content problem in /product/ and re-validating the affected spec. The event type is new in Phase 4; per-type schema is authored alongside.",
+  "description": "Payload shape for the `spec_issue_resolved` event emitted by the specs agent's spec-issue-triage skill when a spec issue filed by a downstream agent (component, QA) is resolved by editing spec content under `/product/`. The resolution is a spec-side fix — the specs agent edits the affected spec file, re-validates, and emits this event. The original inbox file is archived to `/inbox/spec-issue/processed/`, never deleted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "original_issue_correlation_id",
+    "affected_files",
+    "resolution_summary"
+  ],
+  "properties": {
+    "original_issue_correlation_id": {
+      "type": "string",
+      "description": "The task-level correlation ID from the triggering task that filed the spec issue (e.g. `FEAT-2026-0042/T09`). Links the resolution event back to the original `spec_issue_raised` event and the downstream task that discovered the problem. This is the task-level ID, not the feature-level ID, because spec issues are raised in the context of a specific task's work.",
+      "pattern": "^((FEAT-\\d{4}-\\d{4})|(INIT-\\d{4}-\\d{4}/F\\d{2}))/T\\d{2}$"
+    },
+    "affected_files": {
+      "type": "array",
+      "description": "Paths of spec files edited under `/product/` to resolve the issue, relative to the product specs repo root (e.g. `product/specs/inventory-api-bookmarks.yaml`). At least one file must be affected — a resolution that touches no files is not a resolution.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "resolution_summary": {
+      "type": "string",
+      "description": "Human-readable summary of what was fixed and why. States the concrete change (e.g. 'Changed response status from 201 to 200 for the idempotent repeat case on POST /bookmarks') — enough for downstream agents and the human to understand the fix without re-reading the diff.",
+      "minLength": 1
+    }
+  }
+}

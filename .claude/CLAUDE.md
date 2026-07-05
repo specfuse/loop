@@ -9,3 +9,4 @@ discovery picks them up.
 @.specfuse/rules/correlation-ids.md
 @.specfuse/rules/never-touch.md
 @.specfuse/rules/security-boundaries.md
+@.specfuse/rules/verification-discipline.md

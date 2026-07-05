@@ -25,8 +25,7 @@ anything conventionally treated as a credential (see the enumeration in
   This applies whether the value came from a real secret or was constructed.
 - **Never commit.** Secrets files are excluded from commits categorically. A
   `.env` in your working directory is a mistake; remove it before the driver
-  commits, not after. If you discover a secret already committed, emit
-  `status: blocked` immediately — do not attempt history rewriting.
+  commits, not after. If you discover a secret already committed, signal blocked immediately — do not attempt history rewriting.
 - **Reference by name, not by value.** When a command needs a secret, pass it via
   an environment variable reference (`$GITHUB_TOKEN`) rather than substituting
   the value into the command line. Do not expand secret variables into log output;
@@ -51,15 +50,15 @@ is almost always a unit-definition problem, not a license to break the rule.
 2. **Re-read the unit.** Verify you have understood the step correctly. Often the
    unit describes how the *human* will verify, with the session doing an
    upstream-only step.
-3. **If the requirement is genuine, escalate via the RESULT block.** Emit
-   `status: blocked` with a precise `blocked_reason` naming the privilege
-   required (e.g., "verification command requires reading
-   `config/db-prod.env`"). The driver halts the gate and the human decides
-   whether to adjust the unit, run the step out-of-band, or provide a scoped
-   credential.
+3. **If the requirement is genuine, signal blocked.** Name the privilege
+   required (e.g., "verification command requires reading `config/db-prod.env`")
+   as the blocked reason. Work halts and the human decides whether to adjust the
+   unit, run the step out-of-band, or provide a scoped credential. (The signal is
+   surface-specific — a `status: blocked` RESULT on the loop, a `blocked_*`
+   transition on the orchestrator.)
 4. **Do not report the unit complete.** A verification that could not be run is
    not a verification; a unit whose verification cannot be run is not done (see
-   [`result-contract.md`](result-contract.md)).
+   [`verification-discipline.md`](verification-discipline.md)).
 
 The common mistake here is to "helpfully" substitute a weaker check for a
 privileged one — "I couldn't run the secret-requiring command, so I inspected the
@@ -76,7 +75,7 @@ yours, and you are not expected to inspect or transmit them. The prohibition is 
 unit's scope* — not on using a credentialed tool to do the work the unit names.
 
 If an authenticated tool returns an error that implies a credential problem
-(expired token, permission denied, 401/403), stop and emit `status: blocked`. Do
+(expired token, permission denied, 401/403), stop and signal blocked. Do
 not attempt to re-authenticate, reconfigure the credential, or swap accounts.
 
 ## Log hygiene

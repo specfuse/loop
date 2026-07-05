@@ -10,9 +10,9 @@ feature folder, the WU file, the event log, the branch, and the commit history.
 This rule defines the format, the surfaces the ID must appear on, how the next ID
 is chosen, and what to do when you see — or are about to produce — a malformed one.
 
-[`docs/methodology.md`](../../docs/methodology.md) §1 is normative on the
-correlation-ID scheme; this file is the operational reference every session reads
-before emitting an ID.
+`methodology.md` §1 (the gate-cycle canonical, in this shared substrate set) is
+normative on the correlation-ID scheme; this file is the operational reference
+every session reads before emitting an ID.
 
 ## Format
 
@@ -192,6 +192,6 @@ any downstream tooling filter and join on these IDs; a typo breaks the thread.
   feature crosses a calendar boundary.
 
 When you detect a malformed ID in your own work in progress, fix it before reporting.
-When you detect one in an artifact that is already committed, emit
-`status: blocked` rather than silently rewriting history — the
-[result-contract](result-contract.md) discipline applies here too.
+When you detect one in an artifact that is already committed, signal blocked
+rather than silently rewriting history — the
+[verification-discipline](verification-discipline.md) applies here too.

@@ -3,21 +3,36 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# sync-scaffold.sh — copy canonical .specfuse/ sources into specfuse/loop/data/.
+# sync-scaffold.sh — vendor shared substrate from core, then copy canonical
+# .specfuse/ sources into specfuse/loop/data/.
 #
-# The packaged scaffold data (specfuse/loop/data/) is a byte-for-byte copy of the
-# canonical sources in .specfuse/. Run this after editing any canonical source,
-# then commit and run the drift-guard test (tests/test_scaffold_data_in_sync.py).
+# Two stages:
+#   1. Vendor-from-core (skipped when core is absent): the shared Specfuse
+#      methodology substrate — the neutral rules and the event schema — has a
+#      single source of truth in the methodology core (specfuse/methodology/).
+#      This stage copies those files from core INTO the canonical .specfuse/, so
+#      core is the vendoring source. It runs only in a dev checkout where core is
+#      a sibling; CI (no core) skips it and just verifies drift between the
+#      already-committed .specfuse/ and data/.
+#      Vendored from core: correlation-ids, never-touch, security-boundaries,
+#      verification-discipline, and the event schema. NOT vendored:
+#      result-contract.md (loop-surface-specific, stays loop-local) and
+#      role-switch-hygiene.md (orchestrator multi-role concept; N/A to the loop's
+#      fresh-session-per-WU model).
+#   2. Package-sync: specfuse/loop/data/ is a byte-for-byte copy of the canonical
+#      .specfuse/ sources. Run this after editing any canonical source, then
+#      commit and run the drift-guard test (tests/test_scaffold_data_in_sync.py).
 #
 # Usage: scripts/sync-scaffold.sh
 #
-# REPO_ROOT may be overridden by the environment (used by tests).
+# REPO_ROOT and SPECFUSE_CORE may be overridden by the environment (used by tests).
 
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 SRC="$REPO_ROOT/.specfuse"
 DEST="$REPO_ROOT/specfuse/loop/data"
+CORE="${SPECFUSE_CORE:-$REPO_ROOT/../specfuse/methodology}"
 
 if [[ ! -d "$SRC" ]]; then
   echo "error: canonical source dir not found: $SRC" >&2
@@ -27,6 +42,47 @@ if [[ ! -d "$DEST" ]]; then
   echo "error: package data dir not found: $DEST" >&2
   exit 1
 fi
+
+# Files vendored FROM core (relative both under $CORE and under $SRC).
+CORE_FILES=(
+  rules/correlation-ids.md
+  rules/never-touch.md
+  rules/security-boundaries.md
+  rules/verification-discipline.md
+  schemas/event.schema.json
+  schemas/events/initiative_created.schema.json
+  schemas/events/spec_validated.schema.json
+  schemas/events/spec_issue_resolved.schema.json
+  schemas/events/spec_issue_routed.schema.json
+)
+
+vendored=0
+echo "Vendoring shared substrate from core:"
+if [[ -d "$CORE" ]]; then
+  echo "  from: $CORE"
+  echo "  to:   $SRC"
+  for rel in "${CORE_FILES[@]}"; do
+    core_path="$CORE/$rel"
+    dest_path="$SRC/$rel"
+    if [[ ! -f "$core_path" ]]; then
+      echo "error: core source missing: $core_path" >&2
+      exit 1
+    fi
+    mkdir -p "$(dirname "$dest_path")"
+    if cmp -s "$core_path" "$dest_path" 2>/dev/null; then
+      echo "  unchanged: $rel"
+    else
+      cp "$core_path" "$dest_path"
+      echo "  vendored:  $rel"
+      vendored=$((vendored + 1))
+    fi
+  done
+  echo "  $vendored file(s) updated from core."
+else
+  echo "  core not found at $CORE — skipping (dev-only stage)."
+  echo "  set SPECFUSE_CORE to re-vendor; CI verifies committed .specfuse/↔data/ drift."
+fi
+echo
 
 synced=0
 
@@ -63,6 +119,12 @@ FILES=(
   rules/never-touch.md
   rules/result-contract.md
   rules/security-boundaries.md
+  rules/verification-discipline.md
+  schemas/event.schema.json
+  schemas/events/initiative_created.schema.json
+  schemas/events/spec_validated.schema.json
+  schemas/events/spec_issue_resolved.schema.json
+  schemas/events/spec_issue_routed.schema.json
 )
 
 echo "Syncing scaffold data:"
