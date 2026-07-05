@@ -62,8 +62,8 @@
     },
     "source": {
       "type": "string",
-      "description": "Emitter of the event: a fixed role (`specs`, `pm`, `qa`, `config-steward`, `merge-watcher`), a component agent scoped by repo (`component:<name>`), or `human`. For `component:<name>`, `<name>` is the bare component repository name with no owner prefix — the short form of the git remote (e.g. `component:api-sample`, not `component:acme/api-sample`). This matches the `source: component:<repo>` convention used across roles; the PM and QA agents emit events with `source: pm` and `source: qa` respectively (no repo suffix, since those roles are not scoped by component repo).",
-      "pattern": "^(human|specs|pm|qa|config-steward|merge-watcher|component:[a-z0-9][a-z0-9-]*)$"
+      "description": "Emitter of the event: a fixed role (`specs`, `pm`, `qa`, `config-steward`, `merge-watcher`), the loop's single-repo `driver`, a component agent scoped by repo (`component:<name>`), or `human`. The `driver` value is the loop execution surface's sole emitter (single-repo gate-cycle); the orchestrator surface uses the role-scoped values. For `component:<name>`, `<name>` is the bare component repository name with no owner prefix — the short form of the git remote (e.g. `component:api-sample`, not `component:acme/api-sample`). This matches the `source: component:<repo>` convention used across roles; the PM and QA agents emit events with `source: pm` and `source: qa` respectively (no repo suffix, since those roles are not scoped by component repo).",
+      "pattern": "^(human|driver|specs|pm|qa|config-steward|merge-watcher|component:[a-z0-9][a-z0-9-]*)$"
     },
     "source_version": {
       "type": "string",

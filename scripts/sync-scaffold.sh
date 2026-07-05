@@ -8,15 +8,17 @@
 #
 # Two stages:
 #   1. Vendor-from-core (skipped when core is absent): the shared Specfuse
-#      methodology substrate — the four* shared rules and the event schema — has
-#      a single source of truth in the methodology core
-#      (specfuse/methodology/). This stage copies those files from core INTO the
-#      canonical .specfuse/, so core is the vendoring source. It runs only in a
-#      dev checkout where core is a sibling; CI (no core) skips it and just
-#      verifies drift between the already-committed .specfuse/ and data/.
-#      *result-contract.md is loop-surface-specific and is NOT vendored from
-#       core; it stays loop-local. The three genericized rules and the schema
-#       ARE vendored.
+#      methodology substrate — the neutral rules and the event schema — has a
+#      single source of truth in the methodology core (specfuse/methodology/).
+#      This stage copies those files from core INTO the canonical .specfuse/, so
+#      core is the vendoring source. It runs only in a dev checkout where core is
+#      a sibling; CI (no core) skips it and just verifies drift between the
+#      already-committed .specfuse/ and data/.
+#      Vendored from core: correlation-ids, never-touch, security-boundaries,
+#      verification-discipline, and the event schema. NOT vendored:
+#      result-contract.md (loop-surface-specific, stays loop-local) and
+#      role-switch-hygiene.md (orchestrator multi-role concept; N/A to the loop's
+#      fresh-session-per-WU model).
 #   2. Package-sync: specfuse/loop/data/ is a byte-for-byte copy of the canonical
 #      .specfuse/ sources. Run this after editing any canonical source, then
 #      commit and run the drift-guard test (tests/test_scaffold_data_in_sync.py).
@@ -46,6 +48,7 @@ CORE_FILES=(
   rules/correlation-ids.md
   rules/never-touch.md
   rules/security-boundaries.md
+  rules/verification-discipline.md
   schemas/event.schema.json
   schemas/events/initiative_created.schema.json
   schemas/events/spec_validated.schema.json
@@ -116,6 +119,7 @@ FILES=(
   rules/never-touch.md
   rules/result-contract.md
   rules/security-boundaries.md
+  rules/verification-discipline.md
   schemas/event.schema.json
   schemas/events/initiative_created.schema.json
   schemas/events/spec_validated.schema.json

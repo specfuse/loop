@@ -29,6 +29,7 @@ setup() {
   printf 'never\n'       > "$TESTDIR/.specfuse/rules/never-touch.md"
   printf 'result\n'      > "$TESTDIR/.specfuse/rules/result-contract.md"
   printf 'security\n'    > "$TESTDIR/.specfuse/rules/security-boundaries.md"
+  printf 'verifdisc\n'   > "$TESTDIR/.specfuse/rules/verification-discipline.md"
   printf '{"event":1}\n' > "$TESTDIR/.specfuse/schemas/event.schema.json"
   printf '{"e":1}\n'     > "$TESTDIR/.specfuse/schemas/events/initiative_created.schema.json"
   printf '{"e":2}\n'     > "$TESTDIR/.specfuse/schemas/events/spec_validated.schema.json"

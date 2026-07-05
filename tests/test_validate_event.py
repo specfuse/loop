@@ -38,8 +38,8 @@ FEAT_0008_EVENTS = (
 # ── Bundled schemas ────────────────────────────────────────────────────────────
 # Mirrors the vendored event schema (specfuse/loop/data/schemas/event.schema.json,
 # itself a byte-for-byte copy of the methodology core); the source pattern is
-# intentionally identical to pin the documented contract — "driver" is absent, so
-# loop-emitted driver events are rejected (see test_driver_event_from_feat_0008).
+# intentionally identical to pin the documented contract — "driver" is admitted,
+# so loop-emitted driver events validate (see test_driver_event_from_feat_0008).
 
 _ENVELOPE_SCHEMA: dict = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -78,9 +78,10 @@ _ENVELOPE_SCHEMA: dict = {
         },
         "source": {
             "type": "string",
-            # Matches the real schema; "driver" is intentionally absent.
+            # Matches the real schema; "driver" is admitted (core now lists it),
+            # so loop-emitted driver events validate.
             "pattern": (
-                r"^(human|specs|pm|qa|config-steward|merge-watcher"
+                r"^(human|driver|specs|pm|qa|config-steward|merge-watcher"
                 r"|component:[a-z0-9][a-z0-9-]*)$"
             ),
         },
@@ -293,12 +294,10 @@ class TestValidateEventValid(unittest.TestCase):
             Path(fname).unlink(missing_ok=True)
 
     def test_regression_envelope_mirroring_feat_0008(self) -> None:
-        """Regression: envelope shape from FEAT-2026-0008 is valid when source
-        is corrected from 'driver' to a schema-admitted value.
+        """Regression: envelope shape from FEAT-2026-0008 validates.
 
         Satisfies LEARNINGS [FEAT-2026-0005/G1-LESSONS] (regression case on
-        existing valid fixture). Confirms the envelope itself is fine and that
-        only the source value is what makes driver events invalid.
+        existing valid fixture).
         """
         self._assert_validates(_valid_event(
             event_type="task_started",
@@ -311,13 +310,44 @@ class TestValidateEventValid(unittest.TestCase):
             },
         ))
 
+    # AC 4: driver events from FEAT-2026-0008 are now accepted (core admits
+    # "driver" in the source pattern).
+
+    def test_driver_event_from_feat_0008_is_accepted(self) -> None:
+        """Driver events (source: driver) must now be ACCEPTED — core admits
+        "driver" in the source pattern (methodology consolidation).
+
+        Reads a real driver-emitted line from FEAT-2026-0008/events.jsonl and
+        asserts it validates cleanly. This closes the pre-existing gap where the
+        loop's own events failed validation because "driver" was absent from the
+        schema. Uses a `task_completed` line (envelope-only — no per-type payload
+        schema) so acceptance turns on the envelope, `source: driver` included.
+        """
+        with open(FEAT_0008_EVENTS, encoding="utf-8") as fh:
+            driver_line = next(
+                line.strip()
+                for line in fh
+                if line.strip()
+                and json.loads(line).get("source") == "driver"
+                and json.loads(line).get("event_type") == "task_completed"
+            )
+        validator = ve.load_validator()
+        errors = ve.validate_line(
+            validator, FEAT_0008_EVENTS.name, 1, driver_line
+        )
+        self.assertEqual(
+            errors, [],
+            f"driver-emitted event must now validate; errors={errors!r}",
+        )
+
 
 class TestValidateEventInvalid(unittest.TestCase):
     """Invalid events → non-zero exit; error message names the offending key.
 
     Satisfies AC 3: covers (a) missing required key, (b) wrong type, (c)
     unknown event_type, (d) malformed JSON.
-    Satisfies AC 4: driver event from FEAT-2026-0008 is rejected.
+    (Driver-event acceptance moved to TestValidateEventValid — "driver" is now
+    an admitted source.)
     """
 
     def setUp(self) -> None:
@@ -421,41 +451,10 @@ class TestValidateEventInvalid(unittest.TestCase):
 
     def test_main_exits_1_on_invalid_source(self) -> None:
         rc, _, stderr = _call_main(
-            [], stdin_data=json.dumps(_valid_event(source="driver"))
+            [], stdin_data=json.dumps(_valid_event(source="robot"))
         )
         self.assertEqual(rc, 1, f"expected exit 1; stderr={stderr!r}")
         self.assertIn("source", stderr)
-
-    # AC 4: driver events from FEAT-2026-0008 are rejected
-
-    def test_driver_event_from_feat_0008_is_rejected(self) -> None:
-        """Driver events (source: driver) must be rejected — documented contract.
-
-        Reads a real event line from FEAT-2026-0008/events.jsonl and asserts
-        the script rejects it with an error naming 'source'. loop.py emits
-        source: "driver" which is intentionally NOT in the orchestrator's source
-        enum. If the schema is later widened to admit "driver", this test must
-        be updated in the same change — that coupling is intentional.
-        """
-        with open(FEAT_0008_EVENTS, encoding="utf-8") as fh:
-            driver_line = next(
-                line.strip()
-                for line in fh
-                if line.strip() and json.loads(line).get("source") == "driver"
-            )
-        validator = ve.load_validator()
-        errors = ve.validate_line(
-            validator, FEAT_0008_EVENTS.name, 1, driver_line
-        )
-        self.assertTrue(
-            errors,
-            "driver-emitted event must be rejected by the orchestrator schema",
-        )
-        combined = " ".join(errors)
-        self.assertIn(
-            "source", combined,
-            f"rejection must name the 'source' key; errors={errors!r}",
-        )
 
     # non-dict JSON: exercises the isinstance(event, dict) False branch
 
@@ -683,7 +682,7 @@ class TestValidateEventSubprocess(unittest.TestCase):
     def test_cli_exits_1_on_invalid_source(self) -> None:
         proc = self._run(
             [],
-            stdin_text=json.dumps(_valid_event(source="driver")),
+            stdin_text=json.dumps(_valid_event(source="robot")),
         )
         self.assertEqual(proc.returncode, 1)
         self.assertIn("source", proc.stderr)

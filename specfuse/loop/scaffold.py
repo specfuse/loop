@@ -164,6 +164,7 @@ _RULES_BLOCK = (
     "@.specfuse/rules/correlation-ids.md\n"
     "@.specfuse/rules/never-touch.md\n"
     "@.specfuse/rules/security-boundaries.md\n"
+    "@.specfuse/rules/verification-discipline.md\n"
 )
 
 _RULES_SENTINEL = "@.specfuse/rules/result-contract.md"
