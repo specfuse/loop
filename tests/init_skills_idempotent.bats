@@ -25,9 +25,10 @@ setup() {
 }
 
 @test "source repo holds skill content in .specfuse (real), not .claude" {
-  # .specfuse is the canonical home; .claude/skills/<name> is a forward discovery
-  # symlink that must RESOLVE to the real, non-empty SKILL.md (a dangling symlink
-  # is the #56 failure mode).
+  # .specfuse/skills/ is the vendored copy of the canonical plugin
+  # (plugins/specfuse/skills/); .claude/skills/<name> is a forward discovery
+  # symlink that must RESOLVE to the real, non-empty SKILL.md in .specfuse (a
+  # dangling symlink is the #56 failure mode). Runtime resolution is unchanged.
   for s in roadmap-add roadmap-archive arm-gate; do
     [ ! -L "$REPO/.specfuse/skills/$s" ]                # .specfuse side is a real dir
     [ -s "$REPO/.specfuse/skills/$s/SKILL.md" ]         # real, non-empty content

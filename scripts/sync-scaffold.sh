@@ -19,7 +19,12 @@
 #      result-contract.md (loop-surface-specific, stays loop-local) and
 #      role-switch-hygiene.md (orchestrator multi-role concept; N/A to the loop's
 #      fresh-session-per-WU model).
-#   2. Package-sync: specfuse/loop/data/ is a byte-for-byte copy of the canonical
+#   2. Vendor-skills: .specfuse/skills/ is a byte-for-byte copy of the loop's
+#      canonical, marketplace-published plugin at plugins/specfuse/skills/. The
+#      loop operates on .specfuse/skills/ (via .claude/skills forward symlinks);
+#      plugins/specfuse/ is the single source of truth. Guarded by
+#      tests/test_skills_vendored_in_sync.py.
+#   3. Package-sync: specfuse/loop/data/ is a byte-for-byte copy of the canonical
 #      .specfuse/ sources. Run this after editing any canonical source, then
 #      commit and run the drift-guard test (tests/test_scaffold_data_in_sync.py).
 #
@@ -81,6 +86,29 @@ if [[ -d "$CORE" ]]; then
 else
   echo "  core not found at $CORE — skipping (dev-only stage)."
   echo "  set SPECFUSE_CORE to re-vendor; CI verifies committed .specfuse/↔data/ drift."
+fi
+echo
+
+# Vendor .specfuse/skills/ from the canonical plugin source (plugins/specfuse/
+# skills/), exactly as the rules above are vendored from core. plugins/specfuse/
+# is the loop's canonical, marketplace-published plugin; .specfuse/skills/ is a
+# byte-identical vendored copy so the loop's dogfood session (via the
+# .claude/skills forward symlinks) resolves skills at .specfuse/skills/ unchanged.
+PLUGIN_SKILLS="$REPO_ROOT/plugins/specfuse/skills"
+echo "Vendoring skills from canonical plugin:"
+if [[ -d "$PLUGIN_SKILLS" ]]; then
+  echo "  from: $PLUGIN_SKILLS"
+  echo "  to:   $SRC/skills"
+  if diff -rq "$PLUGIN_SKILLS" "$SRC/skills" >/dev/null 2>&1; then
+    echo "  unchanged: skills/ already in sync"
+  else
+    rm -rf "$SRC/skills"
+    cp -R "$PLUGIN_SKILLS" "$SRC/skills"
+    echo "  vendored:  skills/ ($(find "$SRC/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ') skills)"
+  fi
+else
+  echo "error: canonical plugin skills dir not found: $PLUGIN_SKILLS" >&2
+  exit 1
 fi
 echo
 
