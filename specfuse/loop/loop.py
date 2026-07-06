@@ -507,6 +507,35 @@ def flush_events(events_path: Path, events: list) -> None:
 # --------------------------------------------------------------------------- #
 
 
+# Known signatures of a gate whose oracle SILENTLY DEGRADED — the command
+# exits 0 while its analyzer measured a strict subset of the real check, so a
+# green gate is a hollow pass (issue #134). Each entry is (compiled pattern,
+# human reason). A gate whose output matches while exiting 0 is forced to FAIL
+# so the driver blocks honestly instead of certifying `met` on a subset oracle.
+# These are language/tool-specific data, not detection logic — extend the list
+# as new silent-degradation modes surface; the matching in verify() is generic.
+DEGRADED_ORACLE_MARKERS: list[tuple["re.Pattern[str]", str]] = [
+    # Flutter/Dart custom_lint: the analyzer plugin can't resolve/build (e.g.
+    # network to pub.dev blocked in the sandbox), so `flutter analyze` drops to
+    # core lints only and still exits 0 — every custom_lint/riverpod_lint rule
+    # is invisible. Observed on FEAT-2026-0005 (28 warnings CI caught, loop 0).
+    (re.compile(r"error occurred while setting up the analyzer plugin",
+                re.IGNORECASE),
+     "custom_lint analyzer plugin did not load — 'flutter analyze' degraded to "
+     "core lints only; the warnings oracle measured a subset of the real check "
+     "and cannot certify zero warnings in this environment"),
+]
+
+
+def detect_degraded_oracle(stdout: str) -> str | None:
+    """Return an honest reason string if gate output shows a silently degraded
+    oracle, else None. Matches against DEGRADED_ORACLE_MARKERS (issue #134)."""
+    for pattern, reason in DEGRADED_ORACLE_MARKERS:
+        if pattern.search(stdout):
+            return reason
+    return None
+
+
 def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     """Extract (failure_class, failure_signature) from gate runner stdout.
 
@@ -1654,6 +1683,14 @@ def verify(wu: WorkUnit, feature_dir: Path,
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
             ok = proc.returncode == 0
             tail = (out or "").strip().splitlines()[-15:]
+            # A green gate whose oracle silently degraded is a hollow pass
+            # (issue #134): force FAIL and name the degradation honestly so the
+            # log reads as "oracle couldn't measure it," not "code is clean."
+            if ok:
+                degraded = detect_degraded_oracle(out or "")
+                if degraded:
+                    ok = False
+                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
