@@ -3211,6 +3211,11 @@ def run(
 
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
+                # Summary line: the WU's title, so the log says WHAT is being
+                # worked, not just its id. Skipped when title just echoes the id
+                # (the parse default when a WU has no `# Title` heading).
+                if wu.title and wu.title != wu.wu_id:
+                    print(f"   ↳ {wu.title}")
                 if dry_run:
                     print("   (dry run — would dispatch)")
                     wu.status = DONE
