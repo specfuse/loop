@@ -766,6 +766,84 @@ def _current_branch() -> str:
     return git("branch", "--show-current")
 
 
+def _default_branch() -> "str | None":
+    """The repo's default branch, or None if undeterminable.
+
+    Prefers origin's HEAD symref (`origin/main` -> `main`); falls back to a
+    local `main`/`master` when there is no remote. None when neither resolves —
+    callers then treat the current branch as non-default (auto_sync commits its
+    scaffold sync rather than leaving it dangling).
+    """
+    ref = subprocess.run(
+        ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
+        capture_output=True, text=True,
+    )
+    if ref.returncode == 0 and ref.stdout.strip():
+        name = ref.stdout.strip()
+        return name[len("origin/"):] if name.startswith("origin/") else name
+    for cand in ("main", "master"):
+        if subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", cand],
+            capture_output=True, text=True,
+        ).returncode == 0:
+            return cand
+    return None
+
+
+# Paths the scaffold overlay owns — auto_sync writes these on upgrade. They are
+# the driver's, not the user's edits: they may carry onto a feature branch and
+# are folded into the --prepare scaffold commit. Mirrors scaffold.py's versioned
+# overlay set (templates/, rules/, docs/, schemas/) plus the meta files.
+_SCAFFOLD_MANAGED_PREFIXES: tuple[str, ...] = (
+    ".specfuse/templates/", ".specfuse/rules/",
+    ".specfuse/docs/", ".specfuse/schemas/",
+)
+_SCAFFOLD_MANAGED_EXACT: frozenset[str] = frozenset({
+    ".specfuse/VERSION", ".specfuse/.scaffold-manifest",
+    ".specfuse/verification.yml.example",
+})
+
+
+def _is_scaffold_managed(path: str) -> bool:
+    return (path in _SCAFFOLD_MANAGED_EXACT
+            or any(path.startswith(p) for p in _SCAFFOLD_MANAGED_PREFIXES))
+
+
+def _scaffold_managed_dirty() -> set[str]:
+    """Tracked-dirty paths the scaffold overlay owns (subset of the dirty set)."""
+    return {p for p in _tracked_dirty_paths() if _is_scaffold_managed(p)}
+
+
+def _persist_scaffold_sync(installed: str) -> None:
+    """After auto_sync overlays a newer scaffold, keep the tree clean for the
+    rest of the run. On a non-default branch, commit the scaffold-managed
+    changes (`chore(loop): sync scaffold to X.Y.Z`). On the DEFAULT branch, leave
+    them and print guidance — committing scaffold churn onto the default branch
+    is undesirable; --prepare (or the next ensure_feature_branch) carries them
+    onto the feature branch and folds them into its scaffold commit instead.
+    """
+    dirty = _scaffold_managed_dirty()
+    if not dirty:
+        return
+    branch = _current_branch()
+    on_default = (not branch) or branch == _default_branch()
+    if on_default:
+        print(
+            f"auto_sync: scaffold upgraded to {installed}; leaving "
+            f"{len(dirty)} scaffold file(s) uncommitted on default branch "
+            f"'{branch or '(detached)'}'. --prepare will carry them onto the "
+            f"feature branch, or commit them yourself.",
+            file=sys.stderr,
+        )
+        return
+    commit_bookkeeping(sorted(dirty), f"chore(loop): sync scaffold to {installed}")
+    print(
+        f"auto_sync: scaffold upgraded to {installed}; committed "
+        f"{len(dirty)} scaffold file(s) on '{branch}'.",
+        file=sys.stderr,
+    )
+
+
 def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> str:
     """Actionable next-step block for the two pre-flight guards.
 
@@ -920,6 +998,11 @@ def prepare_feature(feat_fm: dict, feature_dir: "Path", feature_id: str) -> None
     for rel in (".specfuse/roadmap.md", ".specfuse/roadmap-archive.md"):
         if (repo_root / rel).exists():
             add_paths.append(str(repo_root / rel))
+    # Fold auto_sync's scaffold overlay into this commit too. On the default
+    # branch auto_sync leaves those uncommitted (see _persist_scaffold_sync);
+    # committing them here lands the upgrade on the feature branch, clean.
+    for rel in sorted(_scaffold_managed_dirty()):
+        add_paths.append(str(repo_root / rel))
     git("add", "--", *add_paths)
     staged = git("status", "--porcelain", "--", *add_paths)
     if staged:
@@ -1006,7 +1089,11 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         # Create-from-HEAD carries the working tree onto the new branch. Only
         # the expected /pick-feature flips may ride along; anything else stops.
         dirty = _tracked_dirty_paths()
-        unexpected = dirty - _expected_flip_paths(feature_dir)
+        # Scaffold-overlay files (auto_sync's own upgrade writes) ride along too:
+        # they are driver-owned, and prepare_feature folds them into the scaffold
+        # commit. Only genuinely-unrelated edits remain "unexpected" (#prepare).
+        allowed = _expected_flip_paths(feature_dir) | _scaffold_managed_dirty()
+        unexpected = dirty - allowed
         if unexpected:
             raise FeatureBranchError(
                 "working tree has uncommitted changes to unexpected paths: "
@@ -3112,7 +3199,14 @@ def run(
         # draft-feature can't take). --prepare-only stops after, so you can
         # review the commit before the loop dispatches anything.
         if prepare or prepare_only:
-            prepare_feature(feat_fm, feature_dir, feature_id)
+            # Genuinely-unrelated dirty paths (not the /pick-feature flips, not
+            # auto_sync's scaffold overlay) still stop --prepare — but with a
+            # clean, actionable message and a non-zero exit, not a traceback.
+            try:
+                prepare_feature(feat_fm, feature_dir, feature_id)
+            except FeatureBranchError as exc:
+                print(f"--prepare cannot proceed:\n{exc}", file=sys.stderr)
+                return 1
         if prepare_only:
             print("Prepared: feature is on its branch and committed. "
                   "Re-run `specfuse-loop` to start the gate.")
@@ -3998,6 +4092,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
+        _persist_scaffold_sync(installed)
         return
 
     # Older with modified files.
@@ -4056,6 +4151,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
+        _persist_scaffold_sync(installed)
     else:
         # Non-interactive (CI / claude -p): skip modified files + warn; never block.
         print(
@@ -4092,6 +4188,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
+        _persist_scaffold_sync(installed)
 
 
 def main() -> int:
