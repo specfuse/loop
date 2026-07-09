@@ -38,7 +38,7 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
 - `produces` — OPTIONAL. File path(s) this WU must produce; machine-enforced by the driver's
   presence gate (FEAT-2026-0022). Lint WARN when absent on `implementation` WUs.
 
-DRIVER-OWNED FIELDS — the driver writes these at outcome time; authors leave them absent:
+DRIVER-OWNED FIELDS - the driver writes these at outcome time; authors leave them absent:
 <!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,
      cumulative_cost_usd, cumulative_duration_seconds, cumulative_input_tokens,
      cumulative_output_tokens, re_arm_count, re_arm_history -->
