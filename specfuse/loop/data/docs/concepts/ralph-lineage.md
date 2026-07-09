@@ -50,7 +50,7 @@ independently-adoptable projects live under it:
   for multi-repo, spec-first feature delivery.
 
 The loop and the orchestrator are two execution surfaces of **one** methodology
-(see [`methodology.md`](methodology.md)); they share the gate cycle, the
+(see [`methodology.md`](../methodology.md)); they share the gate cycle, the
 work-unit contract, the correlation-ID scheme, and the verification discipline.
 The loop is the right home for work that lives in one repo or has no formal
 spec; the orchestrator is the right home when the work genuinely spans repos and
