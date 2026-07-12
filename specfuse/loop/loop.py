@@ -2651,13 +2651,17 @@ _NO_FAILURES_SENTINEL = "### Failure-class breakdown\n\n(no non-passing attempts
 def summarize_attempt_failure_classes(
     feature_dir: Path,
     gate_n: int | None = None,
+    exclude_correlation_id: str | None = None,
 ) -> str:
     """Render a '### Failure-class breakdown' markdown table from events.jsonl.
 
     Reads attempt_outcome events whose outcome != 'passed'.  When gate_n is
     provided, restricts to events whose correlation_id belongs to that gate
-    (resolved via _gate_number_from_wu_id).  Returns _NO_FAILURES_SENTINEL when
-    no non-passing attempts match the filter.
+    (resolved via _gate_number_from_wu_id).  When exclude_correlation_id is
+    provided, drops events with that exact correlation_id — used to keep a
+    close WU's OWN non-passing attempts out of the breakdown it authors, so the
+    close's stumble does not arm the guard against itself (issue #145).  Returns
+    _NO_FAILURES_SENTINEL when no non-passing attempts match the filter.
 
     Pure function — reads events.jsonl; no writes, no side effects.
     Malformed JSONL lines are skipped (legacy-event tolerance, AC5).
@@ -2680,8 +2684,10 @@ def summarize_attempt_failure_classes(
         payload = evt.get("payload") or {}
         if payload.get("outcome") == "passed":
             continue
+        cid = evt.get("correlation_id", "")
+        if exclude_correlation_id is not None and cid == exclude_correlation_id:
+            continue
         if gate_n is not None:
-            cid = evt.get("correlation_id", "")
             if _gate_number_from_wu_id(cid) != gate_n:
                 continue
         non_passing.append(payload)
@@ -2745,7 +2751,14 @@ def assert_failure_class_breakdown_when_failures_present(
         return True, ""
 
     gate_n = _gate_number_from_wu_id(wu.wu_id)
-    summary = summarize_attempt_failure_classes(feature_dir, gate_n)
+    # Exclude the close WU's OWN non-passing attempts: the breakdown documents
+    # SUBSTANTIVE-WU failures, not the close's own stumble. Without this, a
+    # failed first close attempt retroactively requires a new subsection in the
+    # RETROSPECTIVE the close itself authors — and the between-attempt
+    # `reset --hard` wipes the partial each retry → spin → blocked_human on
+    # otherwise-done features (issue #145).
+    summary = summarize_attempt_failure_classes(
+        feature_dir, gate_n, exclude_correlation_id=wu.wu_id)
 
     if summary == _NO_FAILURES_SENTINEL:
         return True, ""
@@ -2753,7 +2766,7 @@ def assert_failure_class_breakdown_when_failures_present(
     if re.search(r"^#{3} Failure-class breakdown\b", retro.read_text(), re.MULTILINE):
         return True, ""
 
-    # Count non-passing attempts for the error message.
+    # Count non-passing attempts (excluding the close's own) for the message.
     events_path = feature_dir / "events.jsonl"
     count = 0
     if events_path.exists():
@@ -2770,18 +2783,25 @@ def assert_failure_class_breakdown_when_failures_present(
             payload = evt.get("payload") or {}
             if payload.get("outcome") == "passed":
                 continue
+            cid = evt.get("correlation_id", "")
+            if cid == wu.wu_id:
+                continue
             if gate_n is not None:
-                cid = evt.get("correlation_id", "")
                 if _gate_number_from_wu_id(cid) != gate_n:
                     continue
             count += 1
 
     gate_label = f"gate {gate_n}" if gate_n is not None else "all gates"
+    # Actionable, self-contained retry note (flows into the next attempt's prompt
+    # via failure_note, issue #145 fix #2): name the moved bar AND embed the exact
+    # table to paste, so the agent doesn't rediscover the requirement.
     return (
         False,
         f"assert_failure_class_breakdown_when_failures_present: {count} "
-        f"non-passing attempt(s) in {gate_label} but '### Failure-class breakdown' "
-        f"subsection absent from RETROSPECTIVE.md",
+        f"substantive-WU attempt(s) in {gate_label} did not pass, so "
+        f"RETROSPECTIVE.md MUST include a '### Failure-class breakdown' subsection "
+        f"— it is absent. Add exactly this subsection to RETROSPECTIVE.md:\n\n"
+        f"{summary}",
     )
 
 
