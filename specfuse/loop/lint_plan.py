@@ -249,6 +249,15 @@ def lint(feature_dir: Path) -> list[str]:
     if missing:
         errs.append(f"PLAN.md frontmatter missing keys: {sorted(missing)}")
 
+    if "base" in fm:
+        base_val = fm["base"]
+        feature_id_val = fm.get("feature_id", feature_dir.name)
+        if not isinstance(base_val, str) or not base_val.strip():
+            errs.append(
+                f"{feature_id_val}: PLAN.md frontmatter 'base' key is present but "
+                f"empty/whitespace-only/non-string: {base_val!r}"
+            )
+
     graph = _find_task_graph_block(body)
     if graph is None:
         return errs + ["PLAN.md has no ```yaml graph block"]

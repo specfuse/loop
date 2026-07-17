@@ -790,6 +790,78 @@ def _default_branch() -> "str | None":
     return None
 
 
+def resolve_base(feat_fm: dict) -> "str | None":
+    """The ref a feature's branch/PR should sit on top of.
+
+    Frontmatter `base` wins when set and non-empty (after stripping
+    whitespace). Absent, empty, or whitespace-only falls back to
+    `_default_branch()`; if that too is undeterminable, falls back to the
+    current branch. Callers (T02, T03) are responsible for wiring this in —
+    this function only resolves the name, it does not touch git state.
+    """
+    base = feat_fm.get("base")
+    if isinstance(base, str) and base.strip():
+        return base.strip()
+    default = _default_branch()
+    if default:
+        return default
+    return _current_branch()
+
+
+class BaseBranchError(RuntimeError):
+    """Raised when a feature's declared `base` ref cannot be made available.
+
+    Carries an actionable, human-readable message distinguishing a probable
+    typo (remote confirms the ref does not exist) from an unreachable remote
+    (network/auth failure — the ref's existence is simply unknown), so the two
+    cases are never mistaken for each other.
+    """
+
+
+def ensure_base_ref(base: str) -> None:
+    """Make sure git ref *base* is resolvable locally, fetching it if needed.
+
+    No-ops (no network call) when `git rev-parse --verify base` already
+    succeeds locally. Otherwise asks origin via `git ls-remote --exit-code`:
+    if origin has it, fetches it and prints one line naming what and why; if
+    origin explicitly does not have it, raises BaseBranchError naming likely
+    local-branch candidates (probable typo); if ls-remote itself fails
+    (offline/auth), raises a distinctly-worded BaseBranchError instead of
+    conflating "does not exist" with "could not check".
+    """
+    local = subprocess.run(
+        ["git", "rev-parse", "--verify", base],
+        capture_output=True, text=True,
+    )
+    if local.returncode == 0:
+        return
+    remote = subprocess.run(
+        ["git", "ls-remote", "--exit-code", "origin", base],
+        capture_output=True, text=True,
+    )
+    if remote.returncode == 0:
+        subprocess.run(["git", "fetch", "origin", base], capture_output=True, text=True, check=True)
+        print(f"ensure_base_ref: fetched '{base}' from origin (declared feature base, not present locally).")
+        return
+    if remote.returncode == 2:
+        # ls-remote's documented exit code for "ref not found on that remote".
+        branches = subprocess.run(
+            ["git", "branch", "--list", "--format=%(refname:short)"],
+            capture_output=True, text=True,
+        ).stdout.splitlines()
+        candidates = [b.strip() for b in branches if b.strip()]
+        listed = ", ".join(sorted(candidates)) if candidates else "(no local branches)"
+        raise BaseBranchError(
+            f"base '{base}' does not exist locally or on origin — probable typo. "
+            f"Local branches: {listed}"
+        )
+    stderr = remote.stderr.strip() or remote.stdout.strip() or "(no git output)"
+    raise BaseBranchError(
+        f"base '{base}' could not be verified against origin — remote unreachable "
+        f"(offline or auth failure), not confirmed missing: {stderr}"
+    )
+
+
 # Paths the scaffold overlay owns — auto_sync writes these on upgrade. They are
 # the driver's, not the user's edits: they may carry onto a feature branch and
 # are folded into the --prepare scaffold commit. Mirrors scaffold.py's versioned

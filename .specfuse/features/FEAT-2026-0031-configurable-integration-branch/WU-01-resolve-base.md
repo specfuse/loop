@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0031/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.20
 produces_driver_helper: resolve_base, ensure_base_ref, BaseBranchError
 produces:
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/lint_plan.py
   - tests/test_resolve_base.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.13
+started_at: 2026-07-17T12:30:13.743152+00:00
+duration_seconds: 319.213
+cost_usd: 1.397775
+input_tokens: 60
+output_tokens: 11924
 ---
 
 # Add the `base` frontmatter key and the base resolver
