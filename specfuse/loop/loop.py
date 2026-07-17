@@ -4469,7 +4469,21 @@ def auto_sync(
         _persist_scaffold_sync(installed)
 
 
+def _force_utf8_console() -> None:
+    """Force stdout/stderr to UTF-8 so the driver's non-ASCII console glyphs
+    (↳, ═, ⚠, — …) don't crash on Windows, whose default console codepage is
+    cp1252 (`UnicodeEncodeError: 'charmap' codec can't encode ...`). No-op on
+    POSIX, which is already UTF-8. `reconfigure` exists on the standard
+    text streams (Python ≥ 3.7); guard for the case where stdout has been
+    replaced by a stream that lacks it (e.g. a captured buffer in tests)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def main() -> int:
+    _force_utf8_console()
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
     ap.add_argument("--feature", help="Feature dir name under .specfuse/features/ "
                     "(optional if exactly one feature is active).")
