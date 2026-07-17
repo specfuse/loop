@@ -32,6 +32,16 @@ skills-lock.json
 # Leak-scan denylist — operator-supplied literal org names; never committed
 .specfuse/scripts/leak_denylist.txt
 
+# Other agent harnesses' local config — operator WIP, not this repo's scaffold.
+# Untracked files are invisible to the driver's dirty-tree guard
+# (`_expected_flip_paths` / `_tracked_dirty_paths` inspect TRACKED paths only),
+# but the per-WU squash commit stages everything — so anything untracked in the
+# tree gets absorbed by whichever WU commits first. FEAT-2026-0031/T01 swept both
+# of these onto its feature branch that way. Ignoring is a stopgap; the real fix
+# is narrowing the squash commit's staging to match the guard's inspection.
+AGENTS.md
+.codex/
+
 # FEAT-2026-0020 gh-content audit dumps — contain private-org refs, must NOT be committed (would leak into public history)
 .specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-issues.json
 .specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-prs.json
