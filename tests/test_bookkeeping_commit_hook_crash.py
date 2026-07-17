@@ -59,25 +59,40 @@ class TestBookkeepingCommitHookCrash(unittest.TestCase):
         hook.write_text(f"#!/bin/sh\necho '{message}' 1>&2\nexit 1\n")
         hook.chmod(0o755)
 
-    def test_hook_rejection_raises_clean_error_not_calledprocesserror(self):
-        """A pre-commit hook exiting non-zero raises BookkeepingCommitError,
-        not a bare CalledProcessError. This is the FEAT-2026-0024 crash."""
+    def test_rejecting_precommit_hook_is_bypassed(self):
+        """issue #156: commit_bookkeeping commits with --no-verify, so a
+        rejecting pre-commit hook is BYPASSED — the bookkeeping commit lands.
+        Internal driver commits belong to the `--all` scan trust context, not
+        the human-oriented structural pre-commit. (Supersedes the FEAT-2026-0024
+        behavior of surfacing the hook's rejection — the hook no longer runs.)"""
         self._install_rejecting_hook("HOOK-REJECTED-SENTINEL")
         (self.root / "gate.md").write_text("status: awaiting_review\n")
-        with self.assertRaises(loop.BookkeepingCommitError):
-            loop.commit_bookkeeping(["gate.md"], "chore(loop): gate 1 awaiting_review")
+        sha = loop.commit_bookkeeping(["gate.md"], "chore(loop): gate 1 awaiting_review")
+        self.assertIsInstance(sha, str)
 
-    def test_hook_rejection_error_carries_git_stderr(self):
-        """The raised error surfaces git's stderr (the hook's message), which
-        the old check=True path swallowed via capture_output."""
-        self._install_rejecting_hook("HOOK-REJECTED-SENTINEL")
+    def test_genuine_commit_failure_still_raises_clean_error(self):
+        """FEAT-2026-0024 crash-safety retained for NON-hook failures: a
+        non-zero `git commit` from any other cause still raises
+        BookkeepingCommitError carrying git's stderr (not a bare
+        CalledProcessError). Simulated by patching subprocess.run."""
+        import types
         (self.root / "gate.md").write_text("status: awaiting_review\n")
+        real_run = subprocess.run
+
+        def fake_run(cmd, *a, **kw):
+            if cmd[:2] == ["git", "commit"]:
+                return types.SimpleNamespace(
+                    returncode=1, stdout="", stderr="fatal: simulated commit failure")
+            return real_run(cmd, *a, **kw)
+
+        orig = loop.subprocess.run
+        loop.subprocess.run = fake_run
         try:
-            loop.commit_bookkeeping(["gate.md"], "chore(loop): gate 1 awaiting_review")
-        except loop.BookkeepingCommitError as exc:
-            self.assertIn("HOOK-REJECTED-SENTINEL", str(exc))
-        else:
-            self.fail("commit_bookkeeping did not raise BookkeepingCommitError")
+            with self.assertRaises(loop.BookkeepingCommitError) as ctx:
+                loop.commit_bookkeeping(["gate.md"], "chore(loop): gate 1 awaiting_review")
+        finally:
+            loop.subprocess.run = orig
+        self.assertIn("simulated commit failure", str(ctx.exception))
 
     def test_bookkeeping_succeeds_when_hook_passes(self):
         """Green path: no rejecting hook -> commit lands, returns the new sha."""

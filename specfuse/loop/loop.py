@@ -1104,7 +1104,9 @@ def prepare_feature(feat_fm: dict, feature_dir: "Path", feature_id: str) -> None
     git("add", "--", *add_paths)
     staged = git("status", "--porcelain", "--", *add_paths)
     if staged:
-        git("commit", "-m", f"chore: scaffold feature {feature_id}")
+        # --no-verify: driver-authored scaffold commit, same trust context as
+        # the WU squash (issue #156) — gated by `--all` + CI, not the pre-commit.
+        git("commit", "--no-verify", "-m", f"chore: scaffold feature {feature_id}")
         print(f"Prepared: committed feature folder on branch '{branch}'.")
     else:
         print(f"Prepare: feature folder already committed on branch '{branch}'.")
@@ -1388,8 +1390,15 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     git("add", "-f", *existing)
     if not git("status", "--porcelain"):
         return None  # all paths were already in their committed state
+    # --no-verify: internal driver commits belong to the `--all` scan trust
+    # context (denylist + gitleaks), NOT the human-oriented structural
+    # pre-commit hook (issue #156). The structural regexes are deliberately
+    # excluded from `--all` as too noisy for agent-authored / fixture-heavy
+    # content; running them on the driver's own commits produces false-positive
+    # blocks. `leak_scan.py --all` + the pre-push/PR surfaces remain the gates.
     res = subprocess.run(
-        ["git", "commit", "-m", message], capture_output=True, text=True,
+        ["git", "commit", "--no-verify", "-m", message],
+        capture_output=True, text=True,
     )
     if res.returncode != 0:
         raise BookkeepingCommitError(
@@ -1474,8 +1483,14 @@ def squash_commit(
         if not git("diff", "--cached", "--name-only"):
             return None
     msg = f"feat: {wu.title}\n\nFeature: {wu.wu_id}"
+    # --no-verify: see commit_bookkeeping — the driver's WU squashes are gated
+    # by `leak_scan.py --all` + CI, not the human-oriented structural pre-commit
+    # hook (issue #156). Without this, an agent-authored fixture token the
+    # structural scan flags (but `--all` allowlists) rejects the squash and the
+    # driver blocks `spinning_detected` after 3 retries.
     res = subprocess.run(
-        ["git", "commit", "-m", msg], capture_output=True, text=True,
+        ["git", "commit", "--no-verify", "-m", msg],
+        capture_output=True, text=True,
     )
     if res.returncode != 0:
         raise SquashCommitError(

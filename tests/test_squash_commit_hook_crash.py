@@ -63,25 +63,42 @@ class TestSquashCommitHookCrash(unittest.TestCase):
         hook.write_text(f"#!/bin/sh\necho '{message}' 1>&2\nexit 1\n")
         hook.chmod(0o755)
 
-    def test_hook_rejection_raises_clean_error_not_calledprocesserror(self):
-        """A pre-commit hook exiting non-zero raises SquashCommitError, not a
-        bare CalledProcessError. This is the #51 crash."""
+    def test_rejecting_precommit_hook_is_bypassed(self):
+        """issue #156: the driver's squash commits with --no-verify, so a
+        rejecting pre-commit hook is BYPASSED — the squash lands. Internal
+        driver commits belong to the `--all` scan trust context, not the
+        human-oriented structural pre-commit. (Supersedes the #51 behavior of
+        surfacing the hook's rejection — the hook no longer runs on the squash.)
+        On HEAD before this fix (no --no-verify) the hook rejects and
+        squash_commit raises, so this test is red until the fix lands."""
         self._install_rejecting_hook("HOOK-REJECTED-SENTINEL")
         (self.root / "a.py").write_text("a\nchanged\n")
-        with self.assertRaises(loop.SquashCommitError):
-            loop.squash_commit(self.wu, self.head)
+        sha = loop.squash_commit(self.wu, self.head)
+        self.assertIsInstance(sha, str)
+        self.assertNotEqual(sha, self.head)
 
-    def test_hook_rejection_error_carries_git_stderr(self):
-        """The raised error surfaces git's stderr (the hook's message), which
-        the old code swallowed via capture_output."""
-        self._install_rejecting_hook("HOOK-REJECTED-SENTINEL")
+    def test_genuine_commit_failure_still_raises_clean_error(self):
+        """#51 crash-safety is retained for NON-hook failures: a non-zero
+        `git commit` from any other cause still raises SquashCommitError
+        carrying git's stderr (not a bare CalledProcessError). Simulated by
+        patching subprocess.run for the commit call."""
         (self.root / "a.py").write_text("a\nchanged\n")
+        real_run = subprocess.run
+
+        def fake_run(cmd, *a, **kw):
+            if cmd[:2] == ["git", "commit"]:
+                return types.SimpleNamespace(
+                    returncode=1, stdout="", stderr="fatal: simulated commit failure")
+            return real_run(cmd, *a, **kw)
+
+        orig = loop.subprocess.run
+        loop.subprocess.run = fake_run
         try:
-            loop.squash_commit(self.wu, self.head)
-        except loop.SquashCommitError as exc:
-            self.assertIn("HOOK-REJECTED-SENTINEL", str(exc))
-        else:
-            self.fail("squash_commit did not raise SquashCommitError")
+            with self.assertRaises(loop.SquashCommitError) as ctx:
+                loop.squash_commit(self.wu, self.head)
+        finally:
+            loop.subprocess.run = orig
+        self.assertIn("simulated commit failure", str(ctx.exception))
 
     def test_squash_commit_succeeds_when_hook_passes(self):
         """Green path: no rejecting hook -> commit lands, returns the new sha."""
