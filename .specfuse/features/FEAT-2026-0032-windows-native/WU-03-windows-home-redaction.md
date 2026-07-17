@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0032/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.75
 oracle_env: linux_docker
 produces: tests/test_redaction_windows_home.py
 produces_driver_helper: _HOME_PATH_RE
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:18:33.396401+00:00
+duration_seconds: 926.654
+cost_usd: 0.587241
+input_tokens: 38
+output_tokens: 4977
 ---
 
 <!--

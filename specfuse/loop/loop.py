@@ -471,21 +471,26 @@ def build_event(event_type: str, correlation_id: str, payload: dict) -> dict:
 
 
 # Matches macOS ("/Users/" + "<name>/") and Linux ("/home/" + "<name>/") home
-# prefixes at runtime without containing a literal "/Users/" substring in
-# source, so this file's own staged diff never re-trips the structural leak-scan.
+# prefixes, plus the Windows shape ("C:" + "\Users\" + "<name>" + "\" or "/",
+# any drive letter, case-insensitive), at runtime without containing a literal
+# "/Users/" substring in source, so this file's own staged diff never re-trips
+# the structural leak-scan.
 _HOME_PATH_RE = re.compile(r"/(?:Users|home)/[^/\s]+/")
+_WIN_HOME_PATH_RE = re.compile(r"[A-Za-z]:\\Users\\[^\\/\s]+[\\/]", re.IGNORECASE)
 _HOME_PATH_PLACEHOLDER = "<redacted-home>/"
 
 
 def _redact_home_paths(value):
     """Recursively redact absolute home-directory prefixes from a JSON-ish value.
 
-    Walks dict/list/str/scalar and replaces every "/Users/" + "<name>/" or
-    "/home/" + "<name>/" match in string leaves with a stable placeholder.
-    Other text is preserved verbatim; idempotent (a second pass is a no-op).
+    Walks dict/list/str/scalar and replaces every "/Users/" + "<name>/",
+    "/home/" + "<name>/", or Windows "<drive>:\\Users\\" + "<name>" + "\\"/"/"
+    match in string leaves with a stable placeholder. Other text is preserved
+    verbatim; idempotent (a second pass is a no-op).
     """
     if isinstance(value, str):
-        return _HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
+        value = _HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
+        return _WIN_HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
     if isinstance(value, dict):
         return {k: _redact_home_paths(v) for k, v in value.items()}
     if isinstance(value, list):
