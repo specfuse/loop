@@ -46,6 +46,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
+| FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to

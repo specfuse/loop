@@ -790,6 +790,78 @@ def _default_branch() -> "str | None":
     return None
 
 
+def resolve_base(feat_fm: dict) -> "str | None":
+    """The ref a feature's branch/PR should sit on top of.
+
+    Frontmatter `base` wins when set and non-empty (after stripping
+    whitespace). Absent, empty, or whitespace-only falls back to
+    `_default_branch()`; if that too is undeterminable, falls back to the
+    current branch. Callers (T02, T03) are responsible for wiring this in —
+    this function only resolves the name, it does not touch git state.
+    """
+    base = feat_fm.get("base")
+    if isinstance(base, str) and base.strip():
+        return base.strip()
+    default = _default_branch()
+    if default:
+        return default
+    return _current_branch()
+
+
+class BaseBranchError(RuntimeError):
+    """Raised when a feature's declared `base` ref cannot be made available.
+
+    Carries an actionable, human-readable message distinguishing a probable
+    typo (remote confirms the ref does not exist) from an unreachable remote
+    (network/auth failure — the ref's existence is simply unknown), so the two
+    cases are never mistaken for each other.
+    """
+
+
+def ensure_base_ref(base: str) -> None:
+    """Make sure git ref *base* is resolvable locally, fetching it if needed.
+
+    No-ops (no network call) when `git rev-parse --verify base` already
+    succeeds locally. Otherwise asks origin via `git ls-remote --exit-code`:
+    if origin has it, fetches it and prints one line naming what and why; if
+    origin explicitly does not have it, raises BaseBranchError naming likely
+    local-branch candidates (probable typo); if ls-remote itself fails
+    (offline/auth), raises a distinctly-worded BaseBranchError instead of
+    conflating "does not exist" with "could not check".
+    """
+    local = subprocess.run(
+        ["git", "rev-parse", "--verify", base],
+        capture_output=True, text=True,
+    )
+    if local.returncode == 0:
+        return
+    remote = subprocess.run(
+        ["git", "ls-remote", "--exit-code", "origin", base],
+        capture_output=True, text=True,
+    )
+    if remote.returncode == 0:
+        subprocess.run(["git", "fetch", "origin", base], capture_output=True, text=True, check=True)
+        print(f"ensure_base_ref: fetched '{base}' from origin (declared feature base, not present locally).")
+        return
+    if remote.returncode == 2:
+        # ls-remote's documented exit code for "ref not found on that remote".
+        branches = subprocess.run(
+            ["git", "branch", "--list", "--format=%(refname:short)"],
+            capture_output=True, text=True,
+        ).stdout.splitlines()
+        candidates = [b.strip() for b in branches if b.strip()]
+        listed = ", ".join(sorted(candidates)) if candidates else "(no local branches)"
+        raise BaseBranchError(
+            f"base '{base}' does not exist locally or on origin — probable typo. "
+            f"Local branches: {listed}"
+        )
+    stderr = remote.stderr.strip() or remote.stdout.strip() or "(no git output)"
+    raise BaseBranchError(
+        f"base '{base}' could not be verified against origin — remote unreachable "
+        f"(offline or auth failure), not confirmed missing: {stderr}"
+    )
+
+
 # Paths the scaffold overlay owns — auto_sync writes these on upgrade. They are
 # the driver's, not the user's edits: they may carry onto a feature branch and
 # are folded into the --prepare scaffold commit. Mirrors scaffold.py's versioned
@@ -1059,34 +1131,41 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
     ).stdout.strip()
     if current == branch:
         return
+    # A declared `base` (T01's resolve_base/ensure_base_ref) is the branch's
+    # true starting point, not wherever HEAD happens to be standing. Resolving
+    # and fetching it here — before any checkout — lets both branch creation
+    # and the staleness check below anchor on the base instead of HEAD.
+    # BaseBranchError is intentionally left to propagate uncaught: the base
+    # cause must reach the operator, not be reshaped into a FeatureBranchError.
+    base = resolve_base(feat_fm)
+    if base:
+        ensure_base_ref(base)
+    else:
+        base = current
     exists = subprocess.run(
         ["git", "rev-parse", "--verify", branch],
         capture_output=True, text=True,
     ).returncode == 0
     if exists:
-        # Surface a stale branch that diverged from the current base instead of
-        # silently reusing it. `merge-base --is-ancestor B HEAD` exits 0 iff B
-        # is an ancestor of HEAD (i.e. HEAD already contains B — safe to reuse).
+        # Surface a stale branch that diverged from the declared base instead
+        # of silently reusing it. `merge-base --is-ancestor B <base>` exits 0
+        # iff B is an ancestor of base (i.e. base already contains B — safe).
         is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", branch, "HEAD"],
+            ["git", "merge-base", "--is-ancestor", branch, base],
             capture_output=True, text=True,
         ).returncode == 0
         if not is_ancestor:
             raise FeatureBranchError(
-                f"branch '{branch}' already exists and has diverged from your "
-                f"current branch '{current}' (it carries commits HEAD does not). "
-                f"Refusing to silently check it out — that could build on a stale "
-                f"base or lose work. Pick one, then re-run:\n"
-                f"  - resume that branch's work:    git checkout {branch}\n"
-                f"  - rebase it onto here:          git checkout {branch} && "
-                f"git rebase {current}\n"
-                f"  - discard it (work not needed): git branch -D {branch}   "
-                f"(the loop recreates it from HEAD)"
+                f"branch '{branch}' has diverged from '{base}' — it carries "
+                f"commits '{base}' does not, likely because it was created "
+                f"from a different starting point or '{base}' has since moved "
+                f"on. The safe action is to bring it up to date with the base:\n"
+                f"  git checkout {branch} && git rebase {base}"
             )
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
-        # Create-from-HEAD carries the working tree onto the new branch. Only
+        # Create-from-base carries the working tree onto the new branch. Only
         # the expected /pick-feature flips may ride along; anything else stops.
         dirty = _tracked_dirty_paths()
         # Scaffold-overlay files (auto_sync's own upgrade writes) ride along too:
@@ -1101,8 +1180,8 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
                 + f". Refusing to carry them onto new branch '{branch}'. "
                 "Commit or stash them first, then re-run."
             )
-        _checked_checkout(["checkout", "-B", branch], f"create of branch '{branch}'")
-        print(f"Created feature branch '{branch}' from '{current}'.")
+        _checked_checkout(["checkout", "-B", branch, base], f"create of branch '{branch}'")
+        print(f"Created feature branch '{branch}' from '{base}'.")
 
 
 def acquire_tree_lock(specfuse_dir: Path):

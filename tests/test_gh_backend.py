@@ -18,6 +18,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import specfuse.loop.loop as _pkg_loop
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -49,9 +51,16 @@ class TestGitHubBackendHooks(unittest.TestCase):
 
     def setUp(self):
         self.calls: list[list[str]] = []
+        # Idempotency-probe returncode a stub_runner call to `gh pr view` reports.
+        # Defaults to "not found" (1) so PR-creation tests exercise the create path
+        # without each having to configure it explicitly.
+        self.probe_returncode = 1
 
-        def stub_runner(args: list) -> None:
+        def stub_runner(args: list, check: bool = True):
             self.calls.append(list(args))
+            if args[:3] == ["gh", "pr", "view"]:
+                return type("R", (), {"returncode": self.probe_returncode})()
+            return None
 
         self.backend = GitHubBackend("owner/repo", 287, runner=stub_runner)
 
@@ -76,15 +85,14 @@ class TestGitHubBackendHooks(unittest.TestCase):
             "initiative": "INIT-1",
         })
         self.calls.clear()
-        # gh pr view returns nonzero -> PR does not yet exist.
-        with patch.object(_gh.subprocess, "run") as mock_run:
-            mock_run.return_value = type("R", (), {"returncode": 1})()
-            self.backend.on_feature_complete("FEAT-2026-0003")
-        self.assertEqual(len(self.calls), 2)
-        self.assertEqual(self.calls[0][:3], ["gh", "pr", "create"])
-        self.assertIn("--head", self.calls[0])
-        self.assertEqual(self.calls[0][self.calls[0].index("--head") + 1], "feat/FEAT-2026-0003")
-        self.assertEqual(self.calls[1], [
+        # probe_returncode stays at setUp's default (1) -> PR does not yet exist.
+        self.backend.on_feature_complete("FEAT-2026-0003")
+        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(self.calls[0][:3], ["gh", "pr", "view"])
+        self.assertEqual(self.calls[1][:3], ["gh", "pr", "create"])
+        self.assertIn("--head", self.calls[1])
+        self.assertEqual(self.calls[1][self.calls[1].index("--head") + 1], "feat/FEAT-2026-0003")
+        self.assertEqual(self.calls[2], [
             "gh", "issue", "edit", "287",
             "--repo", "owner/repo",
             "--add-label", "state:done",
@@ -94,11 +102,46 @@ class TestGitHubBackendHooks(unittest.TestCase):
     def test_on_feature_complete_skips_pr_when_already_exists(self):
         self.backend.on_feature_start("FEAT-2026-0003", {"branch": "feat/x", "title": "t"})
         self.calls.clear()
-        with patch.object(_gh.subprocess, "run") as mock_run:
-            mock_run.return_value = type("R", (), {"returncode": 0})()
+        self.probe_returncode = 0
+        self.backend.on_feature_complete("FEAT-2026-0003")
+        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(self.calls[0][:3], ["gh", "pr", "view"])
+        self.assertEqual(self.calls[1][:4], ["gh", "issue", "edit", "287"])
+
+    def test_gh_pr_view_probe_goes_through_runner(self):
+        """The idempotency probe must be observable by the injected runner,
+        not escape via a direct subprocess.run call (see gh_backend.py's
+        on_feature_complete)."""
+        self.backend.on_feature_start("FEAT-2026-0003", {"branch": "feat/x", "title": "t"})
+        self.calls.clear()
+        self.backend.on_feature_complete("FEAT-2026-0003")
+        probe_calls = [c for c in self.calls if c[:3] == ["gh", "pr", "view"]]
+        self.assertEqual(len(probe_calls), 1)
+        self.assertEqual(probe_calls[0], ["gh", "pr", "view", "feat/x", "--repo", "owner/repo", "--json", "number"])
+
+    def test_pr_create_targets_resolved_base(self):
+        self.backend.on_feature_start("FEAT-2026-0003", {
+            "branch": "feat/FEAT-2026-0003",
+            "title": "Add thing",
+            "base": "release/2026.1",
+        })
+        self.calls.clear()
+        self.backend.on_feature_complete("FEAT-2026-0003")
+        create_call = next(c for c in self.calls if c[:3] == ["gh", "pr", "create"])
+        self.assertIn("--base", create_call)
+        self.assertEqual(create_call[create_call.index("--base") + 1], "release/2026.1")
+
+    def test_pr_create_targets_default_branch_when_base_absent(self):
+        self.backend.on_feature_start("FEAT-2026-0003", {
+            "branch": "feat/FEAT-2026-0003",
+            "title": "Add thing",
+        })
+        self.calls.clear()
+        with patch.object(_pkg_loop, "_default_branch", return_value="develop"):
             self.backend.on_feature_complete("FEAT-2026-0003")
-        self.assertEqual(len(self.calls), 1)
-        self.assertEqual(self.calls[0][:4], ["gh", "issue", "edit", "287"])
+        create_call = next(c for c in self.calls if c[:3] == ["gh", "pr", "create"])
+        self.assertIn("--base", create_call)
+        self.assertEqual(create_call[create_call.index("--base") + 1], "develop")
 
     def test_github_backend_is_backend_subclass(self):
         self.assertIsInstance(self.backend, Backend)

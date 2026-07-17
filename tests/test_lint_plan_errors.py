@@ -236,5 +236,46 @@ class TestLintValidRegression(unittest.TestCase):
         self.assertEqual(errs, [], f"valid fixture produced errors: {errs}")
 
 
+class TestLintBaseKey(unittest.TestCase):
+    """FEAT-2026-0031/T01: optional PLAN.md `base` frontmatter key."""
+
+    def test_base_empty_string_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_minimal_feature(Path(tmp))
+            plan = (feat / "PLAN.md").read_text()
+            plan = plan.replace("status: active\n---", "status: active\nbase: \n---")
+            (feat / "PLAN.md").write_text(plan)
+            errs = lint_plan.lint(feat)
+        self.assertTrue(any("base" in e and "FEAT-2026-0099" in e for e in errs),
+                        f"expected base-key error naming the feature; errs={errs}")
+
+    def test_base_whitespace_only_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_minimal_feature(Path(tmp))
+            plan = (feat / "PLAN.md").read_text()
+            plan = plan.replace('status: active\n---', 'status: active\nbase: "   "\n---')
+            (feat / "PLAN.md").write_text(plan)
+            errs = lint_plan.lint(feat)
+        self.assertTrue(any("base" in e for e in errs),
+                        f"expected base-key error; errs={errs}")
+
+    def test_base_valid_string_accepted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_minimal_feature(Path(tmp))
+            plan = (feat / "PLAN.md").read_text()
+            plan = plan.replace("status: active\n---", "status: active\nbase: release/9.9\n---")
+            (feat / "PLAN.md").write_text(plan)
+            errs = lint_plan.lint(feat)
+        self.assertEqual(errs, [], f"valid base value produced errors: {errs}")
+
+    def test_missing_base_key_still_passes(self):
+        """Regression fixture (criterion 12): no `base` key at all lints clean."""
+        errs = lint_plan.lint(EXAMPLE_FEATURE)
+        self.assertEqual(errs, [], f"no-base fixture produced errors: {errs}")
+
+    def test_base_not_in_required_keys(self):
+        self.assertNotIn("base", lint_plan.REQUIRED_FEATURE_KEYS)
+
+
 if __name__ == "__main__":
     unittest.main()
