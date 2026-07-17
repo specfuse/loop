@@ -43,6 +43,33 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0031"></a>
+## FEAT-2026-0031 — Configurable integration branch
+
+**Why.** A feature branch is cut from whatever HEAD happens to be — `ensure_feature_branch`
+runs a bare `git checkout -B <branch>` with no base ref — and the GH backend hardcodes
+`gh pr create --base main`. Teams working off a long-lived integration or release branch
+therefore cannot use the loop without wrong-target PRs (or a `gh` failure where no `main`
+exists). Cutting from a non-default base does work today, but only by accident: nothing
+validates that HEAD is the intended base, nothing records what the base was, and the
+staleness guard's rebase hint points at the current branch rather than a configured one.
+
+**Goal.** Make a feature's base branch an explicit, recorded property instead of implicit
+operator state. Add an optional `base` key to PLAN.md frontmatter, linted alongside the
+existing required `branch` key; thread it into `checkout -B <branch> <base>` and into the
+PR-create call in place of the literal `main`; resolve the staleness guard and its rebase
+hint against the same base. Default to the existing repo-default detection helper rather
+than a hardcoded string. Settle precedence explicitly: frontmatter is the truth (base is a
+property of the feature, surviving across driver runs and operators), an optional CLI flag
+overrides, repo-default detection is the fallback — HEAD-implicit stops being load-bearing.
+
+**Benefits.** Unblocks release- and integration-branch workflows, which the loop currently
+cannot serve. Removes the last hardcoded `main` from the PR path. Makes the base auditable
+across driver runs and operators instead of dependent on which branch the human happened to
+have checked out, which also closes the silent-wrong-base failure mode.
+
+**Status: active.**
+
 <a id="feat-2026-0025"></a>
 ## FEAT-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
 

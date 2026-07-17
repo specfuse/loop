@@ -13,9 +13,14 @@ from typing import Callable, Optional
 from . import loop as _loop
 
 
-def _default_runner(args: list) -> None:
-    """Shell out to gh with the given argument list. Not called in tests."""
-    subprocess.run(args, check=True, capture_output=True, text=True)
+def _default_runner(args: list, check: bool = True):
+    """Shell out to gh with the given argument list. Not called in tests.
+
+    Returns the completed process so probing callers (e.g. the `gh pr view`
+    idempotency check) can inspect `.returncode` without raising; side-effecting
+    callers pass no `check` override and get the prior raise-on-failure behavior.
+    """
+    return subprocess.run(args, check=check, capture_output=True, text=True)
 
 
 class GitHubBackend(_loop.Backend):
@@ -55,9 +60,9 @@ class GitHubBackend(_loop.Backend):
         title = feat_fm.get("title", feature_id)
 
         # Idempotent: skip PR creation if one already exists for this branch.
-        check = subprocess.run(
+        check = self._runner(
             ["gh", "pr", "view", branch, "--repo", self.repo, "--json", "number"],
-            capture_output=True, text=True,
+            check=False,
         )
         if check.returncode != 0:
             body = (
@@ -70,7 +75,7 @@ class GitHubBackend(_loop.Backend):
                 "gh", "pr", "create",
                 "--title", f"[{feature_id}] {title}",
                 "--body", body,
-                "--base", "main",
+                "--base", _loop.resolve_base(feat_fm),
                 "--head", branch,
             ])
 

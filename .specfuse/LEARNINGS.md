@@ -1698,3 +1698,38 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   vs generator) and bound its ACs to that mechanism's surfaces only; an AC that reaches into
   a sibling delivery path's internals is a mis-scope that will block or force a driver-internals
   edit.
+
+- [FEAT-2026-0031/G1-CLOSE] *(operator-authored — the gate auto-closed, so no close session
+  ran to write this; see the companion lesson below.)* An injected-runner seam that only
+  **some** calls route through gives tests false confidence. `gh_backend.py`'s
+  `on_feature_complete` took a `runner=` injection and had a `runner=stub_runner` test suite
+  (`tests/test_gh_backend.py`) — but its `gh pr view` idempotency probe called
+  `subprocess.run` **directly**, so the stub intercepted `gh pr create` while the probe
+  escaped to the real binary. Every existing test passed; the probe was simply never
+  exercised. Found by *reading* the module while drafting FEAT-2026-0031/T03, not by any
+  test — a bypassed seam is invisible to the suite that assumes it. The fix widened
+  `_default_runner(args, check=True)` to return the completed process, so the probe inspects
+  `.returncode` without raising while side-effecting callers keep raise-on-failure
+  (commit ed44c62). Rule: when a module takes a runner/client injection for testability, an
+  audit that **every** external call goes through it is part of the seam's contract — grep
+  the module for the raw call (`subprocess.run`, `requests.`, the SDK entrypoint) and assert
+  zero direct hits. A partial seam is worse than none: it reads as covered.
+
+- [FEAT-2026-0031/G1-CLOSE] Auto-close silently voids a close WU's `produces:` contract and
+  every acceptance criterion in its body — the deliverable-presence gate (FEAT-2026-0022)
+  cannot fire on a WU that is never dispatched. FEAT-2026-0031's `G1-CLOSE` declared
+  `produces: [RETROSPECTIVE.md, .specfuse/LEARNINGS.md]` and carried explicit AC bullets for
+  a `## Cost analysis` section, a `## What the loop did NOT verify` list (pre-populated with
+  two known deferred `gh` oracles), and four candidate lessons. The gate stayed on-plan, so
+  `evaluate_auto_close` fired (`predicate=v1, reasons=[], auto=True`): the WU closed
+  `verdict: met` with `attempts: 0`, a 10-line stub retrospective was written, and
+  `LEARNINGS.md` received **zero** entries. Nothing failed; the ceremony simply never ran,
+  and the feature's only record of its deferred-verification gaps was the operator's session.
+  This is §6 ceremony proportionality working as designed — but the design's cost is
+  invisible at authoring time, because a carefully-written close WU looks like a contract and
+  is actually a conditional. Rule: when drafting a feature whose close WU carries deliverables
+  that matter **independently of reflection quality** (a deferred-verification list, a
+  cross-repo handoff note, a security caveat), do not rely on the close WU to produce them —
+  either put them in a substantive WU that always dispatches, or plan to write them by hand
+  after an auto-close. Corollary for reviewers: `auto_close: true` + `attempts: 0` on a close
+  WU means its body was never executed; read the WU's ACs as *unfulfilled*, not as evidence.
