@@ -17,8 +17,12 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "==> Installing the leak-scan pre-commit hook (core.hooksPath)"
+echo "==> Installing git hooks (core.hooksPath)"
+# core.hooksPath is single-valued: one directory holds ALL hooks. .specfuse/hooks
+# carries both pre-commit (leak-scan) and pre-push (smoke-test); arm both so this
+# installer and scripts/install-hooks.sh no longer clobber each other (issue #153).
 git config core.hooksPath .specfuse/hooks
+chmod +x .specfuse/hooks/pre-commit .specfuse/hooks/pre-push
 echo "    core.hooksPath = $(git config core.hooksPath)"
 
 DENYLIST=".specfuse/scripts/leak_denylist.txt"
@@ -50,5 +54,6 @@ else
 fi
 
 echo
-echo "Setup complete. The pre-commit hook now runs leak-scan on every commit."
-echo "Emergency bypass (CI still enforces secrets): git commit --no-verify"
+echo "Setup complete. pre-commit runs leak-scan on every commit; pre-push runs"
+echo "the smoke test before every push."
+echo "Emergency bypass (CI still enforces secrets): git commit/push --no-verify"
