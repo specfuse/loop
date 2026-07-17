@@ -7,7 +7,7 @@
 # inside a fresh Ubuntu container to catch fs/cleanup races that don't
 # fire on the operator's macOS (APFS) but do on Linux CI runners (ext4).
 #
-# Rationale: this repo's pre-push hook (`/.githooks/pre-push` ->
+# Rationale: this repo's pre-push hook (`.specfuse/hooks/pre-push` ->
 # `scripts/smoke-test.sh`) runs the same gates CI runs, but on the
 # operator's local platform — script-parity, not environment-parity.
 # Once-luck plus platform difference means a race that's deterministic
