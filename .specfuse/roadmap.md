@@ -46,7 +46,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
-| FEAT-2026-0031 | Configurable integration branch | active | — | — |
+| FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to
@@ -635,32 +635,6 @@ FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adopti
 
 **Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
-
-## FEAT-2026-0031 — Configurable integration branch
-
-**Why.** A feature branch is cut from whatever HEAD happens to be — `ensure_feature_branch`
-runs a bare `git checkout -B <branch>` with no base ref — and the GH backend hardcodes
-`gh pr create --base main`. Teams working off a long-lived integration or release branch
-therefore cannot use the loop without wrong-target PRs (or a `gh` failure where no `main`
-exists). Cutting from a non-default base does work today, but only by accident: nothing
-validates that HEAD is the intended base, nothing records what the base was, and the
-staleness guard's rebase hint points at the current branch rather than a configured one.
-
-**Goal.** Make a feature's base branch an explicit, recorded property instead of implicit
-operator state. Add an optional `base` key to PLAN.md frontmatter, linted alongside the
-existing required `branch` key; thread it into `checkout -B <branch> <base>` and into the
-PR-create call in place of the literal `main`; resolve the staleness guard and its rebase
-hint against the same base. Default to the existing repo-default detection helper rather
-than a hardcoded string. Settle precedence explicitly: frontmatter is the truth (base is a
-property of the feature, surviving across driver runs and operators), an optional CLI flag
-overrides, repo-default detection is the fallback — HEAD-implicit stops being load-bearing.
-
-**Benefits.** Unblocks release- and integration-branch workflows, which the loop currently
-cannot serve. Removes the last hardcoded `main` from the PR path. Makes the base auditable
-across driver runs and operators instead of dependent on which branch the human happened to
-have checked out, which also closes the silent-wrong-base failure mode.
-
-**Status: active.**
 
 ## Notes
 

@@ -5,7 +5,7 @@ slug: configurable-integration-branch
 branch: feat/FEAT-2026-0031-configurable-integration-branch
 roadmap_goal: Make a feature's base branch an explicit property declared once in PLAN.md frontmatter and read by every consumer — branch creation, the staleness guard, and PR creation — so teams working off a long-lived integration or release branch can run the loop without wrong-target PRs or spurious halts.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 5.50
 ---
 
