@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0031/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.20
 oracle_env: github_actions_ci
 produces_driver_helper: GitHubBackend.on_feature_complete
@@ -11,6 +11,15 @@ produces:
   - plugins/specfuse/skills/wrap-feature/SKILL.md
   - tests/test_gh_backend.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.13
+started_at: 2026-07-17T12:41:42.214326+00:00
+duration_seconds: 409.835
+cost_usd: 1.224825
+input_tokens: 68
+output_tokens: 14507
 ---
 
 # Target the PR at the resolved base instead of a hardcoded `main`

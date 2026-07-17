@@ -128,10 +128,14 @@ this.
 
 ### 3. Open the PR
 
+- Resolve the PR's base ref: PLAN.md frontmatter `base` if set and
+  non-empty, else the repo's default branch. Do not rely on
+  `--fill` to inherit GitHub's repo default — name it explicitly so
+  the PR always targets the feature's actual integration branch.
 - Probe `gh auth status` once. If ✗: per LEARNINGS, print the
-  exact `gh pr create --fill` command for the operator and skip
-  to step 4.
-- If ✓: ask "Open PR via `gh pr create --fill`? (y / n)"
+  exact `gh pr create --fill --base <resolved_base>` command for
+  the operator and skip to step 4.
+- If ✓: ask "Open PR via `gh pr create --fill --base <resolved_base>`? (y / n)"
 - On y: run it. Capture the PR URL from output; report it.
 - On n: print the command for the operator.
 
