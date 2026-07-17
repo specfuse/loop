@@ -62,3 +62,6 @@ jobs:
 
       - name: Dry-run walk the bundled example
         run: python .specfuse/scripts/loop.py --feature FEAT-2026-0001-health-endpoint --dry-run
+
+      - name: Real-Windows gate-exec oracle (Git-Bash routing + python3 normalization)
+        run: python -m unittest tests.test_windows_gate_exec -v
