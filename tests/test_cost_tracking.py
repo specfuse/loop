@@ -22,6 +22,7 @@ import unittest
 from pathlib import Path
 
 from tests._loop_loader import load_loop
+from tests._workspace import with_deliverable
 from tests.test_driver_integration import (
     integration_workspace,
     write_minimal_feature,
@@ -125,6 +126,11 @@ class TestCostTrackingIntegration(unittest.TestCase):
 
     def _patch(self, name: str, replacement):
         self._patches.append((name, getattr(loop, name)))
+        # Dispatch stubs must write a deliverable or the presence gate
+        # (FEAT-2026-0022) rejects the WU as hollow. See #150 —
+        # `.specfuse/.loop.lock` used to stand in as the deliverable.
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_enabled_writes_cost_to_wu_frontmatter_and_events(self):

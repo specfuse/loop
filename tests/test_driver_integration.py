@@ -26,7 +26,7 @@ import unittest
 from pathlib import Path
 
 from tests._loop_loader import load_loop
-from tests._workspace import integration_workspace
+from tests._workspace import integration_workspace, with_deliverable
 
 loop = load_loop()
 
@@ -90,6 +90,13 @@ gates:
             f"---\nid: {wu_id}\ntype: {wu_type}\nmodel: claude-haiku-4-5-20251001\n"
             f"status: {wu_status}\nattempts: 0\n---\n\n# {tnn}{body}"
         )
+    # Mirror the real repo's .gitignore for driver-owned runtime files. Without
+    # this the fixture repo leaves `.specfuse/.loop.lock` untracked, and before
+    # #150 `squash_commit`'s `git add -A` committed it — where it silently
+    # satisfied the deliverable-presence guard for stub dispatches that write
+    # nothing. The lock file is not a deliverable; the real .gitignore has always
+    # excluded it, so the fixture models reality by doing the same.
+    (root / ".gitignore").write_text(".specfuse/.loop.lock\n")
     # Stage and commit the scaffold so the driver starts from a clean tree.
     subprocess.run(["git", "-C", str(root), "add", "."], check=True)
     subprocess.run(["git", "-C", str(root), "commit", "-q", "-m",
@@ -147,6 +154,11 @@ class TestBug1StatusFlipSurvivesReset(unittest.TestCase):
 
     def _patch(self, name: str, replacement):
         self._patches.append((name, getattr(loop, name)))
+        # Dispatch stubs must write a deliverable or the presence gate
+        # (FEAT-2026-0022) rejects the WU as hollow. See #150 —
+        # `.specfuse/.loop.lock` used to stand in as the deliverable.
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_passed_then_blocked_flips_persist(self):
@@ -253,6 +265,11 @@ class TestBug2FeatureBranchCheckout(unittest.TestCase):
 
     def _patch(self, name: str, replacement):
         self._patches.append((name, getattr(loop, name)))
+        # Dispatch stubs must write a deliverable or the presence gate
+        # (FEAT-2026-0022) rejects the WU as hollow. See #150 —
+        # `.specfuse/.loop.lock` used to stand in as the deliverable.
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_driver_switches_to_declared_branch(self):
