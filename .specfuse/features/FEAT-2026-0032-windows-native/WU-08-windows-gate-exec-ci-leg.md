@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0032/T08
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 0.85
 oracle_env: github_actions_ci
@@ -9,6 +9,10 @@ produces: ["tests/test_windows_gate_exec.py", ".github/workflows/ci.yml"]
 model: sonnet
 effort: medium
 gate_set: code
+duration_seconds: 729.185
+cost_usd: 1.662945
+input_tokens: 102
+output_tokens: 13393
 ---
 
 <!--
