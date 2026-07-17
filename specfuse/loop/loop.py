@@ -2542,7 +2542,17 @@ def write_stub_retrospective_terminal(
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n"
+        f"- reasons: [] (auto=True)\n\n"
+        # issue #157: terminal auto-close skips the close body AND has no
+        # downstream gate to catch the gap — the operator is the last line.
+        f"## What the loop did NOT verify (gate {gate_number})\n\n"
+        f"This terminal gate auto-closed on-plan; the full close ceremony did not\n"
+        f"run, so the per-criterion deferred-verification list was **not**\n"
+        f"enumerated, and there is no downstream gate to reconcile it. Before\n"
+        f"treating the feature as fully verified, the operator MUST confirm every\n"
+        f"acceptance criterion was actually verified in-loop (not only by artifact\n"
+        f"shape). Any AC deferred to a post-merge or real-system step must be\n"
+        f"recorded and completed now.\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -2670,7 +2680,18 @@ def append_stub_retrospective_intermediate(
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n"
+        f"- reasons: [] (auto=True)\n\n"
+        # issue #157: the auto-close path skips the close-intermediate body, so
+        # the per-criterion deferred-verification list is never enumerated. Emit
+        # an explicit marker rather than silently omitting it — the predicate
+        # cannot reason over ACs, so it flags the gap for downstream reconciliation.
+        f"## What the loop did NOT verify (gate {gate_number})\n\n"
+        f"This gate auto-closed on-plan; the full close-intermediate ceremony did\n"
+        f"not run, so the per-criterion deferred-verification list was **not**\n"
+        f"enumerated. Any acceptance criterion whose verification is deferred\n"
+        f"(loop-sandbox limit, cross-repo coordination, real-system access) is\n"
+        f"unrecorded here. Gate {gate_number + 1}'s close MUST reconcile these\n"
+        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
