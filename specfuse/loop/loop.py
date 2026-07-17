@@ -1716,6 +1716,39 @@ def extract_smoke_imports(wu_body: str) -> list[str]:
     return out
 
 
+LEADING_PYTHON3_RE = re.compile(r'^(\s*)python3\b')
+
+
+def resolve_windows_interpreter() -> str:
+    """Return the interpreter token to substitute for a leading `python3`.
+
+    Windows Python ships `python` and the `py` launcher, never `python3`. A
+    bare `python` token is the safest form to hand to Git-Bash `bash -c` —
+    unlike a raw `sys.executable` path, it has no backslashes for MSYS to
+    mangle (cross-repo contract, see GATE-02-REVIEW.md). No real-Windows-runner
+    round-trip has verified this from the sandbox; T08 owns that proof.
+    """
+    return "python"
+
+
+def normalize_interpreter(command: str) -> str:
+    """Rewrite a leading `python3` token to the Windows interpreter, else no-op.
+
+    POSIX (`sys.platform != "win32"`): returns `command` unchanged — target
+    repos and the driver's own smoke imports already assume `python3` exists.
+    Windows: rewrites ONLY a `python3` token anchored at the start of the
+    command string (optionally after leading whitespace); a `python3`
+    appearing later, e.g. inside a quoted argument, is left untouched.
+    """
+    if sys.platform != "win32":
+        return command
+    match = LEADING_PYTHON3_RE.match(command)
+    if not match:
+        return command
+    interpreter = resolve_windows_interpreter()
+    return match.group(1) + interpreter + command[match.end():]
+
+
 def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     """Run each smoke-import command in `cwd` in declared order.
 
@@ -1730,6 +1763,7 @@ def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     active venv per `[loop-driver-operation]`).
     """
     for cmd in commands:
+        cmd = normalize_interpreter(cmd)
         proc = subprocess.run(  # nosec B602
             cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
         )
@@ -1931,6 +1965,7 @@ def verify(wu: WorkUnit, feature_dir: Path,
     results, ok_all = [], True
     for gate in gate_set:
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
+        command = normalize_interpreter(command)
         # shell=True is intentional: gate commands are authored by the user in
         # verification.yml and routinely use shell features (pipes, &&, glob,
         # redirects — e.g. `dotnet build && dotnet test --no-build`). The input

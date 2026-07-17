@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0032/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 oracle_env: linux_docker
 produces: tests/test_interpreter_normalization.py
@@ -10,6 +10,12 @@ produces_driver_helper: normalize_interpreter
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T17:02:30.971626+00:00
+duration_seconds: 241.925
+cost_usd: 0.776869
+input_tokens: 44
+output_tokens: 7183
 ---
 
 <!--
