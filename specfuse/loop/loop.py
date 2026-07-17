@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import fcntl
 import hashlib
 import json
 import logging
@@ -54,6 +53,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import _filelock
 from . import _miniyaml
 from . import scaffold as _scaffold
 from .gate_eval import evaluate_auto_close, AutoCloseDecision
@@ -1205,22 +1205,14 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
 
 
 def acquire_tree_lock(specfuse_dir: Path):
-    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive flock.
+    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive lock.
 
-    Returns the open file object; caller keeps it alive for the process
-    lifetime — the kernel auto-releases on fd close or process exit (SIGKILL
-    included), so no stale-lock cleanup is ever needed.
+    Delegates to `_filelock`, which selects fcntl.flock (POSIX) or
+    msvcrt.locking (Windows) by sys.platform. See `_filelock` for why the
+    kernel-auto-release property this preserves rules out pidfiles.
     Raises BlockingIOError if another process already holds the lock.
     """
-    lock_path = specfuse_dir / ".loop.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = lock_path.open("w")
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        fd.close()
-        raise
-    return fd
+    return _filelock.acquire_tree_lock(specfuse_dir)
 
 
 def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:

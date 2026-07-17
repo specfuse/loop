@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0032/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 oracle_env: linux_docker
 produces: ["specfuse/loop/_filelock.py", "tests/test_filelock_portable.py"]
 produces_driver_helper: acquire_tree_lock
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:07:07.007745+00:00
+duration_seconds: 349.34
+cost_usd: 1.063703
+input_tokens: 54
+output_tokens: 12030
 ---
 
 <!--
