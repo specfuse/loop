@@ -1733,3 +1733,27 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   either put them in a substantive WU that always dispatches, or plan to write them by hand
   after an auto-close. Corollary for reviewers: `auto_close: true` + `attempts: 0` on a close
   WU means its body was never executed; read the WU's ACs as *unfulfilled*, not as evidence.
+
+- [FEAT-2026-0032/G2-CLOSE] A gate-1 deferral that names a *later gate* as its verification
+  venue is not closed just because that gate ships — the later gate has to actually exercise
+  the deferred path. Gate 1 deferred T02's real-Windows timeout `taskkill` branch to "gate 2's
+  gate execution." Gate 2's CI oracle (T08) does run a real gate command through Git-Bash on
+  `windows-latest`, but that command **passes** (`… && echo GATE_OK`); nothing drives a gate to
+  timeout, so the `CREATE_NEW_PROCESS_GROUP` + `taskkill` branch stayed unexercised. The
+  deferral read as "gate 2 will close it," gate 2 closed the *happy path*, and the kill path
+  silently rode into the close as still-open — caught only because WU-92 AC3 forced folding the
+  gate-1 deferrals back in and asking "resolved?". Rule: when deferring an AC to a future gate,
+  the deferral must name the **specific WU/oracle** that will exercise it (here: a CI leg that
+  drives a gate to timeout and asserts the kill), not just the gate; and the future gate's close
+  must verify each inherited deferral was *actually* exercised, not merely that the gate shipped.
+  A deferral pointed at a gate is a promise the gate can silently break.
+
+- [FEAT-2026-0032/T08] A CI-oracle WU whose real exit condition is a `windows-latest` (or any
+  cross-OS) PR job is `done` in-loop the moment its `@skipUnless(sys.platform=="win32")` test is
+  collected-and-skipped on the Linux sandbox and the wiring lints — which proves the wiring and
+  the skip, NOT that the gate ran green on the target OS. Combined with `[FEAT-2026-0024/G2-CLOSE]`:
+  such a feature's close must report `partially_met`/`met_locally` (never `met`) until the operator
+  confirms the real-runner job is green, so `verdict_permits_terminal_flips` holds the terminal
+  `PLAN status → done` flip. Tell at draft time: any WU whose oracle is a CI leg on an OS the loop
+  sandbox is not, ships its real proof PR-deferred — enumerate it in the close's `## What the loop
+  did NOT verify` and hedge the verdict.

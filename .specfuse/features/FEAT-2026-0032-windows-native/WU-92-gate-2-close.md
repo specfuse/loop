@@ -1,10 +1,15 @@
 ---
 id: FEAT-2026-0032/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 1.20
 generated_surfaces: []
+verdict: partially_met
+duration_seconds: 600.75
+cost_usd: 4.122038
+input_tokens: 97
+output_tokens: 40219
 ---
 
 <!--
