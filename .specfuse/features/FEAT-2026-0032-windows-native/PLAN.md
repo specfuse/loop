@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0032-windows-native
 roadmap_goal: Run the specfuse-loop driver on native Windows without WSL — importable, gate commands executing through Git-Bash, home-path redaction correct — proven by a windows-latest CI leg, so corporate-managed and non-technical Windows users can run the loop.
 autonomy_default: review
 status: active
-planned_cost_usd: 6.90
+planned_cost_usd: 10.65
 ---
 
 <!--
