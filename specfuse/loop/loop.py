@@ -719,14 +719,34 @@ class FeatureBranchError(RuntimeError):
     """
 
 
+def untracked_paths() -> set[str]:
+    """Repo-relative paths git reports as untracked, honoring .gitignore.
+
+    Snapshotted per-WU immediately before dispatch so `squash_commit` can tell
+    "the operator already had this file" from "this run created it" — only the
+    latter belongs in the WU's commit. See issue #150 and `squash_commit`.
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
 def _tracked_dirty_paths() -> set[str]:
     """Paths with TRACKED, uncommitted changes (staged or unstaged), repo-relative.
 
     Untracked files (porcelain `??`) are excluded: they never block a create
-    (`checkout -B`) and carry harmlessly, so counting them would spuriously
-    flag a leftover events.jsonl as an "unexpected" change. The dirty-tree
-    failure in #48 is tracked local modifications ("your local changes would
-    be overwritten by checkout"), which is exactly what this set captures.
+    (`checkout -B`), so counting them would spuriously flag a leftover
+    events.jsonl as an "unexpected" change. The dirty-tree failure in #48 is
+    tracked local modifications ("your local changes would be overwritten by
+    checkout"), which is exactly what this set captures.
+
+    This exclusion means untracked files DO carry onto a freshly created feature
+    branch. That is safe only because `squash_commit` refuses to stage untracked
+    paths that pre-date the WU's dispatch (#150) — before that fix, its
+    `git add -A` committed them, so this guard was strictly narrower than the
+    commit that followed it.
     """
     out = subprocess.run(
         ["git", "status", "--porcelain"],
@@ -1423,12 +1443,38 @@ class SquashCommitError(RuntimeError):
     """
 
 
-def squash_commit(wu: WorkUnit, head_before: str) -> str | None:
+def squash_commit(
+    wu: WorkUnit,
+    head_before: str,
+    untracked_before: "set[str] | frozenset[str]" = frozenset(),
+) -> str | None:
+    """Squash the WU's work into one commit; return its sha, or None if nothing.
+
+    `untracked_before` is the set of untracked paths captured immediately before
+    this WU was dispatched (see `untracked_paths`). Those are the operator's —
+    scratch notes, another harness's config, a local script — and are unstaged
+    after `add -A` so they are not absorbed into the WU's commit (#150). Files
+    the run itself created are still committed: the distinction is "did this
+    dispatch create it", not "is it tracked".
+
+    Callers that omit the snapshot keep the legacy stage-everything behavior.
+    """
     if git("rev-parse", "HEAD") != head_before:
         git("reset", "--soft", head_before)  # fold away any commits the agent made
     if not git("status", "--porcelain"):
         return None
     git("add", "-A")
+    if untracked_before:
+        # Unstage the operator's pre-existing untracked files. Paths the agent
+        # deleted during dispatch are skipped — `git reset -- <missing>` is fine,
+        # but pathspec-matching nothing errors on some git versions.
+        stale = sorted(p for p in untracked_before if Path(p).exists())
+        if stale:
+            git("reset", "-q", "--", *stale)
+        # `add -A` may have had nothing else to stage: a WU whose only tree
+        # change was the operator's WIP must not manufacture a commit from it.
+        if not git("diff", "--cached", "--name-only"):
+            return None
     msg = f"feat: {wu.title}\n\nFeature: {wu.wu_id}"
     res = subprocess.run(
         ["git", "commit", "-m", msg], capture_output=True, text=True,
@@ -3493,6 +3539,11 @@ def run(
                     # Fall through to existing close-WU dispatch path
 
                 head_before = git("rev-parse", "HEAD")
+                # Snapshot the operator's untracked files alongside head_before:
+                # squash_commit must not absorb WIP that pre-dates this dispatch
+                # (#150). Captured here, not inside squash_commit, because by
+                # then the agent's own new files are indistinguishable from it.
+                untracked_before = untracked_paths()
                 _is_rearm = detect_rearm_dispatch(wu)
                 if _is_rearm:
                     fold_cumulative_on_rearm(wu, backend)
@@ -3632,7 +3683,8 @@ def run(
                         backend.set_wu(wu, "status", DONE)
                         write_cost_to_wu(backend, wu, cum_usage)
                         try:
-                            sha = squash_commit(wu, head_before)
+                            sha = squash_commit(wu, head_before,
+                                                untracked_before=untracked_before)
                         except SquashCommitError as exc:
                             # The squash commit was rejected (typically a
                             # pre-commit hook). Treat as a failed attempt rather

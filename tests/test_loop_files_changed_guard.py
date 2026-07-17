@@ -28,7 +28,7 @@ import unittest
 from pathlib import Path
 
 from tests._loop_loader import load_loop
-from tests._workspace import integration_workspace
+from tests._workspace import integration_workspace, with_deliverable
 
 loop = load_loop()
 
@@ -342,6 +342,13 @@ class TestFilesChangedOmittedPassesIntegration(unittest.TestCase):
 
     def _patch(self, name: str, replacement):
         self._patches.append((name, getattr(loop, name)))
+        # This class exercises the files_changed guard, not the deliverable
+        # guard — but a stub that writes nothing trips the latter first and
+        # never reaches the assertion. Give it a deliverable so the WU gets far
+        # enough to test what this class is actually about. (#150: the
+        # `.specfuse/.loop.lock` that used to serve this purpose is gone.)
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_no_files_changed_in_result_block_runs_squash_as_today(self):

@@ -25,7 +25,7 @@ import unittest
 from pathlib import Path
 
 from tests._loop_loader import load_loop
-from tests._workspace import integration_workspace
+from tests._workspace import integration_workspace, with_deliverable
 
 loop = load_loop()
 
@@ -161,6 +161,11 @@ class TestZeroTokenAllAttemptsIntegration(unittest.TestCase):
 
     def _patch(self, name: str, replacement):
         self._patches.append((name, getattr(loop, name)))
+        # Dispatch stubs must write a deliverable or the presence gate
+        # (FEAT-2026-0022) rejects the WU as hollow. See #150 —
+        # `.specfuse/.loop.lock` used to stand in as the deliverable.
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_three_zero_token_attempts_block_human_with_new_reason(self):

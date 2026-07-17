@@ -34,6 +34,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from tests._loop_loader import load_loop
+from tests._workspace import with_deliverable
 
 loop = load_loop()
 
@@ -592,6 +593,11 @@ class TestRunGateBudgetHalt(unittest.TestCase):
 
     def _patch(self, name: str, replacement) -> None:
         self._patches.append((name, getattr(loop, name)))
+        # Dispatch stubs must write a deliverable or the presence gate
+        # (FEAT-2026-0022) rejects the WU as hollow. See #150 —
+        # `.specfuse/.loop.lock` used to stand in as the deliverable.
+        if name == "dispatch":
+            replacement = with_deliverable(replacement)
         setattr(loop, name, replacement)
 
     def test_gate_budget_halt_after_first_wu_passes(self):
