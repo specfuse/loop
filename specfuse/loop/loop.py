@@ -41,12 +41,12 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import fcntl
 import hashlib
 import json
 import logging
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -54,6 +54,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import _filelock
 from . import _miniyaml
 from . import scaffold as _scaffold
 from .gate_eval import evaluate_auto_close, AutoCloseDecision
@@ -471,21 +472,26 @@ def build_event(event_type: str, correlation_id: str, payload: dict) -> dict:
 
 
 # Matches macOS ("/Users/" + "<name>/") and Linux ("/home/" + "<name>/") home
-# prefixes at runtime without containing a literal "/Users/" substring in
-# source, so this file's own staged diff never re-trips the structural leak-scan.
+# prefixes, plus the Windows shape ("C:" + "\Users\" + "<name>" + "\" or "/",
+# any drive letter, case-insensitive), at runtime without containing a literal
+# "/Users/" substring in source, so this file's own staged diff never re-trips
+# the structural leak-scan.
 _HOME_PATH_RE = re.compile(r"/(?:Users|home)/[^/\s]+/")
+_WIN_HOME_PATH_RE = re.compile(r"[A-Za-z]:\\Users\\[^\\/\s]+[\\/]", re.IGNORECASE)
 _HOME_PATH_PLACEHOLDER = "<redacted-home>/"
 
 
 def _redact_home_paths(value):
     """Recursively redact absolute home-directory prefixes from a JSON-ish value.
 
-    Walks dict/list/str/scalar and replaces every "/Users/" + "<name>/" or
-    "/home/" + "<name>/" match in string leaves with a stable placeholder.
-    Other text is preserved verbatim; idempotent (a second pass is a no-op).
+    Walks dict/list/str/scalar and replaces every "/Users/" + "<name>/",
+    "/home/" + "<name>/", or Windows "<drive>:\\Users\\" + "<name>" + "\\"/"/"
+    match in string leaves with a stable placeholder. Other text is preserved
+    verbatim; idempotent (a second pass is a no-op).
     """
     if isinstance(value, str):
-        return _HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
+        value = _HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
+        return _WIN_HOME_PATH_RE.sub(_HOME_PATH_PLACEHOLDER, value)
     if isinstance(value, dict):
         return {k: _redact_home_paths(v) for k, v in value.items()}
     if isinstance(value, list):
@@ -1205,22 +1211,14 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
 
 
 def acquire_tree_lock(specfuse_dir: Path):
-    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive flock.
+    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive lock.
 
-    Returns the open file object; caller keeps it alive for the process
-    lifetime — the kernel auto-releases on fd close or process exit (SIGKILL
-    included), so no stale-lock cleanup is ever needed.
+    Delegates to `_filelock`, which selects fcntl.flock (POSIX) or
+    msvcrt.locking (Windows) by sys.platform. See `_filelock` for why the
+    kernel-auto-release property this preserves rules out pidfiles.
     Raises BlockingIOError if another process already holds the lock.
     """
-    lock_path = specfuse_dir / ".loop.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = lock_path.open("w")
-    try:
-        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except BlockingIOError:
-        fd.close()
-        raise
-    return fd
+    return _filelock.acquire_tree_lock(specfuse_dir)
 
 
 def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
@@ -1599,6 +1597,7 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
                    + truncate_failure_note(failure_note))
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
+    cmd = resolve_claude_cmd(cmd)
     if wu.unsandboxed:
         # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
         # emitted in run()'s attempt loop; rationale lives in WU frontmatter.
@@ -1717,6 +1716,39 @@ def extract_smoke_imports(wu_body: str) -> list[str]:
     return out
 
 
+LEADING_PYTHON3_RE = re.compile(r'^(\s*)python3\b')
+
+
+def resolve_windows_interpreter() -> str:
+    """Return the interpreter token to substitute for a leading `python3`.
+
+    Windows Python ships `python` and the `py` launcher, never `python3`. A
+    bare `python` token is the safest form to hand to Git-Bash `bash -c` —
+    unlike a raw `sys.executable` path, it has no backslashes for MSYS to
+    mangle (cross-repo contract, see GATE-02-REVIEW.md). No real-Windows-runner
+    round-trip has verified this from the sandbox; T08 owns that proof.
+    """
+    return "python"
+
+
+def normalize_interpreter(command: str) -> str:
+    """Rewrite a leading `python3` token to the Windows interpreter, else no-op.
+
+    POSIX (`sys.platform != "win32"`): returns `command` unchanged — target
+    repos and the driver's own smoke imports already assume `python3` exists.
+    Windows: rewrites ONLY a `python3` token anchored at the start of the
+    command string (optionally after leading whitespace); a `python3`
+    appearing later, e.g. inside a quoted argument, is left untouched.
+    """
+    if sys.platform != "win32":
+        return command
+    match = LEADING_PYTHON3_RE.match(command)
+    if not match:
+        return command
+    interpreter = resolve_windows_interpreter()
+    return match.group(1) + interpreter + command[match.end():]
+
+
 def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     """Run each smoke-import command in `cwd` in declared order.
 
@@ -1731,6 +1763,7 @@ def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     active venv per `[loop-driver-operation]`).
     """
     for cmd in commands:
+        cmd = normalize_interpreter(cmd)
         proc = subprocess.run(  # nosec B602
             cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
         )
@@ -1827,6 +1860,65 @@ def load_verification() -> dict:
     return _miniyaml.parse(VERIFICATION_PATH.read_text()) or {}
 
 
+def resolve_claude_cmd(cmd: list[str]) -> list[str]:
+    """Resolve a bare `claude` argv[0] to its executable path on Windows.
+
+    `subprocess.run(..., shell=False)` calls `CreateProcess` on Windows, which
+    does not consult `PATHEXT` — a bare `"claude"` argv[0] will not resolve to
+    the `claude.cmd` shim the Windows install ships. `shutil.which` does honor
+    `PATHEXT`, so use it to find the real executable and substitute it as
+    argv[0]; the rest of `cmd` (flags, model/effort substitution) is untouched.
+    On POSIX, `shell=False` with a bare `claude` already resolves via PATH, so
+    `cmd` is returned unchanged.
+    """
+    if sys.platform != "win32":
+        return cmd
+    resolved = shutil.which(cmd[0])
+    if not resolved:
+        raise SystemExit(
+            f"claude not found on PATH — install Claude Code or add its "
+            f"install directory to PATH (resolve_claude_cmd: "
+            f"shutil.which('{cmd[0]}') returned None)."
+        )
+    return [resolved] + cmd[1:]
+
+
+def resolve_bash() -> str | None:
+    """Resolve a Git-for-Windows `bash.exe` for routing gate commands.
+
+    Prefers deriving it from `git --exec-path` (the git-core dir inside a
+    Git-for-Windows install; `bash.exe` lives at the install's `bin/bash.exe`,
+    i.e. two levels up from git-core then into `bin`) over a bare
+    `shutil.which("bash")`, which on a Windows host can resolve to
+    `C:\\Windows\\System32\\bash.exe` — the WSL launcher, which fails with no
+    distro installed. Returns None if no Git-Bash can be found.
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "--exec-path"], capture_output=True, text=True, check=True,
+        )
+        exec_path = str(completed.stdout).strip()
+        if exec_path:
+            candidate = Path(exec_path).parent.parent / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+    except Exception:
+        pass
+
+    # Manual PATH scan rather than shutil.which(): shutil.which's win32 branch
+    # touches _winapi, which is unavailable when running under a mocked
+    # sys.platform on a non-Windows test host.
+    for dirname in os.environ.get("PATH", "").split(os.pathsep):
+        if not dirname:
+            continue
+        for name in ("bash.exe", "bash"):
+            candidate = Path(dirname) / name
+            if candidate.is_file() and "system32" not in str(candidate).lower():
+                return str(candidate)
+
+    return None
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None) -> tuple[bool, str]:
     """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
@@ -1873,6 +1965,7 @@ def verify(wu: WorkUnit, feature_dir: Path,
     results, ok_all = [], True
     for gate in gate_set:
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
+        command = normalize_interpreter(command)
         # shell=True is intentional: gate commands are authored by the user in
         # verification.yml and routinely use shell features (pipes, &&, glob,
         # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
@@ -1883,13 +1976,41 @@ def verify(wu: WorkUnit, feature_dir: Path,
         # output pipe so communicate() stalls past the timeout):
         #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
         #     gets EOF immediately and fails fast instead of blocking forever.
-        #  2. start_new_session + killpg on timeout — the gate runs in its own
-        #     process group; on timeout the WHOLE group (shell + grandchildren) is
+        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
+        #     taskkill (Windows) on timeout — the gate runs in its own process
+        #     group; on timeout the WHOLE group (shell + grandchildren) is
         #     killed, so the timer actually returns.
+        is_win32 = sys.platform == "win32"
+        spawn_kwargs = (
+            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+            if is_win32
+            else {"start_new_session": True}
+        )
+        if is_win32:
+            # cmd.exe (the shell=True default on Windows) does not understand
+            # the POSIX shell syntax (&&, ||, globs, pipes) that real
+            # verification.yml gate commands routinely use. Route through
+            # Git-Bash instead so gate commands run unmodified across
+            # platforms.
+            bash = resolve_bash()
+            if not bash:
+                ok_all = False
+                results.append(
+                    f"### {gate['name']}: FAIL\n```\n$ {command}\n"
+                    f"No Git-Bash found — install Git for Windows "
+                    f"(https://git-scm.com/download/win) so gate commands can "
+                    f"run through bash.exe.\n```"
+                )
+                continue
+            popen_argv = [bash, "-c", command]
+            popen_kwargs = dict(shell=False)
+        else:
+            popen_argv = command
+            popen_kwargs = dict(shell=True)  # nosec B604
         proc = subprocess.Popen(  # nosec B602
-            command, shell=True, stdin=subprocess.DEVNULL,
+            popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            start_new_session=True,
+            **popen_kwargs, **spawn_kwargs,
         )
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
@@ -1904,10 +2025,16 @@ def verify(wu: WorkUnit, feature_dir: Path,
                     ok = False
                     tail = tail + [f"DEGRADED ORACLE: {degraded}"]
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                proc.kill()
+            if is_win32:
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                    capture_output=True,
+                )
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    proc.kill()
             out, _ = proc.communicate()
             ok = False
             tail = (out or "").strip().splitlines()[-10:] + [
@@ -4342,7 +4469,21 @@ def auto_sync(
         _persist_scaffold_sync(installed)
 
 
+def _force_utf8_console() -> None:
+    """Force stdout/stderr to UTF-8 so the driver's non-ASCII console glyphs
+    (↳, ═, ⚠, — …) don't crash on Windows, whose default console codepage is
+    cp1252 (`UnicodeEncodeError: 'charmap' codec can't encode ...`). No-op on
+    POSIX, which is already UTF-8. `reconfigure` exists on the standard
+    text streams (Python ≥ 3.7); guard for the case where stdout has been
+    replaced by a stream that lacks it (e.g. a captured buffer in tests)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+
 def main() -> int:
+    _force_utf8_console()
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
     ap.add_argument("--feature", help="Feature dir name under .specfuse/features/ "
                     "(optional if exactly one feature is active).")

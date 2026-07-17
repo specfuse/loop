@@ -31,6 +31,16 @@ python3 -m pip install specfuse
 > venv) — that's what puts `specfuse-loop` / `specfuse-lint` on PATH for the gate
 > commands to find.
 
+> **Windows: Git-Bash is required.** The driver runs natively on Windows (no WSL),
+> but it routes gate commands through **Git-Bash** so a target repo's
+> `verification.yml` (`&&`, `exit 1 || exit 0`, `bats`, globs) runs unchanged.
+> Install [Git for Windows](https://gitforwindows.org/) — it ships `bash.exe`, no
+> admin and no WSL feature needed — before running the loop. The driver prefers
+> the Git-for-Windows `bash.exe` over the `C:\Windows\System32\bash.exe` WSL
+> launcher; it also normalizes `python3` gate tokens to your Windows interpreter
+> and resolves the `claude` CLI via `PATHEXT`, so gate commands authored on
+> POSIX run as-is.
+
 Enable the skills plugin in Claude Code (one-time):
 
 ```
