@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0032/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.90
 oracle_env: linux_docker
 produces: tests/test_claude_resolution.py
@@ -10,6 +10,12 @@ produces_driver_helper: resolve_claude_cmd
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:59:59.388783+00:00
+duration_seconds: 151.407
+cost_usd: 0.523161
+input_tokens: 30
+output_tokens: 5469
 ---
 
 <!--

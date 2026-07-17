@@ -46,6 +46,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import subprocess
 import sys
@@ -1596,6 +1597,7 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
                    + truncate_failure_note(failure_note))
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
+    cmd = resolve_claude_cmd(cmd)
     if wu.unsandboxed:
         # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
         # emitted in run()'s attempt loop; rationale lives in WU frontmatter.
@@ -1822,6 +1824,29 @@ def load_verification() -> dict:
     if not VERIFICATION_PATH.exists():
         return {}
     return _miniyaml.parse(VERIFICATION_PATH.read_text()) or {}
+
+
+def resolve_claude_cmd(cmd: list[str]) -> list[str]:
+    """Resolve a bare `claude` argv[0] to its executable path on Windows.
+
+    `subprocess.run(..., shell=False)` calls `CreateProcess` on Windows, which
+    does not consult `PATHEXT` — a bare `"claude"` argv[0] will not resolve to
+    the `claude.cmd` shim the Windows install ships. `shutil.which` does honor
+    `PATHEXT`, so use it to find the real executable and substitute it as
+    argv[0]; the rest of `cmd` (flags, model/effort substitution) is untouched.
+    On POSIX, `shell=False` with a bare `claude` already resolves via PATH, so
+    `cmd` is returned unchanged.
+    """
+    if sys.platform != "win32":
+        return cmd
+    resolved = shutil.which(cmd[0])
+    if not resolved:
+        raise SystemExit(
+            f"claude not found on PATH — install Claude Code or add its "
+            f"install directory to PATH (resolve_claude_cmd: "
+            f"shutil.which('{cmd[0]}') returned None)."
+        )
+    return [resolved] + cmd[1:]
 
 
 def resolve_bash() -> str | None:
