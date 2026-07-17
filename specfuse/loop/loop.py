@@ -1824,6 +1824,42 @@ def load_verification() -> dict:
     return _miniyaml.parse(VERIFICATION_PATH.read_text()) or {}
 
 
+def resolve_bash() -> str | None:
+    """Resolve a Git-for-Windows `bash.exe` for routing gate commands.
+
+    Prefers deriving it from `git --exec-path` (the git-core dir inside a
+    Git-for-Windows install; `bash.exe` lives at the install's `bin/bash.exe`,
+    i.e. two levels up from git-core then into `bin`) over a bare
+    `shutil.which("bash")`, which on a Windows host can resolve to
+    `C:\\Windows\\System32\\bash.exe` — the WSL launcher, which fails with no
+    distro installed. Returns None if no Git-Bash can be found.
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "--exec-path"], capture_output=True, text=True, check=True,
+        )
+        exec_path = str(completed.stdout).strip()
+        if exec_path:
+            candidate = Path(exec_path).parent.parent / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+    except Exception:
+        pass
+
+    # Manual PATH scan rather than shutil.which(): shutil.which's win32 branch
+    # touches _winapi, which is unavailable when running under a mocked
+    # sys.platform on a non-Windows test host.
+    for dirname in os.environ.get("PATH", "").split(os.pathsep):
+        if not dirname:
+            continue
+        for name in ("bash.exe", "bash"):
+            candidate = Path(dirname) / name
+            if candidate.is_file() and "system32" not in str(candidate).lower():
+                return str(candidate)
+
+    return None
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None) -> tuple[bool, str]:
     """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
@@ -1890,10 +1926,31 @@ def verify(wu: WorkUnit, feature_dir: Path,
             if is_win32
             else {"start_new_session": True}
         )
+        if is_win32:
+            # cmd.exe (the shell=True default on Windows) does not understand
+            # the POSIX shell syntax (&&, ||, globs, pipes) that real
+            # verification.yml gate commands routinely use. Route through
+            # Git-Bash instead so gate commands run unmodified across
+            # platforms.
+            bash = resolve_bash()
+            if not bash:
+                ok_all = False
+                results.append(
+                    f"### {gate['name']}: FAIL\n```\n$ {command}\n"
+                    f"No Git-Bash found — install Git for Windows "
+                    f"(https://git-scm.com/download/win) so gate commands can "
+                    f"run through bash.exe.\n```"
+                )
+                continue
+            popen_argv = [bash, "-c", command]
+            popen_kwargs = dict(shell=False)
+        else:
+            popen_argv = command
+            popen_kwargs = dict(shell=True)  # nosec B604
         proc = subprocess.Popen(  # nosec B602
-            command, shell=True, stdin=subprocess.DEVNULL,
+            popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            **spawn_kwargs,
+            **popen_kwargs, **spawn_kwargs,
         )
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)

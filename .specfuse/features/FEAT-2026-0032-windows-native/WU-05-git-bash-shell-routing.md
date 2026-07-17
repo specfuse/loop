@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0032/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 oracle_env: linux_docker
 produces: tests/test_bash_routing.py
@@ -10,6 +10,12 @@ produces_driver_helper: resolve_bash
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:53:03.800790+00:00
+duration_seconds: 415.484
+cost_usd: 1.432183
+input_tokens: 83
+output_tokens: 15584
 ---
 
 <!--
