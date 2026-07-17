@@ -1,13 +1,16 @@
 ---
 id: FEAT-2026-0031/G1-CLOSE
 type: close
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.50
 produces:
   - .specfuse/features/FEAT-2026-0031-configurable-integration-branch/RETROSPECTIVE.md
   - .specfuse/LEARNINGS.md
 generated_surfaces: []
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Gate 1 close — retrospective, lessons, docs, terminal verdict
