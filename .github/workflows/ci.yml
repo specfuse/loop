@@ -41,3 +41,24 @@ jobs:
 
       - name: Run scaffold smoke-test + code gates
         run: ./scripts/smoke-test.sh
+
+  windows-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Import driver module
+        run: python -c "import specfuse.loop.loop"
+
+      - name: Dry-run walk the bundled example
+        run: python .specfuse/scripts/loop.py --feature FEAT-2026-0001-health-endpoint --dry-run

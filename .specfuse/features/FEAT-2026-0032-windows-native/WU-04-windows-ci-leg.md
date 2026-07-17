@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0032/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 0.75
 oracle_env: github_actions_ci
 produces: .github/workflows/ci.yml
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:34:00.315655+00:00
+duration_seconds: 135.032
+cost_usd: 0.334802
+input_tokens: 22
+output_tokens: 2203
 ---
 
 <!--
