@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 ---
 
 # Gate 1 — Driver imports and runs on native Windows, proven by CI

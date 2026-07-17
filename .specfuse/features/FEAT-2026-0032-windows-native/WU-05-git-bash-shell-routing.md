@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0032/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 1.00
 oracle_env: linux_docker
