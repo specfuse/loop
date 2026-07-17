@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0032/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 generated_surfaces: []
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.3.14
+started_at: 2026-07-17T16:36:15.697848+00:00
+duration_seconds: 576.153
+cost_usd: 3.313649
+input_tokens: 44
+output_tokens: 39514
 ---
 
 <!--

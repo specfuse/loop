@@ -118,9 +118,28 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      - id: FEAT-2026-0032/T05
+        file: WU-05-git-bash-shell-routing.md
+        depends_on: []
+      - id: FEAT-2026-0032/T06
+        file: WU-06-python3-interpreter-normalization.md
+        depends_on:
+          - FEAT-2026-0032/T05
+      - id: FEAT-2026-0032/T07
+        file: WU-07-windows-claude-resolution.md
+        depends_on: []
+      - id: FEAT-2026-0032/T08
+        file: WU-08-windows-gate-exec-ci-leg.md
+        depends_on:
+          - FEAT-2026-0032/T05
+          - FEAT-2026-0032/T06
       - id: FEAT-2026-0032/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0032/T05
+          - FEAT-2026-0032/T06
+          - FEAT-2026-0032/T07
+          - FEAT-2026-0032/T08
 ```
 
 ## Notes
@@ -136,6 +155,16 @@ gates:
   timing-out gate's `taskkill` path (T02) and the contended-lock SIGKILL handoff
   (T01) — and are enumerated as deferred in the gate-1 close.
 - Gate 2 pre-declares `G2-CLOSE` only so the linter treats the last non-empty
-  gate as terminal; `plan-next` inserts gate 2's substantive WUs *before* it and
-  updates its `depends_on`.
+  gate as terminal; `plan-next` (G1-PLAN) inserted gate 2's substantive WUs
+  (T05–T08) *before* it and updated its `depends_on`. Drafts are in `draft`
+  status; the human arms them at the gate-1 → gate-2 review (see
+  `GATE-02-REVIEW.md`).
+- **Gate-2 shape.** T05 routes the `verify()` gate runner through Git-Bash on
+  Windows; T06 normalizes `python3` for gate + smoke-import commands (depends on
+  T05, same command surface); T07 resolves the bare `claude` CLI (independent,
+  different call site); T08 is the real-Windows CI oracle proving a gate command
+  runs green through Git-Bash on `windows-latest` (depends on T05+T06). T05/T06/T07
+  Windows branches are Linux-mock-verified in-loop; T08 is the real-runner proof.
+  T07's real-Windows `claude.cmd` resolution is not CI-exercised (CI dispatches no
+  agent) — a post-merge manual check enumerated in the gate-2 close.
 - This feature keeps WSL working; it adds a native path beside it.
