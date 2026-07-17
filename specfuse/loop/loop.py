@@ -1131,34 +1131,41 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
     ).stdout.strip()
     if current == branch:
         return
+    # A declared `base` (T01's resolve_base/ensure_base_ref) is the branch's
+    # true starting point, not wherever HEAD happens to be standing. Resolving
+    # and fetching it here — before any checkout — lets both branch creation
+    # and the staleness check below anchor on the base instead of HEAD.
+    # BaseBranchError is intentionally left to propagate uncaught: the base
+    # cause must reach the operator, not be reshaped into a FeatureBranchError.
+    base = resolve_base(feat_fm)
+    if base:
+        ensure_base_ref(base)
+    else:
+        base = current
     exists = subprocess.run(
         ["git", "rev-parse", "--verify", branch],
         capture_output=True, text=True,
     ).returncode == 0
     if exists:
-        # Surface a stale branch that diverged from the current base instead of
-        # silently reusing it. `merge-base --is-ancestor B HEAD` exits 0 iff B
-        # is an ancestor of HEAD (i.e. HEAD already contains B — safe to reuse).
+        # Surface a stale branch that diverged from the declared base instead
+        # of silently reusing it. `merge-base --is-ancestor B <base>` exits 0
+        # iff B is an ancestor of base (i.e. base already contains B — safe).
         is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", branch, "HEAD"],
+            ["git", "merge-base", "--is-ancestor", branch, base],
             capture_output=True, text=True,
         ).returncode == 0
         if not is_ancestor:
             raise FeatureBranchError(
-                f"branch '{branch}' already exists and has diverged from your "
-                f"current branch '{current}' (it carries commits HEAD does not). "
-                f"Refusing to silently check it out — that could build on a stale "
-                f"base or lose work. Pick one, then re-run:\n"
-                f"  - resume that branch's work:    git checkout {branch}\n"
-                f"  - rebase it onto here:          git checkout {branch} && "
-                f"git rebase {current}\n"
-                f"  - discard it (work not needed): git branch -D {branch}   "
-                f"(the loop recreates it from HEAD)"
+                f"branch '{branch}' has diverged from '{base}' — it carries "
+                f"commits '{base}' does not, likely because it was created "
+                f"from a different starting point or '{base}' has since moved "
+                f"on. The safe action is to bring it up to date with the base:\n"
+                f"  git checkout {branch} && git rebase {base}"
             )
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
-        # Create-from-HEAD carries the working tree onto the new branch. Only
+        # Create-from-base carries the working tree onto the new branch. Only
         # the expected /pick-feature flips may ride along; anything else stops.
         dirty = _tracked_dirty_paths()
         # Scaffold-overlay files (auto_sync's own upgrade writes) ride along too:
@@ -1173,8 +1180,8 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
                 + f". Refusing to carry them onto new branch '{branch}'. "
                 "Commit or stash them first, then re-run."
             )
-        _checked_checkout(["checkout", "-B", branch], f"create of branch '{branch}'")
-        print(f"Created feature branch '{branch}' from '{current}'.")
+        _checked_checkout(["checkout", "-B", branch, base], f"create of branch '{branch}'")
+        print(f"Created feature branch '{branch}' from '{base}'.")
 
 
 def acquire_tree_lock(specfuse_dir: Path):

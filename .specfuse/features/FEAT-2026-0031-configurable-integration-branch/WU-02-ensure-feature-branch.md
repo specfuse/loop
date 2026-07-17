@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0031/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.60
 produces_driver_helper: ensure_feature_branch
 produces:
   - specfuse/loop/loop.py
   - tests/test_ensure_feature_branch_base.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.13
+started_at: 2026-07-17T12:35:33.147433+00:00
+duration_seconds: 368.912
+cost_usd: 1.158896
+input_tokens: 56
+output_tokens: 13922
 ---
 
 # Cut the feature branch from the resolved base and re-anchor the staleness guard
