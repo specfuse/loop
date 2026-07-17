@@ -1,10 +1,12 @@
 ---
 id: FEAT-2026-0032/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 1.20
 generated_surfaces: []
+auto_close: true
+auto_close_reasons: []
 ---
 
 <!--
