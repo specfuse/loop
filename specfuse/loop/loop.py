@@ -1875,13 +1875,20 @@ def verify(wu: WorkUnit, feature_dir: Path,
         # output pipe so communicate() stalls past the timeout):
         #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
         #     gets EOF immediately and fails fast instead of blocking forever.
-        #  2. start_new_session + killpg on timeout — the gate runs in its own
-        #     process group; on timeout the WHOLE group (shell + grandchildren) is
+        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
+        #     taskkill (Windows) on timeout — the gate runs in its own process
+        #     group; on timeout the WHOLE group (shell + grandchildren) is
         #     killed, so the timer actually returns.
+        is_win32 = sys.platform == "win32"
+        spawn_kwargs = (
+            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+            if is_win32
+            else {"start_new_session": True}
+        )
         proc = subprocess.Popen(  # nosec B602
             command, shell=True, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            start_new_session=True,
+            **spawn_kwargs,
         )
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
@@ -1896,10 +1903,16 @@ def verify(wu: WorkUnit, feature_dir: Path,
                     ok = False
                     tail = tail + [f"DEGRADED ORACLE: {degraded}"]
         except subprocess.TimeoutExpired:
-            try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                proc.kill()
+            if is_win32:
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                    capture_output=True,
+                )
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    proc.kill()
             out, _ = proc.communicate()
             ok = False
             tail = (out or "").strip().splitlines()[-10:] + [

@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0032/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 oracle_env: linux_docker
 produces: tests/test_timeout_kill_portable.py
 produces_driver_helper: run_gate
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.14
+started_at: 2026-07-17T16:12:56.545630+00:00
+duration_seconds: 336.658
+cost_usd: 1.031557
+input_tokens: 63
+output_tokens: 9999
 ---
 
 <!--
