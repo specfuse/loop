@@ -1410,7 +1410,49 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     return git("rev-parse", "HEAD")
 
 
-def reset_preserving_events(head_before: str, events_path: Path) -> None:
+def _clean_attempt_untracked(
+    untracked_before: "set[str] | frozenset[str]", events_path: Path,
+) -> None:
+    """Delete untracked files that appeared since the *untracked_before* snapshot.
+
+    Helper for `reset_preserving_events`; see its docstring for why. Deletes
+    FILES only — empty directories are left behind, which is harmless (git
+    does not track directories) and avoids racing the driver's own mid-run
+    scratch dirs.
+
+    Never deletes: paths in *untracked_before* (the operator's, per #150),
+    *events_path* (driver-managed, and untracked on a fresh branch), or
+    gitignored paths (`untracked_paths` honors .gitignore, so a feature's
+    `work/` scratch dir never enters the delete set).
+
+    Best-effort: any git or filesystem error is swallowed. A failure to clean
+    reverts to the old leftover behavior, which must not crash the run.
+    """
+    try:
+        root = Path(git("rev-parse", "--show-toplevel"))
+        candidates = untracked_paths() - set(untracked_before)
+    except (subprocess.CalledProcessError, OSError):
+        return
+    try:
+        keep = events_path.resolve()
+    except OSError:
+        keep = None
+    for rel in sorted(candidates):
+        target = root / rel
+        try:
+            if keep is not None and target.resolve() == keep:
+                continue
+            if target.is_file() or target.is_symlink():
+                target.unlink()
+        except OSError:
+            continue
+
+
+def reset_preserving_events(
+    head_before: str,
+    events_path: Path,
+    untracked_before: "set[str] | frozenset[str] | None" = None,
+) -> None:
     """`git reset --hard <head_before>` without losing events.jsonl content.
 
     The hard-reset is the methodology's "wipe agent's edits before we write our
@@ -1433,11 +1475,27 @@ def reset_preserving_events(head_before: str, events_path: Path) -> None:
 
     Subsequent `flush_events` calls then append to the preserved content;
     `commit_bookkeeping` captures the full history.
+
+    `untracked_before` (#162) is the per-WU untracked snapshot taken at
+    dispatch. When supplied, untracked files that appeared SINCE it are
+    deleted after the reset. A hard reset rolls back tracked content but
+    leaves untracked files on disk, and the snapshot is taken once per WU
+    (outside the attempt loop) — so without this, attempt 1's new files
+    survive into attempt 2, where they are indistinguishable from attempt 2's
+    own work: `verify_files_changed` passes them and `squash_commit` commits
+    them, letting an attempt pass on its predecessor's leftovers.
+
+    Absence is inert BY DESIGN. An empty set would read as "the operator had
+    nothing untracked" and delete the entire untracked working tree; `None`
+    means "no snapshot available, do not clean" and preserves the pre-#162
+    behavior for callers that cannot supply one.
     """
     saved = events_path.read_text() if events_path.is_file() else None
     git("reset", "--hard", head_before)
     if saved is not None:
         events_path.write_text(saved)
+    if untracked_before is not None:
+        _clean_attempt_untracked(untracked_before, events_path)
 
 
 class SquashCommitError(RuntimeError):
@@ -3801,7 +3859,8 @@ def run(
                             wu, attempt, "zero_token_skip",
                             attempts_usage[-1],
                         ))
-                        reset_preserving_events(head_before, events_path)
+                        reset_preserving_events(head_before, events_path,
+                                                untracked_before=untracked_before)
                         print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
                               f"— no agent output, skipping")
                         continue
@@ -3812,7 +3871,8 @@ def run(
                         # reset wipe the flip — the silent-state-loss bug.
                         # Use reset_preserving_events to keep prior WU's
                         # flushed-but-uncommitted events.jsonl entries.
-                        reset_preserving_events(head_before, events_path)
+                        reset_preserving_events(head_before, events_path,
+                                                untracked_before=untracked_before)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
                         wu_events.append(emit_attempt_outcome(
@@ -3856,7 +3916,8 @@ def run(
                             # written just above — record the failure with git's
                             # stderr, and retry within budget (MAX_ATTEMPTS
                             # exhaustion escalates to blocked_human).
-                            reset_preserving_events(head_before, events_path)
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
                             # Redact any quoted leak-scan match before it lands
                             # in events.jsonl / the attempt note, so the captured
                             # FINDINGS text can't re-trip the next bookkeeping
@@ -3887,7 +3948,8 @@ def run(
                                 smoke_cmds, Path("."),
                             )
                             if not smoke_ok:
-                                reset_preserving_events(head_before, events_path)
+                                reset_preserving_events(head_before, events_path,
+                                                        untracked_before=untracked_before)
                                 wu_events.append(emit_attempt_outcome(
                                     wu, attempt, "smoke_import_failed",
                                     attempts_usage[-1],
@@ -3904,7 +3966,8 @@ def run(
                             wu, feature_dir, REPO_ROOT, head_before,
                         )
                         if not closing_ok:
-                            reset_preserving_events(head_before, events_path)
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
                             # `assertion` names the primary (first) failing
                             # assertion. With aggregation (#72) closing_summary
                             # may list several; the first `assert_*` token is the
@@ -3940,7 +4003,8 @@ def run(
                         # every current WU is unchanged.
                         deliv_ok, deliv_summary = assert_declared_deliverables(wu)
                         if not deliv_ok:
-                            reset_preserving_events(head_before, events_path)
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
                             missing = deliv_summary.split(": ", 1)[-1]
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "deliverable_missing",
@@ -3966,7 +4030,8 @@ def run(
                             wu, touched,
                         )
                         if not impl_ok:
-                            reset_preserving_events(head_before, events_path)
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "no_deliverable_files",
                                 attempts_usage[-1],
@@ -4068,7 +4133,8 @@ def run(
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
-                        reset_preserving_events(head_before, events_path)
+                        reset_preserving_events(head_before, events_path,
+                                                untracked_before=untracked_before)
                         print(f"   FILES_CHANGED MISMATCH attempt "
                               f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
                               f"unchanged")
@@ -4101,7 +4167,8 @@ def run(
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
                         }))
-                        reset_preserving_events(head_before, events_path)
+                        reset_preserving_events(head_before, events_path,
+                                                untracked_before=untracked_before)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
@@ -4119,7 +4186,8 @@ def run(
                         prior_failure_signature = (_fc, _fs)
                     flush_events(events_path, wu_events)
                     wu_events.clear()
-                    reset_preserving_events(head_before, events_path)
+                    reset_preserving_events(head_before, events_path,
+                                            untracked_before=untracked_before)
                     print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
                 else:
                     # for-else: ran out of attempts without break = spinning.

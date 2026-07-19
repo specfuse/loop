@@ -138,5 +138,157 @@ class TestResetPreservingEventsHelper(unittest.TestCase):
             self.assertEqual(events_path.read_text(), events_content)
 
 
+class TestResetClearsAttemptUntracked(unittest.TestCase):
+    """Issue #162: the reset must clear the failed attempt's untracked output.
+
+    `git reset --hard` rolls back tracked content but leaves untracked files
+    on disk. Because `untracked_before` is snapshotted once per WU (loop.py
+    :3709) and the attempt loop runs beneath it (:3769), attempt 1's new
+    files survive into attempt 2 and are indistinguishable from attempt 2's
+    own work — `verify_files_changed` passes them and `squash_commit` commits
+    them, so an attempt can pass on its predecessor's leftovers.
+
+    The snapshot is the exclusion set: untracked paths present at dispatch
+    are the operator's and must survive; anything else appeared during the
+    attempt and must go.
+    """
+
+    def _snapshot(self):
+        return loop.untracked_paths()
+
+    def test_untracked_file_created_during_attempt_is_removed(self):
+        with _git_repo_no_sign() as root:
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+
+            # The attempt creates a new deliverable, then fails.
+            (root / "new.sh").write_text("#!/bin/sh\necho hi\n")
+
+            loop.reset_preserving_events(
+                head_before, root / "events.jsonl", untracked_before=before,
+            )
+
+            self.assertFalse(
+                (root / "new.sh").exists(),
+                "attempt's untracked output must not survive into the next "
+                "attempt — it is what lets a later attempt hollow-pass",
+            )
+
+    def test_operator_untracked_file_survives(self):
+        with _git_repo_no_sign() as root:
+            # Operator WIP predates dispatch (#150's concern).
+            (root / "scratch.md").write_text("my notes\n")
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+            self.assertIn("scratch.md", before)
+
+            (root / "new.sh").write_text("#!/bin/sh\n")
+
+            loop.reset_preserving_events(
+                head_before, root / "events.jsonl", untracked_before=before,
+            )
+
+            self.assertTrue((root / "scratch.md").exists())
+            self.assertEqual((root / "scratch.md").read_text(), "my notes\n")
+            self.assertFalse((root / "new.sh").exists())
+
+    def test_untracked_file_in_subdir_is_removed(self):
+        with _git_repo_no_sign() as root:
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+
+            (root / "scripts").mkdir()
+            (root / "scripts" / "check.sh").write_text("#!/bin/sh\n")
+
+            loop.reset_preserving_events(
+                head_before, root / "events.jsonl", untracked_before=before,
+            )
+
+            self.assertFalse((root / "scripts" / "check.sh").exists())
+
+    def test_events_file_survives_even_when_untracked(self):
+        """events.jsonl is driver-managed; the cleanup must never eat it.
+
+        It can be untracked (first run on a fresh branch) and is by
+        definition not in the pre-dispatch snapshot when the driver just
+        created it — exactly the shape the cleanup deletes.
+        """
+        with _git_repo_no_sign() as root:
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+
+            events_path = root / "events.jsonl"
+            events_path.write_text(
+                '{"correlation_id":"X/T01","event_type":"task_started"}\n'
+            )
+
+            loop.reset_preserving_events(
+                head_before, events_path, untracked_before=before,
+            )
+
+            self.assertTrue(events_path.is_file())
+            self.assertIn("X/T01", events_path.read_text())
+
+    def test_gitignored_file_survives(self):
+        """Gitignored paths (e.g. the feature's `work/` dir) are out of scope.
+
+        `untracked_paths` honors .gitignore, so ignored files never enter the
+        delete set. Asserted explicitly because deleting them would destroy
+        agent scratch space mid-run.
+        """
+        with _git_repo_no_sign() as root:
+            (root / ".gitignore").write_text("work/\n")
+            subprocess.run(
+                ["git", "-C", str(root), "add", ".gitignore"],
+                check=True, capture_output=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(root), "commit", "-q", "-m", "ignore"],
+                check=True, capture_output=True,
+            )
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+
+            (root / "work").mkdir()
+            (root / "work" / "scratch.txt").write_text("agent scratch\n")
+
+            loop.reset_preserving_events(
+                head_before, root / "events.jsonl", untracked_before=before,
+            )
+
+            self.assertTrue((root / "work" / "scratch.txt").exists())
+
+    def test_omitting_snapshot_preserves_untracked(self):
+        """Back-compat: no snapshot means no cleanup.
+
+        An empty set is NOT the right default — it reads as "the operator had
+        nothing untracked", which would make every existing call site delete
+        the whole untracked working tree. Absence must stay inert.
+        """
+        with _git_repo_no_sign() as root:
+            head_before = loop.git("rev-parse", "HEAD")
+            (root / "new.sh").write_text("#!/bin/sh\n")
+
+            loop.reset_preserving_events(head_before, root / "events.jsonl")
+
+            self.assertTrue((root / "new.sh").exists())
+
+    def test_tracked_rollback_still_happens_with_cleanup(self):
+        """The cleanup must not displace the reset's original job."""
+        with _git_repo_no_sign() as root:
+            head_before = loop.git("rev-parse", "HEAD")
+            before = self._snapshot()
+
+            (root / "README.md").write_text("# AGENT-VANDALIZED\n")
+            (root / "new.sh").write_text("#!/bin/sh\n")
+
+            loop.reset_preserving_events(
+                head_before, root / "events.jsonl", untracked_before=before,
+            )
+
+            self.assertEqual((root / "README.md").read_text(), "# fixture\n")
+            self.assertFalse((root / "new.sh").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
