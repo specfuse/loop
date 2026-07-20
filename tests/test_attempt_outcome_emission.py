@@ -231,6 +231,45 @@ class TestParseGateFailureSignature(unittest.TestCase):
         self.assertEqual(fc, "other")
         self.assertEqual(sig, "no_gate_marker")
 
+    # -- #167: non-Python gate output must not collapse to a bare fence -- #
+
+    def test_fallback_skips_bare_code_fence(self):
+        # A non-Python tests gate (e.g. TypeScript) matches none of the
+        # Python _SIG_PATTERNS and falls through. The first line after the
+        # marker is a Markdown fence; the signature must key off the real
+        # failure line beneath it, not the fence.
+        stdout = (
+            "### tests: FAIL\n"
+            "```\n"
+            "  ✕ company builds a valid config (expected 3, got 4)\n"
+            "```\n"
+        )
+        fc, sig = loop.parse_gate_failure_signature(stdout)
+        self.assertEqual(fc, "tests")
+        self.assertNotEqual(sig, "```")
+        self.assertIn("company builds a valid config", sig)
+
+    def test_fallback_skips_whitespace_and_tilde_fence(self):
+        stdout = "### tests: FAIL\n   \n~~~\n\nReal failure: assertion X\n"
+        fc, sig = loop.parse_gate_failure_signature(stdout)
+        self.assertEqual(fc, "tests")
+        self.assertIn("Real failure", sig)
+
+    def test_all_noninformative_returns_no_signature(self):
+        stdout = "### tests: FAIL\n```\n   \n~~~\n"
+        fc, sig = loop.parse_gate_failure_signature(stdout)
+        self.assertEqual(fc, "tests")
+        self.assertEqual(sig, "no_signature")
+
+    def test_two_distinct_ts_failures_yield_distinct_signatures(self):
+        # The #167 false-spin: two genuinely different failures must NOT
+        # reduce to the same signature (both previously became "```").
+        a = "### tests: FAIL\n```\n  ✕ builds config (expected 3, got 4)\n```\n"
+        b = "### tests: FAIL\n```\n  ✕ parses tokens (unexpected EOF)\n```\n"
+        _, sig_a = loop.parse_gate_failure_signature(a)
+        _, sig_b = loop.parse_gate_failure_signature(b)
+        self.assertNotEqual(sig_a, sig_b)
+
 
 # --------------------------------------------------------------------------- #
 # TestExtractFailureExcerpt                                                    #
@@ -442,6 +481,49 @@ class TestDetectSpinningSignatureRepeat(unittest.TestCase):
             ("tests", "test_foo"), ("other", "no_gate_marker"),
         )
         self.assertFalse(result)
+
+    # -- #167: non-informative signatures must not trip the spin detector -- #
+
+    def test_false_on_bare_fence_signature(self):
+        # The exact #167 shape: both attempts reduced to "```". Even though
+        # current == prior, a bare fence carries no failure-distinguishing
+        # content and must not escalate.
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                ("tests", "```"), ("tests", "```"),
+            )
+        )
+
+    def test_false_on_whitespace_signature(self):
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                ("tests", "   "), ("tests", "   "),
+            )
+        )
+
+    def test_false_on_pure_ansi_signature(self):
+        ansi = "\x1b[31m\x1b[0m"
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                ("tests", ansi), ("tests", ansi),
+            )
+        )
+
+    def test_false_on_no_signature_sentinel(self):
+        self.assertFalse(
+            loop.detect_spinning_signature_repeat(
+                ("tests", "no_signature"), ("tests", "no_signature"),
+            )
+        )
+
+    def test_still_true_on_real_repeated_signature(self):
+        # Guard against over-correction: a genuine repeat still escalates.
+        self.assertTrue(
+            loop.detect_spinning_signature_repeat(
+                ("tests", "builds config (expected 3, got 4)"),
+                ("tests", "builds config (expected 3, got 4)"),
+            )
+        )
 
 
 # --------------------------------------------------------------------------- #
