@@ -8,6 +8,7 @@ import importlib.resources
 import json
 import os
 import re
+import sys
 from pathlib import Path
 
 from . import _miniyaml
@@ -389,7 +390,43 @@ def upgrade_specfuse(
     wire_claude(target_path)
     _write_manifest(specfuse_dir, manifest_entries)
 
+    _warn_unmanaged_legacy_dirs(specfuse_dir)
+
     return sorted(written)
+
+
+def _warn_unmanaged_legacy_dirs(specfuse_dir: Path) -> None:
+    """Warn (stderr) when legacy scripts/ or skills/ copies exist post-upgrade.
+
+    Current scaffold data ships neither directory: scripts come from the
+    specfuse-loop package, skills from the specfuse@specfuse plugin. Only
+    pre-PyPI (init.sh-era) repos carry full copies, and `upgrade` overlays
+    none of them while still advancing VERSION — so a VERSION that outpaces
+    the vendored scripts/skills is silent drift (#165). New projects have
+    neither dir, so this is a no-op for them.
+
+    A warning, not a prune: reconciling those copies (see `migrate_legacy`)
+    is destructive and left to an explicit operator step.
+    """
+    drift: list[str] = []
+    for name in ("scripts", "skills"):
+        d = specfuse_dir / name
+        if d.is_dir():
+            n = sum(1 for p in d.rglob("*") if p.is_file())
+            if n:
+                drift.append(f"  .specfuse/{name}/ ({n} file(s))")
+    if not drift:
+        return
+    print(
+        f"specfuse upgrade: WARNING — VERSION advanced to {scaffold_version()}, "
+        "but these directories are NOT managed by upgrade and may be stale:\n"
+        + "\n".join(drift)
+        + "\n  Scripts are provided by the specfuse-loop package and skills by "
+        "the specfuse@specfuse plugin; these are leftover full copies from an "
+        "older (pre-package) install. Remove them once nothing local depends "
+        "on them.",
+        file=sys.stderr,
+    )
 
 
 def init(target: str | Path, *, ci_check: str | None = None) -> list[str]:
