@@ -1537,6 +1537,51 @@ def reset_preserving_events(
         _clean_attempt_untracked(untracked_before, events_path)
 
 
+def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
+    """Return `git diff <head_before>` (working tree vs pre-attempt base), capped.
+
+    Folded into a failing attempt's evidence note BEFORE the per-attempt
+    `git reset --hard` discards the rejected work, so a blocked WU stays
+    diagnosable — a human (or /gate-status) can see the diff that was rolled
+    back, not just a truncated failure excerpt (#168).
+
+    Best-effort: returns "" on any git error or a clean tree. Truncated to
+    max_chars so a large refactor's diff cannot bloat the committed note.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "diff", head_before],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError):
+        return ""
+    if len(out) > max_chars:
+        out = out[:max_chars] + "\n… (diff truncated)\n"
+    return out
+
+
+def persist_attempt_notes(
+    work_dir: Path, wu_id: str, attempt_notes: "list[tuple[int, str]]",
+) -> "list[Path]":
+    """Write buffered per-attempt evidence to work/<wu>/attempt-N.md.
+
+    Extracted so both escalation paths persist evidence the same way: the
+    exhausted-attempts `for-else` and the early `spinning_signature_repeat`
+    halt. Previously only the former wrote notes, so a signature-repeat block
+    left nothing on disk to diagnose (#168). Returns the written paths for
+    inclusion in the escalation commit. `work/` is gitignored, so the explicit
+    `git add` in commit_bookkeeping is what tracks these.
+    """
+    wu_key = wu_id.replace("/", "_")
+    paths: list[Path] = []
+    for atmpt, evidence in attempt_notes:
+        p = work_dir / wu_key / f"attempt-{atmpt}.md"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(evidence)
+        paths.append(p)
+    return paths
+
+
 class SquashCommitError(RuntimeError):
     """Raised when squash_commit's `git commit` is rejected (non-zero exit).
 
@@ -4183,7 +4228,19 @@ def run(
                     # Per-attempt notes are buffered (not written to disk) so they
                     # ride with the spinning-escalation commit if we exhaust
                     # attempts; on eventual PASS they're discarded as scratch.
-                    attempt_notes.append((attempt, payload))
+                    # Fold the rejected working-tree diff into the buffered
+                    # evidence NOW, before the reset below discards it (#168).
+                    # Signature/excerpt parsing stays on the raw payload.
+                    _diff = capture_working_tree_diff(head_before)
+                    _evidence = payload
+                    if _diff:
+                        _evidence = (
+                            payload
+                            + "\n\n## Rejected working-tree diff "
+                              "(discarded by git reset on block)\n\n"
+                            + "```diff\n" + _diff + "\n```\n"
+                        )
+                    attempt_notes.append((attempt, _evidence))
                     failure_note = payload
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
@@ -4208,11 +4265,18 @@ def run(
                         }))
                         reset_preserving_events(head_before, events_path,
                                                 untracked_before=untracked_before)
+                        # Persist buffered evidence (verify output + rejected
+                        # diff) AFTER the reset — work/ is gitignored so the
+                        # reset leaves it untouched, and this makes a
+                        # signature-repeat block diagnosable like the
+                        # exhausted-attempts path (#168).
+                        note_paths = persist_attempt_notes(
+                            work_dir, wu.wu_id, attempt_notes)
                         backend.set_wu(wu, "status", "blocked_human")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
-                            [wu.file, events_path],
+                            [wu.file, events_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(spinning_signature_repeat, attempt {attempt})"
                             f"\n\nFeature: {wu.wu_id}",
@@ -4245,13 +4309,8 @@ def run(
                         o == "zero_token" for o in attempt_outcomes)
                     reason = ("all_attempts_zero_token" if all_zero
                               else "spinning_detected")
-                    wu_key = wu.wu_id.replace("/", "_")
-                    note_paths = []
-                    for atmpt, evidence in attempt_notes:
-                        p = work_dir / wu_key / f"attempt-{atmpt}.md"
-                        p.parent.mkdir(parents=True, exist_ok=True)
-                        p.write_text(evidence)
-                        note_paths.append(p)
+                    note_paths = persist_attempt_notes(
+                        work_dir, wu.wu_id, attempt_notes)
                     backend.set_wu(wu, "status", "blocked_human")
                     write_cost_to_wu(backend, wu, cum_usage)
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
