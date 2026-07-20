@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "specfuse",
   "displayName": "Specfuse",
-  "version": "0.3.16",
+  "version": "0.3.17",
   "description": "Gate-cycle methodology skills: pick / draft / arm / diagnose / wrap features, author and verify work units. Pairs with the specfuse-loop driver (pip install specfuse-loop).",
   "author": {
     "name": "Specfuse contributors"
