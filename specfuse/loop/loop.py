@@ -542,6 +542,36 @@ def detect_degraded_oracle(stdout: str) -> str | None:
     return None
 
 
+# A failure signature carries no distinguishing content when it is a bare
+# code/markdown fence, whitespace-only, or pure ANSI. Non-Python gate output
+# (e.g. a TypeScript `tests` gate) matches none of the Python-specific
+# _SIG_PATTERNS below and used to fall through to the first line after the
+# marker — often a ``` fence — collapsing genuinely different failures to one
+# value and false-firing spinning_signature_repeat (#167).
+_FENCE_RE = re.compile(r"^[`~]{3,}[\w.+-]*$")
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# Sentinel returned when every line after the FAIL marker is non-informative.
+# Distinct from `no_gate_marker` (a marker WAS found) and treated as
+# non-informative by `_is_noninformative_signature`.
+NO_SIGNATURE = "no_signature"
+
+
+def _is_noninformative_signature(sig: "str | None") -> bool:
+    """True when *sig* cannot distinguish one failure from another.
+
+    Covers None, whitespace-only, bare fences (``` / ~~~, optionally with a
+    language tag), pure-ANSI strings, and the NO_SIGNATURE sentinel. The spin
+    detector and the extraction fallback both consult this so a content-free
+    signature neither becomes a WU's identity nor trips escalation (#167).
+    """
+    if sig is None or sig == NO_SIGNATURE:
+        return True
+    stripped = _ANSI_RE.sub("", sig).strip()
+    if not stripped:
+        return True
+    return bool(_FENCE_RE.match(stripped))
+
+
 def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     """Extract (failure_class, failure_signature) from gate runner stdout.
 
@@ -577,9 +607,12 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
             return failure_class, sig if sig else "unknown"
     for line in after_lines:
         stripped = line.strip()
-        if stripped:
-            return failure_class, stripped[:100]
-    return failure_class, "unknown"
+        # Skip non-informative lines (bare fences, whitespace, pure ANSI):
+        # keying the signature off one would collapse distinct failures (#167).
+        if _is_noninformative_signature(stripped):
+            continue
+        return failure_class, stripped[:100]
+    return failure_class, NO_SIGNATURE
 
 
 def detect_spinning_signature_repeat(
@@ -592,6 +625,9 @@ def detect_spinning_signature_repeat(
     Returns False when either element of current is None.
     Returns False when current or prior is the no_gate_marker sentinel to
     avoid false-positive halts on parser-opaque failures (AC4).
+    Returns False when either signature is non-informative — a bare fence,
+    whitespace, pure ANSI, or the NO_SIGNATURE sentinel — since such values
+    collapse distinct failures and would false-fire the spin halt (#167).
     """
     _SENTINEL = ("other", "no_gate_marker")
     if prior is None:
@@ -599,6 +635,9 @@ def detect_spinning_signature_repeat(
     if current[0] is None or current[1] is None:
         return False
     if current == _SENTINEL or prior == _SENTINEL:
+        return False
+    if (_is_noninformative_signature(current[1])
+            or _is_noninformative_signature(prior[1])):
         return False
     return current == prior
 
