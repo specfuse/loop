@@ -186,6 +186,11 @@ class TestUntrackedPathsHelper(unittest.TestCase):
         root = Path(self._tmp.name)
         subprocess.run(["git", "init", "-q", "-b", "main", str(root)],
                        check=True)
+        # Disable commit signing so the fixture is independent of operator
+        # global config: with SSH signing on and no agent socket (e.g. a
+        # sandboxed session) `git commit` fails "Couldn't get agent socket"
+        # (#166). Mirrors the _git_repo_no_sign convention used elsewhere.
+        _git(root, "config", "commit.gpgSign", "false")
         _git(root, "config", "user.email", "test@example.com")
         _git(root, "config", "user.name", "Test")
         (root / "a.py").write_text("a\n")
