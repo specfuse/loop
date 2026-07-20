@@ -1,6 +1,8 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 
+import contextlib
+import io
 import pathlib
 import shutil
 import tempfile
@@ -83,6 +85,70 @@ class TestUpgradeDowngradeRefusal(unittest.TestCase):
         try:
             with self.assertRaises(ScaffoldDowngradeError):
                 upgrade_specfuse(target)
+        finally:
+            shutil.rmtree(tmpdir)
+
+
+class TestUnmanagedLegacyWarning(unittest.TestCase):
+    """#165: upgrade advances VERSION but never manages scripts/ or skills/.
+
+    Only pre-PyPI (init.sh-era) repos carry full copies; upgrade leaves them
+    stale while VERSION moves on. A warning must surface that drift; a clean
+    (post-migration) project must stay silent.
+    """
+
+    def _upgrade_capturing_stderr(self, target) -> str:
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            upgrade_specfuse(target)
+        return err.getvalue()
+
+    def test_warns_when_legacy_scripts_and_skills_present(self):
+        target, specfuse, tmpdir = _make_target_with_version("0.0.1")
+        try:
+            (specfuse / "scripts").mkdir()
+            (specfuse / "scripts" / "loop.py").write_text("# legacy 0.2.0\n")
+            (specfuse / "skills" / "draft-feature").mkdir(parents=True)
+            (specfuse / "skills" / "draft-feature" / "SKILL.md").write_text("x")
+            out = self._upgrade_capturing_stderr(target)
+            self.assertIn("scripts/", out)
+            self.assertIn("skills/", out)
+            # Names the version it advanced to, so the drift is legible.
+            self.assertIn(scaffold_version(), out)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_warns_when_only_scripts_present(self):
+        target, specfuse, tmpdir = _make_target_with_version("0.0.1")
+        try:
+            (specfuse / "scripts").mkdir()
+            (specfuse / "scripts" / "loop.py").write_text("# legacy\n")
+            out = self._upgrade_capturing_stderr(target)
+            self.assertIn("scripts/", out)
+            self.assertNotIn("skills/", out)
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_silent_on_clean_project(self):
+        # A post-migration project (init_specfuse ships neither dir).
+        tmpdir = tempfile.mkdtemp()
+        target = pathlib.Path(tmpdir)
+        try:
+            init_specfuse(target)
+            self.assertFalse((target / ".specfuse" / "scripts").exists())
+            self.assertFalse((target / ".specfuse" / "skills").exists())
+            out = self._upgrade_capturing_stderr(target)
+            self.assertNotIn("not managed", out.lower())
+        finally:
+            shutil.rmtree(tmpdir)
+
+    def test_empty_legacy_dir_does_not_warn(self):
+        # An empty scripts/ dir (no files) is not drift.
+        target, specfuse, tmpdir = _make_target_with_version("0.0.1")
+        try:
+            (specfuse / "scripts").mkdir()
+            out = self._upgrade_capturing_stderr(target)
+            self.assertNotIn("not managed", out.lower())
         finally:
             shutil.rmtree(tmpdir)
 
