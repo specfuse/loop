@@ -104,6 +104,46 @@ class TestLintErrorArms(unittest.TestCase):
         self.assertTrue(any("frontmatter missing keys" in e for e in errs),
                         f"expected missing-keys error; errs={errs}")
 
+    def test_unknown_feature_status_errors(self):
+        """#185: a feature status outside the driver's enum is a lint error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_minimal_feature(Path(tmp))
+            plan = feat / "PLAN.md"
+            plan.write_text(plan.read_text().replace(
+                "status: active", "status: paused", 1))
+            errs = lint_plan.lint(feat)
+        self.assertTrue(
+            any("'paused'" in e and "feature status" in e for e in errs),
+            f"expected feature-status error; errs={errs}")
+
+    def test_known_feature_statuses_do_not_error(self):
+        """Every documented feature status passes the vocabulary check."""
+        for status in ("planned", "active", "deferred", "done", "abandoned"):
+            with tempfile.TemporaryDirectory() as tmp:
+                feat = _build_minimal_feature(Path(tmp))
+                plan = feat / "PLAN.md"
+                plan.write_text(plan.read_text().replace(
+                    "status: active", f"status: {status}", 1))
+                errs = lint_plan.lint(feat)
+            self.assertFalse(
+                any("feature status" in e for e in errs),
+                f"{status!r} should be a valid feature status; errs={errs}")
+
+    def test_unknown_gate_status_errors(self):
+        """#185: a gate status outside the driver's enum is a lint error."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_minimal_feature(Path(tmp))
+            (feat / "GATE-01.md").write_text(
+                "---\nstatus: reviewing\n---\n\n# Gate 1\n")
+            # Point the graph's gate at the file so lint reads it.
+            plan = feat / "PLAN.md"
+            plan.write_text(plan.read_text().replace(
+                "  - gate: 1\n", "  - gate: 1\n    file: GATE-01.md\n", 1))
+            errs = lint_plan.lint(feat)
+        self.assertTrue(
+            any("'reviewing'" in e and "gate status" in e for e in errs),
+            f"expected gate-status error; errs={errs}")
+
     def test_plan_no_yaml_block(self):
         """Line 91: PLAN.md has valid frontmatter but no fenced yaml graph block."""
         with tempfile.TemporaryDirectory() as tmp:
