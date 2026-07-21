@@ -138,6 +138,69 @@ def _slice_section(body: str, section_name: str) -> str:
     return after[:em.start()] if em else after
 
 
+# Interpreters / super-generic words that don't distinguish one gate command
+# from another — excluded from a command's signature tokens (#176).
+_GATE_TOKEN_STOP = {
+    "python", "python3", "bash", "sh", "run", "exec", "discover",
+    "report", "source", "true", "false",
+}
+_GATE_TOKEN_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.:+-]{2,}")
+# Verification prose that delegates to the whole gate set — treat as
+# referencing every gate so a legitimate "all gates pass" phrasing is not
+# flagged.
+_UMBRELLA_GATES_RE = re.compile(r"(?i)\b(all|every|entire|full|the)\b[^.\n]{0,24}\bgate")
+
+
+def _must_reference_gate_signatures(feature_dir: Path) -> list[tuple[str, set[str]]]:
+    """Return [(gate_name, signature_tokens)] for OPT-IN must-reference gates (#176).
+
+    Reads ``<project>/.specfuse/verification.yml`` (``feature_dir`` is
+    ``.../.specfuse/features/<name>``) and includes only `code` gates that set
+    ``wu_must_reference: true``. This is deliberately opt-in: warning on every
+    declared gate is noise on real multi-gate projects (leak-scan, hygiene
+    bats, etc. that an individual WU has no business naming). A project flags
+    the gates whose fix is mechanical over a WU's own output — formatters,
+    auto-fixable linters — the class #175 shows can burn the whole attempt
+    budget when a WU forgets them. Empty list (the check no-ops) when the file
+    is absent, unparseable, or no gate opts in. Each gate's token set is the
+    distinctive words of its command plus the gate name, lowercased.
+    """
+    vpath = feature_dir.parent.parent / "verification.yml"
+    if not vpath.is_file():
+        return []
+    try:
+        cfg = _miniyaml.parse(vpath.read_text()) or {}
+    except _miniyaml.MiniYAMLError:
+        return []
+    out: list[tuple[str, set[str]]] = []
+    for gate in cfg.get("code") or []:
+        if not isinstance(gate, dict) or gate.get("wu_must_reference") is not True:
+            continue
+        name = str(gate.get("name") or "").strip()
+        command = str(gate.get("command") or "")
+        tokens = {t.lower() for t in _GATE_TOKEN_RE.findall(command)
+                  if t.lower() not in _GATE_TOKEN_STOP}
+        if name:
+            tokens.add(name.lower())
+        if tokens:
+            out.append((name or command[:40], tokens))
+    return out
+
+
+def _unreferenced_code_gates(
+    verification_text: str, signatures: list[tuple[str, set[str]]],
+) -> list[str]:
+    """Names of code gates whose tokens *verification_text* references none of.
+
+    An umbrella "all gates" phrasing short-circuits to [] (author delegated).
+    """
+    if _UMBRELLA_GATES_RE.search(verification_text):
+        return []
+    low = verification_text.lower()
+    return [name for name, tokens in signatures
+            if not any(tok in low for tok in tokens)]
+
+
 def detect_oracle_verbs(ac_section_text: str) -> list[str]:
     """Return matched oracle-verb strings found in the AC section text."""
     found = []
@@ -248,6 +311,11 @@ def lint(feature_dir: Path) -> list[str]:
     missing = REQUIRED_FEATURE_KEYS - set(fm)
     if missing:
         errs.append(f"PLAN.md frontmatter missing keys: {sorted(missing)}")
+
+    # Opt-in must-reference gate signatures, loaded once for the
+    # Verification-reference WARN below (#176). Empty unless the project flags
+    # gates with `wu_must_reference: true`.
+    must_ref_gate_sigs = _must_reference_gate_signatures(feature_dir)
 
     if "base" in fm:
         base_val = fm["base"]
@@ -398,6 +466,25 @@ def lint(feature_dir: Path) -> list[str]:
                         f"({wiring_matches}) but `produces_driver_helper` frontmatter "
                         f"is empty. Declare the symbol(s) this WU produces in the "
                         f"driver. See authoring-work-units §9 + FEAT-2026-0017."
+                    )
+
+            # Verification ↔ must-reference gate WARN (#176). For gates a
+            # project has flagged `wu_must_reference: true` — those whose fix is
+            # mechanical over a WU's own output (formatters, auto-fixable
+            # linters) — the driver enforces them regardless of what a WU's
+            # Verification names. A session not told to run one writes code that
+            # fails it and, per #175, can burn the whole attempt budget on the
+            # mechanical failure. Flag at lint time, at zero model cost. Opt-in,
+            # so no noise on projects that don't flag any gate.
+            if wu_type_val == "implementation" and must_ref_gate_sigs:
+                verif_text = _slice_section(wbody, "Verification")
+                unref = _unreferenced_code_gates(verif_text, must_ref_gate_sigs)
+                if unref:
+                    print(
+                        f"WARN: {wfile}: Verification references none of the "
+                        f"must-reference gate(s): {', '.join(unref)}. The driver "
+                        f"runs them regardless; name each so the session knows to "
+                        f"satisfy it before finishing (#176)."
                     )
 
             # Deliverable-presence declaration WARN (FEAT-2026-0022/T01).
