@@ -2778,6 +2778,27 @@ def _already_auto_closed(wu_file: Path) -> bool:
     return auto in (True, "true", "True")
 
 
+def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
+    """True iff the close WU's frontmatter sets ``auto_close_disabled`` truthy.
+
+    Per-WU counterpart to PLAN.md's feature-level ``auto_close_disabled``
+    (#189). The auto-close predicate keys on the implementation WUs' cost and
+    plan-conformance; it has no signal for what the CLOSE WU itself is
+    contracted to verify. A substantive close — one whose acceptance criteria
+    assert on the source tree, reconcile prior gates, or observe runtime
+    behaviour — must be dispatched and run, not optimized away. The plan author
+    marks such a close with ``auto_close_disabled: true`` in its frontmatter;
+    the predicate then always defers to dispatch for that gate.
+
+    Distinct from the ``auto_close`` key, which is the auto-close OUTPUT marker
+    (set to ``true`` by mark_close_wu_auto_closed after a gate auto-closes).
+    """
+    if close_wu is None or not close_wu.file.is_file():
+        return False
+    fm, _ = read_frontmatter(close_wu.file)
+    return fm.get("auto_close_disabled") in (True, "true", "True")
+
+
 def write_stub_retrospective_terminal(
     feature_dir: Path,
     gate_number: int,
@@ -2876,6 +2897,16 @@ def maybe_auto_close_terminal(
         return False, AutoCloseDecision(
             auto=False,
             reasons=["already_auto_closed"],
+            metrics={},
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version="v1",
+        )
+    if _close_wu_disables_auto_close(close_wu_for_terminal):
+        # Substantive close marked must-run (#189): dispatch it, don't skip.
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=["auto_close_disabled_per_wu"],
             metrics={},
             gate_id=gate.number,
             feature_id=feature_id,
@@ -2989,6 +3020,16 @@ def maybe_auto_close_intermediate(
         return False, AutoCloseDecision(
             auto=False,
             reasons=["already_auto_closed"],
+            metrics={},
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version="v1",
+        )
+    if _close_wu_disables_auto_close(close_intermediate_wu):
+        # Substantive close-intermediate marked must-run (#189): dispatch it.
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=["auto_close_disabled_per_wu"],
             metrics={},
             gate_id=gate.number,
             feature_id=feature_id,

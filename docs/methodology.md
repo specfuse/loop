@@ -139,7 +139,13 @@ auto-close only eliminates the reflective overhead, not the forward-design step.
 full close ceremony regardless of predicate outcome. Alternatively, set
 `auto_close_disabled: true` in a feature's `PLAN.md` frontmatter to disable
 auto-close permanently for that feature (e.g., for features that are inherently
-exploratory and expect off-plan behavior).
+exploratory and expect off-plan behavior). For a single **substantive close**
+— a `close` (or `close-intermediate`) WU whose acceptance criteria assert on the
+source tree, reconcile prior gates, or observe runtime behaviour rather than
+just writing the retrospective stub — set `auto_close_disabled: true` in **that
+WU's** frontmatter. The predicate keys on the implementation WUs' cost and
+plan-conformance and cannot see what a close verifies, so a substantive close
+must be marked must-run or its verification is silently skipped (#189).
 
 **Predicate-version transparency** — every `auto_close_decision` event in
 `events.jsonl` carries a `predicate_version` field (e.g., `predicate_version:
