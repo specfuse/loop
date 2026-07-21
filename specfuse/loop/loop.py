@@ -266,11 +266,28 @@ def write_frontmatter_field(path: Path, key: str, value) -> None:
 def find_feature(arg: str | None) -> Path:
     if arg:
         d = FEATURES_DIR / arg if not arg.startswith(".") else Path(arg)
-        if not (d / "PLAN.md").exists():
+        plan = d / "PLAN.md"
+        if not plan.exists():
             sys.exit(f"No PLAN.md under {d}")
+        # A `deferred` feature is parked — non-dispatchable by contract (the
+        # gate-status skill documents it as "non-dispatchable but resumable;
+        # the loop does not auto-resume it"). Refuse an explicit --feature
+        # targeting one instead of dispatching it anyway (#183). Malformed
+        # frontmatter is left to fail later where the graph is parsed.
+        try:
+            _fm, _ = read_frontmatter(plan)
+        except _miniyaml.MiniYAMLError:
+            _fm = {}
+        if _fm.get("status") == "deferred":
+            sys.exit(
+                f"{d.name} is deferred (parked) — the loop does not dispatch "
+                f"deferred features. Flip its PLAN.md status back to `active` "
+                f"when the blocker clears, then re-run."
+            )
         return d
     actives = []
     done_pending_wrap = []
+    deferred = []
     for d in sorted(FEATURES_DIR.glob("*/")):
         plan = d / "PLAN.md"
         if plan.exists():
@@ -293,10 +310,23 @@ def find_feature(arg: str | None) -> Path:
                 # push + PR are pending.
                 if (d / "RETROSPECTIVE.md").is_file():
                     done_pending_wrap.append(d)
+            elif fm.get("status") == "deferred":
+                # Parked — non-dispatchable (#183). Never enters `actives`, so
+                # a bare invocation won't pick it up; surfaced below so a lone
+                # deferred feature reads as parked, not silently absent.
+                deferred.append(d)
     if len(actives) == 1:
         return actives[0]
     if not actives:
         msg = "No active feature. Set a feature's PLAN.md status to 'active'.\n"
+        if deferred:
+            names = ", ".join(d.name for d in deferred[-3:])
+            msg += (
+                f"  - {len(deferred)} deferred (parked) feature(s), skipped: "
+                f"{names}\n"
+                f"                    Flip one's PLAN.md status to `active` to "
+                f"resume it.\n"
+            )
         if done_pending_wrap:
             names = ", ".join(d.name for d in done_pending_wrap[-3:])
             msg += (
