@@ -1917,6 +1917,22 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
     return unchanged
 
 
+def _annotate_unchanged_paths(paths: "list[str]") -> str:
+    """Format files_changed-mismatch paths, distinguishing missing from unchanged.
+
+    Each declared-but-non-diffing path is labeled ``(missing)`` when it does
+    not exist on disk or ``(no diff)`` when it exists but is byte-identical to
+    head_before. Prior wording listed paths bare, which conflated the two —
+    an existing, unchanged file could read as a deletion claim and seed a
+    wrong root-cause diagnosis (#182). The labels say exactly what was found.
+    """
+    lines = []
+    for p in paths:
+        label = "no diff" if Path(str(p)).exists() else "missing"
+        lines.append(f"  - ({label}) {p}")
+    return "\n".join(lines)
+
+
 # Smoke-import runner (FEAT-2026-0008/T03). The conservative pattern matches
 # ONLY a `python3 -c "from X import Y"` line. The agent-authored WU body may
 # declare an existence check naming new symbols this WU just minted; the
@@ -4274,17 +4290,33 @@ def run(
                         # against head_before. Treat as a failed attempt: skip
                         # squash, reset the tree, record evidence, retry within
                         # budget. payload is the list of unchanged paths.
+                        _mm_paths = list(payload)
                         note = (
-                            "RESULT block declared `files_changed` paths that "
-                            "show NO diff against HEAD before this attempt:\n"
-                            + "\n".join(f"  - {p}" for p in payload)
-                            + "\nEither actually modify them, or correct the "
-                              "files_changed list to match what you really edited."
+                            "The RESULT block declared these `files_changed` "
+                            "paths, but each shows NO diff against HEAD before "
+                            "this attempt:\n"
+                            + _annotate_unchanged_paths(_mm_paths)
+                            + "\n\nDeclaring an unchanged path is what fails this "
+                              "guard. For each path: if it did NOT need changing, "
+                              "OMIT it from `files_changed` (declare only files you "
+                              "actually edit); if it SHOULD have changed, make the "
+                              "edit this attempt. A `(missing)` path was never "
+                              "created; a `(no diff)` path exists but is unchanged."
                         )
+                        # Populate failure_class/signature/excerpt (#182): a
+                        # driver-side rejection previously emitted all-null, so
+                        # events.jsonl — and gate-status, which reads only it —
+                        # showed empty columns exactly where the diagnosis lives.
+                        _mm_sig = ", ".join(
+                            sorted({Path(str(p)).name for p in _mm_paths})
+                        )[:100] or "unchanged"
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "files_changed_mismatch",
                             attempts_usage[-1],
-                            extras={"unchanged_paths": list(payload)},
+                            failure_class="files_changed_mismatch",
+                            failure_signature=_mm_sig,
+                            failure_excerpt=extract_failure_excerpt(note),
+                            extras={"unchanged_paths": _mm_paths},
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
