@@ -2778,6 +2778,35 @@ def _already_auto_closed(wu_file: Path) -> bool:
     return auto in (True, "true", "True")
 
 
+def _gate_impl_deliverables_present(
+    feature_dir: Path, gate: "GateNode",
+) -> tuple[bool, str]:
+    """Return (True, "") iff every implementation WU in *gate* has its declared
+    ``produces:`` deliverables present and non-empty on disk (#190).
+
+    Auto-close keys on WU cost/plan-conformance and trusts each WU's ``done``
+    status; ``assert_declared_deliverables`` — the dispatch-time presence gate —
+    never runs on an auto-closed gate, so a WU that reported ``done`` with its
+    ``produces:`` paths absent still counts as a clean gate. Running the same
+    check here stops the predicate auto-closing over a ``done`` that did not
+    deliver. Non-implementation WUs and WUs with no ``produces:`` are skipped
+    (the latter is assert_declared_deliverables's own opt-out). A missing or
+    malformed WU file is left to the predicate / dispatch path that already
+    handles it, not crashed on here.
+    """
+    for ref in gate.refs:
+        try:
+            wu = load_wu(feature_dir, ref)
+        except (FileNotFoundError, KeyError, _miniyaml.MiniYAMLError):
+            continue
+        if wu.type != "implementation":
+            continue
+        ok, summary = assert_declared_deliverables(wu)
+        if not ok:
+            return False, f"{ref.get('id', wu.wu_id)}: {summary}"
+    return True, ""
+
+
 def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
     """True iff the close WU's frontmatter sets ``auto_close_disabled`` truthy.
 
@@ -2915,6 +2944,19 @@ def maybe_auto_close_terminal(
     decision = evaluate_auto_close(feature_dir, gate.number)
     if not decision.auto:
         return False, decision
+    present, reason = _gate_impl_deliverables_present(feature_dir, gate)
+    if not present:
+        # A gate WU reported done without its declared deliverable on disk;
+        # do not auto-close over the discrepancy — dispatch the close, which is
+        # where it surfaces (#190).
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=[f"declared_deliverable_missing: {reason}"],
+            metrics=decision.metrics,
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version=decision.predicate_version,
+        )
     write_stub_retrospective_terminal(feature_dir, gate.number, decision)
     mark_close_wu_auto_closed(close_wu_for_terminal, decision)
     metrics = decision.metrics
@@ -3038,6 +3080,18 @@ def maybe_auto_close_intermediate(
     decision = evaluate_auto_close(feature_dir, gate.number)
     if not decision.auto:
         return False, decision
+    present, reason = _gate_impl_deliverables_present(feature_dir, gate)
+    if not present:
+        # See maybe_auto_close_terminal: don't auto-close over a done WU whose
+        # declared deliverable is absent — dispatch the close instead (#190).
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=[f"declared_deliverable_missing: {reason}"],
+            metrics=decision.metrics,
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version=decision.predicate_version,
+        )
     append_stub_retrospective_intermediate(feature_dir, gate.number, decision)
     if close_intermediate_wu is not None:
         write_frontmatter_field(close_intermediate_wu.file, "status", "done")
