@@ -190,14 +190,27 @@ FM = re.compile(r"^---\s*$")
 
 
 def read_frontmatter(path: Path) -> tuple[dict, str]:
-    """Return (frontmatter_dict, body_text)."""
+    """Return (frontmatter_dict, body_text).
+
+    A parse failure is re-raised with the file path attached and the line
+    clarified as frontmatter-relative (add 1 for the file line, since the
+    opening `---` is line 1). Without this a `_miniyaml.MiniYAMLError` carries
+    only a block-relative line number, so locating the offending file across
+    many feature folders meant grepping by hand (#177).
+    """
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
         return {}, path.read_text()
     j = 1
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
-    fm = _miniyaml.parse("\n".join(lines[1:j])) or {}
+    try:
+        fm = _miniyaml.parse("\n".join(lines[1:j])) or {}
+    except _miniyaml.MiniYAMLError as exc:
+        raise _miniyaml.MiniYAMLError(
+            f"{path}: {exc} (line is relative to the frontmatter block; "
+            f"add 1 for the file line)"
+        ) from exc
     body = "\n".join(lines[j + 1 :])
     return fm, body
 
@@ -261,7 +274,16 @@ def find_feature(arg: str | None) -> Path:
     for d in sorted(FEATURES_DIR.glob("*/")):
         plan = d / "PLAN.md"
         if plan.exists():
-            fm, _ = read_frontmatter(plan)
+            try:
+                fm, _ = read_frontmatter(plan)
+            except _miniyaml.MiniYAMLError as exc:
+                # One feature's malformed frontmatter must not block dispatch of
+                # every OTHER feature. Feature lookup is the earliest and least
+                # relevant failure point; skip the bad candidate with a warning
+                # rather than aborting the whole scan (#177).
+                print(f"warning: skipping {d.name} — unparseable PLAN.md "
+                      f"frontmatter: {exc}", file=sys.stderr)
+                continue
             if fm.get("status") == "active":
                 actives.append(d)
             elif fm.get("status") == "done":
