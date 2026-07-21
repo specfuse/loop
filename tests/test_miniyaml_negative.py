@@ -98,13 +98,16 @@ class TestUnsupportedConstructsFailLoudly(unittest.TestCase):
     def test_top_level_indent_nonzero_rejected(self):
         self._expect_error("  foo: 1\n", "indent 0")
 
-    # --- explicit nulls / forbidden boolean spellings ---
+    # --- explicit nulls now ACCEPTED (#177); forbidden boolean spellings ---
 
-    def test_explicit_null_marker_rejected(self):
-        self._expect_error("foo: null\n", "explicit null marker")
-
-    def test_tilde_null_marker_rejected(self):
-        self._expect_error("foo: ~\n", "explicit null marker")
+    def test_explicit_null_spellings_accepted_as_none(self):
+        # #177: null/~/Null/NULL map to None, matching yaml.safe_load — the
+        # explicit-null rejection used to crash feature lookup with a
+        # traceback. Boolean spellings below stay rejected (Norway problem).
+        for spelling in ("null", "Null", "NULL", "~"):
+            self.assertEqual(
+                miniyaml.parse(f"foo: {spelling}\n"), {"foo": None},
+                f"{spelling!r} should parse to None")
 
     def test_titlecase_boolean_rejected(self):
         self._expect_error("foo: True\n", "lowercase", "true")

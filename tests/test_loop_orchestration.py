@@ -320,6 +320,41 @@ class TestFindFeatureSelection(unittest.TestCase):
         result = loop.find_feature("FEAT-2026-9502-explicit")
         self.assertEqual(result, fdir)
 
+    def test_null_in_frontmatter_does_not_crash_lookup(self):
+        """#177 fix 3: an explicit null in frontmatter parses fine now."""
+        fdir = self._features_dir / "FEAT-2026-9502-nullkey"
+        fdir.mkdir(parents=True)
+        (fdir / "PLAN.md").write_text(
+            "---\nfeature_id: FEAT-2026-9502\nstatus: active\n"
+            "supersedes_gate_of: null\n---\n\n# Plan\n"
+        )
+        self.assertEqual(loop.find_feature(None), fdir)
+
+    def test_unparseable_candidate_is_skipped_not_fatal(self):
+        """#177 fix 2: a malformed PLAN.md in one feature must not block
+        dispatch of a different, valid active feature."""
+        bad = self._features_dir / "FEAT-2026-9502-bad"
+        bad.mkdir(parents=True)
+        # Single-quoted scalar is unsupported → MiniYAMLError on this file only.
+        (bad / "PLAN.md").write_text(
+            "---\nfeature_id: FEAT-2026-9502\nstatus: 'active'\n---\n\n# Plan\n"
+        )
+        good = self._write_plan("FEAT-2026-9502-good", "active")
+        # The bad one is skipped; the good active feature still resolves.
+        self.assertEqual(loop.find_feature(None), good)
+
+    def test_read_frontmatter_error_names_the_file(self):
+        """#177 fix 1: a parse error carries the file path, not just a
+        block-relative line number."""
+        bad = self._features_dir / "FEAT-2026-9502-badfm"
+        bad.mkdir(parents=True)
+        plan = bad / "PLAN.md"
+        plan.write_text("---\nstatus: 'active'\n---\n\n# Plan\n")
+        with self.assertRaises(loop._miniyaml.MiniYAMLError) as ctx:
+            loop.read_frontmatter(plan)
+        self.assertIn("PLAN.md", str(ctx.exception))
+        self.assertIn(str(plan), str(ctx.exception))
+
     def test_deferred_feature_is_not_auto_selected(self):
         """Issue #106: a `deferred` foldered feature is non-dispatchable — the
         driver skips it exactly like a non-active feature (parked, resumable)."""
