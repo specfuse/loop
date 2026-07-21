@@ -245,6 +245,17 @@ class TestAutoCloseIntermediateFiresOnCleanGate(unittest.TestCase):
             self.events_path, self.root, self.ci_wu, self.plan_next_wu,
         )
 
+    def test_per_wu_opt_out_refuses(self):
+        # #189: close-intermediate marked auto_close_disabled → not auto-closed.
+        self.ci_wu.file.write_text(
+            f"---\nid: {self.feature_id}/G1-CI\ntype: close-intermediate\n"
+            f"model: opus\nstatus: pending\nattempts: 0\n"
+            f"auto_close_disabled: true\n---\n\n# CI\n"
+        )
+        result, decision = self._call()
+        self.assertFalse(result)
+        self.assertIn("auto_close_disabled_per_wu", decision.reasons)
+
     def test_returns_true_and_decision(self):
         result, decision = self._call()
         self.assertTrue(result)
