@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "specfuse-loop"
-version = "0.3.17"
+version = "0.3.18"
 description = "Local-first executor for the Specfuse Plan + Work Unit gate-cycle methodology."
 readme = "README.md"
 requires-python = ">=3.10"
