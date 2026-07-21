@@ -655,7 +655,56 @@ def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     encoded = text.encode("utf-8")
     if len(encoded) <= max_chars:
         return text
-    return encoded[-max_chars:].decode("utf-8", errors="ignore")
+    # Head+tail, not tail-only (#175): build-tool output puts the actionable
+    # part (the list of offending files) up top and boilerplate (help URLs,
+    # stack-trace hints) at the bottom. A tail-only slice reliably keeps the
+    # noise; splitting the budget preserves both ends.
+    marker = "\n...\n"
+    budget = max_chars - len(marker.encode("utf-8"))
+    if budget <= 0:
+        return encoded[-max_chars:].decode("utf-8", errors="ignore")
+    head_bytes = budget // 2
+    tail_bytes = budget - head_bytes
+    head = encoded[:head_bytes].decode("utf-8", errors="ignore")
+    tail = encoded[-tail_bytes:].decode("utf-8", errors="ignore")
+    return head + marker + tail
+
+
+# Forward-looking retry directives keyed by failure_class (#175 fix 1). The
+# gate output replayed into a retry describes files the per-attempt reset
+# already discarded, and reads as stale advice about a prior attempt. These
+# reframe it as a standing requirement for the fresh attempt and name the
+# mechanical remedy per class — no per-tool knowledge.
+_RETRY_CLASS_HINT: dict[str, str] = {
+    "lint": "This was a lint/format gate — its fix is mechanical: run the "
+            "formatter / linter's fix command over your changes and re-run the "
+            "gate before declaring done, rather than only rewriting the code.",
+    "tests": "Run the failing tests and make them pass before declaring done.",
+    "coverage": "Add tests covering the new or changed code to clear the "
+                "coverage gate before declaring done.",
+    "security": "Resolve the flagged security findings (or add a narrowly "
+                "scoped, justified suppression) before declaring done.",
+}
+
+
+def synthesize_retry_directive(failure_class: "str | None") -> str:
+    """Return a forward-looking retry instruction for *failure_class* (#175).
+
+    Prepended to the failure note fed into the next attempt. The note itself
+    is raw gate output about files the reset discarded; without this lead a
+    fresh session reads it as stale advice and reproduces the same omission
+    (e.g. never running the formatter), failing identically until attempts
+    exhaust. The lead reframes the output as a standing requirement and the
+    per-class hint names the remedy generically.
+    """
+    lead = ("The previous attempt's work was DISCARDED before this retry, so "
+            "the gate output below refers to files that no longer exist. Do "
+            "not read it as stale advice about a past attempt — treat it as a "
+            "standing requirement for THIS fresh attempt. ")
+    hint = _RETRY_CLASS_HINT.get(
+        failure_class or "",
+        "Satisfy every declared gate before declaring done.")
+    return lead + hint
 
 
 def emit_attempt_outcome(
@@ -4241,9 +4290,16 @@ def run(
                             + "```diff\n" + _diff + "\n```\n"
                         )
                     attempt_notes.append((attempt, _evidence))
-                    failure_note = payload
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
+                    # Prepend a forward-looking directive so the retry reads the
+                    # gate output as a standing requirement, not stale advice
+                    # about the discarded attempt (#175 fix 1).
+                    failure_note = (
+                        synthesize_retry_directive(_fc)
+                        + "\n\n## Gate output from the discarded attempt\n\n"
+                        + payload
+                    )
                     wu_events.append(emit_attempt_outcome(
                         wu, attempt, "failed",
                         attempts_usage[-1],

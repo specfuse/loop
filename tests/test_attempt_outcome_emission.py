@@ -304,6 +304,49 @@ class TestExtractFailureExcerpt(unittest.TestCase):
             self.fail(f"UnicodeDecodeError raised: {e}")
         self.assertIsInstance(excerpt, str)
 
+    def test_keeps_head_and_tail_on_truncation(self):
+        # #175: build-tool output puts the offending-file list up top and
+        # boilerplate (help URLs, stack hints) at the bottom. A tail-only
+        # slice keeps the noise; head+tail must preserve both ends.
+        lines = ["Error: HEAD_MARKER offending file list here"]
+        lines += [f"Error: filler line {i} " + "x" * 40 for i in range(400)]
+        lines += ["Error: TAIL_MARKER re-run with -X for debug"]
+        excerpt = loop.extract_failure_excerpt("\n".join(lines), max_chars=500)
+        self.assertLessEqual(len(excerpt.encode("utf-8")), 500)
+        self.assertIn("HEAD_MARKER", excerpt)
+        self.assertIn("TAIL_MARKER", excerpt)
+
+
+class TestSynthesizeRetryDirective(unittest.TestCase):
+    """#175 fix 1: the retry note must carry a forward-looking lesson, not
+    just replay output about files the reset already discarded."""
+
+    def test_lint_directive_is_forward_looking(self):
+        d = loop.synthesize_retry_directive("lint")
+        self.assertIn("discard", d.lower())
+        # Names the mechanical remedy without per-tool knowledge.
+        self.assertIn("format", d.lower())
+        self.assertIn("before", d.lower())
+
+    def test_tests_directive_mentions_tests(self):
+        d = loop.synthesize_retry_directive("tests")
+        self.assertIn("test", d.lower())
+        self.assertIn("before", d.lower())
+
+    def test_coverage_and_security_have_specific_hints(self):
+        self.assertIn("coverage", loop.synthesize_retry_directive("coverage").lower())
+        self.assertIn(
+            "finding", loop.synthesize_retry_directive("security").lower())
+
+    def test_unknown_class_falls_back_to_generic_non_empty(self):
+        d = loop.synthesize_retry_directive("other")
+        self.assertTrue(d.strip())
+        self.assertIn("discard", d.lower())
+
+    def test_none_class_does_not_crash(self):
+        d = loop.synthesize_retry_directive(None)
+        self.assertTrue(d.strip())
+
 
 # --------------------------------------------------------------------------- #
 # TestCumulativeFoldOnRearm                                                    #
