@@ -133,6 +133,15 @@ class TestVerifyFilesChanged(unittest.TestCase):
         self.assertEqual(
             loop.verify_files_changed(result, self.head), ["ignored.log"])
 
+    def test_annotate_distinguishes_missing_from_no_diff(self):
+        # #182: never label an existing-but-unchanged file as deleted. An
+        # on-disk path → "(no diff)"; an absent path → "(missing)".
+        (self.root / "present.py").write_text("x\n")
+        out = loop._annotate_unchanged_paths(["present.py", "gone.py"])
+        self.assertIn("(no diff) present.py", out)
+        self.assertIn("(missing) gone.py", out)
+        self.assertNotIn("deleted", out)
+
 
 def write_minimal_feature(root: Path, feature_id: str, slug: str,
                           branch: str, wus: list) -> Path:
@@ -302,6 +311,13 @@ class TestFilesChangedMismatchSpinsIntegration(unittest.TestCase):
                 self.assertEqual(ev["payload"]["unchanged_paths"],
                                  ["sentinel.py"],
                                  "payload must name the sentinel path")
+                # #182: driver-side rejections must populate the diagnosis
+                # fields, not emit all-null — gate-status reads only events.jsonl.
+                self.assertEqual(ev["payload"]["failure_class"],
+                                 "files_changed_mismatch")
+                self.assertIn("sentinel.py", ev["payload"]["failure_signature"])
+                self.assertTrue(ev["payload"]["failure_excerpt"],
+                                "failure_excerpt must not be null/empty")
 
             types = [e["event_type"] for e in events]
             self.assertNotIn("task_completed", types,
