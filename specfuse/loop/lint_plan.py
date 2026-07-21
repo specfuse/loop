@@ -40,6 +40,14 @@ VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next"
                "close-intermediate"}
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
+# Feature (PLAN.md) and gate status vocabularies the DRIVER branches on. Kept
+# here (duplicated from loop.py's status literals, like VALID_TYPES/VALID_STATUS
+# above) so the linter validates the same set the driver acts on — an
+# unrecognized status that passes lint and then behaves differently at dispatch
+# is the class #183 (deferred) and #185 exist to close. Keep in sync with
+# find_feature / the gate-status transitions in loop.py.
+VALID_FEATURE_STATUS = {"planned", "active", "deferred", "done", "abandoned"}
+VALID_GATE_STATUS = {"open", "awaiting_review", "passed"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
 # New compact closing shapes (FEAT-2026-0015):
 #   non-terminal gate: close-intermediate → plan-next
@@ -312,6 +320,17 @@ def lint(feature_dir: Path) -> list[str]:
     if missing:
         errs.append(f"PLAN.md frontmatter missing keys: {sorted(missing)}")
 
+    # Feature status must be a value the driver recognizes (#185). An
+    # unrecognized status passes every other check and then behaves
+    # differently at dispatch — the shape #183 (deferred passed lint,
+    # dispatched anyway) exposed. Only validate when present; the missing-key
+    # check above already covers absence.
+    if "status" in fm and fm["status"] not in VALID_FEATURE_STATUS:
+        errs.append(
+            f"PLAN.md frontmatter status {fm['status']!r} is not a recognized "
+            f"feature status {sorted(VALID_FEATURE_STATUS)}"
+        )
+
     # Opt-in must-reference gate signatures, loaded once for the
     # Verification-reference WARN below (#176). Empty unless the project flags
     # gates with `wu_must_reference: true`.
@@ -351,6 +370,12 @@ def lint(feature_dir: Path) -> list[str]:
             gate_path = feature_dir / gate_file_rel
             if gate_path.exists():
                 gfm, _ = read_frontmatter(gate_path)
+                # Gate status must be a value the driver recognizes (#185).
+                if "status" in gfm and gfm["status"] not in VALID_GATE_STATUS:
+                    errs.append(
+                        f"{gate_file_rel}: gate status {gfm['status']!r} is not "
+                        f"a recognized gate status {sorted(VALID_GATE_STATUS)}"
+                    )
                 if "cost_budget_usd" in gfm:
                     val = gfm["cost_budget_usd"]
                     if isinstance(val, bool) or not isinstance(val, (int, float)):
