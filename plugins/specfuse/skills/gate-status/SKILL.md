@@ -69,11 +69,23 @@ For the active feature folder `.specfuse/features/FEAT-YYYY-NNNN-<slug>/`:
   current gate (first one whose `status != passed`).
 - **`GATE-NN.md`** — current gate's status (`open`, `awaiting_review`)
   and optional `cost_budget_usd` field. If `cost_budget_usd` is set,
-  compare it against the sum of `cost_usd` across the gate's `done`
-  WUs to surface budget headroom or overshoot.
+  compare it against the sum of `cost_usd` + `cumulative_cost_usd`
+  across the gate's `done` WUs to surface budget headroom or overshoot.
 - **WU files** under the gate's `work_units` graph — frontmatter
   `status`, `attempts`, and bodies. Group by status:
   `done`, `in_progress`, `blocked_human`, `pending`, `ready`, `draft`.
+
+  **Attempts/cost caveat (#199):** frontmatter `attempts` and `cost_usd`
+  are PER-DISPATCH-CYCLE — a re-arm resets `attempts` to 0 and folds
+  prior cost into `cumulative_cost_usd` / prior attempts into
+  `cumulative_attempts`. Never quote frontmatter `attempts`/`cost_usd`
+  as a WU's lifetime totals (FEAT-2026-0049/WU-06 read as 1 attempt /
+  $2.75 when the true totals were 9 / $30.29). For any WU with
+  `re_arm_count > 0`, compute lifetime numbers from `events.jsonl`
+  (`attempt_outcome` count and `cost_usd` sum per WU, or the
+  `task_completed` payload's `attempts_lifetime` /
+  `cumulative_cost_usd` fields on drivers >= 0.3.21) — events.jsonl is
+  the source of truth; frontmatter cumulative fields are the fallback.
 - **`events.jsonl`** — most recent `task_started` / `task_completed` /
   `human_escalation` / `gate_reached` entries. The
   `human_escalation` entries carry `reason` and `blocked_reason` for

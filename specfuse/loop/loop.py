@@ -1426,6 +1426,22 @@ def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
     backend.set_wu(wu, "cumulative_input_tokens", cum_input)
     backend.set_wu(wu, "cumulative_output_tokens", cum_output)
 
+    # Lifetime attempts (#199). unblock-wu resets `attempts: 0` BEFORE this
+    # fold runs, so the prior cycle's count is unrecoverable from `attempts`
+    # itself — it survives only in re_arm_history[].prior_attempts. Recompute
+    # (not increment) the sum so the write is idempotent across re-entries,
+    # matching the fold's cost-fold idempotence contract. Entries a pre-#199
+    # unblock-wu wrote without prior_attempts contribute 0.
+    history = fm.get("re_arm_history") or []
+    cum_attempts = 0
+    if isinstance(history, list):
+        for entry in history:
+            if isinstance(entry, dict):
+                prior = entry.get("prior_attempts")
+                if isinstance(prior, int) and not isinstance(prior, bool):
+                    cum_attempts += prior
+    backend.set_wu(wu, "cumulative_attempts", cum_attempts)
+
     # Reset per-cycle fields so the new cycle's write_cost_to_wu starts clean.
     backend.set_wu(wu, "cost_usd", 0.0)
     backend.set_wu(wu, "duration_seconds", 0.0)
@@ -1453,14 +1469,15 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 
 
 def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
-    """Sum cost_usd across the gate's done WUs (closing-sequence included).
+    """Sum lifetime cost across the gate's done WUs (closing-sequence included).
 
     Reads each WU file's frontmatter from `gate["work_units"]` and adds
-    `cost_usd` when the WU's status is "done". WUs whose frontmatter omits
-    cost_usd — cost tracking off, or the attempt didn't record a cost —
-    contribute 0.0. `plan` is the feature frontmatter dict and is accepted for
-    signature symmetry with the broader gate-budget helpers; the spent total
-    is derived from WU files alone.
+    `cost_usd` PLUS `cumulative_cost_usd` (prior re-arm cycles' spend, folded
+    by fold_cumulative_on_rearm — #199) when the WU's status is "done". WUs
+    whose frontmatter omits both — cost tracking off, or the attempt didn't
+    record a cost — contribute 0.0. `plan` is the feature frontmatter dict and
+    is accepted for signature symmetry with the broader gate-budget helpers;
+    the spent total is derived from WU files alone.
     """
     del plan  # signature symmetry — sum is derived from WU files only
     total = 0.0
@@ -1474,11 +1491,16 @@ def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
         fm, _ = read_frontmatter(wu_path)
         if fm.get("status") != "done":
             continue
-        cost = fm.get("cost_usd")
-        if isinstance(cost, bool):
-            continue
-        if isinstance(cost, (int, float)):
-            total += float(cost)
+        # Lifetime spend, not per-cycle (#199): fold_cumulative_on_rearm
+        # moves each prior dispatch cycle's cost into cumulative_cost_usd and
+        # zeroes cost_usd, so summing cost_usd alone undercounts every
+        # re-armed WU (FEAT-2026-0049/WU-06 read as $2.75 of a $30.29 spend).
+        for key in ("cost_usd", "cumulative_cost_usd"):
+            cost = fm.get(key)
+            if isinstance(cost, bool):
+                continue
+            if isinstance(cost, (int, float)):
+                total += float(cost)
     return total
 
 
@@ -4536,9 +4558,38 @@ def run(
                             agent_status="complete",
                             agent_blocked_reason=None,
                         ))
+                        # Lifetime fields (#199): a retrospective must be able
+                        # to compute rework-vs-new-work and planned-vs-actual
+                        # per WU from this one event, without reconciling
+                        # re-arm generations by hand. cumulative_* frontmatter
+                        # holds prior cycles' totals (folded at re-arm
+                        # dispatch); this cycle's numbers are added here.
+                        _fm_done, _ = read_frontmatter(wu.file)
+                        _prior_cost = _fm_done.get("cumulative_cost_usd")
+                        _prior_cost = (float(_prior_cost)
+                                       if isinstance(_prior_cost, (int, float))
+                                       and not isinstance(_prior_cost, bool)
+                                       else 0.0)
+                        _prior_attempts = _fm_done.get("cumulative_attempts")
+                        _prior_attempts = (int(_prior_attempts)
+                                           if isinstance(_prior_attempts, int)
+                                           and not isinstance(_prior_attempts, bool)
+                                           else 0)
+                        _planned = _fm_done.get("planned_cost_usd")
+                        _planned = (float(_planned)
+                                    if isinstance(_planned, (int, float))
+                                    and not isinstance(_planned, bool)
+                                    else None)
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "type": wu.type,
+                            "re_arm_count": re_arm_count,
+                            "cost_usd": round(cum_usage["cost_usd"], 6),
+                            "cumulative_cost_usd": round(
+                                _prior_cost + cum_usage["cost_usd"], 6),
+                            "attempts_lifetime": _prior_attempts + attempt,
+                            "planned_cost_usd": _planned,
                         }))
                         flush_events(events_path, wu_events)
                         done_ids.add(wu.wu_id)
