@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import hashlib
 import json
 import logging
@@ -3666,6 +3667,35 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     return True, ""
 
 
+def assert_produces_in_diff(
+    wu: WorkUnit, touched: list[str],
+) -> tuple[bool, str]:
+    """Cross-check declared ``produces:`` entries against the squash diff (#198).
+
+    ``assert_declared_deliverables`` is presence-only, so a WU whose
+    ``produces:`` paths are pre-existing files it was supposed to MODIFY passes
+    it without touching them — the FEAT-2026-0049/T06 shape: ``done`` touching
+    only gate docs while both declared src/main deliverables (existing files)
+    sat unchanged. Every ``produces:`` entry must match at least one path in
+    *touched* (the squash's changed-path list), literally or as a glob.
+    Opt-out mirrors the presence gate: empty ``produces:`` never fires.
+    Returns (False, summary) naming every unmatched entry.
+    """
+    if not wu.produces:
+        return True, ""
+    unmatched = []
+    for raw in wu.produces:
+        entry = str(raw)
+        if not any(t == entry or fnmatch.fnmatch(t, entry) for t in touched):
+            unmatched.append(entry)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -4338,6 +4368,48 @@ def run(
                             print(
                                 f"   NO DELIVERABLE FILES attempt "
                                 f"{attempt}/{MAX_ATTEMPTS}"
+                            )
+                            continue
+                        # Produces-vs-diff cross-check (#198): the presence gate
+                        # above cannot see a WU that declared pre-existing files
+                        # it never touched (the FEAT-2026-0049/T06 done-without-
+                        # delivering shape). Every produces: entry must match a
+                        # path in this WU's squash diff; otherwise refuse the
+                        # pass, roll back the squash, retry within budget.
+                        prod_ok, prod_summary = assert_produces_in_diff(
+                            wu, touched,
+                        )
+                        if not prod_ok:
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
+                            _prod_note = (
+                                prod_summary
+                                + "\n\nEach listed path is a deliverable this WU "
+                                  "declared in `produces:` but did not change. "
+                                  "Make the declared change this attempt — do "
+                                  "not declare done while a deliverable is "
+                                  "untouched."
+                            )
+                            _prod_sig = ", ".join(sorted(
+                                Path(p).name for p in wu.produces
+                                if not any(t == str(p)
+                                           or fnmatch.fnmatch(t, str(p))
+                                           for t in touched)
+                            ))[:100] or "produces_unchanged"
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "produces_not_in_diff",
+                                attempts_usage[-1],
+                                failure_class="produces_not_in_diff",
+                                failure_signature=_prod_sig,
+                                failure_excerpt=extract_failure_excerpt(_prod_note),
+                                files_touched=touched,
+                                extras={"summary": prod_summary},
+                            ))
+                            attempt_notes.append((attempt, _prod_note))
+                            failure_note = _prod_note
+                            print(
+                                f"   PRODUCES NOT IN DIFF attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
                             )
                             continue
                         if wu.type == "close":
