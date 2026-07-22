@@ -47,7 +47,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
-| FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | — |
+| FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -637,16 +637,6 @@ FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adopti
 
 **Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
-
-## FEAT-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
-
-**Why.** Loop requires WSL on Windows today. WSL is blocked on many corporate-managed devices and too heavy for non-technical users, excluding exactly the population that needs turnkey execution.
-
-**Goal.** Run the loop driver on native Windows (no WSL): make the driver importable and runnable, route gate commands through Git-Bash, and prove it with a windows-latest CI leg.
-
-**Benefits.** Removes the WSL prerequisite; unblocks corporate-managed and non-technical Windows users; driver is already stdlib-only so port surface is ~6 call sites (fcntl lock, killpg/SIGKILL timeout, python3 literal, shell=True gate semantics, bare-claude PATHEXT resolution, POSIX-only home-redaction regex); Git-Bash absorbs shell/bats/&&-exit gates for free.
-
-**Status: planned.**
 
 ## FEAT-2026-0033 — Sub-repo component scoping: multiple components in one repo
 

@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0032"></a>
+## FEAT-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
+
+**Why.** Loop requires WSL on Windows today. WSL is blocked on many corporate-managed devices and too heavy for non-technical users, excluding exactly the population that needs turnkey execution.
+
+**Goal.** Run the loop driver on native Windows (no WSL): make the driver importable and runnable, route gate commands through Git-Bash, and prove it with a windows-latest CI leg.
+
+**Benefits.** Removes the WSL prerequisite; unblocks corporate-managed and non-technical Windows users; driver is already stdlib-only so port surface is ~6 call sites (fcntl lock, killpg/SIGKILL timeout, python3 literal, shell=True gate semantics, bare-claude PATHEXT resolution, POSIX-only home-redaction regex); Git-Bash absorbs shell/bats/&&-exit gates for free.
+
+**Status: done.**
+
 <a id="feat-2026-0031"></a>
 ## FEAT-2026-0031 — Configurable integration branch
 
