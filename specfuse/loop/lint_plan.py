@@ -248,12 +248,23 @@ def _find_task_graph_block(body: str) -> dict | None:
     return None
 
 
+# Ceremony WU types systematically under-estimated in the field: close and
+# plan-next WUs ran 2.8-5.2x over on $2-3 estimates across FEAT-2026-0049
+# (clabonte/generator), poisoning every calibration built on the plans (#201).
+# The floor is a WARN threshold, not a cap — estimates below it are almost
+# certainly wishful, not cheap.
+CEREMONY_COST_FLOOR_USD = 5.0
+_CEREMONY_TYPES = frozenset({"close", "close-intermediate", "plan-next"})
+
+
 def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
     """Emit WARN for missing planned_cost_usd on WUs and PLAN.md.
 
     Sealed WUs (wu status=done AND plan status=done) are skipped silently —
     backfilling cost estimates on history is pointless.  Active or draft WUs
-    get the WARN.  PLAN.md is compared against the sum of WU planned costs;
+    get the WARN.  Ceremony-type WUs (close/close-intermediate/plan-next)
+    with a planned cost below CEREMONY_COST_FLOOR_USD get a floor WARN
+    (#201).  PLAN.md is compared against the sum of WU planned costs;
     delta > 10% emits a separate WARN naming the delta.  Never raises or
     appends to an errors list — all findings are WARN-only (exit code 0).
     """
@@ -283,6 +294,21 @@ def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
                 )
             if planned is not None:
                 wu_sum += float(planned)
+                # Floor applies to POSITIVE estimates only: the observed
+                # failure is a real-but-wishful $2-3 estimate anchoring
+                # calibration, not an explicit 0.00 (the scaffold's
+                # "unestimated" placeholder, already visible as such).
+                if (not is_sealed
+                        and wfm.get("type") in _CEREMONY_TYPES
+                        and 0 < float(planned) < CEREMONY_COST_FLOOR_USD):
+                    print(
+                        f"WARN: {wfile}: planned_cost_usd "
+                        f"${float(planned):.2f} is below the "
+                        f"${CEREMONY_COST_FLOOR_USD:.2f} floor for "
+                        f"'{wfm.get('type')}' WUs. Ceremony WUs ran 2.8-5.2x "
+                        f"over on $2-3 estimates (FEAT-2026-0049); raise the "
+                        f"estimate rather than anchoring calibration on it."
+                    )
 
     wu_sum = round(wu_sum, 2)
 

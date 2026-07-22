@@ -187,6 +187,78 @@ class TestPlannedCostLint(unittest.TestCase):
             self.assertTrue(wu_warns,
                             f"must warn for WUs missing field; stdout={stdout!r}")
 
+    def test_lint_warns_on_ceremony_wu_below_cost_floor(self):
+        """close WU with planned_cost_usd below the ceremony floor → WARN
+        naming the file and the floor (#201)."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, extra_fm="planned_cost_usd: 12.00\n")
+            _write_wu(feature, wu_id="FEAT-2026-9998/T01",
+                      wu_file="WU-01-impl.md",
+                      wu_type="implementation", wu_status="done",
+                      planned_cost=10.0)
+            _write_wu(feature, wu_id="FEAT-2026-9998/G1-CLOSE",
+                      wu_file="WU-90-close.md",
+                      wu_type="close", wu_status="done", planned_cost=2.5)
+            errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [], "floor finding must be WARN-only")
+            floor_warns = [ln for ln in stdout.splitlines()
+                           if "WARN:" in ln and "floor" in ln]
+            self.assertTrue(floor_warns, f"expected floor WARN; {stdout!r}")
+            self.assertIn("WU-90-close.md", floor_warns[0])
+
+    def test_lint_silent_on_ceremony_wu_at_or_above_floor(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, extra_fm="planned_cost_usd: 15.00\n")
+            _write_wu(feature, wu_id="FEAT-2026-9998/T01",
+                      wu_file="WU-01-impl.md",
+                      wu_type="implementation", wu_status="done",
+                      planned_cost=10.0)
+            _write_wu(feature, wu_id="FEAT-2026-9998/G1-CLOSE",
+                      wu_file="WU-90-close.md",
+                      wu_type="close", wu_status="done", planned_cost=5.0)
+            errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [])
+            self.assertNotIn("floor", stdout)
+
+    def test_lint_no_floor_warn_for_implementation_wu(self):
+        """The floor applies to ceremony types only — a cheap implementation
+        WU is a legitimate estimate."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, extra_fm="planned_cost_usd: 7.50\n")
+            _write_wu(feature, wu_id="FEAT-2026-9998/T01",
+                      wu_file="WU-01-impl.md",
+                      wu_type="implementation", wu_status="done",
+                      planned_cost=1.5)
+            _write_wu(feature, wu_id="FEAT-2026-9998/G1-CLOSE",
+                      wu_file="WU-90-close.md",
+                      wu_type="close", wu_status="done", planned_cost=6.0)
+            errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [])
+            self.assertNotIn("floor", stdout)
+
+    def test_lint_no_floor_warn_on_sealed_ceremony_wu(self):
+        """Sealed feature: history is not re-estimated — no floor WARN."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sealed_fm = (
+                "feature_id: FEAT-2026-9998\n"
+                "title: Planned cost lint test\n"
+                "branch: feat/planned-cost-lint-test\n"
+                "roadmap_goal: Verify planned_cost_usd lint.\n"
+                "status: done\n"
+            )
+            feature = _make_feature(tmpdir, plan_fm=sealed_fm,
+                                    extra_fm="planned_cost_usd: 12.00\n")
+            _write_wu(feature, wu_id="FEAT-2026-9998/T01",
+                      wu_file="WU-01-impl.md",
+                      wu_type="implementation", wu_status="done",
+                      planned_cost=10.0)
+            _write_wu(feature, wu_id="FEAT-2026-9998/G1-CLOSE",
+                      wu_file="WU-90-close.md",
+                      wu_type="close", wu_status="done", planned_cost=2.0)
+            errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [])
+            self.assertNotIn("floor", stdout)
+
     def test_lint_exit_code_zero_for_all_planned_cost_warns(self):
         """All planned_cost warn scenarios produce empty errs list (exit code 0)."""
         scenarios = [
