@@ -624,6 +624,14 @@ def _is_noninformative_signature(sig: "str | None") -> bool:
     return bool(_FENCE_RE.match(stripped))
 
 
+# Maven surefire failing-test line: "[ERROR]   SomeClassTest.method:123 ..."
+# (also matches the IT / Tests naming conventions). Group 1 is Class.method —
+# the per-test identity a retry can act on (#207).
+_SUREFIRE_FAILING_TEST_RE = re.compile(
+    r"^\[ERROR\]\s+([A-Z]\w*(?:Test|Tests|IT)\w*\.\w+)", re.MULTILINE,
+)
+
+
 def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     """Extract (failure_class, failure_signature) from gate runner stdout.
 
@@ -645,14 +653,20 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     failure_class = _GATE_CLASS_MAP.get(gate_name, "other")
     after_lines = stdout[m.end():].splitlines()[:50]
     after_text = "\n".join(after_lines)
-    _SIG_PATTERNS: dict[str, re.Pattern[str]] = {
-        "tests": re.compile(r"^FAIL: (test_\S+)", re.MULTILINE),
-        "lint": re.compile(r"\b([A-Z]\d{3,4})\b"),
-        "security": re.compile(r"Issue: \[(B\d+)"),
-        "coverage": re.compile(r"^([^\s]+\.py)\s+\d+\s+\d+", re.MULTILINE),
+    # Per-class patterns, tried in order (#207): pytest/unittest first, then
+    # Maven surefire — whose failures previously fell through to the first-
+    # informative-line heuristic and collapsed onto a generic Maven line,
+    # identical across distinct failing-test sets.
+    _SIG_PATTERNS: dict[str, list[re.Pattern[str]]] = {
+        "tests": [
+            re.compile(r"^FAIL: (test_\S+)", re.MULTILINE),
+            _SUREFIRE_FAILING_TEST_RE,
+        ],
+        "lint": [re.compile(r"\b([A-Z]\d{3,4})\b")],
+        "security": [re.compile(r"Issue: \[(B\d+)")],
+        "coverage": [re.compile(r"^([^\s]+\.py)\s+\d+\s+\d+", re.MULTILINE)],
     }
-    pattern = _SIG_PATTERNS.get(failure_class)
-    if pattern:
+    for pattern in _SIG_PATTERNS.get(failure_class, []):
         sm = pattern.search(after_text)
         if sm:
             sig = sm.group(1)
@@ -703,6 +717,16 @@ def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     """
     _KW = re.compile(r"FAIL|Error|Exception|Traceback", re.IGNORECASE)
     relevant = [ln for ln in stdout.splitlines() if _KW.search(ln)]
+    # Hoist surefire failing-test lines to the front (#207): Maven emits
+    # dozens of boilerplate [ERROR] wrapper lines that all pass the keyword
+    # filter, so the head+tail budget reliably crowded out the actual
+    # failing-test list — five consecutive FEAT-2026-0049/T06 retries carried
+    # the identical information-free Maven tail while the failing tests sat
+    # mid-output. The list is the one part a retry can act on; put it first.
+    surefire = [ln for ln in relevant if _SUREFIRE_FAILING_TEST_RE.match(ln)]
+    if surefire:
+        rest = [ln for ln in relevant if not _SUREFIRE_FAILING_TEST_RE.match(ln)]
+        relevant = surefire + rest
     text = "\n".join(relevant) if relevant else stdout
     encoded = text.encode("utf-8")
     if len(encoded) <= max_chars:
