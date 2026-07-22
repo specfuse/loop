@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: passed
 cost_budget_usd: 5.0
 ---
 

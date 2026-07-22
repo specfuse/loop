@@ -47,7 +47,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
-| FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | active | `.specfuse/features/FEAT-2026-0032-windows-native/` | — |
+| FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | — |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
