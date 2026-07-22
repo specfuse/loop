@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import hashlib
 import json
 import logging
@@ -2633,6 +2634,48 @@ def _legacy_4wu_terminal_close_complete(
     return required.issubset(have_done)
 
 
+def revert_terminal_surfaces(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path,
+) -> list[Path]:
+    """Revert agent-written terminal surfaces after a hedged close verdict (#195).
+
+    A close WU that passes with a hedged verdict (met_locally / partially_met /
+    not_met) must leave every terminal surface un-flipped, but the agent's own
+    close ceremony may already have written PLAN.md `done` and the roadmap row
+    `done` before the driver read the verdict. Reverting only PLAN.md — the
+    pre-#195 behavior — leaves the two surfaces disagreeing about whether the
+    feature is complete. Revert the same surface set fire_terminal_flips owns:
+    PLAN.md status and the roadmap Status cell (the gate file is not flipped
+    until the post-loop awaiting_review write, so there is nothing to revert
+    there). Returns the modified Paths for one bookkeeping commit.
+    """
+    modified: list[Path] = []
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    plan_path = feature_dir / "PLAN.md"
+    if plan_path.exists():
+        plan_fm, _ = read_frontmatter(plan_path)
+        if plan_fm.get("status") == "done":
+            write_frontmatter_field(plan_path, "status", "active")
+            modified.append(plan_path)
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if roadmap_path.exists():
+        roadmap_text = roadmap_path.read_text()
+        parsed = _parse_roadmap_row(roadmap_text, feature_id)
+        if parsed is not None and parsed["columns"].get("Status", "") == "done":
+            status_start, status_end = parsed["cell_spans"]["Status"]
+            status_cell = roadmap_text[status_start:status_end]
+            roadmap_path.write_text(
+                roadmap_text[:status_start]
+                + status_cell.replace("done", "active", 1)
+                + roadmap_text[status_end:]
+            )
+            modified.append(roadmap_path)
+
+    return modified
+
+
 def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> list[Path]:
     """Flip terminal gate → passed, roadmap row → done, call auto_archive_feature.
 
@@ -2642,6 +2685,26 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
     """
     modified: set[Path] = set()
     feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    # Evaluate the verdict BEFORE writing any surface (#195). The pre-#195
+    # shape flipped gate + roadmap unconditionally and only gated the PLAN
+    # flip on the verdict, so a hedged close left a split state (roadmap
+    # `done`, PLAN `active`). A verdict that is present but not `met` now
+    # touches nothing. verdict absent (None) keeps the legacy 4-WU behavior:
+    # those plan-next WUs carry no verdict field and still need the gate and
+    # roadmap flips (their PLAN flip stays with the plan-next agent).
+    disk_verdict = None
+    if wu.file.is_file():
+        wu_fm, _ = read_frontmatter(wu.file)
+        disk_verdict = wu_fm.get("verdict") or None
+    if disk_verdict is not None and not verdict_permits_terminal_flips(disk_verdict):
+        logging.info(
+            "fire_terminal_flips: verdict %r does not permit terminal flips"
+            " — no surface written for %s",
+            disk_verdict,
+            wu.wu_id,
+        )
+        return []
 
     _, gates = load_graph(feature_dir)
     if not gates:
@@ -2724,15 +2787,11 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
     # assert_terminal_flips_fired: the auto-close path writes verdict=met to the
     # WU file via mark_close_wu_auto_closed but leaves the in-memory wu.verdict
     # None, so disk is the authoritative source for both paths.
-    # Re-read verdict from disk only when the WU file exists. The legacy 4-WU
+    # disk_verdict was read at the top of this function. The legacy 4-WU
     # close sequence reaches here with a plan-next WU that carries no verdict
-    # field (and whose file may be a synthetic stub in tests); a missing file or
-    # a non-met verdict simply skips the PLAN flip, leaving legacy behavior
-    # unchanged (those features flip PLAN via the plan-next agent, as before).
-    disk_verdict = None
-    if wu.file.is_file():
-        wu_fm, _ = read_frontmatter(wu.file)
-        disk_verdict = wu_fm.get("verdict") or None
+    # field (and whose file may be a synthetic stub in tests); a missing file
+    # simply skips the PLAN flip, leaving legacy behavior unchanged (those
+    # features flip PLAN via the plan-next agent, as before).
     if not verdict_permits_terminal_flips(disk_verdict):
         logging.info(
             "fire_terminal_flips: verdict %r does not permit terminal flips"
@@ -3688,6 +3747,35 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     return True, ""
 
 
+def assert_produces_in_diff(
+    wu: WorkUnit, touched: list[str],
+) -> tuple[bool, str]:
+    """Cross-check declared ``produces:`` entries against the squash diff (#198).
+
+    ``assert_declared_deliverables`` is presence-only, so a WU whose
+    ``produces:`` paths are pre-existing files it was supposed to MODIFY passes
+    it without touching them — the FEAT-2026-0049/T06 shape: ``done`` touching
+    only gate docs while both declared src/main deliverables (existing files)
+    sat unchanged. Every ``produces:`` entry must match at least one path in
+    *touched* (the squash's changed-path list), literally or as a glob.
+    Opt-out mirrors the presence gate: empty ``produces:`` never fires.
+    Returns (False, summary) naming every unmatched entry.
+    """
+    if not wu.produces:
+        return True, ""
+    unmatched = []
+    for raw in wu.produces:
+        entry = str(raw)
+        if not any(t == entry or fnmatch.fnmatch(t, entry) for t in touched):
+            unmatched.append(entry)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -4362,6 +4450,48 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS}"
                             )
                             continue
+                        # Produces-vs-diff cross-check (#198): the presence gate
+                        # above cannot see a WU that declared pre-existing files
+                        # it never touched (the FEAT-2026-0049/T06 done-without-
+                        # delivering shape). Every produces: entry must match a
+                        # path in this WU's squash diff; otherwise refuse the
+                        # pass, roll back the squash, retry within budget.
+                        prod_ok, prod_summary = assert_produces_in_diff(
+                            wu, touched,
+                        )
+                        if not prod_ok:
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
+                            _prod_note = (
+                                prod_summary
+                                + "\n\nEach listed path is a deliverable this WU "
+                                  "declared in `produces:` but did not change. "
+                                  "Make the declared change this attempt — do "
+                                  "not declare done while a deliverable is "
+                                  "untouched."
+                            )
+                            _prod_sig = ", ".join(sorted(
+                                Path(p).name for p in wu.produces
+                                if not any(t == str(p)
+                                           or fnmatch.fnmatch(t, str(p))
+                                           for t in touched)
+                            ))[:100] or "produces_unchanged"
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "produces_not_in_diff",
+                                attempts_usage[-1],
+                                failure_class="produces_not_in_diff",
+                                failure_signature=_prod_sig,
+                                failure_excerpt=extract_failure_excerpt(_prod_note),
+                                files_touched=touched,
+                                extras={"summary": prod_summary},
+                            ))
+                            attempt_notes.append((attempt, _prod_note))
+                            failure_note = _prod_note
+                            print(
+                                f"   PRODUCES NOT IN DIFF attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
+                            )
+                            continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
@@ -4377,14 +4507,19 @@ def run(
                             if verdict_permits_terminal_flips(wu.verdict):
                                 close_wu_for_terminal = wu
                             else:
-                                plan_path = feature_dir / "PLAN.md"
-                                plan_fm_recheck, _ = read_frontmatter(plan_path)
-                                if plan_fm_recheck.get("status") == "done":
-                                    write_frontmatter_field(plan_path, "status", "active")
+                                # Hedged verdict: revert EVERY terminal surface
+                                # the agent's close ceremony may have flipped,
+                                # not just PLAN.md (#195 — reverting one of two
+                                # surfaces left roadmap `done` vs PLAN `active`).
+                                reverted = revert_terminal_surfaces(
+                                    wu, feature_dir, REPO_ROOT,
+                                )
+                                if reverted:
                                     commit_bookkeeping(
-                                        [plan_path],
-                                        f"chore(loop): {wu.wu_id} revert PLAN.md done"
-                                        f" (hedged verdict)\n\nFeature: {wu.wu_id}",
+                                        reverted,
+                                        f"chore(loop): {wu.wu_id} revert terminal"
+                                        f" surfaces (hedged verdict)"
+                                        f"\n\nFeature: {wu.wu_id}",
                                     )
                         elif _legacy_4wu_terminal_close_complete(
                             wu, units, gate, gates,
