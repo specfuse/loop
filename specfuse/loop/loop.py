@@ -1396,6 +1396,50 @@ def detect_rearm_dispatch(wu: WorkUnit) -> bool:
     return isinstance(cost_usd, (int, float)) and float(cost_usd) > 0
 
 
+def rearm_reproduction_gate(wu: WorkUnit) -> tuple[bool, str]:
+    """Refuse re-dispatch of a spinning-escalated WU without reproduction (#200).
+
+    After a spinning_signature_repeat escalation the driver used to re-dispatch
+    a re-armed WU with no evidence the escalated failure was ever reproduced in
+    full — FEAT-2026-0049/WU-06 was re-armed twice on test-subset diagnoses;
+    the third re-arm, the first to reproduce the full suite, found the real
+    defect immediately. Before dispatching a WU whose frontmatter carries
+    ``escalation_reason: spinning_signature_repeat`` (stamped at escalation
+    time) with ``re_arm_count > 0``, require one of:
+
+      - ``reproduced_signature`` equal to ``escalation_failure_signature`` —
+        the operator attests the exact escalated failure was reproduced before
+        re-arming, or
+      - ``re_arm_override: true`` — an explicit operator bypass.
+
+    Returns (True, "") when the WU may dispatch (including every WU that never
+    escalated on spinning, and first-time dispatches). Returns (False, reason)
+    when the dispatch must be refused; the caller re-blocks the WU.
+    """
+    if not wu.file.is_file():
+        return True, ""
+    fm, _ = read_frontmatter(wu.file)
+    if fm.get("escalation_reason") != "spinning_signature_repeat":
+        return True, ""
+    re_arm_count = fm.get("re_arm_count", 0)
+    if not isinstance(re_arm_count, int) or isinstance(re_arm_count, bool) \
+            or re_arm_count <= 0:
+        return True, ""
+    if fm.get("re_arm_override") in (True, "true", "True"):
+        return True, ""
+    signature = str(fm.get("escalation_failure_signature") or "")
+    reproduced = str(fm.get("reproduced_signature") or "")
+    if signature and reproduced == signature:
+        return True, ""
+    return False, (
+        f"WU escalated on spinning_signature_repeat "
+        f"(signature: {signature or '<unrecorded>'}) and was re-armed without "
+        f"reproduction evidence. Reproduce the exact failure and set "
+        f"`reproduced_signature: {signature or '<signature>'}` in the WU "
+        f"frontmatter, or set `re_arm_override: true` to bypass explicitly."
+    )
+
+
 def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
     """Fold the prior dispatch cycle's cost/token/duration into cumulative fields.
 
@@ -4055,6 +4099,30 @@ def run(
                     )])
                     # Fall through to existing close-WU dispatch path
 
+                # Spinning re-arm reproduction gate (#200): a WU that escalated
+                # on spinning_signature_repeat may not be re-dispatched until
+                # the exact escalated failure was reproduced (or the operator
+                # explicitly overrode). Fires BEFORE any dispatch state change;
+                # on refusal the WU goes back to blocked_human with an
+                # actionable message and the gate halts as usual.
+                repro_ok, repro_reason = rearm_reproduction_gate(wu)
+                if not repro_ok:
+                    backend.set_wu(wu, "status", "blocked_human")
+                    flush_events(events_path, [build_event(
+                        "re_arm_rejected", wu.wu_id, {
+                            "reason": "spinning_reproduction_missing",
+                            "detail": repro_reason,
+                        })])
+                    commit_bookkeeping(
+                        [wu.file, events_path],
+                        f"chore(loop): {wu.wu_id} re-arm rejected "
+                        f"(spinning reproduction missing)"
+                        f"\n\nFeature: {wu.wu_id}",
+                    )
+                    print(f"   RE-ARM REJECTED — {repro_reason}")
+                    blocked = True
+                    continue
+
                 head_before = git("rev-parse", "HEAD")
                 # Snapshot the operator's untracked files alongside head_before:
                 # squash_commit must not absorb WIP that pre-dates this dispatch
@@ -4508,6 +4576,15 @@ def run(
                         note_paths = persist_attempt_notes(
                             work_dir, wu.wu_id, attempt_notes)
                         backend.set_wu(wu, "status", "blocked_human")
+                        # Stamp the escalation identity into frontmatter (#200):
+                        # the re-arm reproduction gate needs the exact signature
+                        # at the NEXT dispatch, and events.jsonl is not read on
+                        # the dispatch path. Rides the same bookkeeping commit.
+                        backend.set_wu(wu, "escalation_reason",
+                                       "spinning_signature_repeat")
+                        backend.set_wu(wu, "escalation_failure_class", _fc or "")
+                        backend.set_wu(wu, "escalation_failure_signature",
+                                       _fs or "")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
