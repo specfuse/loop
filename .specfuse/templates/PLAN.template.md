@@ -23,6 +23,30 @@ each WU file owns its own status, and each GATE file owns its gate's status. Det
 only as far as the next gate; plan-next drafts the gate after that from the
 retrospective and lessons.
 
+## Existing-mechanism search (mandatory — see `.specfuse/rules/planning-discipline.md` §1)
+
+Before any ADR or gate designs a validation rule, a severity level, an enforcement
+gate, or a measurement, establish that it does not already exist. **An ADR without
+this section is incomplete.**
+
+- **Grep command run:** `<the exact command — e.g. grep -rl <concept>
+  src/main/java/.../validation/rules/>`
+- **Verdict:** `<"no existing mechanism, building new" | "found <X>, reusing/extending">`
+- **If reusing:** name `<X>` and quote the line of its javadoc/description that
+  confirms it covers the property. If building new despite a hit, say why the hit does
+  not suffice.
+
+## Escalation-predicate satisfiability (mandatory for any severity flip — §2)
+
+If this feature raises a check to `ERROR`, flips a `WARNING` to blocking, or asserts a
+"zero issues" close predicate, answer here:
+
+- **What does the rule report on an input already in its intended final state?**
+  `<answer>`
+- If that answer is **not zero**, the predicate is unsatisfiable — the rule fires on
+  correct inputs. **Redesign before drafting gates:** fix the rule so a correct input
+  reports zero, or route enforcement to the mechanism found in the search above.
+
 ## Task graph
 
 ```yaml

@@ -107,6 +107,32 @@ blocked_reason: <present only when status is blocked>
 5. **No secret-looking values in evidence.** The RESULT block is read by the driver
    and may be archived. See [`security-boundaries.md`](security-boundaries.md).
 
+## Closing obligations for implementation WUs (FEAT-2026-0049)
+
+Four binding obligations before `status: complete`. Each guards a way a prior WU
+closed on nothing:
+
+1. **Diff against `produces:` first.** Every path in the WU's `produces:` list must
+   show a working-tree change, or the RESULT must justify each unchanged path
+   explicitly: "no change needed because X; here is the evidence the deliverable
+   already holds: `<command + output>`." Silence on an unchanged deliverable is not
+   a valid close. (The driver will enforce this mechanically — loop #189 fix 3 — the
+   obligation binds now.)
+2. **A plan-level contradiction is `blocked`, not `complete`.** If mid-WU you find
+   the plan cannot be delivered as written (a decision contradicts another, a
+   deliverable cannot exist), emit `status: blocked` with the finding in
+   `blocked_reason`. Never write the finding into a gate document and close
+   `complete`. `complete` means the deliverables exist; `blocked` means they cannot
+   or should not.
+3. **Every `evidence:` cites an executed command** — its observed exit code/output.
+   Reading source, grepping for a string, or citing another WU's RESULT is not
+   verification. For a validation-rule or severity claim the evidence must include a
+   negative observation (the rule seen rejecting a purpose-built bad input); see
+   [`verification-discipline.md`](verification-discipline.md) §3.
+4. **Analysis without edits is not a silent attempt.** If an attempt produces
+   analysis but no file edits, say so explicitly and end `blocked` (or with a
+   concrete next-edit plan). Do not exhaust the attempt on prose.
+
 ## Why this matters
 
 The driver's trust model is that the RESULT block is an honest claim about what
