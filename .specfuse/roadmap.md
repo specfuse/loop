@@ -48,6 +48,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | active | `.specfuse/features/FEAT-2026-0032-windows-native/` | — |
+| FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 pending an external decision/dependency; resumable (a human flips it back to
@@ -646,6 +647,24 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Benefits.** Removes the WSL prerequisite; unblocks corporate-managed and non-technical Windows users; driver is already stdlib-only so port surface is ~6 call sites (fcntl lock, killpg/SIGKILL timeout, python3 literal, shell=True gate semantics, bare-claude PATHEXT resolution, POSIX-only home-redaction regex); Git-Bash absorbs shell/bats/&&-exit gates for free.
 
 **Status: planned.**
+
+## FEAT-2026-0033 — Sub-repo component scoping: multiple components in one repo
+
+**Why.** The loop assumes component == repo: `.specfuse/` is resolved as `Path(".specfuse")` relative to cwd (`specfuse/loop/loop.py:61-64`), gate commands run with no `cwd=` (`loop.py:1764`), there is one tree lock, one roadmap, and one verification surface per repo. Real projects put multiple shippable deliverables in one repo — a phone app and a kiosk/tablet app sharing generated Flutter libraries, delivered as separate store apps from the same git tree. Today the only way to model that is to flatten every deliverable into a single repo-root-scoped component, so a kiosk-only feature also runs the phone app's gates. Slow, not wrong — but it degrades as deliverables and gate runtimes grow, and it gives ownership/release-cadence-diverged deliverables no independent surface.
+
+**Goal.** Let one repo host N components without splitting the git tree, keeping `.specfuse/` at repo root (one lock, one roadmap). Introduce an optional `component:` selector so a feature runs only the gates tagged to its component; unset selector = all gates, so existing single-component projects are unchanged.
+
+**Sketch (subject to design gate).**
+- `verification.yml`: optional per-gate `cwd:` (run command from a subdir) and optional `component:` tag on gate entries.
+- Feature frontmatter: optional `component:` field; driver filters gates to matching `component:` (unset ⇒ run all — backward compatible).
+- Widen the event `source` regex `component:<name>` (`shared/schemas/event.schema.json:65`) to admit `component:<repo>/<sub>` addressing, so sub-repo components are legible in the audit trail. Flag now so nothing hard-codes against the current bare-repo-name shape.
+- Explicitly **rejected** approach: multiple `.specfuse/` dirs per repo — fights the single lock, the single roadmap, and `git rev-parse --show-toplevel` path math (`loop.py:904-935`) for little gain.
+
+**Benefits.** Backward-compatible (new fields optional, selector defaults to all) ⇒ ships as an `init.sh --upgrade` propagation, not a migration. Removes the flatten tax for multi-deliverable repos. Orchestrator side gains an optional `components:` list per repo inventory + a `component:` narrower alongside `assigned_repo`, so the orchestrator can dispatch to a sub-repo component without breaking the existing `assigned_repo` contract.
+
+**Trigger to promote (deferred → active).** One of: gate runtime on a multi-deliverable repo hurts enough to matter, or two deliverables in one repo genuinely diverge on owner / release cadence / CI. First live case in a downstream project: a kiosk/tablet app sharing one repo with its phone app, both consuming the same generated libraries. Until a trigger fires, the flatten approach is the sanctioned workaround.
+
+**Status: deferred.** Parked pending a real trigger (above). Resumable — flip to `active` when a trigger fires; design gate first (the sketch is not yet a committed contract).
 
 ## Notes
 
