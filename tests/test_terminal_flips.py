@@ -171,6 +171,37 @@ class TestFireTerminalFlips(unittest.TestCase):
         # modified list is non-empty
         self.assertTrue(modified, "fire_terminal_flips must return non-empty modified list")
 
+    def test_fire_terminal_flips_hedged_verdict_touches_nothing(self):
+        """Hedged on-disk verdict: no surface written — gate, roadmap, archive
+        all untouched (#195: verdict must be evaluated before any write)."""
+        feature_id = "FEAT-2026-9995"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        # On-disk verdict is what fire_terminal_flips reads (not wu.verdict).
+        (feature_dir / "WU-close.md").write_text(
+            f"---\nid: {feature_id}/G2-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: done\nattempts: 1\nverdict: met_locally\n---\n\n"
+            f"# Close{_WU_BODY}"
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE",
+                            verdict="met_locally")
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+
+        self.assertEqual(modified, [],
+                         "hedged verdict must modify no surface")
+        gate_fm = _read_frontmatter(feature_dir / "GATE-02.md")
+        self.assertEqual(gate_fm.get("status"), "awaiting_review",
+                         "hedged verdict must not flip the gate")
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | active |", roadmap_text,
+                      "hedged verdict must not flip the roadmap row")
+        archive_text = (repo_root / ".specfuse" / "roadmap-archive.md").read_text()
+        self.assertNotIn(f"## {feature_id} — Test feature", archive_text,
+                         "hedged verdict must not archive the feature")
+
     def test_fire_terminal_flips_skips_when_already_passed(self):
         """Re-firing when gate is already passed: gate left untouched (idempotent)."""
         feature_id = "FEAT-2026-9992"
@@ -323,6 +354,60 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
             plan_fm = _read_frontmatter(plan_path)
             self.assertEqual(plan_fm.get("status"), "active",
                              "driver must revert PLAN.md to active on hedged verdict")
+
+    def test_run_reverts_roadmap_row_on_hedged_verdict(self):
+        """Hedged verdict: if close WU body wrote PLAN.md AND the roadmap row
+        to done, driver reverts BOTH — no split state (#195)."""
+        with integration_workspace() as root:
+            os.chdir(root)
+            feature_id = "FEAT-2026-9996"
+            fdir = self._write_feature(root, feature_id, close_verdict="met_locally")
+            plan_path = fdir / "PLAN.md"
+
+            specfuse = root / ".specfuse"
+            roadmap_path = specfuse / "roadmap.md"
+            roadmap_path.write_text(
+                f"---\nproject: test\n---\n\n# Roadmap\n\n"
+                f"| Feature ID | Title | Status | Folder | Detail |\n"
+                f"|------------|-------|--------|--------|--------|\n"
+                f"| {feature_id} | Test | active | — | — |\n\n"
+                f"## {feature_id} — Test\n\nContent.\n"
+            )
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m",
+                            "roadmap"], check=True)
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                # Satisfy the closing-deliverable guard so the WU PASSES —
+                # otherwise it blocks and the git reset reverts the roadmap
+                # for us, passing this test without the revert path running.
+                (fdir / "RETROSPECTIVE.md").write_text(
+                    "# Retrospective\n\nNothing generalizes from this gate.\n"
+                )
+                # Simulate agent close ceremony flipping BOTH surfaces to done
+                loop.write_frontmatter_field(plan_path, "status", "done")
+                text = roadmap_path.read_text()
+                roadmap_path.write_text(text.replace(
+                    f"| {feature_id} | Test | active |",
+                    f"| {feature_id} | Test | done |", 1))
+                return ("", {"input_tokens": 10, "output_tokens": 5,
+                             "cost_usd": 0.001})
+
+            def fake_verify(wu, feature_dir, cfg=None):
+                return True, "(stub pass)"
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", fake_verify)
+
+            loop.run(None, dry_run=False)
+
+            plan_fm = _read_frontmatter(plan_path)
+            self.assertEqual(plan_fm.get("status"), "active",
+                             "driver must revert PLAN.md to active on hedged verdict")
+            roadmap_text = roadmap_path.read_text()
+            self.assertIn(f"| {feature_id} | Test | active |", roadmap_text,
+                          "driver must revert the roadmap row to active on "
+                          "hedged verdict — not leave it done")
 
 
 # --------------------------------------------------------------------------- #
