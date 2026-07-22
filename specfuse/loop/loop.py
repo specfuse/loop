@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import hashlib
 import json
 import logging
@@ -1420,6 +1421,50 @@ def detect_rearm_dispatch(wu: WorkUnit) -> bool:
     return isinstance(cost_usd, (int, float)) and float(cost_usd) > 0
 
 
+def rearm_reproduction_gate(wu: WorkUnit) -> tuple[bool, str]:
+    """Refuse re-dispatch of a spinning-escalated WU without reproduction (#200).
+
+    After a spinning_signature_repeat escalation the driver used to re-dispatch
+    a re-armed WU with no evidence the escalated failure was ever reproduced in
+    full — FEAT-2026-0049/WU-06 was re-armed twice on test-subset diagnoses;
+    the third re-arm, the first to reproduce the full suite, found the real
+    defect immediately. Before dispatching a WU whose frontmatter carries
+    ``escalation_reason: spinning_signature_repeat`` (stamped at escalation
+    time) with ``re_arm_count > 0``, require one of:
+
+      - ``reproduced_signature`` equal to ``escalation_failure_signature`` —
+        the operator attests the exact escalated failure was reproduced before
+        re-arming, or
+      - ``re_arm_override: true`` — an explicit operator bypass.
+
+    Returns (True, "") when the WU may dispatch (including every WU that never
+    escalated on spinning, and first-time dispatches). Returns (False, reason)
+    when the dispatch must be refused; the caller re-blocks the WU.
+    """
+    if not wu.file.is_file():
+        return True, ""
+    fm, _ = read_frontmatter(wu.file)
+    if fm.get("escalation_reason") != "spinning_signature_repeat":
+        return True, ""
+    re_arm_count = fm.get("re_arm_count", 0)
+    if not isinstance(re_arm_count, int) or isinstance(re_arm_count, bool) \
+            or re_arm_count <= 0:
+        return True, ""
+    if fm.get("re_arm_override") in (True, "true", "True"):
+        return True, ""
+    signature = str(fm.get("escalation_failure_signature") or "")
+    reproduced = str(fm.get("reproduced_signature") or "")
+    if signature and reproduced == signature:
+        return True, ""
+    return False, (
+        f"WU escalated on spinning_signature_repeat "
+        f"(signature: {signature or '<unrecorded>'}) and was re-armed without "
+        f"reproduction evidence. Reproduce the exact failure and set "
+        f"`reproduced_signature: {signature or '<signature>'}` in the WU "
+        f"frontmatter, or set `re_arm_override: true` to bypass explicitly."
+    )
+
+
 def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
     """Fold the prior dispatch cycle's cost/token/duration into cumulative fields.
 
@@ -1449,6 +1494,22 @@ def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
     backend.set_wu(wu, "cumulative_input_tokens", cum_input)
     backend.set_wu(wu, "cumulative_output_tokens", cum_output)
 
+    # Lifetime attempts (#199). unblock-wu resets `attempts: 0` BEFORE this
+    # fold runs, so the prior cycle's count is unrecoverable from `attempts`
+    # itself — it survives only in re_arm_history[].prior_attempts. Recompute
+    # (not increment) the sum so the write is idempotent across re-entries,
+    # matching the fold's cost-fold idempotence contract. Entries a pre-#199
+    # unblock-wu wrote without prior_attempts contribute 0.
+    history = fm.get("re_arm_history") or []
+    cum_attempts = 0
+    if isinstance(history, list):
+        for entry in history:
+            if isinstance(entry, dict):
+                prior = entry.get("prior_attempts")
+                if isinstance(prior, int) and not isinstance(prior, bool):
+                    cum_attempts += prior
+    backend.set_wu(wu, "cumulative_attempts", cum_attempts)
+
     # Reset per-cycle fields so the new cycle's write_cost_to_wu starts clean.
     backend.set_wu(wu, "cost_usd", 0.0)
     backend.set_wu(wu, "duration_seconds", 0.0)
@@ -1476,14 +1537,15 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 
 
 def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
-    """Sum cost_usd across the gate's done WUs (closing-sequence included).
+    """Sum lifetime cost across the gate's done WUs (closing-sequence included).
 
     Reads each WU file's frontmatter from `gate["work_units"]` and adds
-    `cost_usd` when the WU's status is "done". WUs whose frontmatter omits
-    cost_usd — cost tracking off, or the attempt didn't record a cost —
-    contribute 0.0. `plan` is the feature frontmatter dict and is accepted for
-    signature symmetry with the broader gate-budget helpers; the spent total
-    is derived from WU files alone.
+    `cost_usd` PLUS `cumulative_cost_usd` (prior re-arm cycles' spend, folded
+    by fold_cumulative_on_rearm — #199) when the WU's status is "done". WUs
+    whose frontmatter omits both — cost tracking off, or the attempt didn't
+    record a cost — contribute 0.0. `plan` is the feature frontmatter dict and
+    is accepted for signature symmetry with the broader gate-budget helpers;
+    the spent total is derived from WU files alone.
     """
     del plan  # signature symmetry — sum is derived from WU files only
     total = 0.0
@@ -1497,11 +1559,16 @@ def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
         fm, _ = read_frontmatter(wu_path)
         if fm.get("status") != "done":
             continue
-        cost = fm.get("cost_usd")
-        if isinstance(cost, bool):
-            continue
-        if isinstance(cost, (int, float)):
-            total += float(cost)
+        # Lifetime spend, not per-cycle (#199): fold_cumulative_on_rearm
+        # moves each prior dispatch cycle's cost into cumulative_cost_usd and
+        # zeroes cost_usd, so summing cost_usd alone undercounts every
+        # re-armed WU (FEAT-2026-0049/WU-06 read as $2.75 of a $30.29 spend).
+        for key in ("cost_usd", "cumulative_cost_usd"):
+            cost = fm.get(key)
+            if isinstance(cost, bool):
+                continue
+            if isinstance(cost, (int, float)):
+                total += float(cost)
     return total
 
 
@@ -2635,6 +2702,48 @@ def _legacy_4wu_terminal_close_complete(
     return required.issubset(have_done)
 
 
+def revert_terminal_surfaces(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path,
+) -> list[Path]:
+    """Revert agent-written terminal surfaces after a hedged close verdict (#195).
+
+    A close WU that passes with a hedged verdict (met_locally / partially_met /
+    not_met) must leave every terminal surface un-flipped, but the agent's own
+    close ceremony may already have written PLAN.md `done` and the roadmap row
+    `done` before the driver read the verdict. Reverting only PLAN.md — the
+    pre-#195 behavior — leaves the two surfaces disagreeing about whether the
+    feature is complete. Revert the same surface set fire_terminal_flips owns:
+    PLAN.md status and the roadmap Status cell (the gate file is not flipped
+    until the post-loop awaiting_review write, so there is nothing to revert
+    there). Returns the modified Paths for one bookkeeping commit.
+    """
+    modified: list[Path] = []
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    plan_path = feature_dir / "PLAN.md"
+    if plan_path.exists():
+        plan_fm, _ = read_frontmatter(plan_path)
+        if plan_fm.get("status") == "done":
+            write_frontmatter_field(plan_path, "status", "active")
+            modified.append(plan_path)
+
+    roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+    if roadmap_path.exists():
+        roadmap_text = roadmap_path.read_text()
+        parsed = _parse_roadmap_row(roadmap_text, feature_id)
+        if parsed is not None and parsed["columns"].get("Status", "") == "done":
+            status_start, status_end = parsed["cell_spans"]["Status"]
+            status_cell = roadmap_text[status_start:status_end]
+            roadmap_path.write_text(
+                roadmap_text[:status_start]
+                + status_cell.replace("done", "active", 1)
+                + roadmap_text[status_end:]
+            )
+            modified.append(roadmap_path)
+
+    return modified
+
+
 def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> list[Path]:
     """Flip terminal gate → passed, roadmap row → done, call auto_archive_feature.
 
@@ -2644,6 +2753,26 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
     """
     modified: set[Path] = set()
     feature_id = wu.wu_id.rsplit("/", 1)[0]
+
+    # Evaluate the verdict BEFORE writing any surface (#195). The pre-#195
+    # shape flipped gate + roadmap unconditionally and only gated the PLAN
+    # flip on the verdict, so a hedged close left a split state (roadmap
+    # `done`, PLAN `active`). A verdict that is present but not `met` now
+    # touches nothing. verdict absent (None) keeps the legacy 4-WU behavior:
+    # those plan-next WUs carry no verdict field and still need the gate and
+    # roadmap flips (their PLAN flip stays with the plan-next agent).
+    disk_verdict = None
+    if wu.file.is_file():
+        wu_fm, _ = read_frontmatter(wu.file)
+        disk_verdict = wu_fm.get("verdict") or None
+    if disk_verdict is not None and not verdict_permits_terminal_flips(disk_verdict):
+        logging.info(
+            "fire_terminal_flips: verdict %r does not permit terminal flips"
+            " — no surface written for %s",
+            disk_verdict,
+            wu.wu_id,
+        )
+        return []
 
     _, gates = load_graph(feature_dir)
     if not gates:
@@ -2726,15 +2855,11 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
     # assert_terminal_flips_fired: the auto-close path writes verdict=met to the
     # WU file via mark_close_wu_auto_closed but leaves the in-memory wu.verdict
     # None, so disk is the authoritative source for both paths.
-    # Re-read verdict from disk only when the WU file exists. The legacy 4-WU
+    # disk_verdict was read at the top of this function. The legacy 4-WU
     # close sequence reaches here with a plan-next WU that carries no verdict
-    # field (and whose file may be a synthetic stub in tests); a missing file or
-    # a non-met verdict simply skips the PLAN flip, leaving legacy behavior
-    # unchanged (those features flip PLAN via the plan-next agent, as before).
-    disk_verdict = None
-    if wu.file.is_file():
-        wu_fm, _ = read_frontmatter(wu.file)
-        disk_verdict = wu_fm.get("verdict") or None
+    # field (and whose file may be a synthetic stub in tests); a missing file
+    # simply skips the PLAN flip, leaving legacy behavior unchanged (those
+    # features flip PLAN via the plan-next agent, as before).
     if not verdict_permits_terminal_flips(disk_verdict):
         logging.info(
             "fire_terminal_flips: verdict %r does not permit terminal flips"
@@ -3690,6 +3815,35 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     return True, ""
 
 
+def assert_produces_in_diff(
+    wu: WorkUnit, touched: list[str],
+) -> tuple[bool, str]:
+    """Cross-check declared ``produces:`` entries against the squash diff (#198).
+
+    ``assert_declared_deliverables`` is presence-only, so a WU whose
+    ``produces:`` paths are pre-existing files it was supposed to MODIFY passes
+    it without touching them — the FEAT-2026-0049/T06 shape: ``done`` touching
+    only gate docs while both declared src/main deliverables (existing files)
+    sat unchanged. Every ``produces:`` entry must match at least one path in
+    *touched* (the squash's changed-path list), literally or as a glob.
+    Opt-out mirrors the presence gate: empty ``produces:`` never fires.
+    Returns (False, summary) naming every unmatched entry.
+    """
+    if not wu.produces:
+        return True, ""
+    unmatched = []
+    for raw in wu.produces:
+        entry = str(raw)
+        if not any(t == entry or fnmatch.fnmatch(t, entry) for t in touched):
+            unmatched.append(entry)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -4079,6 +4233,30 @@ def run(
                     )])
                     # Fall through to existing close-WU dispatch path
 
+                # Spinning re-arm reproduction gate (#200): a WU that escalated
+                # on spinning_signature_repeat may not be re-dispatched until
+                # the exact escalated failure was reproduced (or the operator
+                # explicitly overrode). Fires BEFORE any dispatch state change;
+                # on refusal the WU goes back to blocked_human with an
+                # actionable message and the gate halts as usual.
+                repro_ok, repro_reason = rearm_reproduction_gate(wu)
+                if not repro_ok:
+                    backend.set_wu(wu, "status", "blocked_human")
+                    flush_events(events_path, [build_event(
+                        "re_arm_rejected", wu.wu_id, {
+                            "reason": "spinning_reproduction_missing",
+                            "detail": repro_reason,
+                        })])
+                    commit_bookkeeping(
+                        [wu.file, events_path],
+                        f"chore(loop): {wu.wu_id} re-arm rejected "
+                        f"(spinning reproduction missing)"
+                        f"\n\nFeature: {wu.wu_id}",
+                    )
+                    print(f"   RE-ARM REJECTED — {repro_reason}")
+                    blocked = True
+                    continue
+
                 head_before = git("rev-parse", "HEAD")
                 # Snapshot the operator's untracked files alongside head_before:
                 # squash_commit must not absorb WIP that pre-dates this dispatch
@@ -4364,6 +4542,48 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS}"
                             )
                             continue
+                        # Produces-vs-diff cross-check (#198): the presence gate
+                        # above cannot see a WU that declared pre-existing files
+                        # it never touched (the FEAT-2026-0049/T06 done-without-
+                        # delivering shape). Every produces: entry must match a
+                        # path in this WU's squash diff; otherwise refuse the
+                        # pass, roll back the squash, retry within budget.
+                        prod_ok, prod_summary = assert_produces_in_diff(
+                            wu, touched,
+                        )
+                        if not prod_ok:
+                            reset_preserving_events(head_before, events_path,
+                                                    untracked_before=untracked_before)
+                            _prod_note = (
+                                prod_summary
+                                + "\n\nEach listed path is a deliverable this WU "
+                                  "declared in `produces:` but did not change. "
+                                  "Make the declared change this attempt — do "
+                                  "not declare done while a deliverable is "
+                                  "untouched."
+                            )
+                            _prod_sig = ", ".join(sorted(
+                                Path(p).name for p in wu.produces
+                                if not any(t == str(p)
+                                           or fnmatch.fnmatch(t, str(p))
+                                           for t in touched)
+                            ))[:100] or "produces_unchanged"
+                            wu_events.append(emit_attempt_outcome(
+                                wu, attempt, "produces_not_in_diff",
+                                attempts_usage[-1],
+                                failure_class="produces_not_in_diff",
+                                failure_signature=_prod_sig,
+                                failure_excerpt=extract_failure_excerpt(_prod_note),
+                                files_touched=touched,
+                                extras={"summary": prod_summary},
+                            ))
+                            attempt_notes.append((attempt, _prod_note))
+                            failure_note = _prod_note
+                            print(
+                                f"   PRODUCES NOT IN DIFF attempt "
+                                f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
+                            )
+                            continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
@@ -4379,14 +4599,19 @@ def run(
                             if verdict_permits_terminal_flips(wu.verdict):
                                 close_wu_for_terminal = wu
                             else:
-                                plan_path = feature_dir / "PLAN.md"
-                                plan_fm_recheck, _ = read_frontmatter(plan_path)
-                                if plan_fm_recheck.get("status") == "done":
-                                    write_frontmatter_field(plan_path, "status", "active")
+                                # Hedged verdict: revert EVERY terminal surface
+                                # the agent's close ceremony may have flipped,
+                                # not just PLAN.md (#195 — reverting one of two
+                                # surfaces left roadmap `done` vs PLAN `active`).
+                                reverted = revert_terminal_surfaces(
+                                    wu, feature_dir, REPO_ROOT,
+                                )
+                                if reverted:
                                     commit_bookkeeping(
-                                        [plan_path],
-                                        f"chore(loop): {wu.wu_id} revert PLAN.md done"
-                                        f" (hedged verdict)\n\nFeature: {wu.wu_id}",
+                                        reverted,
+                                        f"chore(loop): {wu.wu_id} revert terminal"
+                                        f" surfaces (hedged verdict)"
+                                        f"\n\nFeature: {wu.wu_id}",
                                     )
                         elif _legacy_4wu_terminal_close_complete(
                             wu, units, gate, gates,
@@ -4425,9 +4650,38 @@ def run(
                             agent_status="complete",
                             agent_blocked_reason=None,
                         ))
+                        # Lifetime fields (#199): a retrospective must be able
+                        # to compute rework-vs-new-work and planned-vs-actual
+                        # per WU from this one event, without reconciling
+                        # re-arm generations by hand. cumulative_* frontmatter
+                        # holds prior cycles' totals (folded at re-arm
+                        # dispatch); this cycle's numbers are added here.
+                        _fm_done, _ = read_frontmatter(wu.file)
+                        _prior_cost = _fm_done.get("cumulative_cost_usd")
+                        _prior_cost = (float(_prior_cost)
+                                       if isinstance(_prior_cost, (int, float))
+                                       and not isinstance(_prior_cost, bool)
+                                       else 0.0)
+                        _prior_attempts = _fm_done.get("cumulative_attempts")
+                        _prior_attempts = (int(_prior_attempts)
+                                           if isinstance(_prior_attempts, int)
+                                           and not isinstance(_prior_attempts, bool)
+                                           else 0)
+                        _planned = _fm_done.get("planned_cost_usd")
+                        _planned = (float(_planned)
+                                    if isinstance(_planned, (int, float))
+                                    and not isinstance(_planned, bool)
+                                    else None)
                         wu_events.append(build_event("task_completed", wu.wu_id, {
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "type": wu.type,
+                            "re_arm_count": re_arm_count,
+                            "cost_usd": round(cum_usage["cost_usd"], 6),
+                            "cumulative_cost_usd": round(
+                                _prior_cost + cum_usage["cost_usd"], 6),
+                            "attempts_lifetime": _prior_attempts + attempt,
+                            "planned_cost_usd": _planned,
                         }))
                         flush_events(events_path, wu_events)
                         done_ids.add(wu.wu_id)
@@ -4532,6 +4786,15 @@ def run(
                         note_paths = persist_attempt_notes(
                             work_dir, wu.wu_id, attempt_notes)
                         backend.set_wu(wu, "status", "blocked_human")
+                        # Stamp the escalation identity into frontmatter (#200):
+                        # the re-arm reproduction gate needs the exact signature
+                        # at the NEXT dispatch, and events.jsonl is not read on
+                        # the dispatch path. Rides the same bookkeeping commit.
+                        backend.set_wu(wu, "escalation_reason",
+                                       "spinning_signature_repeat")
+                        backend.set_wu(wu, "escalation_failure_class", _fc or "")
+                        backend.set_wu(wu, "escalation_failure_signature",
+                                       _fs or "")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
