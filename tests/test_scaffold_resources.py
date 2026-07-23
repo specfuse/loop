@@ -18,6 +18,7 @@ _EXPECTED_RELPATHS = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/never-touch.md",
     "rules/planning-discipline.md",

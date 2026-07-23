@@ -92,6 +92,26 @@ defect gates later.
 |---|---|---|
 | `<path/method>` | yes / no | <one line> |
 
+**Close obligations** (REQUIRED only for `close` / `close-intermediate` WUs; omit
+otherwise — see `.specfuse/rules/close-discipline.md`). The close's acceptance
+criteria must cover:
+
+1. **Oracles re-run fresh** (§1): every oracle the feature's criteria name,
+   full command(s), exit codes read directly — never a producing WU's
+   self-report; regenerate into a clean dir before asserting on generated
+   artifacts.
+2. **Hedged follow-up record** (§2): on `met_locally`, a named record per
+   unmet criterion — criterion, why unverifiable here, exact re-run condition
+   that upgrades it to `met`.
+3. **Consumer-visible contract changes** (§3): enumerate every addition /
+   removal / rename across the feature's producing WUs and block on human
+   acknowledgment, or write exactly `n/a — no consumer-visible contract
+   change`.
+
+A close whose criteria include any of these is load-bearing — set
+`auto_close_disabled: true` in this WU's frontmatter so the auto-close
+predicate cannot skip it.
+
 **Do not touch.** Generated directories (`_generated/`, `gen-src/`, or the repo's
 declared equivalent), files owned by other work units in this gate, secrets,
 `.git/`. The driver owns all git operations — you edit files only. See

@@ -147,6 +147,18 @@ WU's** frontmatter. The predicate keys on the implementation WUs' cost and
 plan-conformance and cannot see what a close verifies, so a substantive close
 must be marked must-run or its verification is silently skipped (#189).
 
+**Hedged verdicts leave a trail** — a close that ends `met_locally` (everything
+locally verifiable passed; something structurally could not be verified here)
+leaves every terminal surface un-flipped (driver >= 0.3.21: gate
+`awaiting_review`, roadmap row `active`, PLAN.md `active`) AND must produce a
+follow-up record — in the gate review or `RETROSPECTIVE.md` — naming each
+unmet criterion, why it was unverifiable in this environment, and the exact
+re-run condition that would upgrade the verdict to `met`. Without the record,
+`met_locally` is a dead end; with it, the feature is resumable by anyone. See
+`.specfuse/rules/close-discipline.md` §2 for the record's shape and the other
+close-time obligations (fresh oracle re-runs, consumer-visible-change
+enumeration).
+
 **Predicate-version transparency** — every `auto_close_decision` event in
 `events.jsonl` carries a `predicate_version` field (e.g., `predicate_version:
 v1`). Future revisions to the predicate constants increment this version, so
