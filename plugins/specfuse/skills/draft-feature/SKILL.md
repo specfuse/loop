@@ -131,6 +131,14 @@ Also ask, once, the universal framing trio:
 
 ### 4. Propose the gate skeleton
 
+> **Existing-mechanism search first (#209 item 6).** Before drafting any WU
+> that designs a validation rule, a severity level, an enforcement gate, or a
+> measurement, run the existing-mechanism search and record the command +
+> verdict in PLAN.md's `Existing-mechanism search` section — see
+> `.specfuse/rules/planning-discipline.md` §1. FEAT-2026-0049 spent two gates
+> building enforcement that already existed one grep away. Features designing
+> no such mechanism write the section's explicit n/a line.
+
 #### Size rule — ceremony proportionality
 
 Before sketching the gate count, tally planned substantive WUs (types

@@ -32,6 +32,7 @@ setup() {
   printf 'PLAN\n'        > "$TESTDIR/.specfuse/templates/PLAN.template.md"
   printf 'WU\n'          > "$TESTDIR/.specfuse/templates/WU.template.md"
   printf 'corr\n'        > "$TESTDIR/.specfuse/rules/correlation-ids.md"
+  printf 'closedisc\n'   > "$TESTDIR/.specfuse/rules/close-discipline.md"
   printf 'never\n'       > "$TESTDIR/.specfuse/rules/never-touch.md"
   printf 'plandisc\n'    > "$TESTDIR/.specfuse/rules/planning-discipline.md"
   printf 'localreadme\n' > "$TESTDIR/.specfuse/rules-local/README.md"

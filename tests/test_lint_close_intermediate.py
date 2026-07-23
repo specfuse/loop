@@ -42,6 +42,14 @@ def _write_plan(feature_dir: Path, gates_yaml: str) -> None:
         "```yaml\n"
         f"{gates_yaml}\n"
         "```\n"
+        "\n"
+        "## Existing-mechanism search\n"
+        "\n"
+        "n/a — no enforcement or measurement designed\n"
+        "\n"
+        "## Escalation-predicate satisfiability\n"
+        "\n"
+        "n/a — no severity flip\n"
     )
 
 

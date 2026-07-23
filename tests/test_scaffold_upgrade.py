@@ -200,10 +200,64 @@ class TestUpgradeOverlayAndPreserve(unittest.TestCase):
         self.assertEqual(written, sorted(written))
 
     def test_upgrade_prunes_removed_versioned(self):
+        """A file the seed once shipped (in the manifest) but no longer
+        carries is pruned. Manifest membership is the ownership proof (#214)."""
+        import json as _json
         stray = self.specfuse / "rules" / "obsolete.md"
         stray.write_bytes(b"stale content")
+        manifest = self.specfuse / ".scaffold-manifest"
+        entries = _json.loads(manifest.read_text())
+        entries["rules/obsolete.md"] = (
+            "0" * 64  # sha irrelevant to prune — membership is the proof
+        )
+        manifest.write_text(_json.dumps(entries))
         upgrade_specfuse(self.target)
-        self.assertFalse(stray.exists(), "stray versioned file must be pruned")
+        self.assertFalse(stray.exists(), "manifest-owned removed file must be pruned")
+
+    def test_upgrade_keeps_unmanaged_file_in_rules_with_warning(self):
+        """A project-authored file dropped into rules/ (never written by
+        specfuse — absent from the manifest) survives upgrade, with a stderr
+        warning pointing at rules-local/ (#214)."""
+        user_rule = self.specfuse / "rules" / "our-own-rule.md"
+        user_rule.write_bytes(b"# project rule\n")
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            upgrade_specfuse(self.target)
+        self.assertTrue(user_rule.exists(),
+                        "unmanaged file must NOT be pruned")
+        self.assertEqual(user_rule.read_bytes(), b"# project rule\n")
+        err = stderr.getvalue()
+        self.assertIn("rules/our-own-rule.md", err)
+        self.assertIn("rules-local", err)
+
+    def test_upgrade_warns_before_overwriting_modified_versioned(self):
+        """A locally-modified shipped file is still overwritten (versioned-dir
+        contract) but loudly (#214)."""
+        target_file = self.specfuse / "rules" / "result-contract.md"
+        target_file.write_bytes(b"locally modified\n")
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            upgrade_specfuse(self.target)
+        self.assertEqual(target_file.read_bytes(),
+                         read_scaffold("rules/result-contract.md"),
+                         "versioned file must still be overwritten")
+        err = stderr.getvalue()
+        self.assertIn("locally-modified", err)
+        self.assertIn("rules/result-contract.md", err)
+
+    def test_upgrade_legacy_no_manifest_keeps_unknown_silently_unpruned(self):
+        """Pre-manifest tree: ownership unprovable — unknown files kept
+        (warned), no clobber warnings for shipped files (#214)."""
+        (self.specfuse / ".scaffold-manifest").unlink()
+        user_rule = self.specfuse / "rules" / "legacy-own-rule.md"
+        user_rule.write_bytes(b"legacy project rule\n")
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            upgrade_specfuse(self.target)
+        self.assertTrue(user_rule.exists(),
+                        "no manifest -> cannot prove ownership -> keep")
+        self.assertNotIn("locally-modified", stderr.getvalue(),
+                         "no manifest -> overlay clobber warnings suppressed")
 
     def test_upgrade_prune_scoped_to_versioned_dirs(self):
         # features/ must never be pruned

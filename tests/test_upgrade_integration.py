@@ -160,8 +160,16 @@ class TestUpgradePruneAndPreserve(unittest.TestCase):
         self._tmpdir.cleanup()
 
     def test_stray_rules_file_pruned(self):
+        """Manifest-owned rules file the seed no longer ships is pruned;
+        an unmanaged file would be kept (#214, covered in
+        test_scaffold_upgrade)."""
+        import json as _json
         stray = self.sf / "rules" / "obsolete.md"
         stray.write_bytes(b"# no longer shipped by seed\n")
+        manifest = self.sf / ".scaffold-manifest"
+        entries = _json.loads(manifest.read_text())
+        entries["rules/obsolete.md"] = "0" * 64
+        manifest.write_text(_json.dumps(entries))
         upgrade_specfuse(self.target)
         self.assertFalse(stray.exists(), "stray versioned file must be pruned")
 

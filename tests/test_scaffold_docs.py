@@ -91,8 +91,15 @@ class TestUpgradeOverlaysDocs(unittest.TestCase):
         )
 
     def test_upgrade_prunes_removed_docs(self):
+        """A docs file the seed once shipped (manifest-owned) but no longer
+        carries is pruned; manifest membership is the ownership proof (#214)."""
+        import json as _json
         stray = self.specfuse / "docs" / "obsolete-doc.md"
         stray.write_bytes(b"old doc")
+        manifest = self.specfuse / ".scaffold-manifest"
+        entries = _json.loads(manifest.read_text())
+        entries["docs/obsolete-doc.md"] = "0" * 64
+        manifest.write_text(_json.dumps(entries))
         upgrade_specfuse(self.target)
         self.assertFalse(stray.exists(), "stray docs file must be pruned on upgrade")
 
