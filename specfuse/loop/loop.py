@@ -2693,7 +2693,14 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         section_m2 = section_re.search(roadmap_text)
         if section_m2:
             roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
-            roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
+    # A feature that was ever `blocked` via /block-feature carries an explicit
+    # `<a id="feat-…"></a>` line above its heading (so intra-page `#feat-…`
+    # links resolve). The section regex above does not span it, so removing the
+    # section would strand the anchor pointing at a section that has moved to the
+    # archive. Strip the now-orphaned anchor line; Step 3 already re-emitted the
+    # canonical anchor in roadmap-archive.md, so the link target travels with it.
+    roadmap_text = roadmap_text.replace(f"{anchor}\n", "")
+    roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
     return "archived"
