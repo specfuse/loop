@@ -1,6 +1,6 @@
 ---
 name: draft-feature
-description: "Interactively draft a Specfuse feature \u2014 its gate skeleton, gate 1's work units, and the matching files \u2014 for a major initiative in a Specfuse-integrated project. Reads roadmap, LEARNINGS, recent feature exemplars, binding rules, and the project itself; asks framing questions wearing multiple hats; proposes and only writes on accept. The drafting counterpart to authoring-work-units (per-WU craft) and feature-conversion (post-hoc fixes). Lean v0.1; expected to grow as real features are drafted with it."
+description: "Interactively draft a Specfuse feature \u2014 its gate skeleton, gate 1's work units, and the matching files \u2014 for a major initiative in a Specfuse-integrated project. Reads roadmap, LEARNINGS, recent feature exemplars, binding rules, and the project itself; walks a guided one-question-at-a-time interview (elicitation questions open, decision questions with prose pros/cons + a recommendation, never tables); proposes and only writes on accept. The drafting counterpart to authoring-work-units (per-WU craft) and feature-conversion (post-hoc fixes). Lean v0.1; expected to grow as real features are drafted with it."
 ---
 
 <!--
@@ -19,11 +19,11 @@ mirrors `derive-verification` and `plan-next`: **draft, then arm**. The
 skill proposes the structure section by section, asks before writing,
 and writes only on your explicit accept.
 
-**Run interactively.** The skill asks multiple framing questions
-wearing different hats (product / architect / QA / reviewer /
-operator); `claude -p` with stdin redirected consumes the channel the
-skill needs to ask through. Start `claude` in the target project and
-ask it to run this skill against your feature idea.
+**Run interactively.** The skill walks a guided interview — one framing
+question at a time, wearing different hats (product / architect / QA /
+reviewer / operator) — so `claude -p` with stdin redirected consumes the
+channel the skill needs to ask through. Start `claude` in the target
+project and ask it to run this skill against your feature idea.
 
 ## Hard rules
 
@@ -102,32 +102,76 @@ Light-touch read so framing questions are specific, not generic:
 - The existing test layout and `.specfuse/verification.yml` — so WU
   `Verification` sections later name the real gate commands.
 
-### 3. Ask — wear multiple hats, batched
+### 3. Interview — one decision at a time, guided
 
-After steps 1–2, present a **single batched round** of framing
-questions, organized by hat. Choose 3–5 hats whose perspective the
-evidence didn't already answer. Forbidden: hats that have nothing
-specific to ask for this feature ("just to be thorough" is filler).
+Walk the user through the framing questions as a **guided interview:
+one question per turn**, not a single batched wall. This is the flow —
+there is **no mode toggle**. Do not open with "do you want the quick
+version or the guided one?"; that meta-question is itself something a
+newcomer can't answer, and it's the friction this interview exists to
+remove.
 
-- **Product hat** — *what user-observable outcome does this produce?*
-  Who is the user (operator, developer, end customer)? What does
-  success look like in one sentence?
-- **Architect hat** — *what surfaces does this touch?* Additive or
-  replacement? Cross-feature ordering or dependencies on planned
-  roadmap items? Architectural debts this pays down or creates?
-- **QA hat** — *what makes this hard to verify?* Boundary cases that
-  will trip the gates? Integration points whose test story is unclear?
-  Anything that needs a real environment that the gates can't provide?
-- **Reviewer hat** — *at PR review, what would worry me?* The "scary"
-  part of the change; the part where the agent will need the tightest
-  acceptance criteria to keep it honest.
-- **Operator hat** — *how does this ship and roll back?* Migration
-  story, observability, feature-flag posture, deploy ordering.
+The interview **auto-scales** — it does not mean "ask everything." The
+"infer first, ask last" hard rule governs the *set*: ask only what the
+evidence from steps 1–2 didn't already answer, so a well-grounded
+feature is two or three questions and a vague one is more. A hat with
+nothing specific to ask is skipped, not filled with filler.
 
-Also ask, once, the universal framing trio:
-1. What's the **roadmap_goal** in one sentence?
-2. **Autonomy** — `auto`, `review`, or `supervised`?
-3. **Scope boundary** — what's explicitly OUT for this feature?
+**Escape hatch (in-flow, not up-front).** If the user says some variant
+of "take your recommendations for the rest," stop asking: apply your
+recommended option to every remaining *decision* question, then jump to
+step 4 with all the assumed choices surfaced together for a single
+confirm. This is the expert fast-path — an exit mid-interview, never a
+choice imposed at the start.
+
+**Generate the questions by wearing the hats, surfaced one at a time,
+highest-leverage first:**
+
+- **Product** — what user-observable outcome does this produce? Who is
+  the user (operator, developer, end customer)? One-sentence success.
+- **Architect** — what surfaces does this touch? Additive or
+  replacement? Cross-feature ordering or dependencies on planned items?
+- **QA** — what makes this hard to verify? Boundary cases that trip the
+  gates? Anything needing a real environment the gates can't provide?
+- **Reviewer** — the scary part of the change; where the agent needs
+  the tightest acceptance criteria to stay honest.
+- **Operator** — how does this ship and roll back? Migration,
+  observability, feature-flag posture, deploy ordering.
+
+Also cover, once, the universal framing trio: the **roadmap_goal** (one
+sentence), **autonomy** (`auto` / `review` / `supervised`), and the
+**scope boundary** (what's explicitly OUT).
+
+**Two kinds of question — ask them differently. This is the crux of the
+interview.**
+
+- **Elicitation — only the user knows the answer** (roadmap_goal, who
+  the user is, what's out of scope, a domain constraint). Ask it
+  **open**, in one or two plain sentences. Do NOT manufacture options
+  for these: a fake multiple-choice on the user's own intent reads as a
+  phone tree and buries the real question.
+- **Decision — you can enumerate real options and have a basis to
+  recommend** (autonomy level; additive vs replacement; gate count;
+  single-gate vs multi-gate; a WU's red-test strategy; where an
+  integration gets verified). Present each as:
+  1. the decision in one line, **and why it matters to the driver** —
+     the downstream dispatch, gating, or ceremony it changes;
+  2. each viable option as a short **prose** paragraph: the option,
+     then its pros and cons in plain sentences;
+  3. your **recommendation** — which option, and the one reason it wins
+     *here*, anchored in evidence from steps 1–2;
+  4. the ask: "which — or override?"
+
+  **Never render the options as a table.** A table flattens away the
+  pros and cons that make the choice legible — they belong in prose.
+  This is `/pick-feature`'s decision shape applied per question.
+
+Keep **uncertainty callouts loud** as you go: when you're unsure whether
+something belongs in this feature at all, or in gate 2 vs gate 3, say so
+at that question rather than deciding silently. And carry each answer
+forward — a question an earlier answer already settled is not asked
+again (the "infer first" rule applied across the interview, not only
+against files).
 
 ### 4. Propose the gate skeleton
 
@@ -337,9 +381,20 @@ with what was decided so far in `blocked_reason`.
 
 ## Version
 
-**v0.1.** Six steps; the hats and the universal framing trio are the
-entire question-shape rule today. Expected to grow once real major
-initiatives are drafted with it — which hat surfaced the highest-
-leverage question, which step the user redoes most often, where the
-gate skeleton needed revision after gate 1 actually ran. Shared
-methodology craft (loop is near-term author, like the addendum).
+**v0.2 (FEAT-2026-0035).** Step 3 rewritten from a single batched round
+into a **guided one-question-at-a-time interview**. No mode toggle; the
+question set auto-scales via "infer first, ask last," with an in-flow
+"take your recommendations for the rest" escape hatch. Questions split
+into **elicitation** (only the user knows — asked open) and **decision**
+(skill enumerates — presented as prose options + pros/cons +
+recommendation + pick, the `/pick-feature` shape, never a table). The
+hats now *generate* questions surfaced sequentially rather than a batch.
+Aimed at onboarding newcomers and tightening driver alignment.
+
+**v0.1.** Six steps; the hats and the universal framing trio, asked as a
+single batched round, were the entire question-shape rule. Expected to
+grow once real major initiatives are drafted with it — which hat
+surfaced the highest-leverage question, which step the user redoes most
+often, where the gate skeleton needed revision after gate 1 actually
+ran. Shared methodology craft (loop is near-term author, like the
+addendum).

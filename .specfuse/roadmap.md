@@ -50,6 +50,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 | FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
+| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | active | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -686,6 +687,19 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches blocker link-rot at lint time instead of when a human clicks a dead link. Closes the enforcement gap the blocked-status feature deliberately deferred, keeping the machine-checkable invariants ahead of the prose conventions.
 
 **Status: planned.**
+
+## FEAT-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
+
+**Why.** `draft-feature` Step 3 asks a **single batched round** of hat questions — a wall of questions that suits an expert who already knows every answer but overwhelms the newcomers the methodology most needs to onboard, and it hands the driver weakly-validated answers (a batch is skimmed, not deliberated). Onboarding friction and driver alignment both suffer. The improvement: walk the user through the framing decisions **one at a time**, and for each *decision* question present the options with prose pros/cons and a recommendation so they choose well — the shape `/pick-feature` already uses, extended per-question.
+
+**Goal.** Rewrite Step 3 into an **adaptive guided interview**, no mode toggle:
+- Ask one question per turn; the count is **evidence-gated** (the existing "infer first, ask last" rule already auto-scales it — a well-evidenced feature yields few questions, a vague one many), so experts aren't forced through filler and novices aren't dumped a wall.
+- Distinguish two question kinds: **elicitation** (only the user knows — roadmap_goal, who's the user, scope-out) asked open; **decision** (skill can enumerate — autonomy level, additive-vs-replacement, gate count, single-vs-multi-gate, red-test strategy) presented as options + **prose** pros/cons + a recommendation + the user's pick. **Never a table.**
+- Mid-interview escape hatch: the user can say "take your recommendations for the rest" to fast-forward — an in-flow expert exit, not an up-front choice.
+
+**Benefits.** Lowers onboarding friction and teaches the methodology as it asks; every answer is validated before the next builds on it, so the resulting PLAN aligns the driver better; auto-scaling keeps it cheap for experts on well-understood features. Reuses the proven `/pick-feature` decision-presentation shape, so the craft is consistent across skills.
+
+**Status: active.**
 
 ## Notes
 
