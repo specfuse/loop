@@ -335,6 +335,56 @@ def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
             )
 
 
+# Planning-discipline section names (#201, second half). Canonical since the
+# FEAT-2026-0049 planning-discipline drop (PR #211): PLAN.md carries the two
+# ADR sections; each gate file carries the arming-discipline section. Names
+# are shared vocabulary with downstream planning tooling — do not rename here
+# without a template/coordination change.
+PLAN_DISCIPLINE_SECTIONS = (
+    "Existing-mechanism search",
+    "Escalation-predicate satisfiability",
+)
+GATE_ARMING_SECTION = "Arming discipline"
+
+
+def check_planning_sections(
+    feature_dir: Path, plan_fm: dict, plan_body: str, gates: list,
+) -> None:
+    """WARN when the planning-discipline sections are absent (#201).
+
+    Presence-only: the PLAN template's sections allow an explicit n/a line, so
+    content is the arming reviewer's job — this check only catches the section
+    never being written at all (pre-0.3.22 drafts, or a plan-next that dropped
+    it). Sealed features (plan status done/abandoned) are history and skipped.
+    WARN-only, exit code 0, like the rest of the planning-lint family.
+    """
+    if plan_fm.get("status") in ("done", "abandoned"):
+        return
+    for section in PLAN_DISCIPLINE_SECTIONS:
+        if not _slice_section(plan_body, section).strip():
+            print(
+                f"WARN: {feature_dir}/PLAN.md: missing '{section}' section "
+                f"(planning-discipline; write it or an explicit 'n/a' line). "
+                f"See .specfuse/rules/planning-discipline.md."
+            )
+    for g in gates:
+        gate_file = g.get("file")
+        if not gate_file:
+            continue
+        gate_path = feature_dir / gate_file
+        if not gate_path.exists():
+            continue
+        gfm, gbody = read_frontmatter(gate_path)
+        if gfm.get("status") == "passed":
+            continue
+        if not _slice_section(gbody, GATE_ARMING_SECTION).strip():
+            print(
+                f"WARN: {gate_file}: missing '{GATE_ARMING_SECTION}' section "
+                f"(runtime-probe / flag-scope / predicate checks before "
+                f"arming). See .specfuse/rules/planning-discipline.md."
+            )
+
+
 def lint(feature_dir: Path) -> list[str]:
     errs: list[str] = []
     plan = feature_dir / "PLAN.md"
@@ -623,6 +673,8 @@ def lint(feature_dir: Path) -> list[str]:
 
     # Planned-cost capture: WARN on missing/divergent planned_cost_usd fields.
     check_planned_cost(feature_dir, fm, gates)
+    # Planning-discipline section presence (#201): WARN-only.
+    check_planning_sections(feature_dir, fm, body, gates)
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
