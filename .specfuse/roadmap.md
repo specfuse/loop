@@ -51,6 +51,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 | FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | active | — | — |
+| FEAT-2026-0036 | Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -700,6 +701,16 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Benefits.** Lowers onboarding friction and teaches the methodology as it asks; every answer is validated before the next builds on it, so the resulting PLAN aligns the driver better; auto-scaling keeps it cheap for experts on well-understood features. Reuses the proven `/pick-feature` decision-presentation shape, so the craft is consistent across skills.
 
 **Status: active.**
+
+## FEAT-2026-0036 — Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin
+
+**Why.** ruff 0.16.0 tightened its import-ordering rules; run against this repo's test suite it flags ~300 pre-existing lint errors (unsorted / unconsolidated imports in `tests/`), none tied to any single change. Because CI installed ruff unpinned (`>=0.6`), 0.16.0's release broke the lint gate on **every** PR at once. The immediate fix pinned `ruff>=0.6,<0.16` to restore green; this feature is the deliberate fix-forward that pays down the debt and lifts the pin, rather than freezing the linter indefinitely.
+
+**Goal.** Adopt ruff 0.16: run `ruff check --fix` (≈103 auto-fixable) and hand-resolve the remainder across the test files, confirm the suite still passes, then change the `pyproject.toml` pin back to an open `ruff>=0.16` (or a fresh floor). Land it as one reviewable diff so the mechanical import churn is separated from behaviour changes.
+
+**Benefits.** Keeps the linter current instead of frozen at 0.15, so future rule improvements are available; removes the pin as a standing "why is this here?" question; does the import cleanup once, deliberately, instead of letting the next unpinned bump surprise CI again.
+
+**Status: planned.**
 
 ## Notes
 
