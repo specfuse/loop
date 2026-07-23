@@ -1537,15 +1537,20 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 
 
 def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
-    """Sum lifetime cost across the gate's done WUs (closing-sequence included).
+    """Sum lifetime recorded cost across ALL of the gate's WUs.
 
     Reads each WU file's frontmatter from `gate["work_units"]` and adds
     `cost_usd` PLUS `cumulative_cost_usd` (prior re-arm cycles' spend, folded
-    by fold_cumulative_on_rearm — #199) when the WU's status is "done". WUs
-    whose frontmatter omits both — cost tracking off, or the attempt didn't
-    record a cost — contribute 0.0. `plan` is the feature frontmatter dict and
-    is accepted for signature symmetry with the broader gate-budget helpers;
-    the spent total is derived from WU files alone.
+    by fold_cumulative_on_rearm — #199) regardless of WU status (#219):
+    write_cost_to_wu records cost on every outcome — pass, blocked, spinning —
+    so cost on a non-done WU is real spend, not an estimate. The pre-#219
+    done-only filter left a blocked WU's re-arm burn invisible to the budget
+    brake until the WU finally passed (FEAT-2026-0049/WU-06: $30.29 across 9
+    attempts, contributing $0 while blocked). WUs whose frontmatter omits both
+    fields — cost tracking off, never dispatched, or the attempt didn't record
+    a cost — contribute 0.0. `plan` is the feature frontmatter dict and is
+    accepted for signature symmetry with the broader gate-budget helpers; the
+    spent total is derived from WU files alone.
     """
     del plan  # signature symmetry — sum is derived from WU files only
     total = 0.0
@@ -1557,8 +1562,6 @@ def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
         if not wu_path.exists():
             continue
         fm, _ = read_frontmatter(wu_path)
-        if fm.get("status") != "done":
-            continue
         # Lifetime spend, not per-cycle (#199): fold_cumulative_on_rearm
         # moves each prior dispatch cycle's cost into cumulative_cost_usd and
         # zeroes cost_usd, so summing cost_usd alone undercounts every
