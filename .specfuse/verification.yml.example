@@ -28,6 +28,15 @@
 #
 # cost_tracking: true
 
+# PER-GATE `wu_must_reference: true` (optional, default false). Flag a gate
+# whose fix is MECHANICAL over a work unit's own output — a formatter, an
+# auto-fixable linter (`spotless:check`, `black --check`, `gofmt -l`,
+# `prettier --check`). The plan linter (specfuse-lint) then WARNs when an
+# implementation WU's Verification section names none of that gate's command —
+# catching, at authoring time and zero model cost, the case where a WU forgets
+# a mechanical gate and the driver spins retries on the identical failure until
+# the attempt budget is exhausted. Leave it off for project-global gates
+# (leak-scan, hygiene checks) that an individual WU has no reason to name.
 code:
   - name: tests
     command: "pytest -q"
@@ -37,6 +46,9 @@ code:
     command: "python3 -W error -c 'pass'"    # replace with your build's -Werror equivalent
   - name: lint
     command: "ruff check ."
+  - name: format
+    command: "black --check ."               # deterministic formatter: fix with `black .`
+    wu_must_reference: true                   # WUs must name it (see note above)
   - name: security
     command: "bandit -r src -ll"             # or your OWASP-aligned scanner
 

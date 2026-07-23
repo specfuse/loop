@@ -256,6 +256,117 @@ class TestMaybeAutoCloseTerminalAutoPath(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 
+class TestMaybeAutoCloseTerminalPerWuOptOut(unittest.TestCase):
+    """#189: a close WU marked auto_close_disabled must NOT be auto-closed,
+    even on an otherwise clean/on-plan gate — it is dispatched instead."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_id = "FEAT-2026-9981"
+        self.gate_num = 1
+        fdir = self.root
+        self.fdir = fdir
+        _write_plan_md(fdir, self.feature_id, self.gate_num)
+        _write_wu_impl(fdir, f"{self.feature_id}/T01")
+        # Close WU carries the per-WU opt-out.
+        (fdir / "WU-close.md").write_text(
+            f"---\nid: {self.feature_id}/G{self.gate_num}-CLOSE\ntype: close\n"
+            f"model: opus\nstatus: pending\nattempts: 0\n"
+            f"auto_close_disabled: true\n---\n\n# Close\n"
+        )
+        _write_gate_file(fdir, self.gate_num)
+        _write_task_completed_event(fdir, f"{self.feature_id}/T01")
+        self.gate = _make_gate_node(fdir, self.feature_id, self.gate_num)
+        self.close_wu = _make_close_wu(
+            fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
+        self.events_path = fdir / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_refuses_and_names_reason(self):
+        result, decision = loop.maybe_auto_close_terminal(
+            self.fdir, self.feature_id, self.gate, [self.gate],
+            self.events_path, self.close_wu, repo_root=self.root,
+        )
+        self.assertFalse(result)
+        self.assertFalse(decision.auto)
+        self.assertIn("auto_close_disabled_per_wu", decision.reasons)
+
+    def test_close_wu_not_marked_auto_closed(self):
+        loop.maybe_auto_close_terminal(
+            self.fdir, self.feature_id, self.gate, [self.gate],
+            self.events_path, self.close_wu, repo_root=self.root,
+        )
+        fm, _ = loop.read_frontmatter(self.close_wu.file)
+        # Status untouched (still dispatchable); no auto_close output marker.
+        self.assertEqual(fm.get("status"), "pending")
+        self.assertNotEqual(fm.get("auto_close"), True)
+
+    def test_helper_reads_the_flag(self):
+        self.assertTrue(loop._close_wu_disables_auto_close(self.close_wu))
+
+
+class TestMaybeAutoCloseTerminalDeliverableMissing(unittest.TestCase):
+    """#190: auto-close must refuse when an implementation WU reports done but
+    its declared `produces:` deliverable is absent — dispatch the close."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+        self.feature_id = "FEAT-2026-9982"
+        self.gate_num = 1
+        fdir = self.root
+        self.fdir = fdir
+        _write_plan_md(fdir, self.feature_id, self.gate_num)
+        # Implementation WU claims done + a produces path that does NOT exist.
+        missing = fdir / "src" / "never-created.py"
+        (fdir / "WU-01.md").write_text(
+            f"---\nid: {self.feature_id}/T01\ntype: implementation\n"
+            f"model: sonnet\nstatus: done\nattempts: 1\ncost_usd: 0.5\n"
+            f"planned_cost_usd: 0.5\nproduces: [{missing}]\n---\n\n# T01\n"
+        )
+        _write_wu_close(fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
+        _write_gate_file(fdir, self.gate_num)
+        _write_task_completed_event(fdir, f"{self.feature_id}/T01")
+        self.gate = _make_gate_node(fdir, self.feature_id, self.gate_num)
+        self.close_wu = _make_close_wu(
+            fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
+        self.events_path = fdir / "events.jsonl"
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _call(self):
+        return loop.maybe_auto_close_terminal(
+            self.fdir, self.feature_id, self.gate, [self.gate],
+            self.events_path, self.close_wu, repo_root=self.root,
+        )
+
+    def test_refuses_on_missing_deliverable(self):
+        result, decision = self._call()
+        self.assertFalse(result)
+        self.assertFalse(decision.auto)
+        self.assertTrue(any("declared_deliverable_missing" in r
+                            for r in decision.reasons),
+                        f"reasons={decision.reasons}")
+
+    def test_present_deliverable_still_auto_closes(self):
+        # Create the declared deliverable → predicate proceeds to auto-close.
+        missing = self.fdir / "src" / "never-created.py"
+        missing.parent.mkdir(parents=True, exist_ok=True)
+        missing.write_text("x = 1\n")
+        result, decision = self._call()
+        self.assertTrue(result)
+        self.assertTrue(decision.auto)
+
+    def test_helper_reports_the_offender(self):
+        ok, reason = loop._gate_impl_deliverables_present(self.fdir, self.gate)
+        self.assertFalse(ok)
+        self.assertIn("never-created.py", reason)
+
+
 class TestMaybeAutoCloseTerminalNonAutoPath(unittest.TestCase):
 
     def setUp(self):

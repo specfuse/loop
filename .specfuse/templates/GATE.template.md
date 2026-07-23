@@ -30,6 +30,23 @@ here for human review-and-arm: read the review artifact, accept or edit the draf
 next-gate work units, flip the accepted ones to `pending`, set this gate's status to
 `passed`, and re-run.
 
+## Arming discipline (see `.specfuse/rules/planning-discipline.md`)
+
+Before flipping this gate's next-gate WUs to `pending`:
+
+- **Runtime probe for a default/severity flip (§4).** If any WU in the gate being armed
+  flips a **default value** or a **severity**, it may **not** be armed on "mechanical,
+  nothing design-open." Apply the change locally, run the **exact command the WU's tests
+  gate will run** (the full oracle, not a subset), and paste the failure list into
+  `GATE-NN-REVIEW.md`. That list becomes the WU's enumerated test surface. Arming such a
+  gate without a probe is what makes an implementation WU spin on a defect one local run
+  would have shown.
+- **Flag-scope table (§3).** If a WU introduces or flips a behavior flag, confirm it
+  carries a flag-scope table and that the feature's headline claim matches it.
+- **Escalation-predicate satisfiability (§2).** If a WU raises a check to `ERROR` or
+  asserts a "zero issues" predicate, confirm PLAN.md answered "what does the rule report
+  on a correct input" and that the answer is zero.
+
 ## Reflection notes
 
 <Written by the human at review time. What surprised you, what you changed in the

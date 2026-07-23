@@ -15,6 +15,7 @@ setup() {
   mkdir -p \
     "$TESTDIR/.specfuse/templates" \
     "$TESTDIR/.specfuse/rules" \
+    "$TESTDIR/.specfuse/rules-local" \
     "$TESTDIR/.specfuse/schemas/events" \
     "$TESTDIR/.specfuse/skills/demo" \
     "$TESTDIR/plugins/specfuse/skills/demo" \
@@ -32,6 +33,8 @@ setup() {
   printf 'WU\n'          > "$TESTDIR/.specfuse/templates/WU.template.md"
   printf 'corr\n'        > "$TESTDIR/.specfuse/rules/correlation-ids.md"
   printf 'never\n'       > "$TESTDIR/.specfuse/rules/never-touch.md"
+  printf 'plandisc\n'    > "$TESTDIR/.specfuse/rules/planning-discipline.md"
+  printf 'localreadme\n' > "$TESTDIR/.specfuse/rules-local/README.md"
   printf 'result\n'      > "$TESTDIR/.specfuse/rules/result-contract.md"
   printf 'security\n'    > "$TESTDIR/.specfuse/rules/security-boundaries.md"
   printf 'verifdisc\n'   > "$TESTDIR/.specfuse/rules/verification-discipline.md"

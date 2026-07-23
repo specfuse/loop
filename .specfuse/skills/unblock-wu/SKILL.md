@@ -139,6 +139,34 @@ Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
        reason: "<operator's one-line rationale, trimmed>"
      ```
 
+  **Spinning-escalated WU (#200).** If the WU's frontmatter carries
+  `escalation_reason: spinning_signature_repeat`, the driver will REFUSE
+  the re-arm dispatch (event `re_arm_rejected`, reason
+  `spinning_reproduction_missing`) unless one of these is also written:
+
+  - `reproduced_signature: "<exact escalation_failure_signature value>"`
+    — only after the operator has actually reproduced the escalated
+    failure in full (run the failing command the signature names, whole
+    suite, not a subset). Quote the WU frontmatter's
+    `escalation_failure_signature` verbatim.
+  - `re_arm_override: true` — explicit bypass; record WHY in the re-arm
+    rationale.
+
+  So for such WUs, prompt additionally:
+
+  ```
+  spinning escalation — signature: "<escalation_failure_signature>"
+  Reproduced in full (y = write reproduced_signature) /
+  override without reproduction (o = write re_arm_override: true) /
+  back (b)?
+  ```
+
+  Refuse `y` unless the operator confirms the reproduction ran the
+  full failing command (FEAT-2026-0049/WU-06 was re-armed twice on
+  test-subset diagnoses; the first full reproduction found the real
+  defect immediately). Include the chosen field in the same atomic
+  frontmatter write as steps 1-4.
+
   The `reason` field in the new `re_arm_history` entry is the string the
   driver's `re_arm_dispatched` event reads via `re_arm_history[-1].reason`.
   A re-arm without this write produces a `re_arm_dispatched` event with

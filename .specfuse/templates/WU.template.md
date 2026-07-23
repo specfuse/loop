@@ -28,6 +28,10 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   `xhigh` | `max`. Absent → type-keyed default. `low`/`medium` add a terseness directive.
 - `planned_cost_usd` — OPTIONAL. Estimated USD at draft time. Compared against actual in close
   WU's cost analysis. Lint WARN when absent on active/draft WUs (non-blocking).
+  **Planning-WU cost floor (`.specfuse/rules/planning-discipline.md` §5):** for `plan-next`,
+  `close`, and `close-intermediate` WUs, draft `planned_cost_usd` at a **floor of $5.00** — these
+  run 2.8–5.2× the $2–3 that "it's just bookkeeping" suggests. A gate `cost_budget_usd` set to
+  the sum of $2–3 planning estimates is a brake that fires by construction on the first real close.
 - `generated_surfaces` — OPTIONAL. Paths to generated files this unit's acceptance depends on.
 - `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
   `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions
@@ -76,6 +80,17 @@ same test **passes after the WU's edits**. The red→green proof is the loop's
 cheapest hollow-pass guard; see `/authoring-work-units` §12 for the contract and
 the carve-outs (refactor, migration, pure-data → explicit `Red-test exempt:
 <reason>` line in the WU body).
+
+**Flag-scope table** (REQUIRED only when this WU introduces, gates on, or flips a
+behavior flag; omit otherwise — see `.specfuse/rules/planning-discipline.md` §3). Every
+code path the flag is claimed to affect, marked gated / not gated, with a one-line why.
+The arming review checks the feature's headline claim ("the flip retires X") against
+this table; a claim the table does not support is a scope mismatch that surfaces as a
+defect gates later.
+
+| Code path | Gated by flag? | Why |
+|---|---|---|
+| `<path/method>` | yes / no | <one line> |
 
 **Do not touch.** Generated directories (`_generated/`, `gen-src/`, or the repo's
 declared equivalent), files owned by other work units in this gate, secrets,

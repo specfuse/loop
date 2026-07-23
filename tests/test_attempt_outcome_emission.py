@@ -220,6 +220,35 @@ class TestParseGateFailureSignature(unittest.TestCase):
         self.assertEqual(fc, "coverage")
         self.assertEqual(sig, "file.py")
 
+    def test_tests_fail_extracts_surefire_failing_test(self):
+        """#207: surefire failures name Class.method, not 'FAIL: test_*' —
+        the signature must carry the first failing test, not a generic
+        Maven line identical across distinct failures."""
+        stdout = (
+            "### tests: FAIL\n"
+            "[ERROR] Tests run: 431, Failures: 1, Errors: 0, Skipped: 0\n"
+            "[ERROR]   RelationshipSymmetryTest.rejectsAsymmetric:123 "
+            "expected ERROR but was WARNING\n"
+        )
+        fc, sig = loop.parse_gate_failure_signature(stdout)
+        self.assertEqual(fc, "tests")
+        self.assertEqual(sig, "RelationshipSymmetryTest.rejectsAsymmetric")
+
+    def test_distinct_surefire_failures_yield_distinct_signatures(self):
+        base = "### tests: FAIL\n[ERROR] Tests run: 10, Failures: 1\n"
+        _, sig_a = loop.parse_gate_failure_signature(
+            base + "[ERROR]   AlphaTest.one:1 boom\n")
+        _, sig_b = loop.parse_gate_failure_signature(
+            base + "[ERROR]   BetaTest.two:2 boom\n")
+        self.assertNotEqual(sig_a, sig_b)
+
+    def test_pytest_pattern_still_wins_over_surefire(self):
+        stdout = ("### tests: FAIL\n"
+                  "FAIL: test_foo\n"
+                  "[ERROR]   SomeTest.method:1 noise\n")
+        _, sig = loop.parse_gate_failure_signature(stdout)
+        self.assertEqual(sig, "test_foo")
+
     def test_unknown_gate_name_returns_other(self):
         stdout = "### custom-gate: FAIL\nsome output"
         fc, _sig = loop.parse_gate_failure_signature(stdout)
@@ -303,6 +332,70 @@ class TestExtractFailureExcerpt(unittest.TestCase):
         except UnicodeDecodeError as e:
             self.fail(f"UnicodeDecodeError raised: {e}")
         self.assertIsInstance(excerpt, str)
+
+    def test_surefire_failing_tests_hoisted_to_front(self):
+        """#207: Maven boilerplate [ERROR] lines crowd the head+tail budget;
+        the surefire failing-test lines must survive truncation by being
+        hoisted to the front of the relevant-line set."""
+        lines = ["[ERROR] Maven boilerplate wrapper line " + "x" * 40
+                 for _ in range(200)]
+        # Failing tests buried mid-output — where the pre-#207 budget lost them.
+        lines.insert(100, "[ERROR]   RelationshipSymmetryTest.rejectsAsymmetric:123 "
+                          "expected ERROR but was WARNING")
+        lines.insert(101, "[ERROR]   FkInferenceTest.retiresImplicit:45 "
+                          "NullPointerException")
+        excerpt = loop.extract_failure_excerpt("\n".join(lines), max_chars=500)
+        self.assertIn("RelationshipSymmetryTest.rejectsAsymmetric", excerpt)
+        self.assertIn("FkInferenceTest.retiresImplicit", excerpt)
+
+    def test_no_surefire_lines_keeps_existing_order(self):
+        """Without surefire lines the excerpt behaviour is unchanged."""
+        stdout = "Error: alpha\nError: beta"
+        excerpt = loop.extract_failure_excerpt(stdout)
+        self.assertEqual(excerpt, "Error: alpha\nError: beta")
+
+    def test_keeps_head_and_tail_on_truncation(self):
+        # #175: build-tool output puts the offending-file list up top and
+        # boilerplate (help URLs, stack hints) at the bottom. A tail-only
+        # slice keeps the noise; head+tail must preserve both ends.
+        lines = ["Error: HEAD_MARKER offending file list here"]
+        lines += [f"Error: filler line {i} " + "x" * 40 for i in range(400)]
+        lines += ["Error: TAIL_MARKER re-run with -X for debug"]
+        excerpt = loop.extract_failure_excerpt("\n".join(lines), max_chars=500)
+        self.assertLessEqual(len(excerpt.encode("utf-8")), 500)
+        self.assertIn("HEAD_MARKER", excerpt)
+        self.assertIn("TAIL_MARKER", excerpt)
+
+
+class TestSynthesizeRetryDirective(unittest.TestCase):
+    """#175 fix 1: the retry note must carry a forward-looking lesson, not
+    just replay output about files the reset already discarded."""
+
+    def test_lint_directive_is_forward_looking(self):
+        d = loop.synthesize_retry_directive("lint")
+        self.assertIn("discard", d.lower())
+        # Names the mechanical remedy without per-tool knowledge.
+        self.assertIn("format", d.lower())
+        self.assertIn("before", d.lower())
+
+    def test_tests_directive_mentions_tests(self):
+        d = loop.synthesize_retry_directive("tests")
+        self.assertIn("test", d.lower())
+        self.assertIn("before", d.lower())
+
+    def test_coverage_and_security_have_specific_hints(self):
+        self.assertIn("coverage", loop.synthesize_retry_directive("coverage").lower())
+        self.assertIn(
+            "finding", loop.synthesize_retry_directive("security").lower())
+
+    def test_unknown_class_falls_back_to_generic_non_empty(self):
+        d = loop.synthesize_retry_directive("other")
+        self.assertTrue(d.strip())
+        self.assertIn("discard", d.lower())
+
+    def test_none_class_does_not_crash(self):
+        d = loop.synthesize_retry_directive(None)
+        self.assertTrue(d.strip())
 
 
 # --------------------------------------------------------------------------- #
