@@ -1,6 +1,6 @@
 ---
 name: abandon-feature
-description: "Cleanly abandon the active feature when retry isn't worth it. Flips every non-`done` WU to `abandoned`, every non-`passed` gate to `passed`, PLAN.md `status: active` \u2192 `abandoned`, and the roadmap row's status column to `abandoned`. Single up-front confirmation surfaces all four surfaces before any write."
+description: "Cleanly abandon a feature when retry isn't worth it \u2014 the active one, or a `blocked`/`deferred` one named explicitly. Flips every non-`done` WU to `abandoned`, every non-`passed` gate to `passed`, PLAN.md `status` (active/blocked/deferred) \u2192 `abandoned`, and the roadmap row's status column to `abandoned`. Single up-front confirmation surfaces all four surfaces before any write."
 ---
 
 <!--
@@ -72,8 +72,10 @@ current one.
 
 ### 1. Detect the state
 
-- Find the active feature (PLAN.md `status: active`; if multiple,
-  ask via `--feature` or pick interactively).
+- Find the feature to abandon (PLAN.md `status: active`, or a `blocked` /
+  `deferred` one named explicitly — parked features can be abandoned too when
+  the approach dies; if multiple actives, ask via `--feature` or pick
+  interactively).
 - Read PLAN.md frontmatter and the gates graph.
 - For every WU file, read frontmatter (`id`, `status`).
 - For every gate file, read frontmatter (`gate`, `status`).
@@ -89,7 +91,8 @@ Build the list of file edits this skill will apply:
   `done` or `abandoned` are listed as "untouched" but not flipped.
 - For each gate with `status` in `{open, awaiting_review}`:
   planned flip → `passed`. Gates already `passed` are untouched.
-- PLAN.md frontmatter: `status: active` → `abandoned`.
+- PLAN.md frontmatter: `status` (`active` / `blocked` / `deferred`) →
+  `abandoned`.
 - Roadmap row: status column → `abandoned`. (Detail-section
   `**Status: planned.**` / `**Status: active.**` lines under the
   per-feature header are not edited by this skill — those are

@@ -26,7 +26,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` | [→ archive](roadmap-archive.md#feat-2026-0007) |
 | FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` | [→ archive](roadmap-archive.md#feat-2026-0008) |
 | FEAT-2026-0010 | Roadmap restructure: add + archive          | done     | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0010) |
-| FEAT-2026-0011 | Scoring framework for roadmap features      | planned  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` | — |
+| FEAT-2026-0011 | Scoring framework for roadmap features      | blocked  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` | — |
 | FEAT-2026-0012 | Closing-WU deliverable guard (folded into 0015) | abandoned | — | [→ archive](roadmap-archive.md#feat-2026-0012) |
 | FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
 | FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
@@ -51,9 +51,26 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
-pending an external decision/dependency; resumable (a human flips it back to
-`active` when the blocker clears), distinct from `abandoned` (dead).
+by choice pending an external decision/dependency; resumable (a human flips it
+back to `active` when the blocker clears), distinct from `abandoned` (dead).
+`blocked` = cannot proceed because a *named* dependency is unmet — an ADR
+awaiting approval, or an upstream feature that must complete first. Resumable
+like `deferred`, but where `deferred` is a voluntary park with no named blocker,
+`blocked` always names its blocker so the roadmap shows what it waits on and
+links to it.
 
+A `blocked` feature's detail section carries a `**Blocked by.**` block — blank
+line above it, one linked blocker per clause:
+
+**Blocked by.** [ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval; [FEAT-2026-0011](#feat-2026-0011) — scoring data must land first.
+
+Each blocker is a Markdown link: an ADR points at its `.md` file (kept under
+`docs/adr/` by convention, so from `.specfuse/roadmap.md` the link is
+`../docs/adr/…`); a feature dependency points at the blocking
+feature's roadmap anchor (`#feat-yyyy-nnnn`). When every blocker clears, a human
+flips `blocked` → `active` (or `planned`) and removes the `**Blocked by.**` block.
+
+<a id="feat-2026-0011"></a>
 ## FEAT-2026-0011 — Scoring framework for roadmap features
 
 **Why.** Today the roadmap has no scoring signal — `pick-feature`
@@ -143,8 +160,11 @@ deterministic file given the same inputs. `scoring-criteria.md`
 revision flow lets a user change the rubric without losing prior
 estimates' grounding (revision log captures the change).
 
-**Status: planned.** Depends on FEAT-2026-0010 landing first (table
-shape needs to be ready to carry the new column shape).
+**Blocked by.** [ADR-0002: ratify the roadmap feature-scoring model](../docs/adr/0002-ratify-roadmap-feature-scoring-model.md) — Proposed; the scoring formula + criteria schema must be accepted before the artifacts are built, or estimates captured under a later-changed rubric are invalidated.
+
+**Status: blocked.** Design dependency ADR-0002 is unaccepted; build is held
+until it lands. (FEAT-2026-0010, the earlier prerequisite, is `done`.) Clear with
+`/block-feature FEAT-2026-0011 --unblock` once ADR-0002 is Accepted.
 
 ## Verdict-state ↔ PLAN.md coupling
 

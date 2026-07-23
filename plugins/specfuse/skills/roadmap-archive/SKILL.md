@@ -23,8 +23,9 @@ with a back-link, and shrinks the hot roadmap file.
 
 ## Hard rules
 
-- **Archive only `done` or `abandoned`.** Refuse `planned` or `active` with
-  message `FEAT-YYYY-NNNN: refused (status=<status>)`.
+- **Archive only `done` or `abandoned`.** Refuse any other status
+  (`planned`, `active`, `blocked`, `deferred`) with message
+  `FEAT-YYYY-NNNN: refused (status=<status>)`.
 - **Idempotent.** If the `Detail` cell already contains a back-link, or if
   the inline `## FEAT-YYYY-NNNN —` section is absent from `roadmap.md`,
   report `FEAT-YYYY-NNNN: already archived` and make zero file edits.
@@ -66,7 +67,9 @@ Read `.specfuse/roadmap.md`. Locate the table row whose first cell is
 **Guard checks (stop here if triggered):**
 
 - `Detail` contains `roadmap-archive.md#` → `FEAT-YYYY-NNNN: already archived`
-- `Status` is `planned` or `active` → `FEAT-YYYY-NNNN: refused (status=<status>)`
+- `Status` is anything other than `done` or `abandoned` (i.e. `planned`,
+  `active`, `blocked`, or `deferred`) → `FEAT-YYYY-NNNN: refused (status=<status>)`.
+  Archive only terminal features; a parked or blocked feature is still live.
 
 ### Step 2 — Extract the inline detail section
 
@@ -76,6 +79,14 @@ If no such line exists → `FEAT-YYYY-NNNN: already archived` (stop).
 Take from that heading through the line immediately before the next `## `
 heading at column 0 (or through EOF). Strip trailing blank lines, preserving
 one final newline.
+
+**Include a preceding `<a id="feat-yyyy-nnnn"></a>` anchor** if one sits on the
+line immediately above the heading (a live feature blocked via `/block-feature`
+gets one so intra-page `#feat-…` links resolve). Extend the extracted span
+upward to swallow it, so Step 5 removes it from `roadmap.md` rather than leaving
+an orphan anchor pointing at a section that has moved to the archive. Step 3
+re-emits the canonical anchor above the section in the archive file, so the
+link target travels with it — do not emit a second one.
 
 ### Step 3 — Append to archive
 

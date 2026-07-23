@@ -285,10 +285,22 @@ def find_feature(arg: str | None) -> Path:
                 f"deferred features. Flip its PLAN.md status back to `active` "
                 f"when the blocker clears, then re-run."
             )
+        # A `blocked` feature waits on a named unmet dependency (an ADR or an
+        # upstream feature — see its roadmap `**Blocked by.**` block). Like
+        # `deferred` it is non-dispatchable; refuse an explicit --feature
+        # targeting one rather than dispatching it anyway.
+        if _fm.get("status") == "blocked":
+            sys.exit(
+                f"{d.name} is blocked — the loop does not dispatch blocked "
+                f"features. Clear its blocker(s), then run "
+                f"`/block-feature {_fm.get('feature_id', d.name)} --unblock` "
+                f"(or flip its PLAN.md status back to `active`) and re-run."
+            )
         return d
     actives = []
     done_pending_wrap = []
     deferred = []
+    blocked = []
     for d in sorted(FEATURES_DIR.glob("*/")):
         plan = d / "PLAN.md"
         if plan.exists():
@@ -316,6 +328,11 @@ def find_feature(arg: str | None) -> Path:
                 # a bare invocation won't pick it up; surfaced below so a lone
                 # deferred feature reads as parked, not silently absent.
                 deferred.append(d)
+            elif fm.get("status") == "blocked":
+                # Waiting on a named unmet dependency — non-dispatchable, same
+                # as deferred. Surfaced below so a lone blocked feature reads as
+                # parked-on-a-blocker, not silently absent.
+                blocked.append(d)
     if len(actives) == 1:
         return actives[0]
     if not actives:
@@ -327,6 +344,13 @@ def find_feature(arg: str | None) -> Path:
                 f"{names}\n"
                 f"                    Flip one's PLAN.md status to `active` to "
                 f"resume it.\n"
+            )
+        if blocked:
+            names = ", ".join(d.name for d in blocked[-3:])
+            msg += (
+                f"  - {len(blocked)} blocked feature(s), skipped: {names}\n"
+                f"                    Clear the blocker, then /block-feature "
+                f"<id> --unblock to resume.\n"
             )
         if done_pending_wrap:
             names = ", ".join(d.name for d in done_pending_wrap[-3:])
@@ -2669,7 +2693,14 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         section_m2 = section_re.search(roadmap_text)
         if section_m2:
             roadmap_text = roadmap_text[:section_m2.start()] + roadmap_text[section_m2.end():]
-            roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
+    # A feature that was ever `blocked` via /block-feature carries an explicit
+    # `<a id="feat-…"></a>` line above its heading (so intra-page `#feat-…`
+    # links resolve). The section regex above does not span it, so removing the
+    # section would strand the anchor pointing at a section that has moved to the
+    # archive. Strip the now-orphaned anchor line; Step 3 already re-emitted the
+    # canonical anchor in roadmap-archive.md, so the link target travels with it.
+    roadmap_text = roadmap_text.replace(f"{anchor}\n", "")
+    roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
     return "archived"

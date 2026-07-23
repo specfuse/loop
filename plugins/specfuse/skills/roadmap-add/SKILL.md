@@ -31,9 +31,15 @@ issue/PR titles are not reused.
   does not match that shape exactly, refuse with a clear error naming the mismatch.
 - **New rows are always `planned`.** That's the only status this skill
   writes. For reference, the full roadmap status vocabulary is
-  `planned | active | deferred | done | abandoned` (`deferred` = parked on
-  an external decision/dependency, resumable); later transitions are owned
-  by /pick-feature, the driver, or a human — not this skill.
+  `planned | active | blocked | deferred | done | abandoned` (`blocked` = a
+  named dependency is unmet — an ADR or upstream feature, linked from the
+  detail section's `**Blocked by.**` block; `deferred` = a voluntary park with
+  no named blocker); later transitions are owned by /pick-feature, the driver,
+  or a human — not this skill.
+
+  (Do not confuse a roadmap *feature* `blocked` status with this skill's own
+  RESULT `status: blocked` on a sequence-gap escalation below — the latter is
+  this run's outcome, never written into the roadmap table.)
 - **No git.** The driver owns all commits. Edit files only.
 - **Interactive mode only confirms once** — the presented next ID, then collects
   fields. It does not re-ask for confirmation before writing.

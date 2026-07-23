@@ -53,13 +53,20 @@ exactly one, that's the target. If zero, report "no active feature"
 and stop. If more than one, ask the user which to inspect (or report
 all of them at a high level).
 
-**`deferred` features.** If the only candidate (or the one the user names)
-is `deferred`, don't report "no active feature" as if it were missing.
-Report it as **parked** — blocked on an external decision/dependency,
-non-dispatchable but resumable — and read its PLAN/GATE state anyway so
-you can name *what* it's waiting on (the next gate's arm-gate condition
-usually spells out the external blocker). A human flips it back to
-`active` when the blocker clears; the loop does not auto-resume it.
+**`deferred` and `blocked` features.** If the only candidate (or the one the
+user names) is `deferred` or `blocked`, don't report "no active feature" as if
+it were missing. Report it as **parked**, and distinguish the two:
+
+- `deferred` — voluntarily parked pending an external decision/dependency, with
+  no named blocker (the next gate's arm-gate condition usually spells out what
+  it's waiting on).
+- `blocked` — waiting on a *named* unmet dependency: an ADR awaiting approval or
+  an upstream feature, linked from its roadmap `**Blocked by.**` block. Read
+  that block to name exactly what it waits on.
+
+Both are non-dispatchable but resumable — read the PLAN/GATE state anyway. A
+human flips it back to `active` when the blocker clears (for `blocked`,
+`/block-feature <id> --unblock`); the loop does not auto-resume either.
 
 ### 2. Read the canonical state files
 

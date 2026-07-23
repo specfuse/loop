@@ -7,7 +7,7 @@ roadmap_goal: <one line copied from the roadmap — the north star this feature 
   plan-next anchors every drafted gate to this and flags if a retrospective implies
   it should change>
 autonomy_default: review        # auto | review | supervised
-status: active                  # active | deferred | done | abandoned
+status: active                  # active | blocked | deferred | done | abandoned
                                 # deferred = parked pending an external decision/dependency; resumable, non-dispatchable
 # planned_cost_usd: 0.00        # OPTIONAL — sum of WU planned costs; lint warns when missing or when delta from WU sum > 10%
 ---

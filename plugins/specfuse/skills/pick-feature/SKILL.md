@@ -44,12 +44,16 @@ comparison but cannot accept your pick.
   NOT auto-demote the existing active — the user owns that
   transition (mark it `done`, `blocked_human`, `abandoned`, or
   leave it parallel).
-- **`deferred` is not a pick candidate — and not an active blocker.**
-  A `deferred` feature is parked pending an external decision/dependency:
-  do NOT offer it in the pick list (it isn't `planned`), and do NOT treat
-  it as the current active that must be finished first (it isn't `active`,
-  nothing is loop-dispatchable). If the user wants to resume one, that's a
-  human flip `deferred` → `active`, not a pick.
+- **`deferred` and `blocked` are not pick candidates — and not active
+  blockers.** A `deferred` feature is parked by choice; a `blocked` feature
+  waits on a named unmet dependency (an ADR or upstream feature, linked from
+  its detail section's `**Blocked by.**` block). For either: do NOT offer it in
+  the pick list (neither is `planned`), and do NOT treat it as the current
+  active that must be finished first (neither is `active`, nothing is
+  loop-dispatchable). Resuming one is a human flip to `active`, not a pick.
+  When a `blocked` feature's blocker is itself a `planned`/`active` roadmap
+  feature, note that in the Dependency-hat read — pulling the blocker unblocks
+  it.
 - **Infer first, ask last.** A question is legitimate only when no
   file the skill could read would answer it. Asking "what's the
   goal?" when `roadmap_goal` is set in PLAN frontmatter is a bug.
@@ -65,8 +69,8 @@ roadmap, this skill is solving nothing — just start it.
 ### 1. Read the roadmap and the durable lessons
 
 - **`.specfuse/roadmap.md`** — the master index. Each row's status
-  (`planned` / `active` / `done` / `abandoned`) and one-line goal are
-  the primary input.
+  (`planned` / `active` / `blocked` / `deferred` / `done` / `abandoned`) and
+  one-line goal are the primary input.
 - **Durable lessons, sliced, not the whole file.** Run
   `python3 .specfuse/scripts/learnings_query.py "<query>" --top 15`
   rather than reading `.specfuse/LEARNINGS.md` whole. Because this

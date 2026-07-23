@@ -42,6 +42,27 @@ _ROADMAP_DONE = textwrap.dedent("""\
     Some content here.
     """)
 
+_ROADMAP_DONE_WITH_ANCHOR = textwrap.dedent("""\
+    ---
+    project: test
+    ---
+
+    # Roadmap
+
+    | Feature ID | Title | Status | Folder | Detail |
+    |------------|-------|--------|--------|--------|
+    | FEAT-2026-9999 | Test feature | done | — | — |
+
+    <a id="feat-2026-9999"></a>
+    ## FEAT-2026-9999 — Test feature
+
+    Some content here.
+
+    ## Notes
+
+    Trailing content.
+    """)
+
 _ROADMAP_DONE_NO_SECTION = textwrap.dedent("""\
     ---
     project: test
@@ -121,6 +142,25 @@ class TestAutoArchiveFeature(unittest.TestCase):
             self.assertLess(anchor_pos, section_pos,
                             "anchor must appear before section heading in archive")
             self.assertIn('Some content here.', archive_text)
+
+    def test_preexisting_anchor_not_orphaned(self):
+        """A feature blocked via /block-feature carries an explicit <a id> above
+        its heading; archiving must remove it, not strand it in roadmap.md."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            repo = _make_repo(tmp, roadmap=_ROADMAP_DONE_WITH_ANCHOR)
+            result = loop.auto_archive_feature("FEAT-2026-9999", repo)
+            self.assertEqual(result, "archived")
+
+            roadmap_text = (repo / ".specfuse" / "roadmap.md").read_text()
+            archive_text = (repo / ".specfuse" / "roadmap-archive.md").read_text()
+
+            # No orphan anchor left behind in roadmap.md.
+            self.assertNotIn('<a id="feat-2026-9999"></a>', roadmap_text)
+            self.assertNotIn('## FEAT-2026-9999 — ', roadmap_text)
+            # Unrelated content survives.
+            self.assertIn('## Notes', roadmap_text)
+            # Archive carries exactly one anchor for the feature.
+            self.assertEqual(archive_text.count('<a id="feat-2026-9999"></a>'), 1)
 
     def test_idempotent_second_call(self):
         """Second call returns 'already archived' and makes zero file edits."""
