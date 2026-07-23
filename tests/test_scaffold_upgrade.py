@@ -212,6 +212,40 @@ class TestUpgradeOverlayAndPreserve(unittest.TestCase):
         upgrade_specfuse(self.target)
         self.assertTrue(user_file.exists())
 
+    def test_upgrade_preserves_rules_local_files(self):
+        """The rules-local/ contract: project-authored rules survive upgrade
+        byte-identical — never overlaid, never pruned."""
+        sentinel = b"# Project rule\n\nGrep our own rules dir before designing.\n"
+        rule = self.specfuse / "rules-local" / "our-project-rule.md"
+        rule.parent.mkdir(exist_ok=True)
+        rule.write_bytes(sentinel)
+
+        upgrade_specfuse(self.target)
+
+        self.assertTrue(rule.exists(),
+                        "project-authored rules-local file must survive upgrade")
+        self.assertEqual(rule.read_bytes(), sentinel,
+                         "project-authored rules-local file must be untouched")
+
+    def test_upgrade_seeds_rules_local_readme_when_absent(self):
+        readme = self.specfuse / "rules-local" / "README.md"
+        if readme.exists():
+            readme.unlink()
+            readme.parent.rmdir()
+        written = upgrade_specfuse(self.target)
+        self.assertTrue(readme.exists())
+        self.assertIn("rules-local/README.md", written)
+
+    def test_upgrade_never_overwrites_edited_rules_local_readme(self):
+        sentinel = b"project-edited readme"
+        readme = self.specfuse / "rules-local" / "README.md"
+        readme.parent.mkdir(exist_ok=True)
+        readme.write_bytes(sentinel)
+        upgrade_specfuse(self.target)
+        self.assertEqual(readme.read_bytes(), sentinel,
+                         "seeded README is project-owned after init — "
+                         "upgrade must not overwrite it")
+
     def test_upgrade_prune_does_not_touch_scripts_dir(self):
         # init.sh-legacy scripts/ dir must be left alone (migration prune out of scope)
         scripts = self.specfuse / "scripts"

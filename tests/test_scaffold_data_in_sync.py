@@ -26,6 +26,7 @@ TRACKED = {
     "rules/correlation-ids.md",
     "rules/never-touch.md",
     "rules/planning-discipline.md",
+    "rules-local/README.md",
     "rules/result-contract.md",
     "rules/security-boundaries.md",
     "rules/verification-discipline.md",
