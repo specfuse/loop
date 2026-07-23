@@ -50,7 +50,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 | FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
-| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | active | — | — |
+| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
 | FEAT-2026-0036 | Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -700,7 +700,7 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Benefits.** Lowers onboarding friction and teaches the methodology as it asks; every answer is validated before the next builds on it, so the resulting PLAN aligns the driver better; auto-scaling keeps it cheap for experts on well-understood features. Reuses the proven `/pick-feature` decision-presentation shape, so the craft is consistent across skills.
 
-**Status: active.**
+**Status: done.** Shipped in draft-feature v0.2 (#228).
 
 ## FEAT-2026-0036 — Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin
 
