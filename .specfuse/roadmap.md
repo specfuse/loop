@@ -49,6 +49,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
+| FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -675,6 +676,16 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Trigger to promote (deferred → active).** One of: gate runtime on a multi-deliverable repo hurts enough to matter, or two deliverables in one repo genuinely diverge on owner / release cadence / CI. First live case in a downstream project: a kiosk/tablet app sharing one repo with its phone app, both consuming the same generated libraries. Until a trigger fires, the flatten approach is the sanctioned workaround.
 
 **Status: deferred.** Parked pending a real trigger (above). Resumable — flip to `active` when a trigger fires; design gate first (the sketch is not yet a committed contract).
+
+## FEAT-2026-0034 — Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link
+
+**Why.** The `blocked` feature status (shipped in loop 0.3.24) is only meaningful if a blocked feature actually names its unmet dependency — an ADR or an upstream FEAT — and links to it. Nothing enforces that today: `lint_plan` validates feature dirs, PLAN frontmatter, and the gate/WU graph, not the roadmap-table prose. So a row can sit at `status: blocked` with no `**Blocked by.**` block at all (silently collapsing the deliberate `blocked`-vs-`deferred` distinction — `deferred` is the no-named-blocker park), or with a link that has rotted: an ADR path that moved, or a `#feat-yyyy-nnnn` anchor whose target was archived. The one enforcement gap left by the blocked-status work.
+
+**Goal.** Add a roadmap-table lint pass (extend `lint_plan.py` or a sibling roadmap linter, wired into the same gate) that, for every row whose Status is `blocked`, checks its detail section carries a `**Blocked by.**` block with at least one link, and that each link resolves — an ADR file path exists on disk (or is a well-formed URL), and a feature-dependency link points at a live inline `<a id="feat-…">` anchor or a `roadmap-archive.md#…` target. Symmetrically WARN on a `**Blocked by.**` block attached to a non-`blocked` row (stale block left after an unblock).
+
+**Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches blocker link-rot at lint time instead of when a human clicks a dead link. Closes the enforcement gap the blocked-status feature deliberately deferred, keeping the machine-checkable invariants ahead of the prose conventions.
+
+**Status: planned.**
 
 ## Notes
 
