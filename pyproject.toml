@@ -35,7 +35,11 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
   "PyYAML>=6.0",
-  "ruff>=0.6",
+  # Upper bound: ruff 0.16.0 tightened import rules and flags ~300 pre-existing
+  # lint errors in the test suite (unrelated to any one change), breaking CI on
+  # every PR. Pinned <0.16 to restore green; adopting 0.16 is tracked as
+  # FEAT-2026-0036 (deliberate fix-forward, not an emergency).
+  "ruff>=0.6,<0.16",
   "bandit>=1.7",
   "coverage>=7.0",
   "jsonschema>=4.0",
