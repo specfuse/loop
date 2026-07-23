@@ -70,6 +70,27 @@ def _write_manifest(specfuse_dir: Path, entries: dict[str, str]) -> None:
     )
 
 
+def _read_manifest(specfuse_dir: Path) -> dict[str, str]:
+    """Return the on-disk .scaffold-manifest entries, {} when absent/unreadable.
+
+    The manifest is the ownership record: a versioned-dir file is provably
+    specfuse-written iff its relpath appears here (#214). Malformed content
+    degrades to {} — the callers then act as if ownership is unprovable,
+    which errs on the side of not deleting.
+    """
+    manifest_path = specfuse_dir / _MANIFEST_FILE
+    if not manifest_path.exists():
+        return {}
+    try:
+        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {k: v for k, v in data.items()
+            if isinstance(k, str) and isinstance(v, str)}
+
+
 def detect_modified(target: str | Path) -> list[str]:
     """Return sorted relpaths of versioned .specfuse/ files whose sha256 differs from the manifest.
 
@@ -322,10 +343,12 @@ def upgrade_specfuse(
     """Overlay versioned seed onto an existing .specfuse/ tree.
 
     Overwrites versioned files (templates/, rules/, verification.yml.example, VERSION),
-    prunes versioned files the seed no longer ships (scoped to templates/ and rules/),
-    seeds missing user-authored files from templates, and refreshes .claude wiring.
-    rules-local/ is project-owned: never overlaid, never pruned; only its README
-    is seeded when absent.
+    prunes versioned files the seed no longer ships — but only those the prior
+    .scaffold-manifest proves specfuse wrote; unknown files are kept with a
+    warning (#214) — seeds missing user-authored files from templates, and
+    refreshes .claude wiring. Overwriting a file whose content is not what the
+    prior upgrade wrote warns to stderr. rules-local/ is project-owned: never
+    overlaid, never pruned; only its README is seeded when absent.
 
     Returns the sorted list of .specfuse/ relpaths written.
     Raises ScaffoldDowngradeError if the target VERSION is newer than the installed seed.
@@ -350,6 +373,11 @@ def upgrade_specfuse(
     written: list[str] = []
     versioned_relpaths: set[str] = set()
     manifest_entries: dict[str, str] = {}
+    # Ownership record from the PRIOR init/upgrade (#214): a file in a
+    # versioned dir is provably specfuse-written iff it appears here. Read
+    # before the overlay overwrites anything and before _write_manifest
+    # replaces it below.
+    old_manifest = _read_manifest(specfuse_dir)
 
     for relpath, content in iter_scaffold_files():
         if not (
@@ -358,6 +386,32 @@ def upgrade_specfuse(
         ):
             continue
         dest = specfuse_dir / relpath
+        # Clobber warning (#214): overwriting is the versioned-dir contract,
+        # but do it loudly when the on-disk content is not what the prior
+        # upgrade wrote — either a project-authored file whose name now
+        # collides with a shipped one, or a locally-modified shipped file.
+        # A missing manifest (legacy pre-manifest tree) stays silent: every
+        # file would warn and the signal would drown.
+        if old_manifest and dest.exists():
+            on_disk_sha = _sha256_hex(dest.read_bytes())
+            if on_disk_sha != _sha256_hex(content):
+                owned_sha = old_manifest.get(relpath)
+                if owned_sha is None:
+                    print(
+                        f"specfuse upgrade: WARNING — overwriting {relpath}: "
+                        "not written by a prior init/upgrade (project-"
+                        "authored?). Project-owned rules belong in "
+                        ".specfuse/rules-local/, which upgrade never touches.",
+                        file=sys.stderr,
+                    )
+                elif on_disk_sha != owned_sha:
+                    print(
+                        f"specfuse upgrade: WARNING — overwriting locally-"
+                        f"modified versioned file {relpath}. Upstream edits "
+                        "belong in a scaffold PR; project-specific rules in "
+                        ".specfuse/rules-local/.",
+                        file=sys.stderr,
+                    )
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(content)
         written.append(relpath)
@@ -370,8 +424,24 @@ def upgrade_specfuse(
             for existing in dir_path.rglob("*"):
                 if existing.is_file():
                     rel = existing.relative_to(specfuse_dir).as_posix()
-                    if rel not in versioned_relpaths:
+                    if rel in versioned_relpaths:
+                        continue
+                    # Manifest-scoped prune (#214): delete only files the
+                    # prior manifest proves specfuse wrote (shipped once,
+                    # since removed from the seed). Anything else — a
+                    # project-authored file, or any file on a legacy
+                    # pre-manifest tree — is kept, loudly.
+                    if rel in old_manifest:
                         existing.unlink()
+                    else:
+                        print(
+                            f"specfuse upgrade: WARNING — keeping {rel}: not "
+                            "in the shipped scaffold and not written by a "
+                            "prior init/upgrade. If it is project-authored, "
+                            "move it to .specfuse/rules-local/ (never touched "
+                            "by upgrade); if it is stale, delete it manually.",
+                            file=sys.stderr,
+                        )
 
     user_seeds = [
         ("LEARNINGS.md", "LEARNINGS.template.md"),
