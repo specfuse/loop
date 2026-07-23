@@ -9,7 +9,8 @@ Encodes hard-won discipline from feature retrospectives — the checks that, app
 at design and arming time, would have prevented the most expensive re-plans. Each
 check below is cheap (a grep, a sentence, a table, one local run) and guards a
 failure mode that cost multiple gates when skipped. Provenance is named per check so
-the reasoning survives the rule.
+the reasoning survives the rule (the FEAT-2026-0049 / F1–F4 references resolve in the
+retrospective of the specfuse-generator dogfood feature that motivated these checks).
 
 These are **binding at draft, plan-next, and arm time**. A gate armed in violation
 of any check is not ready, regardless of what a WU's frontmatter says.
@@ -20,10 +21,11 @@ Before an ADR designs a validation rule, a severity level, an enforcement gate, 
 measurement, it must first establish that the mechanism does not already exist. The
 ADR is **incomplete** without this section.
 
-- **Grep the inventory.** For a validation rule:
-  `grep -rl <concept> src/main/java/.../validation/rules/`. For an artifact:
-  `java -jar specfuse-generator.jar templates`. For any check: the directory that
-  holds its siblings.
+- **Grep the inventory.** Search the directory that holds the mechanism's
+  siblings — for a validation rule, the project's rules directory (e.g.
+  `grep -rl <concept> <path/to/validation/rules/>`); for an artifact, the
+  tool's own inventory command (e.g. `<tool> templates`); for any other
+  check, the directory that holds its siblings.
 - **Record the grep command and its verdict** in the ADR — the exact command, and
   either "no existing mechanism, building new" or "found `<X>`, reusing / extending
   it". A verdict of "reusing" that then builds new anyway must say why.
