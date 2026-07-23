@@ -368,6 +368,31 @@ class TestFindFeatureSelection(unittest.TestCase):
         good = self._write_plan("FEAT-2026-9502-live", "active")
         self.assertEqual(loop.find_feature(None), good)
 
+    def test_explicit_blocked_feature_is_refused(self):
+        """`--feature` on a blocked feature must refuse, not dispatch."""
+        self._write_plan("FEAT-2026-9502-stuck", "blocked")
+        with self.assertRaises(SystemExit) as ctx:
+            loop.find_feature("FEAT-2026-9502-stuck")
+        msg = str(ctx.exception.code).lower()
+        self.assertIn("blocked", msg)
+        self.assertIn("unblock", msg)  # points at the fix
+
+    def test_blocked_not_treated_as_active_in_scan(self):
+        """A lone blocked feature yields 'no active', named as blocked."""
+        self._write_plan("FEAT-2026-9502-stuck", "blocked")
+        with self.assertRaises(SystemExit) as ctx:
+            loop.find_feature(None)
+        msg = str(ctx.exception.code)
+        self.assertIn("No active feature", msg)
+        self.assertIn("blocked", msg.lower())
+        self.assertIn("FEAT-2026-9502-stuck", msg)
+
+    def test_blocked_does_not_block_a_real_active(self):
+        """A blocked feature alongside one active resolves to the active."""
+        self._write_plan("FEAT-2026-9502-stuck", "blocked")
+        good = self._write_plan("FEAT-2026-9502-live", "active")
+        self.assertEqual(loop.find_feature(None), good)
+
     def test_read_frontmatter_error_names_the_file(self):
         """#177 fix 1: a parse error carries the file path, not just a
         block-relative line number."""

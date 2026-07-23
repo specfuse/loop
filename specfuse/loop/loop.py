@@ -285,10 +285,22 @@ def find_feature(arg: str | None) -> Path:
                 f"deferred features. Flip its PLAN.md status back to `active` "
                 f"when the blocker clears, then re-run."
             )
+        # A `blocked` feature waits on a named unmet dependency (an ADR or an
+        # upstream feature — see its roadmap `**Blocked by.**` block). Like
+        # `deferred` it is non-dispatchable; refuse an explicit --feature
+        # targeting one rather than dispatching it anyway.
+        if _fm.get("status") == "blocked":
+            sys.exit(
+                f"{d.name} is blocked — the loop does not dispatch blocked "
+                f"features. Clear its blocker(s), then run "
+                f"`/block-feature {_fm.get('feature_id', d.name)} --unblock` "
+                f"(or flip its PLAN.md status back to `active`) and re-run."
+            )
         return d
     actives = []
     done_pending_wrap = []
     deferred = []
+    blocked = []
     for d in sorted(FEATURES_DIR.glob("*/")):
         plan = d / "PLAN.md"
         if plan.exists():
@@ -316,6 +328,11 @@ def find_feature(arg: str | None) -> Path:
                 # a bare invocation won't pick it up; surfaced below so a lone
                 # deferred feature reads as parked, not silently absent.
                 deferred.append(d)
+            elif fm.get("status") == "blocked":
+                # Waiting on a named unmet dependency — non-dispatchable, same
+                # as deferred. Surfaced below so a lone blocked feature reads as
+                # parked-on-a-blocker, not silently absent.
+                blocked.append(d)
     if len(actives) == 1:
         return actives[0]
     if not actives:
@@ -327,6 +344,13 @@ def find_feature(arg: str | None) -> Path:
                 f"{names}\n"
                 f"                    Flip one's PLAN.md status to `active` to "
                 f"resume it.\n"
+            )
+        if blocked:
+            names = ", ".join(d.name for d in blocked[-3:])
+            msg += (
+                f"  - {len(blocked)} blocked feature(s), skipped: {names}\n"
+                f"                    Clear the blocker, then /block-feature "
+                f"<id> --unblock to resume.\n"
             )
         if done_pending_wrap:
             names = ", ".join(d.name for d in done_pending_wrap[-3:])

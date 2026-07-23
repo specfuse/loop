@@ -46,7 +46,7 @@ VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
 # unrecognized status that passes lint and then behaves differently at dispatch
 # is the class #183 (deferred) and #185 exist to close. Keep in sync with
 # find_feature / the gate-status transitions in loop.py.
-VALID_FEATURE_STATUS = {"planned", "active", "deferred", "done", "abandoned"}
+VALID_FEATURE_STATUS = {"planned", "active", "blocked", "deferred", "done", "abandoned"}
 VALID_GATE_STATUS = {"open", "awaiting_review", "passed"}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
 # New compact closing shapes (FEAT-2026-0015):

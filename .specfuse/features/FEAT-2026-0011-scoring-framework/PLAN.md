@@ -5,7 +5,7 @@ slug: scoring-framework
 branch: feat/FEAT-2026-0011-scoring-framework
 roadmap_goal: Per-repo scoring criteria, quarterly weights, per-feature CI/BV/TF/COI/R estimates, and a `roadmap-rank` skill compute a 0-100 Feature Score that drives `pick-feature`'s ranking — implementing Christian's "Feature Prioritization Guidelines" methodology as a reusable Specfuse component.
 autonomy_default: review
-status: planned
+status: blocked
 ---
 
 # Plan: Scoring framework for roadmap features

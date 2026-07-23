@@ -23,8 +23,9 @@ with a back-link, and shrinks the hot roadmap file.
 
 ## Hard rules
 
-- **Archive only `done` or `abandoned`.** Refuse `planned` or `active` with
-  message `FEAT-YYYY-NNNN: refused (status=<status>)`.
+- **Archive only `done` or `abandoned`.** Refuse any other status
+  (`planned`, `active`, `blocked`, `deferred`) with message
+  `FEAT-YYYY-NNNN: refused (status=<status>)`.
 - **Idempotent.** If the `Detail` cell already contains a back-link, or if
   the inline `## FEAT-YYYY-NNNN —` section is absent from `roadmap.md`,
   report `FEAT-YYYY-NNNN: already archived` and make zero file edits.

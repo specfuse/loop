@@ -48,6 +48,11 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
   `/draft-feature`.
 - **`/roadmap-add`** — add a new feature row to the roadmap before it's ready to
   pick.
+- **`/block-feature`** — flip a roadmap feature to `blocked` (or clear it) with a
+  linked `**Blocked by.**` blocker — an ADR awaiting approval or an upstream
+  FEAT-ID that must complete first. Writes the row status, the detail block, and
+  PLAN frontmatter, keeping intra-page feature links resolvable.
+  `/block-feature FEAT-ID --unblock` clears the block and restores the status.
 
 ### 2. Draft — turn a picked feature into a runnable gate
 
