@@ -134,15 +134,20 @@ class TestGateBudgetUsd(unittest.TestCase):
 
 class TestGateSpentUsd(unittest.TestCase):
 
-    def test_sums_done_wus_only(self):
+    def test_sums_recorded_cost_regardless_of_status(self):
+        """#219: recorded cost is real spend on every status — a blocked WU's
+        re-arm burn must count toward the brake, not wait for done. A WU that
+        never dispatched carries no cost fields and contributes 0."""
         with tempfile.TemporaryDirectory() as tmp:
             feature = Path(tmp)
             _write_wu(feature / "WU-T01.md", wu_id="FEAT-2026-9701/T01",
                       status="done", cost_usd=0.5)
+            # Blocked mid-gate: write_cost_to_wu recorded its spend.
             _write_wu(feature / "WU-T02.md", wu_id="FEAT-2026-9701/T02",
-                      status="pending", cost_usd=1.25)
+                      status="blocked_human", cost_usd=1.25)
+            # Never dispatched: no cost fields at all.
             _write_wu(feature / "WU-T03.md", wu_id="FEAT-2026-9701/T03",
-                      status="done", cost_usd=0.75)
+                      status="pending", cost_usd=None)
             gate = {
                 "file": "GATE-01.md",
                 "work_units": [
@@ -152,7 +157,26 @@ class TestGateSpentUsd(unittest.TestCase):
                 ],
             }
             spent = loop.gate_spent_usd({}, gate, feature)
-            self.assertAlmostEqual(spent, 1.25, places=6)
+            self.assertAlmostEqual(spent, 1.75, places=6)
+
+    def test_blocked_wu_cumulative_counts_toward_brake(self):
+        """The WU-06 shape: blocked with folded prior-cycle spend — the brake
+        must see the full lifetime burn while the WU is still blocked."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp)
+            (feature / "WU-T01.md").write_text(
+                "---\nid: FEAT-2026-9701/T01\ntype: implementation\n"
+                "model: sonnet\nstatus: blocked_human\nattempts: 3\n"
+                "cost_usd: 2.75\ncumulative_cost_usd: 27.54\n---\n\n# T01\n"
+            )
+            gate = {
+                "file": "GATE-01.md",
+                "work_units": [
+                    {"id": "FEAT-2026-9701/T01", "file": "WU-T01.md"},
+                ],
+            }
+            self.assertAlmostEqual(
+                loop.gate_spent_usd({}, gate, feature), 30.29, places=6)
 
     def test_missing_cost_contributes_zero(self):
         with tempfile.TemporaryDirectory() as tmp:
