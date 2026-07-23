@@ -34,6 +34,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/never-touch.md",
     "rules/planning-discipline.md",
@@ -117,6 +118,7 @@ class TestInitFullLayout(unittest.TestCase):
 
     def test_rules_byte_faithful(self):
         for rel in (
+            "rules/close-discipline.md",
             "rules/correlation-ids.md",
             "rules/never-touch.md",
             "rules/planning-discipline.md",

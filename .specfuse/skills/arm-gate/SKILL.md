@@ -78,6 +78,16 @@ If no gate is in `awaiting_review`, the skill stops with a hint
 
 ### 3. Per-draft accept / revise / reject
 
+> **Runtime probe before arming a default/severity flip (#209 item 6).** If
+> any draft in this gate flips a default value or a severity, do NOT arm it
+> on "mechanical, nothing design-open": apply the change locally, run the
+> exact command the WU's tests gate will run (the full oracle, not a subset),
+> and paste the failure list into `GATE-NN-REVIEW.md` before accepting. See
+> `.specfuse/rules/planning-discipline.md` §4 — the un-probed arm is what let
+> FEAT-2026-0049's WU spin three times (~$14) on a defect one local run
+> exposed in seconds. Also confirm any flag-introducing draft carries its
+> flag-scope table (§3).
+
 For each WU in the target gate whose `status: draft`:
 
 1. **Show**: the WU's ID, title, type, model, the body's five
