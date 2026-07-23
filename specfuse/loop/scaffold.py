@@ -166,6 +166,9 @@ _RULES_BLOCK = (
     "@.specfuse/rules/never-touch.md\n"
     "@.specfuse/rules/security-boundaries.md\n"
     "@.specfuse/rules/verification-discipline.md\n"
+    "<!-- Project-authored rules live in .specfuse/rules-local/ (never touched\n"
+    "     by `specfuse upgrade`). Add one @.specfuse/rules-local/<rule>.md line\n"
+    "     per rule below. See .specfuse/rules-local/README.md. -->\n"
 )
 
 _RULES_SENTINEL = "@.specfuse/rules/result-contract.md"
@@ -321,6 +324,8 @@ def upgrade_specfuse(
     Overwrites versioned files (templates/, rules/, verification.yml.example, VERSION),
     prunes versioned files the seed no longer ships (scoped to templates/ and rules/),
     seeds missing user-authored files from templates, and refreshes .claude wiring.
+    rules-local/ is project-owned: never overlaid, never pruned; only its README
+    is seeded when absent.
 
     Returns the sorted list of .specfuse/ relpaths written.
     Raises ScaffoldDowngradeError if the target VERSION is newer than the installed seed.
@@ -372,6 +377,12 @@ def upgrade_specfuse(
         ("LEARNINGS.md", "LEARNINGS.template.md"),
         ("roadmap.md", "roadmap.template.md"),
         ("verification.yml", "verification.yml.example"),
+        # rules-local/ is the project-authored rules directory: outside every
+        # versioned overlay prefix and prune dir BY CONSTRUCTION, so upgrade
+        # never overwrites or deletes its contents. The README is seeded once
+        # (create-if-absent, like the other user seeds) and then owned by the
+        # project.
+        ("rules-local/README.md", "rules-local/README.md"),
     ]
     for target_rel, seed_rel in user_seeds:
         dest = specfuse_dir / target_rel

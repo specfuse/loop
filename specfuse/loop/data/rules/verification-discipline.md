@@ -39,6 +39,12 @@ Two generic meanings, both apply unless the unit narrows the scope:
   decide done. Run them yourself first, in declared order, with full output.
   Generic verifications — "I assume the tests still pass" — are not verifications.
   The commands are the verification.
+- **Observe behavior, not source.** A claim that code does X is verified by making
+  X happen and reading the output — never by reading the source that looks like it
+  does X. A rule read as `ERROR` in source may be gated off and never fire; only a
+  run proves it. For any rule or severity claim, include a **negative observation**:
+  the rule seen rejecting a purpose-built bad input. A rule that fires on nothing
+  passes every test.
 
 **Verification is the exit oracle.** The agent's own report is advisory; done is
 decided by the checks passing, not by the agent's belief. If a check fails you are
