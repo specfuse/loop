@@ -27,7 +27,9 @@ retrospective and lessons.
 
 Before any ADR or gate designs a validation rule, a severity level, an enforcement
 gate, or a measurement, establish that it does not already exist. **An ADR without
-this section is incomplete.**
+this section is incomplete.** If this feature designs no such mechanism, write
+exactly `n/a — no enforcement or measurement designed` and stop — do not fabricate
+a grep to fill the section.
 
 - **Grep command run:** `<the exact command — e.g. grep -rl <concept>
   src/main/java/.../validation/rules/>`

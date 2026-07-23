@@ -116,8 +116,9 @@ closed on nothing:
    show a working-tree change, or the RESULT must justify each unchanged path
    explicitly: "no change needed because X; here is the evidence the deliverable
    already holds: `<command + output>`." Silence on an unchanged deliverable is not
-   a valid close. (The driver will enforce this mechanically — loop #189 fix 3 — the
-   obligation binds now.)
+   a valid close. (The driver enforces this mechanically since specfuse-loop 0.3.21
+   — #198, outcome `produces_not_in_diff`; the obligation binds regardless of
+   driver version.)
 2. **A plan-level contradiction is `blocked`, not `complete`.** If mid-WU you find
    the plan cannot be delivered as written (a decision contradicts another, a
    deliverable cannot exist), emit `status: blocked` with the finding in
