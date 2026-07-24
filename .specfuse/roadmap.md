@@ -51,7 +51,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 | FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
-| FEAT-2026-0036 | Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin | planned | — | — |
+| FEAT-2026-0036 | Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin | planned | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
