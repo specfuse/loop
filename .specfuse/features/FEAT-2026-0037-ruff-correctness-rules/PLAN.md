@@ -5,7 +5,7 @@ slug: ruff-correctness-rules
 branch: feat/FEAT-2026-0037-ruff-correctness-rules
 roadmap_goal: Deliberately opt into ruff 0.16's correctness families — subprocess-run-without-check, bugbear, blind-except, try-except-pass — fixing each finding by review, so the linter catches the silent-subprocess-failure class in a driver that shells out constantly.
 autonomy_default: review
-status: planned                 # active | blocked | deferred | done | abandoned
+status: active                  # active | blocked | deferred | done | abandoned
 planned_cost_usd: 17.00
 ---
 

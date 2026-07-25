@@ -894,11 +894,11 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
 def require_git_ready() -> None:
     """Driver squashes per WU on top of HEAD, so the repo needs an initial commit."""
     in_repo = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
-                             capture_output=True, text=True)
+                             capture_output=True, text=True, check=False)
     if in_repo.returncode != 0:
         sys.exit("Not a git repository. Run `git init` from the repo root first.")
     has_head = subprocess.run(["git", "rev-parse", "HEAD"],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, check=False)
     if has_head.returncode != 0:
         sys.exit("Git repository has no commits yet. The driver squashes per work "
                  "unit on top of HEAD; create an initial commit first "
@@ -991,7 +991,7 @@ def _default_branch() -> "str | None":
     """
     ref = subprocess.run(
         ["git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     if ref.returncode == 0 and ref.stdout.strip():
         name = ref.stdout.strip()
@@ -999,7 +999,7 @@ def _default_branch() -> "str | None":
     for cand in ("main", "master"):
         if subprocess.run(
             ["git", "rev-parse", "--verify", "--quiet", cand],
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         ).returncode == 0:
             return cand
     return None
@@ -1046,13 +1046,13 @@ def ensure_base_ref(base: str) -> None:
     """
     local = subprocess.run(
         ["git", "rev-parse", "--verify", base],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     if local.returncode == 0:
         return
     remote = subprocess.run(
         ["git", "ls-remote", "--exit-code", "origin", base],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     if remote.returncode == 0:
         subprocess.run(["git", "fetch", "origin", base], capture_output=True, text=True, check=True)
@@ -1062,7 +1062,7 @@ def ensure_base_ref(base: str) -> None:
         # ls-remote's documented exit code for "ref not found on that remote".
         branches = subprocess.run(
             ["git", "branch", "--list", "--format=%(refname:short)"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         ).stdout.splitlines()
         candidates = [b.strip() for b in branches if b.strip()]
         listed = ", ".join(sorted(candidates)) if candidates else "(no local branches)"
@@ -1306,7 +1306,7 @@ def _checked_checkout(checkout_args: list[str], action: str) -> str:
     carrying git's stderr, instead of a bare CalledProcessError that hides it.
     """
     proc = subprocess.run(
-        ["git", *checkout_args], capture_output=True, text=True,
+        ["git", *checkout_args], capture_output=True, text=True, check=False,
     )
     if proc.returncode != 0:
         stderr = proc.stderr.strip() or proc.stdout.strip() or "(no git output)"
@@ -1344,7 +1344,7 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         return  # not declared — defensive (lint_plan normally requires it)
     current = subprocess.run(
         ["git", "branch", "--show-current"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     ).stdout.strip()
     if current == branch:
         return
@@ -1361,7 +1361,7 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         base = current
     exists = subprocess.run(
         ["git", "rev-parse", "--verify", branch],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     ).returncode == 0
     if exists:
         # Surface a stale branch that diverged from the declared base instead
@@ -1369,7 +1369,7 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         # iff B is an ancestor of base (i.e. base already contains B — safe).
         is_ancestor = subprocess.run(
             ["git", "merge-base", "--is-ancestor", branch, base],
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         ).returncode == 0
         if not is_ancestor:
             raise FeatureBranchError(
@@ -1656,7 +1656,7 @@ def commit_bookkeeping(paths: list, message: str) -> str | None:
     # blocks. `leak_scan.py --all` + the pre-push/PR surfaces remain the gates.
     res = subprocess.run(
         ["git", "commit", "--no-verify", "-m", message],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     if res.returncode != 0:
         raise BookkeepingCommitError(
@@ -1851,7 +1851,7 @@ def squash_commit(
     # driver blocks `spinning_detected` after 3 retries.
     res = subprocess.run(
         ["git", "commit", "--no-verify", "-m", msg],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     if res.returncode != 0:
         raise SquashCommitError(
@@ -1981,7 +1981,7 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
         cmd.insert(2, "--dangerously-skip-permissions")
     if cost_tracking:
         cmd += ["--output-format", "json"]
-    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True)
+    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, check=False)
     raw = proc.stdout or ""
     if not cost_tracking:
         return raw, None
@@ -2045,7 +2045,7 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
             continue
         rc = subprocess.run(
             ["git", "diff", "--quiet", head_before, "--", path],
-            capture_output=True,
+            capture_output=True, check=False,
         ).returncode
         if rc == 0:
             # `git diff` only sees tracked content — a freshly created file
@@ -2058,7 +2058,7 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
             ls = subprocess.run(
                 ["git", "ls-files", "--others", "--exclude-standard",
                  "--", path],
-                capture_output=True, text=True,
+                capture_output=True, text=True, check=False,
             ).stdout.strip()
             if not ls:
                 unchanged.append(path)
@@ -2157,7 +2157,7 @@ def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     for cmd in commands:
         cmd = normalize_interpreter(cmd)
         proc = subprocess.run(  # nosec B602
-            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
+            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd), check=False,
         )
         if proc.returncode != 0:
             summary = (
@@ -2420,7 +2420,7 @@ def verify(wu: WorkUnit, feature_dir: Path,
             if is_win32:
                 subprocess.run(
                     ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                    capture_output=True,
+                    capture_output=True, check=False,
                 )
             else:
                 try:
@@ -3368,7 +3368,7 @@ def assert_learnings_appended_or_noop(
     """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
     proc = subprocess.run(
         ["git", "diff", head_before, "HEAD", "--", ".specfuse/LEARNINGS.md"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     added = any(
         ln.startswith("+") and not ln.startswith("+++")
@@ -3400,7 +3400,7 @@ def assert_doc_or_roadmap_diff(
     """
     proc = subprocess.run(
         ["git", "diff", "--name-only", head_before, "HEAD"],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     for path in proc.stdout.splitlines():
         if path == ".specfuse/roadmap.md" or path.startswith("docs/"):

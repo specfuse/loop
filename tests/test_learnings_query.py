@@ -172,6 +172,7 @@ class TestCli(unittest.TestCase):
             [sys.executable, str(LEARNINGS_QUERY_PATH), *args],
             capture_output=True,
             text=True,
+            check=False,
         )
 
     def test_cli_below_threshold_signals_load_whole(self):

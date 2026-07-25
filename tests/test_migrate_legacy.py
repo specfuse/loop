@@ -151,7 +151,7 @@ class TestMigrateLegacy(unittest.TestCase):
             b"code:\n  - name: t\n    command: 'single-quoted'\n"
         )
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             migrate_legacy(self.target)
 
         self.assertTrue((self.scripts_dir / "dead_script.py").exists())
@@ -165,7 +165,7 @@ class TestMigrateLegacy(unittest.TestCase):
         claude_dir.mkdir(parents=True, exist_ok=True)
         (claude_dir / "settings.json").write_bytes(b"{broken json")
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             migrate_legacy(self.target)
 
         self.assertTrue((self.scripts_dir / "dead_script.py").exists())

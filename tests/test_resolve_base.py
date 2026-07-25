@@ -143,13 +143,13 @@ class TestEnsureBaseRef(unittest.TestCase):
             with _chdir(root):
                 local_before = subprocess.run(
                     ["git", "rev-parse", "--verify", "release/1.0"],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, check=False,
                 ).returncode
                 self.assertNotEqual(local_before, 0)
                 loop.ensure_base_ref("release/1.0")
                 fetched = subprocess.run(
                     ["git", "rev-parse", "--verify", "FETCH_HEAD"],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, check=False,
                 )
             self.assertEqual(fetched.returncode, 0)
 

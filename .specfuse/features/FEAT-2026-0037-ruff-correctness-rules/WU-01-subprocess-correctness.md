@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0037/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.24
+started_at: 2026-07-25T13:11:26.162954+00:00
+duration_seconds: 445.384
+cost_usd: 2.261393
+input_tokens: 102
+output_tokens: 19133
 ---
 
 # Adopt subprocess-correctness rules (PLW1510 + bugbear); make `check=` explicit

@@ -132,6 +132,7 @@ class TestOrchestratedCandidate(unittest.TestCase):
             ["python3", str(SCRIPTS_DIR / "lint_plan.py"), str(self.folder)],
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -162,6 +163,7 @@ class TestComponentLocalCandidate(unittest.TestCase):
             ["python3", str(SCRIPTS_DIR / "lint_plan.py"), str(self.folder)],
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -188,6 +190,7 @@ class TestMalformedBody(unittest.TestCase):
             ["python3", str(SCRIPTS_DIR / "lint_plan.py"), str(self.folder)],
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertNotEqual(result.returncode, 0, "expected lint to fail on missing section")
 

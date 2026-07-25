@@ -309,6 +309,7 @@ def _check_gitleaks(text: str) -> list[str]:
             ],
             capture_output=True,
             text=True,
+            check=False,
         )
     if proc.returncode == 0:
         return []
@@ -342,6 +343,7 @@ def _get_staged_diff() -> str:
         ["git", "diff", "--staged"],
         capture_output=True,
         text=True,
+        check=False,
     )
     return proc.stdout if proc.returncode == 0 else ""
 
@@ -370,6 +372,7 @@ def _list_tracked_files(root: Path) -> list[str]:
         ["git", "-C", str(root), "ls-files"],
         capture_output=True,
         text=True,
+        check=False,
     )
     return proc.stdout.splitlines() if proc.returncode == 0 else []
 
@@ -393,6 +396,7 @@ def _check_gitleaks_dir(path: Path) -> list[str]:
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
     if proc.returncode == 0:
         return []

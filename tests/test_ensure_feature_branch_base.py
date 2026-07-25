@@ -143,7 +143,7 @@ class TestEnsureFeatureBranchBase(unittest.TestCase):
                     loop.ensure_feature_branch({"branch": "feat/x", "base": "release/2.0"})
                 exists = subprocess.run(
                     ["git", "rev-parse", "--verify", "feat/x"],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, check=False,
                 ).returncode == 0
 
             self.assertFalse(exists)
