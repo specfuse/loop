@@ -1757,3 +1757,25 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `PLAN status → done` flip. Tell at draft time: any WU whose oracle is a CI leg on an OS the loop
   sandbox is not, ships its real proof PR-deferred — enumerate it in the close's `## What the loop
   did NOT verify` and hedge the verdict.
+
+- [FEAT-2026-0036] Pin a linter/formatter's RULESET explicitly (`[tool.ruff.lint] select`),
+  not just its version. A bare ruff config inherits ruff's *implicit default* `select`; ruff
+  0.16 broadened that default from the classic `E4,E7,E9,F` to a large opinionated set
+  (B/SIM/PLW/RUF/I/…), so an unpinned `ruff>=0.6` flagged ~300 findings on code clean for
+  months and broke the lint gate on every PR — zero code involved, purely a version bump
+  redefining "default." A version pin (`<0.16`) only defers the surprise to the next bump; the
+  durable fix is to write the intended ruleset down (`select = ["E4","E7","E9","F"]`) so the
+  gate is version-independent. Adopting new rule families then becomes a deliberate choice, not
+  an accident of upgrading. Same shape for any tool whose "default" behavior you rely on
+  implicitly (formatters, type-checkers, test collectors).
+
+- [FEAT-2026-0036/T01] A WU's gate verifies the gate's *tools*, not the WU's *premise*. T01's
+  job was "make `ruff check` pass under ruff 0.16," but the `code` gate ran the repo's pinned
+  ruff 0.15 (clean by the classic default), so the gate went green while the agent changed
+  nothing — a hollow pass that only surfaced when T02 lifted the pin and 0.16's ruleset
+  appeared. Two compounding causes: (1) a WU that targets a specific tool *version/ruleset*
+  must run its gate under that exact version, or the gate can't enforce the goal; (2) T01
+  declared no `produces:`, so the deliverable-presence floor had nothing to assert and the
+  empty change slid through — do not wave off the `no produces:` WARN on a change-existing-files
+  WU. Also: when a WU blocks, check whether the *plan* was wrong before re-arming — here the
+  premise (300 real errors) was itself false, so re-arming would have spun forever.

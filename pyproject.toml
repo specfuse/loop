@@ -35,11 +35,7 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
   "PyYAML>=6.0",
-  # Upper bound: ruff 0.16.0 tightened import rules and flags ~300 pre-existing
-  # lint errors in the test suite (unrelated to any one change), breaking CI on
-  # every PR. Pinned <0.16 to restore green; adopting 0.16 is tracked as
-  # FEAT-2026-0036 (deliberate fix-forward, not an emergency).
-  "ruff>=0.6,<0.16",
+  "ruff>=0.6",
   "bandit>=1.7",
   "coverage>=7.0",
   "jsonschema>=4.0",
@@ -49,10 +45,20 @@ dev = [
 Homepage = "https://github.com/specfuse/loop"
 Source = "https://github.com/specfuse/loop"
 
-# Minimal ruff config — keep defaults (E + F). Target the loop's actual
-# minimum Python (matches pyproject's `requires-python`).
+# Target the loop's actual minimum Python (matches `requires-python`).
 [tool.ruff]
 target-version = "py310"
+
+[tool.ruff.lint]
+# Pin the ruleset EXPLICITLY rather than relying on ruff's implicit default.
+# ruff 0.16 broadened its default `select` to a large opinionated set
+# (B/SIM/PLW/RUF/I/…); a bare config inherited that overnight and flagged ~300
+# findings across code that had been clean for months — breaking CI on every PR
+# purely from a version bump. This repo intends only the classic default
+# (pyflakes + the core pycodestyle subset); pinning it here makes that intent
+# version-independent. Adopting the broader ruleset is a separate, deliberate
+# decision (see the roadmap), never an implicit consequence of upgrading ruff.
+select = ["E4", "E7", "E9", "F"]
 
 [project.scripts]
 specfuse-loop = "specfuse.loop.loop:main"

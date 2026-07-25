@@ -5,11 +5,22 @@ slug: adopt-ruff-016
 branch: feat/FEAT-2026-0036-adopt-ruff-016
 roadmap_goal: Adopt ruff 0.16 — fix the ~300 new import-rule lint errors in the test suite, confirm the suite still passes, then lift the temporary `ruff>=0.6,<0.16` pin so the linter tracks current again.
 autonomy_default: review
-status: planned                 # active | blocked | deferred | done | abandoned
+status: done                    # active | blocked | deferred | done | abandoned
 planned_cost_usd: 10.00
 ---
 
 # Plan: Adopt ruff 0.16 and lift the <0.16 pin
+
+> **Resolution (reframed — original premise was wrong).** This plan assumed ~300
+> real import-lint errors to fix across `tests/`. A loop run on it blocked (T01
+> hollow-passed — its gate ran the pinned ruff 0.15 and went green while nothing
+> was fixed; T02 then blocked when 0.16 surfaced the findings). Investigation
+> found the true cause: ruff 0.16 **changed its implicit default `select`** to a
+> broad new ruleset the bare config inherited. The real fix was two lines of
+> config — pin `select = ["E4","E7","E9","F"]` explicitly + lift the version
+> pin — **no source change**. Done directly. The three WUs below are the
+> superseded draft, kept for the audit trail. Deliberate adoption of 0.16's
+> broader families is FEAT-2026-0037. See `.specfuse/LEARNINGS.md`.
 
 ruff 0.16.0 tightened its import rules; run against `tests/` it reports ~300
 lint errors (unsorted / unconsolidated imports) that predate any one change.

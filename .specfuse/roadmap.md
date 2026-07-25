@@ -51,7 +51,8 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
 | FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
-| FEAT-2026-0036 | Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin | planned | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
+| FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
+| FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -702,13 +703,23 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: done.** Shipped in draft-feature v0.2 (#228).
 
-## FEAT-2026-0036 — Adopt ruff 0.16: fix the ~300 new import-rule lint errors, lift the <0.16 pin
+## FEAT-2026-0036 — Pin ruff's lint ruleset explicitly; lift the <0.16 version pin
 
-**Why.** ruff 0.16.0 tightened its import-ordering rules; run against this repo's test suite it flags ~300 pre-existing lint errors (unsorted / unconsolidated imports in `tests/`), none tied to any single change. Because CI installed ruff unpinned (`>=0.6`), 0.16.0's release broke the lint gate on **every** PR at once. The immediate fix pinned `ruff>=0.6,<0.16` to restore green; this feature is the deliberate fix-forward that pays down the debt and lifts the pin, rather than freezing the linter indefinitely.
+**Why.** CI's lint gate broke on ruff 0.16 with ~300 findings on code clean for months. Investigation (this feature) reframed the original premise: they were **not** 300 real errors, and not import-ordering. ruff 0.16 **changed its implicit default `select`** from the classic `E4,E7,E9,F` to a large opinionated set (B/SIM/PLW/RUF/I/…). The repo's `[tool.ruff]` config selected nothing, so it inherited 0.16's new default overnight — the gate expanded purely from a version bump, no code involved. The emergency `ruff>=0.6,<0.16` pin froze the version to dodge it.
 
-**Goal.** Adopt ruff 0.16: run `ruff check --fix` (≈103 auto-fixable) and hand-resolve the remainder across the test files, confirm the suite still passes, then change the `pyproject.toml` pin back to an open `ruff>=0.16` (or a fresh floor). Land it as one reviewable diff so the mechanical import churn is separated from behaviour changes.
+**What was done.** Pin the ruleset **explicitly** and version-independently — `[tool.ruff.lint] select = ["E4","E7","E9","F"]`, the classic default the repo was always clean under — then lift the version pin (`ruff>=0.6`). Under ruff 0.16 with the explicit select the gate is clean (`All checks passed!`) and the full suite is unchanged (1295 OK). **No source code changed** — the original "fix ~300 errors across the test files" plan was based on a false premise and was abandoned; the real fix is two lines of config. Executed directly after a loop run on the flawed plan blocked (see LEARNINGS: the run surfaced a hollow-pass and a gate/tool-version-skew lesson).
 
-**Benefits.** Keeps the linter current instead of frozen at 0.15, so future rule improvements are available; removes the pin as a standing "why is this here?" question; does the import cleanup once, deliberately, instead of letting the next unpinned bump surprise CI again.
+**Benefits.** The gate is now immune to ruff redefining its defaults again — the intent is written down, not inherited. The version pin is gone, so ruff tracks current. Deliberately adopting 0.16's broader rule families (many are genuinely good) is decoupled into its own opt-in decision (see FEAT-2026-0037) rather than being forced by a bump.
+
+**Status: done.** Config-only fix (`pyproject.toml` explicit select + version unpin); no code change.
+
+## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
+
+**Why.** FEAT-2026-0036 pinned the lint `select` to the classic `E4,E7,E9,F` to stop a version bump from silently changing the gate — the right move for stability, but it deliberately declined the ~300 findings ruff 0.16 now surfaces by default. Some of those families are genuinely valuable and worth adopting on purpose: `PLW1510` (`subprocess.run` without `check=` — a real correctness smell in a driver that shells out constantly), `RUF059` (unused unpacked bindings), `SIM117`/`SIM102` (nested-`with` / collapsible-`if`), `LOG015` (root-logger use), `B`/`S` (bugbear / security). This feature decides — deliberately, family by family — which to add, and does the fixes.
+
+**Goal.** Triage ruff 0.16's expanded default families against this codebase: for each, decide adopt / decline (with a one-line reason), add the adopted ones to `[tool.ruff.lint] select`, and fix the findings — the semantic ones (e.g. `subprocess check=`) reviewed individually, not blanket-autofixed. Land per-family or in small reviewable batches, not one 300-line sweep. Some findings are in `tests/` and low-stakes; prioritise the `specfuse/` driver and `.specfuse/scripts/` surfaces.
+
+**Benefits.** Turns an accident (an upstream default change) into an intentional quality bar; catches real defects (unchecked subprocesses especially matter in the driver); keeps the ruleset a considered choice rather than either "whatever the classic default was" or "whatever ruff decides to add next."
 
 **Status: planned.**
 
