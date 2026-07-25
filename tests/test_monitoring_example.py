@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+"""Tests binding .specfuse/monitoring.yml.example to the validator and doc."""
+
+from __future__ import annotations
+
+import re
+import subprocess
+import sys
+import unittest
+from pathlib import Path
+
+from specfuse.loop import _miniyaml
+from specfuse.loop.lint_monitoring import CHECK_TYPES, validate_monitoring
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_EXAMPLE_PATH = _REPO_ROOT / ".specfuse" / "monitoring.yml.example"
+_DOC_PATH = _REPO_ROOT / "docs" / "concepts" / "monitoring-schema.md"
+
+_CREDENTIAL_KEY_RE = re.compile(
+    r"(?i)(^|_)(key|token|secret|password|credential|connection[_-]?string)s?$"
+)
+_ENV_VAR_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+
+def _parsed_example() -> dict:
+    return _miniyaml.parse(_EXAMPLE_PATH.read_text())
+
+
+def _iter_credential_values(node: object):
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if _CREDENTIAL_KEY_RE.search(str(key)) and isinstance(value, str):
+                yield key, value
+            yield from _iter_credential_values(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _iter_credential_values(item)
+
+
+class MonitoringExampleTests(unittest.TestCase):
+    def test_shipped_example_validates_clean(self):
+        self.assertTrue(
+            _EXAMPLE_PATH.is_file(),
+            f"{_EXAMPLE_PATH} does not exist",
+        )
+        findings = validate_monitoring(_EXAMPLE_PATH)
+        self.assertEqual(findings, [])
+
+    def test_example_exercises_every_check_type(self):
+        parsed = _parsed_example()
+        seen_types = set()
+        for component in parsed["components"]:
+            for check in component["checks"]:
+                seen_types.add(check["type"])
+        self.assertEqual(seen_types, set(CHECK_TYPES))
+
+    def test_example_declares_two_differently_typed_components(self):
+        parsed = _parsed_example()
+        component_types = {c["type"] for c in parsed["components"]}
+        self.assertGreaterEqual(len(parsed["components"]), 2)
+        self.assertGreaterEqual(len(component_types), 2)
+
+    def test_example_credentials_are_env_var_names(self):
+        parsed = _parsed_example()
+        credentials = list(_iter_credential_values(parsed))
+        self.assertGreater(len(credentials), 0)
+        for key, value in credentials:
+            self.assertRegex(
+                value, _ENV_VAR_NAME_RE,
+                f"credential '{key}' is not an environment-variable name: {value!r}",
+            )
+
+    def test_leak_scan_passes_on_repo(self):
+        result = subprocess.run(
+            [sys.executable, str(_REPO_ROOT / ".specfuse" / "scripts" / "leak_scan.py"), "--all"],
+            capture_output=True, text=True, check=False, cwd=_REPO_ROOT,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"leak_scan.py --all failed:\nstdout={result.stdout}\nstderr={result.stderr}",
+        )
+
+    def test_doc_and_validator_agree(self):
+        doc_text = _DOC_PATH.read_text()
+        table_match = re.search(
+            r"## Check types\n.*?\n\n(\| Type.*?)\n\n", doc_text, re.DOTALL
+        )
+        self.assertIsNotNone(table_match, "could not find check-types table in doc")
+        documented_types = set(re.findall(r"^\| `([a-z0-9-]+)` \|", table_match.group(1), re.MULTILINE))
+        self.assertEqual(documented_types, set(CHECK_TYPES))
+
+
+if __name__ == "__main__":
+    unittest.main()

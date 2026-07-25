@@ -1,0 +1,113 @@
+# .specfuse/monitoring.yml.example
+#
+# Declares how THIS project notices that a deployed component is misbehaving,
+# the way verification.yml declares how a change is proven correct before it
+# merges. Copy this file to `.specfuse/monitoring.yml` and edit it for your
+# real environments and components to opt in.
+#
+# MONITORING IS OPT-IN. An absent `.specfuse/monitoring.yml` is a correct,
+# valid final state — it is not an error, and the shipped gate does not fail
+# on a missing file. Only add this file once you have real components to
+# watch.
+#
+# This file is validated structurally by `specfuse/loop/lint_monitoring.py`
+# (`validate_monitoring`). Schema reference: docs/concepts/monitoring-schema.md
+#
+# SECURITY POSTURE: every credential-bearing value below is an
+# ENVIRONMENT-VARIABLE NAME (UPPER_SNAKE_CASE), never a literal secret. The
+# validator rejects inline literals. Every organization name, host, workspace
+# ID, and queue name here is an obvious placeholder — replace them with your
+# own before use, but never with a literal credential value.
+
+# --------------------------------------------------------------------------
+# environments
+#
+# One entry per deploy target (staging, production, ...). Each environment
+# names its telemetry and broker provider bindings. `provider` is an OPAQUE
+# STRING this layer does not interpret — FEAT-2026-0040's harvester CLI reads
+# it and dispatches to a provider-specific adapter. Adding a new provider
+# never requires a change here or in the validator.
+# --------------------------------------------------------------------------
+environments:
+  staging:
+    telemetry:
+      provider: acme-telemetry
+      credentials:
+        api_key: ACME_TELEMETRY_STAGING_API_KEY
+    broker:
+      provider: acme-broker
+      credentials:
+        connection_string: ACME_BROKER_STAGING_CONNECTION_STRING
+
+  production:
+    telemetry:
+      provider: acme-telemetry
+      credentials:
+        api_key: ACME_TELEMETRY_PROD_API_KEY
+    broker:
+      provider: acme-broker
+      credentials:
+        connection_string: ACME_BROKER_PROD_CONNECTION_STRING
+
+# --------------------------------------------------------------------------
+# components
+#
+# One entry per deployable unit. Two are shown here so the per-component
+# dial model is visible rather than implied: `web-api` is HTTP-serving,
+# `order-worker` is message-consuming. Each component carries the same five
+# required fields and the same three dials, regardless of its shape.
+#
+# Dials, all per component:
+#   runner    — where diagnosis/autofix executes for this component.
+#               one of: local | gh-actions | in-cluster
+#   diagnose  — whether a harvested finding is investigated automatically.
+#               one of: manual | auto
+#   autofix   — whether a diagnosed finding may trigger an automated fix.
+#               one of: "off" | "on"  (quoted: bare `off` is not valid YAML
+#               here — see _miniyaml's rejection of the "off"/"on" spellings)
+#
+# Start every component at runner: local, diagnose: manual, autofix: "off".
+# Loosen one dial at a time as you build confidence in the checks below.
+# --------------------------------------------------------------------------
+components:
+  - name: web-api
+    type: http-service
+    runner: local
+    diagnose: manual
+    autofix: "off"
+    checks:
+      # http-5xx: alerts when the rolling 5xx rate crosses a threshold.
+      # Use for any component that serves HTTP traffic directly.
+      - type: http-5xx
+
+      # heartbeat: alerts when the component stops reporting in at all —
+      # the check that catches "it didn't error, it just went silent."
+      - type: heartbeat
+
+      # error-logs: scans structured application logs for error-level
+      # entries. Cheapest check to add; pairs with the design-for-diagnosis
+      # rule's structured-logging requirement.
+      - type: error-logs
+
+  - name: order-worker
+    type: queue-consumer
+    runner: local
+    diagnose: manual
+    autofix: "off"
+    checks:
+      # dlq: alerts when messages land in this component's dead-letter
+      # queue. harvest_mode controls whether the harvester CLI (0040) only
+      # reads DLQ entries (peek) or removes them from the queue after
+      # reading (quarantine) — start with peek until you trust the pipeline.
+      - type: dlq
+        harvest_mode: peek
+
+      # invariant: runs an operator-supplied query against this component's
+      # data and alerts when it returns unexpected rows. `query` is opaque
+      # to this schema (it is not parsed or executed here); `fingerprint_by`
+      # names the column used to dedupe repeat findings into one issue.
+      - type: invariant
+        query: "select count(*) from orders where fulfilled_at is null and created_at < now() - interval '1 day'"
+        fingerprint_by: order_id
+
+      - type: heartbeat

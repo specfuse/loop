@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0039/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - .specfuse/monitoring.yml.example
   - docs/concepts/monitoring-schema.md
   - tests/test_monitoring_example.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-25T21:24:29.033874+00:00
+duration_seconds: 509.228
+cost_usd: 0.634368
+input_tokens: 7930
+output_tokens: 6702
 ---
 
 # Author the shipped monitoring.yml example and its schema reference doc
