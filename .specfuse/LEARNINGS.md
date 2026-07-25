@@ -1806,3 +1806,36 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   intentional top-level driver guard is precisely where that `noqa` is most tempting. Assert
   the property, not the family: "no unbound catch-all remains" (or explicitly bless `noqa` +
   reason as policy) so the adoption cannot land green with the swallow untouched.
+
+- [FEAT-2026-0051/G1-CLOSE] "Probe the oracle before trusting it as an oracle" generalizes
+  well beyond gate sets. The invariant is not about gates; it is about any exit oracle whose
+  verdict can change without the repo changing — a dependency audit whose advisory database
+  updated, a linter release adding a rule, a compiler bump, a license scanner, a
+  network-dependent fixture, or an acceptance criterion asserting on a regenerated artifact.
+  Wherever an oracle is externally fed, measure it ONCE against the unchanged base tree
+  before attributing any failure to a work unit; otherwise the first WU to run inherits the
+  red oracle and spins its whole attempt budget against a failure it did not cause and often
+  cannot fix. This is the actionable counterpart to the `[FEAT-2026-0007/G1-LESSONS]` family:
+  those say "don't make a tool's own report the acceptance oracle," this one says what to do
+  when you must depend on one anyway.
+
+- [FEAT-2026-0051/G1-CLOSE] A pre-flight probe of the full `code` set is cheap enough that
+  once-per-gate-entry needs no further debate — record the measurement so it is not
+  re-derived: 118s wall-clock on this repo's nine `code` gates, 93% of it duplicated test
+  execution (the same suite run bare and again under coverage), ZERO model tokens (it runs
+  gate commands and dispatches no agent), and 0s on any resume at an unchanged sha. Against
+  a gate whose dispatch wall-clock was 1783s of billed agent time that is 6.6%, paid once.
+  General rule: when sizing a brake, compare CPU-seconds against BILLED agent time, not
+  against other CPU-seconds — and expect probe cost to be dominated by whichever gates
+  duplicate each other's work, which is a `verification.yml` authoring concern rather than a
+  driver one.
+
+- [FEAT-2026-0051/G1-CLOSE] A driver change to dispatch control flow does NOT take effect for
+  the run that writes it: Python loads the driver module once at process start, and
+  gate-entry code has already executed before the first WU is dispatched. This cuts both
+  ways, so state it explicitly in any self-hosting hazard note. It defuses the hazard — a WU
+  editing the dispatch path cannot break the run dispatching it — and it equally invalidates
+  self-hosting as EVIDENCE: a feature cannot cite "it ran against our own gates" when the
+  probe it added never executed. Phrase such notes as "takes effect on the NEXT driver
+  invocation," and plan a separate observation point if the self-hosted run is meant to be
+  part of the acceptance evidence.

@@ -1,11 +1,24 @@
 ---
 id: FEAT-2026-0051/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+verdict: met
+produces:
+  - .specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/RETROSPECTIVE.md
+  - .specfuse/LEARNINGS.md
+driver_version: 0.3.24
+started_at: 2026-07-25T19:36:51.978708+00:00
+duration_seconds: 845.449
+cost_usd: 4.558345
+input_tokens: 2117
+output_tokens: 45813
 ---
 
 # Gate 1 close — Pre-flight baseline gate probe
