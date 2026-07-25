@@ -54,7 +54,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
 | FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
-| FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | planned | — | — |
+| FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | active | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | blocked | — | — |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
@@ -749,7 +749,15 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Benefits.** Turnkey bootstrap: interview ends, user reviews drafted files, first local `--dry-run` is minutes away. The diagnosability audit ensures components are born diagnosable — the property that lets a repo-resident agent outperform external monitoring at root-cause. Schema decided up front keeps the harvester (FEAT-2026-0040) and later autonomy stages purely additive.
 
-**Status: planned.**
+**Scope narrowed at drafting (see the feature's `PLAN.md`).** Deliverable (c)'s
+GitHub Actions runner workflow moved to [FEAT-2026-0040](#feat-2026-0040): that
+workflow invokes the harvester CLI, which does not exist until 0040, and shipping a
+template whose entry point is a nonexistent binary is the `[FEAT-2026-0029/G1-CLOSE]`
+failure verbatim. The local-runner bootstrap artifacts still ship here. Added at
+drafting: a committed structural validator for the schema, so 0040 inherits a
+machine-checkable contract rather than prose.
+
+**Status: active.**
 
 <a id="feat-2026-0040"></a>
 ## FEAT-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
