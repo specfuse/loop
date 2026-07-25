@@ -67,7 +67,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
-| FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | blocked | — | — |
+| FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -894,9 +894,7 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Benefits.** A feature blocked on externally-caused debt can proceed without anyone weakening a gate: the debt is held constant, tracked in an issue, and visible in the gate review, while every newly-introduced failure still fails. Designed against real baseline records produced by 0051 rather than speculatively, and sequenced after it so the oracle-semantics change lands behind a shipped, proven brake.
 
-**Blocked by.** [FEAT-2026-0051](#feat-2026-0051) — the ratchet and waiver both read the baseline record that 0051 produces; there is nothing to hold constant until it exists
-
-**Status: blocked.**
+**Status: planned.**
 
 ## Notes
 
