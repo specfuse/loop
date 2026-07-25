@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0037"></a>
+## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
+
+**Why.** FEAT-2026-0036 pinned the lint `select` to the classic `E4,E7,E9,F` to stop a version bump from silently changing the gate — the right move for stability, but it deliberately declined the ~300 findings ruff 0.16 now surfaces by default. Some of those families are genuinely valuable and worth adopting on purpose: `PLW1510` (`subprocess.run` without `check=` — a real correctness smell in a driver that shells out constantly), `RUF059` (unused unpacked bindings), `SIM117`/`SIM102` (nested-`with` / collapsible-`if`), `LOG015` (root-logger use), `B`/`S` (bugbear / security). This feature decides — deliberately, family by family — which to add, and does the fixes.
+
+**Goal.** Triage ruff 0.16's expanded default families against this codebase: for each, decide adopt / decline (with a one-line reason), add the adopted ones to `[tool.ruff.lint] select`, and fix the findings — the semantic ones (e.g. `subprocess check=`) reviewed individually, not blanket-autofixed. Land per-family or in small reviewable batches, not one 300-line sweep. Some findings are in `tests/` and low-stakes; prioritise the `specfuse/` driver and `.specfuse/scripts/` surfaces.
+
+**Benefits.** Turns an accident (an upstream default change) into an intentional quality bar; catches real defects (unchecked subprocesses especially matter in the driver); keeps the ruleset a considered choice rather than either "whatever the classic default was" or "whatever ruff decides to add next."
+
+**Status: planned.**
+
 <a id="feat-2026-0032"></a>
 ## FEAT-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
 
