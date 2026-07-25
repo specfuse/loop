@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0039/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/lint_monitoring.py
   - tests/test_lint_monitoring.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-25T21:15:01.400337+00:00
+duration_seconds: 567.533
+cost_usd: 2.074243
+input_tokens: 7461
+output_tokens: 20203
 ---
 
 # Add the monitoring.yml structural validator
