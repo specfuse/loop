@@ -53,6 +53,19 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
+| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
+| FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | planned | — | — |
+| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | blocked | — | — |
+| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
+| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
+| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
+| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
+| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
+| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | planned | — | — |
+| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | blocked | — | — |
+| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
+| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
+| FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -712,6 +725,164 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Benefits.** The gate is now immune to ruff redefining its defaults again — the intent is written down, not inherited. The version pin is gone, so ruff tracks current. Deliberately adopting 0.16's broader rule families (many are genuinely good) is decoupled into its own opt-in decision (see FEAT-2026-0037) rather than being forced by a bump.
 
 **Status: done.** Config-only fix (`pyproject.toml` explicit select + version unpin); no code change.
+
+## FEAT-2026-0038 — DLQ quarantine harvest mode (per-component)
+
+**Why.** Peek-only DLQ harvesting (monitoring v1) leaves messages in the DLQ: TTL can expire evidence, DLQ depth loses signal value, and replay-after-fix stays manual. Quarantine mode (receive + archive to blob storage) preserves evidence durably and makes replay mechanical, enabling autonomy level 4 (replay-verify-close).
+
+**Goal.** Add a per-component `harvest_mode: peek|quarantine` flag to monitoring.yml; quarantine mode receives DLQ messages, archives full message (body + properties) to a per-env blob container with crash-safe receive-archive ordering, and links the artifact from the GH finding issue. Fingerprint and finding schema unchanged from peek mode.
+
+**Benefits.** DLQ depth becomes a true live signal; failure evidence survives TTL; replay-after-fix becomes mechanical, unlocking self-healing level 4.
+
+**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — extends the harvester's peek-mode DLQ adapter
+
+**Status: blocked.**
+
+<a id="feat-2026-0039"></a>
+## FEAT-2026-0039 — Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap)
+
+**Why.** Specfuse-configured repos should be self-healing: every deployable component (web API, message worker, timer worker) proactively watched for functional failures — DLQ messages, error logs, 5xx, missed timer runs, broken business invariants — with findings reported as GitHub issues that feed the existing triage loop (fix-bug or roadmap). The foundation is a declarative `.specfuse/monitoring.yml` (the post-deploy counterpart of `verification.yml`) and a skill that derives it from repo evidence, because hand-authoring per-component checks and auditing diagnosability is mechanical work the repo itself can mostly answer.
+
+**Goal.** Ship (a) the monitoring.yml schema + example: `environments`, `components` with per-component trust dials (`runner: local|gh-actions|in-cluster`, `diagnose: manual|auto`, `autofix: off|on`), check types `dlq` (harvest_mode peek|quarantine), `error-logs`, `http-5xx`, `heartbeat`, and custom `invariant` (user KQL + `fingerprint_by`); (b) a design-for-diagnosis rule (correlation IDs, structured logging, cloud_RoleName per component, DLQ error-context capture); (c) the `derive-monitoring` skill mirroring derive-verification's posture (evidence first, ask only what code cannot answer, draft never auto-write) that discovers components, interviews for invariants and environment coordinates, audits each component against the design-for-diagnosis rule with gap findings, and drafts monitoring.yml + runner bootstrap files (GH Actions workflow, gitignored `monitoring.local.yml` example, read-only secrets checklist) with staged per-file accepts. Provider-agnostic by design, exactly as verification.yml is language-agnostic: check types are neutral concepts, environments carry typed provider bindings (`telemetry.provider`, `broker.provider`), and adapters normalize into a neutral artifact model (OTel semantic conventions; `trace_id` as the correlation spine). Azure adapters ship first: Service Bus + App Insights (operation_Id maps to the spine).
+
+**Benefits.** Turnkey bootstrap: interview ends, user reviews drafted files, first local `--dry-run` is minutes away. The diagnosability audit ensures components are born diagnosable — the property that lets a repo-resident agent outperform external monitoring at root-cause. Schema decided up front keeps the harvester (FEAT-2026-0040) and later autonomy stages purely additive.
+
+**Status: planned.**
+
+<a id="feat-2026-0040"></a>
+## FEAT-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
+
+**Why.** Detection must be deterministic, cheap, and LLM-free: enumerate discrete failure artifacts (DLQ messages, error-log entries, 5xx traces, missed heartbeats, invariant violations) and report them as deduplicated GitHub issues. Laser focus on component misbehavior — not metrics or infra (that is Datadog's job) — catching functional issues before platform alerts fire.
+
+**Goal.** A CLI (`specfuse-monitor run [--component X] [--env Y] [--dry-run]`) implementing the FEAT-2026-0039 schema behind a provider-adapter interface (telemetry adapter + broker adapter, each normalizing to the neutral artifact model — core logic never sees provider types); v1 ships the Azure pair: Service Bus DLQ peek adapter and App Insights KQL adapters for the built-in check types; fingerprinting (component + failure class + signature, e.g. exception type + top app stack frame); context collection by correlation ID; redaction pass before any artifact text lands in an issue; issue lifecycle — search by `specfuse-monitor` label + fingerprint marker, create with diagnosis-ready artifact section, update occurrence count throttled, annotate "quiet for N runs — candidate for close" (humans close; no quiet-based auto-close ever). State principle: everything derivable from GitHub issues or safely losable — issues are the fingerprint registry; watermarks are best-effort per-host cache with lookback-window fallback; idempotency comes from fingerprint dedupe. Ships local runner mode plus the GH Actions workflow surface; all env access read-only.
+
+**Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
+
+**Blocked by.** [FEAT-2026-0039](#feat-2026-0039) — monitoring.yml schema must land first
+
+**Status: blocked.**
+
+<a id="feat-2026-0041"></a>
+## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
+
+**Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.
+
+**Goal.** A `/diagnose-issue NN` skill: pulls artifact section + correlation-ID-linked telemetry from the finding issue, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable `confidence` and `fix_scope: small|large|external` fields (the gate FEAT-2026-0042 consumes). Identical comment format from both entry points: interactive first, headless (`claude -p`) second, auto-triggered by the harvester on new fingerprints only for components with `diagnose: auto` (one diagnosis per fingerprint, not per occurrence). Redaction rules apply to diagnosis prose.
+
+**Benefits.** Autonomy level 2: issues arrive pre-diagnosed for opted-in components, at bounded token cost (dedupe caps spend). The per-component manual-to-auto dial lets diagnosis quality be proven with a human watching before automation, component by component.
+
+**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — harvester findings/issue contract must exist
+
+**Status: blocked.**
+
+## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
+
+**Why.** With detection (FEAT-2026-0040) and diagnosis (FEAT-2026-0041) in place, the remaining step to a self-healing repo is launching the existing fix-bug skill (1 bug = 1 branch = 1 PR, test-first) from a diagnosed finding — guarded, because a wrong diagnosis can produce a confidently-wrong PR and an incident storm can flood the repo.
+
+**Goal.** Per-component `autofix: on|off` (default off). Auto-fire headless `/fix-bug NN` only when the diagnosis self-reports confident + `fix_scope: small`; `large`/`external` findings route to human triage or roadmap promotion instead. One fix run per fingerprint, daily auto-fix cap, and an "auto-fix attempted, failed" label so refusals and failures surface instead of dying silently. Human merge on a protected branch is the default floor; auto-merge is governed by the agent-level dial and hardcoded guardrails defined in FEAT-2026-0048 (supersession recorded 2026-07-25 — small test-first bug diffs are cheap to revert, so bugs may graduate to auto-merge; features never do here).
+
+**Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
+
+**Blocked by.** [FEAT-2026-0041](#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
+
+**Status: blocked.**
+
+## FEAT-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
+
+**Why.** The harvester CLI is host-agnostic by design (FEAT-2026-0040 ships local + gh-actions surfaces), but orgs whose policy forbids external runners touching environments — or who want workload identity instead of exported secrets and tighter schedules than GH Actions cron honors — need an in-cluster surface.
+
+**Goal.** Container image build for the harvester CLI, a CronJob manifest template, Azure workload-identity setup docs (read-only Service Bus Listen + App Insights access, GH token for issue writes), and derive-monitoring drafting support for `runner: in-cluster` components. Same CLI, same monitoring.yml, same issue contract — only the launch surface differs.
+
+**Benefits.** Completes the per-component runner matrix (local for tuning, gh-actions for turnkey, in-cluster for perimeter-bound orgs); schedules honored tightly; credentials never leave Azure.
+
+**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — packages the harvester CLI
+
+**Status: blocked.**
+
+<a id="feat-2026-0044"></a>
+## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
+
+**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
+
+**Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run — entries must exist and be `planned`/`active`/`blocked`; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
+
+**Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
+
+**Status: planned.**
+
+<a id="feat-2026-0045"></a>
+## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
+
+**Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
+
+**Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
+
+**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
+
+**Status: planned.**
+
+<a id="feat-2026-0046"></a>
+## FEAT-2026-0046 — Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill
+
+**Why.** An autonomous agent is only trustworthy if what it cannot handle surfaces reliably, with enough context to act on in minutes. Escalations need one queue with an audit trail — GitHub issues, not chat threads — plus a fast local view. Useful immediately with today's manual loop (blocked WUs, awaiting_review gates, blocked features, stale PRs), before any agent exists.
+
+**Goal.** Ship (a) the escalation contract: a `needs-human` labeled GH issue per escalation, auto-assigned to the configured `assignee` (per-category assignee map supported) so escalations surface in native GH inbox/filters; body in plain English — context, options with pros/cons, a recommendation, numbered answers ("reply `1`, `2`, or prose") so the agent can parse replies unambiguously; category labels (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval); answered issues are parsed, acted on, and closed by the next agent run. (b) The `/attention` skill: local inbox over the same label set plus repo-state sweep (gate-status generalized repo-wide), presenting everything needing the human in priority order — the interactive counterpart of the issue queue, never a second source of truth.
+
+**Benefits.** One escalation queue, two views (GH native + rich local session); nothing the agent parks goes silent; the operator's check-in ritual becomes "open /attention, work top-down".
+
+**Status: planned.**
+
+<a id="feat-2026-0047"></a>
+## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
+
+**Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
+
+**Goal.** A webhook notifier in agent-policy.yml (`escalation.webhook`): on new/re-pinged needs-human issues, post a one-liner + link to the configured channel; provider = any incoming-webhook URL (Discord/Slack/Teams payload adapters, provider swap = URL change). SLA handling: unanswered escalation past the configured window re-pings once, then the item is parked and the queue continues. Heartbeat-silence self-alert: the agent records a last-run timestamp (repo-derivable); a scheduled check (or /attention on open) flags "agent has not run in M hours" — and where a schedule exists, fires the same webhook.
+
+**Benefits.** The operator hears about blockers within minutes wherever they live, answers where the audit trail lives, and can trust that agent silence is itself alarmed — monitoring the monitor at near-zero build cost.
+
+**Blocked by.** [FEAT-2026-0046](#feat-2026-0046) — notifies escalation-contract items; contract must exist first
+
+**Status: blocked.**
+
+<a id="feat-2026-0048"></a>
+## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
+
+**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
+
+**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
+
+**Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
+
+**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](#feat-2026-0046) — refusals and guardrail failures escalate through the contract
+
+**Status: blocked.**
+
+<a id="feat-2026-0049"></a>
+## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
+
+**Why.** The capstone: a script that drives the whole lifecycle of a specfuse-configured repo — monitoring findings, issue triage, bug fixing, prioritized feature advancement — as a thin conductor over the existing loop driver and skills (none of which it modifies), escalating whatever it cannot handle. The operator controls when and how long it runs, and therefore what it costs.
+
+**Goal.** `specfuse-agent run` — operator-launched, run-to-drain: acquire a lock file (PID + heartbeat timestamp, stale-lock detection, exactly one agent per repo); loop — read repo state (issues, PRs, roadmap, agent-policy.yml, feature folders: the entire agent memory, per the derivable-from-GH-or-safely-losable principle — no agent database), pick the highest-value action under policy (bugs preempt per rules; queue top for features; parse answered needs-human issues first), execute via the existing skill/driver surfaces, reconcile — until the queue is drained or a cap hits (`--max-minutes`, `--max-tokens`, `--max-items`). Feature execution respects gate checkpoints: driver halts `awaiting_review` → escalate per contract and switch to the next workable item (pause = stop and pick different work; feature folders already persist all state). Blocked items park with an escalation; drafting-needed queue tops escalate (drafting stays human in v1). Kill switch: a PAUSE marker checked each iteration. Cron or event triggers later invoke the same script unchanged.
+
+**Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
+
+**Blocked by.** [FEAT-2026-0044](#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
+
+**Status: blocked.**
+
+<a id="feat-2026-0050"></a>
+## FEAT-2026-0050 — Async feature-drafting interview via question issues
+
+**Why.** In agent v1, an undrafted queue-top feature escalates and waits for an interactive /draft-feature session — correct sequencing (planning is where human judgment adds most), but it becomes the throughput bottleneck once the agent outpaces operator session availability. The interview itself can move async without surrendering drafting quality.
+
+**Goal.** Agent-preparable drafting: for a drafting-needed queue top, the agent studies the roadmap entry, LEARNINGS, exemplars, and the codebase, then posts the draft-feature interview as a needs-human question issue — batched questions in the established format (elicitation open; decisions with prose pros/cons + recommendation), at most two rounds. From the answers it drafts the feature folder, logging explicit assumptions for anything unanswered; gate-1 review remains human per the `gate_review` dial. Falls back to plain escalation when answers are too thin to draft responsibly.
+
+**Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
+
+**Blocked by.** [FEAT-2026-0049](#feat-2026-0049) — an agent capability; the runner and its escalation loop must exist
+
+**Status: blocked.**
 
 ## Notes
 
