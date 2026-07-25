@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0039/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - .specfuse/scripts/lint_monitoring.py
   - tests/test_monitoring_seed.py
 produces_driver_helper: scaffold seed registration for monitoring.yml.example
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-25T21:32:58.414431+00:00
+duration_seconds: 739.812
+cost_usd: 3.225256
+input_tokens: 5550
+output_tokens: 20227
 ---
 
 # Ship the validator shim, seed the example, and wire the gate

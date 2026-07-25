@@ -39,6 +39,15 @@ code:
     # scan on the staged diff; this gate is the can't-bypass backstop.
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
+  - name: monitoring-example-lint
+    # Targets the shipped EXAMPLE, not a live config: this repo is a CLI tool
+    # with no deployable components and will never carry a real
+    # monitoring.yml, so a gate pointed at a live file would fail permanently
+    # on an absent file or pass vacuously forever. Pointed at the example, it
+    # has real signal — the shipped example cannot silently drift from the
+    # validator that ships alongside it.
+    command: "python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml.example"
+
   - name: leak-scan-hook
     # §11 operator-script gate: the pre-commit hook's bats happy-path.
     command: "bats tests/leak_scan_hook.bats"

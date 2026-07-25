@@ -31,6 +31,7 @@ _EXPECTED_TREE = {
     "schemas/events/spec_issue_routed.schema.json",
     "VERSION",
     "verification.yml",
+    "monitoring.yml.example",
     "roadmap.md",
     "LEARNINGS.md",
     "features/.gitkeep",

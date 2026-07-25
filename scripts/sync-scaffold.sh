@@ -138,6 +138,7 @@ FILES=(
   VERSION
   gitignore.snippet
   verification.yml.example
+  monitoring.yml.example
   roadmap.template.md
   LEARNINGS.template.md
   templates/GATE.template.md

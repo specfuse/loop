@@ -63,6 +63,7 @@ select = ["E4", "E7", "E9", "F", "PLW1510", "B", "BLE001", "S110", "TRY004"]
 [project.scripts]
 specfuse-loop = "specfuse.loop.loop:main"
 specfuse-lint = "specfuse.loop.lint_plan:main"
+specfuse-monitor-lint = "specfuse.loop.lint_monitoring:main"
 
 [tool.setuptools.packages.find]
 # Ship ONLY the specfuse namespace package. Without this scope, setuptools'
