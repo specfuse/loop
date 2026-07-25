@@ -1779,3 +1779,30 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   empty change slid through — do not wave off the `no produces:` WARN on a change-existing-files
   WU. Also: when a WU blocks, check whether the *plan* was wrong before re-arming — here the
   premise (300 real errors) was itself false, so re-arming would have spun forever.
+
+- [FEAT-2026-0037] A lint/type-check **adoption** WU must record the PRE-FIX finding count
+  per rule code (`ruff check --statistics --select <codes>` before the fix, quoted in the
+  WU), not only the post-fix "reports zero findings". Zero-findings is exactly what a hollow
+  pass shows too, and the close cannot reconstruct the delta — the result contract bars close
+  sessions from running `git`, so the dirty tree is unreadable from there. Only the WU that
+  had the findings in front of it can capture the number; without it the close's "how many
+  were fixed" criterion degrades into an unverifiable claim. Same shape for any
+  adopt-a-stricter-tool WU (new mypy strictness, new bandit codes, a raised coverage floor):
+  capture the before-number at the moment it still exists.
+
+- [FEAT-2026-0037/T01] `PLW1510` (`subprocess.run` without an explicit `check=`) on a SHARED
+  runner helper wants a `check: bool = True` **parameter**, not a hardcoded literal. When one
+  helper serves both probing callers (which must inspect `.returncode` without raising) and
+  side-effecting callers (which want the raise), `check=True` breaks the probes and
+  `check=False` re-hides exactly the silent-failure class the rule exists to surface. The
+  per-site decision rule that scales: `check=False` only where the code already reads
+  `.returncode` (handling visible at the call site), `check=True` everywhere else, and a
+  parameter where one helper does both.
+
+- [FEAT-2026-0037/T02] `BLE001` has a linter-satisfying escape hatch that leaves the swallow
+  intact: `# noqa: BLE001` plus a reason comment turns the gate green without binding or
+  logging the exception. A WU whose criterion reads "narrow the catch, OR bind-and-log where
+  a catch-all is intentional" silently permits a third path it never named — and an
+  intentional top-level driver guard is precisely where that `noqa` is most tempting. Assert
+  the property, not the family: "no unbound catch-all remains" (or explicitly bless `noqa` +
+  reason as policy) so the adoption cannot land green with the swallow untouched.

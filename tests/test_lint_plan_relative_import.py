@@ -47,7 +47,7 @@ class TestLintPlanRelativeImport(unittest.TestCase):
                 [sys.executable, "-c",
                  "from specfuse.loop.lint_plan import lint_plan_next_draft; "
                  "print('ok')"],
-                capture_output=True, text=True, cwd=tmp,
+                capture_output=True, text=True, cwd=tmp, check=False,
             )
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("ok", r.stdout)

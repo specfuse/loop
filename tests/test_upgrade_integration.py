@@ -311,6 +311,7 @@ class TestUpgradeInstalledWheelResolution(unittest.TestCase):
                 cwd=str(_REPO_ROOT),
                 capture_output=True,
                 text=True,
+                check=False,
             )
             self.assertEqual(
                 build_result.returncode, 0,
@@ -372,6 +373,7 @@ class TestUpgradeInstalledWheelResolution(unittest.TestCase):
                 [str(venv_python), "-c", script],
                 capture_output=True,
                 text=True,
+                check=False,
             )
             self.assertEqual(
                 proc.returncode, 0,

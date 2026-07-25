@@ -193,7 +193,7 @@ class TestLintCliContract(unittest.TestCase):
     def test_cli_exits_zero_on_clean_example(self):
         proc = subprocess.run(
             [sys.executable, str(LINT), str(EXAMPLE_FEATURE)],
-            capture_output=True, text=True,
+            capture_output=True, text=True, check=False,
         )
         self.assertEqual(proc.returncode, 0,
                          f"CLI must exit 0 on clean example; stderr={proc.stderr}")
@@ -207,7 +207,7 @@ class TestLintCliContract(unittest.TestCase):
                    "id: FEAT-2026-0001/T1")
             proc = subprocess.run(
                 [sys.executable, str(LINT), str(feature)],
-                capture_output=True, text=True,
+                capture_output=True, text=True, check=False,
             )
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("FAIL", proc.stdout)

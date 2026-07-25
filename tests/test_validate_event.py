@@ -673,6 +673,7 @@ class TestValidateEventSubprocess(unittest.TestCase):
             capture_output=True,
             text=True,
             env=env,
+            check=False,
         )
 
     def test_cli_exits_0_on_valid_stdin(self) -> None:

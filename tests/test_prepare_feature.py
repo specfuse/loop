@@ -106,7 +106,7 @@ class TestPrepareFeature(unittest.TestCase):
             self.assertEqual(loop.untracked_feature_files(rel), [])
             self.assertEqual(loop.feature_folder_tracked_modifications(rel), [])
             tracked = subprocess.run(["git", "ls-files", str(rel)],
-                                     capture_output=True, text=True).stdout
+                                     capture_output=True, text=True, check=False).stdout
             self.assertIn("PLAN.md", tracked)
 
     def test_prepare_commits_uncommitted_roadmap_row(self):
@@ -125,7 +125,7 @@ class TestPrepareFeature(unittest.TestCase):
             # roadmap.md must be clean (row committed, not left dirty)
             dirty = subprocess.run(
                 ["git", "status", "--porcelain", "--", ".specfuse/roadmap.md"],
-                capture_output=True, text=True).stdout.strip()
+                capture_output=True, text=True, check=False).stdout.strip()
             self.assertEqual(dirty, "", f"roadmap.md left uncommitted: {dirty!r}")
             # the row survives a per-attempt reset to the scaffold commit
             subprocess.run(["git", "reset", "--hard", "-q", "HEAD"], check=True)

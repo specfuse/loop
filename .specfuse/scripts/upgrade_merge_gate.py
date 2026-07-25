@@ -53,6 +53,7 @@ def collect_reports(repo_root) -> list[dict]:
             [sys.executable, str(lint_script), str(feature_dir)],
             capture_output=True,
             text=True,
+            check=False,
         )
         ok = result.returncode == 0
         detail = ""

@@ -137,7 +137,7 @@ class TestEnsureFeatureBranch(unittest.TestCase):
                 # branch was NOT created
                 exists = subprocess.run(
                     ["git", "rev-parse", "--verify", "feat/FEAT-2026-0023-x"],
-                    capture_output=True, text=True,
+                    capture_output=True, text=True, check=False,
                 ).returncode == 0
             self.assertFalse(exists)
             self.assertIn("src/app.py", str(ctx.exception))
@@ -182,7 +182,7 @@ class TestEnsureFeatureBranch(unittest.TestCase):
         scripts = Path(__file__).resolve().parent.parent / ".specfuse" / "scripts"
         proc = subprocess.run(
             ["python3", "-c", "from loop import ensure_feature_branch"],
-            cwd=str(scripts), capture_output=True, text=True,
+            cwd=str(scripts), capture_output=True, text=True, check=False,
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
 

@@ -1,10 +1,15 @@
 ---
 id: FEAT-2026-0037/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
+duration_seconds: 1029.663
+cost_usd: 4.874997
+input_tokens: 1517
+output_tokens: 51439
 ---
 
 # Gate 1 close — Adopt ruff's correctness rule families

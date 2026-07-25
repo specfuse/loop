@@ -54,7 +54,7 @@ class TestBookkeepingNoVerify(unittest.TestCase):
         self.assertIsInstance(sha, str)
         # the file is now committed
         tracked = subprocess.run(
-            ["git", "ls-files", "note.txt"], capture_output=True, text=True,
+            ["git", "ls-files", "note.txt"], capture_output=True, text=True, check=False,
         ).stdout.strip()
         self.assertEqual(tracked, "note.txt")
 
