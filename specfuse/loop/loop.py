@@ -1546,7 +1546,7 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 
     Reads `cost_budget_usd` from the GATE file's frontmatter. Returns the float
     when set, None when the field is absent. A present-but-non-numeric value is
-    a configuration error and raises ValueError naming the gate file — the
+    a configuration error and raises TypeError naming the gate file — the
     fail-loud posture matches verify()'s missing-gate-set treatment.
     """
     fm, _ = read_frontmatter(gate_file)
@@ -1554,7 +1554,7 @@ def gate_budget_usd(gate_file: Path) -> float | None:
         return None
     val = fm["cost_budget_usd"]
     if isinstance(val, bool) or not isinstance(val, (int, float)):
-        raise ValueError(
+        raise TypeError(
             f"{gate_file}: cost_budget_usd must be numeric, got {val!r}"
         )
     return float(val)
@@ -2294,8 +2294,8 @@ def resolve_bash() -> str | None:
             candidate = Path(exec_path).parent.parent / "bin" / "bash.exe"
             if candidate.is_file():
                 return str(candidate)
-    except Exception:
-        pass
+    except (OSError, subprocess.CalledProcessError) as exc:
+        logging.debug("resolve_bash: git --exec-path lookup failed: %s", exc)
 
     # Manual PATH scan rather than shutil.which(): shutil.which's win32 branch
     # touches _winapi, which is unavailable when running under a mocked
@@ -4667,7 +4667,10 @@ def run(
                                 # ships as a pip package (#100).
                                 from .lint_plan import lint_plan_next_draft
                                 _warns = lint_plan_next_draft(feature_dir, gate.number)
-                            except Exception as _exc:
+                            except Exception as _exc:  # noqa: BLE001 — warn-only
+                                # driver guard: a lint-hook bug must not crash
+                                # the run; the exception is bound and surfaced
+                                # to the operator via the warning, not swallowed.
                                 _warns = [f"lint_plan_next_draft raised: {_exc}"]
                             for _w in _warns:
                                 print(f"   WARN (plan-next-draft lint): {_w}")

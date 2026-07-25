@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0037/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.24
+started_at: 2026-07-25T13:18:51.686121+00:00
+duration_seconds: 312.173
+cost_usd: 0.826306
+input_tokens: 60
+output_tokens: 7557
 ---
 
 # Adopt exception-handling correctness rules (BLE001, S110, TRY004)

@@ -127,7 +127,7 @@ class TestGateBudgetUsd(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             gate_file = Path(tmp) / "GATE-01.md"
             _write_gate(gate_file, budget_line='cost_budget_usd: "two-fifty"')
-            with self.assertRaises(ValueError) as ctx:
+            with self.assertRaises(TypeError) as ctx:
                 loop.gate_budget_usd(gate_file)
             self.assertIn("GATE-01.md", str(ctx.exception))
 

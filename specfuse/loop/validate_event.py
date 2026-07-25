@@ -49,6 +49,7 @@ from pathlib import Path
 
 try:
     from jsonschema import Draft202012Validator
+    from jsonschema.exceptions import SchemaError
 except ImportError:
     sys.stderr.write(
         "error: the 'jsonschema' package is required.\n"
@@ -126,7 +127,7 @@ def load_per_type_validator(event_type: str) -> Draft202012Validator | None:
 
     try:
         Draft202012Validator.check_schema(schema)
-    except Exception as exc:  # jsonschema raises SchemaError, keep generic
+    except SchemaError as exc:
         sys.stderr.write(f"error: invalid per-type schema {schema_file}: {exc}\n")
         sys.exit(2)
 
