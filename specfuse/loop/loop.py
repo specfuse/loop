@@ -259,6 +259,60 @@ def write_frontmatter_field(path: Path, key: str, value) -> None:
     path.write_text("\n".join(new) + "\n")
 
 
+def write_frontmatter_block(path: Path, key: str, block_lines: list[str]) -> None:
+    """Replace (or insert) a multi-line YAML block value under `key` in a
+    file's frontmatter, leaving every other line untouched.
+
+    `block_lines` is the fully rendered `key:` line followed by its indented
+    child lines, exactly as the frontmatter should read (2-space steps, per
+    `_miniyaml`'s documented subset). An existing occurrence of `key` — its
+    `key:` line plus every following line indented deeper than `key`'s own
+    line — is spliced out and replaced; everything else in the frontmatter
+    block keeps its original text and order. This is the block-value sibling
+    of `write_frontmatter_field`'s single-scalar replace (FEAT-2026-0051/T02):
+    same no-reflow guarantee, needed because `baseline:` is a nested mapping,
+    not a scalar.
+    """
+    if not path.exists():
+        raise WorkUnitFileMissingError(
+            f"frontmatter file {path} is gone — the feature folder may have been "
+            f"removed by `git reset` mid-run (was it committed before the run?). "
+            f"Recover the folder from the reflog "
+            f"(`git checkout <squash-sha> -- {path.parent}`), reset the in-flight "
+            f"WU's status, and commit it before re-running the loop."
+        )
+    lines = path.read_text().splitlines()
+    if not lines or not FM.match(lines[0]):
+        raise ValueError(f"{path} has no frontmatter")
+    j = 1
+    while j < len(lines) and not FM.match(lines[j]):
+        j += 1
+    block = lines[1:j]
+    pat = re.compile(rf"^{re.escape(key)}:")
+    start = None
+    for idx, line in enumerate(block):
+        if pat.match(line):
+            start = idx
+            break
+    if start is None:
+        new_block = block + block_lines
+    else:
+        key_indent = len(block[start]) - len(block[start].lstrip(" "))
+        end = start + 1
+        while end < len(block):
+            candidate = block[end]
+            if candidate.strip() == "":
+                end += 1
+                continue
+            cur_indent = len(candidate) - len(candidate.lstrip(" "))
+            if cur_indent <= key_indent:
+                break
+            end += 1
+        new_block = block[:start] + block_lines + block[end:]
+    new = ["---", *new_block, "---", *lines[j + 1 :]]
+    path.write_text("\n".join(new) + "\n")
+
+
 # --------------------------------------------------------------------------- #
 # Plan / gate / WU loading                                                    #
 # --------------------------------------------------------------------------- #
@@ -2311,6 +2365,108 @@ def resolve_bash() -> str | None:
     return None
 
 
+def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
+    """Run every gate in *gate_set* and return one result dict per gate.
+
+    Each dict is {"name": str, "ok": bool, "report": str} where "report" is
+    the same PASS/FAIL fenced block `verify()` has always produced. Factored
+    out of `verify()` (FEAT-2026-0051/T01) so `probe_baseline()`
+    can run the `code` set independent of any work unit without duplicating the
+    subprocess hang defenses (stdin=DEVNULL, process-group kill on timeout) —
+    those stay exactly as they were, just in one place both callers share.
+    """
+    results = []
+    for gate in gate_set:
+        command = gate["command"].replace("{feature_dir}", str(feature_dir))
+        command = normalize_interpreter(command)
+        # shell=True is intentional: gate commands are authored by the user in
+        # verification.yml and routinely use shell features (pipes, &&, glob,
+        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
+        # is the project's own config, not untrusted external data.
+        #
+        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
+        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
+        # output pipe so communicate() stalls past the timeout):
+        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
+        #     gets EOF immediately and fails fast instead of blocking forever.
+        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
+        #     taskkill (Windows) on timeout — the gate runs in its own process
+        #     group; on timeout the WHOLE group (shell + grandchildren) is
+        #     killed, so the timer actually returns.
+        is_win32 = sys.platform == "win32"
+        spawn_kwargs = (
+            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+            if is_win32
+            else {"start_new_session": True}
+        )
+        if is_win32:
+            # cmd.exe (the shell=True default on Windows) does not understand
+            # the POSIX shell syntax (&&, ||, globs, pipes) that real
+            # verification.yml gate commands routinely use. Route through
+            # Git-Bash instead so gate commands run unmodified across
+            # platforms.
+            bash = resolve_bash()
+            if not bash:
+                results.append({
+                    "name": gate["name"],
+                    "ok": False,
+                    "report": (
+                        f"### {gate['name']}: FAIL\n```\n$ {command}\n"
+                        f"No Git-Bash found — install Git for Windows "
+                        f"(https://git-scm.com/download/win) so gate commands can "
+                        f"run through bash.exe.\n```"
+                    ),
+                })
+                continue
+            popen_argv = [bash, "-c", command]
+            popen_kwargs = dict(shell=False)
+        else:
+            popen_argv = command
+            popen_kwargs = dict(shell=True)  # nosec B604
+        proc = subprocess.Popen(  # nosec B602
+            popen_argv, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            **popen_kwargs, **spawn_kwargs,
+        )
+        try:
+            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
+            ok = proc.returncode == 0
+            tail = (out or "").strip().splitlines()[-15:]
+            # A green gate whose oracle silently degraded is a hollow pass
+            # (issue #134): force FAIL and name the degradation honestly so the
+            # log reads as "oracle couldn't measure it," not "code is clean."
+            if ok:
+                degraded = detect_degraded_oracle(out or "")
+                if degraded:
+                    ok = False
+                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
+        except subprocess.TimeoutExpired:
+            if is_win32:
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                    capture_output=True, check=False,
+                )
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    proc.kill()
+            out, _ = proc.communicate()
+            ok = False
+            tail = (out or "").strip().splitlines()[-10:] + [
+                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
+                f"(process group) — a hang (test reading stdin, infinite loop, "
+                f"or a wedged subprocess)."
+            ]
+        results.append({
+            "name": gate["name"],
+            "ok": ok,
+            "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
+                       f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
+        })
+    return results
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None) -> tuple[bool, str]:
     """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
@@ -2354,90 +2510,219 @@ def verify(wu: WorkUnit, feature_dir: Path,
                 continue
             seen_names.add(gate["name"])
             gate_set.append(gate)
-    results, ok_all = [], True
-    for gate in gate_set:
-        command = gate["command"].replace("{feature_dir}", str(feature_dir))
-        command = normalize_interpreter(command)
-        # shell=True is intentional: gate commands are authored by the user in
-        # verification.yml and routinely use shell features (pipes, &&, glob,
-        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
-        # is the project's own config, not untrusted external data.
-        #
-        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
-        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
-        # output pipe so communicate() stalls past the timeout):
-        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
-        #     gets EOF immediately and fails fast instead of blocking forever.
-        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
-        #     taskkill (Windows) on timeout — the gate runs in its own process
-        #     group; on timeout the WHOLE group (shell + grandchildren) is
-        #     killed, so the timer actually returns.
-        is_win32 = sys.platform == "win32"
-        spawn_kwargs = (
-            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
-            if is_win32
-            else {"start_new_session": True}
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    ok_all = all(g["ok"] for g in gate_results)
+    return ok_all, "\n\n".join(g["report"] for g in gate_results)
+
+
+def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
+    """Run the `code` gate set once, independent of any work unit, and return
+    the failing subset (FEAT-2026-0051/T01).
+
+    Returns a list of {"gate": <name>, "failure_class": <class>,
+    "failure_signature": <sig>} — one entry per failing gate, empty when every
+    gate in the `code` set passes. Only the `code` set is probed: `doc` and
+    `plannext` are driver-internal and have no externally-fed-oracle exposure.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    gate_set = cfg.get("code") or []
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    failing = []
+    for g in gate_results:
+        if g["ok"]:
+            continue
+        failure_class, failure_signature = parse_gate_failure_signature(g["report"])
+        failing.append({
+            "gate": g["name"],
+            "failure_class": failure_class,
+            "failure_signature": failure_signature,
+        })
+    return failing
+
+
+def baseline_evidence_diffstat(feat_fm: dict) -> "str | None":
+    """`git diff <base>...HEAD --stat` against the feature's configured
+    integration branch (FEAT-2026-0051/T03) — the base-vs-head proof that the
+    feature did not cause a preexisting_gate_failure halt.
+
+    Resolves the base through `resolve_base` (FEAT-2026-0031's existing
+    frontmatter-`base` / repo-default mechanism), never a hardcoded branch
+    name. Returns None — never raises — when the base cannot be resolved
+    (e.g. detached HEAD with no remote default) or the `git diff` itself
+    fails (unreachable ref, shallow clone): the caller degrades to a
+    "base-tree comparison unavailable" line rather than let evidence
+    collection block the halt.
+    """
+    base = resolve_base(feat_fm)
+    if not base:
+        return None
+    out = subprocess.run(
+        ["git", "diff", f"{base}...HEAD", "--stat"],
+        capture_output=True, text=True, check=False,
+    )
+    if out.returncode != 0:
+        return None
+    stat = out.stdout.strip()
+    return f"git diff {base}...HEAD --stat:\n{stat}" if stat else (
+        f"git diff {base}...HEAD --stat: (no differences from '{base}')"
+    )
+
+
+def format_preexisting_gate_failure(
+    gate_number: int, failing_gates: list[dict], feat_fm: dict,
+) -> str:
+    """Render the `preexisting_gate_failure` halt as a message a non-expert
+    operator can act on without reading driver source (FEAT-2026-0051/T03).
+
+    Names the failing gate(s) and their exact failure signatures, states
+    plainly that no work unit caused the failure and that zero work units
+    were dispatched, attaches the `baseline_evidence_diffstat` proof (or an
+    explicit unavailable line when that proof cannot be produced), and lists
+    the only two v1 options — fix the debt on the integration branch, or
+    defer the feature. There is no "proceed anyway" option in v1: the waiver
+    is future work tracked as FEAT-2026-0052, never offered here as if it
+    already existed.
+    """
+    lines = [
+        f"Gate {gate_number} is blocked: the automated checks it depends on "
+        f"were already failing before this feature touched any file.",
+        "",
+        "Failing check(s) found at gate entry:",
+    ]
+    for g in failing_gates:
+        lines.append(
+            f"  - {g['gate']}: {g['failure_class']} "
+            f"(signature: {g['failure_signature']})"
         )
-        if is_win32:
-            # cmd.exe (the shell=True default on Windows) does not understand
-            # the POSIX shell syntax (&&, ||, globs, pipes) that real
-            # verification.yml gate commands routinely use. Route through
-            # Git-Bash instead so gate commands run unmodified across
-            # platforms.
-            bash = resolve_bash()
-            if not bash:
-                ok_all = False
-                results.append(
-                    f"### {gate['name']}: FAIL\n```\n$ {command}\n"
-                    f"No Git-Bash found — install Git for Windows "
-                    f"(https://git-scm.com/download/win) so gate commands can "
-                    f"run through bash.exe.\n```"
-                )
-                continue
-            popen_argv = [bash, "-c", command]
-            popen_kwargs = dict(shell=False)
-        else:
-            popen_argv = command
-            popen_kwargs = dict(shell=True)  # nosec B604
-        proc = subprocess.Popen(  # nosec B602
-            popen_argv, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            **popen_kwargs, **spawn_kwargs,
+    lines.append("")
+    lines.append(
+        "No work unit caused this failure: the checks were run once, before "
+        "any work unit was dispatched, and this is what they found. Zero "
+        "work units were dispatched for this gate."
+    )
+    lines.append("")
+    diffstat = baseline_evidence_diffstat(feat_fm)
+    if diffstat is not None:
+        lines.append(
+            "Proof the feature's tree matches its integration branch "
+            "(so the failure predates this feature):"
         )
-        try:
-            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
-            ok = proc.returncode == 0
-            tail = (out or "").strip().splitlines()[-15:]
-            # A green gate whose oracle silently degraded is a hollow pass
-            # (issue #134): force FAIL and name the degradation honestly so the
-            # log reads as "oracle couldn't measure it," not "code is clean."
-            if ok:
-                degraded = detect_degraded_oracle(out or "")
-                if degraded:
-                    ok = False
-                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
-        except subprocess.TimeoutExpired:
-            if is_win32:
-                subprocess.run(
-                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                    capture_output=True, check=False,
-                )
-            else:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    proc.kill()
-            out, _ = proc.communicate()
-            ok = False
-            tail = (out or "").strip().splitlines()[-10:] + [
-                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
-                f"(process group) — a hang (test reading stdin, infinite loop, "
-                f"or a wedged subprocess)."
-            ]
-        ok_all = ok_all and ok
-        results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
-                       f"```\n$ {command}\n" + "\n".join(tail) + "\n```")
-    return ok_all, "\n\n".join(results)
+        lines.append(diffstat)
+    else:
+        lines.append(
+            "Base-tree comparison unavailable (no integration branch could "
+            "be resolved, or the comparison itself failed) — the failing "
+            "check(s) above were still measured before any work unit ran, "
+            "so the conclusion stands even without this proof."
+        )
+    lines.append("")
+    lines.append("What to do next:")
+    lines.append(
+        "  1. Fix the failing check(s) on the integration branch — typically "
+        "with /fix-bug — so this feature's branch inherits the fix on rebase."
+    )
+    lines.append("  2. Or defer this feature until the integration branch is green.")
+    lines.append("")
+    lines.append(
+        "There is no way to proceed past this halt in this version. A "
+        "waiver that lets a feature continue against a red baseline is "
+        "future work tracked as FEAT-2026-0052; it does not exist yet."
+    )
+    return "\n".join(lines)
+
+
+def read_gate_baseline(gate_file: Path) -> dict | None:
+    """Return the gate's persisted probe record, or None if absent or malformed
+    (FEAT-2026-0051/T02).
+
+    A `baseline:` block missing `sha`, holding the wrong shape (not a mapping,
+    `failing` not a list), or sitting inside frontmatter that fails to parse at
+    all, is treated as if the gate had never been probed — the caller re-probes
+    rather than crashing on a half-written block. An empty `failing:` list is
+    NOT malformed: it is the real, meaningful "probed, and it was green" record
+    and is returned as `{"failing": []}`, distinguishable from this function's
+    `None` (never probed / unreadable).
+    """
+    try:
+        fm, _ = read_frontmatter(gate_file)
+    except _miniyaml.MiniYAMLError:
+        return None
+    baseline = fm.get("baseline")
+    if not isinstance(baseline, dict):
+        return None
+    sha = baseline.get("sha")
+    if not isinstance(sha, str) or not sha:
+        return None
+    failing = baseline.get("failing")
+    if failing is None:
+        failing = []
+    if not isinstance(failing, list):
+        return None
+    return {"sha": sha, "probed_at": baseline.get("probed_at"), "failing": failing}
+
+
+def write_gate_baseline(
+    gate_file: Path, sha: str, probed_at: str, failing: list[dict],
+) -> None:
+    """Persist a probe result into the gate file's `baseline:` frontmatter
+    block (FEAT-2026-0051/T02), via `write_frontmatter_block` — the same
+    no-reflow writer `write_frontmatter_field` uses for scalar gate keys, so
+    every other line in the gate file (including `cost_budget_usd`) is left
+    byte-identical.
+
+    An empty `failing` is written as `failing: []` (inline empty flow list),
+    never an omitted key — `read_gate_baseline` depends on this to tell "probed
+    green" from "never probed."
+    """
+    lines = ["baseline:", f"  sha: {sha}", f"  probed_at: {probed_at}"]
+    if not failing:
+        lines.append("  failing: []")
+    else:
+        lines.append("  failing:")
+        for entry in failing:
+            lines.append(f"    - gate: {entry['gate']}")
+            lines.append(f"      failure_class: {entry['failure_class']}")
+            lines.append(f"      failure_signature: {entry['failure_signature']}")
+    write_frontmatter_block(gate_file, "baseline", lines)
+
+
+def gate_baseline_check(
+    gate_file: Path, feature_dir: Path, cfg: dict, head_sha: str,
+    probed_at: str | None = None,
+) -> tuple[list[dict], bool]:
+    """Resolve this gate entry's failing-gate set, re-probing only when the
+    tree has moved (FEAT-2026-0051/T02's re-probe policy).
+
+    Skips `probe_baseline` when the gate's recorded `baseline.sha` already
+    equals `head_sha` — nothing else invalidates the record in v1. Any other
+    case (no record, or a different sha) re-probes and persists the new
+    result via `write_gate_baseline`. Returns `(failing_gates, freshly_probed)`
+    — the caller uses the second element to decide whether a bookkeeping
+    commit is needed for this entry (a skip writes nothing, so nothing to
+    commit).
+    """
+    baseline = read_gate_baseline(gate_file)
+    if baseline is not None and baseline["sha"] == head_sha:
+        return baseline["failing"], False
+    if probed_at is None:
+        probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    failing = probe_baseline(feature_dir, cfg)
+    write_gate_baseline(gate_file, head_sha, probed_at, failing)
+    return failing, True
+
+
+def baseline_probe_enabled(no_baseline_probe: bool, cfg: dict | None = None) -> bool:
+    """Resolve whether the pre-flight baseline probe runs at gate entry
+    (FEAT-2026-0051/T02), in this one place. Precedence: the `--no-baseline-probe`
+    CLI flag beats the `baseline_probe` verification.yml key beats the default
+    (enabled) — the CLI flag wins even if verification.yml also enables it.
+    """
+    if no_baseline_probe:
+        return False
+    if cfg is None:
+        cfg = load_verification()
+    return cfg.get("baseline_probe", True) is not False
 
 
 def execute_unit_attempt(
@@ -4015,6 +4300,7 @@ def run(
     force_full_close: str | None = None,
     prepare: bool = False,
     prepare_only: bool = False,
+    no_baseline_probe: bool = False,
 ) -> int:
     # Fail-fast on a malformed verification.yml BEFORE we touch any WU state.
     # The per-gate `verify()` call lazy-loads the same file; if it's malformed,
@@ -4141,6 +4427,47 @@ def run(
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
+
+        # Pre-flight baseline gate probe (FEAT-2026-0051/T01) — one run of the
+        # `code` set at gate entry, before any WU is dispatched, so a gate
+        # already red on the base tree halts here instead of every WU
+        # inheriting it as a self-inflicted exit oracle. Skipped in dry_run
+        # (no gates should run) and when the gate is already awaiting_review
+        # (mirrors the budget brake's skip condition just below).
+        if (not dry_run and gate.status != "awaiting_review"
+                and baseline_probe_enabled(no_baseline_probe, cfg)):
+            head_sha = git("rev-parse", "HEAD")
+            failing_gates, freshly_probed = gate_baseline_check(
+                gate.file, feature_dir, cfg, head_sha)
+            # A fresh green probe still needs its record committed — nothing
+            # else touches gate.file on this path, so without this commit the
+            # write would sit uncommitted and vanish on the next reset (#199's
+            # class of bug). The red path's commit below already carries the
+            # write (same gate.file), so this only fires on green.
+            if freshly_probed and not failing_gates:
+                commit_bookkeeping(
+                    [gate.file],
+                    f"chore(loop): gate {gate.number} baseline probed clean"
+                    f"\n\nFeature: {feature_id}",
+                )
+            if failing_gates:
+                backend.set_gate(gate, "awaiting_review")
+                escalation_message = format_preexisting_gate_failure(
+                    gate.number, failing_gates, feat_fm)
+                flush_events(events_path, [build_event(
+                    "human_escalation", feature_id, {
+                        "reason": "preexisting_gate_failure",
+                        "gate": gate.number,
+                        "failing_gates": failing_gates,
+                        "message": escalation_message,
+                    })])
+                commit_bookkeeping(
+                    [gate.file, events_path],
+                    f"chore(loop): gate {gate.number} preexisting gate failure "
+                    f"— awaiting_review\n\nFeature: {feature_id}",
+                )
+                print(f"\n{escalation_message}")
+                return 1
 
         while True:
             pending = ready(units, done_ids)
@@ -5264,12 +5591,20 @@ def main() -> int:
                     help="Like --prepare (create branch + commit the folder) but "
                     "STOP afterwards without dispatching — review the commit, then "
                     "re-run `specfuse-loop` to start.")
+    ap.add_argument("--no-baseline-probe", action="store_true",
+                    help="Skip the pre-flight baseline gate probe entirely — "
+                    "dispatch proceeds exactly as it did before the probe existed. "
+                    "Weakens no gate: verify()'s per-WU pass/fail semantics are "
+                    "unchanged; only the preexisting_gate_failure pre-dispatch "
+                    "halt is disabled, since with no probe there is no failing "
+                    "set for it to fire on.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
     auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
-               prepare=args.prepare, prepare_only=args.prepare_only)
+               prepare=args.prepare, prepare_only=args.prepare_only,
+               no_baseline_probe=args.no_baseline_probe)
 
 
 if __name__ == "__main__":

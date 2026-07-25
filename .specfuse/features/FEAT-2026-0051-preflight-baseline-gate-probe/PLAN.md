@@ -5,7 +5,7 @@ slug: preflight-baseline-gate-probe
 branch: feat/FEAT-2026-0051-preflight-baseline-gate-probe
 roadmap_goal: Probe the gate set once at gate entry so a gate already red on the base tree halts with preexisting_gate_failure having dispatched zero work units, instead of every WU inheriting the red gate as its exit oracle and spinning its full attempt budget against a failure no WU caused.
 autonomy_default: review
-status: planned
+status: done
 planned_cost_usd: 21.00
 ---
 

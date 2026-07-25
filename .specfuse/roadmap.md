@@ -66,7 +66,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
-| FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | planned | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | — |
+| FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | blocked | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -886,20 +886,6 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: blocked.**
 
-<a id="feat-2026-0051"></a>
-## FEAT-2026-0051 — Pre-flight baseline gate probe + preexisting_gate_failure halt
-
-**Why.** A `code`-set gate that is already red on the feature's base commit becomes every work unit's exit oracle, so each WU spins to `spinning_signature_repeat` / `spinning_detected` against a failure it did not cause and could not fix. A live run burned roughly $8 of attempt budget across two WUs — one of them a zero-dependency file — on a dependency-audit advisory published after the base tree was last green, with the lockfile byte-identical to the integration branch. This is the time-varying-oracle failure mode already recorded in LEARNINGS (`[FEAT-2026-0007/G1-CLOSE]`); dependency audits are the canonical case, but it generalizes to any externally-fed gate whose verdict changes without a code change.
-
-**Goal.** Run the `code` gate set once at gate entry, before the gate's first WU is dispatched, and record the failing gates plus their signatures as the gate's baseline in `GATE-NN.md` frontmatter. A non-empty baseline halts pre-dispatch under a new `preexisting_gate_failure` reason — distinct from the spinning escalations, which fire only after attempts are spent — with zero work units dispatched. The halt message states in plain language which gate is red, the exact failing signature, and the `git diff <integration-branch>...HEAD --stat` proof that the base tree is unchanged, so no WU caused it. The baseline is re-measured only when the tree moves, keeping resume cheap, and `--no-baseline-probe` (plus a `verification.yml` opt-out) restores today's behavior exactly — a switch that disables the probe, not a mute that suppresses any gate's verdict.
-
-**Benefits.** Repo-wide debt stops charging rent per work unit: one gate-set run replaces a full attempt budget burned per WU, and the operator gets the conclusion — pre-existing, not yours — in the first escalation instead of deriving it by hand after several spurious ones. Enforcement is untouched: every WU is still gated on the full set with unchanged pass/fail semantics.
-
-**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
-
-**Status: planned.**
-
-<a id="feat-2026-0052"></a>
 ## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
 
 **Why.** [FEAT-2026-0051](#feat-2026-0051) stops the bleeding — a gate already red on the base tree halts before any work unit is dispatched — but leaves the operator only two exits: fix the repo-wide debt first, or defer the feature. Neither is right when the debt is real, externally-caused, and slow to resolve (an unpatched transitive advisory with no upstream fix yet), because the feature is then held hostage by a failure it did not cause and cannot repair. The missing third exit is "proceed, with everything the baseline already had held constant and everything new still enforced."

@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: passed
 cost_budget_usd: 32.00
 ---
 

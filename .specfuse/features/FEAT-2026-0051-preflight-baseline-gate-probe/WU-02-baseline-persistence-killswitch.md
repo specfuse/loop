@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0051/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces_driver_helper: read_gate_baseline, write_gate_baseline, baseline_probe_enabled
 produces:
   - specfuse/loop/loop.py
   - tests/test_baseline_persistence.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.24
+started_at: 2026-07-25T19:15:00.556942+00:00
+duration_seconds: 825.306
+cost_usd: 3.753671
+input_tokens: 124
+output_tokens: 40408
 ---
 
 # Persist the baseline in gate frontmatter; add the re-probe policy and kill-switch

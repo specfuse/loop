@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0051/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 produces_driver_helper: probe_baseline, _should_halt_for_preexisting_failure
 produces:
   - specfuse/loop/loop.py
   - tests/test_baseline_probe.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.24
+started_at: 2026-07-25T19:07:08.582011+00:00
+duration_seconds: 471.807
+cost_usd: 1.830919
+input_tokens: 4911
+output_tokens: 18336
 ---
 
 # Probe the code gate set at gate entry and halt on a red baseline

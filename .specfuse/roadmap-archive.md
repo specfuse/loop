@@ -43,6 +43,21 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0051"></a>
+## FEAT-2026-0051 — Pre-flight baseline gate probe + preexisting_gate_failure halt
+
+**Why.** A `code`-set gate that is already red on the feature's base commit becomes every work unit's exit oracle, so each WU spins to `spinning_signature_repeat` / `spinning_detected` against a failure it did not cause and could not fix. A live run burned roughly $8 of attempt budget across two WUs — one of them a zero-dependency file — on a dependency-audit advisory published after the base tree was last green, with the lockfile byte-identical to the integration branch. This is the time-varying-oracle failure mode already recorded in LEARNINGS (`[FEAT-2026-0007/G1-CLOSE]`); dependency audits are the canonical case, but it generalizes to any externally-fed gate whose verdict changes without a code change.
+
+**Goal.** Run the `code` gate set once at gate entry, before the gate's first WU is dispatched, and record the failing gates plus their signatures as the gate's baseline in `GATE-NN.md` frontmatter. A non-empty baseline halts pre-dispatch under a new `preexisting_gate_failure` reason — distinct from the spinning escalations, which fire only after attempts are spent — with zero work units dispatched. The halt message states in plain language which gate is red, the exact failing signature, and the `git diff <integration-branch>...HEAD --stat` proof that the base tree is unchanged, so no WU caused it. The baseline is re-measured only when the tree moves, keeping resume cheap, and `--no-baseline-probe` (plus a `verification.yml` opt-out) restores today's behavior exactly — a switch that disables the probe, not a mute that suppresses any gate's verdict.
+
+**Benefits.** Repo-wide debt stops charging rent per work unit: one gate-set run replaces a full attempt budget burned per WU, and the operator gets the conclusion — pre-existing, not yours — in the first escalation instead of deriving it by hand after several spurious ones. Enforcement is untouched: every WU is still gated on the full set with unchanged pass/fail semantics.
+
+**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
+
+**Status: planned.**
+
+<a id="feat-2026-0052"></a>
+
 <a id="feat-2026-0037"></a>
 ## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
 
