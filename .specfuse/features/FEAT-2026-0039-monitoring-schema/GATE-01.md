@@ -1,6 +1,10 @@
 ---
 gate: 1
 status: open
+baseline:
+  sha: a045765f43f0a98c232a88c413b89b5f96b04199
+  probed_at: 2026-07-25T21:13:12.880633+00:00
+  failing: []
 ---
 
 # Gate 1 — the monitoring contract is machine-checkable
