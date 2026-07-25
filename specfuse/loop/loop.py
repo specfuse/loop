@@ -2541,6 +2541,97 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
     return failing
 
 
+def baseline_evidence_diffstat(feat_fm: dict) -> "str | None":
+    """`git diff <base>...HEAD --stat` against the feature's configured
+    integration branch (FEAT-2026-0051/T03) — the base-vs-head proof that the
+    feature did not cause a preexisting_gate_failure halt.
+
+    Resolves the base through `resolve_base` (FEAT-2026-0031's existing
+    frontmatter-`base` / repo-default mechanism), never a hardcoded branch
+    name. Returns None — never raises — when the base cannot be resolved
+    (e.g. detached HEAD with no remote default) or the `git diff` itself
+    fails (unreachable ref, shallow clone): the caller degrades to a
+    "base-tree comparison unavailable" line rather than let evidence
+    collection block the halt.
+    """
+    base = resolve_base(feat_fm)
+    if not base:
+        return None
+    out = subprocess.run(
+        ["git", "diff", f"{base}...HEAD", "--stat"],
+        capture_output=True, text=True, check=False,
+    )
+    if out.returncode != 0:
+        return None
+    stat = out.stdout.strip()
+    return f"git diff {base}...HEAD --stat:\n{stat}" if stat else (
+        f"git diff {base}...HEAD --stat: (no differences from '{base}')"
+    )
+
+
+def format_preexisting_gate_failure(
+    gate_number: int, failing_gates: list[dict], feat_fm: dict,
+) -> str:
+    """Render the `preexisting_gate_failure` halt as a message a non-expert
+    operator can act on without reading driver source (FEAT-2026-0051/T03).
+
+    Names the failing gate(s) and their exact failure signatures, states
+    plainly that no work unit caused the failure and that zero work units
+    were dispatched, attaches the `baseline_evidence_diffstat` proof (or an
+    explicit unavailable line when that proof cannot be produced), and lists
+    the only two v1 options — fix the debt on the integration branch, or
+    defer the feature. There is no "proceed anyway" option in v1: the waiver
+    is future work tracked as FEAT-2026-0052, never offered here as if it
+    already existed.
+    """
+    lines = [
+        f"Gate {gate_number} is blocked: the automated checks it depends on "
+        f"were already failing before this feature touched any file.",
+        "",
+        "Failing check(s) found at gate entry:",
+    ]
+    for g in failing_gates:
+        lines.append(
+            f"  - {g['gate']}: {g['failure_class']} "
+            f"(signature: {g['failure_signature']})"
+        )
+    lines.append("")
+    lines.append(
+        "No work unit caused this failure: the checks were run once, before "
+        "any work unit was dispatched, and this is what they found. Zero "
+        "work units were dispatched for this gate."
+    )
+    lines.append("")
+    diffstat = baseline_evidence_diffstat(feat_fm)
+    if diffstat is not None:
+        lines.append(
+            "Proof the feature's tree matches its integration branch "
+            "(so the failure predates this feature):"
+        )
+        lines.append(diffstat)
+    else:
+        lines.append(
+            "Base-tree comparison unavailable (no integration branch could "
+            "be resolved, or the comparison itself failed) — the failing "
+            "check(s) above were still measured before any work unit ran, "
+            "so the conclusion stands even without this proof."
+        )
+    lines.append("")
+    lines.append("What to do next:")
+    lines.append(
+        "  1. Fix the failing check(s) on the integration branch — typically "
+        "with /fix-bug — so this feature's branch inherits the fix on rebase."
+    )
+    lines.append("  2. Or defer this feature until the integration branch is green.")
+    lines.append("")
+    lines.append(
+        "There is no way to proceed past this halt in this version. A "
+        "waiver that lets a feature continue against a red baseline is "
+        "future work tracked as FEAT-2026-0052; it does not exist yet."
+    )
+    return "\n".join(lines)
+
+
 def read_gate_baseline(gate_file: Path) -> dict | None:
     """Return the gate's persisted probe record, or None if absent or malformed
     (FEAT-2026-0051/T02).
@@ -4361,21 +4452,21 @@ def run(
                 )
             if failing_gates:
                 backend.set_gate(gate, "awaiting_review")
+                escalation_message = format_preexisting_gate_failure(
+                    gate.number, failing_gates, feat_fm)
                 flush_events(events_path, [build_event(
                     "human_escalation", feature_id, {
                         "reason": "preexisting_gate_failure",
                         "gate": gate.number,
                         "failing_gates": failing_gates,
+                        "message": escalation_message,
                     })])
                 commit_bookkeeping(
                     [gate.file, events_path],
                     f"chore(loop): gate {gate.number} preexisting gate failure "
                     f"— awaiting_review\n\nFeature: {feature_id}",
                 )
-                print(f"\nGate {gate.number} baseline probe found "
-                      f"{len(failing_gates)} pre-existing failing gate(s): "
-                      f"{[g['gate'] for g in failing_gates]}. Halted before "
-                      f"dispatching any work unit.")
+                print(f"\n{escalation_message}")
                 return 1
 
         while True:

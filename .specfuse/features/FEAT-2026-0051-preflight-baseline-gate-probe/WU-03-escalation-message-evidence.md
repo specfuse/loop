@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0051/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: format_preexisting_gate_failure, baseline_evidence_diffstat
 produces:
   - specfuse/loop/loop.py
   - tests/test_baseline_escalation_message.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.3.24
+started_at: 2026-07-25T19:28:46.015961+00:00
+duration_seconds: 485.836
+cost_usd: 1.576671
+input_tokens: 72
+output_tokens: 16722
 ---
 
 # Write the halt message a non-expert operator can act on
