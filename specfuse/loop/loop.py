@@ -2311,6 +2311,108 @@ def resolve_bash() -> str | None:
     return None
 
 
+def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
+    """Run every gate in *gate_set* and return one result dict per gate.
+
+    Each dict is {"name": str, "ok": bool, "report": str} where "report" is
+    the same PASS/FAIL fenced block `verify()` has always produced. Factored
+    out of `verify()` (FEAT-2026-0051/T01) so `probe_baseline()`
+    can run the `code` set independent of any work unit without duplicating the
+    subprocess hang defenses (stdin=DEVNULL, process-group kill on timeout) —
+    those stay exactly as they were, just in one place both callers share.
+    """
+    results = []
+    for gate in gate_set:
+        command = gate["command"].replace("{feature_dir}", str(feature_dir))
+        command = normalize_interpreter(command)
+        # shell=True is intentional: gate commands are authored by the user in
+        # verification.yml and routinely use shell features (pipes, &&, glob,
+        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
+        # is the project's own config, not untrusted external data.
+        #
+        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
+        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
+        # output pipe so communicate() stalls past the timeout):
+        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
+        #     gets EOF immediately and fails fast instead of blocking forever.
+        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
+        #     taskkill (Windows) on timeout — the gate runs in its own process
+        #     group; on timeout the WHOLE group (shell + grandchildren) is
+        #     killed, so the timer actually returns.
+        is_win32 = sys.platform == "win32"
+        spawn_kwargs = (
+            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
+            if is_win32
+            else {"start_new_session": True}
+        )
+        if is_win32:
+            # cmd.exe (the shell=True default on Windows) does not understand
+            # the POSIX shell syntax (&&, ||, globs, pipes) that real
+            # verification.yml gate commands routinely use. Route through
+            # Git-Bash instead so gate commands run unmodified across
+            # platforms.
+            bash = resolve_bash()
+            if not bash:
+                results.append({
+                    "name": gate["name"],
+                    "ok": False,
+                    "report": (
+                        f"### {gate['name']}: FAIL\n```\n$ {command}\n"
+                        f"No Git-Bash found — install Git for Windows "
+                        f"(https://git-scm.com/download/win) so gate commands can "
+                        f"run through bash.exe.\n```"
+                    ),
+                })
+                continue
+            popen_argv = [bash, "-c", command]
+            popen_kwargs = dict(shell=False)
+        else:
+            popen_argv = command
+            popen_kwargs = dict(shell=True)  # nosec B604
+        proc = subprocess.Popen(  # nosec B602
+            popen_argv, stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            **popen_kwargs, **spawn_kwargs,
+        )
+        try:
+            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
+            ok = proc.returncode == 0
+            tail = (out or "").strip().splitlines()[-15:]
+            # A green gate whose oracle silently degraded is a hollow pass
+            # (issue #134): force FAIL and name the degradation honestly so the
+            # log reads as "oracle couldn't measure it," not "code is clean."
+            if ok:
+                degraded = detect_degraded_oracle(out or "")
+                if degraded:
+                    ok = False
+                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
+        except subprocess.TimeoutExpired:
+            if is_win32:
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                    capture_output=True, check=False,
+                )
+            else:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    proc.kill()
+            out, _ = proc.communicate()
+            ok = False
+            tail = (out or "").strip().splitlines()[-10:] + [
+                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
+                f"(process group) — a hang (test reading stdin, infinite loop, "
+                f"or a wedged subprocess)."
+            ]
+        results.append({
+            "name": gate["name"],
+            "ok": ok,
+            "report": (f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
+                       f"```\n$ {command}\n" + "\n".join(tail) + "\n```"),
+        })
+    return results
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None) -> tuple[bool, str]:
     """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
@@ -2354,90 +2456,35 @@ def verify(wu: WorkUnit, feature_dir: Path,
                 continue
             seen_names.add(gate["name"])
             gate_set.append(gate)
-    results, ok_all = [], True
-    for gate in gate_set:
-        command = gate["command"].replace("{feature_dir}", str(feature_dir))
-        command = normalize_interpreter(command)
-        # shell=True is intentional: gate commands are authored by the user in
-        # verification.yml and routinely use shell features (pipes, &&, glob,
-        # redirects — e.g. `dotnet build && dotnet test --no-build`). The input
-        # is the project's own config, not untrusted external data.
-        #
-        # Two hang defenses (a bare subprocess.run(timeout=) is NOT enough — on
-        # timeout it SIGKILLs only the shell, leaving a hung grandchild holding the
-        # output pipe so communicate() stalls past the timeout):
-        #  1. stdin=DEVNULL — a gate that reads stdin (e.g. a test calling input())
-        #     gets EOF immediately and fails fast instead of blocking forever.
-        #  2. start_new_session + killpg (POSIX) / CREATE_NEW_PROCESS_GROUP +
-        #     taskkill (Windows) on timeout — the gate runs in its own process
-        #     group; on timeout the WHOLE group (shell + grandchildren) is
-        #     killed, so the timer actually returns.
-        is_win32 = sys.platform == "win32"
-        spawn_kwargs = (
-            {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200)}
-            if is_win32
-            else {"start_new_session": True}
-        )
-        if is_win32:
-            # cmd.exe (the shell=True default on Windows) does not understand
-            # the POSIX shell syntax (&&, ||, globs, pipes) that real
-            # verification.yml gate commands routinely use. Route through
-            # Git-Bash instead so gate commands run unmodified across
-            # platforms.
-            bash = resolve_bash()
-            if not bash:
-                ok_all = False
-                results.append(
-                    f"### {gate['name']}: FAIL\n```\n$ {command}\n"
-                    f"No Git-Bash found — install Git for Windows "
-                    f"(https://git-scm.com/download/win) so gate commands can "
-                    f"run through bash.exe.\n```"
-                )
-                continue
-            popen_argv = [bash, "-c", command]
-            popen_kwargs = dict(shell=False)
-        else:
-            popen_argv = command
-            popen_kwargs = dict(shell=True)  # nosec B604
-        proc = subprocess.Popen(  # nosec B602
-            popen_argv, stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            **popen_kwargs, **spawn_kwargs,
-        )
-        try:
-            out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
-            ok = proc.returncode == 0
-            tail = (out or "").strip().splitlines()[-15:]
-            # A green gate whose oracle silently degraded is a hollow pass
-            # (issue #134): force FAIL and name the degradation honestly so the
-            # log reads as "oracle couldn't measure it," not "code is clean."
-            if ok:
-                degraded = detect_degraded_oracle(out or "")
-                if degraded:
-                    ok = False
-                    tail = tail + [f"DEGRADED ORACLE: {degraded}"]
-        except subprocess.TimeoutExpired:
-            if is_win32:
-                subprocess.run(
-                    ["taskkill", "/T", "/F", "/PID", str(proc.pid)],
-                    capture_output=True, check=False,
-                )
-            else:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                except (ProcessLookupError, PermissionError):
-                    proc.kill()
-            out, _ = proc.communicate()
-            ok = False
-            tail = (out or "").strip().splitlines()[-10:] + [
-                f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
-                f"(process group) — a hang (test reading stdin, infinite loop, "
-                f"or a wedged subprocess)."
-            ]
-        ok_all = ok_all and ok
-        results.append(f"### {gate['name']}: {'PASS' if ok else 'FAIL'}\n"
-                       f"```\n$ {command}\n" + "\n".join(tail) + "\n```")
-    return ok_all, "\n\n".join(results)
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    ok_all = all(g["ok"] for g in gate_results)
+    return ok_all, "\n\n".join(g["report"] for g in gate_results)
+
+
+def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
+    """Run the `code` gate set once, independent of any work unit, and return
+    the failing subset (FEAT-2026-0051/T01).
+
+    Returns a list of {"gate": <name>, "failure_class": <class>,
+    "failure_signature": <sig>} — one entry per failing gate, empty when every
+    gate in the `code` set passes. Only the `code` set is probed: `doc` and
+    `plannext` are driver-internal and have no externally-fed-oracle exposure.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    gate_set = cfg.get("code") or []
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    failing = []
+    for g in gate_results:
+        if g["ok"]:
+            continue
+        failure_class, failure_signature = parse_gate_failure_signature(g["report"])
+        failing.append({
+            "gate": g["name"],
+            "failure_class": failure_class,
+            "failure_signature": failure_signature,
+        })
+    return failing
 
 
 def execute_unit_attempt(
@@ -4141,6 +4188,33 @@ def run(
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
+
+        # Pre-flight baseline gate probe (FEAT-2026-0051/T01) — one run of the
+        # `code` set at gate entry, before any WU is dispatched, so a gate
+        # already red on the base tree halts here instead of every WU
+        # inheriting it as a self-inflicted exit oracle. Skipped in dry_run
+        # (no gates should run) and when the gate is already awaiting_review
+        # (mirrors the budget brake's skip condition just below).
+        if not dry_run and gate.status != "awaiting_review":
+            failing_gates = probe_baseline(feature_dir, cfg)
+            if failing_gates:
+                backend.set_gate(gate, "awaiting_review")
+                flush_events(events_path, [build_event(
+                    "human_escalation", feature_id, {
+                        "reason": "preexisting_gate_failure",
+                        "gate": gate.number,
+                        "failing_gates": failing_gates,
+                    })])
+                commit_bookkeeping(
+                    [gate.file, events_path],
+                    f"chore(loop): gate {gate.number} preexisting gate failure "
+                    f"— awaiting_review\n\nFeature: {feature_id}",
+                )
+                print(f"\nGate {gate.number} baseline probe found "
+                      f"{len(failing_gates)} pre-existing failing gate(s): "
+                      f"{[g['gate'] for g in failing_gates]}. Halted before "
+                      f"dispatching any work unit.")
+                return 1
 
         while True:
             pending = ready(units, done_ids)

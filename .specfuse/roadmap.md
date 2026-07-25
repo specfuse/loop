@@ -66,7 +66,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
-| FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | planned | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | — |
+| FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | active | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | — |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | blocked | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
