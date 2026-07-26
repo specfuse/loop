@@ -253,8 +253,18 @@ def _find_task_graph_block(body: str) -> dict | None:
 # (clabonte/generator), poisoning every calibration built on the plans (#201).
 # The floor is a WARN threshold, not a cap — estimates below it are almost
 # certainly wishful, not cheap.
-CEREMONY_COST_FLOOR_USD = 5.0
-_CEREMONY_TYPES = frozenset({"close", "close-intermediate", "plan-next"})
+# Per-type, because the types do not cost the same: across 158 closing WUs in
+# 9 repositories the medians were $3.57 / $2.73 / $2.01 and the p90s $6.10 /
+# $5.42 / $4.34. Each floor sits at roughly its own p90. A single flat figure
+# either warns on a correctly-drafted close-intermediate or lets a wishful
+# plan-next through. Canonical statement: planning-discipline.md §5 — these
+# values are bound to it by tests/test_planning_cost_floor.py.
+CEREMONY_COST_FLOORS_USD = {
+    "plan-next": 6.0,
+    "close": 5.0,
+    "close-intermediate": 4.5,
+}
+_CEREMONY_TYPES = frozenset(CEREMONY_COST_FLOORS_USD)
 
 
 def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
@@ -263,7 +273,7 @@ def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
     Sealed WUs (wu status=done AND plan status=done) are skipped silently —
     backfilling cost estimates on history is pointless.  Active or draft WUs
     get the WARN.  Ceremony-type WUs (close/close-intermediate/plan-next)
-    with a planned cost below CEREMONY_COST_FLOOR_USD get a floor WARN
+    with a planned cost below their type's CEREMONY_COST_FLOORS_USD entry get
     (#201).  PLAN.md is compared against the sum of WU planned costs;
     delta > 10% emits a separate WARN naming the delta.  Never raises or
     appends to an errors list — all findings are WARN-only (exit code 0).
@@ -298,16 +308,16 @@ def check_planned_cost(feature_dir: Path, plan_fm: dict, gates: list) -> None:
                 # failure is a real-but-wishful $2-3 estimate anchoring
                 # calibration, not an explicit 0.00 (the scaffold's
                 # "unestimated" placeholder, already visible as such).
-                if (not is_sealed
-                        and wfm.get("type") in _CEREMONY_TYPES
-                        and 0 < float(planned) < CEREMONY_COST_FLOOR_USD):
+                wu_type = wfm.get("type")
+                floor = CEREMONY_COST_FLOORS_USD.get(wu_type)
+                if not is_sealed and floor is not None and 0 < float(planned) < floor:
                     print(
                         f"WARN: {wfile}: planned_cost_usd "
                         f"${float(planned):.2f} is below the "
-                        f"${CEREMONY_COST_FLOOR_USD:.2f} floor for "
-                        f"'{wfm.get('type')}' WUs. Ceremony WUs ran 2.8-5.2x "
-                        f"over on $2-3 estimates (FEAT-2026-0049); raise the "
-                        f"estimate rather than anchoring calibration on it."
+                        f"${floor:.2f} floor for '{wu_type}' WUs "
+                        f"(planning-discipline.md §5). Do not raise a floor to "
+                        f"absorb a retry — a closing-WU retry is a defect to "
+                        f"diagnose; see close-discipline.md §4."
                     )
 
     wu_sum = round(wu_sum, 2)
@@ -345,6 +355,90 @@ PLAN_DISCIPLINE_SECTIONS = (
     "Escalation-predicate satisfiability",
 )
 GATE_ARMING_SECTION = "Arming discipline"
+
+
+
+# Closing-WU guards check literal strings in the artifacts a closing WU writes,
+# and they check them AFTER the WU has run — so a mismatch costs a full
+# re-dispatch, not a re-arm. Measured across 158 closing WUs in 9 repositories:
+# 28% of all closing-WU spend went to attempts the driver refused, and guards
+# whose literals appeared in no authoring surface accounted for 45% of that.
+#
+# The guard itself cannot move earlier: it inspects output that does not exist
+# until the WU runs. What CAN move earlier is the prediction. If a closing WU's
+# body never tells the agent to produce the literal its guard will demand, the
+# refusal is foreseeable at arm time, for free.
+#
+# Verified against the two refusals that motivated this: FEAT-2026-0069's
+# G1-CLOSE-INTERMEDIATE (no `## Gate 1` instruction -> $4.45) and G1-PLAN
+# (instructed `GATE-01-REVIEW.md`, guard wanted `GATE-02` -> $8.61). Both are
+# flagged by this check.
+#
+# Each entry: WU type -> (regex over the BODY, human label, guard it predicts).
+# `{n}` is substituted with the WU's own gate number, `{n1}` with n+1.
+# Requirements are the guards' own, documented in close-discipline.md §4.
+_GUARD_LITERAL_PREDICTIONS = {
+    "close-intermediate": (
+        r"`[^`]*#{{1,3}} Gate {n}\b[^`]*`",
+        "`## Gate {n}` (the heading assert_retrospective_gate_section requires "
+        "in RETROSPECTIVE.md)",
+        "assert_retrospective_gate_section",
+    ),
+    "close": (
+        r"`[^`]*## Cost analysis[^`]*`",
+        "`## Cost analysis` (the heading assert_cost_analysis_section_when_met "
+        "requires in RETROSPECTIVE.md when verdict is `met`)",
+        "assert_cost_analysis_section_when_met",
+    ),
+    "plan-next": (
+        r"`[^`]*GATE-{n1:02d}-REVIEW\.md[^`]*`",
+        "`GATE-{n1:02d}-REVIEW.md` (assert_gate_review_exists names the review "
+        "for the gate being DRAFTED, not the one being closed)",
+        "assert_gate_review_exists",
+    ),
+}
+
+# Matches only inside backticks. The WU's own H1 ("# Gate 1 close-intermediate
+# ...") otherwise satisfies a bare substring search, which would bless the exact
+# WU that went on to be refused — a false pass is worse than no check.
+_GATE_NUM_RE = re.compile(r"/G(\d+)-")
+
+
+def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
+    """WARN when a closing WU's body omits a literal its guard will demand.
+
+    WARN, never ERROR: 22% of this repo's existing closing WUs would fail it,
+    and they are history. An ERROR predicate unsatisfiable on a populated tree
+    is the failure `[FEAT-2026-0015/G2-CLOSE]` records. Findings are advisory
+    and the exit code is unchanged.
+    """
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wfile = feature_dir / str(entry.get("file", ""))
+            if not wfile.is_file():
+                continue
+            try:
+                wfm, wbody = read_frontmatter(wfile)
+            except Exception:  # noqa: BLE001 - malformed WU is another check's finding
+                continue
+            spec = _GUARD_LITERAL_PREDICTIONS.get(wfm.get("type"))
+            if spec is None:
+                continue
+            if wfm.get("status") == "done":
+                continue  # sealed; backfilling instructions on history is pointless
+            gate_m = _GATE_NUM_RE.search(str(wfm.get("id", "")))
+            if gate_m is None:
+                continue
+            n = int(gate_m.group(1))
+            pattern, label, guard = spec
+            if re.search(pattern.format(n=n, n1=n + 1), wbody):
+                continue
+            print(
+                f"WARN: {wfile}: body does not instruct the agent to produce "
+                f"{label.format(n=n, n1=n + 1)}. {guard} checks this AFTER "
+                f"dispatch, so the refusal costs a full re-attempt. See "
+                f"close-discipline.md §4."
+            )
 
 
 def check_planning_sections(
@@ -675,6 +769,7 @@ def lint(feature_dir: Path) -> list[str]:
     check_planned_cost(feature_dir, fm, gates)
     # Planning-discipline section presence (#201): WARN-only.
     check_planning_sections(feature_dir, fm, body, gates)
+    check_closing_guard_literals(feature_dir, gates)
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
