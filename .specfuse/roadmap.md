@@ -769,7 +769,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
 
-**Blocked by.** [FEAT-2026-0039](#feat-2026-0039) — monitoring.yml schema must land first
+**Blocked by.** [FEAT-2026-0069](#feat-2026-0069) — the check-target axis must land before adapters are built against the contract. [FEAT-2026-0039](#feat-2026-0039) (the schema itself) is **done**; its first real-repo run found that `component` conflates deployment/attribution with failure-artifact enumeration, and the adapter interface has to know whether it enumerates per component or per target before it can be written. Note for this feature: **fingerprints must include the target key**, or 20 DLQ targets collapse into one issue and 0069's attribution is lost at the last step.
 
 **Status: blocked.**
 

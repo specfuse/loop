@@ -318,12 +318,74 @@ def write_frontmatter_block(path: Path, key: str, block_lines: list[str]) -> Non
 # --------------------------------------------------------------------------- #
 
 
+_FEATURE_ID_RE = re.compile(r"^FEAT-\d{4}-\d{4}$")
+
+
+def _resolve_feature_dir(arg: str) -> Path:
+    """Resolve *arg* to a feature directory.
+
+    Accepts the full folder name (`FEAT-2026-0039-monitoring-schema`) or the
+    bare correlation ID (`FEAT-2026-0039`). The ID is the identifier in the
+    roadmap row, in PLAN.md frontmatter, in every WU id, in every correlation
+    ID, and in commit subjects — the folder name is the one place it is *not*,
+    so reaching for the ID first is the natural move (#244).
+
+    Prefix matching is anchored to the FEAT-ID shape: an arbitrary substring
+    like `monitoring` must not resolve, or a typo could dispatch a feature the
+    operator never named.
+    """
+    direct = FEATURES_DIR / arg
+    if (direct / "PLAN.md").exists():
+        return direct
+
+    if not _FEATURE_ID_RE.match(arg):
+        sys.exit(f"No PLAN.md under {direct}{_feature_hint()}")
+
+    matches = sorted(
+        p for p in FEATURES_DIR.glob(f"{arg}-*") if (p / "PLAN.md").exists()
+    ) if FEATURES_DIR.is_dir() else []
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        names = ", ".join(p.name for p in matches)
+        sys.exit(
+            f"--feature {arg} is ambiguous — {len(matches)} folders match: "
+            f"{names}\nPass the full folder name."
+        )
+
+    sys.exit(f"No feature {arg} under {FEATURES_DIR}{_feature_hint()}")
+
+
+def _feature_hint(limit: int = 8) -> str:
+    """Newest-first sample of available features, for an unresolvable --feature.
+
+    Capped: this repo already carries 35 feature folders, and a wall of every
+    one is barely more useful than no hint at all. Newest-first because a
+    mistyped ID is almost always for recent work.
+    """
+    if not FEATURES_DIR.is_dir():
+        return ""
+    names = sorted(
+        (p.name for p in FEATURES_DIR.glob("*") if (p / "PLAN.md").exists()),
+        reverse=True,
+    )
+    if not names:
+        return ""
+    shown = ", ".join(names[:limit])
+    more = len(names) - limit
+    return (f"\nAvailable features (newest first): {shown}"
+            + (f", +{more} more" if more > 0 else ""))
+
+
 def find_feature(arg: str | None) -> Path:
     if arg:
-        d = FEATURES_DIR / arg if not arg.startswith(".") else Path(arg)
+        if arg.startswith("."):
+            d = Path(arg)
+            if not (d / "PLAN.md").exists():
+                sys.exit(f"No PLAN.md under {d}")
+        else:
+            d = _resolve_feature_dir(arg)
         plan = d / "PLAN.md"
-        if not plan.exists():
-            sys.exit(f"No PLAN.md under {d}")
         # A `deferred` feature is parked — non-dispatchable by contract (the
         # gate-status skill documents it as "non-dispatchable but resumable;
         # the loop does not auto-resume it"). Refuse an explicit --feature
@@ -5573,7 +5635,8 @@ def _force_utf8_console() -> None:
 def main() -> int:
     _force_utf8_console()
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
-    ap.add_argument("--feature", help="Feature dir name under .specfuse/features/ "
+    ap.add_argument("--feature", help="Feature dir name or bare FEAT-ID (e.g. "
+                    "FEAT-2026-0039) under .specfuse/features/ "
                     "(optional if exactly one feature is active).")
     ap.add_argument("--dry-run", action="store_true",
                     help="Walk the current gate without dispatching or writing.")
