@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0069/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/lint_monitoring.py
   - tests/test_lint_monitoring.py
   - docs/concepts/monitoring-schema.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T20:02:57.162212+00:00
+duration_seconds: 460.921
+cost_usd: 0.860519
+input_tokens: 38
+output_tokens: 5908
 ---
 
 # Decide `invariant`'s `targets` position, and correct the stale `_check_targets` docstring

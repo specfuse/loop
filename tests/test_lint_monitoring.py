@@ -728,5 +728,38 @@ class TestQueueStalled(unittest.TestCase):
         self.assertEqual(validate_monitoring(p), [])
 
 
+class TestInvariantTargetsRejected(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        self.tmp_path = Path(self._tmpdir.name)
+
+    def _write(self, text: str) -> Path:
+        p = self.tmp_path / "monitoring.yml"
+        p.write_text(text)
+        return p
+
+    def test_invariant_check_carrying_targets_is_a_finding(self):
+        text = VALID_CONFIG.replace(
+            "      - type: invariant\n"
+            "        query: \"select count(*) from orders\"\n"
+            "        fingerprint_by: order_id\n",
+            "      - type: invariant\n"
+            "        query: \"select count(*) from orders\"\n"
+            "        fingerprint_by: order_id\n"
+            "        targets:\n"
+            "          - name: whatever\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("invariant", findings[0])
+        self.assertIn("targets", findings[0])
+
+    def test_invariant_without_targets_still_validates_clean(self):
+        p = self._write(VALID_CONFIG)
+        self.assertEqual(validate_monitoring(p), [])
+
+
 if __name__ == "__main__":
     unittest.main()

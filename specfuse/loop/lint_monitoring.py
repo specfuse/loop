@@ -265,7 +265,7 @@ _TARGET_REQUIRED_FIELDS = {
     "queue-stalled": ("subscription", "function"),
 }
 # Check types that must never carry `targets` at all.
-_TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx"})
+_TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx", "invariant"})
 
 
 def _check_targets(
@@ -276,9 +276,10 @@ def _check_targets(
     Structural only, per T01's scope: a target's required coordinates must
     be present, but coordinate *contents* (a cron expression, a timezone
     name) are opaque here, exactly as `invariant.query` is. `targets` itself
-    is required only for `dlq` (enforced in `_check_checks`, since a missing
-    key and an empty/malformed one are different findings); every other
-    check type still treats `targets` as optional.
+    is required for `dlq` and `queue-stalled` (enforced in `_check_checks`,
+    since a missing key and an empty/malformed one are different findings).
+    `error-logs`, `http-5xx`, and `invariant` must not carry `targets` at
+    all; every other check type treats `targets` as optional.
     """
     if targets is None:
         return []

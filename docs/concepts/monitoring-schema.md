@@ -139,7 +139,7 @@ triggers as `targets[]` is what keeps that property satisfiable.
 | `dlq` | **required** | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
 | `queue-stalled` | **required** | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
 | `heartbeat` | optional | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
-| `invariant` | optional | none required | Permitted with no required coordinates. `fingerprint_by` already carries this check type's dedupe key, so no target coordinate is mandated. |
+| `invariant` | **forbidden** | — | `fingerprint_by` is already this check type's enumeration key; permitting `targets` too would give it two competing enumeration keys. |
 | `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
 | `http-5xx` | **forbidden** | — | Same reason as `error-logs`. |
 
