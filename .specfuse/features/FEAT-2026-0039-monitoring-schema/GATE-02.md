@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 20.0
+baseline:
+  sha: b8814be7e731f294135178b5329778493db8ecff
+  probed_at: 2026-07-26T04:22:40.517192+00:00
+  failing: []
 ---
 
 # Gate 2 — an operator can derive a project's monitoring config
