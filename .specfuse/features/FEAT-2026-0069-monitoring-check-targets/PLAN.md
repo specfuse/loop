@@ -152,9 +152,18 @@ gates:
       - id: FEAT-2026-0069/T02
         file: WU-02-migrate-shipped-surfaces.md
         depends_on: [FEAT-2026-0069/T01]
+      # Hygiene WU inserted after T03 blocked on `spinning_signature_repeat`:
+      # T02's ACs tested "add a component with targets" rather than "migrate
+      # every surface", so three pre-existing target-less `dlq` checks survived
+      # and T03's contract flip inherited a non-conforming tree. T03H fixes
+      # those and adds the tree-wide criterion T02 lacked. See its Context for
+      # the escalation event.
+      - id: FEAT-2026-0069/T03H
+        file: WU-03H-dlq-targets-in-remaining-surfaces.md
+        depends_on: [FEAT-2026-0069/T02]
       - id: FEAT-2026-0069/T03
         file: WU-03-dlq-targets-required.md
-        depends_on: [FEAT-2026-0069/T02]
+        depends_on: [FEAT-2026-0069/T03H]
       - id: FEAT-2026-0069/T04
         file: WU-04-queue-stalled-check-type.md
         depends_on: [FEAT-2026-0069/T03]
@@ -164,6 +173,7 @@ gates:
         depends_on:
           - FEAT-2026-0069/T01
           - FEAT-2026-0069/T02
+          - FEAT-2026-0069/T03H
           - FEAT-2026-0069/T03
           - FEAT-2026-0069/T04
       - id: FEAT-2026-0069/G1-PLAN

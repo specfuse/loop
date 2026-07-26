@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T03
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 produces:
@@ -12,10 +12,22 @@ oracle_env: macos_local
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 1237.491
-cost_usd: 5.261239
+duration_seconds: 0
+cost_usd: 0
 input_tokens: 240
 output_tokens: 59914
+cumulative_cost_usd: 5.261239
+cumulative_duration_seconds: 1237.491
+re_arm_count: 1
+reproduced_signature: "$ python3 -m unittest discover -s tests -v"
+re_arm_history:
+  -
+    timestamp: 2026-07-26T17:45:00+00:00
+    prior_status: blocked_human
+    prior_attempts: 3
+    prior_cost_usd: 5.261239
+    prior_duration_seconds: 1237.491
+    reason: "T02's ACs tested 'add a component with targets' rather than 'migrate every surface', leaving three pre-existing target-less dlq checks; T03H inserted to fix them and add the missing tree-wide criterion. T03 re-arms unmodified."
 ---
 
 # Contract: make `targets` required on `dlq` checks
@@ -26,8 +38,34 @@ it honest.
 
 **Context.** This is `FEAT-2026-0069/T03`, the **contract** step of the expand →
 migrate → contract sequence in `PLAN.md`'s escalation-predicate section. T01 taught the
-validator to accept `targets`; T02 migrated every shipped example to carry them. Nothing
-target-less should remain in the tree, which is what makes this flip safe.
+validator to accept `targets`; T02 and `T03H` between them migrated the shipped
+surfaces to carry them.
+
+> **Re-armed once (2026-07-26).** The first dispatch blocked on
+> `spinning_signature_repeat` after 3 attempts / $5.26. Cause: T02's acceptance
+> criteria tested *adding* a component with targets rather than *migrating* every
+> surface, so three pre-existing target-less `dlq` checks survived and this WU
+> inherited a non-conforming tree. `FEAT-2026-0069/T03H` was inserted to fix them
+> and to add the tree-wide criterion T02 lacked; this WU now depends on it. Your
+> scope and Do-not-touch bounds are unchanged — the earlier agent was right to
+> block rather than reach into T02's files.
+>
+> **Two things the operator's full reproduction established, so you do not
+> rediscover them at attempt cost.** Applying the flip locally and running
+> `python3 -m unittest discover -s tests -v` produced 32 failures:
+>
+> 1. **Most of them are this WU's own test fixtures, not shipped data.**
+>    `tests/test_lint_monitoring.py` carries target-less `dlq` blocks in
+>    `VALID_CONFIG` (~line 38) and a second inline fixture (~line 314). T01
+>    deliberately wrote them that way — its AC7 asserted a target-less `dlq`
+>    validates clean. Both must gain `targets`, or roughly twenty
+>    `test_lint_monitoring` cases fail for reasons unrelated to your change. See
+>    AC14.
+> 2. **The three shipped-data failures are T03H's**, and will already be fixed
+>    when you run: `test_shipped_example_validates_clean`,
+>    `test_overrides_example_validates_clean`, and
+>    `test_every_yaml_block_validates_clean`. If any of them still fails, T03H
+>    was incomplete — block and say which, per the escalation triggers.
 
 Why `dlq` and not `heartbeat`: a DLQ **always** belongs to a specific subscription, so a
 target-less `dlq` is always underspecified — on the observed host it means 20 unrelated
@@ -38,7 +76,7 @@ HTTP component. The asymmetry traces to a property, not to convenience — prese
 
 **The coupling that shapes this WU** (enumerated in `PLAN.md`'s §10 note, so you are not
 discovering it at dispatch cost): `suggest_checks()` in
-`tests/test_derive_monitoring_discovery.py:102` emits a target-less
+`tests/test_derive_monitoring_discovery.py:103` emits a target-less
 `{"type": "dlq", "harvest_mode": "peek"}` for any message-consuming component;
 `render_monitoring_yml()` renders each check's own keys at one indent level;
 `TestDiscoveredConfigPassesLint` (`:332`) runs that render through `validate_monitoring`
@@ -98,7 +136,13 @@ Binding rules in `.specfuse/rules/` apply.
 13. `tests/test_monitoring_fenced_blocks.py` passes: every shipped ```yaml block still
     validates against the now-stricter validator. If any block fails, T02 missed a
     surface — fix the block, do not loosen the validator.
-14. Coverage stays ≥ 90%.
+14. **This WU's own fixtures carry `targets`.** Every target-less `dlq` block in
+    `tests/test_lint_monitoring.py` — `VALID_CONFIG` (~line 38) and the inline
+    fixture (~line 314) — gains a `targets` list, so the suite exercises the new
+    contract rather than the retired one. Added at re-arm: the operator's full
+    reproduction showed these fixtures account for roughly twenty of the 32
+    failures, and the first dispatch had no criterion naming them.
+15. Coverage stays ≥ 90%.
 
 **Do not touch.**
 
