@@ -48,9 +48,23 @@ Either binding may additionally carry a `credentials` mapping (or any
 nested structure) whose credential-shaped keys (`*_key`, `*_token`,
 `*_secret`, `*_password`, `*_credential`, `*_connection_string`, matched
 case-insensitively) must hold an **environment-variable name**
-(`^[A-Z_][A-Z0-9_]*$`), never an inline literal. This is the same rule the
+(`^[A-Za-z_][A-Za-z0-9_]*$`), never an inline literal. This is the same rule the
 validator enforces everywhere a credential-shaped key appears, at any
 nesting depth, in a list or a mapping.
+
+Both `UPPER_SNAKE_CASE` and the `Section__Key` form are accepted — case is not
+constrained. `UPPER_SNAKE_CASE` is a convention, not a rule: POSIX permits
+lowercase, and `Section__Key` is the canonical environment-variable spelling for
+hierarchical configuration in .NET, Spring, and other stacks, so an operator
+naming a variable their application actually reads must be able to write its
+true name (#246).
+
+The property enforced is **"this is a variable name, not a secret value."** It is
+a structural shape check, not a secret detector — a value that happens to be
+name-shaped is indistinguishable from a name here. Secret detection belongs to
+the `leak-scan` gate; this check catches the common authoring slip of pasting a
+connection string where a variable name belongs, which every marker a literal
+carries (whitespace, `=`, `;`, `://`, `.`, `,`) still trips.
 
 ## `components[]`
 

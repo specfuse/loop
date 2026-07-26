@@ -14,16 +14,21 @@ import unittest
 from pathlib import Path
 
 from specfuse.loop import _miniyaml
-from specfuse.loop.lint_monitoring import CHECK_TYPES, validate_monitoring
+from specfuse.loop.lint_monitoring import (
+    CHECK_TYPES,
+    _CREDENTIAL_KEY_RE,
+    _ENV_VAR_NAME_RE,
+    validate_monitoring,
+)
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLE_PATH = _REPO_ROOT / ".specfuse" / "monitoring.yml.example"
 _DOC_PATH = _REPO_ROOT / "docs" / "concepts" / "monitoring-schema.md"
 
-_CREDENTIAL_KEY_RE = re.compile(
-    r"(?i)(^|_)(key|token|secret|password|credential|connection[_-]?string)s?$"
-)
-_ENV_VAR_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+# Both credential regexes are IMPORTED, not redeclared. They used to be copied
+# here, which made this module assert a stricter rule than the validator itself
+# the moment the validator widened — the exact drift #246 exposed and
+# `[FEAT-2026-0015/G1]` in LEARNINGS warns about. One fact, one home.
 
 
 def _parsed_example() -> dict:

@@ -14,7 +14,8 @@
 # (`validate_monitoring`). Schema reference: docs/concepts/monitoring-schema.md
 #
 # SECURITY POSTURE: every credential-bearing value below is an
-# ENVIRONMENT-VARIABLE NAME (UPPER_SNAKE_CASE), never a literal secret. The
+# ENVIRONMENT-VARIABLE NAME (UPPER_SNAKE_CASE or the Section__Key form used by
+# .NET, Spring, and other hierarchical-config stacks), never a literal secret. The
 # validator rejects inline literals. Every organization name, host, workspace
 # ID, and queue name here is an obvious placeholder — replace them with your
 # own before use, but never with a literal credential value.

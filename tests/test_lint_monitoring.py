@@ -165,6 +165,68 @@ class LintMonitoringTests(unittest.TestCase):
         p = self._write(VALID_CONFIG)
         self.assertEqual(validate_monitoring(p), [])
 
+    def test_hierarchical_env_var_name_is_accepted(self):
+        """`Section__Key` is the canonical .NET/Spring spelling — see #246.
+
+        Case is preserved and the separator is a double underscore. This is an
+        environment-variable NAME, not a value, so the credential check must
+        accept it. `UPPER_SNAKE_CASE` is a convention, not a rule; POSIX
+        permits lowercase and nothing forbids mixed case.
+        """
+        for name in (
+            "ApplicationInsights__ConnectionString",
+            "AzureServiceBus__ConnectionString",
+        ):
+            with self.subTest(name=name):
+                text = VALID_CONFIG.replace("api_key: BROKER_API_KEY",
+                                            f"api_key: {name}")
+                p = self._write(text)
+                self.assertEqual(validate_monitoring(p), [])
+
+    def test_lowercase_env_var_name_is_accepted(self):
+        text = VALID_CONFIG.replace("api_key: BROKER_API_KEY",
+                                    "api_key: broker_api_key")
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_credential_finding_names_the_accepted_forms(self):
+        """The finding must say what to write, not merely that this is wrong.
+
+        Per #246: the operator's next move after a rejection was a guess,
+        because the message named no accepted form.
+        """
+        bad = VALID_CONFIG.replace("api_key: BROKER_API_KEY",
+                                   'api_key: "some value with spaces"')
+        p = self._write(bad)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("ACME_API_KEY", findings[0])
+        self.assertIn("Section__Key", findings[0])
+
+    def test_value_shaped_credentials_are_still_rejected(self):
+        """Widening for `Section__Key` must not admit value-shaped strings.
+
+        Each marker below (whitespace, `=`, `;`, `://`, quotes, commas) is a
+        thing a variable NAME cannot contain and an inline literal commonly
+        does.
+        """
+        for value in (
+            "has whitespace",
+            "KEY=VALUE",
+            "a;b",
+            "scheme://host/path",
+            "trailing-hyphen-not-allowed",
+            "dots.are.not.allowed",
+            "comma,separated",
+        ):
+            with self.subTest(value=value):
+                bad = VALID_CONFIG.replace("api_key: BROKER_API_KEY",
+                                           f'api_key: "{value}"')
+                p = self._write(bad)
+                findings = validate_monitoring(p)
+                self.assertEqual(len(findings), 1, f"{value!r} was accepted")
+                self.assertIn("api_key", findings[0])
+
     def test_findings_are_deterministically_ordered(self):
         bad = VALID_CONFIG.replace("runner: local", "runner: quantum-cloud")
         p = self._write(bad)
