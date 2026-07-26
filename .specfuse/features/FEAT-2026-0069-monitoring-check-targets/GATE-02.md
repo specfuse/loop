@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 26.0
+baseline:
+  sha: 6f9ff547fb77ba372a83e7e2feaca7c138f273b3
+  probed_at: 2026-07-26T20:00:44.036037+00:00
+  failing: []
 ---
 
 # Gate 2 — discovery emits one component with N targets, not N components
