@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0039/G2-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -17,11 +17,11 @@ verdict, and include the `## Cost analysis` and `## What the loop did NOT verify
 sections. Driver-side terminal flips (gate → `passed`, roadmap row → `done`,
 `PLAN.md status` → `done`, auto-archive) fire when the verdict permits.
 
-**Placeholder note.** This close is pre-declared at draft time so the gate graph is
-valid and gate 1 reads as non-terminal (the linter treats the last non-empty gate
-as terminal). Gate 1's `plan-next` (G1-PLAN) inserts gate 2's substantive WUs
-BEFORE this close and updates this WU's `depends_on` to list them. Until then it
-stays `status: draft` (unarmed).
+**Provenance note.** This close was pre-declared at draft time so the gate graph was
+valid and gate 1 read as non-terminal (the linter treats the last non-empty gate as
+terminal). `G1-PLAN` has since inserted gate 2's substantive WUs before it and set
+this WU's `depends_on` to T04–T08; it was armed at the gate-1 boundary. Criteria 3
+and 7 were added at arm time and are not from the original placeholder.
 
 **Context.** This is `FEAT-2026-0039/G2-CLOSE`, the feature's terminal close. Read
 this feature's `events.jsonl`, both gates' commits, `PLAN.md`'s `roadmap_goal` and
@@ -38,7 +38,14 @@ the following are the obligations that hold regardless.)
 2. **`## Cost analysis`** present, reconciling `planned_cost_usd` ($34.00 at the
    feature level) against actual spend from `events.jsonl`, with the delta named
    per gate.
-3. **`## What the loop did NOT verify`** present. This feature has a known
+3. **Reconcile gate 1's un-enumerated deferred-verification list.** Gate 1
+   auto-closed (`predicate=v1`), so its per-criterion deferred list was never
+   produced — no session walked T01–T03's acceptance criteria to ask which were
+   actually verified in-loop. Walk them now and either confirm each was verified
+   in-loop or add it to `## What the loop did NOT verify` with its re-run condition.
+   Gate 1's own generated `RETROSPECTIVE.md` records that the full close-intermediate
+   ceremony did not run and that this close must reconcile it.
+4. **`## What the loop did NOT verify`** present. This feature has a known
    non-empty entry: the live run of `derive-monitoring` against a real
    multi-component backend never happens in-loop — the skill is interactive and its
    target is a different repository, so a dispatched WU has neither the human
@@ -48,15 +55,24 @@ the following are the obligations that hold regardless.)
    `monitoring.yml` passes `lint_monitoring` clean. Per the skill's own threshold,
    if the deferred list exceeds two entries or 30% of the gate's criteria, flag the
    feature's gate sizing under `## What I'd change`.
-4. **Oracles re-run fresh** (`close-discipline.md` §1): every oracle this feature's
+5. **Oracles re-run fresh** (`close-discipline.md` §1): every oracle this feature's
    criteria name is re-run here with full commands and exit codes read directly —
    never a producing WU's self-report.
-5. **Consumer-visible contract changes** (§3): enumerate every addition across both
+6. **Consumer-visible contract changes** (§3): enumerate every addition across both
    gates — `validate_monitoring`, the shim CLI, the new `code` gate, the seeded
    example, the seeded rule, the skill — or write exactly `n/a — no consumer-visible
    contract change`. FEAT-2026-0040/0041/0042/0043 are all `blocked` on this
    feature, so this enumeration is their handoff document.
-6. The feature-arc verdict is written honestly against `PLAN.md`'s `roadmap_goal`,
+7. **`met_locally` is the ceiling — `met` is not available.** `GATE-02.md`'s
+   definition of done says an operator can run `/derive-monitoring` and get a
+   drafted `monitoring.yml` that passes gate 1's validator. Gate 2 proves the
+   second clause on a stylized fixture and the first clause not at all: the skill's
+   interview quality has no in-loop oracle, because a dispatched session has neither
+   a human channel nor access to a target repository (`GATE-02-REVIEW.md` §3(c)).
+   Do not write `met`. On `met_locally`, `close-discipline.md` §2's hedged
+   follow-up record is mandatory — one named record per unmet criterion, each with
+   the exact re-run condition that upgrades it.
+8. The feature-arc verdict is written honestly against `PLAN.md`'s `roadmap_goal`,
    accounting for the two deliberate scope narrowings recorded in the scope
    boundary (the GitHub Actions workflow deferred to FEAT-2026-0040; the live run
    deferred to post-merge operator work).

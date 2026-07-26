@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 baseline:
   sha: cd3e78fc9eaca96d17486a8b35c748a5517fb293
   probed_at: 2026-07-26T03:57:33.045223+00:00
