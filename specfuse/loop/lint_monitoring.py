@@ -55,8 +55,23 @@ _CREDENTIAL_KEY_RE = re.compile(
     r"(?i)(^|_)(key|token|secret|password|credential|connection[_-]?string)s?$"
 )
 # An environment-variable-NAME reference: the schema admits credentials by
-# env-var name only, e.g. `TELEMETRY_API_KEY`.
-_ENV_VAR_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+# env-var name only, e.g. `TELEMETRY_API_KEY` or `Section__Key`.
+#
+# The property enforced is "this is a variable NAME, not a secret VALUE" — which
+# does not require upper case. `UPPER_SNAKE_CASE` is a convention; POSIX permits
+# lowercase, and `Section__Key` (case preserved, double-underscore separator) is
+# the canonical spelling for hierarchical configuration in .NET, Spring, and
+# other stacks. Requiring upper case rejected the true name of a variable the
+# application actually reads and taught the operator nothing (#246).
+#
+# This is a structural shape check, NOT a secret detector: a value that happens
+# to be name-shaped (`hunter2`) cannot be distinguished from a name here, and
+# never could — the old pattern accepted `ABC123DEF456` just as readily. Secret
+# detection is the `leak-scan` gate's job (gitleaks over the tree); this check
+# exists to catch the common authoring slip of pasting a connection string where
+# a variable name belongs, which every marker a literal carries (whitespace,
+# `=`, `;`, `://`, `.`, `,`, quotes) still trips.
+_ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 _DEFAULT_PATH = Path(".specfuse/monitoring.yml")
 
@@ -126,9 +141,9 @@ def _check_credentials(node: object, where: str) -> list[str]:
             if _CREDENTIAL_KEY_RE.search(str(key)) and isinstance(value, str):
                 if not _ENV_VAR_NAME_RE.match(value):
                     findings.append(
-                        f"{where}: credential '{key}' must reference an "
-                        f"environment-variable name (e.g. UPPER_SNAKE_CASE), "
-                        f"not an inline literal value"
+                        f"{where}: credential '{key}' must be an "
+                        f"environment-variable NAME (e.g. ACME_API_KEY or "
+                        f"Section__Key), not a value"
                     )
             findings.extend(_check_credentials(value, where))
     elif isinstance(node, list):
