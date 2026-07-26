@@ -99,10 +99,60 @@ provider-agnostic by construction: a check type names a concept
 
 A check `type` outside this set is a validator finding.
 
+## Check targets
+
+`component` and check `targets` are two different axes, and the schema keeps
+them separate on purpose:
+
+- **Component** is the unit of deployment and attribution — the redeploy
+  boundary, the `runner`/`diagnose`/`autofix` dials, the thing whose name
+  should match the role name it reports at runtime.
+- **Check target** is the unit of failure-artifact enumeration — what a
+  single check counts findings *per*, when one deployable produces more than
+  one of the thing a check is about (a subscription, a schedule).
+
+Those two coincide only when a deployable carries exactly one trigger. A
+functions host with 3 queue subscriptions and 2 timer schedules is still
+**one component** — one process, one role name — but its `dlq` check needs
+per-subscription attribution and its `heartbeat` check needs per-schedule
+attribution. `targets[]` is the optional list on a check that expresses that.
+
+**Why N components per trigger is not the fix.** `cloud_RoleName` (and its
+equivalent in every other telemetry backend) is reported **per process**, not
+per trigger. Splitting one host into N components — one per subscription or
+schedule — would not give each component a distinct role name; all N would
+still report the same one. Each of those N components would then carry its
+own `error-logs`/`heartbeat` check running the literal same role-name-scoped
+query, producing N duplicate findings for a single exception. Worse, the
+design-for-diagnosis property "a component's `monitoring.yml` `name` matches
+the role name it reports" becomes unsatisfiable by construction — N names
+cannot all equal one runtime identity. Keeping one component and enumerating
+triggers as `targets[]` is what keeps that property satisfiable.
+
+**Per-type target coordinates:**
+
+| Check type | Target coordinates | Notes |
+|---|---|---|
+| `dlq` | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
+| `heartbeat` | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. |
+| `error-logs` | not permitted | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
+| `http-5xx` | not permitted | Same reason as `error-logs`. |
+
+**`targets` is optional today, on every check type that permits it.** A
+`dlq` or `heartbeat` check with no `targets` key is currently valid — the
+single-target-per-component shape (one subscription, one schedule) is common
+and does not need the list. `targets` is not yet *required* on `dlq`; a
+future change is expected to make a target-less `dlq` check a validator
+finding once every shipped example carries targets, closing the migration
+window this section documents. Check `specfuse/loop/lint_monitoring.py`'s
+`_check_targets` for the current, authoritative behavior — this document
+describes intent, the validator is the contract.
+
 ## Example
 
 See `.specfuse/monitoring.yml.example` for a fully-commented example that
-exercises every check type across two components of different types (an
-HTTP-serving component and a message-consuming component). It is validated
-by this repo's own `code` gate, so it cannot silently drift from the schema
-above.
+exercises every check type across three components of different types (an
+HTTP-serving component, a single-subscription message-consuming component,
+and a multi-trigger functions host demonstrating `targets[]`). It is
+validated by this repo's own `code` gate, so it cannot silently drift from
+the schema above.

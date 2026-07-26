@@ -99,5 +99,39 @@ class MonitoringExampleTests(unittest.TestCase):
         self.assertEqual(documented_types, set(CHECK_TYPES))
 
 
+class TestTargetsAreExercised(unittest.TestCase):
+    def test_example_has_a_multi_target_dlq_check(self):
+        parsed = _parsed_example()
+        found = False
+        for component in parsed["components"]:
+            for check in component["checks"]:
+                if check["type"] != "dlq":
+                    continue
+                targets = check.get("targets") or []
+                if len(targets) >= 2:
+                    found = True
+                    for target in targets:
+                        self.assertTrue(target.get("subscription"))
+                        self.assertTrue(target.get("function"))
+        self.assertTrue(found, "no 'dlq' check with 2+ targets found in the shipped example")
+
+    def test_example_has_a_multi_target_heartbeat_check(self):
+        parsed = _parsed_example()
+        found = False
+        for component in parsed["components"]:
+            for check in component["checks"]:
+                if check["type"] != "heartbeat":
+                    continue
+                targets = check.get("targets") or []
+                if len(targets) >= 2:
+                    crons = {t.get("cron") for t in targets}
+                    self.assertEqual(
+                        len(crons), len(targets),
+                        "multi-target heartbeat check has duplicate cron values",
+                    )
+                    found = True
+        self.assertTrue(found, "no 'heartbeat' check with 2+ distinct-cron targets found in the shipped example")
+
+
 if __name__ == "__main__":
     unittest.main()

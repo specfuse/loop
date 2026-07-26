@@ -188,9 +188,19 @@ components:
     checks:
       - type: dlq
         harvest_mode: peek
+        targets:
+          - subscription: acme-orders-created-sub
+            function: ProcessOrderCreated
+          - subscription: acme-orders-cancelled-sub
+            function: ProcessOrderCancelled
       - type: heartbeat
       - type: error-logs
 ```
+
+`targets[]` appears only where discovery found more than one subscription or
+schedule feeding one deployable — the shape the schema doc's "Check targets"
+section documents. A single-subscription consumer stays target-less; adding
+`targets` there would just restate the component's own name.
 
 #### 4b. The proposed `.specfuse/monitoring.overrides.yml`
 
