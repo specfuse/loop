@@ -1985,3 +1985,86 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and the constant survives to mis-price the next one. This entry exists because
   FEAT-2026-0049 produced the same evidence and it was recorded as provenance for the
   $5.00 floor rather than as a reason to move it. Tracked as issue #260.
+
+- [FEAT-2026-0069/G2-CLOSE] **The expensive `plan-next` bought the cheap gate — raise the
+  §5 floor because planning costs that much and is worth it, not because planning is
+  wasteful.** This is the counter-evidence that keeps [FEAT-2026-0069/GATE-1-ARM]'s floor
+  revision from inviting the wrong correction. `G1-PLAN` cost **$16.44** against a $5.00
+  floor, and its §4 runtime probe applied the re-key locally, ran the full 1473-test
+  oracle twice, and pasted the resulting four-failure list **verbatim into the WU body**.
+  The result, same feature and same author: gate 1, planned without a probe for its own
+  WUs, ran **5 WUs / 8 attempts / 3 failures / 1 escalation, $11.94**; gate 2, whose
+  hardest WU was handed an enumerated failure list, ran **4 WUs / 4 attempts / 0 failures,
+  $4.43 against $12.00 (−63%)** — and the WU flagged most likely to need a second pass
+  passed first try for $1.25. A revision framed as "planning WUs overspend" invites cheaper
+  probes and costs the next feature a gate. Two riders on the floor itself: **(a)** both of
+  this feature's overrunning closing WUs were **two-attempt** WUs whose first attempt was
+  `closing_deliverable_missing` ($4.45+$5.57 and $8.61+$7.83) — roughly half the spend went
+  to an attempt the driver refused, so the $5.00 floor is priced as if closing WUs pass
+  first try, and neither did; **(b)** the rule change must reach
+  `.specfuse/templates/WU.template.md` (which quotes the flat $5.00 verbatim at `:31-32`)
+  and not only `planning-discipline.md` §5 — the template is the surface a drafting agent
+  actually reads. Third dataset for issue #260: `plan-next` $16.44, `close-intermediate`
+  $10.01.
+
+- [FEAT-2026-0069/G2-CLOSE] **A grep-based acceptance criterion asserting a symbol's
+  absence must anchor on the definition or use a word boundary — a bare substring grep is
+  evidence of neither presence nor absence.** A WU asserted
+  `grep -c "_with_subscriptions" <file>` returns `0`. Re-run fresh at the close it returned
+  **`1`**, with the deliverable fully met: the hit was a substring inside the method name
+  `test_message_consuming_with_subscriptions_emits_one_target_per_entry`, added by a *later
+  WU in the same gate*. A close re-running the criterion literally would have escalated a
+  naming coincidence. The mirror failure is worse and silent — the same criterion returns
+  `0` if the symbol is **renamed** rather than deleted. Write
+  `grep -c "def <symbol>"` or `grep -cE "\b<symbol>\b"`, and say which property is being
+  asserted. Same family as [FEAT-2026-0039/G2-CLOSE] (a criterion naming a test runner the
+  repo does not have): a command written into a criterion is an oracle only if it measures
+  the thing the sentence claims. Corollary for closes: when a fresh re-run disagrees with a
+  criterion, diagnose the *command* before escalating the *work* — the disagreement is as
+  likely to be in the wording as in the tree.
+
+- [FEAT-2026-0069/G2-CLOSE] **Any test whose assertion is a relation between two derived
+  collections is vacuously true on empty inputs and must assert non-emptiness first.**
+  Equal lengths, disjoint sets, stable ordering, round-trip identity — `len([]) == len([])`,
+  `sorted([]) == sorted([])`, and two empty sets are disjoint. Two of this feature's
+  provider-neutrality boundary tests — the ones guarding the property the whole feature
+  exists to protect — passed against a discovery function returning **zero** components,
+  and no gate could see it: the tests do real work and their assertions are real, they are
+  just true of nothing. This is not the hollow-pass shape the driver already guards
+  ([FEAT-2026-0022/G1-CLOSE]); it is a *vacuous-truth* shape and needs a different check.
+  It was found only because a runtime probe's **passes** were read as carefully as its
+  failures. Worth a sweep across a repo's boundary tests, not just the module that
+  surfaced it.
+
+- [FEAT-2026-0069/G2-CLOSE] **When a gate's definition of done is written in terms of a
+  skill but its oracle is a test-local reference implementation, the gap between them is a
+  real deferral — name it, or the green reads as "the skill is proven".** Gate 2's DoD said
+  *"`/derive-monitoring`, run against a repo whose single deployable carries N triggers,
+  emits 1 component with N targets"*. What the oracles prove is that the reference
+  algorithm does (fresh, exit 0) and that the skill's prose describes that algorithm
+  (fresh, exit 0). No test in the repo composes them, so "an agent following the prose
+  reproduces the result on an unseen tree" is unverified. This is not pedantry: it is the
+  exact gap that *created* this feature — FEAT-2026-0039's gates were green and its skill
+  still emitted 30 components on its first real repo, because a passing fixture and an
+  agent-executed skill are different oracles. Two fixes, and both are cheap. **Write the
+  DoD as what the gate can decide** (the algorithm yields X, the prose describes it), so
+  the wording artifact disappears and only the genuine gap remains; and **schedule the
+  genuine gap as one named post-merge operator run against a named real repo** — several
+  such deferrals usually collapse into a single run. Extends
+  [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] (a gate's DoD must be decidable by that gate) from
+  cross-*feature* claims to cross-*surface* ones.
+
+- [FEAT-2026-0069/G2-CLOSE] **Reject a schema position while it is still unreleased; that
+  window is the only time the conservative direction is free.** Gate 1 shipped `invariant`
+  permitting `targets` by fall-through — absent from both lookup tables, decided by nobody.
+  Gate 2 rejected it for $0.86, on the reasoning that `invariant` already carries
+  `fingerprint_by` as its required enumeration key and permitting both would hand the
+  downstream fingerprint model two competing keys with nothing in the schema saying which
+  wins. The move was free **only because the permissive position had never been merged or
+  released**, so no consumer had seen it; the same rejection after a release is a breaking
+  change. The asymmetry is the rule: a rejected field can be permitted later without
+  breaking anyone, and the reverse cannot. So when a close's contract-change table surfaces
+  a position *"never an explicit decision"*, route it to the next gate rather than the next
+  feature — the cost of deciding rises discontinuously at release, and an undecided
+  fall-through is something a terminal close has to report as an open schema position
+  either way.
