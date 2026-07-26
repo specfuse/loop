@@ -225,6 +225,12 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                     f"check has unknown 'harvest_mode' {harvest_mode!r} — "
                     f"must be one of {sorted(HARVEST_MODE_VALUES)}"
                 )
+            if check.get("targets") is None:
+                findings.append(
+                    f"component '{component_label}': checks[{index}]: 'dlq' "
+                    f"check requires 'targets' — each target needs "
+                    f"'subscription' and 'function'"
+                )
         elif check_type == "invariant":
             for field in ("query", "fingerprint_by"):
                 if not check.get(field):
@@ -259,8 +265,10 @@ def _check_targets(
 
     Structural only, per T01's scope: a target's required coordinates must
     be present, but coordinate *contents* (a cron expression, a timezone
-    name) are opaque here, exactly as `invariant.query` is. Requiredness of
-    `targets` itself is not enforced yet — that is T03.
+    name) are opaque here, exactly as `invariant.query` is. `targets` itself
+    is required only for `dlq` (enforced in `_check_checks`, since a missing
+    key and an empty/malformed one are different findings); every other
+    check type still treats `targets` as optional.
     """
     if targets is None:
         return []

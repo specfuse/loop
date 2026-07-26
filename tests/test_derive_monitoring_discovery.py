@@ -91,16 +91,31 @@ def suggest_checks(component: dict) -> list[dict]:
     """Map one neutral component record to a conservative check list.
 
     Every component gets ``heartbeat`` and ``error-logs``. An HTTP-serving
-    component also gets ``http-5xx``; a message-consuming component also gets
-    ``dlq`` with ``harvest_mode: peek``. ``invariant`` is never suggested —
-    its ``query`` is operator-supplied by definition, so inventing one would
-    be fabricating evidence.
+    component also gets ``http-5xx``. A message-consuming component gets
+    ``dlq`` with ``harvest_mode: peek`` only if its record carries a
+    non-empty neutral ``subscriptions`` list — each entry a real
+    ``{subscription, function}`` pair known from discovery — rendered one
+    ``dlq`` target per entry. A message-consuming component with no known
+    subscriptions gets no ``dlq`` check at all: a target needs a real
+    subscription and function, and inventing either would be fabricating
+    evidence. ``invariant`` is never suggested — its ``query`` is
+    operator-supplied by definition, so inventing one would be fabricating
+    evidence too.
     """
     checks = []
     if component.get("http_serving"):
         checks.append({"type": "http-5xx"})
     if component.get("message_consuming"):
-        checks.append({"type": "dlq", "harvest_mode": "peek"})
+        subscriptions = component.get("subscriptions") or []
+        if subscriptions:
+            checks.append({
+                "type": "dlq",
+                "harvest_mode": "peek",
+                "targets": [
+                    {"subscription": s["subscription"], "function": s["function"]}
+                    for s in subscriptions
+                ],
+            })
     checks.append({"type": "heartbeat"})
     checks.append({"type": "error-logs"})
     return checks
@@ -199,6 +214,15 @@ def render_monitoring_yml(components_with_checks: list[dict]) -> str:
             lines.append(f"      - type: {check['type']}")
             for key, value in check.items():
                 if key == "type":
+                    continue
+                if key == "targets":
+                    lines.append("        targets:")
+                    for target in value:
+                        items = list(target.items())
+                        first_key, first_value = items[0]
+                        lines.append(f"          - {first_key}: {first_value}")
+                        for t_key, t_value in items[1:]:
+                            lines.append(f"            {t_key}: {t_value}")
                     continue
                 lines.append(f"        {key}: {value}")
     return "\n".join(lines) + "\n"
@@ -329,11 +353,28 @@ _STACK_B_TREE = {
 # ---------------------------------------------------------------------------
 
 
+def _with_subscriptions(components: list[dict], subscriptions: list[dict]) -> list[dict]:
+    """Attach discovery-supplied subscription data to message-consuming
+    records for a test. Not a `discover_components()` change — this stands
+    in for evidence gate 2 will one day derive; see PLAN.md's gate cut."""
+    out = []
+    for component in components:
+        component = dict(component)
+        if component.get("message_consuming"):
+            component["subscriptions"] = subscriptions
+        out.append(component)
+    return out
+
+
 class TestDiscoveredConfigPassesLint(unittest.TestCase):
     """AC1: discovery + suggestion output satisfies gate 1's validator."""
 
     def test_discovered_config_passes_lint_monitoring(self):
         components = discover_components(_STACK_A_TREE, _STACK_A_PATTERNS)
+        components = _with_subscriptions(
+            components,
+            [{"subscription": "acme-orders-queue-sub", "function": "ProcessOrder"}],
+        )
         rendered = [
             {"name": c["name"], "type": c["type"], "checks": suggest_checks(c)}
             for c in components
@@ -384,6 +425,8 @@ class TestNeutralRecordsSurviveASecondStack(unittest.TestCase):
     structurally identical neutral records — same types, same dials, same
     suggested check types — differing only in names and evidence paths."""
 
+    _SUBSCRIPTIONS = [{"subscription": "shipments-topic-sub", "function": "ProcessShipment"}]
+
     @staticmethod
     def _signature(record):
         return (
@@ -394,8 +437,13 @@ class TestNeutralRecordsSurviveASecondStack(unittest.TestCase):
         )
 
     def test_neutral_records_survive_a_second_stack(self):
-        stack_a = discover_components(_STACK_A_TREE, _STACK_A_PATTERNS)
-        stack_b = discover_components(_STACK_B_TREE, _STACK_B_PATTERNS)
+        stack_a = _with_subscriptions(
+            discover_components(_STACK_A_TREE, _STACK_A_PATTERNS),
+            [{"subscription": "acme-orders-queue-sub", "function": "ProcessOrder"}],
+        )
+        stack_b = _with_subscriptions(
+            discover_components(_STACK_B_TREE, _STACK_B_PATTERNS), self._SUBSCRIPTIONS
+        )
 
         self.assertEqual(len(stack_a), len(stack_b))
 
@@ -410,6 +458,21 @@ class TestNeutralRecordsSurviveASecondStack(unittest.TestCase):
         evidence_a = {ev for r in stack_a for ev in r["evidence"]}
         evidence_b = {ev for r in stack_b for ev in r["evidence"]}
         self.assertEqual(evidence_a.isdisjoint(evidence_b), True)
+
+    def test_second_stacks_render_also_passes_lint(self):
+        stack_b = _with_subscriptions(
+            discover_components(_STACK_B_TREE, _STACK_B_PATTERNS), self._SUBSCRIPTIONS
+        )
+        rendered = [
+            {"name": c["name"], "type": c["type"], "checks": suggest_checks(c)}
+            for c in stack_b
+        ]
+        text = render_monitoring_yml(rendered)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "monitoring.yml"
+            path.write_text(text)
+            findings = validate_monitoring(path)
+        self.assertEqual(findings, [], f"unexpected findings: {findings}")
 
 
 class TestCoreNamesNoStackTokens(unittest.TestCase):
@@ -456,6 +519,65 @@ class TestSuggestChecksNeverInvariant(unittest.TestCase):
                      "http_serving": False, "message_consuming": False}
         types = {c["type"] for c in suggest_checks(component)}
         self.assertNotIn("invariant", types)
+
+
+class TestSuggestChecksHonestDlq(unittest.TestCase):
+    """AC6/AC7: `dlq` targets come only from a neutral `subscriptions` list
+    on the record, one target per entry; a message-consuming component with
+    no known subscriptions gets no `dlq` check at all — never a fabricated
+    placeholder target."""
+
+    def test_message_consuming_without_subscriptions_gets_no_dlq_check(self):
+        component = {"name": "worker", "type": "queue-consumer",
+                     "http_serving": False, "message_consuming": True}
+        types = {c["type"] for c in suggest_checks(component)}
+        self.assertNotIn("dlq", types)
+
+    def test_message_consuming_with_subscriptions_emits_one_target_per_entry(self):
+        component = {
+            "name": "worker", "type": "queue-consumer",
+            "http_serving": False, "message_consuming": True,
+            "subscriptions": [
+                {"subscription": "orders-sub", "function": "ProcessOrder"},
+                {"subscription": "refunds-sub", "function": "ProcessRefund"},
+            ],
+        }
+        checks = suggest_checks(component)
+        dlq_checks = [c for c in checks if c["type"] == "dlq"]
+        self.assertEqual(len(dlq_checks), 1)
+        self.assertEqual(dlq_checks[0]["harvest_mode"], "peek")
+        self.assertEqual(dlq_checks[0]["targets"], [
+            {"subscription": "orders-sub", "function": "ProcessOrder"},
+            {"subscription": "refunds-sub", "function": "ProcessRefund"},
+        ])
+
+    def test_non_message_consuming_component_gets_no_dlq_check_regardless(self):
+        component = {"name": "api", "type": "http-service",
+                     "http_serving": True, "message_consuming": False,
+                     "subscriptions": [{"subscription": "x", "function": "y"}]}
+        types = {c["type"] for c in suggest_checks(component)}
+        self.assertNotIn("dlq", types)
+
+
+class TestRenderTargetsRoundTrip(unittest.TestCase):
+    """AC8: nested `targets` list-of-mappings render at correct indentation
+    and round-trip through `_miniyaml.parse` unchanged. Asserted on the
+    parsed structure, not the rendered string."""
+
+    def test_dlq_targets_round_trip_through_miniyaml(self):
+        targets = [
+            {"subscription": "orders-sub", "function": "ProcessOrder"},
+            {"subscription": "refunds-sub", "function": "ProcessRefund"},
+        ]
+        rendered = [{
+            "name": "worker",
+            "type": "queue-consumer",
+            "checks": [{"type": "dlq", "harvest_mode": "peek", "targets": targets}],
+        }]
+        text = render_monitoring_yml(rendered)
+        parsed = _miniyaml.parse(text)
+        dlq_check = parsed["components"][0]["checks"][0]
+        self.assertEqual(dlq_check["targets"], targets)
 
 
 class TestAuditFindingsAreAllWarn(unittest.TestCase):

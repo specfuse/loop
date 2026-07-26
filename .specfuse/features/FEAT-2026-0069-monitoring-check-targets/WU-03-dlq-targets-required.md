@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0069/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/lint_monitoring.py
@@ -12,10 +12,10 @@ oracle_env: macos_local
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 0
-cost_usd: 0
-input_tokens: 240
-output_tokens: 59914
+duration_seconds: 637.494
+cost_usd: 2.38416
+input_tokens: 110
+output_tokens: 28388
 cumulative_cost_usd: 5.261239
 cumulative_duration_seconds: 1237.491
 re_arm_count: 1
@@ -28,6 +28,11 @@ re_arm_history:
     prior_cost_usd: 5.261239
     prior_duration_seconds: 1237.491
     reason: "T02's ACs tested 'add a component with targets' rather than 'migrate every surface', leaving three pre-existing target-less dlq checks; T03H inserted to fix them and add the missing tree-wide criterion. T03 re-arms unmodified."
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T17:56:54.853206+00:00
 ---
 
 # Contract: make `targets` required on `dlq` checks
