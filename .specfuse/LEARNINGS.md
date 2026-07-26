@@ -1897,3 +1897,174 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   substituting a different runner. Before writing a command into a criterion, confirm it
   is the command the project's own `verification.yml` gate actually runs, or that it is
   installed; a criterion that cannot be executed verbatim is prose.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] For any breaking change to a schema this repo's
+  own gates validate, **expand → migrate → contract is the named default ordering — and
+  the migrate step's acceptance criterion must be a tree-wide completeness command
+  asserted at zero hits, never a prose enumeration of surfaces.** Flip-first is not merely
+  risky, it is unsatisfiable by construction: the shipped example is validated by a `code`
+  gate, so tightening the validator before migrating turns the gate red on a correct tree,
+  and under FEAT-2026-0051's preflight baseline probe a red base gate halts the run before
+  any WU dispatches. Every intermediate state must be independently green, because the
+  driver squashes each WU with the full gate set required to pass. The ordering alone is
+  not enough: this gate got the ordering right and still lost its only $5.26 to a migrate
+  WU whose criterion tested "a component with the new field exists and validates" (a
+  sample) where the flip needed "no non-conforming instance remains anywhere" (a sweep).
+  It passed every criterion it carried, so no driver guard could catch it — a
+  correctly-scoped WU and an under-scoped one are indistinguishable from outside. The flip
+  WU then inherited a non-conforming tree, burned three attempts and a
+  `spinning_signature_repeat` escalation, and the hygiene WU written with the sweep
+  criterion passed first attempt for $0.83. Same failure as [FEAT-2026-0039/T04]
+  (hand-written fan-out lists reproduce the author's blind spots) one level up, at the
+  criterion rather than the body.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A fixture that cannot express the bug class it
+  guards is an authoring defect, and it is detectable at authoring time.** Ask of every
+  fixture: what is the cardinality of the thing this is meant to catch, and does the
+  fixture carry more than one of it? FEAT-2026-0039's discovery fixture had one trigger per
+  deployable, so it structurally could not express the N-triggers-per-deployable failure —
+  and the gap surfaced only on a real repo, twice, across two features. A fixture with
+  cardinality 1 where the failure needs N is not a small fixture, it is a fixture testing a
+  different question. When a WU's `produces:` includes a fixture, the acceptance criterion
+  should name the cardinality the fixture must carry.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A gate's definition of done must be decidable by
+  that gate.** This gate carried a clause asserting a property of an artifact in a
+  different, unwritten feature ("FEAT-2026-0040's adapter interface has a machine-checkable
+  answer to X"), which is undecidable here and lands in the deferred-verification list as
+  an entry no gate sizing can remove. Recast to what the gate actually proves ("the schema
+  expresses and the validator enforces X") it is decidable, and the cross-feature intent
+  survives as a binding constraint recorded in PLAN.md and the roadmap — which is where a
+  claim about another feature belongs.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A close reporting a gate-set result must state
+  which sandbox each gate ran under.** Three of this repo's ten `code` gates are `bats`
+  suites whose `setup` calls `mktemp -d`; under the agent session's default sandbox that
+  returns `Operation not permitted` and all thirteen cases fail before a single assertion
+  runs. Re-run with the sandbox disabled they are green. A close that reported "7/10" would
+  have reported the sandbox and manufactured a regression. Cheap to say, and it is the
+  difference between an oracle and a number. The consumer-side complement of
+  [FEAT-2026-0029/G1-CLOSE], which covers the authoring side (name the tmp-dir constraint
+  in the WU spec so an implementation WU doesn't spend its spinning budget rediscovering
+  the denial); this one binds every close that re-runs oracles under §1.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **Do not measure a gate against a plan that was
+  re-based onto its own failure.** When a WU is inserted mid-gate in response to a miss,
+  the gate's planned cost rises by that WU's estimate, and reconciling actual spend against
+  the *re-planned* figure reports the miss as estimating accuracy — here, a +8.6% overrun
+  against the as-drafted $11.00 became a −8.1% "underrun" against the re-planned $13.00.
+  Report both, and name the as-drafted figure as the honest one. Corollary: a gate whose
+  WUs all come in 39–75% under except one 155% overrun did not overrun on estimation, it
+  overran on one defect — say which, and price the defect rather than the estimate.
+
+- [FEAT-2026-0069/GATE-1-ARM] **`planning-discipline.md` §5's flat $5.00 planning floor is
+  wrong for `plan-next` specifically, and the error is large enough to invert a feature's
+  cost verdict.** Two independent datasets now agree, and they separate cleanly by WU type
+  rather than by feature:
+
+  | WU type | observed actuals | §5 floor |
+  |---|---|---|
+  | `plan-next` | $15.65 (FEAT-2026-0049), **$16.44** (FEAT-2026-0069/G1-PLAN, 2 attempts) | $5.00 |
+  | `close-intermediate` | $5.67 (FEAT-2026-0049), **$10.01** (FEAT-2026-0069, 2 attempts) | $5.00 |
+
+  FEAT-2026-0069's gate 1 shows the consequence in isolation, because its substantive
+  estimating was good: substantive WUs came in at **$11.94 against $11.00 planned (+8.6%,
+  four of five under)**, while the two closing WUs came in at **$26.45 against $10.00
+  (+165%)**. Gate 1 alone therefore cost **$38.39** against a **$34.00 whole-feature** plan
+  — the feature reads as a 63% overrun caused entirely by a rule-supplied constant, not by
+  anything the planner judged.
+
+  Three rules follow. **(a)** Draft `plan-next` at a floor of **$12.00** and `close` /
+  `close-intermediate` at **$8.00** until more data lands; the flat $5.00 is a floor for the
+  cheapest observed case, never an expectation. **(b)** A gate's `cost_budget_usd` must be
+  set against those figures plus one re-attempt of its largest WU — a budget summed from
+  $5.00 planning estimates is the brake §5 already warns fires by construction, and it now
+  has a second dataset. **(c)** When a feature's overrun traces to a floor the rules
+  supplied rather than to a judgement the author made, the retrospective must say so and
+  propose the floor revision. Otherwise the signal is recorded as "this feature overran"
+  and the constant survives to mis-price the next one. This entry exists because
+  FEAT-2026-0049 produced the same evidence and it was recorded as provenance for the
+  $5.00 floor rather than as a reason to move it. Tracked as issue #260.
+
+- [FEAT-2026-0069/G2-CLOSE] **The expensive `plan-next` bought the cheap gate — raise the
+  §5 floor because planning costs that much and is worth it, not because planning is
+  wasteful.** This is the counter-evidence that keeps [FEAT-2026-0069/GATE-1-ARM]'s floor
+  revision from inviting the wrong correction. `G1-PLAN` cost **$16.44** against a $5.00
+  floor, and its §4 runtime probe applied the re-key locally, ran the full 1473-test
+  oracle twice, and pasted the resulting four-failure list **verbatim into the WU body**.
+  The result, same feature and same author: gate 1, planned without a probe for its own
+  WUs, ran **5 WUs / 8 attempts / 3 failures / 1 escalation, $11.94**; gate 2, whose
+  hardest WU was handed an enumerated failure list, ran **4 WUs / 4 attempts / 0 failures,
+  $4.43 against $12.00 (−63%)** — and the WU flagged most likely to need a second pass
+  passed first try for $1.25. A revision framed as "planning WUs overspend" invites cheaper
+  probes and costs the next feature a gate. Two riders on the floor itself: **(a)** both of
+  this feature's overrunning closing WUs were **two-attempt** WUs whose first attempt was
+  `closing_deliverable_missing` ($4.45+$5.57 and $8.61+$7.83) — roughly half the spend went
+  to an attempt the driver refused, so the $5.00 floor is priced as if closing WUs pass
+  first try, and neither did; **(b)** the rule change must reach
+  `.specfuse/templates/WU.template.md` (which quotes the flat $5.00 verbatim at `:31-32`)
+  and not only `planning-discipline.md` §5 — the template is the surface a drafting agent
+  actually reads. Third dataset for issue #260: `plan-next` $16.44, `close-intermediate`
+  $10.01.
+
+- [FEAT-2026-0069/G2-CLOSE] **A grep-based acceptance criterion asserting a symbol's
+  absence must anchor on the definition or use a word boundary — a bare substring grep is
+  evidence of neither presence nor absence.** A WU asserted
+  `grep -c "_with_subscriptions" <file>` returns `0`. Re-run fresh at the close it returned
+  **`1`**, with the deliverable fully met: the hit was a substring inside the method name
+  `test_message_consuming_with_subscriptions_emits_one_target_per_entry`, added by a *later
+  WU in the same gate*. A close re-running the criterion literally would have escalated a
+  naming coincidence. The mirror failure is worse and silent — the same criterion returns
+  `0` if the symbol is **renamed** rather than deleted. Write
+  `grep -c "def <symbol>"` or `grep -cE "\b<symbol>\b"`, and say which property is being
+  asserted. Same family as [FEAT-2026-0039/G2-CLOSE] (a criterion naming a test runner the
+  repo does not have): a command written into a criterion is an oracle only if it measures
+  the thing the sentence claims. Corollary for closes: when a fresh re-run disagrees with a
+  criterion, diagnose the *command* before escalating the *work* — the disagreement is as
+  likely to be in the wording as in the tree.
+
+- [FEAT-2026-0069/G2-CLOSE] **Any test whose assertion is a relation between two derived
+  collections is vacuously true on empty inputs and must assert non-emptiness first.**
+  Equal lengths, disjoint sets, stable ordering, round-trip identity — `len([]) == len([])`,
+  `sorted([]) == sorted([])`, and two empty sets are disjoint. Two of this feature's
+  provider-neutrality boundary tests — the ones guarding the property the whole feature
+  exists to protect — passed against a discovery function returning **zero** components,
+  and no gate could see it: the tests do real work and their assertions are real, they are
+  just true of nothing. This is not the hollow-pass shape the driver already guards
+  ([FEAT-2026-0022/G1-CLOSE]); it is a *vacuous-truth* shape and needs a different check.
+  It was found only because a runtime probe's **passes** were read as carefully as its
+  failures. Worth a sweep across a repo's boundary tests, not just the module that
+  surfaced it.
+
+- [FEAT-2026-0069/G2-CLOSE] **When a gate's definition of done is written in terms of a
+  skill but its oracle is a test-local reference implementation, the gap between them is a
+  real deferral — name it, or the green reads as "the skill is proven".** Gate 2's DoD said
+  *"`/derive-monitoring`, run against a repo whose single deployable carries N triggers,
+  emits 1 component with N targets"*. What the oracles prove is that the reference
+  algorithm does (fresh, exit 0) and that the skill's prose describes that algorithm
+  (fresh, exit 0). No test in the repo composes them, so "an agent following the prose
+  reproduces the result on an unseen tree" is unverified. This is not pedantry: it is the
+  exact gap that *created* this feature — FEAT-2026-0039's gates were green and its skill
+  still emitted 30 components on its first real repo, because a passing fixture and an
+  agent-executed skill are different oracles. Two fixes, and both are cheap. **Write the
+  DoD as what the gate can decide** (the algorithm yields X, the prose describes it), so
+  the wording artifact disappears and only the genuine gap remains; and **schedule the
+  genuine gap as one named post-merge operator run against a named real repo** — several
+  such deferrals usually collapse into a single run. Extends
+  [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] (a gate's DoD must be decidable by that gate) from
+  cross-*feature* claims to cross-*surface* ones.
+
+- [FEAT-2026-0069/G2-CLOSE] **Reject a schema position while it is still unreleased; that
+  window is the only time the conservative direction is free.** Gate 1 shipped `invariant`
+  permitting `targets` by fall-through — absent from both lookup tables, decided by nobody.
+  Gate 2 rejected it for $0.86, on the reasoning that `invariant` already carries
+  `fingerprint_by` as its required enumeration key and permitting both would hand the
+  downstream fingerprint model two competing keys with nothing in the schema saying which
+  wins. The move was free **only because the permissive position had never been merged or
+  released**, so no consumer had seen it; the same rejection after a release is a breaking
+  change. The asymmetry is the rule: a rejected field can be permitted later without
+  breaking anyone, and the reverse cannot. So when a close's contract-change table surfaces
+  a position *"never an explicit decision"*, route it to the next gate rather than the next
+  feature — the cost of deciding rises discontinuously at release, and an undecided
+  fall-through is something a terminal close has to report as an open schema position
+  either way.

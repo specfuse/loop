@@ -20,10 +20,25 @@ from specfuse.loop.lint_monitoring import (
     _ENV_VAR_NAME_RE,
     validate_monitoring,
 )
+from tests.test_monitoring_fenced_blocks import _extract_blocks
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _EXAMPLE_PATH = _REPO_ROOT / ".specfuse" / "monitoring.yml.example"
 _DOC_PATH = _REPO_ROOT / "docs" / "concepts" / "monitoring-schema.md"
+
+# Explicit scope for the tree-wide no-targetless-dlq assertion below: the six
+# paths named in this WU's `produces:` frontmatter (minus this test file
+# itself, which is not a check surface) plus the one synced-copy surface the
+# frontmatter doesn't list separately. Not a glob, on purpose — a new surface
+# must be added to this tuple consciously, per T02's escalation.
+_ALL_DLQ_SURFACES = (
+    _REPO_ROOT / ".specfuse" / "monitoring.yml.example",
+    _REPO_ROOT / "specfuse" / "loop" / "data" / "monitoring.yml.example",
+    _REPO_ROOT / ".specfuse" / "monitoring.overrides.yml.example",
+    _REPO_ROOT / "specfuse" / "loop" / "data" / "monitoring.overrides.yml.example",
+    _REPO_ROOT / "plugins" / "specfuse" / "skills" / "derive-monitoring" / "SKILL.md",
+    _REPO_ROOT / ".specfuse" / "skills" / "derive-monitoring" / "SKILL.md",
+)
 
 # Both credential regexes are IMPORTED, not redeclared. They used to be copied
 # here, which made this module assert a stricter rule than the validator itself
@@ -97,6 +112,90 @@ class MonitoringExampleTests(unittest.TestCase):
         self.assertIsNotNone(table_match, "could not find check-types table in doc")
         documented_types = set(re.findall(r"^\| `([a-z0-9-]+)` \|", table_match.group(1), re.MULTILINE))
         self.assertEqual(documented_types, set(CHECK_TYPES))
+
+
+class TestTargetsAreExercised(unittest.TestCase):
+    def test_example_has_a_multi_target_dlq_check(self):
+        parsed = _parsed_example()
+        found = False
+        for component in parsed["components"]:
+            for check in component["checks"]:
+                if check["type"] != "dlq":
+                    continue
+                targets = check.get("targets") or []
+                if len(targets) >= 2:
+                    found = True
+                    for target in targets:
+                        self.assertTrue(target.get("subscription"))
+                        self.assertTrue(target.get("function"))
+        self.assertTrue(found, "no 'dlq' check with 2+ targets found in the shipped example")
+
+    def test_example_has_a_multi_target_heartbeat_check(self):
+        parsed = _parsed_example()
+        found = False
+        for component in parsed["components"]:
+            for check in component["checks"]:
+                if check["type"] != "heartbeat":
+                    continue
+                targets = check.get("targets") or []
+                if len(targets) >= 2:
+                    crons = {t.get("cron") for t in targets}
+                    self.assertEqual(
+                        len(crons), len(targets),
+                        "multi-target heartbeat check has duplicate cron values",
+                    )
+                    found = True
+        self.assertTrue(found, "no 'heartbeat' check with 2+ distinct-cron targets found in the shipped example")
+
+
+def _dlq_checks_in_parsed(parsed: dict):
+    for component in parsed.get("components", []):
+        for check in component.get("checks", []):
+            if check.get("type") == "dlq":
+                yield component["name"], check
+
+
+def _dlq_checks_in_yaml_surface(path: Path):
+    parsed = _miniyaml.parse(path.read_text())
+    return list(_dlq_checks_in_parsed(parsed))
+
+
+def _dlq_checks_in_prose_surface(path: Path):
+    found = []
+    for block in _extract_blocks(path.read_text(), path):
+        if block.is_fragment:
+            continue
+        parsed = _miniyaml.parse(block.body)
+        for name, check in _dlq_checks_in_parsed(parsed):
+            found.append((f"{block.where()} ({name})", check))
+    return found
+
+
+class TestNoTargetlessDlqRemains(unittest.TestCase):
+    def test_no_shipped_surface_has_a_targetless_dlq(self):
+        offenders = []
+        for path in _ALL_DLQ_SURFACES:
+            self.assertTrue(path.is_file(), f"declared surface missing: {path}")
+            if path.suffix == ".md":
+                dlq_checks = _dlq_checks_in_prose_surface(path)
+            else:
+                dlq_checks = _dlq_checks_in_yaml_surface(path)
+            for where, check in dlq_checks:
+                targets = check.get("targets") or []
+                if not targets:
+                    offenders.append(f"{path}: {where}: 'dlq' check has no targets")
+                    continue
+                for target in targets:
+                    if not target.get("subscription") or not target.get("function"):
+                        offenders.append(
+                            f"{path}: {where}: 'dlq' target missing "
+                            f"'subscription' and/or 'function': {target!r}"
+                        )
+        self.assertEqual(
+            offenders,
+            [],
+            "target-less or incomplete 'dlq' check(s) found:\n" + "\n".join(offenders),
+        )
 
 
 if __name__ == "__main__":

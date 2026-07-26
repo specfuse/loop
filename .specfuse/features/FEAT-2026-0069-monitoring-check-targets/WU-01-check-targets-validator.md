@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0069/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/lint_monitoring.py
   - tests/test_lint_monitoring.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T16:46:22.837152+00:00
+duration_seconds: 206.246
+cost_usd: 0.739927
+input_tokens: 24
+output_tokens: 5789
 ---
 
 # Accept and validate `checks[].targets` when present
@@ -121,4 +130,3 @@ automatic if AC7 holds and fails loudly if it does not. See
   — do not claim complete.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

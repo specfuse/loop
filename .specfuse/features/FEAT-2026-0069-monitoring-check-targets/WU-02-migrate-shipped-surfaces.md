@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0069/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - .specfuse/monitoring.yml.example
@@ -11,6 +11,15 @@ produces:
   - plugins/specfuse/skills/derive-monitoring/SKILL.md
   - tests/test_monitoring_example.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T16:49:49.228949+00:00
+duration_seconds: 653.049
+cost_usd: 1.51133
+input_tokens: 1631
+output_tokens: 12520
 ---
 
 # Migrate every shipped surface to carry check targets
@@ -128,4 +137,3 @@ all pass, plus the explicit `cmp` in AC9 and the CLI exit check in AC10.
   `acme-telemetry` bindings do.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

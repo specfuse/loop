@@ -102,6 +102,9 @@ components:
       # reading (quarantine) — start with peek until you trust the pipeline.
       - type: dlq
         harvest_mode: peek
+        targets:
+          - subscription: acme-orders-dlq-sub
+            function: ProcessOrder
 
       # invariant: runs an operator-supplied query against this component's
       # data and alerts when it returns unexpected rows. `query` is opaque
@@ -112,3 +115,56 @@ components:
         fingerprint_by: order_id
 
       - type: heartbeat
+
+  # acme-functions-host: the motivating shape this feature exists for. One
+  # deployable, many triggers — 3 queue subscriptions and 2 timer schedules,
+  # all running inside one process. `cloud_RoleName` is per-process, so this
+  # is ONE component (one role name, one set of dials), not five. Each
+  # trigger gets its own `targets[]` entry instead of its own component: a
+  # `dlq` check enumerates per subscription, a `heartbeat` check enumerates
+  # per schedule, and both stay attributable without duplicating the
+  # component (and its role-name-keyed error-logs/heartbeat query) once per
+  # trigger. See docs/concepts/monitoring-schema.md#check-targets.
+  - name: acme-functions-host
+    type: multi-trigger-host
+    runner: local
+    diagnose: manual
+    autofix: "off"
+    checks:
+      # One dlq check, many targets — not one dlq check per subscription.
+      # `subscription` is what the harvester queries; `function` is what a
+      # human diagnoses by, since a subscription name alone rarely tells an
+      # on-call engineer which handler failed.
+      - type: dlq
+        harvest_mode: peek
+        targets:
+          - subscription: acme-orders-created-sub
+            function: ProcessOrderCreated
+          - subscription: acme-orders-cancelled-sub
+            function: ProcessOrderCancelled
+          - subscription: acme-inventory-sync-sub
+            function: SyncInventoryLevels
+
+      # One heartbeat check, many targets — one per schedule, so a single
+      # silent timer among several is still individually visible instead of
+      # being averaged away by a single host-wide heartbeat.
+      - type: heartbeat
+        targets:
+          - name: nightly-reconciliation
+            cron: "0 2 * * *"
+            timezone: Etc/UTC
+          - name: hourly-cache-warm
+            cron: "0 * * * *"
+            timezone: Etc/UTC
+
+      # queue-stalled: catches a consumer that has stopped consuming — no
+      # message failed (so `dlq` sees nothing), the host is still alive (so
+      # `heartbeat` sees nothing), and queue depth is a broker coordinate, not
+      # a telemetry query (so `invariant` can't see it either). Same
+      # subscription/function coordinates as `dlq`; the stall-threshold value
+      # is opaque here, exactly like `invariant.query`.
+      - type: queue-stalled
+        targets:
+          - subscription: acme-orders-created-sub
+            function: ProcessOrderCreated
+            stall_after: 15m

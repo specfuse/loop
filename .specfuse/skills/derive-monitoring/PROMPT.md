@@ -43,18 +43,32 @@ Read these in the loop scaffold under this repo's `.specfuse/` before acting:
 
 ### Step 1 — Evidence gathering → component discovery
 
+A component is a deployable, keyed on deployment evidence — it exists because
+a deployment artifact names it. A trigger registration (HTTP route,
+subscription binding, schedule entry) is evidence of that deployable's type
+and the source of its target list, never a component in its own right: a
+telemetry backend's role name is per-process, so keying on triggers instead
+would mint N components sharing one role name and N duplicate
+`error-logs`/`heartbeat` findings per exception.
+
 Read what's in the repo: deployment manifests, container/process
-definitions, entrypoint scripts, CI deploy workflows, and routing/consumer
-registration files. For each candidate component, gather evidence that it is
-HTTP-serving, message-consuming, or neither — file paths that justify the
-claim, mirroring `discover_components(tree, patterns)` in
-`tests/test_derive_monitoring_discovery.py`: match an evidence-pattern table
-against the tree and emit sorted, neutral component records (`name`, `type`,
-`http_serving`, `message_consuming`, `evidence`). Then apply
+definitions, entrypoint scripts, and CI deploy workflows — whatever names a
+candidate as deployed. Then, scoped to each candidate, read its HTTP routing,
+consumer/subscription, and schedule registration files to learn what
+triggers feed it, mirroring `discover_components(tree, patterns)` in
+`tests/test_derive_monitoring_discovery.py`: `patterns["components"]` (deployment
+markers + `scope_prefix` per candidate) and `patterns["triggers"]` (the sibling
+HTTP, subscription, and schedule table) are the two injected, per-stack tables; the
+function emits sorted, neutral component records — one per deployable — with
+`name`, `type`, `http_serving`, `message_consuming`, `subscriptions`,
+`schedules`, `evidence`. `http_serving`/`message_consuming` are derived from
+matched triggers, never declared; `subscriptions`/`schedules` are the neutral
+lists `suggest_checks(component)` renders into targets. Then apply
 `suggest_checks(component)`'s conservative mapping: every component gets
 `heartbeat` and `error-logs`; HTTP-serving also gets `http-5xx`;
-message-consuming also gets `dlq` with `harvest_mode: peek`. Never suggest an
-`invariant` check — its `query` is operator-supplied by definition.
+message-consuming with a non-empty `subscriptions` list also gets `dlq` with
+`harvest_mode: peek`, one target per entry. Never suggest an `invariant`
+check — its `query` is operator-supplied by definition.
 
 ### Step 2 — Diagnosability audit
 

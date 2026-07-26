@@ -85,24 +85,87 @@ confidence in the checks grows.
 
 ## Check types
 
-Every check has a required `type`, one of five neutral values. This set is
+Every check has a required `type`, one of six neutral values. This set is
 provider-agnostic by construction: a check type names a concept
 (a dead-letter queue, a heartbeat), never a vendor.
 
 | Type | Extra required fields | Meaning |
 |---|---|---|
-| `dlq` | `harvest_mode` (`peek` or `quarantine`) | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. |
+| `dlq` | `harvest_mode` (`peek` or `quarantine`), `targets` | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. `targets` is **required**: a dead-lettered message is attributed to a subscription, and a target-less `dlq` check on a multi-subscription host cannot say which one. |
 | `error-logs` | none | Scans structured application logs for error-level entries. |
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
 | `heartbeat` | none | Alerts when the component stops reporting in at all. |
 | `invariant` | `query`, `fingerprint_by` | Runs an operator-supplied query (opaque to this schema — not parsed or executed here) and alerts on unexpected rows. `fingerprint_by` names the field used to dedupe repeat findings into one issue. |
+| `queue-stalled` | `targets` | Alerts when a consumer stops consuming from a subscription — no message failed (so `dlq` sees nothing), the host is still alive (so `heartbeat` sees nothing), and the symptom is a broker coordinate (queue depth / age of oldest message), not a telemetry query, so `invariant` cannot express it either. `targets` is required from birth: a wedged consumer on a multi-subscription host raises the identical "which one" question `dlq`/`heartbeat` targets already answer. |
 
 A check `type` outside this set is a validator finding.
+
+## Check targets
+
+`component` and check `targets` are two different axes, and the schema keeps
+them separate on purpose:
+
+- **Component** is the unit of deployment and attribution — the redeploy
+  boundary, the `runner`/`diagnose`/`autofix` dials, the thing whose name
+  should match the role name it reports at runtime.
+- **Check target** is the unit of failure-artifact enumeration — what a
+  single check counts findings *per*, when one deployable produces more than
+  one of the thing a check is about (a subscription, a schedule).
+
+Those two coincide only when a deployable carries exactly one trigger. A
+functions host with 3 queue subscriptions and 2 timer schedules is still
+**one component** — one process, one role name — but its `dlq` check needs
+per-subscription attribution and its `heartbeat` check needs per-schedule
+attribution. `targets[]` is the list on a check that expresses that — required on
+some check types, optional on others, and forbidden on the rest (see the matrix
+below).
+
+**Why N components per trigger is not the fix.** `cloud_RoleName` (and its
+equivalent in every other telemetry backend) is reported **per process**, not
+per trigger. Splitting one host into N components — one per subscription or
+schedule — would not give each component a distinct role name; all N would
+still report the same one. Each of those N components would then carry its
+own `error-logs`/`heartbeat` check running the literal same role-name-scoped
+query, producing N duplicate findings for a single exception. Worse, the
+design-for-diagnosis property "a component's `monitoring.yml` `name` matches
+the role name it reports" becomes unsatisfiable by construction — N names
+cannot all equal one runtime identity. Keeping one component and enumerating
+triggers as `targets[]` is what keeps that property satisfiable.
+
+**Per-type matrix — is `targets` required, optional, or forbidden:**
+
+| Check type | `targets` | Target coordinates | Notes |
+|---|---|---|---|
+| `dlq` | **required** | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
+| `queue-stalled` | **required** | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
+| `heartbeat` | optional | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
+| `invariant` | **forbidden** | — | `fingerprint_by` is already this check type's enumeration key; permitting `targets` too would give it two competing enumeration keys. |
+| `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
+| `http-5xx` | **forbidden** | — | Same reason as `error-logs`. |
+
+Where `targets` is present it must be a non-empty list of mappings, and every
+entry must carry that check type's required coordinates. An empty list is a
+finding — omit the key to mean "none". Coordinate *contents* are opaque: a cron
+expression or an IANA timezone name is checked for presence, never parsed, in
+the same way `invariant.query` is.
+
+**`targets` is required on `dlq`.** A `dlq` check with no `targets` key is a
+validator finding. This tightened in this repo's FEAT-2026-0069 gate 1: the
+field was introduced permissive, every shipped surface was migrated to carry it,
+and the requirement was flipped once nothing target-less remained. `dlq` is the
+only check type that had a permissive window — `queue-stalled` shipped with
+`targets` required from birth. Existing configs carrying a target-less `dlq`
+check must add the list; the finding message names the required coordinates
+inline.
+
+`specfuse/loop/lint_monitoring.py`'s `_check_checks` and `_check_targets` are the
+executable form of the matrix above.
 
 ## Example
 
 See `.specfuse/monitoring.yml.example` for a fully-commented example that
-exercises every check type across two components of different types (an
-HTTP-serving component and a message-consuming component). It is validated
-by this repo's own `code` gate, so it cannot silently drift from the schema
-above.
+exercises every check type across three components of different types (an
+HTTP-serving component, a single-subscription message-consuming component,
+and a multi-trigger functions host demonstrating `targets[]`). It is
+validated by this repo's own `code` gate, so it cannot silently drift from
+the schema above.
