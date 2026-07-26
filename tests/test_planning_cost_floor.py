@@ -5,16 +5,21 @@
 #
 """Tests for the per-type planning-WU cost floors (issue #260).
 
-`planning-discipline.md` §5 used to set a **flat $5.00** floor for `plan-next`,
-`close`, and `close-intermediate` alike. Three features paid for that constant:
+§5's floors are set from a **population**, not from a feature. Across 158
+closing WUs in 9 repositories, the cost of attempts that PASSED is:
 
-    plan-next          $15.65 (FEAT-2026-0049), $16.44 (FEAT-2026-0069)
-    close-intermediate  $5.67 (FEAT-2026-0049), $10.01 (FEAT-2026-0069)
+    plan-next            n=62  first-try 74%  median $3.57  p90 $6.10
+    close                n=61  first-try 69%  median $2.73  p90 $5.42
+    close-intermediate   n=35  first-try 51%  median $2.01  p90 $4.34
 
-FEAT-2026-0069 isolates the cost: its nine substantive WUs came in at $16.37
-against $25.00 planned (-34.5%), while its two gate-1 closing WUs came in at
-$26.45 against $10.00 (+164.5%). The estimating was good; the rules-supplied
-constant was not.
+Two earlier revisions of §5 each generalised from one feature — a flat $5.00
+from FEAT-2026-0049, then $12.00/$8.00 from FEAT-2026-0069, whose plan-next
+cost $16.44 (4.6x the population median). Both were outlier-driven. The floors
+asserted here sit at roughly p90.
+
+The improvement lever is NOT the floor: 28% of closing-WU spend goes to
+attempts the driver refused, and three guards whose format requirements appear
+in no authoring surface account for 45% of that waste.
 
 Two things are asserted here, and the second is the load-bearing one:
 
@@ -39,14 +44,21 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _RULE = _REPO_ROOT / ".specfuse" / "rules" / "planning-discipline.md"
 _TEMPLATE = _REPO_ROOT / ".specfuse" / "templates" / "WU.template.md"
 
-# The corrected floors. Deliberately below the observed actuals ($16.44 for
-# plan-next): a floor is the cheapest defensible draft, not an expectation.
-EXPECTED_FLOORS = {"plan-next": "12.00", "close": "8.00"}
+# The corrected floors: each at roughly the p90 of PASSING attempts across 158
+# closing WUs in 9 repos (medians $3.57 / $2.73 / $2.01). An earlier revision of
+# this file asserted $12.00/$8.00, derived from one outlier feature whose
+# plan-next cost 4.6x the population median — see the module docstring.
+EXPECTED_FLOORS = {"plan-next": "6.00", "close": "5.00", "close-intermediate": "4.50"}
 
 # `$12.00` / `$8.00` adjacent to the WU type that carries it. Both surfaces are
 # prose, so this matches the figure and the type name within one sentence rather
 # than assuming a fixed layout.
 _FLOOR_RE = re.compile(r"\$(\d+\.\d{2})")
+
+
+def _norm(text: str) -> str:
+    """Collapse whitespace so assertions survive prose line-wrapping."""
+    return re.sub(r"\s+", " ", text)
 
 
 def _floors_stated_in(path: Path) -> set[str]:
@@ -124,15 +136,6 @@ class TestBothSurfacesAgree(unittest.TestCase):
 
 
 class TestBudgetCorollaryIsStated(unittest.TestCase):
-    """§5 must say how `cost_budget_usd` follows from the floors.
-
-    FEAT-2026-0069's gate 2 was drafted at $18.00 against a $17.00 plan — 6% of
-    headroom, a brake firing on ordinary variance rather than a runaway — and had
-    to be revised to $26.00 at arming. The rule warned that a budget summed from
-    $2-3 estimates fires by construction; it now has a second dataset saying the
-    same of one summed from the floors themselves.
-    """
-
     def test_rule_states_the_budget_rule(self):
         text = _RULE.read_text(encoding="utf-8")
         self.assertRegex(
@@ -140,6 +143,25 @@ class TestBudgetCorollaryIsStated(unittest.TestCase):
             "§5 does not state how cost_budget_usd follows from the floors "
             "(sum of estimates plus one re-attempt of the largest WU)",
         )
+
+
+class TestRetryIsFramedAsADefect(unittest.TestCase):
+    """The floors must not be presented as absorbing a second attempt.
+
+    This is the guard against the correction being un-corrected. The obvious
+    reading of "closing WUs often retry" is "raise the floor until it covers
+    the retry" — which makes 28% of closing spend invisible and permanent, and
+    is how the previous revision reached $12.00. Both surfaces must state the
+    opposite: a retry is a defect to diagnose.
+    """
+
+    def test_rule_frames_retry_as_a_defect(self):
+        text = _RULE.read_text(encoding="utf-8")
+        self.assertRegex(_norm(text), r"(?i)defect to diagnose, not a cost to budget for")
+
+    def test_template_warns_against_raising_floors_to_absorb_a_retry(self):
+        text = _TEMPLATE.read_text(encoding="utf-8")
+        self.assertRegex(_norm(text), r"(?i)defect to diagnose, not a cost to budget for")
 
 
 if __name__ == "__main__":

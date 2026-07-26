@@ -29,14 +29,14 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
 - `planned_cost_usd` — OPTIONAL. Estimated USD at draft time. Compared against actual in close
   WU's cost analysis. Lint WARN when absent on active/draft WUs (non-blocking).
   **Planning-WU cost floor (`.specfuse/rules/planning-discipline.md` §5):** draft
-  `planned_cost_usd` at **$12.00 for `plan-next`** and **$8.00 for `close` /
-  `close-intermediate`** — not the $2–3 that "it's just bookkeeping" suggests, and not one
-  flat figure for both: `plan-next` runs roughly twice what a close does. Both floors sit
-  BELOW observed actuals ($16.44 and $10.01), so treat them as a starting point, not a
-  prediction — and price for one retry, since every observed overrun took two attempts
-  with the first refused by the driver. A gate `cost_budget_usd` should be the sum of its
-  WU estimates PLUS one re-attempt of its largest WU; a budget summed from the estimates
-  alone is a brake that fires by construction on the first real close. See issue #260.
+  `planned_cost_usd` at **$6.00 for `plan-next`**, **$5.00 for `close`**, and **$4.50 for
+  `close-intermediate`** — not the $2–3 that "it's just bookkeeping" suggests. Each sits at
+  roughly the p90 of 158 closing WUs observed across 9 repos (medians: $3.57 / $2.73 /
+  $2.01). Do NOT raise these to absorb a second attempt: a closing-WU retry is a defect to
+  diagnose, not a cost to budget for, and 28% of closing spend is currently burned on
+  attempts the driver refused. A gate `cost_budget_usd` should still be the sum of its WU
+  estimates PLUS one re-attempt of its largest WU — defensive padding for that open defect,
+  since first-attempt success runs 51–74%. See issue #260.
 - `generated_surfaces` — OPTIONAL. Paths to generated files this unit's acceptance depends on.
 - `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
   `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions

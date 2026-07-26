@@ -100,49 +100,57 @@ evidence; "nothing design-open" without it is a claim, not a fact.
 
 ## 5. Planning-WU cost floor
 
-`plan-next` and `close` / `close-intermediate` WUs are systematically under-estimated,
-and **not by the same amount** — `plan-next` runs roughly twice what a close does. When
-drafting their `planned_cost_usd`, use these floors:
+`plan-next` and `close` / `close-intermediate` WUs are under-estimated by the $2–3 that
+"it's just bookkeeping" suggests, and they do not all cost the same. When drafting their
+`planned_cost_usd`, use these floors:
 
-| WU type | floor |
-|---|---|
-| `plan-next` | **$12.00** |
-| `close`, `close-intermediate` | **$8.00** |
+| WU type | floor | observed median | observed p90 |
+|---|---|---|---|
+| `plan-next` | **$6.00** | $3.57 | $6.10 |
+| `close` | **$5.00** | $2.73 | $5.42 |
+| `close-intermediate` | **$4.50** | $2.01 | $4.34 |
 
-**These are floors, not expectations.** Both sit *below* the observed actuals; a
-`plan-next` drafted at $12.00 should still be expected to run over. The figure exists to
-stop the draft starting at a number no run has ever come close to, not to predict the run.
+Each floor sits at roughly the **p90 of attempts that passed** — generous enough that a
+normal draft is not immediately over, tight enough that a gate budget summed from them is
+not fiction.
 
-**Price for one retry.** In every observed overrun the WU took two attempts, and the first
-was refused by the driver (`closing_deliverable_missing`) — roughly half the spend went to
-an attempt that produced nothing. A floor reasoned from "what does this cost if it passes
-first try" is wrong for a WU class that routinely does not.
+**A closing-WU retry is a defect to diagnose, not a cost to budget for.** The temptation is
+to raise these floors until they absorb a second attempt. Do not: **28% of all closing-WU
+spend is currently burned on attempts the driver refused**, and a floor sized to swallow
+that makes the refusals invisible and permanent. If a closing WU retries, read the failure
+class and fix the cause — most of them are guard-contract mismatches, not hard work.
 
 **Corollary for `cost_budget_usd`.** Set a gate's budget to the **sum of its WU estimates
-plus one re-attempt of its largest WU**. A budget summed from the estimates alone is a
-brake that fires by construction on the first real close — that was true of the old $2–3
-drafts and is equally true of a sum built from these floors.
+plus one re-attempt of its largest WU**. This is deliberately *defensive rather than
+correct*: first-attempt success on closing WUs runs 51–74%, so a budget with no headroom
+halts gates routinely. It is padding for a known-open defect, not a statement that retries
+are normal — revisit it when the guard-contract gap closes.
 
-> **Provenance.** Three features, and the third is the one that isolates the cost.
+> **Provenance — 158 closing WUs across 9 repositories**, deduplicated on
+> `(correlation_id, timestamp)` from every `.specfuse/features/*/events.jsonl`. Costs are
+> for attempts that **passed**; failed attempts are counted as waste, not as cost.
 >
-> | WU type | FEAT-2026-0049 | FEAT-2026-0069 |
-> |---|---|---|
-> | `plan-next` | $5.90, $15.65 | **$16.44** (2 attempts) |
-> | `close-intermediate` | $5.67 | **$10.01** (2 attempts) |
+> | WU type | WUs | first-try | median | p90 | max |
+> |---|---|---|---|---|---|
+> | `plan-next` | 62 | 74% | $3.57 | $6.10 | $7.83 |
+> | `close` | 61 | 69% | $2.73 | $5.42 | $11.44 |
+> | `close-intermediate` | 35 | 51% | $2.01 | $4.34 | $6.85 |
 >
-> LEARNINGS `[FEAT-2026-0044]` predicted the under-estimation; `[FEAT-2026-0049]` produced
-> a $15.65 `plan-next` and it was recorded as provenance *for* a flat $5.00 floor rather
-> than as a reason to move it — **the rule absorbed its own counter-evidence.**
-> FEAT-2026-0069 then paid again, and its numbers separate cleanly: nine substantive WUs
-> at **$16.37 against $25.00 planned (−34.5%)**, two gate-1 closing WUs at **$26.45
-> against $10.00 (+164.5%)**. The estimating was good; the constant was not. See
-> `[FEAT-2026-0069/GATE-1-ARM]` and issue #260.
+> **This table replaces two earlier revisions of §5 that were each derived from a single
+> feature.** The first set a flat $5.00 floor from FEAT-2026-0049; the second raised it to
+> $12.00/$8.00 from FEAT-2026-0069, whose `plan-next` cost $16.44 — **4.6× the median of
+> 62 observations.** Both generalised a rule from an outlier, which is the failure
+> `[FEAT-2026-0069/G1-CLOSE-INTERMEDIATE]` names for plans and which applies at least as
+> strongly to rules. A floor is a distribution question; answer it with a distribution.
 >
-> **The expensive planning is not waste.** FEAT-2026-0069's $16.44 `plan-next` ran a full
-> runtime probe and enumerated the next gate's failure list into its WU bodies; that gate
-> then ran **4 WUs, 4 attempts, 0 failures, $4.43**, against gate 1's 8 attempts and 3
-> failures. Raise the floor because planning costs this much and earns it — a revision
-> framed as "planning overspends" invites cheaper probes and costs the next gate.
+> **Where the money actually goes.** Of $794.18 total closing-WU spend, **$221.72 (28%)
+> was spent on refused attempts.** Three driver guards whose exact format requirements
+> appear in **no authoring surface** account for $99.30 of that — 45% of all waste:
+> `assert_gate_review_exists` ($53.11), `assert_failure_class_breakdown_when_failures_present`
+> ($23.70), `assert_retrospective_gate_section` ($22.49). By contrast
+> `assert_verdict_well_formed` fired 10 times for **$0.00**, because it is checked before
+> the agent spends anything. The improvement lever is the guard contracts and when they are
+> checked — not the floor.
 
 ## Why these live together
 
