@@ -2,8 +2,8 @@
 gate: 1
 status: open
 baseline:
-  sha: 07796867343bb04ad0cbe63370ddf6d396ca895e
-  probed_at: 2026-07-26T16:44:18.149696+00:00
+  sha: dd81f062ae8df97f52bc3fe166fdff6c5ad09013
+  probed_at: 2026-07-26T17:47:28.864419+00:00
   failing: []
 ---
 
