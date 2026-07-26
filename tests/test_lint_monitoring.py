@@ -139,10 +139,22 @@ class LintMonitoringTests(unittest.TestCase):
         self.assertIn("type", findings[0])
 
     def test_inline_credential_is_rejected(self):
+        # The fixture is assembled from fragments rather than written as one
+        # literal, and the host is a reserved-for-testing domain. Both are
+        # deliberate: a contiguous `Endpoint=sb://...;SharedAccessKey=...`
+        # string matches gitleaks' Azure connection-string rule on some
+        # versions (CI installs whatever apt ships; developers install
+        # whatever brew ships), so the repo's own secret scanner flagged this
+        # line and failed `leak-scan` in CI while passing locally. Splitting it
+        # keeps the value connection-string-*shaped* for the validator — which
+        # is the point of the negative case — without carrying a signature that
+        # a secret scanner is right to match. See #250.
+        secret_shaped = (
+            "Endpoint=sb://example.invalid/;" + "SharedAccess" + "Key=NOT-A-REAL-KEY"
+        )
         bad = VALID_CONFIG.replace(
             "api_key: BROKER_API_KEY",
-            'api_key: "Endpoint=sb://fake-namespace.servicebus.windows.net/;'
-            'SharedAccessKey=NOTAREALKEY000=="',
+            f'api_key: "{secret_shaped}"',
         )
         p = self._write(bad)
         findings = validate_monitoring(p)
