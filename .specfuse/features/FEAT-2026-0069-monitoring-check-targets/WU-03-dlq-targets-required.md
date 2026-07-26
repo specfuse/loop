@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T03
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.00
 produces:
@@ -9,6 +9,13 @@ produces:
   - tests/test_lint_monitoring.py
   - tests/test_derive_monitoring_discovery.py
 oracle_env: macos_local
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: $ python3 -m unittest discover -s tests -v
+duration_seconds: 1237.491
+cost_usd: 5.261239
+input_tokens: 240
+output_tokens: 59914
 ---
 
 # Contract: make `targets` required on `dlq` checks
