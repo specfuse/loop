@@ -36,6 +36,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "templates/WU.template.md",
     "rules/close-discipline.md",
     "rules/correlation-ids.md",
+    "rules/design-for-diagnosis.md",
     "rules/never-touch.md",
     "rules/planning-discipline.md",
     "rules-local/README.md",
@@ -121,6 +122,7 @@ class TestInitFullLayout(unittest.TestCase):
         for rel in (
             "rules/close-discipline.md",
             "rules/correlation-ids.md",
+            "rules/design-for-diagnosis.md",
             "rules/never-touch.md",
             "rules/planning-discipline.md",
             "rules/result-contract.md",

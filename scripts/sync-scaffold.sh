@@ -146,6 +146,7 @@ FILES=(
   templates/WU.template.md
   rules/close-discipline.md
   rules/correlation-ids.md
+  rules/design-for-diagnosis.md
   rules/never-touch.md
   rules/planning-discipline.md
   rules-local/README.md

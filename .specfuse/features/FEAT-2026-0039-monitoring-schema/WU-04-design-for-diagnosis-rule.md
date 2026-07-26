@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0039/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.00
 produces:
   - .specfuse/rules/design-for-diagnosis.md
@@ -11,6 +11,10 @@ produces:
 oracle_env: macos_local
 model: sonnet
 effort: medium
+duration_seconds: 920.093
+cost_usd: 3.034241
+input_tokens: 136
+output_tokens: 25538
 ---
 
 # Author the design-for-diagnosis rule and seed it without @-importing it
