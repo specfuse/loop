@@ -1,14 +1,21 @@
 ---
 id: FEAT-2026-0039/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - tests/test_derive_monitoring_discovery.py
 oracle_env: macos_local
 model: sonnet
 effort: high
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T04:40:14.887014+00:00
+duration_seconds: 576.328
+cost_usd: 2.286997
+input_tokens: 1708
+output_tokens: 28426
 ---
 
 # Add the component-discovery reference implementation and its fixture tests
