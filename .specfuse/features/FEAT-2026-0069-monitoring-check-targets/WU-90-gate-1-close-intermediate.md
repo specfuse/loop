@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0069/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 oracle_env: macos_local
 auto_close_disabled: true
+duration_seconds: 1625.332
+cost_usd: 10.013538
+input_tokens: 4952
+output_tokens: 91903
 ---
 
 # Gate 1 close-intermediate — retrospective + lessons + docs

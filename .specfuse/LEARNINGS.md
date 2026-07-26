@@ -1897,3 +1897,62 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   substituting a different runner. Before writing a command into a criterion, confirm it
   is the command the project's own `verification.yml` gate actually runs, or that it is
   installed; a criterion that cannot be executed verbatim is prose.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] For any breaking change to a schema this repo's
+  own gates validate, **expand → migrate → contract is the named default ordering — and
+  the migrate step's acceptance criterion must be a tree-wide completeness command
+  asserted at zero hits, never a prose enumeration of surfaces.** Flip-first is not merely
+  risky, it is unsatisfiable by construction: the shipped example is validated by a `code`
+  gate, so tightening the validator before migrating turns the gate red on a correct tree,
+  and under FEAT-2026-0051's preflight baseline probe a red base gate halts the run before
+  any WU dispatches. Every intermediate state must be independently green, because the
+  driver squashes each WU with the full gate set required to pass. The ordering alone is
+  not enough: this gate got the ordering right and still lost its only $5.26 to a migrate
+  WU whose criterion tested "a component with the new field exists and validates" (a
+  sample) where the flip needed "no non-conforming instance remains anywhere" (a sweep).
+  It passed every criterion it carried, so no driver guard could catch it — a
+  correctly-scoped WU and an under-scoped one are indistinguishable from outside. The flip
+  WU then inherited a non-conforming tree, burned three attempts and a
+  `spinning_signature_repeat` escalation, and the hygiene WU written with the sweep
+  criterion passed first attempt for $0.83. Same failure as [FEAT-2026-0039/T04]
+  (hand-written fan-out lists reproduce the author's blind spots) one level up, at the
+  criterion rather than the body.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A fixture that cannot express the bug class it
+  guards is an authoring defect, and it is detectable at authoring time.** Ask of every
+  fixture: what is the cardinality of the thing this is meant to catch, and does the
+  fixture carry more than one of it? FEAT-2026-0039's discovery fixture had one trigger per
+  deployable, so it structurally could not express the N-triggers-per-deployable failure —
+  and the gap surfaced only on a real repo, twice, across two features. A fixture with
+  cardinality 1 where the failure needs N is not a small fixture, it is a fixture testing a
+  different question. When a WU's `produces:` includes a fixture, the acceptance criterion
+  should name the cardinality the fixture must carry.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A gate's definition of done must be decidable by
+  that gate.** This gate carried a clause asserting a property of an artifact in a
+  different, unwritten feature ("FEAT-2026-0040's adapter interface has a machine-checkable
+  answer to X"), which is undecidable here and lands in the deferred-verification list as
+  an entry no gate sizing can remove. Recast to what the gate actually proves ("the schema
+  expresses and the validator enforces X") it is decidable, and the cross-feature intent
+  survives as a binding constraint recorded in PLAN.md and the roadmap — which is where a
+  claim about another feature belongs.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A close reporting a gate-set result must state
+  which sandbox each gate ran under.** Three of this repo's ten `code` gates are `bats`
+  suites whose `setup` calls `mktemp -d`; under the agent session's default sandbox that
+  returns `Operation not permitted` and all thirteen cases fail before a single assertion
+  runs. Re-run with the sandbox disabled they are green. A close that reported "7/10" would
+  have reported the sandbox and manufactured a regression. Cheap to say, and it is the
+  difference between an oracle and a number. The consumer-side complement of
+  [FEAT-2026-0029/G1-CLOSE], which covers the authoring side (name the tmp-dir constraint
+  in the WU spec so an implementation WU doesn't spend its spinning budget rediscovering
+  the denial); this one binds every close that re-runs oracles under §1.
+
+- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **Do not measure a gate against a plan that was
+  re-based onto its own failure.** When a WU is inserted mid-gate in response to a miss,
+  the gate's planned cost rises by that WU's estimate, and reconciling actual spend against
+  the *re-planned* figure reports the miss as estimating accuracy — here, a +8.6% overrun
+  against the as-drafted $11.00 became a −8.1% "underrun" against the re-planned $13.00.
+  Report both, and name the as-drafted figure as the honest one. Corollary: a gate whose
+  WUs all come in 39–75% under except one 155% overrun did not overrun on estimation, it
+  overran on one defect — say which, and price the defect rather than the estimate.

@@ -91,7 +91,7 @@ provider-agnostic by construction: a check type names a concept
 
 | Type | Extra required fields | Meaning |
 |---|---|---|
-| `dlq` | `harvest_mode` (`peek` or `quarantine`) | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. |
+| `dlq` | `harvest_mode` (`peek` or `quarantine`), `targets` | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. `targets` is **required**: a dead-lettered message is attributed to a subscription, and a target-less `dlq` check on a multi-subscription host cannot say which one. |
 | `error-logs` | none | Scans structured application logs for error-level entries. |
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
 | `heartbeat` | none | Alerts when the component stops reporting in at all. |
@@ -116,7 +116,9 @@ Those two coincide only when a deployable carries exactly one trigger. A
 functions host with 3 queue subscriptions and 2 timer schedules is still
 **one component** — one process, one role name — but its `dlq` check needs
 per-subscription attribution and its `heartbeat` check needs per-schedule
-attribution. `targets[]` is the optional list on a check that expresses that.
+attribution. `targets[]` is the list on a check that expresses that — required on
+some check types, optional on others, and forbidden on the rest (see the matrix
+below).
 
 **Why N components per trigger is not the fix.** `cloud_RoleName` (and its
 equivalent in every other telemetry backend) is reported **per process**, not
@@ -130,25 +132,34 @@ the role name it reports" becomes unsatisfiable by construction — N names
 cannot all equal one runtime identity. Keeping one component and enumerating
 triggers as `targets[]` is what keeps that property satisfiable.
 
-**Per-type target coordinates:**
+**Per-type matrix — is `targets` required, optional, or forbidden:**
 
-| Check type | Target coordinates | Notes |
-|---|---|---|
-| `dlq` | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
-| `heartbeat` | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. |
-| `queue-stalled` | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
-| `error-logs` | not permitted | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
-| `http-5xx` | not permitted | Same reason as `error-logs`. |
+| Check type | `targets` | Target coordinates | Notes |
+|---|---|---|---|
+| `dlq` | **required** | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
+| `queue-stalled` | **required** | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
+| `heartbeat` | optional | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
+| `invariant` | optional | none required | Permitted with no required coordinates. `fingerprint_by` already carries this check type's dedupe key, so no target coordinate is mandated. |
+| `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
+| `http-5xx` | **forbidden** | — | Same reason as `error-logs`. |
 
-**`targets` is optional today, on every check type that permits it.** A
-`dlq` or `heartbeat` check with no `targets` key is currently valid — the
-single-target-per-component shape (one subscription, one schedule) is common
-and does not need the list. `targets` is not yet *required* on `dlq`; a
-future change is expected to make a target-less `dlq` check a validator
-finding once every shipped example carries targets, closing the migration
-window this section documents. Check `specfuse/loop/lint_monitoring.py`'s
-`_check_targets` for the current, authoritative behavior — this document
-describes intent, the validator is the contract.
+Where `targets` is present it must be a non-empty list of mappings, and every
+entry must carry that check type's required coordinates. An empty list is a
+finding — omit the key to mean "none". Coordinate *contents* are opaque: a cron
+expression or an IANA timezone name is checked for presence, never parsed, in
+the same way `invariant.query` is.
+
+**`targets` is required on `dlq`.** A `dlq` check with no `targets` key is a
+validator finding. This tightened in this repo's FEAT-2026-0069 gate 1: the
+field was introduced permissive, every shipped surface was migrated to carry it,
+and the requirement was flipped once nothing target-less remained. `dlq` is the
+only check type that had a permissive window — `queue-stalled` shipped with
+`targets` required from birth. Existing configs carrying a target-less `dlq`
+check must add the list; the finding message names the required coordinates
+inline.
+
+`specfuse/loop/lint_monitoring.py`'s `_check_checks` and `_check_targets` are the
+executable form of the matrix above.
 
 ## Example
 

@@ -197,10 +197,19 @@ components:
       - type: error-logs
 ```
 
-`targets[]` appears only where discovery found more than one subscription or
-schedule feeding one deployable — the shape the schema doc's "Check targets"
-section documents. A single-subscription consumer stays target-less; adding
-`targets` there would just restate the component's own name.
+`targets[]` is the enumeration axis the schema doc's "Check targets" section
+documents. It is **required on every `dlq` and `queue-stalled` check**, whether
+the deployable carries one subscription or twenty — a single-subscription
+consumer still names its subscription and its handler function, because
+`subscription` is what the harvester queries and `function` is what a human
+diagnoses by, and neither is recoverable from the component name. On
+`heartbeat` the list is optional and worth emitting wherever discovery found
+more than one schedule feeding one deployable; on `error-logs` and `http-5xx`
+it is rejected outright.
+
+If discovery cannot name a real subscription, emit **no `dlq` check at all**
+rather than a target-less or fabricated one. A missing check is a visible gap
+the operator can fill; an invented coordinate is a wrong answer that validates.
 
 #### 4b. The proposed `.specfuse/monitoring.overrides.yml`
 
