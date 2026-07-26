@@ -5,7 +5,7 @@ slug: monitoring-check-targets
 branch: feat/FEAT-2026-0069-monitoring-check-targets
 roadmap_goal: Separate the two axes `monitoring.yml` conflates — component as the unit of deployment and attribution, check target as the unit of failure-artifact enumeration — so a single deployable carrying N queue subscriptions and M schedules can express per-subscription DLQ attribution and per-schedule heartbeat, and so FEAT-2026-0040's adapter interface is built against a contract that already answers "do I enumerate per component or per target."
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 34.00
 ---
 
