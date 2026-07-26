@@ -100,15 +100,49 @@ evidence; "nothing design-open" without it is a claim, not a fact.
 
 ## 5. Planning-WU cost floor
 
-`plan-next` and `close` / `close-intermediate` WUs are systematically under-estimated.
-When drafting their `planned_cost_usd`, use a **floor of $5.00** — never the $2–3 that
-"it's just bookkeeping" suggests. A gate `cost_budget_usd` set to the sum of $2–3
-planning estimates is a brake that fires by construction on the first real close.
+`plan-next` and `close` / `close-intermediate` WUs are systematically under-estimated,
+and **not by the same amount** — `plan-next` runs roughly twice what a close does. When
+drafting their `planned_cost_usd`, use these floors:
 
-> **Provenance (FEAT-2026-0049 + LEARNINGS [FEAT-2026-0044]).** Planning/close WUs ran
-> 2.8–5.2× their $2–3 estimates: `plan-next` at $5.90 and $15.65, `close-intermediate`
-> at $5.67, against $2–3 drafts. LEARNINGS `[FEAT-2026-0044]` had already predicted this
-> systematic under-estimation; the floor makes the prediction binding.
+| WU type | floor |
+|---|---|
+| `plan-next` | **$12.00** |
+| `close`, `close-intermediate` | **$8.00** |
+
+**These are floors, not expectations.** Both sit *below* the observed actuals; a
+`plan-next` drafted at $12.00 should still be expected to run over. The figure exists to
+stop the draft starting at a number no run has ever come close to, not to predict the run.
+
+**Price for one retry.** In every observed overrun the WU took two attempts, and the first
+was refused by the driver (`closing_deliverable_missing`) — roughly half the spend went to
+an attempt that produced nothing. A floor reasoned from "what does this cost if it passes
+first try" is wrong for a WU class that routinely does not.
+
+**Corollary for `cost_budget_usd`.** Set a gate's budget to the **sum of its WU estimates
+plus one re-attempt of its largest WU**. A budget summed from the estimates alone is a
+brake that fires by construction on the first real close — that was true of the old $2–3
+drafts and is equally true of a sum built from these floors.
+
+> **Provenance.** Three features, and the third is the one that isolates the cost.
+>
+> | WU type | FEAT-2026-0049 | FEAT-2026-0069 |
+> |---|---|---|
+> | `plan-next` | $5.90, $15.65 | **$16.44** (2 attempts) |
+> | `close-intermediate` | $5.67 | **$10.01** (2 attempts) |
+>
+> LEARNINGS `[FEAT-2026-0044]` predicted the under-estimation; `[FEAT-2026-0049]` produced
+> a $15.65 `plan-next` and it was recorded as provenance *for* a flat $5.00 floor rather
+> than as a reason to move it — **the rule absorbed its own counter-evidence.**
+> FEAT-2026-0069 then paid again, and its numbers separate cleanly: nine substantive WUs
+> at **$16.37 against $25.00 planned (−34.5%)**, two gate-1 closing WUs at **$26.45
+> against $10.00 (+164.5%)**. The estimating was good; the constant was not. See
+> `[FEAT-2026-0069/GATE-1-ARM]` and issue #260.
+>
+> **The expensive planning is not waste.** FEAT-2026-0069's $16.44 `plan-next` ran a full
+> runtime probe and enumerated the next gate's failure list into its WU bodies; that gate
+> then ran **4 WUs, 4 attempts, 0 failures, $4.43**, against gate 1's 8 attempts and 3
+> failures. Raise the floor because planning costs this much and earns it — a revision
+> framed as "planning overspends" invites cheaper probes and costs the next gate.
 
 ## Why these live together
 
