@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0069/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
   - tests/test_derive_monitoring_discovery.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T20:18:38.182188+00:00
+duration_seconds: 405.663
+cost_usd: 1.289851
+input_tokens: 68
+output_tokens: 12291
 ---
 
 # The N-trigger fixture, and mechanical target-list generation for schedules

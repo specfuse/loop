@@ -152,7 +152,11 @@ def suggest_checks(component: dict) -> list[dict]:
     ``dlq`` target per entry. A message-consuming component with no known
     subscriptions gets no ``dlq`` check at all: a target needs a real
     subscription and function, and inventing either would be fabricating
-    evidence. ``invariant`` is never suggested — its ``query`` is
+    evidence. ``heartbeat`` carries one target per entry in the record's
+    neutral ``schedules`` list, each a real ``{name, cron, timezone}``
+    triple known from discovery; a component with no known schedules gets a
+    target-less ``heartbeat`` -- the same honesty rule ``dlq`` already
+    follows. ``invariant`` is never suggested — its ``query`` is
     operator-supplied by definition, so inventing one would be fabricating
     evidence too.
     """
@@ -170,7 +174,14 @@ def suggest_checks(component: dict) -> list[dict]:
                     for s in subscriptions
                 ],
             })
-    checks.append({"type": "heartbeat"})
+    schedules = component.get("schedules") or []
+    heartbeat = {"type": "heartbeat"}
+    if schedules:
+        heartbeat["targets"] = [
+            {"name": s["name"], "cron": s["cron"], "timezone": s["timezone"]}
+            for s in schedules
+        ]
+    checks.append(heartbeat)
     checks.append({"type": "error-logs"})
     return checks
 
@@ -234,6 +245,18 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
     return findings
 
 
+def _render_target_value(key: str, value: object) -> object:
+    """Quote a `cron` target value, matching the shipped example's spelling.
+
+    `_miniyaml` parses the unquoted spelling correctly too — this is not a
+    parser fix, it keeps this reference implementation's output
+    byte-comparable with `.specfuse/monitoring.yml.example`.
+    """
+    if key == "cron":
+        return f'"{value}"'
+    return value
+
+
 def render_monitoring_yml(components_with_checks: list[dict]) -> str:
     """Render a complete ``monitoring.yml`` text from rendered components.
 
@@ -274,8 +297,10 @@ def render_monitoring_yml(components_with_checks: list[dict]) -> str:
                     for target in value:
                         items = list(target.items())
                         first_key, first_value = items[0]
+                        first_value = _render_target_value(first_key, first_value)
                         lines.append(f"          - {first_key}: {first_value}")
                         for t_key, t_value in items[1:]:
+                            t_value = _render_target_value(t_key, t_value)
                             lines.append(f"            {t_key}: {t_value}")
                     continue
                 lines.append(f"        {key}: {value}")
@@ -433,6 +458,72 @@ _STACK_B_TREE = {
         "acme-shipment-listener\n"
     ),
     "NOTES.txt": "acme widget shipment backend, second stack\n",
+}
+
+# --- Stack C: one deployable, 3 subscription triggers + 2 schedule triggers.
+#
+# Proves: the algorithm fans an N-cardinality trigger table (N > 1 on both
+# kinds) into one component with N targets per check type — GATE-02.md's
+# definition of done. Does NOT prove: that real repos let those coordinates
+# be extracted from source without asking the operator — confirmed only
+# outside this tree; see RETROSPECTIVE.md's "What the loop did NOT verify".
+
+_STACK_C_PATTERNS = {
+    "components": [
+        {
+            "name": "acme-functions-host",
+            "type": "multi-trigger-host",
+            "deployment_markers": ["ACME_C_DEPLOY_MARKER"],
+            "scope_prefix": "host/",
+        },
+    ],
+    "triggers": [
+        {
+            "marker": "ACME_C_SUB_ONE_MARKER",
+            "kind": "subscription",
+            "subscription": "acme-orders-created-sub",
+            "function": "ProcessOrderCreated",
+        },
+        {
+            "marker": "ACME_C_SUB_TWO_MARKER",
+            "kind": "subscription",
+            "subscription": "acme-orders-cancelled-sub",
+            "function": "ProcessOrderCancelled",
+        },
+        {
+            "marker": "ACME_C_SUB_THREE_MARKER",
+            "kind": "subscription",
+            "subscription": "acme-inventory-sync-sub",
+            "function": "SyncInventoryLevels",
+        },
+        {
+            "marker": "ACME_C_TIMER_ONE_MARKER",
+            "kind": "schedule",
+            "name": "acme-nightly-reconciliation",
+            "cron": "0 2 * * *",
+            "timezone": "Etc/UTC",
+        },
+        {
+            "marker": "ACME_C_TIMER_TWO_MARKER",
+            "kind": "schedule",
+            "name": "acme-hourly-cache-warm",
+            "cron": "0 * * * *",
+            "timezone": "Etc/UTC",
+        },
+    ],
+}
+
+_STACK_C_TREE = {
+    "host/deploy.txt": (
+        "# acme-functions-host deployment\n"
+        "ACME_C_DEPLOY_MARKER helm chart\n"
+        "acme-functions-host\n"
+    ),
+    "host/sub_one.txt": "ACME_C_SUB_ONE_MARKER queue subscription\n",
+    "host/sub_two.txt": "ACME_C_SUB_TWO_MARKER queue subscription\n",
+    "host/sub_three.txt": "ACME_C_SUB_THREE_MARKER queue subscription\n",
+    "host/timer_one.txt": "ACME_C_TIMER_ONE_MARKER nightly timer\n",
+    "host/timer_two.txt": "ACME_C_TIMER_TWO_MARKER hourly timer\n",
 }
 
 
@@ -692,6 +783,38 @@ class TestSuggestChecksHonestDlq(unittest.TestCase):
         self.assertNotIn("dlq", types)
 
 
+class TestHeartbeatTargetsFromSchedules(unittest.TestCase):
+    """AC4/AC5: `heartbeat` targets come only from a neutral `schedules`
+    list on the record, one target per entry; a component with no known
+    schedules gets a target-less `heartbeat` — never an empty `targets`
+    list and never a fabricated placeholder target."""
+
+    def test_component_without_schedules_gets_a_targetless_heartbeat(self):
+        component = {"name": "worker", "type": "queue-consumer",
+                     "http_serving": False, "message_consuming": False}
+        checks = suggest_checks(component)
+        heartbeat_checks = [c for c in checks if c["type"] == "heartbeat"]
+        self.assertEqual(len(heartbeat_checks), 1)
+        self.assertNotIn("targets", heartbeat_checks[0])
+
+    def test_component_with_schedules_emits_one_target_per_entry(self):
+        component = {
+            "name": "host", "type": "multi-trigger-host",
+            "http_serving": False, "message_consuming": False,
+            "schedules": [
+                {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC"},
+                {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC"},
+            ],
+        }
+        checks = suggest_checks(component)
+        heartbeat_checks = [c for c in checks if c["type"] == "heartbeat"]
+        self.assertEqual(len(heartbeat_checks), 1)
+        self.assertEqual(heartbeat_checks[0]["targets"], [
+            {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC"},
+            {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC"},
+        ])
+
+
 class TestRenderTargetsRoundTrip(unittest.TestCase):
     """AC8: nested `targets` list-of-mappings render at correct indentation
     and round-trip through `_miniyaml.parse` unchanged. Asserted on the
@@ -800,6 +923,50 @@ class TestAutofixQuotedInEmittedYaml(unittest.TestCase):
         for component in parsed["components"]:
             self.assertEqual(component["autofix"], "off")
             self.assertIsInstance(component["autofix"], str)
+
+
+class TestOneDeployableManyTriggers(unittest.TestCase):
+    """GATE-02.md's definition of done: a repo whose single deployable
+    carries N triggers yields 1 component with N targets — not N
+    components. Stack C carries 3 subscription triggers and 2 schedule
+    triggers, so both trigger kinds have cardinality > 1 and a per-target
+    assertion cannot be satisfied by accident.
+
+    This proves the algorithm fans a trigger table into a target list; it
+    does not prove real repositories are shaped so a trigger table can be
+    built without asking the operator — see `_STACK_C_PATTERNS`'s own
+    comment and RETROSPECTIVE.md's "What the loop did NOT verify"."""
+
+    def test_single_deployable_with_n_triggers_yields_one_component_with_n_targets(self):
+        components = discover_components(_STACK_C_TREE, _STACK_C_PATTERNS)
+        self.assertEqual(len(components), 1)
+
+        component = components[0]
+        rendered = [{
+            "name": component["name"],
+            "type": component["type"],
+            "checks": suggest_checks(component),
+        }]
+        checks = rendered[0]["checks"]
+
+        dlq_checks = [c for c in checks if c["type"] == "dlq"]
+        self.assertEqual(len(dlq_checks), 1)
+        self.assertEqual(len(dlq_checks[0]["targets"]), 3)
+        for target in dlq_checks[0]["targets"]:
+            self.assertEqual(set(target), {"subscription", "function"})
+
+        heartbeat_checks = [c for c in checks if c["type"] == "heartbeat"]
+        self.assertEqual(len(heartbeat_checks), 1)
+        self.assertEqual(len(heartbeat_checks[0]["targets"]), 2)
+        for target in heartbeat_checks[0]["targets"]:
+            self.assertEqual(set(target), {"name", "cron", "timezone"})
+
+        text = render_monitoring_yml(rendered)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "monitoring.yml"
+            path.write_text(text)
+            findings = validate_monitoring(path)
+        self.assertEqual(findings, [], f"unexpected findings: {findings}")
 
 
 if __name__ == "__main__":
