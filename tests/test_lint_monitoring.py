@@ -388,5 +388,156 @@ class LintMonitoringTests(unittest.TestCase):
             os.chdir(cwd)
 
 
+class TestCheckTargets(unittest.TestCase):
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        self.tmp_path = Path(self._tmpdir.name)
+
+    def _write(self, text: str) -> Path:
+        p = self.tmp_path / "monitoring.yml"
+        p.write_text(text)
+        return p
+
+    def test_dlq_target_missing_function_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: dlq\n        harvest_mode: peek\n",
+            "      - type: dlq\n"
+            "        harvest_mode: peek\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("function", findings[0])
+
+    def test_dlq_target_missing_subscription_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: dlq\n        harvest_mode: peek\n",
+            "      - type: dlq\n"
+            "        harvest_mode: peek\n"
+            "        targets:\n"
+            "          - function: ProcessOrder\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("subscription", findings[0])
+
+    def test_dlq_target_with_both_coordinates_validates_clean(self):
+        text = VALID_CONFIG.replace(
+            "      - type: dlq\n        harvest_mode: peek\n",
+            "      - type: dlq\n"
+            "        harvest_mode: peek\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n"
+            "            function: ProcessOrder\n",
+        )
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_heartbeat_target_missing_name_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "        targets:\n"
+            "          - cron: \"0 * * * *\"\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("name", findings[0])
+
+    def test_heartbeat_target_cron_and_timezone_contents_are_opaque(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "        targets:\n"
+            "          - name: nightly-sync\n"
+            "            cron: \"this is not a cron expression at all\"\n"
+            "            timezone: Not/A_Real_Zone\n",
+        )
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_error_logs_check_with_targets_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "    checks:\n      - type: heartbeat\n",
+            "    checks:\n"
+            "      - type: error-logs\n"
+            "        targets:\n"
+            "          - name: whatever\n"
+            "      - type: heartbeat\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("error-logs", findings[0])
+
+    def test_http_5xx_check_with_targets_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "    checks:\n      - type: heartbeat\n",
+            "    checks:\n"
+            "      - type: http-5xx\n"
+            "        targets:\n"
+            "          - name: whatever\n"
+            "      - type: heartbeat\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("http-5xx", findings[0])
+
+    def test_targetless_dlq_check_still_validates_clean(self):
+        """T03 flips this; T01 must not — see PLAN.md escalation-predicate section."""
+        p = self._write(VALID_CONFIG)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_targets_not_a_list_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n        targets: nope\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("targets", findings[0])
+
+    def test_empty_targets_list_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n        targets: []\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("empty", findings[0])
+
+    def test_target_not_a_mapping_names_check_and_target_index(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n        targets:\n          - nope\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("checks[0]", findings[0])
+        self.assertIn("targets[0]", findings[0])
+
+    def test_findings_are_deterministically_ordered(self):
+        text = VALID_CONFIG.replace(
+            "      - type: dlq\n        harvest_mode: peek\n",
+            "      - type: dlq\n"
+            "        harvest_mode: peek\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n",
+        )
+        p = self._write(text)
+        first = validate_monitoring(p)
+        second = validate_monitoring(p)
+        self.assertEqual(first, second)
+
+
 if __name__ == "__main__":
     unittest.main()

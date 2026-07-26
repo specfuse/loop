@@ -233,6 +233,63 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                         f"'invariant' check missing '{field}'"
                     )
 
+        findings.extend(
+            _check_targets(check.get("targets"), check_type, component_label, index)
+        )
+
+    return findings
+
+
+# Per check-type target coordinates: the fields a `targets[]` entry must
+# carry. `error-logs` and `http-5xx` are absent from this map on purpose —
+# they are role-name keyed and therefore genuinely component-scoped; see
+# `_TARGETLESS_CHECK_TYPES` below.
+_TARGET_REQUIRED_FIELDS = {
+    "dlq": ("subscription", "function"),
+    "heartbeat": ("name",),
+}
+# Check types that must never carry `targets` at all.
+_TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx"})
+
+
+def _check_targets(
+    targets: object, check_type: str, component_label: str, check_index: int
+) -> list[str]:
+    """Validate an optional `checks[].targets` list.
+
+    Structural only, per T01's scope: a target's required coordinates must
+    be present, but coordinate *contents* (a cron expression, a timezone
+    name) are opaque here, exactly as `invariant.query` is. Requiredness of
+    `targets` itself is not enforced yet — that is T03.
+    """
+    if targets is None:
+        return []
+
+    where = f"component '{component_label}': checks[{check_index}]"
+
+    if check_type in _TARGETLESS_CHECK_TYPES:
+        return [f"{where}: '{check_type}' check must not carry 'targets'"]
+
+    if not isinstance(targets, list):
+        return [f"{where}: 'targets' must be a list"]
+
+    if not targets:
+        return [f"{where}: 'targets' must not be empty — omit the key for \"none\""]
+
+    required_fields = _TARGET_REQUIRED_FIELDS.get(check_type, ())
+    findings: list[str] = []
+    for t_index, target in enumerate(targets):
+        if not isinstance(target, dict):
+            findings.append(
+                f"{where}: targets[{t_index}]: must be a mapping"
+            )
+            continue
+        for field in required_fields:
+            if not target.get(field):
+                findings.append(
+                    f"{where}: targets[{t_index}]: '{check_type}' target "
+                    f"missing '{field}'"
+                )
     return findings
 
 
