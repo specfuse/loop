@@ -145,10 +145,32 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Substantive WUs are drafted by G1-PLAN and inserted BEFORE this close.
+      # Drafted by G1-PLAN; status: draft (unarmed) until the human arms them.
+      # Review: GATE-02-REVIEW.md.
+      - id: FEAT-2026-0039/T04
+        file: WU-04-design-for-diagnosis-rule.md
+        depends_on: []
+      - id: FEAT-2026-0039/T05
+        file: WU-05-component-discovery-reference-impl.md
+        depends_on: []
+      - id: FEAT-2026-0039/T06
+        file: WU-06-local-runner-bootstrap-artifacts.md
+        depends_on: [FEAT-2026-0039/T04]
+      - id: FEAT-2026-0039/T07
+        file: WU-07-derive-monitoring-skill.md
+        depends_on: [FEAT-2026-0039/T04, FEAT-2026-0039/T05, FEAT-2026-0039/T06]
+      - id: FEAT-2026-0039/T08
+        file: WU-08-fenced-block-drift-test.md
+        depends_on: [FEAT-2026-0039/T06, FEAT-2026-0039/T07]
+      # --- terminal gate: single close, no plan-next ---
       - id: FEAT-2026-0039/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0039/T04
+          - FEAT-2026-0039/T05
+          - FEAT-2026-0039/T06
+          - FEAT-2026-0039/T07
+          - FEAT-2026-0039/T08
 ```
 
 ## Gate 2 sketch (for `plan-next`, not binding)

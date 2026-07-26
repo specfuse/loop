@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0039/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.4.0
+started_at: 2026-07-26T03:59:41.912274+00:00
+duration_seconds: 876.053
+cost_usd: 6.298861
+input_tokens: 3048
+output_tokens: 63495
 ---
 
 # Gate 1 plan-next — draft gate 2 (the derive-monitoring skill)
