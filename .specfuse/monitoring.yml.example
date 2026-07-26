@@ -156,3 +156,15 @@ components:
           - name: hourly-cache-warm
             cron: "0 * * * *"
             timezone: Etc/UTC
+
+      # queue-stalled: catches a consumer that has stopped consuming — no
+      # message failed (so `dlq` sees nothing), the host is still alive (so
+      # `heartbeat` sees nothing), and queue depth is a broker coordinate, not
+      # a telemetry query (so `invariant` can't see it either). Same
+      # subscription/function coordinates as `dlq`; the stall-threshold value
+      # is opaque here, exactly like `invariant.query`.
+      - type: queue-stalled
+        targets:
+          - subscription: acme-orders-created-sub
+            function: ProcessOrderCreated
+            stall_after: 15m

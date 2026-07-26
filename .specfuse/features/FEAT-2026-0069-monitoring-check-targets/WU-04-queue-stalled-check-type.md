@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0069/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/lint_monitoring.py
@@ -11,6 +11,15 @@ produces:
   - docs/concepts/monitoring-schema.md
   - tests/test_lint_monitoring.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T18:07:32.565461+00:00
+duration_seconds: 449.024
+cost_usd: 1.210959
+input_tokens: 6751
+output_tokens: 11837
 ---
 
 # Add the `queue-stalled` check type

@@ -85,7 +85,7 @@ confidence in the checks grows.
 
 ## Check types
 
-Every check has a required `type`, one of five neutral values. This set is
+Every check has a required `type`, one of six neutral values. This set is
 provider-agnostic by construction: a check type names a concept
 (a dead-letter queue, a heartbeat), never a vendor.
 
@@ -96,6 +96,7 @@ provider-agnostic by construction: a check type names a concept
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
 | `heartbeat` | none | Alerts when the component stops reporting in at all. |
 | `invariant` | `query`, `fingerprint_by` | Runs an operator-supplied query (opaque to this schema — not parsed or executed here) and alerts on unexpected rows. `fingerprint_by` names the field used to dedupe repeat findings into one issue. |
+| `queue-stalled` | `targets` | Alerts when a consumer stops consuming from a subscription — no message failed (so `dlq` sees nothing), the host is still alive (so `heartbeat` sees nothing), and the symptom is a broker coordinate (queue depth / age of oldest message), not a telemetry query, so `invariant` cannot express it either. `targets` is required from birth: a wedged consumer on a multi-subscription host raises the identical "which one" question `dlq`/`heartbeat` targets already answer. |
 
 A check `type` outside this set is a validator finding.
 
@@ -135,6 +136,7 @@ triggers as `targets[]` is what keeps that property satisfiable.
 |---|---|---|
 | `dlq` | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
 | `heartbeat` | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. |
+| `queue-stalled` | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
 | `error-logs` | not permitted | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
 | `http-5xx` | not permitted | Same reason as `error-logs`. |
 

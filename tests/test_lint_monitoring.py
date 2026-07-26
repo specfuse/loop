@@ -648,5 +648,85 @@ class TestTargetsRequired(unittest.TestCase):
         self.assertIn("http-5xx", findings[0])
 
 
+class TestQueueStalled(unittest.TestCase):
+    """T04: `queue-stalled` — a wedged consumer, invisible to `dlq` (nothing
+    failed), `heartbeat` (the host is alive), and `invariant` (a broker
+    coordinate, not a telemetry query). `targets` required from birth."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmpdir.cleanup)
+        self.tmp_path = Path(self._tmpdir.name)
+
+    def _write(self, text: str) -> Path:
+        p = self.tmp_path / "monitoring.yml"
+        p.write_text(text)
+        return p
+
+    def test_queue_stalled_is_a_known_check_type(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "      - type: queue-stalled\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n"
+            "            function: ProcessOrder\n",
+        )
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_queue_stalled_without_targets_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "      - type: queue-stalled\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("queue-stalled", findings[0])
+        self.assertIn("subscription", findings[0])
+        self.assertIn("function", findings[0])
+
+    def test_queue_stalled_target_missing_function_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "      - type: queue-stalled\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("function", findings[0])
+
+    def test_queue_stalled_target_missing_subscription_is_rejected(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "      - type: queue-stalled\n"
+            "        targets:\n"
+            "          - function: ProcessOrder\n",
+        )
+        p = self._write(text)
+        findings = validate_monitoring(p)
+        self.assertEqual(len(findings), 1)
+        self.assertIn("subscription", findings[0])
+
+    def test_queue_stalled_threshold_coordinate_is_opaque(self):
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "      - type: queue-stalled\n"
+            "        targets:\n"
+            "          - subscription: orders-sub\n"
+            "            function: ProcessOrder\n"
+            "            stall_after: not-a-duration-at-all-9999h\n",
+        )
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+
 if __name__ == "__main__":
     unittest.main()

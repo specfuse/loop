@@ -521,6 +521,29 @@ class TestSuggestChecksNeverInvariant(unittest.TestCase):
         self.assertNotIn("invariant", types)
 
 
+class TestSuggestChecksNeverQueueStalled(unittest.TestCase):
+    """T04 AC9: suggest_checks never emits queue-stalled — its stall
+    threshold is operator judgement, the same class as invariant.query."""
+
+    def test_no_queue_stalled_for_http_component(self):
+        component = {"name": "x", "type": "http-service",
+                     "http_serving": True, "message_consuming": False}
+        types = {c["type"] for c in suggest_checks(component)}
+        self.assertNotIn("queue-stalled", types)
+
+    def test_no_queue_stalled_for_queue_component(self):
+        component = {"name": "y", "type": "queue-consumer",
+                     "http_serving": False, "message_consuming": True}
+        types = {c["type"] for c in suggest_checks(component)}
+        self.assertNotIn("queue-stalled", types)
+
+    def test_no_queue_stalled_for_plain_component(self):
+        component = {"name": "z", "type": "batch-job",
+                     "http_serving": False, "message_consuming": False}
+        types = {c["type"] for c in suggest_checks(component)}
+        self.assertNotIn("queue-stalled", types)
+
+
 class TestSuggestChecksHonestDlq(unittest.TestCase):
     """AC6/AC7: `dlq` targets come only from a neutral `subscriptions` list
     on the record, one target per entry; a message-consuming component with

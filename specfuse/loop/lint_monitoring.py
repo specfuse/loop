@@ -42,7 +42,9 @@ __all__ = ("validate_monitoring", "main")
 RUNNER_VALUES = frozenset({"local", "gh-actions", "in-cluster"})
 DIAGNOSE_VALUES = frozenset({"manual", "auto"})
 AUTOFIX_VALUES = frozenset({"off", "on"})
-CHECK_TYPES = frozenset({"dlq", "error-logs", "http-5xx", "heartbeat", "invariant"})
+CHECK_TYPES = frozenset(
+    {"dlq", "error-logs", "http-5xx", "heartbeat", "invariant", "queue-stalled"}
+)
 HARVEST_MODE_VALUES = frozenset({"peek", "quarantine"})
 
 REQUIRED_COMPONENT_FIELDS = ("name", "type", "runner", "diagnose", "autofix", "checks")
@@ -231,6 +233,13 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                     f"check requires 'targets' — each target needs "
                     f"'subscription' and 'function'"
                 )
+        elif check_type == "queue-stalled":
+            if check.get("targets") is None:
+                findings.append(
+                    f"component '{component_label}': checks[{index}]: "
+                    f"'queue-stalled' check requires 'targets' — each target "
+                    f"needs 'subscription' and 'function'"
+                )
         elif check_type == "invariant":
             for field in ("query", "fingerprint_by"):
                 if not check.get(field):
@@ -253,6 +262,7 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
 _TARGET_REQUIRED_FIELDS = {
     "dlq": ("subscription", "function"),
     "heartbeat": ("name",),
+    "queue-stalled": ("subscription", "function"),
 }
 # Check types that must never carry `targets` at all.
 _TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx"})
