@@ -435,5 +435,71 @@ class TestMain(unittest.TestCase):
             _mod.main(["--staged", "--all"])
 
 
+class TestGitleaksScansTrackedFilesOnly(unittest.TestCase):
+    """`scan_repo`'s contract is git-tracked files; gitleaks must honour it.
+
+    Regression guard for a CI failure where gitleaks was pointed at the working
+    directory and matched its `aws-access-token` rule against byte sequences in
+    gitignored `__pycache__/*.pyc` files that the test suite had just produced.
+    The gate judged build artifacts that are not in the repo.
+    """
+
+    def test_untracked_file_is_not_scanned(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "tracked.txt").write_text("nothing here\n", encoding="utf-8")
+            junk = root / "__pycache__"
+            junk.mkdir()
+            (junk / "cached.pyc").write_bytes(b"\x00\x01whatever\x02")
+
+            scanned: dict[str, list[str]] = {}
+
+            def _capture(path):
+                scanned["files"] = sorted(
+                    str(p.relative_to(path)) for p in Path(path).rglob("*") if p.is_file()
+                )
+                return []
+
+            with (
+                patch.object(_mod, "_list_tracked_files", return_value=["tracked.txt"]),
+                patch.object(_mod, "_check_gitleaks_dir", side_effect=_capture),
+            ):
+                _mod._check_gitleaks_tracked(root)
+
+            self.assertEqual(scanned["files"], ["tracked.txt"])
+
+    def test_tracked_file_content_is_preserved_for_scanning(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.txt").write_text("payload-marker\n", encoding="utf-8")
+            seen: dict[str, str] = {}
+
+            def _capture(path):
+                seen["body"] = (Path(path) / "a.txt").read_text(encoding="utf-8")
+                return []
+
+            with (
+                patch.object(_mod, "_list_tracked_files", return_value=["a.txt"]),
+                patch.object(_mod, "_check_gitleaks_dir", side_effect=_capture),
+            ):
+                _mod._check_gitleaks_tracked(root)
+
+            self.assertEqual(seen["body"], "payload-marker\n")
+
+    def test_findings_propagate(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "a.txt").write_text("x\n", encoding="utf-8")
+            with (
+                patch.object(_mod, "_list_tracked_files", return_value=["a.txt"]),
+                patch.object(
+                    _mod, "_check_gitleaks_dir", return_value=["secret:aws-access-token"]
+                ),
+            ):
+                self.assertEqual(
+                    _mod._check_gitleaks_tracked(root), ["secret:aws-access-token"]
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
