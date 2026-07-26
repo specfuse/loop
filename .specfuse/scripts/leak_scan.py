@@ -377,6 +377,41 @@ def _list_tracked_files(root: Path) -> list[str]:
     return proc.stdout.splitlines() if proc.returncode == 0 else []
 
 
+def _check_gitleaks_tracked(root: Path) -> list[str]:
+    """Run gitleaks over the repo's *git-tracked* files only.
+
+    `scan_repo`'s contract is "all git-tracked files", and its denylist half
+    honours that by iterating `_list_tracked_files`. Pointing gitleaks at the
+    working directory instead swept in everything untracked and gitignored —
+    `__pycache__`, `.venv`, `build/`, `dist/` — none of which is in the repo
+    and none of which a repo gate should judge.
+
+    That was not theoretical: CI runs the test suite before this gate, and
+    gitleaks 8.18.2 (what Ubuntu's apt ships) matches its `aws-access-token`
+    rule against byte sequences in compiled `.pyc` files, so the gate failed on
+    bytecode that is gitignored and never committed. Locally, with a newer
+    gitleaks, the same tree passed — see #250 for the version-pinning half of
+    this problem.
+
+    Materialising the tracked set into a temp dir keeps the scan aligned with
+    the documented contract and makes the verdict independent of whatever
+    build artifacts happen to be lying around.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        staged = Path(td)
+        for rel in _list_tracked_files(root):
+            src = root / rel
+            if not src.is_file():  # deleted-but-tracked, submodules
+                continue
+            dst = staged / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                dst.write_bytes(src.read_bytes())
+            except OSError:
+                continue
+        return _check_gitleaks_dir(staged)
+
+
 def _check_gitleaks_dir(path: Path) -> list[str]:
     """Run gitleaks over an on-disk directory; return RuleID hit strings."""
     proc = subprocess.run(  # nosec B603 – list args, no shell
@@ -437,7 +472,7 @@ def scan_repo(root: str = ".") -> list[str]:
                     hits.append(f"{rel}:{lineno}: denylist: {entry!r}")
             if hashes and hashed_denylist_hits(line, salt, lengths, hashes):
                 hits.append(f"{rel}:{lineno}: denylist-hash")
-    hits.extend(_check_gitleaks_dir(root_path))
+    hits.extend(_check_gitleaks_tracked(root_path))
     return hits
 
 

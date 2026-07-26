@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+"""
+Specfuse monitoring-schema linter.
+
+Validates a project's ``.specfuse/monitoring.yml`` structurally:
+
+  - top-level ``environments:`` and ``components:`` keys parse,
+  - each environment's ``telemetry``/``broker`` provider bindings are present
+    and carry a ``provider`` name (an opaque string; this module does not
+    interpret it — see FEAT-2026-0040 for provider adapters),
+  - credential-shaped values are environment-variable references, never
+    inline literals,
+  - each component carries its required fields and its ``runner``/
+    ``diagnose``/``autofix`` dials are one of the neutral enum values,
+  - each check's ``type`` is one of the neutral set.
+
+Sibling of ``lint_plan.py`` (unrelated artifact, not an extension of it) and,
+like it, parses only with ``_miniyaml`` — the package has zero runtime
+dependencies.
+
+Monitoring is opt-in: an absent ``monitoring.yml`` is a correct final state,
+not an error. ``validate_monitoring`` returns ``[]`` in that case.
+
+Exit 0 = clean (including "file absent"), 1 = findings printed.
+
+Usage:  lint_monitoring.py [path/to/monitoring.yml]
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from . import _miniyaml
+
+__all__ = ("validate_monitoring", "main")
+
+RUNNER_VALUES = frozenset({"local", "gh-actions", "in-cluster"})
+DIAGNOSE_VALUES = frozenset({"manual", "auto"})
+AUTOFIX_VALUES = frozenset({"off", "on"})
+CHECK_TYPES = frozenset({"dlq", "error-logs", "http-5xx", "heartbeat", "invariant"})
+HARVEST_MODE_VALUES = frozenset({"peek", "quarantine"})
+
+REQUIRED_COMPONENT_FIELDS = ("name", "type", "runner", "diagnose", "autofix", "checks")
+REQUIRED_PROVIDER_BINDINGS = ("telemetry", "broker")
+
+# Keys whose value is a credential reference, wherever they appear nested
+# under `environments:`. Matched case-insensitively against the trailing
+# name segment (e.g. `api_key`, `connection_string`, `token`).
+_CREDENTIAL_KEY_RE = re.compile(
+    r"(?i)(^|_)(key|token|secret|password|credential|connection[_-]?string)s?$"
+)
+# An environment-variable-NAME reference: the schema admits credentials by
+# env-var name only, e.g. `TELEMETRY_API_KEY`.
+_ENV_VAR_NAME_RE = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+_DEFAULT_PATH = Path(".specfuse/monitoring.yml")
+
+
+def validate_monitoring(path: str | Path | None = None) -> list[str]:
+    """Validate *path* (default ``.specfuse/monitoring.yml``); return findings.
+
+    Empty list means valid (including "file does not exist" — monitoring is
+    opt-in). A parse failure is reported as a one-element finding list, never
+    a silent ``[]``.
+    """
+    p = Path(path) if path is not None else _DEFAULT_PATH
+    if not p.is_file():
+        return []
+
+    try:
+        parsed = _miniyaml.parse(p.read_text())
+    except _miniyaml.MiniYAMLError as exc:
+        return [f"{p}: could not parse as YAML: {exc}"]
+
+    if not isinstance(parsed, dict):
+        return [f"{p}: top level must be a mapping with 'environments' and "
+                f"'components' keys"]
+
+    findings: list[str] = []
+    findings.extend(_check_environments(parsed.get("environments")))
+    findings.extend(_check_components(parsed.get("components")))
+    return findings
+
+
+def _check_environments(environments: object) -> list[str]:
+    findings: list[str] = []
+    if environments is None:
+        findings.append("missing top-level 'environments' key")
+        return findings
+    if not isinstance(environments, dict):
+        findings.append("'environments' must be a mapping of environment "
+                         "name to its bindings")
+        return findings
+
+    for env_name, env_body in environments.items():
+        if not isinstance(env_body, dict):
+            findings.append(f"environment '{env_name}': must be a mapping")
+            continue
+        for binding in REQUIRED_PROVIDER_BINDINGS:
+            value = env_body.get(binding)
+            if value is None:
+                findings.append(
+                    f"environment '{env_name}': missing '{binding}' binding"
+                )
+            elif not isinstance(value, dict) or not str(value.get("provider") or "").strip():
+                findings.append(
+                    f"environment '{env_name}': '{binding}' binding missing "
+                    f"a 'provider' name"
+                )
+        findings.extend(
+            _check_credentials(env_body, f"environment '{env_name}'")
+        )
+    return findings
+
+
+def _check_credentials(node: object, where: str) -> list[str]:
+    """Recursively find credential-shaped keys and reject inline literals."""
+    findings: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if _CREDENTIAL_KEY_RE.search(str(key)) and isinstance(value, str):
+                if not _ENV_VAR_NAME_RE.match(value):
+                    findings.append(
+                        f"{where}: credential '{key}' must reference an "
+                        f"environment-variable name (e.g. UPPER_SNAKE_CASE), "
+                        f"not an inline literal value"
+                    )
+            findings.extend(_check_credentials(value, where))
+    elif isinstance(node, list):
+        for item in node:
+            findings.extend(_check_credentials(item, where))
+    return findings
+
+
+def _check_components(components: object) -> list[str]:
+    findings: list[str] = []
+    if components is None:
+        findings.append("missing top-level 'components' key")
+        return findings
+    if not isinstance(components, list):
+        findings.append("'components' must be a list of component mappings")
+        return findings
+
+    for index, component in enumerate(components):
+        if not isinstance(component, dict):
+            findings.append(f"component[{index}]: must be a mapping")
+            continue
+        label = str(component.get("name") or f"component[{index}]")
+
+        for field in REQUIRED_COMPONENT_FIELDS:
+            if component.get(field) is None:
+                findings.append(f"component '{label}': missing '{field}' field")
+
+        runner = component.get("runner")
+        if runner is not None and runner not in RUNNER_VALUES:
+            findings.append(
+                f"component '{label}': 'runner' has unknown value {runner!r} "
+                f"— must be one of {sorted(RUNNER_VALUES)}"
+            )
+        diagnose = component.get("diagnose")
+        if diagnose is not None and diagnose not in DIAGNOSE_VALUES:
+            findings.append(
+                f"component '{label}': 'diagnose' has unknown value "
+                f"{diagnose!r} — must be one of {sorted(DIAGNOSE_VALUES)}"
+            )
+        autofix = component.get("autofix")
+        if autofix is not None and autofix not in AUTOFIX_VALUES:
+            findings.append(
+                f"component '{label}': 'autofix' has unknown value "
+                f"{autofix!r} — must be one of {sorted(AUTOFIX_VALUES)}"
+            )
+
+        checks = component.get("checks")
+        if checks is not None:
+            findings.extend(_check_checks(checks, label))
+
+    return findings
+
+
+def _check_checks(checks: object, component_label: str) -> list[str]:
+    findings: list[str] = []
+    if not isinstance(checks, list):
+        findings.append(f"component '{component_label}': 'checks' must be a list")
+        return findings
+
+    for index, check in enumerate(checks):
+        if not isinstance(check, dict):
+            findings.append(
+                f"component '{component_label}': checks[{index}]: must be a mapping"
+            )
+            continue
+        check_type = check.get("type")
+        if check_type not in CHECK_TYPES:
+            findings.append(
+                f"component '{component_label}': checks[{index}]: unknown "
+                f"check type {check_type!r} — must be one of "
+                f"{sorted(CHECK_TYPES)}"
+            )
+            continue
+        if check_type == "dlq":
+            harvest_mode = check.get("harvest_mode")
+            if harvest_mode not in HARVEST_MODE_VALUES:
+                findings.append(
+                    f"component '{component_label}': checks[{index}]: 'dlq' "
+                    f"check has unknown 'harvest_mode' {harvest_mode!r} — "
+                    f"must be one of {sorted(HARVEST_MODE_VALUES)}"
+                )
+        elif check_type == "invariant":
+            for field in ("query", "fingerprint_by"):
+                if not check.get(field):
+                    findings.append(
+                        f"component '{component_label}': checks[{index}]: "
+                        f"'invariant' check missing '{field}'"
+                    )
+
+    return findings
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Specfuse monitoring-schema linter.",
+        usage="lint_monitoring.py [path/to/monitoring.yml]",
+    )
+    parser.add_argument(
+        "path", nargs="?", default=None,
+        help="Path to monitoring.yml (default .specfuse/monitoring.yml). "
+             "An absent file is not an error.",
+    )
+    args = parser.parse_args()
+    findings = validate_monitoring(args.path)
+    if findings:
+        print(f"FAIL — {len(findings)} finding(s):")
+        for f in findings:
+            print(f"  - {f}")
+        return 1
+    print("OK — monitoring config is structurally valid (or absent).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

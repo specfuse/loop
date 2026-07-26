@@ -1,0 +1,67 @@
+# .specfuse/monitoring.overrides.yml.example
+#
+# Machine-local override slice for monitoring.yml — which environment a local
+# run targets, the credential ENV-VAR NAMES available on this machine, and
+# `runner: local` forced on every component. Copy to
+# `.specfuse/monitoring.overrides.yml` (gitignored — see
+# .specfuse/gitignore.snippet) and edit for your own machine.
+#
+# MERGE AND EXECUTION SEMANTICS LAND IN FEAT-2026-0040. This file, like
+# monitoring.yml.example, is a shape declaration only: valid, inspectable, and
+# machine-checkable standing alone. It does not itself merge into
+# monitoring.yml or invoke anything — that is `specfuse-monitor run`'s job,
+# a CLI FEAT-2026-0040 ships.
+#
+# SAME SCHEMA AS monitoring.yml.example, unchanged — validated by
+# `specfuse/loop/lint_monitoring.py` (`validate_monitoring`). One monitoring
+# schema, not two. See docs/concepts/monitoring-schema.md.
+#
+# SECURITY POSTURE: identical to monitoring.yml.example. Every credential
+# value below is an ENVIRONMENT-VARIABLE NAME (UPPER_SNAKE_CASE), never a
+# literal secret — see .specfuse/monitoring-secrets-checklist.md for where to
+# obtain each value. Every organization name, host, workspace ID, and queue
+# name here is an obvious placeholder.
+
+# --------------------------------------------------------------------------
+# environments
+#
+# The machine-local slice usually names only the one environment this
+# machine runs checks against locally (here: staging).
+# --------------------------------------------------------------------------
+environments:
+  staging:
+    telemetry:
+      provider: acme-telemetry
+      credentials:
+        api_key: ACME_TELEMETRY_STAGING_API_KEY
+    broker:
+      provider: acme-broker
+      credentials:
+        connection_string: ACME_BROKER_STAGING_CONNECTION_STRING
+
+# --------------------------------------------------------------------------
+# components
+#
+# Every component's `runner` is forced to `local` in this override slice —
+# that is the property that makes it a *local-runner* bootstrap artifact.
+# `diagnose`/`autofix` stay at the same conservative defaults as
+# monitoring.yml.example.
+# --------------------------------------------------------------------------
+components:
+  - name: web-api
+    type: http-service
+    runner: local
+    diagnose: manual
+    autofix: "off"
+    checks:
+      - type: heartbeat
+      - type: error-logs
+
+  - name: order-worker
+    type: queue-consumer
+    runner: local
+    diagnose: manual
+    autofix: "off"
+    checks:
+      - type: dlq
+        harvest_mode: peek

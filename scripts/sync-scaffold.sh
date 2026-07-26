@@ -138,6 +138,9 @@ FILES=(
   VERSION
   gitignore.snippet
   verification.yml.example
+  monitoring.yml.example
+  monitoring.overrides.yml.example
+  monitoring-secrets-checklist.md
   roadmap.template.md
   LEARNINGS.template.md
   templates/GATE.template.md
@@ -145,6 +148,7 @@ FILES=(
   templates/WU.template.md
   rules/close-discipline.md
   rules/correlation-ids.md
+  rules/design-for-diagnosis.md
   rules/never-touch.md
   rules/planning-discipline.md
   rules-local/README.md

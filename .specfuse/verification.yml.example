@@ -51,6 +51,9 @@ code:
     wu_must_reference: true                   # WUs must name it (see note above)
   - name: security
     command: "bandit -r src -ll"             # or your OWASP-aligned scanner
+  # Uncomment after running /derive-monitoring to draft .specfuse/monitoring.yml.
+  # - name: monitoring-example-lint
+  #   command: "specfuse-monitor-lint .specfuse/monitoring.yml"
 
 # Reflective units (retrospective, lessons, docs): the artifact exists / something
 # changed. Tighten as you like.
