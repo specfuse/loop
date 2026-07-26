@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 baseline:
   sha: dd81f062ae8df97f52bc3fe166fdff6c5ad09013
   probed_at: 2026-07-26T17:47:28.864419+00:00
