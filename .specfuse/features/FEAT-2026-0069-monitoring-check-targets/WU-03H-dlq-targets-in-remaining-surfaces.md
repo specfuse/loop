@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0069/T03H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - .specfuse/monitoring.yml.example
@@ -12,6 +12,15 @@ produces:
   - plugins/specfuse/skills/derive-monitoring/SKILL.md
   - tests/test_monitoring_example.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T17:49:38.659154+00:00
+duration_seconds: 436.12
+cost_usd: 0.834602
+input_tokens: 44
+output_tokens: 9558
 ---
 
 # Hygiene: give every remaining shipped `dlq` check its `targets`

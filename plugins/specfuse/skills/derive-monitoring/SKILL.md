@@ -237,6 +237,9 @@ components:
     checks:
       - type: dlq
         harvest_mode: peek
+        targets:
+          - subscription: acme-orders-dlq-sub
+            function: ProcessOrder
 ```
 
 #### 4c. A filled-in reading of `monitoring-secrets-checklist.md`
