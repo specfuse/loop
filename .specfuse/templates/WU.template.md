@@ -28,10 +28,15 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   `xhigh` | `max`. Absent → type-keyed default. `low`/`medium` add a terseness directive.
 - `planned_cost_usd` — OPTIONAL. Estimated USD at draft time. Compared against actual in close
   WU's cost analysis. Lint WARN when absent on active/draft WUs (non-blocking).
-  **Planning-WU cost floor (`.specfuse/rules/planning-discipline.md` §5):** for `plan-next`,
-  `close`, and `close-intermediate` WUs, draft `planned_cost_usd` at a **floor of $5.00** — these
-  run 2.8–5.2× the $2–3 that "it's just bookkeeping" suggests. A gate `cost_budget_usd` set to
-  the sum of $2–3 planning estimates is a brake that fires by construction on the first real close.
+  **Planning-WU cost floor (`.specfuse/rules/planning-discipline.md` §5):** draft
+  `planned_cost_usd` at **$12.00 for `plan-next`** and **$8.00 for `close` /
+  `close-intermediate`** — not the $2–3 that "it's just bookkeeping" suggests, and not one
+  flat figure for both: `plan-next` runs roughly twice what a close does. Both floors sit
+  BELOW observed actuals ($16.44 and $10.01), so treat them as a starting point, not a
+  prediction — and price for one retry, since every observed overrun took two attempts
+  with the first refused by the driver. A gate `cost_budget_usd` should be the sum of its
+  WU estimates PLUS one re-attempt of its largest WU; a budget summed from the estimates
+  alone is a brake that fires by construction on the first real close. See issue #260.
 - `generated_surfaces` — OPTIONAL. Paths to generated files this unit's acceptance depends on.
 - `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
   `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions
