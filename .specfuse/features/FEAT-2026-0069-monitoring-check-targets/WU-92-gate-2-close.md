@@ -13,16 +13,25 @@ auto_close_disabled: true
 **Objective.** Close the feature: retrospective, lessons, docs, and the terminal
 feature-arc verdict, in one session.
 
-**Context.** This is `FEAT-2026-0069/G2-CLOSE`, the terminal close. **This file is a
-`status: draft` placeholder**, scaffolded at feature-drafting time so `lint_plan.py`
-reads gate 2 as the non-empty terminal gate and gate 1 as non-terminal. Gate 1's
-`G1-PLAN` fills in gate 2's substantive work units above this entry in `PLAN.md`'s
-graph, sets this WU's real `depends_on`, and refines the criteria below against what
-gate 2 actually drafted.
+**Context.** This is `FEAT-2026-0069/G2-CLOSE`, the terminal close. Gate 1's `G1-PLAN`
+drafted gate 2's substantive work units above this entry in `PLAN.md`'s graph and set
+this WU's real `depends_on`; the criteria below are refined against what it drafted.
 
 Gate 2's definition of done, from `GATE-02.md`: `/derive-monitoring`, run against a repo
 whose single deployable carries N triggers, emits **1 component with N targets** — not N
 components.
+
+The four work units this close reconciles, and where each one's evidence lives:
+
+| WU | deliverable | its own oracle |
+|---|---|---|
+| `T05` | `invariant` may not carry `targets`; `_check_targets` docstring corrected | `tests.test_lint_monitoring.TestInvariantTargetsRejected` |
+| `T06` | `discover_components` re-keyed onto deployment evidence | `tests.test_derive_monitoring_discovery.TestDeploymentKeyedDiscovery` |
+| `T07` | Stack C (1 deployable, 3 subscriptions + 2 schedules) + per-schedule `heartbeat` targets | `tests.test_derive_monitoring_discovery.TestOneDeployableManyTriggers` |
+| `T08` | skill Step 1 / Seams prose, canonical then synced | `tests.test_derive_monitoring_skill_registration.TestStep1IsDeploymentKeyed` |
+
+`T07`'s oracle is the one that decides the definition of done. Re-run it fresh under AC4;
+do not inherit its RESULT block.
 
 **Acceptance criteria.** Refined by `G1-PLAN`; these are the obligations that hold
 regardless of what gate 2 turns out to contain.
@@ -53,7 +62,13 @@ regardless of what gate 2 turns out to contain.
    rename across the whole feature, or write exactly
    `n/a — no consumer-visible contract change`. This will **not** be `n/a`: `dlq` gained a
    required field, `queue-stalled` is a new check type, and discovery's output shape
-   changed. Block on human acknowledgment.
+   changed. Block on human acknowledgment. Gate 1's close already tabled nine items in
+   `RETROSPECTIVE.md` § *Consumer-visible contract changes* — carry that table forward
+   rather than re-deriving it, and add gate 2's: item 6's `invariant` fall-through is
+   **superseded by `T05`** (`targets` now rejected on `invariant`, decided rather than
+   inherited), and the `patterns` table contract that `discover_components` consumes is a
+   **breaking** change for anyone who wrote a pattern table against gate 1's
+   `evidence_markers` shape.
 7. **The downstream constraint is restated for FEAT-2026-0040**, because it is the one
    thing that can silently undo this feature: **fingerprints must include the target
    key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription

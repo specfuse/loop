@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0069/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 oracle_env: macos_local
+duration_seconds: 2260.813
+cost_usd: 16.43642
+input_tokens: 3289
+output_tokens: 138242
 ---
 
 # Gate 1 plan-next — draft gate 2's work units

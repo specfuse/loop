@@ -183,13 +183,37 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      # Drafted by G1-PLAN against the shape gate 1 actually emitted, not the
+      # shape the sketch predicted. All four ship `status: draft` (unarmed);
+      # the human flips them at the gate-1 review-and-arm checkpoint after
+      # reading GATE-02-REVIEW.md.
+      #
+      # T05 is independent of the re-key: it decides the `invariant` x
+      # `targets` fall-through gate 1 shipped by accident and corrects the
+      # stale `_check_targets` docstring, both routed here by gate 1's
+      # retrospective. T06 -> T07 -> T08 is a strict chain: keying, then the
+      # N-trigger fixture that proves the keying, then the prose that
+      # describes it.
+      - id: FEAT-2026-0069/T05
+        file: WU-05-invariant-targets-position.md
+        depends_on: []
+      - id: FEAT-2026-0069/T06
+        file: WU-06-rekey-discovery-on-deployment-evidence.md
+        depends_on: []
+      - id: FEAT-2026-0069/T07
+        file: WU-07-n-trigger-fixture-and-target-generation.md
+        depends_on: [FEAT-2026-0069/T06]
+      - id: FEAT-2026-0069/T08
+        file: WU-08-skill-method-prose.md
+        depends_on: [FEAT-2026-0069/T07]
       # --- terminal gate: single close, no plan-next ---
-      # Scaffolded now so lint reads the last gate as non-empty and gate 1 as
-      # non-terminal. G1-PLAN inserts gate 2's substantive WUs ABOVE this entry
-      # and sets its real depends_on.
       - id: FEAT-2026-0069/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0069/T05
+          - FEAT-2026-0069/T06
+          - FEAT-2026-0069/T07
+          - FEAT-2026-0069/T08
 ```
 
 ## Gate 2 sketch (for `plan-next`, not binding)
@@ -266,5 +290,15 @@ triggers, emits **1 component with N targets** — not N components.
   because the terminal close reconciles actual spend against it and an understated plan
   would make gate 2's real cost read as an overrun. 0039 carried the same warning for
   the same reason.
+- **The convergence prediction above was wrong, and is left standing rather than
+  rewritten.** `G1-PLAN` drafted gate 2's four substantive WUs at $12.00, taking the WU
+  sum from $28.00 to $40.00 — so the delta did not close, it crossed zero and reopened
+  on the other side (now ~18% *over* the $34.00 feature figure). Neither number is
+  adjusted here: `WU-91`'s AC9 requires the discrepancy be reported rather than
+  silently reconciled, and the reasoning is in `GATE-02-REVIEW.md` § *Cost
+  reconciliation*. The short version is that $34.00 was drafted before gate 1 revealed
+  a mid-gate hygiene WU, a four-attempt WU, and a two-attempt close — all real spend the
+  original figure had no way to carry. The terminal close reconciles actuals against
+  both figures.
 </content>
 </invoke>
