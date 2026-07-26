@@ -137,4 +137,3 @@ all pass, plus the explicit `cmp` in AC9 and the CLI exit check in AC10.
   `acme-telemetry` bindings do.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

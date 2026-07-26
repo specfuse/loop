@@ -300,5 +300,3 @@ triggers, emits **1 component with N targets** — not N components.
   a mid-gate hygiene WU, a four-attempt WU, and a two-attempt close — all real spend the
   original figure had no way to carry. The terminal close reconciles actuals against
   both figures.
-</content>
-</invoke>

@@ -371,4 +371,3 @@ cost more in ceremony than the fix.
 - [ ] `GATE-02.md`'s revised `cost_budget_usd: 22.0` confirmed or re-set.
 - [ ] Resume: `python3 .specfuse/scripts/loop.py` (or the driver invocation this repo uses)
       from a venv — never two drivers on one feature.
-</content>

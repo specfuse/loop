@@ -124,4 +124,3 @@ Binding rules in `.specfuse/rules/` apply.
   — report the surface so the enumeration rule gets the correction.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

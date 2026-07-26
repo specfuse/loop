@@ -183,4 +183,3 @@ explicit CLI exit check in AC12.
   `derive-monitoring` skill's central guarantee.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

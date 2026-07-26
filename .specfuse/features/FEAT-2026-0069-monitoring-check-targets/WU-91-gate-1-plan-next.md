@@ -94,4 +94,3 @@ audit or to the skill's Step 1 contract in ways that are themselves multi-WU) â€
 scope finding for the operator, and drafting a gate that cannot fit is worse than halting.
 Also block if gate 1's retrospective contradicts `PLAN.md`'s premise that the two gates
 are separable. Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

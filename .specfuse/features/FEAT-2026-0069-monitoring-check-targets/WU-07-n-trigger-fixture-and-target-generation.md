@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T07
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.50
 oracle_env: macos_local
@@ -138,4 +138,3 @@ requires a change to `specfuse/loop/lint_monitoring.py`: gate 1 shipped that val
 `heartbeat` targets already accepted, so a validator change here would mean the emitted shape
 and the schema disagree — a contract finding, not an implementation detail. Blocked is a
 respectable outcome (`result-contract.md` rule 4).
-</content>

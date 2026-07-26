@@ -1956,3 +1956,32 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Report both, and name the as-drafted figure as the honest one. Corollary: a gate whose
   WUs all come in 39–75% under except one 155% overrun did not overrun on estimation, it
   overran on one defect — say which, and price the defect rather than the estimate.
+
+- [FEAT-2026-0069/GATE-1-ARM] **`planning-discipline.md` §5's flat $5.00 planning floor is
+  wrong for `plan-next` specifically, and the error is large enough to invert a feature's
+  cost verdict.** Two independent datasets now agree, and they separate cleanly by WU type
+  rather than by feature:
+
+  | WU type | observed actuals | §5 floor |
+  |---|---|---|
+  | `plan-next` | $15.65 (FEAT-2026-0049), **$16.44** (FEAT-2026-0069/G1-PLAN, 2 attempts) | $5.00 |
+  | `close-intermediate` | $5.67 (FEAT-2026-0049), **$10.01** (FEAT-2026-0069, 2 attempts) | $5.00 |
+
+  FEAT-2026-0069's gate 1 shows the consequence in isolation, because its substantive
+  estimating was good: substantive WUs came in at **$11.94 against $11.00 planned (+8.6%,
+  four of five under)**, while the two closing WUs came in at **$26.45 against $10.00
+  (+165%)**. Gate 1 alone therefore cost **$38.39** against a **$34.00 whole-feature** plan
+  — the feature reads as a 63% overrun caused entirely by a rule-supplied constant, not by
+  anything the planner judged.
+
+  Three rules follow. **(a)** Draft `plan-next` at a floor of **$12.00** and `close` /
+  `close-intermediate` at **$8.00** until more data lands; the flat $5.00 is a floor for the
+  cheapest observed case, never an expectation. **(b)** A gate's `cost_budget_usd` must be
+  set against those figures plus one re-attempt of its largest WU — a budget summed from
+  $5.00 planning estimates is the brake §5 already warns fires by construction, and it now
+  has a second dataset. **(c)** When a feature's overrun traces to a floor the rules
+  supplied rather than to a judgement the author made, the retrospective must say so and
+  propose the floor revision. Otherwise the signal is recorded as "this feature overran"
+  and the constant survives to mis-price the next one. This entry exists because
+  FEAT-2026-0049 produced the same evidence and it was recorded as provenance for the
+  $5.00 floor rather than as a reason to move it. Tracked as issue #260.

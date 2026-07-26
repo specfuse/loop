@@ -98,4 +98,3 @@ declared `produces:` files, if a fresh oracle re-run disagrees with a WU's self-
 outcome (say which, and by how much), or if the human acknowledgment required by AC5 is
 unavailable in this session — a breaking contract change must not be closed on silence.
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

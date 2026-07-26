@@ -20,5 +20,4 @@ also failed an attempt on `assert_gate_review_exists: GATE-0N-REVIEW.md absent o
 before writing the driver-expected name. Three features have now paid for it. The durable
 fix is a scaffold change — either `WU.template.md` and the gate template say
 `GATE-{N+1}-REVIEW.md`, or the driver accepts both names — and it belongs in the loop's own
-roadmap, not in another per-feature workaround.
-</content>
+roadmap, not in another per-feature workaround. **Filed as issue #261.**

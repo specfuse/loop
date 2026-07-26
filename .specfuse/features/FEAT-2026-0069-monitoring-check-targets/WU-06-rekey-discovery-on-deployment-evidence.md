@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T06
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 4.00
 oracle_env: macos_local
@@ -170,4 +170,3 @@ should absorb. Also block if satisfying AC1 appears to require changing
 `audit_diagnosability` or the skill's Step 1 contract: `GATE-01.md`'s arming discipline
 names exactly that as the multi-WU cascade that does not fit one gate. Blocked is a
 respectable outcome (`result-contract.md` rule 4).
-</content>

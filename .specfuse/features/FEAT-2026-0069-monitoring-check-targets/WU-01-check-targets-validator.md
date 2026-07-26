@@ -130,4 +130,3 @@ automatic if AC7 holds and fails loudly if it does not. See
   — do not claim complete.
 
 Blocked is a respectable outcome (`result-contract.md` rule 4).
-</content>

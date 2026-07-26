@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T08
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 oracle_env: macos_local
@@ -130,4 +130,3 @@ exists to prevent. Also block if `scripts/sync-scaffold.sh` reports drift in a p
 did not edit: that means the vendored tree diverged from canonical before this gate, which
 is a separate hygiene finding for the operator. Blocked is a respectable outcome
 (`result-contract.md` rule 4).
-</content>

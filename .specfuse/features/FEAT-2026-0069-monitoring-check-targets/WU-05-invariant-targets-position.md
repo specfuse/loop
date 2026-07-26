@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0069/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.00
 oracle_env: macos_local
@@ -124,4 +124,3 @@ block if a human reviewer's `GATE-02-REVIEW.md` decision recorded the *permissiv
 position instead: this WU implements rejection, and silently implementing the opposite of
 an armed decision is worse than halting. Blocked is a respectable outcome
 (`result-contract.md` rule 4).
-</content>
