@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0069/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
   - tests/test_derive_monitoring_discovery.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T20:10:38.224630+00:00
+duration_seconds: 479.815
+cost_usd: 1.247977
+input_tokens: 42
+output_tokens: 17570
 ---
 
 # Re-key `discover_components` onto deployment evidence
