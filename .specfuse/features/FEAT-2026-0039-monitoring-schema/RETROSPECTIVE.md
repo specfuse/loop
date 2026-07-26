@@ -751,3 +751,55 @@ token volume, drives cost — and retry probability tracks mechanical fan-out.
   then"** and was never filled in (`GATE-02-REVIEW.md` §1.12 flagged this as a one-line
   arm-time edit; it was not made). `PLAN.md`'s graph is authoritative, so nothing is
   broken — but a reader of `GATE-02.md` alone cannot tell what gate 2 contained.
+
+---
+
+## FU-1 discharge — the live run happened (2026-07-26, post-close)
+
+`FU-1`'s upgrade condition had three steps. All three are now satisfied.
+
+1. **Discovery symlink created** — `.claude/skills/derive-monitoring`, by the operator
+   from an interactive session, as the WU predicted a dispatched session could not.
+2. **`/derive-monitoring` run against a real multi-component project** — a downstream
+   .NET backend: one HTTP API deployed by Helm chart, plus one functions host carrying
+   20 message-topic subscriptions and 10 scheduled triggers.
+3. **The drafted config passes the validator, and the operator confirmed the component
+   set** — `lint_monitoring.py` exited 0 on both the drafted `monitoring.yml` and the
+   drafted overrides file (run, not asserted), and the operator confirmed the two
+   discovered components match what they actually deploy.
+
+**FU-1 is discharged.** Gate 2's definition-of-done clause 1 — "an operator can run
+`/derive-monitoring` … and get a drafted `monitoring.yml` that passes gate 1's
+validator" — is now proven on a real repository rather than on a fixture.
+
+### What the run found — five gaps, four issues, none of them unmet criteria of this feature
+
+The run's value was not confirmation; it was the gaps it surfaced *before*
+FEAT-2026-0040 builds adapters against the contract:
+
+- **The component axis is wrong for enumeration** (#245). Correctly collapsing 30
+  triggers to 2 deployables leaves no way to express per-subscription DLQ attribution
+  or per-schedule heartbeat. Checks need a `targets` list; components stay the
+  deployment/attribution unit.
+- **Discovery would have emitted 30 components** (#245). A matcher keyed on trigger
+  attributes returns one component per trigger. The right key is *deployment* evidence,
+  with trigger registrations as evidence of a component's **type**. The gate-2 fixture
+  could not catch this: its stack had one trigger per deployable.
+- **`_ENV_VAR_NAME_RE` rejects `Section__Key`** (#246), the canonical env-var spelling
+  for hierarchical config in .NET and Spring alike.
+- **A wedged consumer is invisible to every existing check type** (#247) — including
+  `invariant`, because queue depth is a broker coordinate a telemetry query cannot see.
+- **Deployment-regression detection on 4xx codes** (#248) — expressible today via
+  `invariant`, which would erode the discrete-artifact model by precedent rather than
+  by decision. Filed as a scope question, not a schema change.
+
+### Bearing on FU-4 (discovery's field accuracy)
+
+Partially measured, and the honest reading is uncomfortable: the **skill** produced the
+right answer, but it did so because the operator-facing session applied judgement about
+what constitutes a deployable. `discover_components` driven by a naive per-stack pattern
+table would have returned 30. FU-4 is therefore **not** discharged by this run — it is
+now measured, and the measurement says the algorithm needs deployment-evidence keying it
+does not currently have. Tracked in #245.
+
+FU-2 and FU-3 remain open and unmeasured.
