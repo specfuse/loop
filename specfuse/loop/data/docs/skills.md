@@ -66,6 +66,11 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
 - **`/derive-verification`** — draft a `.specfuse/verification.yml` for a project
   by inspecting its CI, tooling manifests, and code. Run this once when
   bootstrapping the loop in a repo that already has CI worth deriving gates from.
+- **`/derive-monitoring`** — draft a `.specfuse/monitoring.yml` (plus a local
+  overrides file and a filled secrets checklist) for a project by discovering
+  deployed components from repo evidence and auditing them against the
+  design-for-diagnosis rule. Run this once a project has real components to
+  monitor.
 
 ### 3. Run — the driver (not a skill)
 
