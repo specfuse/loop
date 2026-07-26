@@ -68,7 +68,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
-| FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | planned | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
+| FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | active | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -918,7 +918,7 @@ machine-checkable contract rather than prose.
 
 **Scope boundary — recorded decisions, deliberately not built.** Per-target dials (multiplies the trust surface; nothing observed motivates it — dials stay per-component). The `environments` × `components` cross-product, where the schema asserts every component exists in every environment (acknowledged limitation; a different axis, and bundling it would double the blast radius of a breaking change). Issue #248, deployment-regression detection on 4xx codes (verdict: the no-metrics boundary holds; `invariant` is not the sanctioned route to rate-based detection). And fingerprinting stays 0040's — but **0040's fingerprint model must include the target key**, or 20 DLQ targets collapse into one issue and the attribution this feature pays for is lost at the last step.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
