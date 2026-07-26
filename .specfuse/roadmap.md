@@ -55,7 +55,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
 | FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
-| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | blocked | — | — |
+| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | planned | — | [→ detail](#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
@@ -769,9 +769,13 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
 
-**Blocked by.** [FEAT-2026-0069](#feat-2026-0069) — the check-target axis must land before adapters are built against the contract. [FEAT-2026-0039](#feat-2026-0039) (the schema itself) is **done**; its first real-repo run found that `component` conflates deployment/attribution with failure-artifact enumeration, and the adapter interface has to know whether it enumerates per component or per target before it can be written. Note for this feature: **fingerprints must include the target key**, or 20 DLQ targets collapse into one issue and 0069's attribution is lost at the last step.
+**Unblocked 2026-07-26.** [FEAT-2026-0069](#feat-2026-0069) landed the check-target axis and is `done`; [FEAT-2026-0039](#feat-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
 
-**Status: blocked.**
+**Binding constraint inherited from FEAT-2026-0069 — do not lose it.** **Fingerprints must include the target key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription attribution 0069 paid two gates for is destroyed at the last step. 0069's terminal close restates this as its own closing obligation; it is this feature's to honour.
+
+**Two open schema questions this feature will be first to feel**, neither blocking: [#262](https://github.com/specfuse/loop/issues/262) — telemetry binds per environment, so components in one environment cannot resolve to different telemetry instances; and the cron-dialect ambiguity 0069's real-repo run surfaced — `cron` is opaque to the schema, and a heartbeat check computing "should this have fired?" cannot tell a 5-field expression from a 6-field one. Decide both when the adapter interface forces the question, not before.
+
+**Status: planned.**
 
 <a id="feat-2026-0041"></a>
 ## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
