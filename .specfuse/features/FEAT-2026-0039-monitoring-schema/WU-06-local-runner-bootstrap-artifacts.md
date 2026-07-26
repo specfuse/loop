@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0039/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - .specfuse/monitoring.overrides.yml.example
@@ -14,6 +14,13 @@ produces_driver_helper: gitignore.snippet entry for .specfuse/monitoring.overrid
 oracle_env: macos_local
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T04:49:51.322017+00:00
+duration_seconds: 493.89
+cost_usd: 1.835641
+input_tokens: 78
+output_tokens: 17034
 ---
 
 # Ship the local-runner bootstrap artifacts and seed them

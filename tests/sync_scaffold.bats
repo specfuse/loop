@@ -29,6 +29,8 @@ setup() {
   printf 'learnings\n'   > "$TESTDIR/.specfuse/LEARNINGS.template.md"
   printf 'verify\n'      > "$TESTDIR/.specfuse/verification.yml.example"
   printf 'monitor\n'     > "$TESTDIR/.specfuse/monitoring.yml.example"
+  printf 'overrides\n'   > "$TESTDIR/.specfuse/monitoring.overrides.yml.example"
+  printf 'checklist\n'   > "$TESTDIR/.specfuse/monitoring-secrets-checklist.md"
   printf 'GATE\n'        > "$TESTDIR/.specfuse/templates/GATE.template.md"
   printf 'PLAN\n'        > "$TESTDIR/.specfuse/templates/PLAN.template.md"
   printf 'WU\n'          > "$TESTDIR/.specfuse/templates/WU.template.md"

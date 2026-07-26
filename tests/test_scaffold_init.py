@@ -33,6 +33,8 @@ _EXPECTED_TREE = {
     "VERSION",
     "verification.yml",
     "monitoring.yml.example",
+    "monitoring.overrides.yml.example",
+    "monitoring-secrets-checklist.md",
     "roadmap.md",
     "LEARNINGS.md",
     "features/.gitkeep",

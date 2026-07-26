@@ -139,6 +139,8 @@ FILES=(
   gitignore.snippet
   verification.yml.example
   monitoring.yml.example
+  monitoring.overrides.yml.example
+  monitoring-secrets-checklist.md
   roadmap.template.md
   LEARNINGS.template.md
   templates/GATE.template.md
