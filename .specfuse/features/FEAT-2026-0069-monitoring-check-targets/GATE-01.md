@@ -1,6 +1,10 @@
 ---
 gate: 1
 status: open
+baseline:
+  sha: 07796867343bb04ad0cbe63370ddf6d396ca895e
+  probed_at: 2026-07-26T16:44:18.149696+00:00
+  failing: []
 ---
 
 # Gate 1 — the schema expresses per-target enumeration, and the validator enforces which check types may carry it
