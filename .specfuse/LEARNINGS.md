@@ -1839,3 +1839,61 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   probe it added never executed. Phrase such notes as "takes effect on the NEXT driver
   invocation," and plan a separate observation point if the self-hosted run is meant to be
   part of the acceptance evidence.
+- [FEAT-2026-0039/T04] A work unit that enumerates N hand-maintained "surfaces" in prose
+  will get the enumeration missed, and the miss costs a whole attempt. T04's body listed
+  five seeding surfaces in a numbered block with a per-surface explanation of what breaks
+  if you skip it; the attempt edited its three `produces:` files and none of the five,
+  reported `complete`, and went red on `tests` + `coverage`. Worse, the enumeration was
+  ITSELF incomplete — the retry also had to touch a sixth file the WU never named, and the
+  two sibling WUs that copied the same list inherited the same omission. A hand-written
+  fan-out list reproduces the previous author's blind spots with perfect fidelity. Two
+  fixes, in preference order: make the registry the single source and have the tests read
+  from it (adding a seed file becomes one edit), or — when that is out of scope — derive
+  the list mechanically at authoring time by grepping the repo for an existing member of
+  the same family, never by copying a sibling WU's prose.
+
+- [FEAT-2026-0039/G2-CLOSE] An auto-closed gate's skipped ceremony is a DEBT ENTRY, not a
+  saving, and the close that inherits it should price it that way. Gate 1 auto-closed
+  on-plan and spent $0.00 against a $5.00 close-intermediate — a 100% underrun that
+  dominated the gate's headline −32% delta. What it actually did was move the
+  per-criterion deferred-verification walk into the terminal close as an explicit
+  acceptance criterion, and make it MORE expensive: the session doing the walk had not
+  written those WUs and had to reconstruct their verification state from the WU files.
+  General rule for any close reading an auto-closed predecessor: report the underrun, then
+  say plainly which of it was deferral rather than efficiency, so the number is not read
+  as estimation accuracy. General rule for auto-close predicates: a gate whose WUs carry
+  criteria the predicate cannot classify as verified-or-deferred is not a candidate for
+  auto-close.
+
+- [FEAT-2026-0039/G2-CLOSE] Estimate `planned_cost_usd` from mechanical fan-out, not prose
+  volume — overrun risk tracks RETRY probability, and retries come from missed
+  enumerations, not from long documents. Across this feature's eight substantive WUs the
+  pattern was unambiguous and ran opposite to the pre-registered prediction: the two WUs
+  that edited a hand-maintained list in many places overran (+29%, +52%, the latter a full
+  retry); the three that wrote a lot of content into few files all came in UNDER (−75%,
+  −42%, −24%). The gate review had named the two highest-authoring-volume WUs as the
+  likeliest overruns; one of them came in 24% under, and the actual worst overrun was a WU
+  nobody flagged because its body was short. Count the surfaces a WU must touch, not the
+  words it must write.
+
+- [FEAT-2026-0039/G2-CLOSE] When a feature's definition of done is an OPERATOR
+  EXPERIENCE — an interactive skill, a CLI someone runs by hand, anything whose target is
+  a different repository — pre-declare `met_locally` as the ceiling in `PLAN.md` at draft
+  time instead of discovering it at the arming review and confirming it at the close. A
+  dispatched session has neither a human channel nor access to a target repo, so no gate
+  sizing fixes it: splitting the gate three ways produces three gates carrying the same
+  deferral. Corollary for the deferred-list threshold (>2 entries or >30% of criteria
+  flags gate sizing): when the deferrals share ONE structural root cause, say so and name
+  the root cause rather than filing it as an oversized gate — the threshold is calibrated
+  for "this gate tried to do too much," and mis-attributing a structural limit to gate
+  sizing sends the next plan to fix the wrong thing.
+
+- [FEAT-2026-0039/G2-CLOSE] An acceptance criterion naming a test runner the repo does not
+  have installed is not an oracle, and it fails silently. Six criteria across four WUs of
+  this feature specified `python3 -m pytest <module>` in a repo whose `tests` gate is
+  `python3 -m unittest discover` and whose venv has no pytest. Every one of them "passed"
+  because the underlying `unittest` bodies run under the gate — so nobody has ever
+  executed those criteria as written, and the close could only satisfy them by
+  substituting a different runner. Before writing a command into a criterion, confirm it
+  is the command the project's own `verification.yml` gate actually runs, or that it is
+  installed; a criterion that cannot be executed verbatim is prose.
