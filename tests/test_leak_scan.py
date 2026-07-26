@@ -265,24 +265,36 @@ class TestGitleaks(unittest.TestCase):
         )
         with patch("subprocess.run", return_value=mock_proc):
             hits = _mod._check_gitleaks("irrelevant")
-        self.assertIn("secret:fake-rule", hits)
+        # Findings now carry the file alongside the rule id, so a real finding is
+        # diagnosable without a second investigation (#250 defect 2).
+        self.assertEqual(len(hits), 1)
+        self.assertIn("secret:fake-rule", hits[0])
+        self.assertIn("content.txt", hits[0])
 
-    def test_gitleaks_invalid_json_fallback(self):
+    def test_gitleaks_invalid_json_reports_scan_failure(self):
+        """#250 defect 2: was `gitleaks:secrets-detected` — a security finding
+        raised on tool failure. Now a distinct scan-failed result."""
         mock_proc = MagicMock()
         mock_proc.returncode = 1
         mock_proc.stdout = "not json at all"
+        mock_proc.stderr = "Error: unknown flag: --report-path"
         with patch("subprocess.run", return_value=mock_proc):
             hits = _mod._check_gitleaks("irrelevant")
-        self.assertIn("gitleaks:secrets-detected", hits)
+        self.assertEqual(len(hits), 1)
+        self.assertIn("gitleaks:scan-failed", hits[0])
+        self.assertIn("unknown flag", hits[0])
+        self.assertNotIn("secret:", hits[0])
 
-    def test_gitleaks_non_list_json_fallback(self):
+    def test_gitleaks_non_list_json_reports_scan_failure(self):
         # gitleaks returns exit 1 but body is an object, not a list
         mock_proc = MagicMock()
         mock_proc.returncode = 1
         mock_proc.stdout = json.dumps({"error": "unexpected format"})
+        mock_proc.stderr = "malformed config"
         with patch("subprocess.run", return_value=mock_proc):
             hits = _mod._check_gitleaks("irrelevant")
-        self.assertIn("gitleaks:secrets-detected", hits)
+        self.assertEqual(len(hits), 1)
+        self.assertIn("gitleaks:scan-failed", hits[0])
 
     def test_gitleaks_empty_findings_list(self):
         # exit 1 with empty list (edge case — treat as no named findings)
@@ -362,12 +374,15 @@ class TestCheckGitleaksDir(unittest.TestCase):
         with patch("subprocess.run", return_value=mock_proc):
             self.assertEqual(_mod._check_gitleaks_dir(Path(".")), ["secret:aws-key"])
 
-    def test_invalid_json_falls_back(self):
-        mock_proc = MagicMock(returncode=1, stdout="not json")
+    def test_invalid_json_reports_scan_failure_not_secrets(self):
+        """#250 defect 2: unparseable output means the TOOL broke, not that a
+        secret exists. It previously reported `gitleaks:secrets-detected`."""
+        mock_proc = MagicMock(returncode=1, stdout="not json", stderr="tool broke")
         with patch("subprocess.run", return_value=mock_proc):
-            self.assertEqual(
-                _mod._check_gitleaks_dir(Path(".")), ["gitleaks:secrets-detected"]
-            )
+            hits = _mod._check_gitleaks_dir(Path("."))
+        self.assertEqual(len(hits), 1)
+        self.assertIn("gitleaks:scan-failed", hits[0])
+        self.assertIn("tool broke", hits[0])
 
 
 class TestScanRepo(unittest.TestCase):

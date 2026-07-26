@@ -39,17 +39,18 @@ jobs:
           python-version: "3.x"
 
       # The runner reuses leak_scan.scan_text, which shells out to `gitleaks`
-      # for secret detection. Without the binary it raises FileNotFoundError and
-      # the job crashes. Mirror ci.yml's install (apt, with a release-binary
-      # fallback) so this Action enforces the same scan the commit gate does.
-      - name: Install gitleaks (secret-scan dependency)
+      # for secret detection. Install the SAME pinned build ci.yml uses — a
+      # different version here would enforce a different ruleset than the commit
+      # gate, which is the divergence #250 reports. The pin must match
+      # leak_scan.GITLEAKS_PINNED_VERSION.
+      #
+      # A missing binary no longer crashes the job: leak_scan reports
+      # `gitleaks:not-installed` as a finding and fails cleanly (#250 defect 3).
+      - name: Install gitleaks (pinned — secret-scan dependency)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gitleaks || {
-            # gitleaks not in apt on all runners — fall back to the release binary.
-            curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
-              | sudo tar -xz -C /usr/local/bin gitleaks
-          }
+          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
 
       - name: Scan the event payload for leaks
         run: python3 .specfuse/scripts/leak_scan_content.py
