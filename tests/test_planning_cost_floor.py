@@ -164,5 +164,35 @@ class TestRetryIsFramedAsADefect(unittest.TestCase):
         self.assertRegex(_norm(text), r"(?i)defect to diagnose, not a cost to budget for")
 
 
+class TestLinterEnforcesTheDocumentedFloors(unittest.TestCase):
+    """The linter is the third copy of these numbers, and it was missed once.
+
+    #260 updated the rule and the template but not `lint_plan.py`, whose
+    constant was spelled `5.0` rather than `5.00` and so escaped the sweep. For
+    a while the docs said $4.50 for `close-intermediate` while the linter warned
+    below $5.00 — a correctly-drafted WU got a spurious warning. The enforcing
+    copy is the one that matters most; bind it.
+    """
+
+    def test_linter_floors_match_the_documented_floors(self):
+        from specfuse.loop.lint_plan import CEREMONY_COST_FLOORS_USD
+
+        expected = {k: float(v) for k, v in EXPECTED_FLOORS.items()}
+        self.assertEqual(
+            {k: float(v) for k, v in CEREMONY_COST_FLOORS_USD.items()}, expected,
+            "lint_plan.CEREMONY_COST_FLOORS_USD disagrees with the floors "
+            "planning-discipline.md §5 and WU.template.md state",
+        )
+
+    def test_linter_covers_every_ceremony_type(self):
+        from specfuse.loop.lint_plan import CEREMONY_COST_FLOORS_USD
+
+        self.assertEqual(
+            set(CEREMONY_COST_FLOORS_USD),
+            {"plan-next", "close", "close-intermediate"},
+            "a ceremony WU type has no floor, so its estimates are unchecked",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
