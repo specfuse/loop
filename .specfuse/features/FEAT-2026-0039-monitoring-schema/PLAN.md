@@ -5,7 +5,7 @@ slug: monitoring-schema
 branch: feat/FEAT-2026-0039-monitoring-schema
 roadmap_goal: Ship a declarative `.specfuse/monitoring.yml` schema with a committed structural validator, a seeded design-for-diagnosis rule, and the `derive-monitoring` skill that drafts a project's monitoring config from repo evidence — so the harvester CLI (FEAT-2026-0040) is built against a contract that is already machine-checkable rather than one that is only described in prose.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 34.00
 ---
 
