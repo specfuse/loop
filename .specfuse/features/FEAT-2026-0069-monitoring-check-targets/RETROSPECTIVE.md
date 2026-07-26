@@ -10,11 +10,18 @@ time is worth more than a tidied one. Everything from *Gate 2* onward was writte
 deferred verification, contract changes — are that pass's and supersede their gate-1-scoped
 counterparts rather than repeating them.
 
-**Verdict: `met_locally`.** Gate 2's definition of done is met and was re-verified fresh in
-this session. Three criteria are not decidable inside this tree; each has a named entry
-under *What the loop did NOT verify* and a re-run condition under *Hedged follow-up record*.
-The consumer-visible contract-change list is submitted for human acknowledgment and is not
-self-acknowledged.
+**Verdict: `met`** — upgraded from `met_locally` on 2026-07-26, post-close, after **FU-1 and
+FU-3 were discharged on real evidence**. See *FU-1 and FU-3 — DISCHARGED* under the hedged
+follow-up record: `/derive-monitoring` was run against the downstream .NET backend, the repo
+that originated issue #245, and returned **2 components from 33 trigger registrations** with
+every target coordinate extracted mechanically and a draft that validates clean.
+
+FU-2 is **not** discharged and is not this feature's to discharge — it asserts about
+FEAT-2026-0040's adapter interface, an artifact that does not exist. It is 0040's
+acceptance criterion and must not be re-listed on a future FEAT-2026-0069 surface.
+
+The consumer-visible contract-change list was acknowledged by the operator at the terminal
+review checkpoint; the upgrade to `met` is what carries that signature.
 
 ---
 
@@ -1018,10 +1025,15 @@ action.
 
 ## Hedged follow-up record (`close-discipline.md` §2)
 
-**Verdict: `met_locally`.** Gate 2's definition of done is met on the evidence this
-environment can produce. Three criteria are not decidable here. Each entry gives the
-criterion, why it is unverifiable in this environment, and the **exact re-run condition** that
-upgrades it to `met`.
+**Verdict at close: `met_locally`; upgraded to `met` post-close.** Gate 2's definition of
+done was met on the evidence this environment could produce. Three criteria were not
+decidable here. Each entry below gives the criterion, why it was unverifiable in this
+environment, and the **exact re-run condition** that upgrades it to `met` — preserved as
+written at close time, because the re-run conditions are what the discharge was executed
+against and rewriting them afterwards would destroy the audit trail.
+
+**FU-1 and FU-3 have since been discharged** by exactly the run FU-1 specifies; see the
+*DISCHARGED* section following FU-3. **FU-2 remains open by design** — it is 0040's.
 
 ### FU-1 — the mechanical-extractability claim
 
@@ -1075,6 +1087,123 @@ additional assertion that closes this specific clause: the drafted `monitoring.y
 **one** component block per deployable, and that component's `dlq` check carries one target
 per subscription. FU-1 and FU-3 are discharged by one run and should be scheduled as one
 follow-up.
+
+---
+
+## FU-1 and FU-3 — DISCHARGED 2026-07-26, post-close, on real evidence
+
+Both were discharged by the single operator run their re-run conditions specify, executed
+against **the downstream .NET backend** — the .NET repo whose FEAT-2026-0039 FU-1 run
+originated issue #245. Discharging them against the originating repo rather than a
+substitute closes the loop on the actual reported defect.
+
+**Verdict upgraded `met_locally` → `met` on the strength of this section.** FU-2 is
+unaffected and remains 0040's; see below.
+
+### The falsifiable core, measured
+
+| | |
+|---|---|
+| Trigger registrations in the tree | **33** (20 subscriptions + 13 schedules) |
+| Components emitted | **2** |
+| Deployables | **2** |
+
+Pre-gate-2 discovery would have returned 33. The re-key returns 2. `GATE-02.md`'s
+definition of done — *"emits 1 component with N targets — not N components"* — holds on a
+real repository, not only on `_STACK_C_TREE`.
+
+The two components are `backend-api` (Dockerfile + `charts/backend-api/Chart.yaml` +
+compose `api:8080`) and the functions host (Dockerfile + its compose service), the latter carrying all 33 triggers.
+
+### Clause-by-clause against FU-1's re-run condition
+
+- **(a) component count = deployable count, not trigger count** — 2 and 2. ✅
+- **(b) every `dlq` coordinate extracted without an operator question** — **20/20**.
+  `subscription` from the `ServiceBusTrigger` attribute's second argument, `function` from
+  `[Function(nameof(...))]`. ✅
+- **(c) every `heartbeat` coordinate extracted the same way** — names **13/13**, crons
+  **13/13**, timezones **10/13**. The 9 constant-based crons resolve via
+  `const string Cron = "..."` **declared in the same file as the trigger class**, so
+  resolution is a same-file lookup, not cross-file symbol resolution. ✅ with the (d)
+  refinements below.
+- **(d) coordinates that required asking** — **none.** No target coordinate was an
+  operator question. Two *refinements* about coordinate quality, filed upstream:
+  - **`the backend repo's #469`** — the repo mixes 5-field and 6-field NCRONTAB
+    spellings (10 vs 3). `*/5 * * * *` and `0/10 * * * * *` differ in meaning by 60×
+    depending on assumed dialect. Extraction succeeds; *interpretation* is ambiguous, and
+    a heartbeat check computing "should this have fired by now?" cannot resolve it from
+    the emitted config. **This is the sharpest finding of the run** and it argues the
+    schema's opaque `cron` may eventually need a dialect discriminator — recorded here,
+    not acted on, because it is 0040's to feel first.
+  - **`the backend repo's #470`** — 3 of 13 timers declare no timezone and silently
+    run UTC while 10 declare `America/Toronto`. Absence is not neutral: it means UTC, and
+    a check configured from the code inherits that without stating it.
+
+  Per this record's own rule, **both refine the claim rather than refute it** — they are
+  findings about *which* coordinates are cleanly interpretable, and they belong on #245's
+  family. Neither required asking the operator for a target.
+
+### FU-3 — the skill-executed-end-to-end clause
+
+The run was performed by an agent **following `SKILL.md`'s prose**, in method order
+(deployment evidence → scoped triggers → audit → questions → output), against a tree the
+prose had never been applied to. That is exactly the composition FU-3 named as unverified:
+*"an agent following the prose against an unseen tree."*
+
+The drafted `monitoring.yml` — 110 lines, 20 `dlq` targets, 13 `heartbeat` targets —
+returns **zero findings** from `python3 .specfuse/scripts/lint_monitoring.py`. Nothing was
+written into the target repo; the skill's draft-never-write rule held.
+
+### What the run found that the fixture could not
+
+1. **A Dockerfile alone is not a deployable.** the project's CLI project has one, but no compose
+   service, no chart, and a bare `dotnet <cli>.dll` entrypoint — a one-shot tool. Excluding it was a judgement the pattern table must encode, and no fixture in
+   this repo models a Dockerfile-bearing non-deployable. **Worth adding to `SKILL.md`
+   Step 1 and to a future fixture.**
+2. **The diagnosability audit's role-name property fired, correctly, and was already
+   tracked.** the HTTP API project stamps a `CloudRoleNameInitializer("backend-api")`; the
+   functions host has none and inherits the Azure Function App name. An existing upstream
+   issue in that repo (#376) covers it (API half landed, worker half open) — so
+   the audit reproduced a known real gap rather than inventing one, which is the better
+   evidence for the audit's value. Component `name` was set to the Function App name from the IaC module precisely so the property can hold once
+   #376's worker half lands.
+3. **`Section__Key` credentials are the real spelling here.** The repo uses
+   `AzureServiceBus__ConnectionString`. That form was rejected by `_ENV_VAR_NAME_RE` until
+   issue #246 was fixed earlier the same day — **before that fix this project's real
+   credential names were unwritable in `monitoring.yml`.** Unplanned corroboration that
+   #246 was a real defect and not a style preference.
+4. **A schema gap the fixture could never have surfaced, because it needs a second
+   project to see.** Telemetry binds per *environment*, so all components in one
+   environment share one telemetry instance. Correct for this project — confirmed by the
+   operator, who chose a single workspace-based App Insights deliberately — but the
+   operator also stated that other projects give each component its own instance, which
+   the schema cannot express. Filed as **#262**, and explicitly distinguished there from
+   `PLAN.md`'s recorded `environments` × `components` non-goal: that one is about
+   *membership*, this one about *binding*. It lands on 0040's adapter contract.
+5. **Operator follow-through provisioning is real work, now tracked.** The monitor must
+   not reuse the app's credentials — the existing Service Bus worker SAS carries
+   listen+send+manage where a DLQ peek needs Listen only. Filed as
+   the infrastructure repo's #316.
+
+### Scope honesty about this run
+
+The agent that performed it had, earlier in the same session, run shallow greps over the
+target repo (trigger counts and file inventories) while advising which repo to use. So it
+was **not a fully naive reader of that tree**. Those looks were counts, not method
+application — no component discovery, no scoping, no coordinate extraction — and the run
+itself followed the prose from Step 1. Recorded because "the prose works for an agent that
+already glanced at the repo" is a marginally weaker claim than "works cold", and the
+difference should not be silently rounded away.
+
+The **two-environment neutrality claim remains unverified.** This run exercised one stack
+(.NET/Azure). A Python repo in the same workspace was examined and rejected as FU evidence
+— its four deployables are single-purpose, so it has no N-triggers-on-one-host shape — but
+it would be a genuine test of the "a new stack is a new pattern table, never a change to
+`discover_components`" claim, which gate 2 asserted with two synthetic fixtures and has
+never run against a real non-.NET repo. **Not a FEAT-2026-0069 obligation** — the feature
+never claimed it — but the natural next probe.
+
+---
 
 **No entry above is a `blocked` condition.** Each is a claim this environment structurally
 cannot decide, which is what `met_locally` means. None of the escalation triggers in `WU-92`
