@@ -106,6 +106,39 @@ class TestReferencesDesignForDiagnosisAndDiscoveryImpl(unittest.TestCase):
         self.assertIn("tests/test_derive_monitoring_discovery.py", text)
 
 
+class TestStep1IsDeploymentKeyed(unittest.TestCase):
+    """FEAT-2026-0069/T08: Step 1's prose must describe deployment-keyed
+    discovery — a component is a deployable, a trigger is evidence of its
+    type and the source of its target list, never a component in its own
+    right — and must name the record fields T07's reference implementation
+    actually emits."""
+
+    def _step_1_text(self) -> str:
+        text = _read(_CANONICAL_DIR / "SKILL.md")
+        start = text.index("### Step 1")
+        end = text.index("### Step 2", start)
+        return text[start:end]
+
+    def test_step_1_describes_deployment_keyed_discovery(self):
+        step_1 = self._step_1_text()
+
+        self.assertRegex(
+            step_1,
+            r"(?i)deployment evidence",
+            "Step 1 must name deployment evidence as the discovery key",
+        )
+        self.assertIn(
+            "subscriptions",
+            step_1,
+            "Step 1 must name `subscriptions` as an emitted record field",
+        )
+        self.assertIn(
+            "schedules",
+            step_1,
+            "Step 1 must name `schedules` as an emitted record field",
+        )
+
+
 class TestAuditSeverityIsWarnNotError(unittest.TestCase):
     def test_states_warn_severity(self):
         text = _read(_CANONICAL_DIR / "SKILL.md")

@@ -92,20 +92,38 @@ This ordering is the whole point. Infer first, ask last.
 
 ### Step 1 — Evidence gathering → component discovery
 
+**A component is a deployable, keyed on deployment evidence: it exists because
+a deployment artifact names it.** A trigger registration — an HTTP route, a
+subscription binding, a schedule entry — is evidence of that deployable's
+type and the source of its target list; it is never a component in its own
+right. The reason this ordering is decisive, not stylistic: the role name a
+telemetry backend reports is **per-process**, so a host running N trigger
+registrations still reports one role name. Keying discovery on triggers
+instead of deployables would mint N components sharing that one role name,
+and each would carry the same role-name-keyed `error-logs` and `heartbeat`
+query — N duplicate findings per exception. Keying on the deployment artifact
+first avoids this by construction.
+
 Read what's in the target repo: deployment manifests, container/process
-definitions, entrypoint scripts, CI deploy workflows, and framework-level routing
-or consumer registration files — whatever the project actually uses. For each
-candidate component, gather the evidence that it is HTTP-serving, message-consuming,
-or neither, and the file paths that justify the claim.
+definitions, entrypoint scripts, and CI deploy workflows — whatever names a
+candidate as deployed. Then, scoped to each candidate found that way, read
+its HTTP routing, consumer/subscription registration, and schedule
+definitions — whatever the project actually uses — to learn what triggers
+feed it.
 
 **The algorithm is not reinvented here — it is pointed at.** The deterministic
 core this step follows is `tests/test_derive_monitoring_discovery.py`'s three pure
-functions: `discover_components(tree, patterns)` matches an evidence-pattern table
-against the repo tree and returns sorted, neutral component records (`name`,
-`type`, `http_serving`, `message_consuming`, `evidence`); `suggest_checks(component)`
-maps a neutral record to a conservative check list (never `invariant`). Evidence
-patterns are a **per-stack input**; the neutral component records are the output —
-a new stack is a new pattern table, never a change to the algorithm. Reading that
+functions: `discover_components(tree, patterns)` takes two injected, per-stack
+tables — `patterns["components"]`, deployment markers plus a `scope_prefix` per
+candidate, and `patterns["triggers"]`, a sibling table of HTTP, subscription,
+and schedule markers matched inside that same scope — and returns sorted, neutral
+component records, one per deployable, not one per trigger: `name`, `type`,
+`http_serving`, `message_consuming`, `subscriptions`, `schedules`, `evidence`.
+`http_serving` and `message_consuming` are **derived** from matched triggers,
+never declared inputs; `subscriptions` and `schedules` are the neutral
+`{subscription, function}` / `{name, cron, timezone}` lists `suggest_checks(component)`
+renders into `dlq` and `heartbeat` targets. `suggest_checks` maps a neutral
+record to a conservative check list (never `invariant`). Reading that
 test module alongside this section keeps the prose and the tested algorithm from
 diverging into two different things.
 
@@ -140,7 +158,12 @@ together with the evidence that motivated each:
 
 **Forbidden questions** — anything answerable by reading a file. "What components
 does this project deploy?" when a deployment manifest names every one is a skill
-bug, not a clarification.
+bug, not a clarification. A `dlq` or `heartbeat` check's `targets[]` is one such
+case: it is derived from Step 1's `subscriptions`/`schedules` evidence and is
+never an operator question — asking the operator to enumerate subscriptions by
+hand would be a Forbidden question by this same rule. If discovery cannot name a
+target, the check is omitted, the same rule §4a already states for `dlq`; it is
+never asked about.
 
 **Non-interactive fallback.** If the skill runs where the operator cannot answer
 (CI invocation, dispatched session, no stdin), it still produces a draft — every
@@ -291,7 +314,7 @@ holds for CI discovery:
 
 | Step | Generic | Stack-specific |
 |------|---------|-----------------|
-| 1 component discovery | `discover_components(tree, patterns)` — generic matcher | the `patterns` table: per-stack evidence markers |
+| 1 component discovery | `discover_components(tree, patterns)` — generic matcher | `patterns["components"]`: deployment markers + `scope_prefix` per candidate; `patterns["triggers"]`: the sibling trigger table |
 | 1 check suggestion | `suggest_checks(component)` — generic, conservative | none — the function takes no stack input |
 | 2 diagnosability audit | `audit_diagnosability(tree, components, patterns)` — generic | the `patterns["diagnosability"]` marker table |
 | 3 ask | Generic | — |

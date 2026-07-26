@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0069/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
@@ -11,6 +11,15 @@ produces:
   - .specfuse/skills/derive-monitoring/SKILL.md
   - .specfuse/skills/derive-monitoring/PROMPT.md
   - tests/test_derive_monitoring_skill_registration.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-26T20:25:23.974315+00:00
+duration_seconds: 360.603
+cost_usd: 1.031204
+input_tokens: 52
+output_tokens: 9157
 ---
 
 # Make the `derive-monitoring` skill's method prose describe deployment-keyed discovery
