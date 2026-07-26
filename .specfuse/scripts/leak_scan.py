@@ -288,16 +288,81 @@ def _check_patterns(
     return hits
 
 
-def _check_gitleaks(text: str) -> list[str]:
-    """Run gitleaks over *text*; return list of RuleID hit strings."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        (Path(tmpdir) / "content.txt").write_text(text, encoding="utf-8")
-        proc = subprocess.run(  # nosec B603 – list args, no shell expansion; tmpdir is process-local
+# The pinned gitleaks version. CI, the release workflow, and the content-scan
+# workflow all install exactly this build; `tests/test_gitleaks_pinning.py`
+# asserts the workflows and this constant agree, so the three cannot drift.
+#
+# Pinning is not tidiness. The gate's verdict used to depend on an UNPINNED
+# binary in both directions: CI did `apt-get install gitleaks || curl <release>`,
+# so a runner whose apt carries gitleaks silently got Ubuntu's build (8.18.x on
+# noble) while a developer had whatever their package manager shipped. The two
+# rulesets disagree, so pass/fail could change with NO change to the repo — the
+# time-varying-oracle failure mode `[FEAT-2026-0007/G1-CLOSE]` records, except
+# varying across machines rather than over time. See #250.
+GITLEAKS_PINNED_VERSION = "8.30.1"
+
+_GITLEAKS_MISSING_HINT = (
+    "gitleaks:not-installed: the leak-scan gate requires the `gitleaks` binary "
+    f"on PATH (pinned v{GITLEAKS_PINNED_VERSION}). Install it from "
+    "https://github.com/gitleaks/gitleaks/releases"
+)
+
+
+def gitleaks_version() -> str:
+    """Return the gitleaks version string on PATH, or a marker if unavailable.
+
+    Reported in the gate output so a version divergence is visible immediately
+    instead of requiring someone to diff two CI logs (#250).
+    """
+    try:
+        proc = subprocess.run(  # nosec B603 – list args, no shell
+            ["gitleaks", "version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return "not-installed"
+    if proc.returncode != 0:
+        return "unknown"
+    return (proc.stdout or proc.stderr).strip().splitlines()[0] if (
+        proc.stdout or proc.stderr
+    ) else "unknown"
+
+
+def _run_gitleaks(source: Path | str) -> list[str]:
+    """Run gitleaks over *source*; return finding strings. `[]` means clean.
+
+    Single implementation for both the text and directory scans — they differ
+    only in what they point `--source` at, and the two hand-written copies had
+    the same defect, so fixing one and not the other would have shipped half a
+    fix (the `[FEAT-2026-0015/G1]` enumeration rule).
+
+    Three outcomes, deliberately distinguished (#250 defect 2). The old code
+    collapsed the last two into the string `gitleaks:secrets-detected`, so a
+    version that does not support `--report-path -`, a malformed config, an
+    unreadable path, or an OOM were all reported as "a secret exists" — with no
+    rule id, no file, and no line. That cried wolf on tool failure AND hid which
+    rule fired on a real finding; it is why diagnosing the CI incident in #250
+    needed a version-archaeology dig instead of reading a rule name.
+
+      exit 0                      -> [] (clean)
+      non-zero + parseable JSON   -> ["secret:<RuleID> (<file>)", ...] (real findings)
+      non-zero + unparseable      -> ["gitleaks:scan-failed: <stderr>"] (tool broke)
+
+    Both non-clean outcomes fail the gate, but they are different failures and
+    now say so. A missing binary is a fourth case: `FileNotFoundError` used to
+    escape as a traceback (`check=False` does not suppress it), so a contributor
+    without gitleaks got a stack trace from a test rather than an actionable
+    message (#250 defect 3).
+    """
+    try:
+        proc = subprocess.run(  # nosec B603 – list args, no shell expansion; source is process-local
             [
                 "gitleaks",
                 "detect",
                 "--source",
-                tmpdir,
+                str(source),
                 "--no-git",
                 "--report-format",
                 "json",
@@ -311,15 +376,33 @@ def _check_gitleaks(text: str) -> list[str]:
             text=True,
             check=False,
         )
+    except FileNotFoundError:
+        return [_GITLEAKS_MISSING_HINT]
+
     if proc.returncode == 0:
         return []
     try:
         findings = json.loads(proc.stdout)
-        if isinstance(findings, list):
-            return [f"secret:{f.get('RuleID', 'unknown')}" for f in findings]
-    except (json.JSONDecodeError, AttributeError):
-        pass
-    return ["gitleaks:secrets-detected"]
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        findings = None
+    if isinstance(findings, list):
+        hits = []
+        for f in findings:
+            if not isinstance(f, dict):
+                continue
+            rule = f.get("RuleID", "unknown")
+            where = f.get("File") or f.get("file")
+            hits.append(f"secret:{rule} ({where})" if where else f"secret:{rule}")
+        return hits
+    stderr = (proc.stderr or "").strip() or "(gitleaks produced no stderr)"
+    return [f"gitleaks:scan-failed: {stderr}"]
+
+
+def _check_gitleaks(text: str) -> list[str]:
+    """Run gitleaks over *text*; return finding strings."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        (Path(tmpdir) / "content.txt").write_text(text, encoding="utf-8")
+        return _run_gitleaks(tmpdir)
 
 
 # ---------------------------------------------------------------------------
@@ -413,35 +496,8 @@ def _check_gitleaks_tracked(root: Path) -> list[str]:
 
 
 def _check_gitleaks_dir(path: Path) -> list[str]:
-    """Run gitleaks over an on-disk directory; return RuleID hit strings."""
-    proc = subprocess.run(  # nosec B603 – list args, no shell
-        [
-            "gitleaks",
-            "detect",
-            "--source",
-            str(path),
-            "--no-git",
-            "--report-format",
-            "json",
-            "--report-path",
-            "-",
-            "--exit-code",
-            "1",
-            "--redact",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if proc.returncode == 0:
-        return []
-    try:
-        findings = json.loads(proc.stdout)
-        if isinstance(findings, list):
-            return [f"secret:{f.get('RuleID', 'unknown')}" for f in findings]
-    except (json.JSONDecodeError, AttributeError):
-        pass
-    return ["gitleaks:secrets-detected"]
+    """Run gitleaks over an on-disk directory; return finding strings."""
+    return _run_gitleaks(path)
 
 
 def scan_repo(root: str = ".") -> list[str]:
@@ -509,6 +565,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     hits = scan_staged() if args.staged else scan_repo()
+    # Report the gitleaks build that produced this verdict. Without it, a
+    # divergence between two machines is invisible until someone diffs two logs
+    # — which is exactly how #250 was diagnosed, expensively.
+    version = gitleaks_version()
+    # `gitleaks version` prints a bare `8.30.1` on some builds and `v8.30.1` on
+    # others, so normalise the optional prefix before comparing — otherwise a
+    # correctly-pinned runner reports a mismatch against itself.
+    matches = version.lstrip("v") == GITLEAKS_PINNED_VERSION
+    suffix = "" if matches else f" — expected v{GITLEAKS_PINNED_VERSION}"
+    print(f"leak-scan: gitleaks {version}{suffix}")
     if hits:
         print("leak-scan: FINDINGS")
         for h in hits:
