@@ -4489,8 +4489,96 @@ def assert_terminal_flips_fired(
     return True, ""
 
 
+_AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
+_DEFERRAL_HEADING_RE = re.compile(r"(?m)^#{1,3}\s*What the loop did NOT verify.*$")
+
+
+def _terminal_deferral_section(retro_text: str) -> str:
+    """Return the text under the LAST `What the loop did NOT verify` heading.
+
+    A gate that auto-closed earlier already wrote its own such section (via
+    `build_autoclose_debt_enumeration`); the terminal close writes its own,
+    appended after. The last occurrence is the terminal close's own record.
+    """
+    matches = list(_DEFERRAL_HEADING_RE.finditer(retro_text))
+    if not matches:
+        return ""
+    last = matches[-1]
+    nl = retro_text.find("\n", last.end())
+    after = retro_text[nl + 1:] if nl != -1 else ""
+    em = re.search(r"(?m)^#{1,3}\s", after)
+    return after[:em.start()] if em else after
+
+
+def assert_autoclose_debt_reconciled(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """(close-g) A marked predecessor auto-close debt must be named in the
+    terminal close's `## What the loop did NOT verify` section.
+
+    Marker-gated (FEAT-2026-0070/T07): only gates whose auto-close stub
+    carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker are
+    considered. No historical retrospective in this repo has one, so this
+    fires on zero of the 11 features that have auto-closed a gate
+    (`GATE-02-REVIEW.md` § Satisfiability) — the unmarked-predicate form
+    fires on 6 of them and is unsatisfiable by `planning-discipline.md` §2.
+
+    Short-circuits `(True, "")` when:
+      - the terminal close WU itself is `auto_close: true` — no session ran,
+        so there is no one to hold responsible and T06's terminal stub is
+        already the record;
+      - `RETROSPECTIVE.md` carries no debt marker for a gate earlier than the
+        terminal gate (a marker for the terminal gate itself is not a
+        predecessor and is ignored).
+
+    Otherwise, every predecessor gate a marker names must appear as
+    `gate N` in the terminal close's own deferral section (the last
+    `What the loop did NOT verify` heading in the file); an unmentioned gate
+    returns `(False, reason)` with `autoclose_debt_unreconciled` in the
+    reason.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    if fm.get("auto_close") in (True, "true", "True"):
+        return True, ""
+
+    retro_path = feature_dir / "RETROSPECTIVE.md"
+    if not retro_path.exists():
+        return True, ""
+    retro_text = retro_path.read_text()
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        return True, ""
+    terminal_gate_number = gates[-1].number
+
+    predecessor_gates = sorted({
+        int(m.group(1))
+        for m in _AUTOCLOSE_DEBT_MARKER_RE.finditer(retro_text)
+        if int(m.group(1)) < terminal_gate_number
+    })
+    if not predecessor_gates:
+        return True, ""
+
+    deferral_section = _terminal_deferral_section(retro_text)
+    unmentioned = [
+        g for g in predecessor_gates
+        if not re.search(rf"\bgate\s+{g}\b", deferral_section, re.IGNORECASE)
+    ]
+    if unmentioned:
+        return False, (
+            "autoclose_debt_unreconciled: gate(s) "
+            f"{', '.join(str(g) for g in unmentioned)} carry an unreconciled "
+            f"auto-close debt marker not named in the terminal close's "
+            f"'## What the loop did NOT verify' section"
+        )
+    return True, ""
+
+
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
-    "close": [assert_terminal_flips_fired],
+    "close": [assert_terminal_flips_fired, assert_autoclose_debt_reconciled],
 }
 
 

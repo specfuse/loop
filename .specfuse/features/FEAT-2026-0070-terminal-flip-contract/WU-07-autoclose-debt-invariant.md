@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0070/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.25
 produces:
   - specfuse/loop/loop.py
@@ -12,6 +12,13 @@ oracle_env: macos_local
 produces_driver_helper: assert_autoclose_debt_reconciled
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T04:22:03.991085+00:00
+duration_seconds: 926.649
+cost_usd: 3.288034
+input_tokens: 126
+output_tokens: 37328
 ---
 
 # A terminal close that ignores an auto-closed predecessor's debt is blocked, not silent
