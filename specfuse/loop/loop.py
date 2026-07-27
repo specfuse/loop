@@ -4678,9 +4678,25 @@ def run(
 
     gate = next((g for g in gates if g.status != "passed"), None)
     if gate is None:
+        # Observation-only path (#276). This poll used to write PLAN.md
+        # `status: complete` here — a value absent from
+        # `lint_plan.VALID_FEATURE_STATUS`, so re-running the driver against an
+        # already-closed feature overwrote the `done` its terminal close wrote
+        # with a status no consumer recognizes: plan-lint rejects it and
+        # `/wrap-feature`'s `done` check refuses the feature.
+        #
+        # The write is deleted rather than corrected to `done`. Terminal state
+        # has exactly ONE driver-side owner — `fire_terminal_flips`, with
+        # `revert_terminal_surfaces` as its deliberate inverse
+        # ([FEAT-2026-0023/G1-CLOSE]) — and a second writer on a different path
+        # is the divergence that rule exists to prevent, whatever value it
+        # writes. Correcting the string would also mask a real problem: if the
+        # gates are all `passed` but PLAN is not `done`, the flips did not fire
+        # and the operator needs to see that, not have it silently papered over.
+        # `--recheck-verdict` (FEAT-2026-0070) is the sanctioned repair, and it
+        # routes through the owner.
         print(f"{feature_id}: all gates passed — feature complete.")
         backend.on_feature_complete(feature_id)
-        write_frontmatter_field(feature_dir / "PLAN.md", "status", "complete")
         return 0
 
     lock_fd = None
