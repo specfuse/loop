@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0070/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_plan_verdict_exempt.py
 oracle_env: macos_local
 produces_driver_helper: lint_plan.lint (close-WU verdict-exempt set)
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T02:44:55.829981+00:00
+duration_seconds: 440.009
+cost_usd: 0.988023
+input_tokens: 60
+output_tokens: 7963
 ---
 
 # Add `in_progress`/`in_review` to `lint_plan`'s close-WU verdict-exempt set

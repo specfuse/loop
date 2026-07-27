@@ -623,7 +623,16 @@ def lint(feature_dir: Path) -> list[str]:
             if wu_type_val in {"close", "close-intermediate"}:
                 # draft/pending: verdict written at execution time, not before dispatch.
                 # done/abandoned/blocked_human: legacy fixtures without verdict are valid.
-                if wu_status not in {"draft", "pending", "done", "abandoned", "blocked_human"}:
+                # in_progress/in_review: dispatch-transient states the driver itself
+                # writes mid-session (flip to in_progress at dispatch, in_review while
+                # the gate set runs) before the agent has written its verdict; the
+                # verdict requirement on a *completed* close WU is owned by
+                # assert_verdict_well_formed (specfuse/loop/loop.py), which runs at
+                # outcome time — not by plan-lint firing on a transient state.
+                if wu_status not in {
+                    "draft", "pending", "done", "abandoned", "blocked_human",
+                    "in_progress", "in_review",
+                }:
                     if wu_verdict is None or wu_verdict not in VERDICT_VALUES:
                         errs.append(
                             f"ERROR: {wfile}: close-type WU missing or invalid 'verdict' "
