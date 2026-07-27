@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0070/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 produces:
   - specfuse/loop/_wu_sections.py
@@ -11,6 +11,13 @@ oracle_env: macos_local
 produces_driver_helper: slice_wu_section
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T04:06:59.663964+00:00
+duration_seconds: 362.853
+cost_usd: 0.614522
+input_tokens: 34
+output_tokens: 5708
 ---
 
 # Extract the WU body-section slicers into a module both `loop.py` and `lint_plan.py` can import

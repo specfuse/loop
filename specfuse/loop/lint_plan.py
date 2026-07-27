@@ -32,6 +32,7 @@ import re
 from pathlib import Path
 
 from . import _miniyaml
+from . import _wu_sections
 from .loop import VERDICT_VALUES
 
 FM = re.compile(r"^---\s*$")
@@ -117,33 +118,14 @@ ORACLE_VERB_PATTERNS = (
     re.compile(r"for\s+i\s+in\s+\$\(seq\b", re.IGNORECASE),
     re.compile(r"\brepeat\s+\d+\s+times\b", re.IGNORECASE),
 )
-_AC_START_RE = re.compile(
-    r"(?mi)^\*\*Acceptance criteria[^\n*]*\*\*\.?|^#{1,6}\s+Acceptance criteria"
-)
-_AC_END_RE = re.compile(r"(?m)^(?:\*\*|#{1,6}\s)")
-
-
 def _slice_ac_section(body: str) -> str:
     """Return the text of the Acceptance criteria section only (bold-preamble or ATX)."""
-    m = _AC_START_RE.search(body)
-    if not m:
-        return ""
-    nl = body.find("\n", m.end())
-    after = body[nl + 1:] if nl != -1 else ""
-    em = _AC_END_RE.search(after)
-    return after[:em.start()] if em else after
+    return _wu_sections.slice_acceptance_criteria(body)
 
 
 def _slice_section(body: str, section_name: str) -> str:
     """Return content between a named section heading and the next heading."""
-    start_re = re.compile(rf"(?mi)^(?:#+\s*|\**){re.escape(section_name)}")
-    m = start_re.search(body)
-    if not m:
-        return ""
-    nl = body.find("\n", m.end())
-    after = body[nl + 1:] if nl != -1 else ""
-    em = _AC_END_RE.search(after)
-    return after[:em.start()] if em else after
+    return _wu_sections.slice_wu_section(body, section_name)
 
 
 # Interpreters / super-generic words that don't distinguish one gate command
