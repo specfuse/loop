@@ -176,15 +176,49 @@ the field-by-field schema see
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
 
-`outcome` taxonomy is **locked at v1**: `passed | failed | blocked |
-zero_token | files_changed_mismatch | post_pass_invariant_failed |
-closing_deliverable_missing | smoke_import_failed`. Extending the
-taxonomy requires a deliberate versioning decision.
+`outcome` taxonomy, as `loop.py` actually emits it — eleven values,
+bound to the emitter by `tests/test_attempt_outcome_contract.py`:
+
+| outcome | meaning |
+|---|---|
+| `passed` | verify + all driver-side guards clean |
+| `failed` | a verification gate failed |
+| `blocked` | the agent reported `status: blocked` |
+| `zero_token_skip` | the session produced no tokens; nothing ran |
+| `files_changed_mismatch` | RESULT declared paths that show no diff |
+| `closing_deliverable_missing` | a closing-WU guard refused (see `close-discipline.md` §4) |
+| `deliverable_missing` | a declared `produces:` path is absent |
+| `no_deliverable_files` | the squash names only the WU file / events |
+| `produces_not_in_diff` | `produces:` path exists but is not in the squash |
+| `squash_commit_failed` | `git commit` for the squash was rejected |
+| `smoke_import_failed` | a declared smoke-import line failed post-squash |
+
+Extending it is a breaking change for every consumer below and requires a
+deliberate versioning decision — **and an update here in the same commit.**
+Five of the values above shipped without that step, and the drift was
+found only when someone mined the corpus (#270).
 
 `failure_class` taxonomy is **locked at v1**: `tests | lint |
 security | coverage | symbol_existence | bandit | other | null`.
 `failure_class: other` is the explicit catch-all for paths not yet
 classified; `null` means the outcome was `passed` (no failure).
+
+**Where the diagnostic lives depends on the outcome.** This is the part that
+misleads readers of the "standardized set" above: `failure_class` /
+`failure_excerpt` are not populated on every non-`passed` outcome, and a
+consumer that queries only those concludes the record is empty when it is not.
+
+| outcome | carries its reason in |
+|---|---|
+| `failed`, `files_changed_mismatch`, `produces_not_in_diff` | `failure_class` + `failure_signature` + `failure_excerpt` |
+| `blocked` | **`agent_blocked_reason`** (plus a sibling `human_escalation` event) |
+| `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed` | **`summary`** |
+| `files_changed_mismatch` (pre-0.3.23) | **`unchanged_paths`** only — `failure_*` was added by #182 |
+| `zero_token_skip` | nothing, correctly — no attempt ran |
+
+**Read every field in that table before concluding a record is undiagnosable.**
+A cross-repo audit reported three separate "missing diagnostic" findings that
+were all query errors against this contract, none of which existed (#270).
 
 Consumers that read `attempt_outcome` events (the auto-close
 predicate, `/gate-status`, the spinning-detector hook, close-ceremony
