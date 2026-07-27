@@ -57,8 +57,14 @@ from pathlib import Path
 
 from . import _filelock
 from . import _miniyaml
+from . import _wu_sections
 from . import scaffold as _scaffold
-from .gate_eval import evaluate_auto_close, AutoCloseDecision
+from .gate_eval import (
+    evaluate_auto_close,
+    AutoCloseDecision,
+    NON_SUBSTANTIVE_TYPES,
+    PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
+)
 
 SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
@@ -3417,6 +3423,110 @@ def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
     return fm.get("auto_close_disabled") in (True, "true", "True")
 
 
+_DEBT_AC_ITEM_RE = re.compile(r"(?m)^\s*\d+\.\s+(.*)$")
+_DEBT_CRITERION_MAX_LEN = 200
+_DEBT_CRITERIA_CAP = 40
+
+
+def _truncate_debt_criterion(text: str) -> str:
+    text = text.strip()
+    if len(text) > _DEBT_CRITERION_MAX_LEN:
+        return text[:_DEBT_CRITERION_MAX_LEN] + "…"
+    return text
+
+
+def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
+    """Return the deferred-verification worklist for an auto-closed gate.
+
+    Reads the gate's WU list from `PLAN.md`'s graph and each WU's frontmatter
+    and body **from disk** (FEAT-2026-0070/T06) — the auto-close path never
+    has a `WorkUnit` loaded for the WUs it enumerates, same constraint as
+    `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
+    call: this only reads files the driver has already located.
+    """
+    try:
+        _fm, gates = load_graph(feature_dir)
+    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
+        gates = []
+    gate = next((g for g in gates if g.number == gate_number), None)
+    refs = gate.refs if gate is not None else []
+
+    sub_ids: list[str] = []
+    entries: list[str] = []
+    total_criteria = 0
+
+    for ref in refs:
+        wu_file = feature_dir / ref["file"]
+        wu_id = ref.get("id", ref["file"])
+        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
+
+        if not wu_file.is_file():
+            entries.append(
+                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"  - deferred: <criteria not parseable> (file not found)"
+            )
+            continue
+
+        try:
+            fm, body = read_frontmatter(wu_file)
+        except (_miniyaml.MiniYAMLError, OSError):
+            entries.append(
+                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"  - deferred: <criteria not parseable> ({ref['file']})"
+            )
+            continue
+
+        wu_type = fm.get("type", "implementation")
+        if wu_type in NON_SUBSTANTIVE_TYPES:
+            continue
+
+        sub_ids.append(sub_id)
+        ac_text = _wu_sections.slice_acceptance_criteria(body)
+        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
+
+        lines = [f"- **{wu_id}** (`{ref['file']}`)"]
+        if not criteria:
+            lines.append(f"  - deferred: <criteria not parseable> ({ref['file']})")
+        else:
+            total_criteria += len(criteria)
+            for criterion in criteria:
+                lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
+        entries.append("\n".join(lines))
+
+    # AC7: no silent cap — list the first 40 criteria total, announce the rest.
+    rendered: list[str] = []
+    emitted = 0
+    truncated_at = None
+    for entry in entries:
+        entry_lines = entry.split("\n")
+        header = entry_lines[0]
+        deferred_lines = entry_lines[1:]
+        kept: list[str] = []
+        for dl in deferred_lines:
+            if emitted >= _DEBT_CRITERIA_CAP:
+                truncated_at = True
+                break
+            kept.append(dl)
+            emitted += 1
+        if kept:
+            rendered.append("\n".join([header] + kept))
+        elif not deferred_lines:
+            rendered.append(header)
+        if truncated_at:
+            break
+
+    remaining = total_criteria - emitted
+    if truncated_at and remaining > 0:
+        rendered.append(f"- … {remaining} further criteria not listed; read the WU files")
+
+    marker = (
+        f"<!-- specfuse:autoclose-debt gate={gate_number} "
+        f"wus={','.join(sub_ids)} criteria={total_criteria} "
+        f"predicate={_GATE_PREDICATE_VERSION} -->"
+    )
+    return marker + "\n\n" + "\n".join(rendered)
+
+
 def write_stub_retrospective_terminal(
     feature_dir: Path,
     gate_number: int,
@@ -3426,8 +3536,19 @@ def write_stub_retrospective_terminal(
 
     Satisfies both assert_retrospective_exists (non-empty file) and
     assert_retrospective_gate_section (^#{1,3} Gate N heading).
+
+    Idempotent: skips if a '## Gate N ... auto-closed' heading already exists
+    (FEAT-2026-0070/T06 AC12 — matches `append_stub_retrospective_intermediate`'s
+    existing skip condition; without it a re-entry duplicates the entire
+    criterion enumeration rather than ~10 lines of prose).
     """
     retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists() and re.search(
+        rf"^##\s+Gate\s+{gate_number}\b.*auto-closed",
+        retro.read_text(),
+        re.MULTILINE,
+    ):
+        return
     metrics = decision.metrics
     budget = metrics.get("gate_budget")
     budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
@@ -3450,7 +3571,8 @@ def write_stub_retrospective_terminal(
         f"treating the feature as fully verified, the operator MUST confirm every\n"
         f"acceptance criterion was actually verified in-loop (not only by artifact\n"
         f"shape). Any AC deferred to a post-merge or real-system step must be\n"
-        f"recorded and completed now.\n"
+        f"recorded and completed now.\n\n"
+        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -3612,7 +3734,8 @@ def append_stub_retrospective_intermediate(
         f"enumerated. Any acceptance criterion whose verification is deferred\n"
         f"(loop-sandbox limit, cross-repo coordination, real-system access) is\n"
         f"unrecorded here. Gate {gate_number + 1}'s close MUST reconcile these\n"
-        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n"
+        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n\n"
+        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
     )
     if retro.exists():
         with retro.open("a") as fh:

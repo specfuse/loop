@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0070/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/loop.py
@@ -11,6 +11,13 @@ oracle_env: macos_local
 produces_driver_helper: build_autoclose_debt_enumeration
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T04:13:02.632512+00:00
+duration_seconds: 541.284
+cost_usd: 3.436137
+input_tokens: 136
+output_tokens: 26609
 ---
 
 # Auto-close writes the concrete deferred-verification worklist, not a paragraph saying it didn't
