@@ -13,15 +13,18 @@ auto_close_disabled: true
 **Objective.** Close the feature: retrospective, lessons, docs, and the terminal
 feature-arc verdict, in one session.
 
-**Context.** This is `FEAT-2026-0070/G2-CLOSE`, the terminal close. **This file is a
-`status: draft` placeholder**, scaffolded at feature-drafting time so `lint_plan.py` reads
-gate 2 as the non-empty terminal gate and gate 1 as non-terminal. Gate 1's `G1-PLAN` fills
-in gate 2's substantive work units above this entry, sets this WU's real `depends_on`, and
-refines the criteria below against what it actually drafted.
+**Context.** This is `FEAT-2026-0070/G2-CLOSE`, the terminal close. Scaffolded at
+feature-drafting time so `lint_plan.py` read gate 2 as the non-empty terminal gate; gate 1's
+`G1-PLAN` has since drafted gate 2's four substantive WUs above this entry, set this WU's
+real `depends_on`, and added AC11–AC12 below. `GATE-02-REVIEW.md` is the arming record.
 
 Gate 2's definition of done, from `GATE-02.md`: an auto-closed gate leaves a concrete
 deferred-verification worklist, and a terminal close that ignores it is visible rather
-than silent.
+than silent. What ships: `T05` extracts the WU section slicers into
+`specfuse/loop/_wu_sections.py`; `T06` makes both auto-close stub writers enumerate the
+gate's unwalked acceptance criteria and emit a `<!-- specfuse:autoclose-debt gate=N … -->`
+marker; `T07` adds the post-pass invariant `assert_autoclose_debt_reconciled` that reads
+that marker; `T08` predicts `T07`'s refusal as a `lint_plan` WARN at arm time.
 
 **Read `close-discipline.md` §4 before writing** — it lists the exact strings the driver
 checks, including the `## Cost analysis` heading required on a `met` verdict and the
@@ -69,6 +72,19 @@ regardless of what gate 2 turns out to contain.
    still-open with a pointer, so holding them does not read as closing them.
 10. `python3 .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0070-terminal-flip-contract`
     passes.
+11. **`T07`'s own invariant is satisfied by this close, and the check is reported.** This is
+    the terminal close of the feature that ships `assert_autoclose_debt_reconciled`, so it
+    runs against itself. Gate 1 did **not** auto-close
+    (`WU-90-gate-1-close-intermediate.md` carries `auto_close_disabled: true` and ran a real
+    session), so no debt marker exists and the invariant passes vacuously. **Say that
+    explicitly rather than letting a green post-pass read as evidence the guard works** —
+    the guard's real evidence is `T07`'s negative and positive controls, and this close
+    must not present a vacuous pass as a second one.
+12. **The satisfiability claim is re-checked against the tree, not inherited from
+    `GATE-02-REVIEW.md`.** Scan every `.specfuse/features/*/RETROSPECTIVE.md` for the debt
+    marker, report the count, and state what `assert_autoclose_debt_reconciled` reports on
+    each hit. The plan-time answer was zero across 11 auto-closing features; a different
+    answer at close time is a finding, not a formality.
 
 **Do NOT** add a "flip `PLAN.md status` to `done`" criterion. The driver owns the terminal
 PLAN flip via `fire_terminal_flips`, gated on `verdict_permits_terminal_flips`. A manual

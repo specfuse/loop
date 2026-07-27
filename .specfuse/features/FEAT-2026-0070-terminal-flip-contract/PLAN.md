@@ -131,11 +131,28 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Scaffolded so lint reads the last gate as non-empty and gate 1 as
-      # non-terminal. G1-PLAN inserts gate 2's substantive WUs ABOVE this entry.
+      # Drafted by G1-PLAN. T05 is a precursor extraction; T06 writes the debt
+      # enumeration + marker; T07 reads the marker; T08 predicts T07's refusal
+      # at arm time. See GATE-02-REVIEW.md for the arming evidence.
+      - id: FEAT-2026-0070/T05
+        file: WU-05-shared-wu-section-slicers.md
+        depends_on: []
+      - id: FEAT-2026-0070/T06
+        file: WU-06-autoclose-debt-enumeration.md
+        depends_on: [FEAT-2026-0070/T05]
+      - id: FEAT-2026-0070/T07
+        file: WU-07-autoclose-debt-invariant.md
+        depends_on: [FEAT-2026-0070/T06]
+      - id: FEAT-2026-0070/T08
+        file: WU-08-arm-time-debt-prediction.md
+        depends_on: [FEAT-2026-0070/T07]
       - id: FEAT-2026-0070/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0070/T05
+          - FEAT-2026-0070/T06
+          - FEAT-2026-0070/T07
+          - FEAT-2026-0070/T08
 ```
 
 ## Gate 2 sketch (for `plan-next`, not binding)
@@ -177,6 +194,12 @@ and a terminal close that ignores it is visible rather than silent.
   (T01 $2.50, T02 $3.50, T03 $2.50, T04 $1.50, `close-intermediate` $4.50, `plan-next`
   $6.00), gate 2 sketched at ~$11.50. Implementation estimates sit above the observed
   $1.33 median because all four touch driver internals with existing guard tests.
-- **Expected lint cost-delta WARN until gate 1 closes** — gate 2's substantive WUs do not
-  exist until `plan-next` drafts them. Left honest rather than trimmed; the terminal close
-  reconciles actuals against the as-drafted figure.
+- **Gate 2 drafted at exactly $11.50** by `G1-PLAN` (T05 $1.00, T06 $2.00, T07 $2.25,
+  T08 $1.25, `close` $5.00), so the WU sum now reconciles to $32.00 and the cost-delta
+  WARN below is retired. The match is arithmetic, not evidence: gate 1's *actual* is
+  running a different shape — the substantive half came in **53.5% under** plan while the
+  `close-intermediate` came in **41.6% over** ($6.37 against $4.50). `GATE-02-REVIEW.md`
+  § *Cost reconciliation* carries the split, and `G2-CLOSE` reconciles actuals against
+  this as-drafted $32.00 rather than re-baselining onto it.
+- **~~Expected lint cost-delta WARN until gate 1 closes~~** — retired at `G1-PLAN`, which
+  drafted gate 2's substantive WUs. The as-drafted figure stands unadjusted.
