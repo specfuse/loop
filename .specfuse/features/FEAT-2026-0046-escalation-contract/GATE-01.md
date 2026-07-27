@@ -1,14 +1,7 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 cost_budget_usd: 22.00
-baseline:
-  sha: f7a09e62a1a77222889d785f2e6013a3cb472e85
-  probed_at: 2026-07-27T21:20:16.208169+00:00
-  failing:
-    - gate: hookspath-conflict-bats
-      failure_class: other
-      failure_signature: no_gate_marker
 ---
 
 # Gate 1 — an escalation has one format, one emitter, and one place to see it
