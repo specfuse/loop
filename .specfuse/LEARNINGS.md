@@ -2201,3 +2201,35 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the marker and then dispatches the close that must read it. Unit fixtures prove the
   function; only a real sequence proves the guard. A green post-pass reported without that
   distinction is the hollow pass the guards exist to catch, one level up.
+
+- [FEAT-2026-0046/G1-CLOSE] **A criterion that mandates a stub does not defer the
+  integration risk — it removes it from the WU's scope, and the estimate must stop paying
+  for it.** The WU that files GitHub issues was the gate's most expensive at $3.50, priced
+  for the risk of discovering `gh` search and create syntax against a live API. Its own
+  criterion 9 then forbade invoking the real `gh` binary, so that discovery never happened
+  and the unit landed 80.5% under; the whole gate, uniformly stub-scoped, came in 73.4%
+  under. Two rules follow, and the second matters more. **Pricing:** when a WU's criteria
+  require an injected runner or fixture in place of the external system, price the unit for
+  wiring a seam, not for negotiating with the system behind it. **Honesty:** a stub makes an
+  unanswered question look answered, so the close must name what the stub declined to ask.
+  Here the specific unknown is whether `gh issue list --search` matches an HTML comment —
+  the idempotency key is `<!-- specfuse:escalation id=… -->`, and a search that returns
+  nothing files a duplicate on every retry, defeating the one property the WU called
+  load-bearing. That is invisible to a passing stub test and belongs in
+  `## What the loop did NOT verify` with the exact re-run that settles it. Generally: pair
+  every stub-mandating criterion with a named deferral in the close, or the gate's green is
+  a statement about the seam and silently reads as a statement about the system.
+
+- [FEAT-2026-0046/G1-CLOSE] **A close criterion that trips a threshold and then attributes a
+  cause is asserting two things; the close must verify the attribution separately.** This
+  gate's close carried a mechanical rule: more than two entries under
+  `## What the loop did NOT verify` flags the feature's gate sizing. Four entries appeared
+  and the flag fired correctly, but the attribution was wrong — every deferral traced to one
+  declared scope boundary (no work unit touches live GitHub), which a two-gate split would
+  have reproduced unchanged. What would actually have closed them is a different work unit,
+  not a different gate count. A flag recorded without that check becomes evidence for a
+  conclusion nobody tested, and the next planner reads "gate was too big" from a retrospective
+  that never established it. Rule: when authoring a criterion of the form "if metric M exceeds
+  N, flag cause C", require the close to state whether C actually explains the observation and
+  to name the alternative if it does not. Thresholds are good at detecting; they are not
+  evidence about why.
