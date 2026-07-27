@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0046/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/escalation.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - render_escalation_body
   - validate_escalation_body
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-27T21:24:34.141522+00:00
+duration_seconds: 356.948
+cost_usd: 0.999586
+input_tokens: 42
+output_tokens: 8346
 ---
 
 # Define the escalation issue format as a machine-checkable contract
