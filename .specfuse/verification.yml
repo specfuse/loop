@@ -66,6 +66,21 @@ code:
     # discovery symlink in .claude). Was silently red + un-run before #121.
     command: "bats tests/init_skills_idempotent.bats"
 
+  - name: hookspath-conflict-bats
+    # §11 operator-script gate: the #153 invariant that install-hooks.sh and
+    # setup.sh converge on ONE core.hooksPath holding BOTH hooks, in either
+    # install order. Was ungated until #257 reconciled tests/*.bats against
+    # this list; it was green throughout, which is precisely why nobody
+    # noticed nothing was running it.
+    command: "bats tests/hookspath_conflict.bats"
+
+  # Every tests/*.bats suite is gated above — the list is reconciled, not
+  # partial (#257). An ungated suite reads as coverage in the tree while
+  # asserting nothing in CI, which is how init_skills_idempotent.bats sat
+  # silently red before #121 and init_leak_exclusion.bats sat silently red
+  # until #257 deleted it. If a future suite is deliberately left out, say
+  # why here rather than leaving the omission to be rediscovered.
+
   # warnings: CONSCIOUSLY DROPPED.
   # Python has no compiler-warnings analogue; this gate assumes a compiled
   # stack (warnings-as-errors at build time) and is N/A for a pure-Python
