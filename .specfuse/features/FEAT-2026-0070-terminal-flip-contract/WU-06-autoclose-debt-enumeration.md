@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0070/T06
 type: implementation
-status: draft
+status: pending
 attempts: 0
-planned_cost_usd: 2.00
+planned_cost_usd: 2.50
 produces:
   - specfuse/loop/loop.py
   - tests/test_autoclose_deferral_visibility.py
@@ -91,7 +91,21 @@ Binding rules in `.specfuse/rules/` apply.
 11. `python3 -m unittest discover -s tests -v` exits zero, in particular
     `tests/test_gate_eval_intermediate_wiring.py`, `tests/test_gate_eval_terminal_wiring.py`,
     and `tests/test_force_full_close.py`.
-12. Coverage stays ≥ 90%.
+12. **Idempotency guard on the terminal stub writer — added at arming, ruled on by the
+    operator (`GATE-02-REVIEW.md` open question 3).**
+    `append_stub_retrospective_intermediate` skips when a `## Gate N … auto-closed` heading
+    already exists; `write_stub_retrospective_terminal` (`loop.py:3420`) has no such guard
+    and appends unconditionally. Give it the same guard its sibling has, and assert it with
+    a test that calls the writer **twice** and checks the section appears once.
+
+    The asymmetry is pre-existing and today costs ~10 duplicated lines. **This WU is what
+    makes it expensive** — after the enumeration lands, a second call appends the entire
+    criterion list again, which on an 8-WU gate is a hundred lines of false debt that the
+    T07 invariant then reads as real. Fixing it here is scope the operator accepted
+    precisely because this WU raises its cost.
+
+    Match the sibling's behaviour exactly; do not invent a different skip condition.
+13. Coverage stays ≥ 90%.
 
 **Cost-reintroduction trade (`[FEAT-2026-0039/G2-CLOSE]`).** This WU lands on the **keeps
 the saving** side, and it must be able to prove it. The enumeration is built by reading
@@ -114,12 +128,11 @@ evidence, not the claim.
   `_gate_impl_deliverables_present`) are correct and out of scope.
 - `mark_close_wu_auto_closed` (`loop.py:3462`) — the frontmatter flip, including
   `verdict: met`, is unchanged.
-- **The terminal writer's missing idempotency guard.**
-  `append_stub_retrospective_intermediate` skips when a `## Gate N … auto-closed` heading
-  already exists; `write_stub_retrospective_terminal` has no such guard and appends
-  unconditionally. Pre-existing asymmetry, guarded upstream by `_already_auto_closed`.
-  Out of scope — handled as an open question in `GATE-02-REVIEW.md` for the human to rule
-  on at arming. Do not add a guard here on your own initiative.
+- ~~The terminal writer's missing idempotency guard.~~ **Now IN scope — see AC12.** The
+  operator ruled on `GATE-02-REVIEW.md` open question 3 at arming and accepted the scope,
+  because this WU is what turns a ~10-line duplication into a hundred-line one that T07
+  would then read as real debt. Match `append_stub_retrospective_intermediate`'s existing
+  skip condition; do not invent a different one.
 - `fire_terminal_flips`, `recheck_terminal_verdict`, `assert_terminal_flips_fired` — gate
   1's surfaces. Read `recheck_terminal_verdict` for its disk-reading shape; change nothing.
 - `specfuse/loop/_wu_sections.py` — `FEAT-2026-0070/T05` owns it. Import it; do not edit it.
