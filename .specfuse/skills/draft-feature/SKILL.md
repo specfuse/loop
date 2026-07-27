@@ -379,6 +379,19 @@ with what was decided so far in `blocked_reason`.
 - **Does not run git.** The user reviews via `git diff` and commits
   when satisfied.
 
+
+## Escalation framing (binding — `.specfuse/rules/operator-escalation.md`)
+
+Whenever this skill halts for a human decision — a refusal, a blocked unit, a
+review checkpoint, an option that only the operator can pick — present it in the
+six parts that rule requires, in plain English, **before** any correlation ID,
+guard name, or cost table: what has been done so far; what the issue is about;
+what decision is needed and why; why it did not close automatically; the options
+with their pros and cons; and a recommendation.
+
+Never author the operator's own justification. Where a field records *why a human
+decided something*, that text comes from them.
+
 ## Version
 
 **v0.2 (FEAT-2026-0035).** Step 3 rewritten from a single batched round

@@ -10,3 +10,4 @@ discovery picks them up.
 @.specfuse/rules/never-touch.md
 @.specfuse/rules/security-boundaries.md
 @.specfuse/rules/verification-discipline.md
+@.specfuse/rules/operator-escalation.md

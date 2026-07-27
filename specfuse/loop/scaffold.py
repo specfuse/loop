@@ -187,6 +187,7 @@ _RULES_BLOCK = (
     "@.specfuse/rules/never-touch.md\n"
     "@.specfuse/rules/security-boundaries.md\n"
     "@.specfuse/rules/verification-discipline.md\n"
+    "@.specfuse/rules/operator-escalation.md\n"
     "<!-- Project-authored rules live in .specfuse/rules-local/ (never touched\n"
     "     by `specfuse upgrade`). Add one @.specfuse/rules-local/<rule>.md line\n"
     "     per rule below. See .specfuse/rules-local/README.md. -->\n"

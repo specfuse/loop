@@ -35,6 +35,7 @@ TRACKED = {
     "rules/result-contract.md",
     "rules/security-boundaries.md",
     "rules/verification-discipline.md",
+    "rules/operator-escalation.md",
     "schemas/event.schema.json",
     "schemas/events/initiative_created.schema.json",
     "schemas/events/spec_validated.schema.json",
