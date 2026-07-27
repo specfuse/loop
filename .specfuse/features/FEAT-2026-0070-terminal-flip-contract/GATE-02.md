@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 16.0
+baseline:
+  sha: 9fb81ddcfaf8c501ecdd3a79082531bb6fa42f81
+  probed_at: 2026-07-27T04:03:53.026581+00:00
+  failing: []
 ---
 
 # Gate 2 — an auto-closed gate's skipped ceremony is a visible debt, not a silent saving
