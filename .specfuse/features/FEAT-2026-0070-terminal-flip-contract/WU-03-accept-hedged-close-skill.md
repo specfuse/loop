@@ -9,6 +9,11 @@ produces:
   - .specfuse/skills/accept-hedged-close/SKILL.md
   - tests/test_accept_hedged_close_skill.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T02:52:15.968732+00:00
 ---
 
 # `/accept-hedged-close` — an auditable operator path out of a standing `met_locally`
