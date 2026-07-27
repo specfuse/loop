@@ -5,7 +5,7 @@ slug: escalation-contract
 branch: feat/FEAT-2026-0046-escalation-contract
 roadmap_goal: Give everything that needs a human one queue with an audit trail and one place to see it, so nothing the loop parks goes silent — a `needs-human` GitHub issue per escalation in a format a later agent can parse, and an `/attention` skill that sweeps repo state and that queue into one priority-ordered view.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 17.00
 ---
 
