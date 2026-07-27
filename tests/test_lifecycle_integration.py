@@ -34,6 +34,10 @@ Coverage map:
   - ``test_branch_seam_carries_pick_flips`` (AC6/#48) — a dirty-tree pick→branch
     handoff via ``ensure_feature_branch`` carries the /pick-feature flips onto
     the feature branch with no raw ``CalledProcessError`` escaping.
+  - ``test_rerun_on_closed_feature_preserves_plan_status`` (#276) — re-running
+    the driver against an already-closed feature must not overwrite the
+    ``done`` its terminal close wrote. The all-gates-passed poll was a second
+    writer of a surface ``fire_terminal_flips`` owns.
 
 Escalation-trigger guard (escalation 1 — "stubbed too shallow"): the tests
 exercise the REAL ``fire_terminal_flips`` / ``auto_archive_feature`` /
@@ -51,10 +55,11 @@ import subprocess
 import unittest
 from pathlib import Path
 
-from tests._loop_loader import load_loop
+from tests._loop_loader import load_lint, load_loop
 from tests._workspace import integration_workspace
 
 loop = load_loop()
+lint_plan = load_lint()
 
 
 # --------------------------------------------------------------------------- #
@@ -457,6 +462,53 @@ class LifecycleIntegrationTest(unittest.TestCase):
             # The carried flips drove a clean terminal close: roadmap row could
             # only reach `done` if the carried `active` flip survived the branch
             # creation (fire_terminal_flips flips active→done).
+            self._assert_terminal_invariant(root, feature_dir, feature_id)
+
+    def test_rerun_on_closed_feature_preserves_plan_status(self):
+        """#276: re-running the driver against an already-closed feature must
+        leave `PLAN.md status: done` intact.
+
+        `fire_terminal_flips` is the single driver-side owner of terminal state
+        per [FEAT-2026-0023/G1-CLOSE]. The all-gates-passed poll in `run()` was
+        a second writer of the same bytes, and it wrote `complete` — a value
+        absent from `lint_plan.VALID_FEATURE_STATUS`. A bare re-run does not
+        reach it (`find_feature(None)` routes `done` features to
+        done_pending_wrap), but an explicit `--feature` does, and
+        `--recheck-verdict` (FEAT-2026-0070) makes re-running a closed feature
+        a routine thing to do.
+        """
+        with integration_workspace() as root:
+            os.chdir(root)
+            feature_id = "FEAT-2026-9005"
+            slug = "rerun-closed"
+            feature_dir = _scaffold_feature(
+                root, feature_id=feature_id, slug=slug,
+                branch=f"feat/{feature_id}-{slug}",
+                roadmap_status="active", plan_status="active",
+                detail_section=True, auto_close_disabled=False)
+            self._stub_agent()
+
+            rc = loop.run(None, dry_run=False)
+            self.assertEqual(rc, 0, "first run must close the feature cleanly")
+            self._assert_terminal_invariant(root, feature_dir, feature_id)
+
+            # Re-run against the SAME, now-closed feature — the poll path.
+            rerun_arg = f"./{feature_dir.relative_to(root)}"
+            rc2 = loop.run(rerun_arg, dry_run=False)
+            self.assertEqual(rc2, 0, "re-run on a closed feature must exit 0")
+
+            plan_status = _read_frontmatter(feature_dir / "PLAN.md").get("status")
+            self.assertEqual(
+                plan_status, "done",
+                "re-running the driver on a closed feature must not overwrite "
+                "the `done` fire_terminal_flips wrote (#276)")
+            self.assertIn(
+                plan_status, lint_plan.VALID_FEATURE_STATUS,
+                f"PLAN.md status {plan_status!r} is not a status lint_plan "
+                f"recognizes — plan-lint would reject it and /wrap-feature "
+                f"would refuse the feature")
+
+            # The rest of the terminal invariant survives the re-run too.
             self._assert_terminal_invariant(root, feature_dir, feature_id)
 
 
