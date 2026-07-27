@@ -4391,13 +4391,23 @@ def assert_produces_in_diff(
     *touched* (the squash's changed-path list), literally or as a glob.
     Opt-out mirrors the presence gate: empty ``produces:`` never fires.
     Returns (False, summary) naming every unmatched entry.
+
+    A leading ``./`` is stripped from both sides before comparing (#259).
+    ``git diff --name-only`` emits repo-root paths bare (``package.json``), so
+    a ``produces:`` entry spelled ``./package.json`` matched nothing even when
+    the WU genuinely edited that file — it failed identically every attempt and
+    spun to a ``spinning_detected`` block. Both spellings name the same path;
+    neither side's spelling should decide the outcome. Unmatched entries are
+    still reported in the author's original spelling.
     """
     if not wu.produces:
         return True, ""
+    touched_norm = [t.removeprefix("./") for t in touched]
     unmatched = []
     for raw in wu.produces:
         entry = str(raw)
-        if not any(t == entry or fnmatch.fnmatch(t, entry) for t in touched):
+        probe = entry.removeprefix("./")
+        if not any(t == probe or fnmatch.fnmatch(t, probe) for t in touched_norm):
             unmatched.append(entry)
     if unmatched:
         return False, (

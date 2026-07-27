@@ -760,21 +760,39 @@ def lint(feature_dir: Path) -> list[str]:
             # root it is absent, so the gate fails identically every attempt and
             # spins to a 3-attempt block — ~3 wasted sessions on an authoring
             # typo a static check catches for free.
+            #
+            # "almost always" is the operative word, and #259 found the
+            # exception: a genuine root-level deliverable (package.json,
+            # pyproject.toml) resolves from the repo root and passes presence in
+            # the plain form. Warning there sent authors to './package.json',
+            # which `assert_produces_in_diff` then rejected — the two guards
+            # were mutually exclusive for a root file. So the warn is suppressed
+            # when the bare path IS a real file at the repo root, using the
+            # presence gate's own oracle (cwd-relative resolution: the driver
+            # runs both from the repo root), and the remediation now names the
+            # `git diff --name-only` spelling the diff cross-check consumes
+            # rather than an unqualified "repo-root-relative path" an author
+            # reasonably reads as "prefix it".
             produces_raw = wfm.get("produces")
             if produces_raw:
                 entries = produces_raw if isinstance(produces_raw, list) else [produces_raw]
                 for entry in entries:
                     entry_s = str(entry).strip()
-                    if entry_s and "/" not in entry_s:
-                        print(
-                            f"WARN: {wfile}: produces path {entry_s!r} is a bare "
-                            f"filename — produces paths are resolved relative to "
-                            f"the repo root, where this almost never exists (WU "
-                            f"deliverables live under .specfuse/, modules/, "
-                            f"environments/, the feature dir, …). Use a "
-                            f"repo-root-relative path or the presence gate will "
-                            f"fail every attempt and spin to a block. See #77."
-                        )
+                    if not entry_s or "/" in entry_s:
+                        continue
+                    if Path(entry_s).exists():
+                        continue
+                    print(
+                        f"WARN: {wfile}: produces path {entry_s!r} is a bare "
+                        f"filename and no such file exists at the repo root — "
+                        f"produces paths are resolved relative to the repo root, "
+                        f"and WU deliverables usually live under .specfuse/, "
+                        f"modules/, environments/, the feature dir, …. Spell it "
+                        f"exactly as `git diff --name-only` reports it (no './' "
+                        f"prefix — the diff cross-check rejects that form), or "
+                        f"the presence gate will fail every attempt and spin to "
+                        f"a block. See #77, #259."
+                    )
 
         # Closing shape check.
         closing_found = [t for t in types_in_order if t in _CLOSING_TYPES]

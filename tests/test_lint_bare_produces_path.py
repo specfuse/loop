@@ -20,9 +20,10 @@ Covers:
 from __future__ import annotations
 
 import io
+import os
 import tempfile
 import unittest
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 
 from tests._loop_loader import load_lint
@@ -147,6 +148,63 @@ class TestBareProducesPathLint(unittest.TestCase):
                 _bare_warns(stdout),
                 f"non-implementation bare produces must warn; stdout={stdout!r}",
             )
+
+
+@contextmanager
+def _chdir(target: Path):
+    previous = os.getcwd()
+    os.chdir(target)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
+class TestBareProducesPathRealRootFile(unittest.TestCase):
+    """#259: the guard's premise is false for a genuine root-level deliverable.
+
+    The presence gate resolves each `produces:` path relative to the repo root,
+    so a real root file (`package.json`) passes it in the plain form. Warning
+    there steered authors to `./package.json`, which the driver's diff
+    cross-check then rejected — the two guards were mutually exclusive for a
+    root deliverable.
+    """
+
+    def test_real_root_file_does_not_warn(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, produces="[package.json]")
+            (Path(tmpdir) / "package.json").write_text("{}\n")
+            with _chdir(Path(tmpdir)):
+                errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [], f"no errors expected; got {errs}")
+            self.assertEqual(
+                _bare_warns(stdout), [],
+                f"a bare path that IS a real root file must not warn; "
+                f"stdout={stdout!r}",
+            )
+
+    def test_absent_root_file_still_warns(self):
+        """The real authoring typo the guard exists for is unaffected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, produces="[GATE-02-REVIEW.md]")
+            with _chdir(Path(tmpdir)):
+                errs, stdout = _run_lint(feature)
+            self.assertEqual(errs, [], f"WARN must not append to errs; got {errs}")
+            warns = _bare_warns(stdout)
+            self.assertTrue(warns, f"expected a bare-path WARN; stdout={stdout!r}")
+            self.assertIn("GATE-02-REVIEW.md", warns[0])
+
+    def test_warn_recommends_the_git_name_form(self):
+        """The remediation must name the spelling the diff cross-check
+        consumes, not an unqualified 'repo-root-relative path' an author
+        reads as 'prefix it with ./'."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(tmpdir, produces="[GATE-02-REVIEW.md]")
+            with _chdir(Path(tmpdir)):
+                _errs, stdout = _run_lint(feature)
+            warns = _bare_warns(stdout)
+            self.assertTrue(warns, f"expected a bare-path WARN; stdout={stdout!r}")
+            self.assertIn("git diff --name-only", warns[0])
 
 
 if __name__ == "__main__":
