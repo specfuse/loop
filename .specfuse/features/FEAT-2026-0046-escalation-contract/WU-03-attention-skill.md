@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0046/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - plugins/specfuse/skills/attention/SKILL.md
   - .specfuse/skills/attention/SKILL.md
   - tests/test_attention_skill_structure.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-27T21:34:06.231203+00:00
+duration_seconds: 219.853
+cost_usd: 0.869812
+input_tokens: 42
+output_tokens: 9347
 ---
 
 # Author the /attention skill: one priority-ordered view of everything needing a human
