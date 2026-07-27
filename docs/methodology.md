@@ -159,6 +159,39 @@ re-run condition that would upgrade the verdict to `met`. Without the record,
 close-time obligations (fresh oracle re-runs, consumer-visible-change
 enumeration).
 
+**Exiting a hedged verdict** (FEAT-2026-0070) — a hedge left the feature with no
+supported path to `done`, because `fire_terminal_flips` runs at close-WU-*outcome*
+time and the driver never re-dispatches a `done` close WU. Two surfaces now close
+that gap, and **neither writes terminal state itself** — both route through the
+one owner:
+
+- `specfuse-loop --recheck-verdict <FEATURE_ID>` re-reads the terminal close WU's
+  verdict from disk and fires the flips if it now permits them, without
+  re-dispatching the WU. Use it when follow-ups were genuinely discharged and the
+  verdict was honestly upgraded to `met`. It is a no-op (exit `0`, printing why)
+  when the feature is already `done` or the verdict is still hedged.
+- `/accept-hedged-close` is the operator path for a hedge that is the ceiling **by
+  construction** — the criterion's oracle lives outside the repo and no amount of
+  gate work will close it. It surfaces the §2 follow-up record, requires a one-line
+  reason and explicit acknowledgment of the standing follow-ups, writes an
+  acceptance record, and then invokes `--recheck-verdict`. It carries the
+  follow-ups forward; it does not discharge them.
+
+**The row flips from any non-`done` status** (FEAT-2026-0070) — the terminal
+roadmap-row flip previously fired only on `active → done`, so an `autonomy: auto`
+feature that self-dispatched from a `planned` row stayed `planned` through a
+correct close and escalated `roadmap_row_not_done`. Any non-`done` row now flips.
+
+**Terminal state has exactly one writer.** `fire_terminal_flips` in
+`specfuse/loop/loop.py` owns the gate → `passed`, roadmap row → `done`, PLAN.md →
+`done`, and auto-archive transitions. Every close path — dispatched, auto-closed,
+and out-of-band re-check — calls that one function; no skill and no agent writes
+those surfaces. Issue #49 exists because two paths once diverged, and
+`[FEAT-2026-0023/G1-CLOSE]` is the rule that came out of it: do **not** add a "flip
+PLAN.md to done" acceptance criterion to a close WU, and do not let a skill
+hand-edit a terminal surface — if a new path needs the flip, give the driver an
+entry point and call it.
+
 **Predicate-version transparency** — every `auto_close_decision` event in
 `events.jsonl` carries a `predicate_version` field (e.g., `predicate_version:
 v1`). Future revisions to the predicate constants increment this version, so

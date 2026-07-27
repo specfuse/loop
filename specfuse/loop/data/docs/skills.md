@@ -78,6 +78,13 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
 WU as a fresh session, verifies, and commits. It is a command, not a skill. It
 either auto-closes a clean gate or halts at the gate boundary for review.
 
+It also owns every terminal flip (gate → `passed`, roadmap row → `done`, PLAN.md →
+`done`, auto-archive) — no skill writes those surfaces. When a verdict is upgraded
+*after* its close WU is already `done`, re-fire them with
+`specfuse-loop --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
+verdict from disk and flips only if it now permits, printing why when it does not.
+Safe to run on an already-`done` or still-hedged feature — it writes nothing.
+
 ### 4. Arm — the human checkpoint at each gate
 
 - **`/arm-gate`** — at a gate boundary (driver halted with `awaiting_review`, next
@@ -101,9 +108,21 @@ either auto-closes a clean gate or halts at the gate boundary for review.
 
 ### 6. Wrap — finish a done feature
 
+- **`/accept-hedged-close`** — the path out of `/wrap-feature`'s refusal. A close
+  that legitimately ends `verdict: met_locally` (or `partially_met`) leaves every
+  terminal surface un-flipped by design, and for some features that hedge is the
+  ceiling *by construction* — the criterion's oracle lives outside the repo. This
+  skill quotes the standing follow-up record, requires a one-line reason and
+  explicit acknowledgment of every open item, writes an acceptance record into
+  `RETROSPECTIVE.md`, and then fires the flips through the driver's
+  `--recheck-verdict` primitive. It carries the follow-ups forward — accepting a
+  hedge is shipping with known-open items, not closing them. Refuses on `met`
+  (nothing to accept), on `not_met`, and on a close WU that isn't `done`. It never
+  writes PLAN.md's status, a gate's status, or the roadmap row.
 - **`/wrap-feature`** — after the terminal gate is `done`, push the feature
   branch, open a PR, optionally watch CI, and point at the next pick. Refuses if
-  PLAN.md isn't `done` yet.
+  PLAN.md isn't `done` yet — run `/accept-hedged-close` first if the block is a
+  standing hedged verdict.
 - **`/roadmap-archive`** — move a done or abandoned feature's detail section from
   `roadmap.md` to `roadmap-archive.md`, leaving a back-link.
 

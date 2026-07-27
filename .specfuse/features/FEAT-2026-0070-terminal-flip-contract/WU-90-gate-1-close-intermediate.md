@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0070/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.4.0
+started_at: 2026-07-27T03:10:10.769768+00:00
+duration_seconds: 985.272
+cost_usd: 6.371276
+input_tokens: 302
+output_tokens: 55171
 ---
 
 # Gate 1 close-intermediate — retrospective + lessons + docs
