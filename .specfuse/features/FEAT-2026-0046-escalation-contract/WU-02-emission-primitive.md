@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0046/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/escalation.py
   - tests/test_escalation_emit.py
 produces_driver_helper:
   - emit_escalation
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-27T21:30:31.175248+00:00
+duration_seconds: 214.946
+cost_usd: 0.682318
+input_tokens: 36
+output_tokens: 9344
 ---
 
 # Add the escalation emission primitive, idempotent and never auto-fired

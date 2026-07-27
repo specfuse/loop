@@ -9,7 +9,14 @@ that lets a caller find an existing issue instead of filing a duplicate.
 
 from __future__ import annotations
 
+import json
+import re
+import subprocess
+from typing import Callable, Optional
+
 NEEDS_HUMAN_LABEL = "needs-human"
+
+DEFAULT_ASSIGNEE = "specfuse-operator"
 
 CATEGORY_LABELS = frozenset(
     {
@@ -133,3 +140,97 @@ def _has_two_numbered_options(text: str) -> bool:
                 found.add(n)
                 break
     return len(found) >= 2
+
+
+def _default_runner(args: list, check: bool = True):
+    """Shell out to gh with the given argument list. Not called in tests."""
+    return subprocess.run(args, check=check, capture_output=True, text=True)
+
+
+def _find_existing_issue(
+    runner: Callable, repo: str, correlation_id: str
+) -> Optional[str]:
+    """Search for an open needs-human issue already carrying this marker."""
+    marker = _correlation_marker(correlation_id)
+    result = runner(
+        [
+            "gh", "issue", "list",
+            "--repo", repo,
+            "--label", NEEDS_HUMAN_LABEL,
+            "--state", "open",
+            "--search", marker,
+            "--json", "number,body",
+        ],
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout:
+        return None
+    try:
+        issues = json.loads(result.stdout)
+    except ValueError:
+        return None
+    for issue in issues:
+        if marker in issue.get("body", ""):
+            return str(issue["number"])
+    return None
+
+
+def _extract_issue_number(stdout: str) -> str:
+    match = re.search(r"/issues/(\d+)", stdout)
+    if match:
+        return match.group(1)
+    return stdout.strip()
+
+
+def emit_escalation(
+    correlation_id: str,
+    *,
+    category: str,
+    repo: str,
+    done_so_far: str,
+    issue_summary: str,
+    decision_needed: str,
+    why_not_auto: str,
+    options: list[tuple[str, str, str]],
+    recommendation: str,
+    assignee: str = DEFAULT_ASSIGNEE,
+    runner: Optional[Callable] = None,
+) -> str:
+    """File a needs-human GitHub issue for an escalating unit.
+
+    Idempotent: searches for an open issue carrying the ``needs-human`` label
+    and this correlation ID's marker before creating; a second call for the
+    same ``correlation_id`` returns the existing issue's identifier instead
+    of filing a duplicate. Mirrors the find-then-create seam used by
+    ``GitHubBackend.on_feature_complete`` in ``gh_backend.py``.
+    """
+    runner = runner if runner is not None else _default_runner
+
+    existing = _find_existing_issue(runner, repo, correlation_id)
+    if existing is not None:
+        return existing
+
+    body = render_escalation_body(
+        correlation_id,
+        category=category,
+        done_so_far=done_so_far,
+        issue_summary=issue_summary,
+        decision_needed=decision_needed,
+        why_not_auto=why_not_auto,
+        options=options,
+        recommendation=recommendation,
+    )
+
+    result = runner(
+        [
+            "gh", "issue", "create",
+            "--repo", repo,
+            "--title", f"[{correlation_id}] {issue_summary}",
+            "--body", body,
+            "--label", NEEDS_HUMAN_LABEL,
+            "--label", category,
+            "--assignee", assignee,
+        ],
+        check=True,
+    )
+    return _extract_issue_number(result.stdout)
