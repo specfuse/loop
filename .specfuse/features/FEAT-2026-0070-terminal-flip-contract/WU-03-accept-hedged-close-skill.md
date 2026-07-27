@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0070/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - plugins/specfuse/skills/accept-hedged-close/SKILL.md
@@ -13,7 +13,11 @@ model: sonnet
 effort: medium
 gate_set: code
 driver_version: 0.4.0
-started_at: 2026-07-27T02:52:15.968732+00:00
+started_at: 2026-07-27T03:02:19.233519+00:00
+duration_seconds: 471.429
+cost_usd: 1.54323
+input_tokens: 60
+output_tokens: 16635
 ---
 
 # `/accept-hedged-close` — an auditable operator path out of a standing `met_locally`
