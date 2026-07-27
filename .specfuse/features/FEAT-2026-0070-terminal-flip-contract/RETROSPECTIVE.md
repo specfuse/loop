@@ -1149,3 +1149,51 @@ invocation being on the feature that shipped it) — it is a one-off consequence
 not a rule, and it is recorded in the hedged follow-up record where an operator will meet
 it. Also not promoted: the sizing-trigger scoping and the missing issue, both single-site
 process fixes that live in *What I'd change* where a fix can find them.
+
+---
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally` — carried forward, not discharged.
+
+**Operator reason (verbatim):** "the follow-ups are named and tracked"
+
+**Recorded:** 2026-07-27T12:22:28+00:00
+
+**Accepted through:** `/accept-hedged-close` — this feature's own skill, on its
+first real subject. The terminal flips were fired by
+`loop.py --recheck-verdict FEAT-2026-0070`, which calls the single owner
+`fire_terminal_flips`. This record and the `verdict:` field in
+`WU-92-gate-2-close.md` are the only things the skill wrote; `PLAN.md`'s status,
+the gate status, and the roadmap row were never opened for a write by it.
+
+**Before accepting, the operator's stated reason was checked against reality and
+found half-true.** The follow-ups were named in the record below but tracked
+nowhere outside it — the issues this retrospective cites (#226, #241, #243, #265,
+#266, #272) are the ones the feature *resolves*. Issues **#276** (H4, the
+`status: complete` defect) and **#277** (H2, H3, H5, H6, H7) were filed before
+the acceptance so the reason recorded here is accurate rather than aspirational.
+
+### Follow-ups carried forward — verbatim, none discharged
+
+Every entry below remains exactly as open as it was. Accepting a hedge means
+shipping with known-open items, not marking them done.
+
+| # | criterion (verbatim, abridged where noted) | why unverifiable here | exact re-run condition that upgrades it to `met` |
+|---|---|---|---|
+| **H1** | `WU-92` AC7: *"Consumer-visible contract changes (§3): enumerate every addition, removal, and rename across the whole feature … Block on human acknowledgment."* | No human is present in a dispatched session, and unlike gate 1 there is no downstream `/arm-gate` checkpoint to route to — this is the terminal close | An operator reads *Consumer-visible contract changes — feature arc* below (**item 8 is the behaviour change**) and either runs `/accept-hedged-close FEAT-2026-0070` with a one-line reason, or rejects this close. The skill's explicit-acknowledgment step **is** the §3 signature |
+| **H2** | `WU-03` AC4–AC9 (behavioural): the skill *refuses* on a wrong verdict or a non-`done` close WU, *re-prompts* on an empty rationale, *writes* the acceptance record carrying follow-ups forward verbatim, and *leaves the three surfaces untouched* while the flips fire | An interactive propose-and-confirm skill's oracle is an operator at a terminal; 19 text assertions prove the prose, not the behaviour | One operator run of `/accept-hedged-close` against a feature standing at `met_locally` — **FEAT-2026-0070 is now exactly that feature**, so H1's run discharges H2 in the same act. Record what the skill actually did |
+| **H3** | `WU-02`'s CLI wiring: flag → `_resolve_feature_dir` → `recheck_terminal_verdict` → `fire_terminal_flips` → the `Modified:` line | Exercising the *firing* path needs a feature whose terminal close WU is `done` with `verdict: met` and whose surfaces are still un-flipped — which did not exist until this WU completed | Either one CLI-level test over a temp feature tree, or the `--recheck-verdict` call that H1's `/accept-hedged-close` run makes; the latter observes it in production and should be reported as such |
+| **H4** | `WU-92` AC5's adjacent finding: `loop.py:4673` writes `PLAN.md status: complete`, an invalid feature status that overwrites a correct `done` | Established from source in both closes; neither executed the sequence, and executing it inside a close WU is the drift `result-contract.md` §2 forbids | The red test on the `/fix-bug` branch: close a feature, re-run the driver against it, assert `PLAN.md` still reads `done` and plan-lint still passes. Needs an issue filed (see below) |
+| **H5** | Gate 1's finding that `/arm-gate` carries no terminal-gate guard, so on a terminal gate it would be a second writer of the gate status | Read from the skill text; no test exercises `/arm-gate` against a terminal gate | One test or one explicit refusal clause added to the skill, plus an operator run confirming it refuses |
+| **H6** | `WU-07` AC1/AC3's claim, at the level of the *sequence* rather than the *function*: a terminal close that ignores a real auto-closed predecessor's debt is refused by the driver | No gate in this repo has auto-closed since T06 shipped, so the marker count on disk is zero (AC12) and no driver-written marker exists to test against | An end-to-end lifecycle test that lets the driver auto-close an intermediate gate, then dispatches a terminal close whose deferral section omits it, and asserts the refusal — or the first real feature that auto-closes a gate on this build and is then observed |
+| **H7** | `WU-06` AC7/AC8/AC12: the >40-criterion truncation line, the three degrade paths, and the idempotency guard, as produced by a real auto-close | Same root cause as H6; verified by fixtures and, for the happy path only, by this close's live build against gate 1 | The same lifecycle test or the same first real auto-close |
+
+**H1** is discharged by this acceptance — it *was* the human acknowledgment.
+**H4** is now issue #276. **H2, H3, H5, H6, H7** are now issue #277.
+
+**H2 and H3 have a live claim on this very act.** H2's re-run condition is one
+operator run of `/accept-hedged-close` against a hedged feature; H3's is the
+`--recheck-verdict` call that run makes. This acceptance is that run. What the
+skill and the primitive actually did is recorded above and in #277 — if either
+misbehaved, that finding outranks the acceptance.

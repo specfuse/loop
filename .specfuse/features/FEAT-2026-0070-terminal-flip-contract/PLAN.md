@@ -5,7 +5,7 @@ slug: terminal-flip-contract
 branch: feat/FEAT-2026-0070-terminal-flip-contract
 roadmap_goal: Make a correctly-closed feature reach `done` through the driver from every legitimate starting state — row `planned` or `active`, verdict `met` or operator-accepted `met_locally` — so terminal state is never hand-edited, and make an auto-closed gate's skipped deferred-verification walk a visible debt rather than a silent saving.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 32.00
 ---
 
