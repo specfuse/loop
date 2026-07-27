@@ -163,6 +163,19 @@ marked passed (or the user accepted that some drafts stay at
 - **Does not touch the roadmap.** Roadmap `active` → `done`
   belongs at feature completion (final gate), not per-gate.
 
+
+## Escalation framing (binding — `.specfuse/rules/operator-escalation.md`)
+
+Whenever this skill halts for a human decision — a refusal, a blocked unit, a
+review checkpoint, an option that only the operator can pick — present it in the
+six parts that rule requires, in plain English, **before** any correlation ID,
+guard name, or cost table: what has been done so far; what the issue is about;
+what decision is needed and why; why it did not close automatically; the options
+with their pros and cons; and a recommendation.
+
+Never author the operator's own justification. Where a field records *why a human
+decided something*, that text comes from them.
+
 ## Version
 
 **v0.1.** Five steps; the accept/revise/reject/skip option set is
