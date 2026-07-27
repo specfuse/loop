@@ -1,6 +1,10 @@
 ---
 gate: 1
 status: open
+baseline:
+  sha: b39ec6eb192d59a23361f354e1c9471168d630aa
+  probed_at: 2026-07-27T02:26:20.654828+00:00
+  failing: []
 ---
 
 # Gate 1 — a correctly-closed feature reaches `done` through the driver, from any legitimate starting state
