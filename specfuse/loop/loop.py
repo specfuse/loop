@@ -3278,6 +3278,72 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
     return list(modified)
 
 
+def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
+    """Re-read a completed terminal close WU's verdict from disk and fire
+    `fire_terminal_flips` if it now permits them (FEAT-2026-0070/T02).
+
+    `fire_terminal_flips` only runs at close-WU outcome time, inside the
+    dispatch loop. Once that close WU is `status: done` the driver never
+    re-dispatches it, so a verdict legitimately upgraded post-close (e.g.
+    `met_locally` -> `met` after follow-ups were discharged) is never re-read
+    and the flips never fire. This is a caller, not a second writer: it
+    locates the terminal gate's close WU, reads its on-disk verdict, and if
+    permitted, calls `fire_terminal_flips` unchanged.
+
+    Returns a dict:
+      fired:    bool  -- whether fire_terminal_flips was invoked
+      reason:   str   -- human-readable explanation (refusal or outcome)
+      modified: list[Path] -- paths fire_terminal_flips reports as modified
+    """
+    _fm, gates = load_graph(feature_dir)
+    if not gates:
+        return {"fired": False, "reason": "no gates in PLAN.md", "modified": []}
+
+    terminal_gate = gates[-1]
+    close_ref = None
+    for ref in terminal_gate.refs:
+        wu_path = feature_dir / ref["file"]
+        if not wu_path.exists():
+            continue
+        wu_fm, _ = read_frontmatter(wu_path)
+        if wu_fm.get("type") == "close":
+            close_ref = ref
+            break
+
+    if close_ref is None:
+        return {
+            "fired": False,
+            "reason": f"no terminal close WU (type: close) found in gate {terminal_gate.number}",
+            "modified": [],
+        }
+
+    close_wu = load_wu(feature_dir, close_ref)
+    if close_wu.status != DONE:
+        return {
+            "fired": False,
+            "reason": f"{close_wu.wu_id} status is {close_wu.status!r} (not done)",
+            "modified": [],
+        }
+
+    # load_wu already reads `verdict` from disk for type: close (loop.py:535);
+    # fire_terminal_flips re-reads it from wu.file itself regardless, so this
+    # is never taken from an in-memory value the auto-close path leaves None.
+    disk_verdict = close_wu.verdict
+    if not verdict_permits_terminal_flips(disk_verdict):
+        return {
+            "fired": False,
+            "reason": f"verdict {disk_verdict!r} does not permit terminal flips for {close_wu.wu_id}",
+            "modified": [],
+        }
+
+    modified = fire_terminal_flips(close_wu, feature_dir, repo_root)
+    return {
+        "fired": True,
+        "reason": f"verdict {disk_verdict!r} permits terminal flips for {close_wu.wu_id}",
+        "modified": modified,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Terminal auto-close helpers (FEAT-2026-0018/T04)                           #
 # --------------------------------------------------------------------------- #
@@ -5654,9 +5720,23 @@ def main() -> int:
                     "unchanged; only the preexisting_gate_failure pre-dispatch "
                     "halt is disabled, since with no probe there is no failing "
                     "set for it to fire on.")
+    ap.add_argument("--recheck-verdict", metavar="FEATURE_ID",
+                    help="Re-read the named feature's terminal close WU verdict "
+                    "from disk and fire the terminal flips (gate/roadmap-row/"
+                    "PLAN.md/archive) if it now permits them, without "
+                    "re-dispatching the close WU. For a verdict upgraded "
+                    "post-close (e.g. met_locally -> met after follow-ups were "
+                    "discharged). No-op if already done or still hedged.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+    if args.recheck_verdict:
+        feature_dir = _resolve_feature_dir(args.recheck_verdict)
+        result = recheck_terminal_verdict(feature_dir, REPO_ROOT)
+        print(result["reason"])
+        if result["modified"]:
+            print("Modified: " + ", ".join(str(p) for p in result["modified"]))
+        return 0
     auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
                prepare=args.prepare, prepare_only=args.prepare_only,
