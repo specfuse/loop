@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0046/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - tests/test_attention_nonwriting_guard.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-27T21:37:46.168581+00:00
+duration_seconds: 211.475
+cost_usd: 0.641066
+input_tokens: 32
+output_tokens: 8423
 ---
 
 # Prove /attention cannot write state — grep guard plus a positive control
