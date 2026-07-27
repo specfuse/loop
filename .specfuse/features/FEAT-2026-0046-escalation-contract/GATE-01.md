@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 22.00
+baseline:
+  sha: 8710c4cd97ed36b922e8a56483c37d98c4caa30e
+  probed_at: 2026-07-27T21:22:50.520483+00:00
+  failing: []
 ---
 
 # Gate 1 — an escalation has one format, one emitter, and one place to see it
