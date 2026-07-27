@@ -57,8 +57,14 @@ from pathlib import Path
 
 from . import _filelock
 from . import _miniyaml
+from . import _wu_sections
 from . import scaffold as _scaffold
-from .gate_eval import evaluate_auto_close, AutoCloseDecision
+from .gate_eval import (
+    evaluate_auto_close,
+    AutoCloseDecision,
+    NON_SUBSTANTIVE_TYPES,
+    PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
+)
 
 SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
@@ -3208,22 +3214,15 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
                     "fire_terminal_flips: roadmap row for %s already done — skipping",
                     feature_id,
                 )
-            elif current_row_status == "active":
+            else:
                 status_cell = roadmap_text[status_start:status_end]
                 new_roadmap = (
                     roadmap_text[:status_start]
-                    + status_cell.replace("active", "done", 1)
+                    + status_cell.replace(current_row_status, "done", 1)
                     + roadmap_text[status_end:]
                 )
                 roadmap_path.write_text(new_roadmap)
                 modified.add(roadmap_path)
-            else:
-                logging.warning(
-                    "fire_terminal_flips: roadmap row for %s has status %r"
-                    " (not active or done) — skipping row flip",
-                    feature_id,
-                    current_row_status,
-                )
 
     # PLAN.md status -> done (FEAT-2026-0023/T01, closes #49). Consolidate the
     # terminal PLAN flip into this one driver-side owner so BOTH the dispatched-
@@ -3283,6 +3282,72 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
         )
 
     return list(modified)
+
+
+def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
+    """Re-read a completed terminal close WU's verdict from disk and fire
+    `fire_terminal_flips` if it now permits them (FEAT-2026-0070/T02).
+
+    `fire_terminal_flips` only runs at close-WU outcome time, inside the
+    dispatch loop. Once that close WU is `status: done` the driver never
+    re-dispatches it, so a verdict legitimately upgraded post-close (e.g.
+    `met_locally` -> `met` after follow-ups were discharged) is never re-read
+    and the flips never fire. This is a caller, not a second writer: it
+    locates the terminal gate's close WU, reads its on-disk verdict, and if
+    permitted, calls `fire_terminal_flips` unchanged.
+
+    Returns a dict:
+      fired:    bool  -- whether fire_terminal_flips was invoked
+      reason:   str   -- human-readable explanation (refusal or outcome)
+      modified: list[Path] -- paths fire_terminal_flips reports as modified
+    """
+    _fm, gates = load_graph(feature_dir)
+    if not gates:
+        return {"fired": False, "reason": "no gates in PLAN.md", "modified": []}
+
+    terminal_gate = gates[-1]
+    close_ref = None
+    for ref in terminal_gate.refs:
+        wu_path = feature_dir / ref["file"]
+        if not wu_path.exists():
+            continue
+        wu_fm, _ = read_frontmatter(wu_path)
+        if wu_fm.get("type") == "close":
+            close_ref = ref
+            break
+
+    if close_ref is None:
+        return {
+            "fired": False,
+            "reason": f"no terminal close WU (type: close) found in gate {terminal_gate.number}",
+            "modified": [],
+        }
+
+    close_wu = load_wu(feature_dir, close_ref)
+    if close_wu.status != DONE:
+        return {
+            "fired": False,
+            "reason": f"{close_wu.wu_id} status is {close_wu.status!r} (not done)",
+            "modified": [],
+        }
+
+    # load_wu already reads `verdict` from disk for type: close (loop.py:535);
+    # fire_terminal_flips re-reads it from wu.file itself regardless, so this
+    # is never taken from an in-memory value the auto-close path leaves None.
+    disk_verdict = close_wu.verdict
+    if not verdict_permits_terminal_flips(disk_verdict):
+        return {
+            "fired": False,
+            "reason": f"verdict {disk_verdict!r} does not permit terminal flips for {close_wu.wu_id}",
+            "modified": [],
+        }
+
+    modified = fire_terminal_flips(close_wu, feature_dir, repo_root)
+    return {
+        "fired": True,
+        "reason": f"verdict {disk_verdict!r} permits terminal flips for {close_wu.wu_id}",
+        "modified": modified,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -3358,6 +3423,110 @@ def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
     return fm.get("auto_close_disabled") in (True, "true", "True")
 
 
+_DEBT_AC_ITEM_RE = re.compile(r"(?m)^\s*\d+\.\s+(.*)$")
+_DEBT_CRITERION_MAX_LEN = 200
+_DEBT_CRITERIA_CAP = 40
+
+
+def _truncate_debt_criterion(text: str) -> str:
+    text = text.strip()
+    if len(text) > _DEBT_CRITERION_MAX_LEN:
+        return text[:_DEBT_CRITERION_MAX_LEN] + "…"
+    return text
+
+
+def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
+    """Return the deferred-verification worklist for an auto-closed gate.
+
+    Reads the gate's WU list from `PLAN.md`'s graph and each WU's frontmatter
+    and body **from disk** (FEAT-2026-0070/T06) — the auto-close path never
+    has a `WorkUnit` loaded for the WUs it enumerates, same constraint as
+    `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
+    call: this only reads files the driver has already located.
+    """
+    try:
+        _fm, gates = load_graph(feature_dir)
+    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
+        gates = []
+    gate = next((g for g in gates if g.number == gate_number), None)
+    refs = gate.refs if gate is not None else []
+
+    sub_ids: list[str] = []
+    entries: list[str] = []
+    total_criteria = 0
+
+    for ref in refs:
+        wu_file = feature_dir / ref["file"]
+        wu_id = ref.get("id", ref["file"])
+        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
+
+        if not wu_file.is_file():
+            entries.append(
+                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"  - deferred: <criteria not parseable> (file not found)"
+            )
+            continue
+
+        try:
+            fm, body = read_frontmatter(wu_file)
+        except (_miniyaml.MiniYAMLError, OSError):
+            entries.append(
+                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"  - deferred: <criteria not parseable> ({ref['file']})"
+            )
+            continue
+
+        wu_type = fm.get("type", "implementation")
+        if wu_type in NON_SUBSTANTIVE_TYPES:
+            continue
+
+        sub_ids.append(sub_id)
+        ac_text = _wu_sections.slice_acceptance_criteria(body)
+        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
+
+        lines = [f"- **{wu_id}** (`{ref['file']}`)"]
+        if not criteria:
+            lines.append(f"  - deferred: <criteria not parseable> ({ref['file']})")
+        else:
+            total_criteria += len(criteria)
+            for criterion in criteria:
+                lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
+        entries.append("\n".join(lines))
+
+    # AC7: no silent cap — list the first 40 criteria total, announce the rest.
+    rendered: list[str] = []
+    emitted = 0
+    truncated_at = None
+    for entry in entries:
+        entry_lines = entry.split("\n")
+        header = entry_lines[0]
+        deferred_lines = entry_lines[1:]
+        kept: list[str] = []
+        for dl in deferred_lines:
+            if emitted >= _DEBT_CRITERIA_CAP:
+                truncated_at = True
+                break
+            kept.append(dl)
+            emitted += 1
+        if kept:
+            rendered.append("\n".join([header] + kept))
+        elif not deferred_lines:
+            rendered.append(header)
+        if truncated_at:
+            break
+
+    remaining = total_criteria - emitted
+    if truncated_at and remaining > 0:
+        rendered.append(f"- … {remaining} further criteria not listed; read the WU files")
+
+    marker = (
+        f"<!-- specfuse:autoclose-debt gate={gate_number} "
+        f"wus={','.join(sub_ids)} criteria={total_criteria} "
+        f"predicate={_GATE_PREDICATE_VERSION} -->"
+    )
+    return marker + "\n\n" + "\n".join(rendered)
+
+
 def write_stub_retrospective_terminal(
     feature_dir: Path,
     gate_number: int,
@@ -3367,8 +3536,19 @@ def write_stub_retrospective_terminal(
 
     Satisfies both assert_retrospective_exists (non-empty file) and
     assert_retrospective_gate_section (^#{1,3} Gate N heading).
+
+    Idempotent: skips if a '## Gate N ... auto-closed' heading already exists
+    (FEAT-2026-0070/T06 AC12 — matches `append_stub_retrospective_intermediate`'s
+    existing skip condition; without it a re-entry duplicates the entire
+    criterion enumeration rather than ~10 lines of prose).
     """
     retro = feature_dir / "RETROSPECTIVE.md"
+    if retro.exists() and re.search(
+        rf"^##\s+Gate\s+{gate_number}\b.*auto-closed",
+        retro.read_text(),
+        re.MULTILINE,
+    ):
+        return
     metrics = decision.metrics
     budget = metrics.get("gate_budget")
     budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
@@ -3391,7 +3571,8 @@ def write_stub_retrospective_terminal(
         f"treating the feature as fully verified, the operator MUST confirm every\n"
         f"acceptance criterion was actually verified in-loop (not only by artifact\n"
         f"shape). Any AC deferred to a post-merge or real-system step must be\n"
-        f"recorded and completed now.\n"
+        f"recorded and completed now.\n\n"
+        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -3553,7 +3734,8 @@ def append_stub_retrospective_intermediate(
         f"enumerated. Any acceptance criterion whose verification is deferred\n"
         f"(loop-sandbox limit, cross-repo coordination, real-system access) is\n"
         f"unrecorded here. Gate {gate_number + 1}'s close MUST reconcile these\n"
-        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n"
+        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n\n"
+        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -4307,8 +4489,96 @@ def assert_terminal_flips_fired(
     return True, ""
 
 
+_AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
+_DEFERRAL_HEADING_RE = re.compile(r"(?m)^#{1,3}\s*What the loop did NOT verify.*$")
+
+
+def _terminal_deferral_section(retro_text: str) -> str:
+    """Return the text under the LAST `What the loop did NOT verify` heading.
+
+    A gate that auto-closed earlier already wrote its own such section (via
+    `build_autoclose_debt_enumeration`); the terminal close writes its own,
+    appended after. The last occurrence is the terminal close's own record.
+    """
+    matches = list(_DEFERRAL_HEADING_RE.finditer(retro_text))
+    if not matches:
+        return ""
+    last = matches[-1]
+    nl = retro_text.find("\n", last.end())
+    after = retro_text[nl + 1:] if nl != -1 else ""
+    em = re.search(r"(?m)^#{1,3}\s", after)
+    return after[:em.start()] if em else after
+
+
+def assert_autoclose_debt_reconciled(
+    wu: WorkUnit,
+    feature_dir: Path,
+    repo_root: Path,
+    head_before: str,
+) -> tuple[bool, str]:
+    """(close-g) A marked predecessor auto-close debt must be named in the
+    terminal close's `## What the loop did NOT verify` section.
+
+    Marker-gated (FEAT-2026-0070/T07): only gates whose auto-close stub
+    carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker are
+    considered. No historical retrospective in this repo has one, so this
+    fires on zero of the 11 features that have auto-closed a gate
+    (`GATE-02-REVIEW.md` § Satisfiability) — the unmarked-predicate form
+    fires on 6 of them and is unsatisfiable by `planning-discipline.md` §2.
+
+    Short-circuits `(True, "")` when:
+      - the terminal close WU itself is `auto_close: true` — no session ran,
+        so there is no one to hold responsible and T06's terminal stub is
+        already the record;
+      - `RETROSPECTIVE.md` carries no debt marker for a gate earlier than the
+        terminal gate (a marker for the terminal gate itself is not a
+        predecessor and is ignored).
+
+    Otherwise, every predecessor gate a marker names must appear as
+    `gate N` in the terminal close's own deferral section (the last
+    `What the loop did NOT verify` heading in the file); an unmentioned gate
+    returns `(False, reason)` with `autoclose_debt_unreconciled` in the
+    reason.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    if fm.get("auto_close") in (True, "true", "True"):
+        return True, ""
+
+    retro_path = feature_dir / "RETROSPECTIVE.md"
+    if not retro_path.exists():
+        return True, ""
+    retro_text = retro_path.read_text()
+
+    _, gates = load_graph(feature_dir)
+    if not gates:
+        return True, ""
+    terminal_gate_number = gates[-1].number
+
+    predecessor_gates = sorted({
+        int(m.group(1))
+        for m in _AUTOCLOSE_DEBT_MARKER_RE.finditer(retro_text)
+        if int(m.group(1)) < terminal_gate_number
+    })
+    if not predecessor_gates:
+        return True, ""
+
+    deferral_section = _terminal_deferral_section(retro_text)
+    unmentioned = [
+        g for g in predecessor_gates
+        if not re.search(rf"\bgate\s+{g}\b", deferral_section, re.IGNORECASE)
+    ]
+    if unmentioned:
+        return False, (
+            "autoclose_debt_unreconciled: gate(s) "
+            f"{', '.join(str(g) for g in unmentioned)} carry an unreconciled "
+            f"auto-close debt marker not named in the terminal close's "
+            f"'## What the loop did NOT verify' section"
+        )
+    return True, ""
+
+
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
-    "close": [assert_terminal_flips_fired],
+    "close": [assert_terminal_flips_fired, assert_autoclose_debt_reconciled],
 }
 
 
@@ -5661,9 +5931,23 @@ def main() -> int:
                     "unchanged; only the preexisting_gate_failure pre-dispatch "
                     "halt is disabled, since with no probe there is no failing "
                     "set for it to fire on.")
+    ap.add_argument("--recheck-verdict", metavar="FEATURE_ID",
+                    help="Re-read the named feature's terminal close WU verdict "
+                    "from disk and fire the terminal flips (gate/roadmap-row/"
+                    "PLAN.md/archive) if it now permits them, without "
+                    "re-dispatching the close WU. For a verdict upgraded "
+                    "post-close (e.g. met_locally -> met after follow-ups were "
+                    "discharged). No-op if already done or still hedged.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+    if args.recheck_verdict:
+        feature_dir = _resolve_feature_dir(args.recheck_verdict)
+        result = recheck_terminal_verdict(feature_dir, REPO_ROOT)
+        print(result["reason"])
+        if result["modified"]:
+            print("Modified: " + ", ".join(str(p) for p in result["modified"]))
+        return 0
     auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
                prepare=args.prepare, prepare_only=args.prepare_only,

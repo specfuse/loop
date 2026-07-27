@@ -2068,3 +2068,136 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   feature — the cost of deciding rises discontinuously at release, and an undecided
   fall-through is something a terminal close has to report as an open schema position
   either way.
+
+- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **"Exactly one writer" is a property of the
+  surface, not of the function — audit it by grepping the writes, in both directions, not
+  the definition.** `[FEAT-2026-0023/G1-CLOSE]` requires terminal-state flips to have ONE
+  driver-side owner, and the natural audit — `grep -c "def fire_terminal_flips"` returns
+  `1` — proves only that the owner is not duplicated. Aiming the grep at each *surface*
+  instead (`write_frontmatter_field(... "status" ...)`, `roadmap_path.write_text`, every
+  `set_gate` call site and the value it passes) took the same minute and found
+  `loop.py:4462`, which writes `PLAN.md` `status: complete` on the all-gates-passed poll —
+  a value absent from `lint_plan.VALID_FEATURE_STATUS`, so re-running the driver on a
+  finished feature overwrites the `done` the owner just wrote with a value plan-lint
+  rejects and `/wrap-feature` refuses. No gate test could have caught it: tests assert what
+  the owner *does*, never what else touches the bytes it owns. Rule: a one-owner audit
+  enumerates writers of the surface and classifies each (owner / deliberate inverse /
+  defect), and it must cover the reverse transition too — this repo's
+  `revert_terminal_surfaces` is a legitimate second writer of the same bytes in the
+  `done → active` direction, so an audit phrased as "nothing else writes these bytes" is
+  unsatisfiable and will be quietly downgraded to the definition-count check that finds
+  nothing.
+
+- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **A skill may not own a state transition the
+  driver owns: the driver exposes an entry point, the skill calls it, and the skill's
+  *non*-writing is enforced by a grep-shaped test over the skill text with a positive
+  control.** `[FEAT-2026-0023/G1-CLOSE]` established one owner across *close paths*; the
+  operator-skill surface is the same hazard with a friendlier name, because a skill that
+  hand-edits three files is indistinguishable in its effect from the divergence that cost
+  issue #49. The shape that worked: order the WUs so the driver primitive lands first
+  (`recheck_terminal_verdict` + a `--recheck-verdict` flag), then build the skill on it;
+  state the prohibition in the skill text; and assert it as a **grep over SKILL.md** —
+  never as prose in the WU body, which verifies nothing. The non-obvious half is the
+  positive control: also assert the forbidden pattern *fires* on a purpose-built
+  violating instruction, or the guard passes because its regex matches nothing rather than
+  because the skill is clean. Corollary for planners: "skill needs a state transition" is
+  always two WUs, and the primitive is the first one.
+
+- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **When a contract is enforced at two moments, the
+  earlier enforcer must either explain the later one's requirement or exempt the states
+  the later one owns — otherwise it fails on the right tree with the wrong message.** One
+  defect class, three incidents: `lint_plan`'s close-WU verdict check omitted
+  `in_progress`/`in_review` from its exempt set, so a close WU mid-dispatch failed
+  plan-lint with a message about the WU rather than about the missing verdict, while the
+  real owner (`assert_verdict_well_formed`) runs at outcome time (this gate's T04);
+  closing-guard literals were enforced in `loop.py`'s `assert_*` functions and documented
+  nowhere, discoverable only by paying for a refusal (#265); and the outcome contract was
+  enforced against a rule generalised from one feature with no surface explaining the
+  population it came from (#272). The fix in each case is not more strictness — it is
+  making the *earlier* enforcement point name the later one. Two questions at authoring
+  time close the class: which other surface enforces this contract, and at what moment?
+  If the answer is "a later one", the earlier check exempts the states that later one owns
+  and its comment names it.
+
+- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **An attempt killed before it reaches an outcome
+  is invisible to every cost consumer — a close reconciling spend from `events.jsonl`
+  reports a lower bound and must say so.** Cost lands in `events.jsonl` at
+  `attempt_outcome`/`task_completed` time, so an infra kill, a Ctrl-C, or an OOM mid-attempt
+  leaves the tokens spent and nothing recorded — and a recovery that resets the WU makes
+  the run look clean in the record while the operator remembers otherwise. This gate's T03
+  was killed mid-attempt and recovered; `events.jsonl` shows `attempts: 1, outcome:
+  passed` and no trace of the cost. Every downstream consumer inherits the understatement:
+  the close's cost analysis, `events_stats.py`'s medians, `/learnings-suggest`'s failure
+  clusters. Rule: a close states its actual as a lower bound and names the killed attempts
+  it knows about (a recovery commit in the gate's history is the usual evidence); and a
+  failure-class breakdown reporting zero driver-recorded failures should say *recorded*
+  rather than claiming every WU passed first try.
+
+- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **An acceptance record that overwrites the field
+  it records leaves no machine-readable trace of what was accepted — carry the
+  accepted-from value forward in frontmatter.** `/accept-hedged-close` writes an auditable
+  acceptance record and then, correctly, sets the close WU's `verdict` to `met` so the
+  driver's one owner recognizes it (`verdict_permits_terminal_flips` is `met`-only, and
+  broadening *it* would have been the worse fix). The cost: after acceptance the
+  frontmatter is byte-identical to a close that genuinely met every criterion, and the
+  hedge survives only in prose that nothing parses. Whenever an operator override mutates
+  the very field that recorded the pre-override state, write the provenance alongside it —
+  `verdict_accepted_from`, `_reason`, `_at` — so "met" and "hedged, accepted on a stated
+  reason with follow-ups open" stay distinguishable to a query, not just to a reader.
+
+- [FEAT-2026-0070/G2-CLOSE] **A machine-readable marker embedded in a prose artifact is
+  forgeable by the prose that documents it — scope the scan, or make the token
+  unquotable.** This gate shipped an auto-close debt marker written into `RETROSPECTIVE.md`
+  and a guard that scans for it. The scan is plain text over the whole file with no
+  awareness of code fences, so a retrospective that *quotes* the marker with a real gate
+  number manufactures debt it must then reconcile. Observed, not reasoned: copying this
+  feature's directory, appending the marker literal inside a fenced block, and running the
+  guard returned `ok=False` with `autoclose_debt_unreconciled`. The population most likely
+  to write that literal is exactly the one documenting the feature that ships it — the
+  close, the migration note, the rule file's own example. The general rule: whenever a
+  scanner's input is an artifact humans write prose into, the token it looks for must be
+  either positionally constrained (first line of a named section), fence-aware, or
+  unreproducible by quotation. "No one would write that string by accident" is false for
+  precisely the readers who most need the feature explained.
+
+- [FEAT-2026-0070/G2-CLOSE] **Cost variance tracks how many distinct things a work unit
+  must prove, not whether its test file already exists.** Paired observation across one
+  feature's two gates. Gate 1 came in **53.5% under** plan and concluded that a WU
+  extending an existing guard test file is *cheaper*, not dearer, than the plan's premium
+  for "touches driver internals". Gate 2 priced all four of its WUs on that lesson — all
+  four extend existing test files — and came in **19.7% over**, with the deltas monotone in
+  acceptance-criterion count (7 ACs −38.5%, 10 ACs −16.9%, 12 ACs +46.1%, 13 ACs +37.4%).
+  The mechanism is legible without the statistics: the two overrunning WUs owed three named
+  control tests, a registration-order assertion, a documentation row bound by a contract
+  test, a tree-wide satisfiability re-probe, three degrade cases, and a truncation case —
+  each a separate deliverable with its own oracle. Estimate by counting the distinct
+  obligations and controls; treat "extends an existing test file" as a modifier on that
+  count, not as the variable. A calibration lesson drawn from one gate's uniform miss is a
+  hypothesis, and the next gate is its test — say so when promoting one.
+
+- [FEAT-2026-0070/G2-CLOSE] **An arm-time reprice silently invalidates the close's
+  as-drafted baseline whenever the resulting delta sits under the linter's threshold — a
+  noise threshold is also an audit blind spot.** The gate-2 arming record reconciled the WU
+  sum to `PLAN.md`'s `planned_cost_usd` at a delta of exactly $0.00. The operator then
+  accepted a scope question at arming, repriced one WU $2.00 → $2.50, and nothing
+  re-reconciled: plan-lint's cost-delta check warns above 10% and the drift was 1.5%. The
+  terminal close discovered it by re-summing the frontmatter rather than reading the arming
+  record. Two fixes, either sufficient: the arming step re-runs the sum and updates the
+  record it just invalidated, or the linter reports the delta informationally at any
+  magnitude and reserves the threshold for the WARN. Generally — when a check suppresses
+  small deltas to avoid noise, something else must still record them, or "reconciles
+  exactly" decays into "reconciled exactly, once, before the edits".
+
+- [FEAT-2026-0070/G2-CLOSE] **A marker-gated guard that reports zero across all history is
+  untested end-to-end by construction, and the close that ships it must not count its own
+  vacuous pass as evidence.** The narrowing that makes such a guard *satisfiable* — only
+  gates marked by the new writer count as debt — is the same property that makes it inert
+  on every artifact that exists, so its first real firing is necessarily in someone else's
+  future run. The terminal close of the feature that ships it will see the guard pass
+  against itself and must say plainly that the pass is vacuous: no marker existed, the
+  predecessor set was empty, the function short-circuited before evaluating anything. The
+  real evidence is the negative control, the positive control, the no-marker control, and —
+  cheapest of the missing pieces — one lifecycle test that lets the driver actually produce
+  the marker and then dispatches the close that must read it. Unit fixtures prove the
+  function; only a real sequence proves the guard. A green post-pass reported without that
+  distinction is the hollow pass the guards exist to catch, one level up.

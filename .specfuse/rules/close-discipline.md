@@ -90,6 +90,7 @@ waste**. This table exists so that number goes down.
 | `assert_gate_review_exists` | `plan-next` | **`GATE-{N+1}-REVIEW.md`** — named for the gate being *drafted*, not the gate being closed. A gate-1 `plan-next` writes `GATE-02-REVIEW.md` |
 | `assert_next_gate_drafted_or_terminal` | `plan-next` | The next gate has ≥1 WU at `status: draft` in `PLAN.md`, or the feature is terminal |
 | `assert_declared_deliverables` | any WU with `produces:` | Every path listed in `produces:` appears in the squash diff |
+| `assert_autoclose_debt_reconciled` | `close` | On a `close` WU, if `RETROSPECTIVE.md` carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker for a gate earlier than the terminal gate, the terminal close's `## What the loop did NOT verify` section must name that gate literally as `gate N`. Marker-gated (fires on none of this repo's pre-FEAT-2026-0070 closes); short-circuits `(True, "")` when the terminal close WU is itself `auto_close: true` |
 
 **The `GATE-{N+1}` row is the single most expensive guard in the system**
 ($53.11 of measured waste across 15 refusals) and the one most likely to

@@ -33,6 +33,9 @@ _FM_DELIM = re.compile(r"^---\s*$")
 _YAML_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)\n```", re.DOTALL)
 _CLOSING_TYPES = frozenset({"close", "close-intermediate"})
 _NON_SUBSTANTIVE_TYPES = frozenset({"close", "close-intermediate", "plan-next"})
+# Public alias (FEAT-2026-0070/T06) — loop.py imports this rather than
+# forking the set; the private name stays for gate_eval.py's own call site.
+NON_SUBSTANTIVE_TYPES = _NON_SUBSTANTIVE_TYPES
 
 
 @dataclass(frozen=True)

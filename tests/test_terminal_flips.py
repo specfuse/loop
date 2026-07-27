@@ -415,6 +415,72 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
 # --------------------------------------------------------------------------- #
 
 
+class TestRowFlipBreadth(unittest.TestCase):
+    """FEAT-2026-0070/T01 (#226): row flip must fire from any non-done status."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_planned_row_flips_to_done(self):
+        """A row status of `planned` (autonomy: auto self-dispatch) must flip
+        to `done` on a met close, not just `active` rows."""
+        feature_id = "FEAT-2026-9993"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="planned",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | done |", roadmap_text,
+                      "planned roadmap row must be flipped to done")
+        self.assertTrue(modified, "fire_terminal_flips must return non-empty modified list")
+
+    def test_active_row_still_flips_to_done(self):
+        """Regression guard: the active -> done path must keep working."""
+        feature_id = "FEAT-2026-9994"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | done |", roadmap_text,
+                      "active roadmap row must still be flipped to done")
+        self.assertTrue(modified, "fire_terminal_flips must return non-empty modified list")
+
+    def test_done_row_second_call_is_noop(self):
+        """Idempotency: a row already done stays done and is not rewritten."""
+        feature_id = "FEAT-2026-9996"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="passed",
+            roadmap_row_status="done",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+        # Pre-archive so auto_archive_feature is also a no-op — isolates the
+        # row-flip idempotency this WU governs from unrelated archive writes.
+        loop.fire_terminal_flips(wu, feature_dir, repo_root)
+        before = roadmap_path.read_bytes()
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+        after = roadmap_path.read_bytes()
+
+        self.assertEqual(before, after, "already-done row must not be rewritten")
+        self.assertNotIn(roadmap_path, modified,
+                         "roadmap path must not appear in modified list on no-op")
+
+
 class TestWrapFeatureSkillGateFlipRemoved(unittest.TestCase):
 
     def test_wrap_feature_skill_no_longer_lists_gate_flip(self):
@@ -439,6 +505,144 @@ class TestWrapFeatureSkillGateFlipRemoved(unittest.TestCase):
             content,
             "SKILL.md must name fire_terminal_flips as the new owner",
         )
+
+
+# --------------------------------------------------------------------------- #
+# TestVerdictRecheck — FEAT-2026-0070/T02                                     #
+# --------------------------------------------------------------------------- #
+
+
+class TestVerdictRecheck(unittest.TestCase):
+    """recheck_terminal_verdict: re-read a done close WU's on-disk verdict and
+    fire fire_terminal_flips if it now permits them, without re-dispatch."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_upgraded_verdict_fires_flips_without_redispatch(self):
+        """close WU is status: done, verdict: met_locally, all three surfaces
+        un-flipped. Rewrite verdict -> met on disk (no re-dispatch). The new
+        primitive must fire all three flips."""
+        feature_id = "FEAT-2026-9997"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        close_path = feature_dir / "WU-close.md"
+        close_path.write_text(
+            f"---\nid: {feature_id}/G2-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: done\nattempts: 1\nverdict: met_locally\n---\n\n"
+            f"# Close{_WU_BODY}"
+        )
+
+        # Follow-ups discharged post-close; verdict honestly upgraded on disk.
+        loop.write_frontmatter_field(close_path, "verdict", "met")
+
+        result = loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        self.assertTrue(result["fired"], result["reason"])
+        gate_fm = _read_frontmatter(feature_dir / "GATE-02.md")
+        self.assertEqual(gate_fm.get("status"), "passed")
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | done |", roadmap_text)
+        plan_fm = _read_frontmatter(feature_dir / "PLAN.md")
+        self.assertEqual(plan_fm.get("status"), "done")
+        archive_text = (repo_root / ".specfuse" / "roadmap-archive.md").read_text()
+        self.assertIn(f"## {feature_id} — Test feature", archive_text)
+
+    def _assert_hedge_touches_nothing(self, verdict_line: str):
+        feature_id = "FEAT-2026-9998"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        close_path = feature_dir / "WU-close.md"
+        close_path.write_text(
+            f"---\nid: {feature_id}/G2-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: done\nattempts: 1\n{verdict_line}---\n\n"
+            f"# Close{_WU_BODY}"
+        )
+
+        result = loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        self.assertFalse(result["fired"])
+        self.assertEqual(result["modified"], [])
+        gate_fm = _read_frontmatter(feature_dir / "GATE-02.md")
+        self.assertEqual(gate_fm.get("status"), "awaiting_review")
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | active |", roadmap_text)
+
+    def test_met_locally_verdict_touches_nothing(self):
+        self._assert_hedge_touches_nothing("verdict: met_locally\n")
+
+    def test_partially_met_verdict_touches_nothing(self):
+        self._assert_hedge_touches_nothing("verdict: partially_met\n")
+
+    def test_not_met_verdict_touches_nothing(self):
+        self._assert_hedge_touches_nothing("verdict: not_met\n")
+
+    def test_absent_verdict_touches_nothing(self):
+        self._assert_hedge_touches_nothing("")
+
+    def test_already_done_feature_is_noop_not_error(self):
+        """Re-running on an already-done feature is idempotent, not an error."""
+        feature_id = "FEAT-2026-9999"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="passed",
+            roadmap_row_status="done",
+        )
+        close_path = feature_dir / "WU-close.md"
+        close_path.write_text(
+            f"---\nid: {feature_id}/G2-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: done\nattempts: 1\nverdict: met\n---\n\n"
+            f"# Close{_WU_BODY}"
+        )
+        # Pre-fire once so gate/roadmap/PLAN/archive are all already terminal
+        # before exercising the re-check's idempotency.
+        loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        result = loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        self.assertTrue(result["fired"])
+        self.assertEqual(result["modified"], [])
+
+    def test_refuses_when_no_terminal_close_wu(self):
+        """No close-type WU in the terminal gate: refuse, name the condition."""
+        feature_id = "FEAT-2026-9981"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        (feature_dir / "WU-close.md").write_text(
+            f"---\nid: {feature_id}/T02\ntype: implementation\nmodel: sonnet\n"
+            f"status: done\nattempts: 1\n---\n\n# Not a close{_WU_BODY}"
+        )
+
+        result = loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        self.assertFalse(result["fired"])
+        self.assertIn("no terminal close WU", result["reason"])
+
+    def test_refuses_when_close_wu_not_done(self):
+        """Terminal close WU exists but is not status: done: refuse, name it."""
+        feature_id = "FEAT-2026-9982"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="open",
+            roadmap_row_status="active",
+        )
+        (feature_dir / "WU-close.md").write_text(
+            f"---\nid: {feature_id}/G2-CLOSE\ntype: close\nmodel: opus\n"
+            f"status: pending\nattempts: 0\n---\n\n# Close{_WU_BODY}"
+        )
+
+        result = loop.recheck_terminal_verdict(feature_dir, repo_root)
+
+        self.assertFalse(result["fired"])
+        self.assertIn("not done", result["reason"])
 
 
 if __name__ == "__main__":

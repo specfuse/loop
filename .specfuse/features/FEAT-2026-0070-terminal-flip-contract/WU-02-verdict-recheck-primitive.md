@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0070/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/loop.py
   - tests/test_terminal_flips.py
 oracle_env: macos_local
 produces_driver_helper: recheck_terminal_verdict
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T02:35:16.281763+00:00
+duration_seconds: 579.381
+cost_usd: 1.203202
+input_tokens: 1104
+output_tokens: 12881
 ---
 
 # A driver-side primitive that re-evaluates a completed close WU's verdict and fires the flips

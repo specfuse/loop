@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0070/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/loop.py
   - tests/test_terminal_flips.py
 oracle_env: macos_local
 produces_driver_helper: fire_terminal_flips
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T02:28:30.852957+00:00
+duration_seconds: 405.244
+cost_usd: 0.914345
+input_tokens: 2278
+output_tokens: 6708
 ---
 
 # Flip the roadmap row to `done` from any non-`done` status, not only `active`
