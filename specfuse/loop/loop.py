@@ -3208,22 +3208,15 @@ def fire_terminal_flips(wu: WorkUnit, feature_dir: Path, repo_root: Path) -> lis
                     "fire_terminal_flips: roadmap row for %s already done — skipping",
                     feature_id,
                 )
-            elif current_row_status == "active":
+            else:
                 status_cell = roadmap_text[status_start:status_end]
                 new_roadmap = (
                     roadmap_text[:status_start]
-                    + status_cell.replace("active", "done", 1)
+                    + status_cell.replace(current_row_status, "done", 1)
                     + roadmap_text[status_end:]
                 )
                 roadmap_path.write_text(new_roadmap)
                 modified.add(roadmap_path)
-            else:
-                logging.warning(
-                    "fire_terminal_flips: roadmap row for %s has status %r"
-                    " (not active or done) — skipping row flip",
-                    feature_id,
-                    current_row_status,
-                )
 
     # PLAN.md status -> done (FEAT-2026-0023/T01, closes #49). Consolidate the
     # terminal PLAN flip into this one driver-side owner so BOTH the dispatched-

@@ -415,6 +415,72 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
 # --------------------------------------------------------------------------- #
 
 
+class TestRowFlipBreadth(unittest.TestCase):
+    """FEAT-2026-0070/T01 (#226): row flip must fire from any non-done status."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.root = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def test_planned_row_flips_to_done(self):
+        """A row status of `planned` (autonomy: auto self-dispatch) must flip
+        to `done` on a met close, not just `active` rows."""
+        feature_id = "FEAT-2026-9993"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="planned",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | done |", roadmap_text,
+                      "planned roadmap row must be flipped to done")
+        self.assertTrue(modified, "fire_terminal_flips must return non-empty modified list")
+
+    def test_active_row_still_flips_to_done(self):
+        """Regression guard: the active -> done path must keep working."""
+        feature_id = "FEAT-2026-9994"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="awaiting_review",
+            roadmap_row_status="active",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+
+        roadmap_text = (repo_root / ".specfuse" / "roadmap.md").read_text()
+        self.assertIn(f"| {feature_id} | Test feature | done |", roadmap_text,
+                      "active roadmap row must still be flipped to done")
+        self.assertTrue(modified, "fire_terminal_flips must return non-empty modified list")
+
+    def test_done_row_second_call_is_noop(self):
+        """Idempotency: a row already done stays done and is not rewritten."""
+        feature_id = "FEAT-2026-9996"
+        feature_dir, repo_root = _make_repo_with_feature(
+            self.root, feature_id, gate_num=2, gate_status="passed",
+            roadmap_row_status="done",
+        )
+        wu = _make_close_wu(feature_dir, f"{feature_id}/G2-CLOSE", verdict="met")
+
+        roadmap_path = repo_root / ".specfuse" / "roadmap.md"
+        # Pre-archive so auto_archive_feature is also a no-op — isolates the
+        # row-flip idempotency this WU governs from unrelated archive writes.
+        loop.fire_terminal_flips(wu, feature_dir, repo_root)
+        before = roadmap_path.read_bytes()
+
+        modified = loop.fire_terminal_flips(wu, feature_dir, repo_root)
+        after = roadmap_path.read_bytes()
+
+        self.assertEqual(before, after, "already-done row must not be rewritten")
+        self.assertNotIn(roadmap_path, modified,
+                         "roadmap path must not appear in modified list on no-op")
+
+
 class TestWrapFeatureSkillGateFlipRemoved(unittest.TestCase):
 
     def test_wrap_feature_skill_no_longer_lists_gate_flip(self):
