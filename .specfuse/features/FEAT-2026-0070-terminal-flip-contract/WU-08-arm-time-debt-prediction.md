@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0070/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.25
 produces:
   - specfuse/loop/lint_plan.py
@@ -11,6 +11,13 @@ oracle_env: macos_local
 produces_driver_helper: check_autoclose_debt_prediction
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.4.0
+started_at: 2026-07-27T04:37:30.773175+00:00
+duration_seconds: 463.837
+cost_usd: 1.03936
+input_tokens: 46
+output_tokens: 12175
 ---
 
 # Predict T07's refusal at arm time instead of charging a dispatch for it

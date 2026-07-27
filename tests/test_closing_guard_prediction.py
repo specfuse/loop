@@ -32,7 +32,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specfuse.loop.lint_plan import check_closing_guard_literals
+from specfuse.loop.lint_plan import (
+    check_autoclose_debt_prediction,
+    check_closing_guard_literals,
+)
 
 _FM = """---
 id: FEAT-2026-9401/{wid}
@@ -154,6 +157,78 @@ class TestAdvisoryOnly(_Harness):
         populated tree is `[FEAT-2026-0015/G2-CLOSE]`."""
         self.assertIsNone(check_closing_guard_literals(
             self.dir, self._wu("G1-CLOSE", "close", "nothing")))
+
+
+class TestAutoCloseDebtPrediction(unittest.TestCase):
+    """FEAT-2026-0070/T08: predicts `assert_autoclose_debt_reconciled`
+    (FEAT-2026-0070/T07) at arm time. Conditional on feature state — fires
+    only when RETROSPECTIVE.md already carries T06's debt marker."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self._tmp.name)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _retro(self, marker_gate: int = 1) -> None:
+        (self.dir / "RETROSPECTIVE.md").write_text(
+            f"## Gate {marker_gate} auto-closed\n\n"
+            f"<!-- specfuse:autoclose-debt gate={marker_gate} wus=T01 "
+            "criteria=3 predicate=v1 -->\n"
+            "deferred: some criterion\n"
+        )
+
+    def _gates(self, close_body: str, status: str = "pending") -> list:
+        (self.dir / "CLOSE.md").write_text(
+            "---\n"
+            "id: FEAT-2026-9402/G2-CLOSE\n"
+            "type: close\n"
+            f"status: {status}\n"
+            "---\n\n"
+            "# Gate 2 close — retrospective and friends\n\n"
+            f"{close_body}\n"
+        )
+        return [
+            {"gate": 1, "work_units": [{"id": "T01", "file": "T01.md"}]},
+            {"gate": 2, "work_units": [{"id": "G2-CLOSE", "file": "CLOSE.md"}]},
+        ]
+
+    def _run(self, gates: list) -> str:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            check_autoclose_debt_prediction(self.dir, gates)
+        return buf.getvalue()
+
+    def test_warns_when_terminal_close_body_ignores_marked_debt(self):
+        self._retro(marker_gate=1)
+        gates = self._gates("Write a retrospective with per-WU outcomes.")
+        out = self._run(gates)
+        self.assertIn("WARN", out)
+        self.assertIn("assert_autoclose_debt_reconciled", out)
+
+    def test_silent_when_body_instructs_reconciling_the_marked_gate(self):
+        """Positive control: a predictor that warns unconditionally is worse
+        than none — it trains the reader to skip the line."""
+        self._retro(marker_gate=1)
+        gates = self._gates(
+            "Name gate 1 in the '## What the loop did NOT verify' section."
+        )
+        self.assertEqual(self._run(gates), "")
+
+    def test_no_marker_no_warn(self):
+        """Mirrors FEAT-2026-0070/T07 AC4: keeps the check off every feature
+        that closed before T06 shipped."""
+        (self.dir / "RETROSPECTIVE.md").write_text("No debt marker in here.")
+        gates = self._gates("Write a retrospective.")
+        self.assertEqual(self._run(gates), "")
+
+    def test_done_terminal_close_wu_is_skipped(self):
+        """Sealed history: matches check_closing_guard_literals's :427
+        behavior."""
+        self._retro(marker_gate=1)
+        gates = self._gates("Write a retrospective.", status="done")
+        self.assertEqual(self._run(gates), "")
 
 
 if __name__ == "__main__":

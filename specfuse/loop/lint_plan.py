@@ -423,6 +423,70 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
             )
 
 
+_AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
+
+
+def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
+    """WARN when a terminal close WU's body never instructs reconciling a
+    marked predecessor auto-close debt (`FEAT-2026-0070/T07`'s
+    ``assert_autoclose_debt_reconciled``).
+
+    Conditional on feature state, unlike `_GUARD_LITERAL_PREDICTIONS`: it
+    fires only when `RETROSPECTIVE.md` already carries T06's
+    `<!-- specfuse:autoclose-debt gate=N ... -->` marker for a gate earlier
+    than the terminal one. No marker, no WARN — a static per-type row would
+    fire on every terminal close in every project, which is the noise this
+    check exists to avoid. WARN-only, exit code unchanged, same discipline as
+    `check_closing_guard_literals`.
+    """
+    retro_path = feature_dir / "RETROSPECTIVE.md"
+    if not retro_path.exists():
+        return
+    retro_text = retro_path.read_text()
+
+    terminal_gate_gnum = next(
+        (g.get("gate", "?") for g in reversed(gates) if g.get("work_units")), None
+    )
+    if terminal_gate_gnum is None:
+        return
+
+    predecessor_gates = sorted({
+        int(m.group(1))
+        for m in _AUTOCLOSE_DEBT_MARKER_RE.finditer(retro_text)
+        if int(m.group(1)) < terminal_gate_gnum
+    })
+    if not predecessor_gates:
+        return
+
+    terminal_gate = next(g for g in gates if g.get("gate") == terminal_gate_gnum)
+    for entry in terminal_gate.get("work_units") or []:
+        wfile = feature_dir / str(entry.get("file", ""))
+        if not wfile.is_file():
+            continue
+        try:
+            wfm, wbody = read_frontmatter(wfile)
+        except Exception:  # noqa: BLE001 - malformed WU is another check's finding
+            continue
+        if wfm.get("type") != "close":
+            continue
+        if wfm.get("status") == "done":
+            continue  # sealed; backfilling instructions on history is pointless
+        unmentioned = [
+            g for g in predecessor_gates
+            if not re.search(rf"\bgate\s+{g}\b", wbody, re.IGNORECASE)
+        ]
+        if not unmentioned:
+            continue
+        print(
+            f"WARN: {wfile}: RETROSPECTIVE.md carries an auto-close debt "
+            f"marker for gate(s) {', '.join(str(g) for g in unmentioned)}, "
+            f"but this terminal close WU's body never instructs the agent to "
+            f"reconcile it. assert_autoclose_debt_reconciled checks this "
+            f"AFTER dispatch, so the refusal costs a full re-attempt. See "
+            f"close-discipline.md §4."
+        )
+
+
 def check_planning_sections(
     feature_dir: Path, plan_fm: dict, plan_body: str, gates: list,
 ) -> None:
@@ -761,6 +825,7 @@ def lint(feature_dir: Path) -> list[str]:
     # Planning-discipline section presence (#201): WARN-only.
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
+    check_autoclose_debt_prediction(feature_dir, gates)
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
