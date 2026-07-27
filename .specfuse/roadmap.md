@@ -69,7 +69,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
-| FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | planned | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ detail](#feat-2026-0070) |
+| FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | active | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ detail](#feat-2026-0070) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -957,7 +957,7 @@ machine-checkable contract rather than prose.
 
 **Held at drafting, deliberately not built.** #243's candidate 2, a roadmap status between `active` and `done` (`done_hedged`): a new status value is a contract every downstream project, every skill, and `lint_plan`'s row parser reads, and `done` carrying an open-follow-up count gets most of the benefit without a new enum member. And #243's candidate 3, pre-declaring the `met_locally` ceiling at draft time: real value, but it is prevention rather than repair and does not help the features already in the dead end — the natural follow-up feature if gate 1 lands cleanly.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
