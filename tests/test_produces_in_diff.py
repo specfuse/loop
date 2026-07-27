@@ -105,6 +105,42 @@ class TestAssertProducesInDiffUnit(unittest.TestCase):
         self.assertIn("src/flags.py", summary)
 
 
+class TestAssertProducesInDiffDotSlash(unittest.TestCase):
+    """Leading-`./` normalization (#259).
+
+    `git diff --name-only` emits repo-root paths bare (`package.json`), so a
+    `produces:` entry spelled `./package.json` never matched — and a WU that
+    genuinely edited the root file failed every attempt and spun to a block.
+    Both sides are normalized so the two spellings are equivalent.
+    """
+
+    def test_dot_slash_entry_matches_bare_touched_path(self):
+        ok, summary = loop.assert_produces_in_diff(
+            _make_wu(["./package.json"]), ["package.json"])
+        self.assertTrue(ok, summary)
+        self.assertEqual(summary, "")
+
+    def test_bare_entry_matches_dot_slash_touched_path(self):
+        """Normalization is symmetric — neither side's spelling decides."""
+        ok, summary = loop.assert_produces_in_diff(
+            _make_wu(["package.json"]), ["./package.json"])
+        self.assertTrue(ok, summary)
+        self.assertEqual(summary, "")
+
+    def test_dot_slash_glob_matches(self):
+        ok, summary = loop.assert_produces_in_diff(
+            _make_wu(["./src/*.py"]), ["src/rule.py"])
+        self.assertTrue(ok, summary)
+
+    def test_dot_slash_entry_still_reported_when_untouched(self):
+        """Normalization must not weaken the check: a `./` entry the diff
+        never touched still fails, named in its original spelling."""
+        ok, summary = loop.assert_produces_in_diff(
+            _make_wu(["./package.json"]), ["docs/GATE-02.md"])
+        self.assertFalse(ok)
+        self.assertIn("./package.json", summary)
+
+
 def _write_minimal_feature(root: Path, feature_id: str, slug: str,
                            branch: str, produces: list) -> Path:
     """One implementation WU with `produces`, plus the close-type WU."""
