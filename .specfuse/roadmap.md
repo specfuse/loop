@@ -61,7 +61,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
-| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | planned | — | — |
+| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | active | — | [→ detail](#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | blocked | — | — |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
@@ -846,7 +846,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** One escalation queue, two views (GH native + rich local session); nothing the agent parks goes silent; the operator's check-in ritual becomes "open /attention, work top-down".
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
