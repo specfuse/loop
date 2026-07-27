@@ -2144,3 +2144,60 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the very field that recorded the pre-override state, write the provenance alongside it —
   `verdict_accepted_from`, `_reason`, `_at` — so "met" and "hedged, accepted on a stated
   reason with follow-ups open" stay distinguishable to a query, not just to a reader.
+
+- [FEAT-2026-0070/G2-CLOSE] **A machine-readable marker embedded in a prose artifact is
+  forgeable by the prose that documents it — scope the scan, or make the token
+  unquotable.** This gate shipped an auto-close debt marker written into `RETROSPECTIVE.md`
+  and a guard that scans for it. The scan is plain text over the whole file with no
+  awareness of code fences, so a retrospective that *quotes* the marker with a real gate
+  number manufactures debt it must then reconcile. Observed, not reasoned: copying this
+  feature's directory, appending the marker literal inside a fenced block, and running the
+  guard returned `ok=False` with `autoclose_debt_unreconciled`. The population most likely
+  to write that literal is exactly the one documenting the feature that ships it — the
+  close, the migration note, the rule file's own example. The general rule: whenever a
+  scanner's input is an artifact humans write prose into, the token it looks for must be
+  either positionally constrained (first line of a named section), fence-aware, or
+  unreproducible by quotation. "No one would write that string by accident" is false for
+  precisely the readers who most need the feature explained.
+
+- [FEAT-2026-0070/G2-CLOSE] **Cost variance tracks how many distinct things a work unit
+  must prove, not whether its test file already exists.** Paired observation across one
+  feature's two gates. Gate 1 came in **53.5% under** plan and concluded that a WU
+  extending an existing guard test file is *cheaper*, not dearer, than the plan's premium
+  for "touches driver internals". Gate 2 priced all four of its WUs on that lesson — all
+  four extend existing test files — and came in **19.7% over**, with the deltas monotone in
+  acceptance-criterion count (7 ACs −38.5%, 10 ACs −16.9%, 12 ACs +46.1%, 13 ACs +37.4%).
+  The mechanism is legible without the statistics: the two overrunning WUs owed three named
+  control tests, a registration-order assertion, a documentation row bound by a contract
+  test, a tree-wide satisfiability re-probe, three degrade cases, and a truncation case —
+  each a separate deliverable with its own oracle. Estimate by counting the distinct
+  obligations and controls; treat "extends an existing test file" as a modifier on that
+  count, not as the variable. A calibration lesson drawn from one gate's uniform miss is a
+  hypothesis, and the next gate is its test — say so when promoting one.
+
+- [FEAT-2026-0070/G2-CLOSE] **An arm-time reprice silently invalidates the close's
+  as-drafted baseline whenever the resulting delta sits under the linter's threshold — a
+  noise threshold is also an audit blind spot.** The gate-2 arming record reconciled the WU
+  sum to `PLAN.md`'s `planned_cost_usd` at a delta of exactly $0.00. The operator then
+  accepted a scope question at arming, repriced one WU $2.00 → $2.50, and nothing
+  re-reconciled: plan-lint's cost-delta check warns above 10% and the drift was 1.5%. The
+  terminal close discovered it by re-summing the frontmatter rather than reading the arming
+  record. Two fixes, either sufficient: the arming step re-runs the sum and updates the
+  record it just invalidated, or the linter reports the delta informationally at any
+  magnitude and reserves the threshold for the WARN. Generally — when a check suppresses
+  small deltas to avoid noise, something else must still record them, or "reconciles
+  exactly" decays into "reconciled exactly, once, before the edits".
+
+- [FEAT-2026-0070/G2-CLOSE] **A marker-gated guard that reports zero across all history is
+  untested end-to-end by construction, and the close that ships it must not count its own
+  vacuous pass as evidence.** The narrowing that makes such a guard *satisfiable* — only
+  gates marked by the new writer count as debt — is the same property that makes it inert
+  on every artifact that exists, so its first real firing is necessarily in someone else's
+  future run. The terminal close of the feature that ships it will see the guard pass
+  against itself and must say plainly that the pass is vacuous: no marker existed, the
+  predecessor set was empty, the function short-circuited before evaluating anything. The
+  real evidence is the negative control, the positive control, the no-marker control, and —
+  cheapest of the missing pieces — one lifecycle test that lets the driver actually produce
+  the marker and then dispatches the close that must read it. Unit fixtures prove the
+  function; only a real sequence proves the guard. A green post-pass reported without that
+  distinction is the hollow pass the guards exist to catch, one level up.
