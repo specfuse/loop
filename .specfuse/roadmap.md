@@ -69,6 +69,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
+| FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | planned | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ detail](#feat-2026-0070) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -941,6 +942,22 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+
+
+<a id="feat-2026-0070"></a>
+## FEAT-2026-0070 — Terminal-flip contract: hedged-verdict acceptance, row-status breadth, auto-close debt
+
+**Why.** Three issues, one symptom: **a correctly-closed feature whose recorded state lies.** [#226](https://github.com/specfuse/loop/issues/226) — an `autonomy: auto` feature self-dispatches from a `planned` row, but `fire_terminal_flips` only handles `active -> done`, so the row never flips and the `roadmap_row_not_done` invariant escalates on a correct close. [#243](https://github.com/specfuse/loop/issues/243) — a close writing `verdict: met_locally` leaves every WU `done`, the gate `awaiting_review`, and PLAN + roadmap `active`, with no supported path to `done`; for some features `met_locally` is the ceiling by construction, not by accident, and `/wrap-feature` refuses them by hard rule. [#241](https://github.com/specfuse/loop/issues/241) — an auto-closed gate skips the per-criterion deferred-verification walk and nothing downstream is obliged to reconcile it. All three were observed on real closes in this repo.
+
+**Goal.** Gate 1 makes a correctly-closed feature reach `done` **through the driver** from every legitimate starting state: broaden the row flip to any non-`done` status (#226); add a driver-side primitive that re-evaluates a completed close WU's verdict and fires the flips when it now permits them; build `/accept-hedged-close` on that primitive so accepting a standing hedge leaves an auditable record instead of three hand-edits (#243); and land the pre-registered `lint_plan` verdict-exempt fix from `[FEAT-2026-0020/G1-CLOSE-INTERMEDIATE]`. Gate 2 makes an auto-closed gate's skipped ceremony a visible debt rather than a silent saving (#241), drafted by `plan-next` once the flip contract has settled.
+
+**Benefits.** Terminal state stops being hand-edited — which happened twice in one session on FEAT-2026-0069 and left no record of why. The `autonomy: auto` path stops escalating on correct closes. And the honest hedged verdict stops being a dead end, so a feature whose ceiling is `met_locally` by construction can ship without either overstating its verdict or lying on the roadmap.
+
+**The constraint that outranks everything else.** `[FEAT-2026-0023/G1-CLOSE]`: **terminal-state flips have exactly ONE driver-side owner, called identically by every close path** — issue #49 existed because two paths diverged. `/accept-hedged-close` must therefore call the driver primitive, never write the three surfaces itself. A WU that hand-writes a terminal surface has failed this feature even with every gate green, and both closes audit it explicitly.
+
+**Held at drafting, deliberately not built.** #243's candidate 2, a roadmap status between `active` and `done` (`done_hedged`): a new status value is a contract every downstream project, every skill, and `lint_plan`'s row parser reads, and `done` carrying an open-follow-up count gets most of the benefit without a new enum member. And #243's candidate 3, pre-declaring the `met_locally` ceiling at draft time: real value, but it is prevention rather than repair and does not help the features already in the dead end — the natural follow-up feature if gate 1 lands cleanly.
+
+**Status: planned.**
 
 ## Notes
 
