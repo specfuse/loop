@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0071/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/scaffold.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - init
   - upgrade_specfuse
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T11:44:01.906789+00:00
+duration_seconds: 279.917
+cost_usd: 0.839388
+input_tokens: 40
+output_tokens: 9439
 ---
 
 # Provision labels from init and upgrade, without letting them fail

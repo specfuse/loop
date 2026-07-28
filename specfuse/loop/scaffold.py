@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import _miniyaml
+from . import labels as _labels
 
 try:
     from importlib.resources.abc import Traversable  # Python 3.11+
@@ -107,6 +108,42 @@ def detect_modified(target: str | Path) -> list[str]:
         if on_disk.exists() and _sha256_hex(on_disk.read_bytes()) != expected:
             modified.append(rel)
     return sorted(modified)
+
+
+_NO_LABELS_ENV = "SPECFUSE_NO_LABELS"
+
+
+def _labels_disabled(no_labels: bool) -> bool:
+    """True if label provisioning should be skipped for this call.
+
+    Gated by an env var, not a CLI flag: the umbrella repo's cli.py already
+    calls init()/upgrade_specfuse(), so no coordinated umbrella release is
+    needed for this opt-out to take effect (FEAT-2026-0071/T03).
+    """
+    if no_labels:
+        return True
+    return bool(os.environ.get(_NO_LABELS_ENV))
+
+
+def _provision_labels_best_effort(target: str | Path) -> None:
+    """Call provision_labels, guaranteeing no exception escapes to the caller.
+
+    provision_labels() already degrades every failure mode it knows about
+    into a returned ProvisionReport rather than raising; this is the belt to
+    that braces, for whatever it doesn't know about. Outcomes are reported to
+    stderr, never folded into init()/upgrade_specfuse()'s returned path list.
+    """
+    try:
+        report = _labels.provision_labels(target)
+    except Exception as exc:  # noqa: BLE001 - must never fail init/upgrade
+        print(f"specfuse: label provisioning raised unexpectedly: {exc}", file=sys.stderr)
+        return
+    if report.created or report.failed:
+        print(
+            f"specfuse: label provisioning — created {report.created}, "
+            f"failed {report.failed}",
+            file=sys.stderr,
+        )
 
 
 class ScaffoldExistsError(Exception):
@@ -339,7 +376,7 @@ _VERSIONED_PRUNE_DIRS: tuple[str, ...] = ("templates", "rules", "docs")
 
 
 def upgrade_specfuse(
-    target: str | Path, *, ci_check: str | None = None
+    target: str | Path, *, ci_check: str | None = None, no_labels: bool = False
 ) -> list[str]:
     """Overlay versioned seed onto an existing .specfuse/ tree.
 
@@ -474,6 +511,9 @@ def upgrade_specfuse(
 
     _warn_unmanaged_legacy_dirs(specfuse_dir)
 
+    if not _labels_disabled(no_labels):
+        _provision_labels_best_effort(target_path)
+
     return sorted(written)
 
 
@@ -511,13 +551,17 @@ def _warn_unmanaged_legacy_dirs(specfuse_dir: Path) -> None:
     )
 
 
-def init(target: str | Path, *, ci_check: str | None = None) -> list[str]:
+def init(
+    target: str | Path, *, ci_check: str | None = None, no_labels: bool = False
+) -> list[str]:
     """Bootstrap a Specfuse-enabled repo: write .specfuse/ then wire .claude/.
 
     Returns the sorted list of .specfuse/ relpaths written (from init_specfuse).
     """
     written = init_specfuse(target, ci_check=ci_check)
     wire_claude(target)
+    if not _labels_disabled(no_labels):
+        _provision_labels_best_effort(target)
     return written
 
 
