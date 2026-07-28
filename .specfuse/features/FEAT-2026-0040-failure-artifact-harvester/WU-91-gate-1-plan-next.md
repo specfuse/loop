@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0040/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.6.0
+started_at: 2026-07-28T19:50:12.237471+00:00
+duration_seconds: 884.28
+cost_usd: 6.68748
+input_tokens: 103
+output_tokens: 66991
 ---
 
 # Draft gate 2 — the Azure adapters and the cron-dialect contract

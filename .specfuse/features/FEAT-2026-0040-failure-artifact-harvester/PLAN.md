@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0040-failure-artifact-harvester
 roadmap_goal: Turn a component's functional failures — dead-lettered messages, error logs, 5xx traces, missed timer runs, invariant violations — into deduplicated GitHub issues within a polling cycle, deterministically and without an LLM, so autonomy level 1 is live end to end.
 autonomy_default: review
 status: active
-planned_cost_usd: 25.00
+planned_cost_usd: 52.00
 ---
 
 # Plan: Failure-artifact harvester CLI
@@ -157,6 +157,13 @@ answer this section again when `plan-next` drafts it: tightening heartbeat-targe
 validation is a severity flip, and the migrate-before-contract ordering
 `[FEAT-2026-0069/G1-CLOSE-INTERMEDIATE]` established is mandatory there.
 
+**Answered for gate 2** by `G1-PLAN`, in `GATE-02.md`'s arming section: `dialect` is
+required only on a heartbeat target that *carries a `cron`*, so a correct tree — one
+where every cron-carrying target declares a conforming dialect, which T04's migrate
+step establishes before its contract step — reports **zero**. The predicate is
+satisfiable, and the migrate criterion is a sweep rather than a sample precisely so
+"zero on a correct input" is a fact rather than a hope.
+
 ## Task graph
 
 ```yaml
@@ -185,7 +192,32 @@ gates:
         depends_on: [FEAT-2026-0040/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []   # drafted by G1-PLAN: Azure adapters + the cron-dialect contract
+    work_units:
+      - id: FEAT-2026-0040/T04
+        file: WU-04-cron-dialect-contract.md
+        depends_on: []
+      - id: FEAT-2026-0040/T05
+        file: WU-05-service-bus-dlq-peek-adapter.md
+        depends_on: []
+      - id: FEAT-2026-0040/T06
+        file: WU-06-app-insights-telemetry-adapters.md
+        depends_on: []
+      - id: FEAT-2026-0040/T07
+        file: WU-07-heartbeat-adapter-declared-dialect.md
+        depends_on:
+          - FEAT-2026-0040/T04
+          - FEAT-2026-0040/T06
+      # --- closing sequence: non-terminal gate ---
+      - id: FEAT-2026-0040/G2-CLOSE-INTERMEDIATE
+        file: WU-90-gate-2-close-intermediate.md
+        depends_on:
+          - FEAT-2026-0040/T04
+          - FEAT-2026-0040/T05
+          - FEAT-2026-0040/T06
+          - FEAT-2026-0040/T07
+      - id: FEAT-2026-0040/G2-PLAN
+        file: WU-91-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
@@ -201,9 +233,11 @@ and redaction are separate properties of the same artifact.
 
 ## Notes
 
-- `planned_cost_usd` covers the **drafted** work only — gate 1's five units plus
-  gate 3's close placeholder. Gates 2 and 3 add theirs when `plan-next` drafts them,
-  and the figure is re-baselined then.
+- `planned_cost_usd` covers the **drafted** work only. Re-baselined by `G1-PLAN` from
+  $25.00 (gate 1's five units plus gate 3's close placeholder) to **$52.00**, adding
+  gate 2's six drafted units at $27.00. Gate 3's substantive units add theirs when
+  `G2-PLAN` drafts them, and the figure is re-baselined again. The delta and its
+  reasoning are in `GATE-02-REVIEW.md`.
 - This repo cannot be the oracle for the adapters. `verification.yml` records that
   it "is a CLI tool with no deployable components and will never carry a real
   monitoring.yml." Proving the Service Bus and App Insights adapters needs an
