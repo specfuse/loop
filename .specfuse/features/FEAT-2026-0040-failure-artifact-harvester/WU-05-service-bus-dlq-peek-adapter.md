@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -12,6 +12,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T21:56:41.687522+00:00
+duration_seconds: 665.682
+cost_usd: 1.527229
+input_tokens: 60
+output_tokens: 18656
 ---
 
 # Peek the dead-letter queue — the Service Bus broker adapter
