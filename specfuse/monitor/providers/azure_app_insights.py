@@ -28,11 +28,13 @@ folded back into a subsequent query; that is the direction
 from __future__ import annotations
 
 import re
-from typing import Iterable, Iterator, Mapping, Protocol
+from datetime import datetime
+from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.artifact import FailureArtifact
 from specfuse.monitor.redaction import redact_artifact
+from specfuse.monitor.schedule import most_recent_firing
 
 _GUID_RE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
@@ -189,6 +191,106 @@ class InvariantAdapter:
             failure_signature=signature,
             observed_text=str(dict(row)),
             target_coordinates=None,
+        )
+        return redact_artifact(artifact)
+
+
+def _heartbeat_query(component: str) -> str:
+    """Built only from *component*, an operator-configured name — never from
+    a telemetry query's returned rows. Groups the component's heartbeat
+    signal by schedule name, since one component may carry several
+    heartbeat targets (T04's `acme-functions-host` shape)."""
+    return (
+        "customEvents "
+        f"| where cloud_RoleName == '{component}' and name == 'ScheduleHeartbeat' "
+        "| summarize last_heartbeat = max(timestamp) by "
+        "name = tostring(customDimensions.scheduleName)"
+    )
+
+
+def _parse_heartbeat_timestamp(value: object) -> Optional[datetime]:
+    if not value:
+        return None
+    text = str(value)
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    return datetime.fromisoformat(text)
+
+
+class HeartbeatAdapter:
+    """``TelemetryAdapter`` for the ``heartbeat`` check type
+    (FEAT-2026-0040/T07).
+
+    Unlike the three adapters above, a silent schedule is not a row a query
+    returns — it is the *absence* of one. This adapter computes, per
+    configured target, the most recent time its declared cron expression
+    under its declared dialect (``specfuse.monitor.schedule``, reading T04's
+    dialect rather than inferring it) was expected to fire, and compares
+    that against the target's last observed heartbeat row. A target that
+    reported in at or after its most recent expected firing yields nothing;
+    only a target that has gone silent yields a `FailureArtifact`, built
+    through `FailureArtifact.from_target` so its `name` round-trips into
+    `target_coordinates` and keeps distinct silent schedules on one
+    component individually fingerprinted (T02).
+    """
+
+    def __init__(
+        self,
+        *,
+        component: str,
+        environment: Mapping[str, object],
+        transport: AppInsightsTransport,
+        targets: Sequence[Mapping[str, str]],
+        reference_time: datetime,
+    ) -> None:
+        self._component = component
+        self._telemetry = resolve_telemetry(component, environment)
+        self._transport = transport
+        self._targets = targets
+        self._reference_time = reference_time
+
+    def fetch_failures(self) -> Iterator[FailureArtifact]:
+        query = _heartbeat_query(self._component)
+        rows = self._transport.run_query(query)
+        last_seen: dict[str, datetime] = {}
+        for row in rows:
+            name = row.get("name")
+            observed = _parse_heartbeat_timestamp(row.get("last_heartbeat"))
+            if name and observed is not None:
+                last_seen[str(name)] = observed
+
+        for target in self._targets:
+            name = target["name"]
+            cron = target.get("cron")
+            dialect = target.get("dialect")
+            if not cron or not dialect:
+                # A cron-less heartbeat target is valid per T04; there is
+                # nothing to evaluate a firing expectation against.
+                continue
+            timezone_name = target.get("timezone", "Etc/UTC")
+            expected = most_recent_firing(
+                cron, dialect, timezone_name, self._reference_time
+            )
+            observed = last_seen.get(name)
+            if observed is not None and observed >= expected:
+                continue
+            yield self._build_artifact(name, expected, observed)
+
+    def _build_artifact(
+        self, name: str, expected: datetime, observed: Optional[datetime]
+    ) -> FailureArtifact:
+        observed_text = (
+            f"schedule '{name}' expected to fire at or before "
+            f"{expected.isoformat()}, last observed heartbeat "
+            f"{observed.isoformat() if observed is not None else 'never'}"
+        )
+        artifact = FailureArtifact.from_target(
+            component=self._component,
+            check_type="heartbeat",
+            target={"name": name},
+            failure_class="silent-schedule",
+            failure_signature=f"heartbeat:{name}",
+            observed_text=observed_text,
         )
         return redact_artifact(artifact)
 

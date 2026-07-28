@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -13,6 +13,12 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T22:16:30.973038+00:00
+duration_seconds: 1111.82
+cost_usd: 4.368643
+input_tokens: 124
+output_tokens: 58389
 ---
 
 # Did it fire? — the heartbeat adapter, against a declared dialect
