@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0040/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/monitor/fingerprint.py
   - tests/test_fingerprint.py
 produces_driver_helper:
   - fingerprint_artifact
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T19:39:31.744945+00:00
+duration_seconds: 412.084
+cost_usd: 0.845956
+input_tokens: 36
+output_tokens: 10404
 ---
 
 # Fingerprint an artifact on its target's coordinates, not only its component
