@@ -55,7 +55,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
 | FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
-| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | planned | — | [→ detail](#feat-2026-0040) |
+| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | active | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ detail](#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
@@ -779,7 +779,7 @@ machine-checkable contract rather than prose.
 
 **Two open schema questions this feature will be first to feel**, neither blocking: [#262](https://github.com/specfuse/loop/issues/262) — telemetry binds per environment, so components in one environment cannot resolve to different telemetry instances; and the cron-dialect ambiguity 0069's real-repo run surfaced — `cron` is opaque to the schema, and a heartbeat check computing "should this have fired?" cannot tell a 5-field expression from a 6-field one. Decide both when the adapter interface forces the question, not before.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0041"></a>
 ## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
