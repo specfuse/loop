@@ -12,13 +12,34 @@ Tests cover each branch of the auto_sync decision tree:
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
 from specfuse.loop.loop import auto_sync
+
+
+@contextmanager
+def _chdir(target: Path):
+    """Run with cwd == the target auto_sync is pointed at.
+
+    Without this, these tests point auto_sync at a temp dir while cwd stays in
+    the real repository — and auto_sync's persistence step operates on cwd, so
+    it committed *this* repo. That produced three real commits before #290
+    guarded against it. The guard makes the mismatch harmless; chdir'ing makes
+    the tests stop creating it in the first place, which is what a test pointed
+    at a temp tree should have done from the start.
+    """
+    previous = os.getcwd()
+    os.chdir(target)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
 
 
 class TestAutoSyncCreatesMissing(unittest.TestCase):
@@ -28,14 +49,16 @@ class TestAutoSyncCreatesMissing(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             target = Path(d)
             with patch("specfuse.loop.loop._scaffold.init") as mock_init:
-                auto_sync(target)
+                with _chdir(target):
+                    auto_sync(target)
             mock_init.assert_called_once_with(target)
 
     def test_autosync_creates_dry_run_no_write(self):
         with tempfile.TemporaryDirectory() as d:
             target = Path(d)
             with patch("specfuse.loop.loop._scaffold.init") as mock_init:
-                auto_sync(target, dry_run=True)
+                with _chdir(target):
+                    auto_sync(target, dry_run=True)
             mock_init.assert_not_called()
             self.assertFalse((target / ".specfuse").exists())
 
@@ -57,7 +80,8 @@ class TestAutoSyncRefusesNewer(unittest.TestCase):
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
                     with patch("specfuse.loop.loop._scaffold.init") as mock_init:
-                        auto_sync(target)
+                        with _chdir(target):
+                            auto_sync(target)
             mock_upgrade.assert_not_called()
             mock_init.assert_not_called()
         finally:
@@ -68,7 +92,8 @@ class TestAutoSyncRefusesNewer(unittest.TestCase):
         try:
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("sys.stderr") as mock_err:
-                    auto_sync(target)
+                    with _chdir(target):
+                        auto_sync(target)
                 written = "".join(str(c) for c in mock_err.write.call_args_list)
                 self.assertIn("99.0.0", written)
         finally:
@@ -92,7 +117,8 @@ class TestAutoSyncOlderClean(unittest.TestCase):
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("specfuse.loop.loop._scaffold.detect_modified", return_value=[]):
                     with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
-                        auto_sync(target)
+                        with _chdir(target):
+                            auto_sync(target)
             mock_upgrade.assert_called_once_with(target)
         finally:
             shutil.rmtree(tmpdir)
@@ -103,7 +129,8 @@ class TestAutoSyncOlderClean(unittest.TestCase):
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("specfuse.loop.loop._scaffold.detect_modified", return_value=[]):
                     with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
-                        auto_sync(target, dry_run=True)
+                        with _chdir(target):
+                            auto_sync(target, dry_run=True)
             mock_upgrade.assert_not_called()
         finally:
             shutil.rmtree(tmpdir)
@@ -137,7 +164,8 @@ class TestAutoSyncOlderModified(unittest.TestCase):
                         # (covered in test_autosync_consent.py). Without pinning
                         # isatty, a TTY-attached gate runner hits real input() and hangs.
                         with patch("sys.stdin.isatty", return_value=False):
-                            auto_sync(target)
+                            with _chdir(target):
+                                auto_sync(target)
 
             self.assertEqual(modified_file.read_bytes(), user_content)
 
@@ -155,7 +183,8 @@ class TestAutoSyncOlderModified(unittest.TestCase):
                 ):
                     with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
                         with patch("sys.stdin.isatty", return_value=False):
-                            auto_sync(target, dry_run=True)
+                            with _chdir(target):
+                                auto_sync(target, dry_run=True)
 
             mock_upgrade.assert_not_called()
 
@@ -174,7 +203,8 @@ class TestAutoSyncEqual(unittest.TestCase):
                 with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
                     with patch("specfuse.loop.loop._scaffold.init") as mock_init:
                         with patch("specfuse.loop.loop._scaffold.detect_modified") as mock_detect:
-                            auto_sync(target)
+                            with _chdir(target):
+                                auto_sync(target)
 
             mock_upgrade.assert_not_called()
             mock_init.assert_not_called()
@@ -190,7 +220,8 @@ class TestAutoSyncEqual(unittest.TestCase):
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
                     with patch("specfuse.loop.loop._scaffold.init") as mock_init:
-                        auto_sync(target, dry_run=True)
+                        with _chdir(target):
+                            auto_sync(target, dry_run=True)
 
             mock_upgrade.assert_not_called()
             mock_init.assert_not_called()
