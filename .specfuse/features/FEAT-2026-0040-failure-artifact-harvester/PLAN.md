@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0040-failure-artifact-harvester
 roadmap_goal: Turn a component's functional failures — dead-lettered messages, error logs, 5xx traces, missed timer runs, invariant violations — into deduplicated GitHub issues within a polling cycle, deterministically and without an LLM, so autonomy level 1 is live end to end.
 autonomy_default: review
 status: active
-planned_cost_usd: 52.00
+planned_cost_usd: 70.00
 ---
 
 # Plan: Failure-artifact harvester CLI
@@ -221,11 +221,28 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Pre-declared so lint reads gate 3 as terminal and gate 1 as non-terminal.
-      # G2's plan-next inserts gate 3's substantive WUs before this entry.
+      - id: FEAT-2026-0040/T08
+        file: WU-08-queue-stalled-broker-adapter.md
+        depends_on: []
+      - id: FEAT-2026-0040/T09
+        file: WU-09-fingerprint-keyed-issue-lifecycle.md
+        depends_on: []
+      - id: FEAT-2026-0040/T10
+        file: WU-10-specfuse-monitor-run-cli.md
+        depends_on:
+          - FEAT-2026-0040/T08
+          - FEAT-2026-0040/T09
+      - id: FEAT-2026-0040/T11
+        file: WU-11-runner-surfaces-local-and-actions.md
+        depends_on: [FEAT-2026-0040/T10]
+      # --- closing sequence: terminal gate ---
       - id: FEAT-2026-0040/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0040/T08
+          - FEAT-2026-0040/T09
+          - FEAT-2026-0040/T10
+          - FEAT-2026-0040/T11
 ```
 
 T02 and T03 both depend only on T01 and are independent of each other: fingerprints
@@ -235,9 +252,11 @@ and redaction are separate properties of the same artifact.
 
 - `planned_cost_usd` covers the **drafted** work only. Re-baselined by `G1-PLAN` from
   $25.00 (gate 1's five units plus gate 3's close placeholder) to **$52.00**, adding
-  gate 2's six drafted units at $27.00. Gate 3's substantive units add theirs when
-  `G2-PLAN` drafts them, and the figure is re-baselined again. The delta and its
-  reasoning are in `GATE-02-REVIEW.md`.
+  gate 2's six drafted units at $27.00; re-baselined again by `G2-PLAN` to **$70.00**,
+  adding gate 3's four substantive units at $18.00 (`T08` $4.00, `T09` $5.00,
+  `T10` $5.00, `T11` $4.00 — `G3-CLOSE`'s $5.00 was already in the $52.00 figure).
+  Every gate is now drafted, so this figure does not rise again. The delta and its
+  reasoning are in `GATE-03-REVIEW.md` §5.
 - This repo cannot be the oracle for the adapters. `verification.yml` records that
   it "is a CLI tool with no deployable components and will never carry a real
   monitoring.yml." Proving the Service Bus and App Insights adapters needs an

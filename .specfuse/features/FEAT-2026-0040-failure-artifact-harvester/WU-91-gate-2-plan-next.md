@@ -1,13 +1,19 @@
 ---
 id: FEAT-2026-0040/G2-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 model: opus
 effort: high
 gate_set: plannext
+driver_version: 0.6.0
+started_at: 2026-07-28T22:52:27.401063+00:00
+duration_seconds: 749.856
+cost_usd: 5.34375
+input_tokens: 3013
+output_tokens: 57716
 ---
 
 # Draft gate 3 — the issue lifecycle, the CLI, and the runner surfaces
