@@ -2233,3 +2233,40 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   N, flag cause C", require the close to state whether C actually explains the observation and
   to name the alternative if it does not. Thresholds are good at detecting; they are not
   evidence about why.
+
+- [FEAT-2026-0071/G1-CLOSE] **An entry point that acquires its first subprocess or network
+  call has made a consumer-visible contract change, even when its signature and return
+  value are untouched.** `scaffold.init()` and `upgrade_specfuse()` were pure filesystem —
+  that is why they worked offline, in CI containers, against non-GitHub remotes, and in
+  directories that were not git repositories. Adding best-effort label provisioning kept the
+  return type identical and could never fail the command, so the diff reads as purely
+  additive; but consumers inherit new latency, new stderr, and outbound network calls in
+  environments where "filesystem only" may have been an audited property. Rule: when a WU
+  puts the first shell-out on a previously pure path, the close enumerates it as the
+  headline contract change and the plan ships an opt-out in the same gate — never-fatal is
+  a mitigation, not a reason to omit it from the list. Corollary observed here: because the
+  wiring uses the real default runner, the pre-existing regression suites silently become
+  live-binary probes, so budget for what a real invocation does in a test tmpdir.
+
+- [FEAT-2026-0071/G1-CLOSE] **A registry that imports its vocabulary from consumer modules
+  guards the names and nothing else — say so, or the drift test reads as broader than it
+  is.** The label registry took its seven names from `escalation.py` and `gh_features.py`
+  rather than retyping them, and a coverage test recomputes the set at test time, so a name
+  added to a consumer without a registry entry fails. That is genuinely structural. But the
+  colours and descriptions beside each name remain hand-kept literals with no upstream
+  owner, and no test can detect them drifting from what the operator actually wants. Rule:
+  when a WU claims a registry "cannot drift", the close states which fields the guard
+  covers and which are unguarded by construction. A partial structural guard described as a
+  total one is how the unguarded fields stop being reviewed.
+
+- [FEAT-2026-0071/G1-CLOSE] **When a plan's scope boundary rejects an interface the roadmap
+  already promised, correct the roadmap at the decision, not at the close.** The roadmap
+  detail section said "`--no-labels` opts out" while `PLAN.md`, written for the same
+  feature, had ruled a CLI flag out of scope in favour of an environment variable — because
+  the flag lives in a different repository and would need a coordinated release. The two
+  documents disagreed from day one and shipped that way; the close had to carry the
+  mismatch as a deferral entry. The roadmap is the surface a consumer reads to learn what
+  exists. Rule: a scope decision that changes the shipped interface is a roadmap edit in the
+  planning WU that makes it, and any close that finds roadmap prose describing an interface
+  that was never built records it under `## What the loop did NOT verify` rather than
+  quietly rewriting it as though it had always matched.
