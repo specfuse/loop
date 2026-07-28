@@ -1223,14 +1223,59 @@ def _scaffold_managed_dirty() -> set[str]:
     return {p for p in _tracked_dirty_paths() if _is_scaffold_managed(p)}
 
 
-def _persist_scaffold_sync(installed: str) -> None:
+def _target_is_cwd_repo(target: Path) -> bool:
+    """True when *target* is inside the same git repo the process is cwd'd into.
+
+    `_scaffold_managed_dirty()` and `commit_bookkeeping` both operate on the
+    CURRENT WORKING DIRECTORY — neither takes a target. `auto_sync`, by
+    contrast, operates on whatever `repo` it was handed. When those agree
+    (the driver's real shape) nothing is wrong. When they diverge, the
+    persistence step commits a repository nobody pointed it at (#290).
+
+    That is not hypothetical: `tests/test_autosync.py` passes a temp dir as the
+    target without chdir'ing into it, and produced three real commits in this
+    repo's history — each sweeping a deliberate release-time edit to
+    `.specfuse/VERSION` into a `chore(loop): sync scaffold to 0.2.0` commit
+    (0.2.0 being the value those tests patch `scaffold_version` to return).
+
+    Compared by git toplevel rather than path equality so a subdirectory of the
+    cwd repo still counts as the same repository.
+    """
+    def _toplevel(cwd: Path | None) -> str | None:
+        try:
+            return subprocess.run(
+                ["git", "rev-parse", "--show-toplevel"],
+                capture_output=True, text=True, check=True,
+                cwd=str(cwd) if cwd else None,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, OSError):
+            return None
+
+    here = _toplevel(None)
+    there = _toplevel(target if target.is_dir() else None)
+    return here is not None and here == there
+
+
+def _persist_scaffold_sync(installed: str, target: Path | None = None) -> None:
     """After auto_sync overlays a newer scaffold, keep the tree clean for the
     rest of the run. On a non-default branch, commit the scaffold-managed
     changes (`chore(loop): sync scaffold to X.Y.Z`). On the DEFAULT branch, leave
     them and print guidance — committing scaffold churn onto the default branch
     is undesirable; --prepare (or the next ensure_feature_branch) carries them
     onto the feature branch and folds them into its scaffold commit instead.
+
+    Refuses entirely when *target* is not the cwd repository (#290): the commit
+    would land somewhere nobody asked for. Leaving the overlay uncommitted is
+    always recoverable; committing into the wrong repository is not.
     """
+    if target is not None and not _target_is_cwd_repo(target):
+        print(
+            f"auto_sync: scaffold upgraded to {installed} in {target}, but that "
+            f"is not the current working directory's repository — leaving the "
+            f"overlay uncommitted rather than committing into the wrong repo.",
+            file=sys.stderr,
+        )
+        return
     dirty = _scaffold_managed_dirty()
     if not dirty:
         return
@@ -5816,7 +5861,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
-        _persist_scaffold_sync(installed)
+        _persist_scaffold_sync(installed, target)
         return
 
     # Older with modified files.
@@ -5875,7 +5920,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
-        _persist_scaffold_sync(installed)
+        _persist_scaffold_sync(installed, target)
     else:
         # Non-interactive (CI / claude -p): skip modified files + warn; never block.
         print(
@@ -5912,7 +5957,7 @@ def auto_sync(
                 f"WARNING: auto_sync: plugin config drift corrected: {', '.join(changes)}",
                 file=sys.stderr,
             )
-        _persist_scaffold_sync(installed)
+        _persist_scaffold_sync(installed, target)
 
 
 def _force_utf8_console() -> None:
