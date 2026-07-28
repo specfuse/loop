@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0040/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.6.0
+started_at: 2026-07-28T22:35:02.897646+00:00
+duration_seconds: 1044.359
+cost_usd: 7.013639
+input_tokens: 116
+output_tokens: 55894
 ---
 
 # Close gate 2 — retrospective, lessons, docs, and an honest deferred list

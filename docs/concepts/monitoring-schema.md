@@ -171,6 +171,15 @@ expression means the expression was dropped, not that the dialect means
 nothing. A `heartbeat` target with only `name` stays valid and needs no
 `dialect`; `cron` remains optional.
 
+Both rules key off whether `cron` holds a **value**, not whether the key is
+present, so an empty `cron: ""` beside a `dialect` reports the
+*dialect-declared-without-cron* finding rather than an empty-expression one —
+an empty string is read as a dropped expression, which is the same author
+mistake. A whitespace-only `cron` does carry a value and is reported against
+its arity instead (`'cron' expression has 0 field(s), dialect 'standard-5'
+requires 5`). Field *count* is all that is checked: extra spaces between
+fields, and leading or trailing whitespace, are not findings.
+
 **`targets` is required on `dlq`.** A `dlq` check with no `targets` key is a
 validator finding. This tightened in this repo's FEAT-2026-0069 gate 1: the
 field was introduced permissive, every shipped surface was migrated to carry it,
