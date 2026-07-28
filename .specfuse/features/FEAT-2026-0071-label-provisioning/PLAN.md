@@ -5,7 +5,7 @@ slug: label-provisioning
 branch: feat/FEAT-2026-0071-label-provisioning
 roadmap_goal: Declare every GitHub label specfuse reads in one registry, and create the missing ones during init and upgrade on a best-effort basis that can never fail the command — so the escalation queue and feature discovery work on a fresh repo without a manual setup checklist.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 14.50
 ---
 

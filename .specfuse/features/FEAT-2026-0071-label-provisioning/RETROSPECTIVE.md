@@ -314,3 +314,54 @@ written back to it at decision time, not at close time.
   above, and specifically entry 1 — `init` and `upgrade` now make outbound network
   calls — needs explicit human acknowledgment at the gate's `awaiting_review`
   checkpoint before the verdict moves off `met_locally`.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator reason (verbatim):** the real gh runs proved the create and skip paths
+
+**Recorded:** 2026-07-28T13:41:59Z
+
+Accepting a hedge means shipping with known-open items, not pretending they are
+done. All four follow-ups from `## What the loop did NOT verify` are carried
+forward below verbatim. Entries 1 and 2 carry the post-close evidence the
+operator's reason refers to; entries 3 and 4 ship open, explicitly acknowledged.
+
+### Carried forward — 1 and 2, with discharging evidence
+
+**1. The real `gh label create` invocation.** Carried forward verbatim from the
+follow-up record. **Post-close evidence:** `provision_labels('.')` run against
+this repository returned
+`created=['specfuse:feature'], already_present=[the six escalation labels], failed=[], skipped=False`.
+`gh label list` confirms `specfuse:feature` present with colour `1d76db` and
+its registry description. The argument vector
+`["gh", "label", "create", name, "--color", colour, "--description", description]`
+has now been accepted by `gh` itself, which is the stated upgrade condition.
+
+**2. The successful real `gh label list` path, including its JSON parse.**
+Carried forward verbatim. **Post-close evidence:** a second consecutive real run
+returned `created=[], already_present=[all seven], failed=[], skipped=False`.
+The stated upgrade condition was "two consecutive real runs, the second producing
+zero creates" — observed exactly.
+
+### Carried forward — 3 and 4, OPEN
+
+**3. The unauthenticated-`gh` degradation path.** Open. No real unauthenticated
+`gh` stderr has been observed. The record's own note stands: the implementation
+does not distinguish "unauthenticated" from "not a GitHub remote" from "list
+failed" — all three collapse into `skipped=True` with `gh`'s stderr copied into
+`reason` — so T02 criterion 9's wording implies a discrimination the code does
+not make. *Re-run condition, verbatim:* `GH_TOKEN= gh auth logout` followed by a
+real provisioning run inside a git repository with a GitHub remote; observe
+`skipped=True` and a `reason` naming the auth failure, with exit status still
+zero from the enclosing `init`/`upgrade`.
+
+**4. The opt-out as a consumer actually reaches it.** Open as a behavioural
+matter, discharged as a documentation one. No `--no-labels` flag exists on the
+`specfuse` CLI; the CLI lives in the umbrella repository and the flag was out of
+scope by design. The roadmap line wrongly claiming it existed was corrected by
+this close. *Re-run condition, verbatim:* a future umbrella release adding
+`specfuse init --no-labels` that sets the same environment variable.
+
+Neither 3 nor 4 is discharged by this acceptance.
