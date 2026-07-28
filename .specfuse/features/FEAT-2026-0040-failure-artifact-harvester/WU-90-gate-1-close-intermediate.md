@@ -1,10 +1,12 @@
 ---
 id: FEAT-2026-0040/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 4.50
 oracle_env: macos_local
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Close gate 1 — retrospective, lessons, docs
