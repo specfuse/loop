@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0040/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/monitor/redaction.py
   - tests/test_artifact_redaction.py
 produces_driver_helper:
   - redact_artifact
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T19:46:23.943831+00:00
+duration_seconds: 228.185
+cost_usd: 0.654674
+input_tokens: 34
+output_tokens: 8423
 ---
 
 # Redact artifact text at the boundary, before anything can leave the process
