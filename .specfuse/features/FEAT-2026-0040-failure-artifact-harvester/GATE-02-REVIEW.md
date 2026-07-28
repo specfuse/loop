@@ -166,13 +166,79 @@ prediction nobody wrote down teaches nothing.
 
 ### 4.3 Probe findings — **paste the verbatim failure list here before arming**
 
-```
-<PASTE PASS 1 OUTPUT — the exact failure list, verbatim>
-```
+**Baseline first** (probe NOT applied), so every line below is attributable:
 
 ```
-<PASTE PASS 2 OUTPUT — the exact failure list, verbatim>
+Ran 1695 tests in 60.223s
+OK (skipped=3)
+OK — monitoring config is structurally valid (or absent).
 ```
+
+**PASS 1 — validator tightened, tree UNMIGRATED.**
+
+```
+$ python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml.example
+FAIL — 2 finding(s):
+  - component 'acme-functions-host': checks[1]: targets[0]: heartbeat target with 'cron' must carry 'dialect'
+  - component 'acme-functions-host': checks[1]: targets[1]: heartbeat target with 'cron' must carry 'dialect'
+
+$ python3 -m unittest discover -s tests -v
+FAIL: test_heartbeat_target_cron_and_timezone_contents_are_opaque   tests/test_lint_monitoring.py
+FAIL: test_heartbeat_target_missing_name_is_rejected                tests/test_lint_monitoring.py
+FAIL: test_shipped_example_validates_clean                          tests/test_monitoring_example.py
+FAIL: test_single_deployable_with_n_triggers_yields_one_component_with_n_targets
+                                                                    tests/test_derive_monitoring_discovery.py
+FAIL: test_shim_resolves_package_from_source_outside_repo           tests/test_monitoring_seed.py
+FAILED (failures=5, skipped=3)
+```
+
+**PASS 2 — both example copies migrated (`dialect: standard-5`; both crons are 5-field).**
+
+```
+$ python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml.example
+OK — monitoring config is structurally valid (or absent).
+
+$ python3 -m unittest discover -s tests -v
+FAIL: test_heartbeat_target_cron_and_timezone_contents_are_opaque   tests/test_lint_monitoring.py
+FAIL: test_heartbeat_target_missing_name_is_rejected                tests/test_lint_monitoring.py
+FAIL: test_single_deployable_with_n_triggers_yields_one_component_with_n_targets
+                                                                    tests/test_derive_monitoring_discovery.py
+FAILED (failures=3, skipped=3)
+```
+
+**Revert confirmed:** tree clean, `1695 tests OK (skipped=3)`, monitoring lint green.
+
+### 4.4 The prediction was falsified in three ways — read before arming `T04`
+
+§4.2 was written so the run could falsify it. It did.
+
+1. **`test_monitoring_fenced_blocks` was predicted red and stayed green.** Harmless, but
+   it means the predicted set was reasoned about rather than observed.
+2. **`tests/test_monitoring_seed.py::test_shim_resolves_package_from_source_outside_repo`
+   was not predicted and went red in pass 1.** It clears once the example is migrated, so
+   it is migration-surface, not residual — but a session working only from §4.2 would have
+   met an unexpected failure.
+3. **The migration surface is two files, not one — and this is the finding that matters.**
+   Migrating `.specfuse/monitoring.yml.example` alone leaves
+   `test_package_data_matches_canonical` red, because the example ships **twice**:
+   `.specfuse/monitoring.yml.example` and `specfuse/loop/data/monitoring.yml.example`,
+   held byte-identical by the scaffold-sync guard. `T04`'s migrate step must touch both,
+   and its sweep criterion must be written so migrating one and not the other fails.
+   `[FEAT-2026-0069/G1-CLOSE-INTERMEDIATE]` lost $5.26 to exactly this shape — a migrate
+   criterion scoped to a sample where the flip needed a sweep.
+
+**The cascade is bounded to four test files**, as §4.2 predicted in count — but the set
+differs by one in each direction, and the two-copy migration surface was invisible to
+static inspection. `T04`'s enumerated surface is the pass-2 residual: two contradicting
+assertions in `tests/test_lint_monitoring.py` and one exact-set assertion in
+`tests/test_derive_monitoring_discovery.py`, plus the `suggest_checks` reference
+implementation that must emit `dialect`.
+
+**Probe environment note.** Run unsandboxed. Under the command sandbox, three tests in
+`tests/test_autosync_no_cwd_leak.py` error with `Couldn't get agent socket?` — the temp
+repos inherit a global commit-signing config whose agent the sandbox blocks. Nothing to
+do with this gate, but it contaminates a sandboxed baseline and is worth a follow-up so
+those tests set `commit.gpgsign=false` on their fixtures.
 
 **This gate is not armed until the two blocks above are filled.** The pasted list
 becomes `T04`'s enumerated test surface, and `T04`'s escalation triggers reference it by
@@ -254,6 +320,28 @@ the operator's call at arming, not this document's.
    but nothing in this repo will ever upgrade it, so if no operator run is planned, the
    feature's terminal verdict is `met_locally` and should be expected as such rather
    than discovered at gate 3's close.
+
+---
+
+### 6.1 Operator decisions — recorded at arming
+
+All four answered "yes to all", i.e. accept the recommendation on 1 and 3, affirm 2 and 4.
+
+1. **Adapter estimates stay at $4.00.** Not trimmed on gate 1's 72% under-run. A budget
+   is a halt threshold, not a spend target, and under-running costs nothing while a
+   budget halt lands mid-gate.
+2. **`standard-5` and `seconds-first-6` are confirmed** as the enum spellings. Locked
+   before `T04` is armed — renaming after ship is a second breaking change to the same
+   field.
+3. **`queue-stalled` gets its adapter in gate 3**, drafted by `G2-PLAN` alongside the
+   CLI. Gate 2 stays the adapter-shape gate. Recorded now so it does not read as an
+   oversight at gate 3's drafting.
+4. **An operator run against the downstream .NET backend IS planned.** This changes what
+   the feature's terminal verdict may claim: gate 3's close is no longer `met_locally` by
+   construction. It may reach `met` once that run is observed and recorded. Gate 2's
+   close must still report its adapters as stub-verified — the run has not happened yet —
+   but `G3-CLOSE` should carry the run as the named condition that upgrades the verdict,
+   not as a permanent deferral.
 
 ---
 

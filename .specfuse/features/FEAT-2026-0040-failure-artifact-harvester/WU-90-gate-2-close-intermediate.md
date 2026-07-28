@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0040/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 4.50
 oracle_env: macos_local

@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0040/G2-PLAN
 type: plan-next
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 oracle_env: macos_local
@@ -58,6 +58,14 @@ actually contains. Two things it must gain: an instruction to reconcile the
 `## What the loop did NOT verify` — `assert_autoclose_debt_reconciled` matches that
 string — and an accurate `depends_on` list once gate 3's substantive units exist.
 
+**`queue-stalled` gets its adapter in gate 3 — an operator decision taken at gate 2's
+arming, recorded in `GATE-02-REVIEW.md` §6.1.** Gate 2 was kept as the adapter-*shape*
+gate, so the check type 0069 added for a wedged consumer was deliberately left out of
+`T05`. It is not an oversight and must not be rediscovered as one. It reads a **broker**
+coordinate — queue depth and age-of-oldest — not a telemetry one, so it extends `T05`'s
+`BrokerAdapter` rather than the telemetry adapters, and the threshold's units are
+currently opaque in the schema. Draft it here, alongside the CLI.
+
 **Acceptance criteria.**
 
 1. `GATE-03-REVIEW.md` exists in the feature directory and is non-empty. The filename
@@ -71,6 +79,11 @@ string — and an accurate `depends_on` list once gate 3's substantive units exi
    weakness and how the WU addresses it.
 5. A drafted WU covers the `specfuse-monitor run` CLI, and one covers the local and
    GitHub Actions runner surfaces.
+5a. A drafted WU covers the `queue-stalled` adapter, extending `T05`'s
+   `BrokerAdapter` rather than the telemetry adapters, per the operator decision
+   recorded in `GATE-02-REVIEW.md` §6.1. Its body states that the check reads broker
+   coordinates (queue depth, age-of-oldest) and names the threshold-units gap in the
+   schema as something to settle or explicitly defer — not to leave implicit.
 6. Each drafted WU whose verification depends on the real `gh` surface is explicitly
    marked as producing no in-loop evidence, with either an operator-journal proxy or a
    stubbed-runner scope plus a named deferred criterion.
