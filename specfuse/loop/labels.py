@@ -1,0 +1,159 @@
+# Copyright 2026 Specfuse Contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""Single registry of every GitHub label this package reads.
+
+Each entry names the label, its provisioning colour/description, and the
+consumer that reads it. Names are imported from the modules that own the
+vocabulary (``escalation.py``, ``gh_features.py``) rather than retyped here,
+so the registry cannot drift from what those consumers actually query.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable, Optional
+
+from specfuse.loop import escalation, gh_features
+
+
+@dataclass(frozen=True)
+class LabelSpec:
+    name: str
+    colour: str
+    description: str
+    consumer: str
+
+
+LABEL_REGISTRY: tuple[LabelSpec, ...] = (
+    LabelSpec(
+        name=gh_features.FEATURE_LABEL,
+        colour="1d76db",
+        description="A roadmap-candidate feature request specfuse discovery reads",
+        consumer="gh_features.py",
+    ),
+    LabelSpec(
+        name=escalation.NEEDS_HUMAN_LABEL,
+        colour="d93f0b",
+        description="The loop stopped and needs a human decision",
+        consumer="escalation.py",
+    ),
+    LabelSpec(
+        name="gate-review",
+        colour="fbca04",
+        description="A gate is at awaiting_review and needs review-and-arm",
+        consumer="escalation.py",
+    ),
+    LabelSpec(
+        name="blocked-wu",
+        colour="e99695",
+        description="A work unit stopped and needs an operator decision",
+        consumer="escalation.py",
+    ),
+    LabelSpec(
+        name="triage-question",
+        colour="c5def5",
+        description="An inbound issue needs categorising before it can be routed",
+        consumer="escalation.py",
+    ),
+    LabelSpec(
+        name="drafting-needed",
+        colour="bfd4f2",
+        description="A queued feature has no folder yet and needs /draft-feature",
+        consumer="escalation.py",
+    ),
+    LabelSpec(
+        name="merge-approval",
+        colour="0e8a16",
+        description="A pull request is green and waiting on a merge decision",
+        consumer="escalation.py",
+    ),
+)
+
+
+@dataclass
+class ProvisionReport:
+    """Outcome of a provision_labels run. Never raised; always returned."""
+
+    created: list = field(default_factory=list)
+    already_present: list = field(default_factory=list)
+    failed: list = field(default_factory=list)
+    skipped: bool = False
+    reason: str = ""
+
+
+def _default_runner(args: list, cwd=None, check: bool = True):
+    """Shell out to gh with the given argument list. Not called in tests."""
+    return subprocess.run(args, cwd=cwd, check=check, capture_output=True, text=True)
+
+
+def provision_labels(
+    target: str | Path,
+    *,
+    runner: Optional[Callable] = None,
+) -> ProvisionReport:
+    """Create every LABEL_REGISTRY label the repo at ``target`` is missing.
+
+    Best-effort and idempotent: lists existing labels first and creates only
+    what is missing, never overwriting so an operator's edited colour or
+    description is left alone. Every failure mode (no gh binary, unauthenticated,
+    not a git repo, remote not GitHub, list failure, a single create failure)
+    is captured in the returned ProvisionReport rather than raised.
+    """
+    runner = runner if runner is not None else _default_runner
+    report = ProvisionReport()
+
+    try:
+        listed = runner(
+            ["gh", "label", "list", "--json", "name,color,description", "--limit", "1000"],
+            cwd=target,
+            check=False,
+        )
+    except FileNotFoundError:
+        report.skipped = True
+        report.reason = "gh binary not found on PATH"
+        return report
+    except Exception as exc:  # noqa: BLE001 - never raise out of provision_labels
+        report.skipped = True
+        report.reason = f"gh label list raised: {exc}"
+        return report
+
+    if listed.returncode != 0:
+        report.skipped = True
+        stderr = (getattr(listed, "stderr", "") or "").strip()
+        report.reason = stderr or "gh label list failed"
+        return report
+
+    try:
+        existing = json.loads(listed.stdout or "[]")
+        existing_names = {item["name"] for item in existing}
+    except (ValueError, TypeError, KeyError) as exc:
+        report.skipped = True
+        report.reason = f"could not parse gh label list output: {exc}"
+        return report
+
+    for spec in LABEL_REGISTRY:
+        if spec.name in existing_names:
+            report.already_present.append(spec.name)
+            continue
+        try:
+            created = runner(
+                [
+                    "gh", "label", "create", spec.name,
+                    "--color", spec.colour,
+                    "--description", spec.description,
+                ],
+                cwd=target,
+                check=False,
+            )
+        except Exception:  # noqa: BLE001 - keep provisioning remaining labels
+            report.failed.append(spec.name)
+            continue
+        if created.returncode == 0:
+            report.created.append(spec.name)
+        else:
+            report.failed.append(spec.name)
+
+    return report

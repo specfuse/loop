@@ -70,6 +70,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
+| FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
