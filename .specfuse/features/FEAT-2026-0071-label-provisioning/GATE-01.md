@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 19.50
+baseline:
+  sha: 2b98dee811c2684c85888f37d28d038ddb65dcb6
+  probed_at: 2026-07-28T11:27:51.780848+00:00
+  failing: []
 ---
 
 # Gate 1 — every label specfuse reads is declared once and created automatically
