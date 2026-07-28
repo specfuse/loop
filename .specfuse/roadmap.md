@@ -61,7 +61,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
-| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | planned | — | — |
+| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | blocked | — | — |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
@@ -837,18 +837,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0046"></a>
-## FEAT-2026-0046 — Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill
-
-**Why.** An autonomous agent is only trustworthy if what it cannot handle surfaces reliably, with enough context to act on in minutes. Escalations need one queue with an audit trail — GitHub issues, not chat threads — plus a fast local view. Useful immediately with today's manual loop (blocked WUs, awaiting_review gates, blocked features, stale PRs), before any agent exists.
-
-**Goal.** Ship (a) the escalation contract: a `needs-human` labeled GH issue per escalation, auto-assigned to the configured `assignee` (per-category assignee map supported) so escalations surface in native GH inbox/filters; body in plain English — context, options with pros/cons, a recommendation, numbered answers ("reply `1`, `2`, or prose") so the agent can parse replies unambiguously; category labels (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval); answered issues are parsed, acted on, and closed by the next agent run. (b) The `/attention` skill: local inbox over the same label set plus repo-state sweep (gate-status generalized repo-wide), presenting everything needing the human in priority order — the interactive counterpart of the issue queue, never a second source of truth.
-
-**Benefits.** One escalation queue, two views (GH native + rich local session); nothing the agent parks goes silent; the operator's check-in ritual becomes "open /attention, work top-down".
-
-**Status: planned.**
-
-<a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
 
 **Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
