@@ -49,6 +49,22 @@ VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
 # find_feature / the gate-status transitions in loop.py.
 VALID_FEATURE_STATUS = {"planned", "active", "blocked", "deferred", "done", "abandoned"}
 VALID_GATE_STATUS = {"open", "awaiting_review", "passed"}
+# Features whose `status: done` legitimately coexists with a non-`passed`
+# gate, keyed by feature directory name. Each entry is checked in
+# check_done_feature_gates below for a non-empty reason, and for pointing at
+# a directory that still exists (FEAT-2026-0072/T03).
+DONE_FEATURE_GATE_EXCLUSIONS = {
+    "FEAT-2026-0001-health-endpoint": (
+        "bundled worked-example fixture — the self-demonstrating reference "
+        "installation a target project copies via init.sh; a template never "
+        "executed and never to be, so its gates stay open by design"
+    ),
+    "FEAT-2026-0036-adopt-ruff-016": (
+        "executed directly as a config-only fix after a loop run on a flawed "
+        "plan blocked — the close ceremony deliberately never ran, so GATE-01 "
+        "stays open rather than asserting a ceremony that did not happen"
+    ),
+}
 CLOSING_SEQUENCE = ["retrospective", "lessons", "docs", "plan-next"]
 # New compact closing shapes (FEAT-2026-0015):
 #   non-terminal gate: close-intermediate → plan-next
@@ -487,6 +503,36 @@ def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
         )
 
 
+def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
+    """A `status: done` feature must have every gate `status: passed` (#287).
+
+    Catches the drift class where a feature's terminal-flip machinery never
+    ran (legacy closing sequence, pre-verdict-contract close WU) and left a
+    gate at `open`/`awaiting_review` while PLAN.md already reads `done`.
+    Excluded features (DONE_FEATURE_GATE_EXCLUSIONS) are ones where that gap
+    is correct, not drift — see the reasons recorded there.
+
+    GATE-NN-REVIEW.md artifacts carry no `status` frontmatter and are not
+    gate files, so they're skipped by name.
+    """
+    if plan_fm.get("status") != "done":
+        return []
+    if feature_dir.name in DONE_FEATURE_GATE_EXCLUSIONS:
+        return []
+    errs: list[str] = []
+    for gate_path in sorted(feature_dir.glob("GATE-*.md")):
+        if gate_path.stem.endswith("-REVIEW"):
+            continue
+        gfm, _ = read_frontmatter(gate_path)
+        gstatus = gfm.get("status")
+        if gstatus != "passed":
+            errs.append(
+                f"{feature_dir.name}: PLAN.md status is 'done' but "
+                f"{gate_path.name} is status: {gstatus!r}, not 'passed'"
+            )
+    return errs
+
+
 def check_planning_sections(
     feature_dir: Path, plan_fm: dict, plan_body: str, gates: list,
 ) -> None:
@@ -844,6 +890,7 @@ def lint(feature_dir: Path) -> list[str]:
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
+    errs.extend(check_done_feature_gates(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #

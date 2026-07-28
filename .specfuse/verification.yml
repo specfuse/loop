@@ -57,6 +57,12 @@ code:
     # The drift-guard test (test_scaffold_data_in_sync.py) runs under 'tests'.
     command: "bats tests/sync_scaffold.bats"
 
+  - name: sync-scaffold-symlinks-bats
+    # §11 operator-script gate: sync-scaffold.sh's .claude/skills discovery-link
+    # step (#284) happy-path via bats. The forward-completeness invariant
+    # (test_skill_discovery_links.py) runs under 'tests'.
+    command: "bats tests/sync_scaffold_symlinks.bats"
+
   - name: init-sh-shim-bats
     # §11 operator-script gate: init.sh thin-shim happy-path + absent-CLI error.
     command: "bats tests/init_sh_shim.bats"

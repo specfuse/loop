@@ -131,7 +131,10 @@ class TestCloseWuLint(unittest.TestCase):
         """(c) Regression: four-WU [retrospective, lessons, docs, plan-next] closing
         sequence must still pass lint after the `close` type was introduced."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            feature = Path(tmpdir) / "feature"
+            # Copied under its original name so the FEAT-2026-0072/T03 done-feature
+            # gate exclusion (keyed by feature directory name) still applies to
+            # this fixture copy — it is the excluded worked-example fixture.
+            feature = Path(tmpdir) / EXAMPLE_FEATURE.name
             shutil.copytree(EXAMPLE_FEATURE, feature)
             errs = lint_plan.lint(feature)
             self.assertEqual(errs, [],

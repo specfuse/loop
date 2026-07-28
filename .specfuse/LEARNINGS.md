@@ -2270,3 +2270,66 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   planning WU that makes it, and any close that finds roadmap prose describing an interface
   that was never built records it under `## What the loop did NOT verify` rather than
   quietly rewriting it as though it had always matched.
+
+- [FEAT-2026-0072/G1-CLOSE] **A new check added to a tree-walking linter is only "swept
+  clean" for inputs the walk actually reached; a non-zero exit from an unrelated crash is
+  not a result for the new check.** T03's criterion 11 required zero findings across every
+  directory under `.specfuse/features/` — a deliberate sweep-not-a-sample, and the right
+  call. The sweep returned 38 clean and one exit-1, and the exit-1 was a pre-existing
+  unhandled `MiniYAMLError` in `read_frontmatter` on a feature whose work-unit files had
+  lost their closing `---` fence. Because the new check is called *after* the work-unit loop
+  that raised, it never ran for that feature at all. The tempting readings are both wrong:
+  "38 of 39 clean" understates it, and "one failure, unrelated, ignore it" silently drops an
+  input from the sweep the criterion said was total. Rule: when a WU adds a check to a
+  linter that iterates over many inputs, the close's sweep must classify every non-zero exit
+  as *this check fired* or *this check never ran*, and for the second class call the check
+  function directly on that input rather than inferring the result. Corollary for linter
+  authors: a validator that aborts the whole run on one malformed input cannot report on
+  anything after the abort point, and its exit code cannot distinguish "found a problem"
+  from "could not look" — that is its own defect, and a sweep is where it surfaces.
+
+- [FEAT-2026-0072/G1-CLOSE] **An opt-out list for a new blocking check must live where the
+  consumer can edit it, or the check is not adoptable — and the close must say which.**
+  T03 shipped `DONE_FEATURE_GATE_EXCLUSIONS` as a module-level constant in
+  `specfuse/loop/lint_plan.py`, with two entries whose inline reasons are genuinely
+  load-bearing (without them the check fires on a bundled fixture, and the likely "fix" is
+  someone mutating a shipped fixture to satisfy a linter). That is right for the repo that
+  owns the file and wrong for every project that vendors it: a downstream project with an
+  equally legitimate exclusion must patch vendored driver source, which the next upgrade
+  erases. Rule: when a WU introduces a blocking check whose correctness depends on an
+  exclusion list, the plan decides at draft time whether the list is a fact about *this*
+  repo's history (constant is fine) or a fact about *any* consumer's tree (it belongs in
+  project-local configuration), and the close enumerates the placement as part of the
+  consumer-visible contract-change list. A blocking check plus an unreachable opt-out is a
+  breaking change with no remedy, which reads as an additive diff.
+
+- [FEAT-2026-0072/G1-CLOSE] **When a WU ships a fix for drift that has already been
+  reconciled, the fix's active code path is unreachable on the correct tree — the close
+  records it as unexercised rather than reading the green guard as coverage.** T02 taught
+  `sync-scaffold.sh` to create missing `.claude/skills/` forward symlinks, but the four
+  missing links had been restored by hand in a prior PR, so on the live tree all 23 links
+  exist and the script reports "no missing links" — the create-branch never runs. Its four
+  behavioural criteria are green, and green only against a bats fixture tree with
+  `REPO_ROOT` overridden to a temp directory; the WU's own "Do not touch" correctly forbade
+  manufacturing the gap on the real tree to exercise it. The guard test passing proves the
+  *invariant* holds, not that the *repair* works where it matters. Rule: when a gate pairs
+  "assert the invariant" with "reconcile the tree" and "automate the repair", the close
+  states explicitly which of the three the real tree exercised, and gives the repair a
+  natural-occurrence upgrade condition (here: the next skill added without a hand-made
+  link) rather than counting the fixture run as verification on the live surface.
+
+- [FEAT-2026-0072/G1-CLOSE] **A declared gate that needs a writable temp directory fails
+  spuriously wherever the executor is sandboxed, and the failure is indistinguishable from
+  a real one unless the close names the environment condition beside the exit code.** Both
+  bats suites in this feature's gate set failed on first run with
+  `mktemp: mkdtemp failed on …: Operation not permitted` — the sandbox denying temp-dir
+  creation, not a defect in the script or the tests. Overriding `TMPDIR` did not help
+  because bats resolves its own; the suites pass cleanly with the sandbox off, and reading
+  the fixture first confirmed every path is rooted in `$TESTDIR` via a `REPO_ROOT` override
+  so nothing in the real tree is touched. Rule: a WU whose verification shells out to
+  `mktemp`, Docker, or any other privileged-ish primitive must name the environment
+  precondition in its Verification section, and a close reporting such a failure must state
+  whether it re-ran the oracle in a permitting environment and what it read to satisfy
+  itself that doing so was safe. An exit code recorded without its environment is not
+  evidence; it is a number that will be read as red by whoever sees it next — including the
+  driver running the same gates.

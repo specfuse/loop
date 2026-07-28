@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: passed
 ---
 
 # Gate 2 — Defaults, telemetry, and guardrails

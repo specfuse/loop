@@ -112,6 +112,32 @@ else
 fi
 echo
 
+# Discovery links: .claude/skills/ forward symlinks into .specfuse/skills/, so
+# Claude Code's discovery (which reads .claude/skills/) picks up every skill.
+# Creates only what's missing; an existing entry is left exactly as found —
+# never replaced, never re-pointed, even if it resolves outside
+# .specfuse/skills/ (operator tooling under .agents/skills/ is not this
+# script's business). Guarded by tests/test_skill_discovery_links.py.
+CLAUDE_SKILLS="$REPO_ROOT/.claude/skills"
+echo "Creating missing skill discovery links:"
+mkdir -p "$CLAUDE_SKILLS"
+linked=0
+for skill_dir in "$SRC/skills"/*/; do
+  [[ -d "$skill_dir" ]] || continue
+  name="$(basename "$skill_dir")"
+  link_path="$CLAUDE_SKILLS/$name"
+  if [[ -e "$link_path" || -L "$link_path" ]]; then
+    continue
+  fi
+  ln -s "../../.specfuse/skills/$name" "$link_path"
+  echo "  linked: $name"
+  linked=$((linked + 1))
+done
+if [[ "$linked" -eq 0 ]]; then
+  echo "  no missing links; all skills already linked."
+fi
+echo
+
 synced=0
 
 sync_file() {
