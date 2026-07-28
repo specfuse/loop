@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0072/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_done_feature_gates.py
 produces_driver_helper:
   - check_done_feature_gates
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T15:14:26.973922+00:00
+duration_seconds: 380.274
+cost_usd: 1.325495
+input_tokens: 74
+output_tokens: 13981
 ---
 
 # Refuse a done feature whose gates are not passed — and reconcile the three that aren't
