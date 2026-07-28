@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0072/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - scripts/sync-scaffold.sh
   - tests/sync_scaffold_symlinks.bats
   - .specfuse/verification.yml
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T15:20:47.378888+00:00
+duration_seconds: 233.983
+cost_usd: 0.623554
+input_tokens: 1681
+output_tokens: 9754
 ---
 
 # Make sync-scaffold.sh create the discovery links it currently only documents
