@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 19.00
+baseline:
+  sha: 85c36e8803932c7e358780b8524cff22eaf62846
+  probed_at: 2026-07-28T15:09:14.018692+00:00
+  failing: []
 ---
 
 # Gate 1 — every declared structural invariant has a check behind it
