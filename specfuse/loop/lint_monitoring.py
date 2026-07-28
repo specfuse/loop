@@ -37,7 +37,7 @@ from pathlib import Path
 
 from . import _miniyaml
 
-__all__ = ("validate_monitoring", "main")
+__all__ = ("validate_monitoring", "main", "CRON_DIALECTS")
 
 RUNNER_VALUES = frozenset({"local", "gh-actions", "in-cluster"})
 DIAGNOSE_VALUES = frozenset({"manual", "auto"})
@@ -46,6 +46,16 @@ CHECK_TYPES = frozenset(
     {"dlq", "error-logs", "http-5xx", "heartbeat", "invariant", "queue-stalled"}
 )
 HARVEST_MODE_VALUES = frozenset({"peek", "quarantine"})
+
+# A `heartbeat` target's `cron` dialect, declared rather than inferred: a
+# 5-field standard cron and a 6-field seconds-first cron (Azure Functions
+# timer triggers) are both well-formed and mean different things, and field
+# count alone cannot disambiguate a new dialect arriving later. The value is
+# the expression's required whitespace-separated field count.
+CRON_DIALECTS = {
+    "standard-5": 5,
+    "seconds-first-6": 6,
+}
 
 REQUIRED_COMPONENT_FIELDS = ("name", "type", "runner", "diagnose", "autofix", "checks")
 REQUIRED_PROVIDER_BINDINGS = ("telemetry", "broker")
@@ -274,12 +284,20 @@ def _check_targets(
     """Validate an optional `checks[].targets` list.
 
     Structural only, per T01's scope: a target's required coordinates must
-    be present, but coordinate *contents* (a cron expression, a timezone
-    name) are opaque here, exactly as `invariant.query` is. `targets` itself
-    is required for `dlq` and `queue-stalled` (enforced in `_check_checks`,
-    since a missing key and an empty/malformed one are different findings).
-    `error-logs`, `http-5xx`, and `invariant` must not carry `targets` at
-    all; every other check type treats `targets` as optional.
+    be present, but coordinate *contents* are opaque — `timezone` and
+    `invariant.query` are never parsed here. FEAT-2026-0040/T04 moved one
+    line of that opacity: a `heartbeat` target's `cron` *field count* is now
+    checked against its declared `dialect` (see `CRON_DIALECTS`), because a
+    heartbeat check computing "should this have fired?" must interpret the
+    expression's arity to do its job — the one coordinate whose contents a
+    check type is required to interpret. `cron`'s field *values* stay
+    opaque; only the field *count* is checked. `timezone` and
+    `invariant.query` are untouched by this and remain fully opaque.
+    `targets` itself is required for `dlq` and `queue-stalled` (enforced in
+    `_check_checks`, since a missing key and an empty/malformed one are
+    different findings). `error-logs`, `http-5xx`, and `invariant` must not
+    carry `targets` at all; every other check type treats `targets` as
+    optional.
     """
     if targets is None:
         return []
@@ -309,6 +327,53 @@ def _check_targets(
                     f"{where}: targets[{t_index}]: '{check_type}' target "
                     f"missing '{field}'"
                 )
+        if check_type == "heartbeat":
+            findings.extend(_check_cron_dialect(target, where, t_index))
+    return findings
+
+
+def _check_cron_dialect(target: dict, where: str, t_index: int) -> list[str]:
+    """Enforce the four cron-dialect rules on one `heartbeat` target.
+
+    1. `cron` without `dialect` is a finding.
+    2. `dialect` outside `CRON_DIALECTS` is a finding.
+    3. Given a valid `dialect` and a `cron`, the expression's
+       whitespace-separated field count must equal the dialect's arity.
+    4. `dialect` without `cron` is a finding — a declared dialect for no
+       expression means the expression was dropped, not that dialect means
+       nothing.
+    """
+    cron = target.get("cron")
+    dialect = target.get("dialect")
+    findings: list[str] = []
+
+    if cron and not dialect:
+        findings.append(
+            f"{where}: targets[{t_index}]: 'heartbeat' target carries 'cron' "
+            f"but no 'dialect' — must be one of {sorted(CRON_DIALECTS)}"
+        )
+    elif dialect and not cron:
+        findings.append(
+            f"{where}: targets[{t_index}]: 'dialect' declared without 'cron' "
+            f"— a dialect with no expression is not valid"
+        )
+
+    if dialect:
+        if dialect not in CRON_DIALECTS:
+            findings.append(
+                f"{where}: targets[{t_index}]: 'dialect' has unknown value "
+                f"{dialect!r} — must be one of {sorted(CRON_DIALECTS)}"
+            )
+        elif cron:
+            arity = CRON_DIALECTS[dialect]
+            field_count = len(str(cron).split())
+            if field_count != arity:
+                findings.append(
+                    f"{where}: targets[{t_index}]: 'cron' expression has "
+                    f"{field_count} field(s), dialect {dialect!r} requires "
+                    f"{arity}"
+                )
+
     return findings
 
 

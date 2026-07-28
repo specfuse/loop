@@ -121,8 +121,11 @@ component records, one per deployable, not one per trigger: `name`, `type`,
 `http_serving`, `message_consuming`, `subscriptions`, `schedules`, `evidence`.
 `http_serving` and `message_consuming` are **derived** from matched triggers,
 never declared inputs; `subscriptions` and `schedules` are the neutral
-`{subscription, function}` / `{name, cron, timezone}` lists `suggest_checks(component)`
-renders into `dlq` and `heartbeat` targets. `suggest_checks` maps a neutral
+`{subscription, function}` / `{name, cron, timezone, dialect}` lists
+`suggest_checks(component)` renders into `dlq` and `heartbeat` targets — a
+generated heartbeat target carries the `dialect` its discovered schedule
+trigger implies, never inferred from the `cron` expression's field count.
+`suggest_checks` maps a neutral
 record to a conservative check list (never `invariant`). Reading that
 test module alongside this section keeps the prose and the tested algorithm from
 diverging into two different things.

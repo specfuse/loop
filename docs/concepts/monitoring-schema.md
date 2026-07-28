@@ -138,16 +138,38 @@ triggers as `targets[]` is what keeps that property satisfiable.
 |---|---|---|---|
 | `dlq` | **required** | `subscription` (required), `function` (required) | `subscription` is what the harvester queries; `function` is what a human diagnoses by — a subscription name alone rarely tells an on-call engineer which handler failed. |
 | `queue-stalled` | **required** | `subscription` (required), `function` (required), a stall-threshold coordinate (optional, opaque) | Same `subscription`/`function` coordinates as `dlq` — same subscription, same on-call-facing handler name. The stall-threshold value (how long is too long since the last message) is accepted but never parsed or bounded here, exactly like `invariant.query`; range-checking it is explicitly not this layer's job. |
-| `heartbeat` | optional | `name` (required), `cron` (optional), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
+| `heartbeat` | optional | `name` (required), `cron` (optional), `dialect` (required when `cron` present), `timezone` (optional) | One target per schedule, so a single silent timer among several stays individually visible. A single-schedule component may omit the list. |
 | `invariant` | **forbidden** | — | `fingerprint_by` is already this check type's enumeration key; permitting `targets` too would give it two competing enumeration keys. |
 | `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
 | `http-5xx` | **forbidden** | — | Same reason as `error-logs`. |
 
 Where `targets` is present it must be a non-empty list of mappings, and every
 entry must carry that check type's required coordinates. An empty list is a
-finding — omit the key to mean "none". Coordinate *contents* are opaque: a cron
-expression or an IANA timezone name is checked for presence, never parsed, in
-the same way `invariant.query` is.
+finding — omit the key to mean "none". Coordinate *contents* are opaque, with
+one exception: a `heartbeat` target's `cron` expression has its *field count*
+checked against its declared `dialect` (below); its field *values* are never
+parsed. An IANA timezone name is checked only for presence, never parsed, the
+same way `invariant.query` is.
+
+**`heartbeat`'s `dialect` field.** A `heartbeat` target that carries `cron`
+must also carry `dialect`, naming which cron dialect the expression is
+written in. A 5-field standard cron and a 6-field seconds-first cron are both
+well-formed and mean different things, and cannot be told apart by field
+count alone once a second dialect exists — inferring from arity degrades
+silently the moment a new dialect arrives, which is the worst time for a
+monitoring tool to start guessing. The dialect is declared, not inferred, so
+a mismatch is a validation error at lint time instead of a wrong verdict at
+3am.
+
+| `dialect` value | fields | field order |
+|---|---|---|
+| `standard-5` | 5 | minute hour day-of-month month day-of-week |
+| `seconds-first-6` | 6 | second minute hour day-of-month month day-of-week |
+
+A `dialect` declared with no `cron` is itself a finding — a dialect for no
+expression means the expression was dropped, not that the dialect means
+nothing. A `heartbeat` target with only `name` stays valid and needs no
+`dialect`; `cron` remains optional.
 
 **`targets` is required on `dlq`.** A `dlq` check with no `targets` key is a
 validator finding. This tightened in this repo's FEAT-2026-0069 gate 1: the

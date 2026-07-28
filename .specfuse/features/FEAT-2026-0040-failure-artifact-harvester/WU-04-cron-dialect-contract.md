@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 produces:
@@ -16,6 +16,12 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T21:40:29.120706+00:00
+duration_seconds: 972.505
+cost_usd: 6.252466
+input_tokens: 198
+output_tokens: 49541
 ---
 
 # The cron dialect is declared, never inferred — schema, sweep, and enforcement
