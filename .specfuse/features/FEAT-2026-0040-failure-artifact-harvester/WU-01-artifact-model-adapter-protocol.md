@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/monitor/artifact.py
@@ -13,6 +13,15 @@ produces_driver_helper:
   - TelemetryAdapter
   - BrokerAdapter
   - resolve_telemetry
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T19:32:29.205401+00:00
+duration_seconds: 422.432
+cost_usd: 1.151037
+input_tokens: 46
+output_tokens: 15536
 ---
 
 # Model a failure artifact, and define the adapter protocols that produce one
