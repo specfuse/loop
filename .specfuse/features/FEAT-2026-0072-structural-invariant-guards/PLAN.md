@@ -5,7 +5,7 @@ slug: structural-invariant-guards
 branch: feat/FEAT-2026-0072-structural-invariant-guards
 roadmap_goal: Make every structural invariant this repo declares about itself enforceable by a check, so a skill without a discovery link or a done feature with an unclosed gate fails on the first run rather than drifting silently for weeks.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 14.00
 ---
 

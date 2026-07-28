@@ -6,7 +6,7 @@ attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
-verdict: met_locally
+verdict: met
 model: opus
 effort: high
 gate_set: plannext

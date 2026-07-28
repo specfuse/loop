@@ -381,3 +381,64 @@ anyone, which is how a real over-run stops being visible.
 
 Generalizable rules appended to `.specfuse/LEARNINGS.md` under
 `[FEAT-2026-0072/G1-CLOSE]`. Feature-specific observations stay here.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator reason (verbatim):** accepted, downstream projects hitting this can reconcile the same way we did
+
+**Recorded:** 2026-07-28T15:37:07Z
+
+**Acknowledgment of the consumer-visible contract-change list (D1).** The operator
+read the enumeration and acknowledged entry 1 — the new blocking `lint_plan` error
+`check_done_feature_gates` — in their own words above. That is the signature D1 was
+withheld for, and it discharges D1 and nothing else.
+
+Accepting a hedge means shipping with known-open items, not pretending they are
+done. All three entries from `## What the loop did NOT verify` are carried forward
+below verbatim in substance. D1 is discharged by this acceptance; **D2 and D3 ship
+open.**
+
+### D1 — Human acknowledgment of the contract-change list — DISCHARGED
+
+The close could not supply the acknowledgment it was collecting;
+`operator-escalation.md` names writing the human's own justification for them as
+one of the three failures that rule exists to prevent. The close wrote the list and
+hedged rather than emitting `blocked` with nothing to read, which was the right
+call. The operator's reason above is the missing signature.
+
+### D2 — Downstream-upgrade impact of the new blocking error — OPEN
+
+Carried forward. No work unit touched a downstream project and none is reachable
+from this repo, so the claim that a consumer with a `done` feature and a
+non-`passed` gate starts failing plan-lint on upgrade is verified in principle by
+a negative control, not against a real consumer tree. *Re-run condition, verbatim:*
+run `specfuse upgrade --dry-run` against a target project holding at least one
+`done` feature with a non-`passed` gate, and record whether its plan-lint gate
+fails and whether the operator can express an exclusion without editing
+`specfuse/loop/lint_plan.py`.
+
+**The sharp edge inside D2 is not discharged by this acceptance.** The exclusion
+mapping is a module-level constant, so a downstream project cannot add a legitimate
+exclusion without patching vendored driver source. The operator's accepted remedy
+is that downstream projects reconcile as this repo did — flip gates that genuinely
+completed, exclude by ID those whose close ceremony deliberately never ran — which
+covers the reconciliation but not the case of an exclusion a consumer needs
+permanently. Project-local exclusions in `.specfuse/` remain a candidate follow-up
+feature.
+
+### D3 — `sync-scaffold.sh`'s link-creation path on the real tree — OPEN
+
+Carried forward. All four T02 criteria are green, but only against a bats fixture
+tree with `REPO_ROOT` overridden to a temp directory. On the live tree every
+forward link already exists (23 skill directories, 23 matching links, plus 7
+operator-tooling links resolving outside `.specfuse/skills/`), so the create
+branch is unreachable, and the WU was forbidden from deleting one to manufacture
+the gap. *Re-run condition, verbatim:* the next skill added to
+`.specfuse/skills/` without a hand-made link — run `scripts/sync-scaffold.sh`,
+confirm it creates that one link, leaves the 7 external entries untouched, and that
+`python3 -m pytest tests/test_skill_discovery_links.py -q` exits zero afterwards.
+A natural-occurrence check, not a task to schedule.
+
+Neither D2 nor D3 is discharged by this acceptance.
