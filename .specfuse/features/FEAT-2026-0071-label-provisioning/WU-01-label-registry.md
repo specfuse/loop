@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0071/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/labels.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - LABEL_REGISTRY
   - FEATURE_LABEL
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T11:29:39.343703+00:00
+duration_seconds: 164.822
+cost_usd: 0.479112
+input_tokens: 18
+output_tokens: 3367
 ---
 
 # Declare every label specfuse reads in one registry

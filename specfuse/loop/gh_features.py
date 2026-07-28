@@ -18,6 +18,8 @@ _TITLE_RE = re.compile(
     r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|FEAT-\d{4}-\d{4}))\]\s*(?P<summary>.*)$"
 )
 
+FEATURE_LABEL = "specfuse:feature"
+
 
 def _default_runner(repo: str) -> list:
     """Shell out to gh and return parsed JSON issue list. Not called in tests."""
@@ -25,7 +27,7 @@ def _default_runner(repo: str) -> list:
         [
             "gh", "issue", "list",
             "--repo", repo,
-            "--label", "specfuse:feature",
+            "--label", FEATURE_LABEL,
             "--state", "open",
             "--json", "number,title,labels,url,body",
         ],
