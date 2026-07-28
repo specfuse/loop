@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0072/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - tests/test_skill_discovery_links.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T15:11:19.996818+00:00
+duration_seconds: 186.866
+cost_usd: 0.556725
+input_tokens: 16
+output_tokens: 4531
 ---
 
 # Assert every skill has a discovery link — forward complete, reverse filtered
