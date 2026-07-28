@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 33.00
+baseline:
+  sha: e3f15b71e5a8d379bc6849281b87a2725973cac1
+  probed_at: 2026-07-28T21:38:12.939921+00:00
+  failing: []
 ---
 
 # Gate 2 — the Azure adapters produce artifacts, and a schedule declares its dialect
