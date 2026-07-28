@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 26.00
+baseline:
+  sha: baac87ce083baa76131568034beba7bbb6a8fcb6
+  probed_at: 2026-07-28T19:30:26.480669+00:00
+  failing: []
 ---
 
 # Gate 1 — a failure artifact can be modelled, fingerprinted, and redacted
