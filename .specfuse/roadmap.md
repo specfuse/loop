@@ -70,6 +70,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
+| FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | active | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ detail](#feat-2026-0071) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -930,6 +931,21 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+
+<a id="feat-2026-0071"></a>
+## FEAT-2026-0071 — Label registry + provisioning on init/upgrade
+
+**Why.** Specfuse ships code that queries GitHub labels it never creates. `gh_features.py:28` has run `gh issue list --label specfuse:feature` since FEAT-2026-0003, and [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) added six more (`needs-human` plus the five escalation categories) whose emitter fails outright on an unknown label — `gh issue create` rejects one. Seven labels, zero provisioning: every consumer repo has to be told to create them by hand, and 0046's own retrospective had to record that as a required operator step rather than something the tool does. Each new label repeats the gap, so the fix is a declared registry rather than a hardcoded list.
+
+**Goal.** Ship (a) a single label registry — name, colour, description, and the consumer that reads it — as the one place a label is declared, with the seven current entries; and (b) provisioning on `specfuse init` and `specfuse upgrade` that creates any missing label and leaves existing ones untouched.
+
+**The constraint that shapes it.** `scaffold.py` has no subprocess, network, or `gh` call today: init and upgrade are pure filesystem, which is why they work offline, in CI containers, and against non-GitHub remotes. Provisioning must not change that contract. It is **best-effort and never fatal** — no `gh`, not authenticated, remote is not GitHub, not a git repo at all, or any per-label failure reports what it would have done and the command still exits zero. An upgrade must never fail because a label could not be created. Idempotent by construction: existing labels are skipped, never `--force`d over an operator's edited colour or description. `--no-labels` opts out.
+
+**Scope boundary.** `specfuse-monitor` is **out**: it appears only in [FEAT-2026-0040](#feat-2026-0040)'s framing, its harvester does not exist, and provisioning a label whose sole consumer is unbuilt repeats the `[FEAT-2026-0029/G1-CLOSE]` failure 0039 recorded — shipping a surface whose entry point is nonexistent. 0040 adds its own entry when it ships. Renaming `specfuse:feature` to match the kebab-case of the six newer labels is also out: the inconsistency is real, but a rename orphans issues already carrying the label in every consumer repo.
+
+**Benefits.** The escalation queue works on a fresh repo without a setup checklist, closing the operator step 0046 had to defer. `specfuse:feature` discovery stops depending on an undeclared label. And the next feature that needs a label adds one registry entry instead of rediscovering that nothing creates it.
+
+**Status: active.**
 
 ## Notes
 
