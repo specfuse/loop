@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-28T22:07:47.515311+00:00
+duration_seconds: 523.304
+cost_usd: 1.182024
+input_tokens: 768
+output_tokens: 17361
 ---
 
 # Query the telemetry backend — the App Insights KQL adapters
