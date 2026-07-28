@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0071/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/loop/labels.py
   - tests/test_provision_labels.py
 produces_driver_helper:
   - provision_labels
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.5.0
+started_at: 2026-07-28T11:32:24.309910+00:00
+duration_seconds: 697.414
+cost_usd: 1.200377
+input_tokens: 76
+output_tokens: 13013
 ---
 
 # Provision missing labels — idempotent, best-effort, never raising
