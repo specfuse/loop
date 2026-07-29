@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0040/T10
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 oracle_env: macos_local
