@@ -30,6 +30,142 @@ by hand is the divergence that cost issue #49 — don't.
 
 ---
 
+## How to run these — read before starting
+
+### What the shipped code actually allows, and one constraint nobody wrote down
+
+`specfuse-monitor run` resolves a provider by importing
+`specfuse.monitor.providers.<provider_with_underscores>` — **only from inside that
+package.** There is no plugin path, no entry-point discovery, no environment override.
+The two resolvable providers are `azure_app_insights` and `azure_service_bus`.
+
+**Consequence: a scratch repository cannot produce a finding on its own.** Run 2 was
+described at arming as an independent oracle — "a scratch repository, not the .NET
+backend" — and for D-11 that holds. For D-9 and D-10 it does not: the CLI has no way
+to manufacture a finding without a live Azure environment behind it. That was not
+visible at drafting time and is worth knowing before you book time for this.
+
+There is a seam. `run_cycle()` accepts `transport_resolver=` and `gh_runner=`
+separately, so a fake transport can plant a finding while the **real** `gh` files the
+issue. `main()` does not expose it, so this needs ~15 lines of Python rather than a
+flag. Both paths are given below; each says what it proves and what it does not.
+
+### Prerequisites, both runs
+
+```bash
+pipx install specfuse            # or: pip install specfuse-loop
+specfuse-monitor --help          # confirms the entry point resolves
+gh auth status                   # must succeed — the harvester shells out to gh
+```
+
+The scratch repository needs the seven labels this project's registry declares.
+`specfuse init <target>` provisions them, best-effort; confirm with `gh label list`.
+
+Config lives at **`.specfuse/monitoring.yml`** in the repository you run from.
+Watermarks land in `.specfuse/monitor-watermarks/`. The repository findings are filed
+against is resolved from `git config --get remote.origin.url` — so **run from inside
+the scratch clone**, not from this repo.
+
+---
+
+### Path A — the full oracle (Azure + scratch repo together)
+
+Discharges **D-1 … D-11**. This is the only path that exercises the real thing end to
+end, and the two runs stop being independent: the GitHub side needs a real finding,
+and only Azure can produce one.
+
+1. **Point a scratch repository's config at the real Azure environment.** Copy
+   `.specfuse/monitoring.yml.example` into the scratch clone as
+   `.specfuse/monitoring.yml` and replace the `acme-*` placeholders with the real
+   coordinates. Validate before running anything:
+
+   ```bash
+   specfuse-monitor-lint .specfuse/monitoring.yml
+   ```
+
+2. **Export the credentials the config names.** Every `credentials:` value is an
+   *environment variable name*, read via `os.environ.get`. A missing one yields an
+   empty binding, not an error.
+
+3. **Dry run first — it reads, and it does not write.**
+
+   ```bash
+   specfuse-monitor run --dry-run
+   ```
+
+   `--dry-run` is not `--offline`: it performs the read-only telemetry and broker
+   calls and gates only the writes. Against a production backend that is real quota.
+   Record the output — D-10 wants the dry-run listing and the resulting issue list
+   **side by side**.
+
+4. **Real run.**
+
+   ```bash
+   specfuse-monitor run
+   gh issue list --label specfuse-monitor
+   ```
+
+5. **Run it again, unchanged.** This is D-9, and it is the single most important
+   observation in this document:
+
+   ```bash
+   specfuse-monitor run
+   gh issue list --label specfuse-monitor      # the count must NOT have grown
+   ```
+
+   A duplicate here means the client-side fingerprint filter that `T09` substituted
+   for `escalation.py`'s `--search` does not hold against the real index — the exact
+   defect it was written to avoid.
+
+6. **Check the per-target split.** With two or more `dlq` targets on one component,
+   confirm findings from different targets produced **different issues**. That is
+   FEAT-2026-0069's binding constraint, and the thing this whole feature exists to
+   get right.
+
+7. **D-11 — the workflow.** Copy
+   `specfuse/loop/data/workflows/specfuse-monitor.yml` into the scratch repo's
+   `.github/workflows/`, add the secrets it references, trigger it via
+   `workflow_dispatch`, and record the run URL and resulting issues.
+
+8. **D-8 needs patience.** DST cannot be forced. Leave a heartbeat check running
+   across a real transition and check the computed instant afterwards.
+
+### Path B — GitHub side only, no Azure
+
+Discharges **D-9** and **partially D-10**. Use when Azure is not available, or to
+de-risk the GitHub half before booking the full run.
+
+A fake transport plants the finding; the real `gh` files it. Run this from inside the
+scratch clone:
+
+```python
+# plant.py — writes real issues to the repo you are standing in
+from datetime import datetime, timezone
+from specfuse.monitor.cli import run_cycle, load_monitoring_config, _resolve_repo
+
+def fake_resolver(module, check_type, binding):
+    """Return a transport whose fetch yields one canned failure."""
+    raise NotImplementedError(
+        "Return a stub matching the adapter's expected transport for check_type. "
+        "See tests/test_monitor_cli.py for the shape each adapter expects."
+    )
+
+cfg = load_monitoring_config(".specfuse/monitoring.yml")
+run_cycle(cfg, repo=_resolve_repo(), transport_resolver=fake_resolver,
+          now=datetime.now(timezone.utc))
+```
+
+Run it **twice** and confirm the issue count does not grow.
+
+**What Path B proves:** the fingerprint-keyed find-or-create works against the real
+GitHub index — which is D-9 in full, and the highest-risk item.
+
+**What it does not prove:** that `specfuse-monitor run` itself files what its dry run
+predicted, because the CLI was not the entry point. D-10 stays partially open, and
+the journal entry should say so rather than tick it.
+
+---
+
 ## Run 1 — Azure: the downstream .NET backend
 
 **Discharges D-1 … D-8.** Every adapter in gates 2 and 3 ran against a stub; no live
