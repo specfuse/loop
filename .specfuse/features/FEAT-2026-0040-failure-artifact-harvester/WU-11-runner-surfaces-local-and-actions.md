@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T11
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -13,6 +13,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-29T11:45:30.092606+00:00
+duration_seconds: 809.251
+cost_usd: 2.771639
+input_tokens: 102
+output_tokens: 28911
 ---
 
 # Where the cycle runs — the local and GitHub Actions runner surfaces

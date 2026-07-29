@@ -1,0 +1,42 @@
+# specfuse-monitor.yml — GitHub Actions template for the "gh-actions" runner
+# surface (FEAT-2026-0040/T11).
+#
+# This file is a TEMPLATE. It ships under specfuse/loop/data/ and is not
+# installed into this repository's own .github/workflows/ — this repo is a
+# CLI tool with no deployable components and no monitoring.yml. Copy this
+# file into a CONSUMER project's .github/workflows/ once that project has
+# real components dialed to `runner: gh-actions` in its .specfuse/monitoring.yml.
+#
+# SECURITY POSTURE: every credential-bearing value below is a
+# ${{ secrets.* }} reference, never a literal secret. Add the named secrets
+# in the consumer repository's Settings -> Secrets and variables -> Actions
+# before enabling the schedule. See docs/concepts/monitoring-runners.md.
+name: specfuse-monitor
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install specfuse-loop
+        run: pip install specfuse-loop
+      - name: Run monitoring cycle
+        run: specfuse-monitor run --runner gh-actions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACME_TELEMETRY_PROD_API_KEY: ${{ secrets.ACME_TELEMETRY_PROD_API_KEY }}
+          ACME_BROKER_PROD_CONNECTION_STRING: ${{ secrets.ACME_BROKER_PROD_CONNECTION_STRING }}

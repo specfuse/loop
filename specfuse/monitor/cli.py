@@ -48,7 +48,7 @@ from typing import Callable, Mapping, Optional, Sequence
 
 from specfuse.loop import _miniyaml
 from specfuse.loop.escalation import _default_runner
-from specfuse.loop.lint_monitoring import CHECK_TYPES, validate_monitoring
+from specfuse.loop.lint_monitoring import CHECK_TYPES, RUNNER_VALUES, validate_monitoring
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.fingerprint import fingerprint_artifact
 from specfuse.monitor.issues import record_finding
@@ -394,6 +394,7 @@ def run_cycle(
     *,
     component_filter: Optional[str] = None,
     env_filter: Optional[str] = None,
+    runner: str = "local",
     dry_run: bool = False,
     repo: Optional[str] = None,
     transport_resolver: Callable = _default_transport_resolver,
@@ -436,6 +437,23 @@ def run_cycle(
 
         for component in selected_components:
             component_name = component.get("name")
+            component_runner = component.get("runner")
+            if component_runner not in RUNNER_VALUES:
+                raise MonitorCliError(
+                    f"component {component_name!r}: unknown runner {component_runner!r} "
+                    f"— must be one of {sorted(RUNNER_VALUES)}"
+                )
+            if component_runner != runner:
+                if component_runner == "in-cluster":
+                    disposition = "unhandled by design (FEAT-2026-0043, not yet implemented)"
+                else:
+                    disposition = "runs on a different surface"
+                summary.append(
+                    f"{env_name}/{component_name}: skipped — runner={component_runner} "
+                    f"({disposition}); this run is runner={runner!r}"
+                )
+                continue
+
             findings: list = []
             skipped: list = []
             for check in component.get("checks") or []:
@@ -501,6 +519,13 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser = subparsers.add_parser("run", help="run one polling cycle")
     run_parser.add_argument("--component", default=None, help="restrict the run to one component")
     run_parser.add_argument("--env", default=None, help="restrict the run to one environment")
+    run_parser.add_argument(
+        "--runner",
+        default="local",
+        choices=sorted(RUNNER_VALUES),
+        help="which runner surface this invocation is (default: local) — "
+        "components whose 'runner' dial names a different surface are skipped and reported",
+    )
     run_parser.add_argument("--dry-run", action="store_true", help="print findings; touch nothing")
     return parser
 
@@ -519,6 +544,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             config,
             component_filter=args.component,
             env_filter=args.env,
+            runner=args.runner,
             dry_run=args.dry_run,
             repo=repo,
         )
