@@ -5,7 +5,7 @@ slug: failure-artifact-harvester
 branch: feat/FEAT-2026-0040-failure-artifact-harvester
 roadmap_goal: Turn a component's functional failures — dead-lettered messages, error logs, 5xx traces, missed timer runs, invariant violations — into deduplicated GitHub issues within a polling cycle, deterministically and without an LLM, so autonomy level 1 is live end to end.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 70.00
 ---
 

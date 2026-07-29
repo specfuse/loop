@@ -972,3 +972,77 @@ label name, and the specific fingerprints the end-to-end run produced.
   FEAT-2026-0041, FEAT-2026-0042, FEAT-2026-0043. The status row and `PLAN.md`'s
   `status` field are **not** touched — the driver owns the terminal flip and it is gated
   on the verdict.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `partially_met`
+
+**Operator reason (verbatim):** Accepting that this ships incomplete: D-1 through D-11 are open, both operator runs are planned, and the verdict gets revisited once they're recorded.
+
+**Recorded:** 2026-07-29T16:44:07Z
+
+**Acknowledgment.** The operator confirmed explicitly: *"yes I accept shipping with
+D-1 through D-11 open."* All eleven are carried forward below by reference to the
+tables that define them — `## What the loop did NOT verify` for D-1 … D-8 and gate
+3's list for D-9 … D-11 — verbatim and undischarged. Accepting a hedge means shipping
+with known-open items, not pretending they are done.
+
+`partially_met` is a stronger admission than `met_locally` and the reason line says
+so. It is the honest grade: the close's fresh-oracle obligation found a real red gate
+at HEAD, not merely something it could not check.
+
+### What changed between the close and this acceptance
+
+Recorded because carrying it forward verbatim would now be false, and an acceptance
+record that misstates the tree is worse than none.
+
+**FU-E is fixed.** It was the close's *main stated reason* for grading
+`partially_met` rather than `met_locally`: `T04`'s tree-wide cron sweep flagged
+`T11`'s GitHub Actions workflow, whose `on.schedule.cron` is POSIX 5-field by
+GitHub's definition and has no dialect to declare. `tests` and `coverage` were red at
+HEAD. Fixed in `1341fe9` by scoping the sweep to dicts carrying `name` — mandatory
+for heartbeat targets, never present on a bare Actions schedule entry — with the
+exclusion asserted by a test so a future widening cannot silently reintroduce it.
+**HEAD is green: 1841 tests, ruff, bandit, coverage 94%, leak-scan clean.**
+
+The verdict is **not** upgraded on that basis. FU-E was one reason among several; D-1
+… D-11 are untouched by it, and they are what `partially_met` now rests on.
+
+**The follow-ups gained owners.** FU-A is [#296](https://github.com/specfuse/loop/issues/296),
+FU-D is [#295](https://github.com/specfuse/loop/issues/295) — the latter discharging
+`GATE-03-REVIEW.md` §6.1 answer 3's condition, which the close itself could not
+satisfy because `gh` is unusable from a work-unit session. FU-B was closed by `T08`.
+FU-C is recorded with a home.
+
+**The operator journal now exists.** `OPERATOR-JOURNAL.md`, cited by D-9, D-10 and
+D-11 as their verification proxy, did not exist when the close ran — the close
+recorded exactly that. It is now committed as a structured stub with a runbook.
+
+### A constraint found after the close, which changes how D-9/D-10 get discharged
+
+Writing that runbook against the shipped code surfaced something drafting missed and
+the close could not have known. `_load_provider_module` resolves a provider only by
+importing `specfuse.monitor.providers.<name>` — no plugin path, no override — so
+**a scratch repository cannot manufacture a finding on its own.**
+`GATE-03-REVIEW.md` §6.1 answer 5 recorded run 2 as an independent oracle, "a scratch
+repository, not the .NET backend." That holds for D-11 and does not hold for D-9 or
+D-10.
+
+The seam that makes it workable: `run_cycle()` takes `transport_resolver` and
+`gh_runner` separately, so a fake transport plants the finding while the real `gh`
+files it. `plant-finding.py` in this folder does that. It discharges **D-9 in full**
+— the fingerprint-keyed find-or-create against the real GitHub index, the
+highest-risk item and the one `T09` replaced `escalation.py`'s `--search` finder to
+get right — and **D-10 only partially**, because the CLI is not the entry point. A
+journal entry must not tick D-10 on that evidence.
+
+The missing extension point is filed as
+[#298](https://github.com/specfuse/loop/issues/298).
+
+### Carried forward — D-1 … D-11, all OPEN
+
+None is discharged by this acceptance. D-1 … D-8 need the Azure run against the
+downstream .NET backend; D-9 … D-11 need the scratch GitHub repository. Both are
+planned, both are the named upgrade conditions, and their exact re-run conditions are
+in the tables above and as checkboxes in `OPERATOR-JOURNAL.md`. When they are
+recorded there, re-evaluate with `--recheck-verdict`.
