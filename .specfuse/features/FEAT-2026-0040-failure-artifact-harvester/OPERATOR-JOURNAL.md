@@ -209,15 +209,78 @@ and the .NET backend cannot settle them. `gh` is unusable from a work-unit sessi
 > nothing silently files a duplicate on every retry. D-9 is the check that the
 > replacement actually works against the real index.
 
-### Entry — *(not yet run)*
+### Entry — 2026-07-29 · Path B · **agent-executed, awaiting operator countersign**
+
+**Attribution, stated plainly.** This entry was produced by an agent running in the
+operator's own session — where `gh` works, unlike a work-unit session — at the
+operator's explicit request. The commands and outputs below were executed and
+observed, not reconstructed. It is **not** an operator-witnessed entry, and the
+checkboxes above are deliberately left unticked until the operator reviews it. See
+the header: an agent may create this scaffold and read the file; the decision that
+evidence is sufficient belongs to a human.
+
+**Repository:** `clabonte/specfuse-monitor-scratch` (private, created for this).
+**Config:** one component, **two** `dlq` targets (`orders-sub`/`ProcessOrder`,
+`inventory-sub`/`ReserveStock`) — two rather than one so the same run tests
+FEAT-2026-0069's per-target split alongside the dedupe.
+
+**A blocking defect was hit first, and required a manual workaround.**
 
 ```
-date:
-command:
-observed output:
-resulting issues:
-notes:
+$ python plant-finding.py
+CalledProcessError: ['gh','issue','create',...,'--label','monitoring-finding'] → exit 1
+$ gh issue create ... --label monitoring-finding
+could not add label: 'monitoring-finding' not found
 ```
+
+`issues.py`'s `FINDING_LABEL = "monitoring-finding"` is absent from
+`LABEL_REGISTRY`, so `provision_labels()` created seven labels and not the eighth the
+harvester needs. **Zero issues filed.** Filed as
+[#300](https://github.com/specfuse/loop/issues/300). Worked around by creating the
+label by hand — which is why D-9 below is reported as *conditionally* observed.
+
+**Run 1** — after the workaround:
+
+```
+scratch/scratch-worker: 2 finding(s) — created 2, updated 0, throttled 0
+total: 2 finding(s) across 1 component(s)
+
+#1 [monitor:cf9d2e6800ce] scratch-worker: MaxDeliveryCountExceeded
+#2 [monitor:deb48dbe5fe4] scratch-worker: MaxDeliveryCountExceeded
+```
+
+**Run 2** — identical invocation, nothing changed:
+
+```
+scratch/scratch-worker: 2 finding(s) — created 0, updated 0, throttled 2
+total: 2 finding(s) across 1 component(s)
+
+#1, #2 — issue count unchanged
+```
+
+**What this establishes.**
+
+- **D-9 — observed, conditional on #300.** `created 0` on the second run: the
+  fingerprint-keyed find-or-create holds **against the real GitHub index**. This is
+  the item that mattered — FEAT-2026-0046 recorded that GitHub does not reliably
+  tokenise HTML-comment markers, so a `--search`-based finder silently duplicates on
+  every retry, and `T09` replaced it with a client-side filter for that reason. The
+  replacement works. The condition: this run needed a hand-created label, so the path
+  is not yet reproducible from a clean install.
+- **Two targets, two distinct fingerprints** (`cf9d2e6800ce` ≠ `deb48dbe5fe4`), two
+  separate issues. FEAT-2026-0069's binding constraint — the reason this feature
+  exists — observed against real GitHub for the first time.
+- **D-10 — remains partially open, as predicted.** `specfuse-monitor run --dry-run`
+  against this config failed with
+  `missing required argument(s) ['fully_qualified_namespace', 'topic_name']`: the dry
+  run *reads*, so it needs a real Azure transport. The CLI was not the entry point
+  here — `plant-finding.py` was — exactly the limit the runbook records. **Do not tick
+  D-10.**
+- **D-11 — untouched.** The workflow was not installed or triggered.
+
+**Operator: countersign or reject.** The open question is whether D-9 counts as
+discharged on a run that required a manual workaround for #300. A defensible reading
+either way; the run is real, the workaround is recorded, and the decision is yours.
 
 ---
 
