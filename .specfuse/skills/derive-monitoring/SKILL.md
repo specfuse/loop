@@ -153,6 +153,31 @@ together with the evidence that motivated each:
    skill; the operator names whatever their telemetry/broker vendor calls itself.
 3. **The credential environment-variable *names*** for each environment's
    `telemetry`/`broker` bindings — never a value.
+3a. **Any additional *connection coordinates* each binding needs beyond
+   credentials** — the values a provider's client requires to know *which*
+   instance it is talking to. Ask it open, per binding: "besides credentials,
+   what does your telemetry/broker client need in order to connect?"
+
+   These are **not** credentials, so they are inline values rather than env-var
+   names — addresses, not secrets. They are also **not schema-declared**: the
+   harvester forwards every binding key that is not `provider` or `credentials`
+   straight to the provider's transport factory, so `lint_monitoring` cannot
+   check them and a missing one is a **runtime** failure
+   (`cannot call <factory>: missing required argument(s) [...]`), never a lint
+   error. Tracked in specfuse/loop#302; until that closes, this question is the
+   only thing between a config that validates and a config that works.
+
+   Stay provider-agnostic when asking — this skill names a symptom, never a
+   vendor. The coordinates for the two providers that ship today, as a worked
+   example rather than a menu:
+
+   | provider | coordinates |
+   |---|---|
+   | `azure-service-bus` | `fully_qualified_namespace`, `topic_name` |
+   | `azure-app-insights` | `workspace_id` |
+
+   For any other provider the operator names them, and if they do not know, emit
+   a `[gap]` line rather than inventing an address.
 4. **Any `invariant` check's `query` and `fingerprint_by`.** Operator-supplied by
    definition; never inferred or invented.
 5. **Per-component dial loosening** beyond the conservative defaults
@@ -188,10 +213,17 @@ environments:
   staging:
     telemetry:
       provider: acme-telemetry
+      # Connection coordinates (Step 3, question 3a): inline values, not env-var
+      # names — addresses, not secrets. Forwarded verbatim to the provider's
+      # transport factory and unvalidated by lint_monitoring (specfuse/loop#302),
+      # so a missing one fails at runtime rather than at lint time.
+      workspace_id: 00000000-0000-0000-0000-000000000000
       credentials:
         api_key: ACME_TELEMETRY_STAGING_API_KEY
     broker:
       provider: acme-broker
+      fully_qualified_namespace: acme-staging.servicebus.windows.net
+      topic_name: acme-orders
       credentials:
         connection_string: ACME_BROKER_STAGING_CONNECTION_STRING
 
