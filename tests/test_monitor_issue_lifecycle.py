@@ -293,7 +293,14 @@ class TestFindingLifecycle(unittest.TestCase):
     # --- criterion 11: redaction at egress ---
 
     def test_issue_body_redacts_planted_secret_in_observed_text(self):
-        secret = "sk_test_51NotARealCredentialAbCdEfGh12345"  # synthetic, not denylisted
+        # Deliberately carries NO vendor-recognisable prefix. The previous value
+        # was Stripe-shaped ("sk_test_51..."), and gitleaks matches that shape
+        # rather than a denylist, so the repo's own leak-scan gate failed on the
+        # committed tree — blocking the NEXT work unit, which had not touched this
+        # file. `redact_artifact` matches on the `api_key=` key-value pattern, not
+        # on the token's shape, so realism here buys nothing and costs a red gate.
+        # Do not "improve" this back into something that looks like a real key.
+        secret = "NotARealCredential0123456789abcdef"
         artifact = _artifact(observed_text=f"upstream call failed: api_key={secret}")
         runner = _StubRunner([_list_result([]), _create_result(number=900)])
 
