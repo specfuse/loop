@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0040/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces:
@@ -15,10 +15,12 @@ gate_set: code
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 2966.416
-cost_usd: 11.654718
-input_tokens: 208
-output_tokens: 206699
+duration_seconds: 1809.464
+cost_usd: 8.11973
+input_tokens: 162
+output_tokens: 133484
+driver_version: 0.6.0
+started_at: 2026-07-29T11:15:20.484942+00:00
 ---
 
 # One polling cycle, end to end — the `specfuse-monitor run` CLI
