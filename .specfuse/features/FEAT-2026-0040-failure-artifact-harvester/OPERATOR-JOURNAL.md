@@ -138,22 +138,21 @@ de-risk the GitHub half before booking the full run.
 A fake transport plants the finding; the real `gh` files it. Run this from inside the
 scratch clone:
 
-```python
-# plant.py — writes real issues to the repo you are standing in
-from datetime import datetime, timezone
-from specfuse.monitor.cli import run_cycle, load_monitoring_config, _resolve_repo
+The script is committed alongside this journal as **`plant-finding.py`**. It uses a
+fake transport for the finding and leaves `gh_runner` at its default — the real `gh` —
+which is the whole point. It refuses to run until you type the repository name back,
+because it files real issues.
 
-def fake_resolver(module, check_type, binding):
-    """Return a transport whose fetch yields one canned failure."""
-    raise NotImplementedError(
-        "Return a stub matching the adapter's expected transport for check_type. "
-        "See tests/test_monitor_cli.py for the shape each adapter expects."
-    )
-
-cfg = load_monitoring_config(".specfuse/monitoring.yml")
-run_cycle(cfg, repo=_resolve_repo(), transport_resolver=fake_resolver,
-          now=datetime.now(timezone.utc))
+```bash
+cd /path/to/scratch-clone
+python3 plant-finding.py     # first run  — expect 2 issues created
+python3 plant-finding.py     # second run — expect 0 created, 2 found
 ```
+
+It plants findings on **two** `dlq` subscriptions rather than one, so the same run
+also proves FEAT-2026-0069's binding constraint: two targets on one component must
+produce **two** issues, not one collapsed bucket. Point the subscription names in
+`fake_resolver` at whatever your `monitoring.yml` declares.
 
 Run it **twice** and confirm the issue count does not grow.
 
