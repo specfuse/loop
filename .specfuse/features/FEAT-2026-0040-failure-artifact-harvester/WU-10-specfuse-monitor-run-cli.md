@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0040/T10
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 oracle_env: macos_local
@@ -12,6 +12,13 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: $ python3 -m unittest discover -s tests -v
+duration_seconds: 2966.416
+cost_usd: 11.654718
+input_tokens: 208
+output_tokens: 206699
 ---
 
 # One polling cycle, end to end — the `specfuse-monitor run` CLI
