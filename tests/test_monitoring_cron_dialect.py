@@ -217,6 +217,26 @@ def _cron_dicts_in_python(path: Path) -> list[dict]:
     return found
 
 
+def _is_heartbeat_target(d: dict) -> bool:
+    """True for a monitoring heartbeat target, false for any other cron carrier.
+
+    The sweep walks every tracked YAML/Markdown/Python surface for dicts with a
+    `cron` key, and `cron` is not a word this repo owns. A GitHub Actions
+    schedule entry is `{"cron": "0 * * * *"}` and nothing else — it is POSIX
+    5-field by GitHub's definition, has no dialect concept, and accepts no such
+    field. `specfuse/loop/data/workflows/specfuse-monitor.yml` (shipped by T11)
+    is exactly that shape, and the unscoped sweep flagged it: a false positive
+    that turned `tests` red at HEAD three work units after T04 shipped the sweep.
+
+    A monitoring heartbeat target always carries `name` — `lint_monitoring`'s
+    `_TARGET_REQUIRED_FIELDS["heartbeat"]` makes it mandatory — so requiring it
+    discriminates without a path allowlist that would rot. This narrows what the
+    sweep *examines*; it does not weaken what the sweep *asserts*, because a
+    heartbeat target missing `name` is already rejected by the validator.
+    """
+    return isinstance(d.get("name"), str)
+
+
 def _collect_cron_carrying_targets() -> list[tuple]:
     found: list[tuple] = []
     for relpath in _tracked_files(_REPO_ROOT):
@@ -227,16 +247,19 @@ def _collect_cron_carrying_targets() -> list[tuple]:
             continue
         if relpath.endswith((".yml", ".yaml", ".yml.example", ".yaml.example")):
             for target in _cron_dicts_in_yaml_text(path.read_text()):
-                found.append((relpath, target))
+                if _is_heartbeat_target(target):
+                    found.append((relpath, target))
         elif relpath.endswith(".md"):
             text = path.read_text()
             for match in _YAML_FENCE_RE.finditer(text):
                 line_no = text[: match.start()].count("\n") + 1
                 for target in _cron_dicts_in_yaml_text(match.group(1)):
-                    found.append((f"{relpath}:{line_no}", target))
+                    if _is_heartbeat_target(target):
+                        found.append((f"{relpath}:{line_no}", target))
         elif relpath.endswith(".py"):
             for target in _cron_dicts_in_python(path):
-                found.append((relpath, target))
+                if _is_heartbeat_target(target):
+                    found.append((relpath, target))
     return found
 
 
@@ -272,6 +295,29 @@ class TestShippedSurfacesDeclareDialect(unittest.TestCase):
                     f"declared dialect {dialect!r} requires {arity}"
                 )
         self.assertEqual(offenders, [], "\n".join(offenders))
+
+    def test_a_workflow_schedule_cron_is_not_treated_as_a_heartbeat_target(self):
+        """The exclusion is deliberate, and asserted so a future widening of the
+        sweep cannot silently reintroduce the false positive it was narrowed for.
+
+        `specfuse/loop/data/workflows/specfuse-monitor.yml` ships a GitHub Actions
+        `on.schedule.cron`. Actions cron is POSIX 5-field by GitHub's definition and
+        has no dialect field to declare. Before this narrowing, the sweep flagged it
+        and turned `tests` red at HEAD — a regression T04's sweep could not have
+        foreseen and T11 was not looking for."""
+        self.assertFalse(
+            _is_heartbeat_target({"cron": "0 * * * *"}),
+            "a bare {cron: ...} dict — the GitHub Actions schedule shape — must not "
+            "be collected as a heartbeat target")
+        self.assertTrue(
+            _is_heartbeat_target({"cron": "0 * * * *", "name": "nightly-rollup",
+                                  "dialect": "standard-5"}),
+            "a real heartbeat target must still be collected — the narrowing must "
+            "not weaken what the sweep asserts")
+
+        collected = {w.split(":")[0] for w, _ in _collect_cron_carrying_targets()}
+        self.assertNotIn("specfuse/loop/data/workflows/specfuse-monitor.yml", collected)
+        self.assertIn(".specfuse/monitoring.yml.example", collected)
 
 
 if __name__ == "__main__":
