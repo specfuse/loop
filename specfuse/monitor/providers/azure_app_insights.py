@@ -34,6 +34,10 @@ from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.artifact import FailureArtifact
 from specfuse.monitor.redaction import redact_artifact
+
+# Credential construction is shared with the other Azure provider and looked up
+# reflectively by the core as `build_credential` (#302).
+from specfuse.monitor.providers._azure_auth import build_credential  # noqa: F401
 from specfuse.monitor.schedule import most_recent_firing
 
 _GUID_RE = re.compile(
