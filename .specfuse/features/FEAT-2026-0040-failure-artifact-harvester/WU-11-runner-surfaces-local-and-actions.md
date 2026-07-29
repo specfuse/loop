@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0040/T11
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 4.00
 oracle_env: macos_local
@@ -137,6 +137,14 @@ all. The split is explicit:
     secrets it needs and why, and — stated plainly rather than left to be inferred —
     that `in-cluster` is FEAT-2026-0043 and unimplemented, and that the local surface
     is the recommended starting point per the schema's own advice.
+11a. **The docs state what `--dry-run` does and does not gate, in one sentence.** An
+    operator decision recorded in `GATE-03-REVIEW.md` §6.1 answer 2: a dry run
+    **performs the read-only `fetch_failures()` calls** and gates only the writes —
+    the watermark and every `gh` invocation. It is not `--offline`. A separate
+    `--offline` flag was considered and rejected, because two flags is a permanent
+    explanation cost. This sentence is the whole mitigation for an operator who reads
+    `--dry-run` as "makes no external calls" and points it at a production telemetry
+    backend with real quota, so it is a criterion rather than a nicety.
 12. `python3 -m unittest tests.test_monitor_runner_surfaces -v` exits zero after
     this WU's edits, `python3 -m unittest tests.test_monitor_cli` still exits zero,
     and the `code` gate set passes in full — `tests`, `lint`, `security`,

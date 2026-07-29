@@ -222,8 +222,34 @@ claude -p 'run: gh auth status; echo "exit=$?"'
 **Paste the observed output here before arming:**
 
 ```
-<not yet run>
+$ claude -p 'run: gh auth status 2>&1; echo "exit=$?"'
+
+github.com
+  X Failed to log in to github.com using token (GH_TOKEN)
+  - Active account: true
+  - The token in GH_TOKEN is invalid.
+
+  X Failed to log in to github.com account clabonte (keyring)
+  - Active account: false
+  - The token in keyring is invalid.
+  - To re-authenticate, run: gh auth login -h github.com
+  - To forget about this account, run: gh auth logout -h github.com -u clabonte
+exit=1
 ```
+
+**Outcome: `gh` fails as recorded.** The expected branch. `T09`, `T10` and `T11`'s
+stubbed-runner scoping and their D-9 / D-10 / D-11 deferrals are correctly drawn, and
+this document's hedged-verdict expectation stands.
+
+**One nuance worth recording, because it changes what a future re-probe means.** The
+failure here is *invalid tokens*, not a missing binary or a sandbox denial — and `gh`
+works normally in the operator's own session, which filed every issue and PR in this
+feature's history today. So the claim that holds is narrow and environmental: **the
+`claude -p` subprocess does not inherit usable GitHub credentials.** It is not "gh is
+broken." A future session whose `claude -p` child *does* carry valid credentials would
+flip this branch, and the honest response then is re-arming those three WUs with real
+acceptance criteria rather than running them as drafted and reporting an avoidable
+hedge. Re-run this one-liner rather than trusting this paste.
 
 ### 4.4 §5 — planning-WU cost floors: applied
 
@@ -352,8 +378,39 @@ See **Open question 1** — trimming is the operator's call, not this document's
 
 ### 6.1 Operator decisions — recorded at arming
 
-<Filled in by the human at review time. Record the answer to each question above,
-and to the §4.3 probe, before flipping any gate-3 WU to `pending`.>
+All six answered "yes to all", with two explicit additions: the journal is
+`OPERATOR-JOURNAL.md`, and a scratch GitHub repository is planned.
+
+1. **`T08` stays at $4.00.** Not trimmed to `T05`/`T06`'s $1.18–$1.53 actuals. Two
+   observations are not a distribution, and `T08` carries the threshold-grammar
+   decision the earlier adapters did not.
+2. **`--dry-run` may read; it gates only writes.** The current split stands. `T11`'s
+   docs must state it in one sentence, so an operator who reads `--dry-run` as
+   `--offline` is corrected by the documentation rather than by a surprise on their
+   telemetry quota. No separate `--offline` flag — a second flag is a permanent
+   explanation cost.
+3. **`stall_after` lint-time enforcement stays out of gate 3.** Closing it here would
+   mean a severity flip, a §4 probe, and a second breaking schema change one release
+   after `dialect`. **It gets a home rather than a mention:** the operator accepted
+   the recommendation on the condition the follow-up is filed as a tracked issue, not
+   left in a retrospective. `G3-CLOSE` must confirm that issue exists and cite it —
+   §7's follow-up list is not a substitute for an owner.
+4. **A `queue-stalled` target with no `stall_after` is skipped and reported.** The
+   drafted behaviour. The run summary is confirmed as a sufficient surface for "this
+   target is monitored by nobody"; raising would crash the harvester on a
+   schema-valid config.
+5. **Both oracles are planned — the Azure run *and* a scratch GitHub repository.**
+   This is the consequential answer and it changes the expected outcome recorded in
+   §7 and in `G3-CLOSE`. The terminal verdict is **no longer `met_locally` by
+   construction**: D-1 … D-8 have their Azure oracle and D-9 … D-11 now have a
+   GitHub-side one. `met` is reachable once both runs are observed and recorded. If
+   `G3-CLOSE` runs before either has happened, `met_locally` with the §2 hedged
+   record is still the honest verdict — the runs are the named upgrade condition, and
+   `/accept-hedged-close` is the path.
+6. **The operator journal is `OPERATOR-JOURNAL.md` in this feature folder.** One
+   dated entry per run: the command, the observed output, and the resulting issue
+   list. D-9, D-10 and D-11 cite it as their verification proxy, and `G3-CLOSE` reads
+   it if it exists and says plainly that it does not if it does not.
 
 ---
 
