@@ -2,6 +2,10 @@
 gate: 3
 status: open
 cost_budget_usd: 28.00
+baseline:
+  sha: a320e8e046e4d69d1eb0493da8e43b8def8504f6
+  probed_at: 2026-07-29T00:20:44.093293+00:00
+  failing: []
 ---
 
 # Gate 3 — a finding becomes an issue, once, and something runs the cycle
