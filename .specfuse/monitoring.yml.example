@@ -147,14 +147,19 @@ components:
 
       # One heartbeat check, many targets — one per schedule, so a single
       # silent timer among several is still individually visible instead of
-      # being averaged away by a single host-wide heartbeat.
+      # being averaged away by a single host-wide heartbeat. `dialect` is
+      # required whenever `cron` is present — declared, never inferred, so
+      # a heartbeat check knows how many fields the expression carries
+      # without guessing. Both targets here are standard 5-field cron.
       - type: heartbeat
         targets:
           - name: nightly-reconciliation
             cron: "0 2 * * *"
+            dialect: standard-5
             timezone: Etc/UTC
           - name: hourly-cache-warm
             cron: "0 * * * *"
+            dialect: standard-5
             timezone: Etc/UTC
 
       # queue-stalled: catches a consumer that has stopped consuming — no

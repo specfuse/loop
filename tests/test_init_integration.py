@@ -62,6 +62,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",
+    "workflows/specfuse-monitor.yml",
 }
 
 _GITIGNORE_SNIPPET = read_scaffold("gitignore.snippet").decode("utf-8")

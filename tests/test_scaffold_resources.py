@@ -41,6 +41,7 @@ _EXPECTED_RELPATHS = {
     "docs/skills.md",
     "docs/concepts/ralph-lineage.md",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "workflows/specfuse-monitor.yml",
 }
 
 

@@ -44,6 +44,7 @@ _EXPECTED_TREE = {
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",
+    "workflows/specfuse-monitor.yml",
 }
 
 # Seed relpaths for versioned files and their target relpaths inside .specfuse/

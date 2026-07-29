@@ -55,7 +55,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
 | FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
-| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | planned | — | [→ detail](#feat-2026-0040) |
+| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
@@ -764,24 +764,6 @@ machine-checkable contract rather than prose.
 
 **Status: done.**
 
-<a id="feat-2026-0040"></a>
-## FEAT-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
-
-**Why.** Detection must be deterministic, cheap, and LLM-free: enumerate discrete failure artifacts (DLQ messages, error-log entries, 5xx traces, missed heartbeats, invariant violations) and report them as deduplicated GitHub issues. Laser focus on component misbehavior — not metrics or infra (that is Datadog's job) — catching functional issues before platform alerts fire.
-
-**Goal.** A CLI (`specfuse-monitor run [--component X] [--env Y] [--dry-run]`) implementing the FEAT-2026-0039 schema behind a provider-adapter interface (telemetry adapter + broker adapter, each normalizing to the neutral artifact model — core logic never sees provider types); v1 ships the Azure pair: Service Bus DLQ peek adapter and App Insights KQL adapters for the built-in check types; fingerprinting (component + failure class + signature, e.g. exception type + top app stack frame); context collection by correlation ID; redaction pass before any artifact text lands in an issue; issue lifecycle — search by `specfuse-monitor` label + fingerprint marker, create with diagnosis-ready artifact section, update occurrence count throttled, annotate "quiet for N runs — candidate for close" (humans close; no quiet-based auto-close ever). State principle: everything derivable from GitHub issues or safely losable — issues are the fingerprint registry; watermarks are best-effort per-host cache with lookback-window fallback; idempotency comes from fingerprint dedupe. Ships local runner mode plus the GH Actions workflow surface; all env access read-only.
-
-**Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
-
-**Unblocked 2026-07-26.** [FEAT-2026-0069](#feat-2026-0069) landed the check-target axis and is `done`; [FEAT-2026-0039](#feat-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
-
-**Binding constraint inherited from FEAT-2026-0069 — do not lose it.** **Fingerprints must include the target key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription attribution 0069 paid two gates for is destroyed at the last step. 0069's terminal close restates this as its own closing obligation; it is this feature's to honour.
-
-**Two open schema questions this feature will be first to feel**, neither blocking: [#262](https://github.com/specfuse/loop/issues/262) — telemetry binds per environment, so components in one environment cannot resolve to different telemetry instances; and the cron-dialect ambiguity 0069's real-repo run surfaced — `cron` is opaque to the schema, and a heartbeat check computing "should this have fired?" cannot tell a 5-field expression from a 6-field one. Decide both when the adapter interface forces the question, not before.
-
-**Status: planned.**
-
-<a id="feat-2026-0041"></a>
 ## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
 
 **Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.

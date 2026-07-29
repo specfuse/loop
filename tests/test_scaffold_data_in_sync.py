@@ -52,6 +52,16 @@ DOCS_TRACKED = {
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
 }
 
+# Unmirrored manifest — files authored directly under specfuse/loop/data/
+# with no canonical .specfuse/ or docs/ counterpart to byte-match against.
+# `workflows/specfuse-monitor.yml` is a template FOR CONSUMER PROJECTS
+# (FEAT-2026-0040/T11): this repository never installs it into its own
+# .github/workflows/ (see test_monitor_runner_surfaces.py), so there is no
+# canonical copy for it to drift from. Existence-only, checked below.
+UNMIRRORED_TRACKED = {
+    "workflows/specfuse-monitor.yml",
+}
+
 
 class TestScaffoldDataInSync(unittest.TestCase):
     def test_package_data_matches_canonical(self):
@@ -98,6 +108,12 @@ class TestScaffoldDataInSync(unittest.TestCase):
                 "Diffs:\n" + "\n".join(f"  {m}" for m in mismatches)
             )
 
+    def test_unmirrored_files_exist(self):
+        """Each unmirrored file must exist — existence-only, no canonical to diff against."""
+        missing = [rel for rel in sorted(UNMIRRORED_TRACKED) if not (PACKAGE_DATA / rel).is_file()]
+        if missing:
+            self.fail("Missing unmirrored package-data files:\n" + "\n".join(f"  {m}" for m in missing))
+
     def test_no_orphan_files_in_package_data(self):
         """No files in specfuse/loop/data/ that are absent from the sync manifest."""
         actual = {
@@ -105,7 +121,7 @@ class TestScaffoldDataInSync(unittest.TestCase):
             for p in PACKAGE_DATA.rglob("*")
             if p.is_file()
         }
-        orphans = actual - TRACKED - DOCS_TRACKED
+        orphans = actual - TRACKED - DOCS_TRACKED - UNMIRRORED_TRACKED
         if orphans:
             self.fail(
                 "Unexpected files in specfuse/loop/data/ not in sync manifest.\n"

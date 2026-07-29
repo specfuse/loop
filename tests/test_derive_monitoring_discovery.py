@@ -74,8 +74,8 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
     trigger-table order. A matched ``http`` trigger sets ``http_serving``; a
     matched ``subscription`` trigger sets ``message_consuming`` and appends a
     ``{subscription, function}`` entry to the record's ``subscriptions`` list;
-    a matched ``schedule`` trigger appends a ``{name, cron, timezone}`` entry
-    to ``schedules``. ``http_serving`` and ``message_consuming`` are always
+    a matched ``schedule`` trigger appends a ``{name, cron, timezone, dialect}``
+    entry to ``schedules``. ``http_serving`` and ``message_consuming`` are always
     derived from matched triggers, never read from the candidate.
 
     A record's ``evidence`` is its deployment file(s) plus every scoped file a
@@ -126,6 +126,7 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
                     "name": trigger["name"],
                     "cron": trigger["cron"],
                     "timezone": trigger["timezone"],
+                    "dialect": trigger["dialect"],
                 })
 
         records.append({
@@ -153,8 +154,8 @@ def suggest_checks(component: dict) -> list[dict]:
     subscriptions gets no ``dlq`` check at all: a target needs a real
     subscription and function, and inventing either would be fabricating
     evidence. ``heartbeat`` carries one target per entry in the record's
-    neutral ``schedules`` list, each a real ``{name, cron, timezone}``
-    triple known from discovery; a component with no known schedules gets a
+    neutral ``schedules`` list, each a real ``{name, cron, timezone, dialect}``
+    entry known from discovery; a component with no known schedules gets a
     target-less ``heartbeat`` -- the same honesty rule ``dlq`` already
     follows. ``invariant`` is never suggested — its ``query`` is
     operator-supplied by definition, so inventing one would be fabricating
@@ -178,7 +179,12 @@ def suggest_checks(component: dict) -> list[dict]:
     heartbeat = {"type": "heartbeat"}
     if schedules:
         heartbeat["targets"] = [
-            {"name": s["name"], "cron": s["cron"], "timezone": s["timezone"]}
+            {
+                "name": s["name"],
+                "cron": s["cron"],
+                "timezone": s["timezone"],
+                "dialect": s["dialect"],
+            }
             for s in schedules
         ]
     checks.append(heartbeat)
@@ -502,6 +508,7 @@ _STACK_C_PATTERNS = {
             "name": "acme-nightly-reconciliation",
             "cron": "0 2 * * *",
             "timezone": "Etc/UTC",
+            "dialect": "standard-5",
         },
         {
             "marker": "ACME_C_TIMER_TWO_MARKER",
@@ -509,6 +516,7 @@ _STACK_C_PATTERNS = {
             "name": "acme-hourly-cache-warm",
             "cron": "0 * * * *",
             "timezone": "Etc/UTC",
+            "dialect": "standard-5",
         },
     ],
 }
@@ -558,6 +566,7 @@ class TestDeploymentKeyedDiscovery(unittest.TestCase):
                 "name": "acme-t06-timer",
                 "cron": "0 * * * *",
                 "timezone": "UTC",
+                "dialect": "standard-5",
             },
         ],
     }
@@ -802,16 +811,20 @@ class TestHeartbeatTargetsFromSchedules(unittest.TestCase):
             "name": "host", "type": "multi-trigger-host",
             "http_serving": False, "message_consuming": False,
             "schedules": [
-                {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC"},
-                {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC"},
+                {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC",
+                 "dialect": "standard-5"},
+                {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC",
+                 "dialect": "standard-5"},
             ],
         }
         checks = suggest_checks(component)
         heartbeat_checks = [c for c in checks if c["type"] == "heartbeat"]
         self.assertEqual(len(heartbeat_checks), 1)
         self.assertEqual(heartbeat_checks[0]["targets"], [
-            {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC"},
-            {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC"},
+            {"name": "nightly", "cron": "0 2 * * *", "timezone": "Etc/UTC",
+             "dialect": "standard-5"},
+            {"name": "hourly", "cron": "0 * * * *", "timezone": "Etc/UTC",
+             "dialect": "standard-5"},
         ])
 
 
@@ -959,7 +972,7 @@ class TestOneDeployableManyTriggers(unittest.TestCase):
         self.assertEqual(len(heartbeat_checks), 1)
         self.assertEqual(len(heartbeat_checks[0]["targets"]), 2)
         for target in heartbeat_checks[0]["targets"]:
-            self.assertEqual(set(target), {"name", "cron", "timezone"})
+            self.assertEqual(set(target), {"name", "cron", "timezone", "dialect"})
 
         text = render_monitoring_yml(rendered)
         with tempfile.TemporaryDirectory() as tmp:

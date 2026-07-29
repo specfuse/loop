@@ -454,6 +454,10 @@ class TestCheckTargets(unittest.TestCase):
         self.assertEqual(validate_monitoring(p), [])
 
     def test_heartbeat_target_missing_name_is_rejected(self):
+        # After the cron-dialect flip (FEAT-2026-0040/T04), a target carrying
+        # `cron` and no `dialect` yields a *second* finding alongside the
+        # missing-`name` one — keep this an exact count so a loosened
+        # `>= 1` doesn't stop distinguishing the two rules.
         text = VALID_CONFIG.replace(
             "      - type: heartbeat\n",
             "      - type: heartbeat\n"
@@ -462,17 +466,34 @@ class TestCheckTargets(unittest.TestCase):
         )
         p = self._write(text)
         findings = validate_monitoring(p)
-        self.assertEqual(len(findings), 1)
-        self.assertIn("name", findings[0])
+        self.assertEqual(len(findings), 2, findings)
+        self.assertTrue(any("name" in f for f in findings), findings)
+        self.assertTrue(any("dialect" in f for f in findings), findings)
 
-    def test_heartbeat_target_cron_and_timezone_contents_are_opaque(self):
+    def test_heartbeat_target_timezone_contents_are_opaque(self):
         text = VALID_CONFIG.replace(
             "      - type: heartbeat\n",
             "      - type: heartbeat\n"
             "        targets:\n"
             "          - name: nightly-sync\n"
-            "            cron: \"this is not a cron expression at all\"\n"
+            "            cron: \"0 2 * * *\"\n"
+            "            dialect: standard-5\n"
             "            timezone: Not/A_Real_Zone\n",
+        )
+        p = self._write(text)
+        self.assertEqual(validate_monitoring(p), [])
+
+    def test_heartbeat_target_cron_field_values_are_opaque(self):
+        # Field *count* is checked against the declared dialect; field
+        # *values* are not — five garbage words still validate clean under
+        # `standard-5` (arity 5).
+        text = VALID_CONFIG.replace(
+            "      - type: heartbeat\n",
+            "      - type: heartbeat\n"
+            "        targets:\n"
+            "          - name: nightly-sync\n"
+            "            cron: \"not real fields but five\"\n"
+            "            dialect: standard-5\n",
         )
         p = self._write(text)
         self.assertEqual(validate_monitoring(p), [])

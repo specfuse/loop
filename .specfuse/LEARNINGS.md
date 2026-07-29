@@ -2333,3 +2333,99 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   itself that doing so was safe. An exit code recorded without its environment is not
   evidence; it is a number that will be read as red by whoever sees it next — including the
   driver running the same gates.
+
+- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **A completeness sweep whose file list is
+  discovered by walking keeps being true as the gate writes new files; one scoped to a
+  hand-written path tuple silently stops looking.** T04's tree-wide assertion ("no
+  cron-carrying heartbeat target anywhere lacks a conforming dialect") enumerates its
+  inputs via `git ls-files` rather than naming paths. When the close re-ran it, the sweep
+  collected 14 targets across 4 files — but one of those files, `tests/test_heartbeat_adapter.py`,
+  did not exist when T04 ran: T07 created it later in the same gate, and it carries the
+  tree's only instance of the second dialect. A hand-written tuple would have gone on
+  reporting "zero non-conforming" while never once looking at the file that exercises the
+  case the enum was added for. Rule: a migrate-step criterion asserts over a **discovered**
+  file set, and is paired with a non-vacuity assertion (collected count above a floor, plus
+  named files that must appear) so "zero offenders" cannot be satisfied by an empty walk.
+  Corollary for closes: re-run the sweep rather than inheriting the producing WU's pass —
+  the tree it swept is not the tree at close time, and only the fresh run says which one
+  the claim covers.
+
+- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **A test fixture that builds a throwaway git repo
+  must pin every commit-affecting setting, not just identity — otherwise it inherits the
+  host operator's global config and fails for reasons that have nothing to do with the
+  code under test.** `tests/test_autosync_no_cwd_leak.py` sets `user.name` and `user.email`
+  on its temp repos and stops there, so each `git commit` inherited a global
+  `commit.gpgsign = true` with `gpg.format = ssh`, and the signing agent socket is
+  unreachable from a sandboxed session: `error: Couldn't get agent socket?` /
+  `fatal: failed to write commit object`, exit 128, three errors in an otherwise green
+  1753-test run. Confirmed by re-running the same module under
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false` → OK. This
+  is a **different** failure from the already-recorded `mktemp`/sandbox one: that is the
+  executor lacking a filesystem privilege, this is host configuration leaking into a
+  fixture, and the two need different fixes. Rule: a fixture repo pins `commit.gpgsign`
+  and `tag.gpgsign` to false alongside identity; and a close that meets a red gate checks
+  whether the failing command reads *ambient host config* before recording the exit code
+  as a regression.
+
+- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **Do not re-price a gate off the previous gate's
+  underrun when the two gates are made of different work; price the migration-and-severity-flip
+  unit separately from the new-module units.** Gate 1's three units came in at $2.65
+  against $9.50 (−72%), three for three, all first attempt, and the arming review faced an
+  explicit temptation to scale gate 2's six units down by the same factor to roughly
+  $10.00. It refused, on the stated grounds that gate 1's units were new modules with no
+  tree to migrate, no severity flip, and no cross-file assertions to re-aim. Measured
+  outcome: the three new-module adapter units did land near gate 1's shape (−62%, −70%,
+  +9%), and **the one over-run was exactly the migration unit, at +39% ($4.50 → $6.25)**.
+  On the scaled-down plan that unit would have carried ~$1.25 and the budget halt would
+  have landed on the gate's first WU. Rule: an estimate is calibrated against work of the
+  same *shape*, not the same feature; a WU that tightens a validator, migrates a tree, and
+  re-aims existing assertions is a different distribution from a WU that adds a module, and
+  a gate mixing both is priced per-unit rather than by one factor. A budget is a halt
+  threshold, not a spend target — under-running it costs nothing, and a halt mid-gate costs
+  the whole gate.
+
+- [FEAT-2026-0040/G3-CLOSE] **A tree-wide sweep that walks `git ls-files` is blind to the
+  new file of the WU that introduces it, so the offending WU always passes and the failure
+  lands on whoever runs the suite next.** A gate-2 WU shipped a walk-discovered assertion
+  over every tracked file; a gate-3 WU shipped a new YAML template that violates it. The
+  gate-3 WU's own verification ran green, because at that moment its file was still
+  **untracked** — the driver commits *after* the gate set passes, so a `git ls-files` walk
+  cannot see the deliverable that made the WU dispatch. The file entered the walk's view
+  only once the WU was `done`, and the failure surfaced two WUs later in the terminal
+  close's fresh re-run. Rule: a sweep that discovers its own file list must walk the
+  **working tree** (tracked plus untracked-not-ignored), not `git ls-files` alone —
+  otherwise it structurally cannot fail on the change that introduces the violation. And
+  the corollary for closes hardens from advice into a requirement: "the producing WU
+  passed" is **no evidence at all** for a walk-discovered assertion, because that walk did
+  not include the WU's own output. Re-run it at close time; that is the only run whose tree
+  is the tree being shipped.
+
+- [FEAT-2026-0040/G3-CLOSE] **A deliberately schema-agnostic structural predicate collides
+  with foreign surfaces that happen to share its key, and the collision arrives exactly
+  when the feature starts shipping its own config-shaped files.** The sweep above collects
+  "every mapping carrying a `cron` key" — chosen on purpose, so a heartbeat target is found
+  whether it lives in a shipped config, a discovery fixture, or a test assertion. Then the
+  same feature shipped a CI workflow template whose `on.schedule` carries a `cron` the
+  domain rule cannot possibly apply to: the required sibling field would make the workflow
+  invalid. Both units were right by their own lights and the composite is red. Rule: scope
+  a structural sweep by **where** a mapping lives (a named file set, or a required ancestor
+  path such as `checks[].targets[]`), not by the bare presence of a key, and expect the
+  first collision at the moment the feature ships YAML of its own. Reaching for a
+  hand-written exclusion list instead is the regression the walk was built to prevent —
+  fix the predicate, keep the walk and its non-vacuity floor.
+
+- [FEAT-2026-0040/G3-CLOSE] **Gate padding sized as "one re-attempt of the largest WU"
+  prices the retry at the drafted figure, which is the one number a retry disproves.** A
+  gate drafted at $23.00 carried a $28.00 budget: $5.00 of padding for exactly one
+  re-attempt of its $5.00 unit. That unit needed two failed attempts plus a re-arm and cost
+  **$19.77 against $5.00 (+295%)**, while the gate's other three units all under-ran
+  (−31% to −52%). The gate reached **97% of its halt threshold before the terminal close
+  dispatched**. The failed attempts were not caused by that unit's difficulty at all — they
+  died on a red base gate seeded by a *different, already-`done`* WU's test fixture, which
+  no per-unit estimate can anticipate and no fresh session of the blocked unit could fix,
+  because the offending file was outside its scope. Rule: when a WU fails on a base gate
+  its own diff cannot clear, the driver-level response (escalate, fix out-of-band, re-arm)
+  must be paired with a **budget re-baseline**, because attempts are billed and a re-arm
+  restarts the attempt counter but not the spend. And padding is more honest as a
+  proportion of the gate than as a copy of one unit's estimate: a retry costs what the
+  retry costs, not what the plan hoped the unit would.
