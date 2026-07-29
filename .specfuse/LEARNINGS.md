@@ -2383,3 +2383,49 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a gate mixing both is priced per-unit rather than by one factor. A budget is a halt
   threshold, not a spend target — under-running it costs nothing, and a halt mid-gate costs
   the whole gate.
+
+- [FEAT-2026-0040/G3-CLOSE] **A tree-wide sweep that walks `git ls-files` is blind to the
+  new file of the WU that introduces it, so the offending WU always passes and the failure
+  lands on whoever runs the suite next.** A gate-2 WU shipped a walk-discovered assertion
+  over every tracked file; a gate-3 WU shipped a new YAML template that violates it. The
+  gate-3 WU's own verification ran green, because at that moment its file was still
+  **untracked** — the driver commits *after* the gate set passes, so a `git ls-files` walk
+  cannot see the deliverable that made the WU dispatch. The file entered the walk's view
+  only once the WU was `done`, and the failure surfaced two WUs later in the terminal
+  close's fresh re-run. Rule: a sweep that discovers its own file list must walk the
+  **working tree** (tracked plus untracked-not-ignored), not `git ls-files` alone —
+  otherwise it structurally cannot fail on the change that introduces the violation. And
+  the corollary for closes hardens from advice into a requirement: "the producing WU
+  passed" is **no evidence at all** for a walk-discovered assertion, because that walk did
+  not include the WU's own output. Re-run it at close time; that is the only run whose tree
+  is the tree being shipped.
+
+- [FEAT-2026-0040/G3-CLOSE] **A deliberately schema-agnostic structural predicate collides
+  with foreign surfaces that happen to share its key, and the collision arrives exactly
+  when the feature starts shipping its own config-shaped files.** The sweep above collects
+  "every mapping carrying a `cron` key" — chosen on purpose, so a heartbeat target is found
+  whether it lives in a shipped config, a discovery fixture, or a test assertion. Then the
+  same feature shipped a CI workflow template whose `on.schedule` carries a `cron` the
+  domain rule cannot possibly apply to: the required sibling field would make the workflow
+  invalid. Both units were right by their own lights and the composite is red. Rule: scope
+  a structural sweep by **where** a mapping lives (a named file set, or a required ancestor
+  path such as `checks[].targets[]`), not by the bare presence of a key, and expect the
+  first collision at the moment the feature ships YAML of its own. Reaching for a
+  hand-written exclusion list instead is the regression the walk was built to prevent —
+  fix the predicate, keep the walk and its non-vacuity floor.
+
+- [FEAT-2026-0040/G3-CLOSE] **Gate padding sized as "one re-attempt of the largest WU"
+  prices the retry at the drafted figure, which is the one number a retry disproves.** A
+  gate drafted at $23.00 carried a $28.00 budget: $5.00 of padding for exactly one
+  re-attempt of its $5.00 unit. That unit needed two failed attempts plus a re-arm and cost
+  **$19.77 against $5.00 (+295%)**, while the gate's other three units all under-ran
+  (−31% to −52%). The gate reached **97% of its halt threshold before the terminal close
+  dispatched**. The failed attempts were not caused by that unit's difficulty at all — they
+  died on a red base gate seeded by a *different, already-`done`* WU's test fixture, which
+  no per-unit estimate can anticipate and no fresh session of the blocked unit could fix,
+  because the offending file was outside its scope. Rule: when a WU fails on a base gate
+  its own diff cannot clear, the driver-level response (escalate, fix out-of-band, re-arm)
+  must be paired with a **budget re-baseline**, because attempts are billed and a re-arm
+  restarts the attempt counter but not the spend. And padding is more honest as a
+  proportion of the gate than as a copy of one unit's estimate: a retry costs what the
+  retry costs, not what the plan hoped the unit would.

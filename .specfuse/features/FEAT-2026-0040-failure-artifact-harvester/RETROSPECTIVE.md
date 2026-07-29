@@ -473,3 +473,502 @@ not promoted.
   shipped notes, and the "two open schema questions" paragraph is updated: the
   cron-dialect ambiguity is now **decided**, and [#262](https://github.com/specfuse/loop/issues/262)
   is deferred **through a seam** rather than left open in the shape it warned about.
+
+---
+
+## Gate 3 — a finding becomes an issue, once, and something runs the cycle
+
+Closed 2026-07-29 by `FEAT-2026-0040/G3-CLOSE`. **Terminal gate.** Verdict:
+**`partially_met`** — recorded in this WU's frontmatter, and argued below rather than
+asserted. It is not the `met_locally` gate 2 expected, and it is not `met`: the fresh
+oracle re-run this close is obliged to perform found a **real, reproducible failure in
+the tree at HEAD** that no producing WU could have seen. That finding is the most
+valuable thing in this section.
+
+Four substantive work units, all `done`:
+
+| WU | shipped | evidence class |
+|---|---|---|
+| `T08` | `QueueStalledAdapter` in `specfuse/monitor/providers/azure_service_bus.py` — depth **plus** age-of-oldest over `T01`'s `BrokerAdapter`, a `<int><s\|m\|h\|d>` threshold grammar that **refuses** rather than guesses, and a skip-with-recorded-reason for a target with no `stall_after` | **fully in-loop**, stub transport |
+| `T09` | `specfuse/monitor/issues.py` — fingerprint-keyed find-or-create over `escalation.py`'s injected-runner seam, `--search` **replaced** by a client-side filter over an explicitly `--limit`ed listing, occurrence bump under a throttle, quiet annotation, and nothing that closes | **stub-runner only** — D-9 |
+| `T10` | `specfuse/monitor/cli.py` + the `specfuse-monitor` entry point — config load, 0069-axis enumeration, registry-driven dispatch, the `resolve_telemetry` seam, watermark fallback, run summary, `--dry-run` | dry-run path in-loop, **write path stub only** — D-10 |
+| `T11` | `specfuse/loop/data/workflows/specfuse-monitor.yml`, the `--runner` dial, and `docs/concepts/monitoring-runners.md` | local half in-loop, **workflow asserted structurally and never executed** — D-11 |
+
+### Failure-class breakdown
+
+Gate 3 is the first gate in this feature with failed attempts, so this section is
+present rather than absent-with-a-reason. Read from `events.jsonl`'s
+`attempt_outcome` payloads, not from prose.
+
+| class | count | WU | what the driver recorded |
+|---|---|---|---|
+| `tests` | 2 | `FEAT-2026-0040/T10` | attempts 1 and 2, identical `failure_signature` (`$ python3 -m unittest discover -s tests -v`), $5.99 and $5.66 |
+
+`T08`, `T09` and `T11` passed on their first attempt. No other class appears — no
+`lint`, no `security`, no `coverage`-only, no `blocked` report from any agent
+(`agent_status: complete` on both failed attempts, `agent_blocked_reason: null`).
+
+**What happened, and what is recoverable from the artifacts.** Two identical
+signatures tripped the driver's `spinning_signature_repeat` guard and it escalated to
+the human rather than spending a third attempt. The recorded `failure_excerpt` on both
+attempts is the same four lines:
+
+```
+### tests: FAIL
+### coverage: FAIL
+$ coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90
+### leak-scan: FAIL
+```
+
+Of those three red gates, **only `leak-scan`'s cause survives in the artifacts**, and
+it is unambiguous: `work/FEAT-2026-0040_T10/attempt-2.md` records the scanner
+reporting one finding in `tests/test_monitor_issue_lifecycle.py` — a vendor-shaped
+token planted as `T09`'s redaction fixture, of exactly the class the pre-commit
+structural form rejects while CI's form tolerates it. `T09` had already passed with
+that fixture in place; `T10` inherited the red gate and could not clear it by editing
+its own files, because the offending file belonged to a `done` WU it was forbidden to
+touch. The fixture was replaced out-of-band (`fix(monitor): drop the vendor-shaped
+token from T09's redaction fixture`), `T10` was re-armed, and it passed on the next
+attempt at $8.12.
+
+**The `tests`-gate cause is *not* recoverable and this close does not invent one.**
+Both attempt notes truncate the `tests` gate's captured output to the tail of an
+integration test's own stdout — a nested driver run for an unrelated fixture feature —
+so the failing test name never reached the note. What is checkable now is stated
+instead: every test module `T10` produces or depends on passes fresh in this session
+(rows 18–22 of the oracle table), so whatever the `tests` gate was reporting on
+2026-07-29 at 01:10 and 01:36 is not reproducible against those modules today. The
+gate is red at HEAD for a **different** reason, diagnosed below, which is not the same
+finding and must not be read as one.
+
+**The cost of this class is the single largest variance in the feature.** `T10` was
+drafted at $5.00 and cost **$19.77** across three attempts — two failed at $11.65
+between them, plus $8.12 on the re-armed pass. See `## Cost analysis`.
+
+### The composite failure the fresh re-run caught
+
+`close-discipline.md` §1 exists for exactly this: *all WUs individually green while the
+feature-level oracle fails*. Row 9 of the oracle table:
+
+```
+$ python3 -m unittest tests.test_monitoring_cron_dialect
+FAIL: test_no_cron_without_a_conforming_dialect_anywhere
+AssertionError: Lists differ: [...] != []
+  specfuse/loop/data/workflows/specfuse-monitor.yml: cron '0 * * * *' has no
+  conforming dialect (got None)
+Ran 9 tests in 0.287s
+FAILED (failures=1)
+```
+
+**`T04`'s tree-wide sweep is now failing on a file `T11` shipped**, and both units were
+right by their own lights:
+
+- `T04`'s sweep collects **every mapping in the git-tracked tree that carries a `cron`
+  key** — deliberately schema-agnostic, because that is the shape a heartbeat target
+  takes whether it lives in a shipped `monitoring.yml`, a discovery fixture, or a test
+  assertion. Its own docstring says so.
+- `T11`'s workflow template carries `on.schedule: - cron: "0 * * * *"`. That is a
+  **GitHub Actions** cron on a surface where `dialect` has no meaning and could not be
+  added without shipping an invalid workflow.
+
+So the sweep's predicate now has a false positive, and the `tests` gate — and with it
+the `coverage` gate, whose command is `coverage run … && coverage report` — is **red at
+HEAD**. Two things follow, and the second is the generalizable one:
+
+1. **This is a defect in the sweep's discovery predicate, not in `T11`'s template.**
+   The template is correct GitHub Actions YAML and criterion 5–9's structural
+   assertions all pass. The fix is to scope the sweep by *where* a mapping lives rather
+   than by the bare presence of a `cron` key. It is **not applied here**: this unit
+   closes the feature and does not patch a `done` WU's work, and the file belongs to
+   `T04`'s test module. Carried as **FU-E**.
+2. **`T11` could not have caught it, and that is a property of the sweep, not of `T11`.**
+   The sweep walks `git ls-files`. When `T11`'s own verification ran, the template it
+   had just written was **untracked** — invisible to the walk. The driver commits after
+   the gate set passes, so the file became visible to the sweep only *after* the unit
+   that introduced it was green. **The introducing WU always passes; the failure lands
+   on whoever runs the suite next.** Here that was this close, one WU later. Promoted to
+   `LEARNINGS.md`.
+
+Gate 2's close already wrote the corollary that caught this — *"re-run the sweep rather
+than inheriting the producing WU's pass — the tree it swept is not the tree at close
+time"* — as a prediction. This is that prediction being paid out, one gate later, on
+the first close obliged to act on it.
+
+### The fingerprint contract, end to end — criterion 6
+
+**The binding constraint inherited from FEAT-2026-0069 holds through the whole
+composition.** Exercised in this session against `T10`'s fixture transports plus a
+stateful stub of `T09`'s injected runner — a fake repository whose `gh issue list`
+returns what its `gh issue create` has filed so far, so the second harvest reads the
+first harvest's state rather than a canned answer:
+
+```
+run 1 exit code          : 0
+gh issue create calls    : 2
+distinct fingerprints    : 2
+issue titles             : ['[monitor:034ab4830a18] order-worker: MaxDeliveryCountExceeded',
+                            '[monitor:bae090a62cd9] order-worker: MaxDeliveryCountExceeded']
+run 2 exit code          : 0
+create calls after run 2 : 2
+issues in fake repo      : 2
+```
+
+One component (`order-worker`), one `dlq` check, **two targets** (`orders-sub` /
+`ProcessOrder` and `inventory-sub` / `SyncInventory`), whose stub messages carry the
+**same** dead-letter reason — so the only thing distinguishing them is the target
+coordinate pair, which is precisely the collapse 0069 paid two gates to prevent. Two
+create calls, two distinct fingerprint markers in the two bodies, two issues. And the
+second cycle over the same two findings creates **nothing**: idempotence and
+distinctness proven in the same run, at the surface where losing either is
+irreversible.
+
+**What this is worth, stated exactly.** It is proof of the *composition* — that
+enumeration, fingerprinting, and the issue lifecycle agree with each other across three
+gates' worth of modules that had never run together. It is **not** proof of GitHub:
+the runner is a stub, and every `gh` argument list it recorded went nowhere. D-9 and
+D-10 remain open exactly as written.
+
+### The duplicate-filing risk inherited from FEAT-2026-0046 — criterion 7
+
+Addressed in `T09`, and the in-loop evidence is recorded here rather than deferred
+silently.
+
+| `T09` c | property | fresh evidence in this session |
+|---|---|---|
+| 4 | the finder never passes the marker to `--search` | `grep -n '"--search"' specfuse/monitor/issues.py` → **exit 1, no match**. `_list_findings` passes `--label`, `--state open`, `--limit`, `--json number,body,title` and nothing else |
+| 5 | the `marker in body` re-check is load-bearing | `tests.test_monitor_issue_lifecycle` → exit 0, `Ran 19 tests … OK`, covering both directions (one row matches, no row matches) |
+| 6 | a truncated page is never reported as not-found | `find_finding_issue` raises `TruncatedListingError` when the returned row count reaches `--limit` with no match — the chosen behaviour of the two the criterion allowed, asserted rather than assumed |
+| 7 | idempotence | the stub suite, **and** the end-to-end run above: a second harvest of two live fingerprints produced zero further create calls |
+
+So 0046's named defect — *a search that returns nothing silently files a duplicate on
+every retry* — is structurally out of the code path: there is no search to return
+nothing, and the one remaining way to mistake absence for emptiness (a full page) now
+raises instead of lying.
+
+**And that is where the in-loop evidence stops.** D-9 — *the same property against a
+real repository* — is discharged only by the operator-journal record. **That record
+does not exist:** there is no `OPERATOR-JOURNAL.md` in this feature folder at close
+time, and `gh` is unusable from this session (invalid `GH_TOKEN`, invalid keyring
+token, and a TLS verification failure from inside the sandbox), so nothing here could
+have produced one. Stated plainly, per criterion 7, rather than implied by the green
+stub suite.
+
+### `stall_after` — the disposition, not an implicit gap — criterion 8
+
+**Disposition: the grammar is settled in the adapter and the validator was deliberately
+left permissive.** `T08` accepts `<integer><unit>` with unit in `s`/`m`/`h`/`d` and
+raises on everything else — `"15"`, `"15 minutes"`, `"m15"`, `""`, `"-5m"` each observed
+rejecting in `tests.test_queue_stalled_adapter` (exit 0, `Ran 14 tests … OK`). It did
+**not** tighten `specfuse/loop/lint_monitoring.py`, because making `stall_after`
+required and bounded is a severity flip: it needs `planning-discipline.md` §4's runtime
+probe, which gate 3 was armed without because it has no other flip, and it would be a
+second breaking schema change one release after `dialect`.
+
+**Consequence, stated so it is not rediscovered:** a typo'd `stall_after` lints clean
+and fails at **run time**, not at lint time. That is a real gap and it is carried as
+**FU-D**, not dropped.
+
+**Its home, and the one thing this close could not confirm.** `GATE-03-REVIEW.md` §6.1
+answer 3 records the operator accepting the deferral *on the condition that the
+follow-up is filed as a tracked issue, not left in a retrospective*, and requires this
+close to confirm the issue exists and cite it. **It could not be confirmed.** `gh` is
+unusable here — `gh auth status` reports both the `GH_TOKEN` and keyring tokens
+invalid, and `gh issue list` fails before reaching the API with
+`tls: failed to verify certificate`. So FU-D is recorded below with its home named as
+*a tracked issue the operator files or confirms at the terminal review checkpoint*, and
+this close reports the unmet half rather than asserting a citation it never read.
+
+### Which sandbox each gate ran under
+
+Per `[FEAT-2026-0069/G1-CLOSE-INTERMEDIATE]`: a bare pass/fail count out of this
+environment manufactures a regression. Three effects are separable, and **only the
+first is a real defect in the tree**.
+
+| gate | sandbox | result | note |
+|---|---|---|---|
+| `tests` | default, `commit.gpgsign=false` | **exit 1** — `Ran 1840 tests`, `FAILED (failures=1, skipped=3)` | **The one real failure**: `test_no_cron_without_a_conforming_dialect_anywhere`. Diagnosed above; FU-E |
+| `tests` (module) | default, no override | exit 1 — `Ran 3 tests`, `FAILED (errors=3)` on `tests.test_autosync_no_cwd_leak` | Host-config contamination, **reproduced again this session**. FU-A, still open |
+| `tests` (module) | default, `commit.gpgsign=false` | exit 0 — `Ran 3 tests … OK` | The controlled re-run that isolates it |
+| `lint` (`ruff`) | default | **exit 0** — `All checks passed!` | |
+| `security` (`bandit -ll`) | default | **exit 0** — Medium: 0, High: 0 | |
+| `coverage` | default, `commit.gpgsign=false` | **exit 1** — the compound command short-circuits on the same single test failure | `coverage report --fail-under=90` on its own: **exit 0, TOTAL 94%**. The threshold is met; the gate is red only because of FU-E |
+| `leak-scan` | default | **exit 0** — `leak-scan: clean` (gitleaks 8.30.1) | The `T09` fixture token that blocked `T10` twice is gone |
+| `monitoring-example-lint` | default | **exit 0** — `OK — monitoring config is structurally valid (or absent).` | |
+| 6 × `bats` | default | **exit 1** on five suites — **21 of 22 cases `not ok`**, every one `mktemp: mkdtemp failed … Operation not permitted` in `setup`, before any assertion. `init_skills_idempotent` (1 case) passes | The recorded environment effect (`[FEAT-2026-0072/G1-CLOSE]`), identical to gate 2's count |
+| 6 × `bats` | sandbox off | **exit 0 for all six**, 22 `ok` / 0 `not ok` | The real signal |
+
+### Oracle re-runs — fresh, in this session, gates 1 through 3
+
+Per `close-discipline.md` §1: every oracle the feature's criteria name, re-run here with
+exit codes read directly, never inherited from a producing WU's `done`. All rows ran
+under the **default sandbox** except the `bats` row noted above. A grep whose passing
+outcome is "no match" exits **1**; that is recorded as the passing result, not as a
+failure.
+
+| # | gate | oracle (criterion) | command | exit |
+|---|---|---|---|---|
+| 1 | 1 | `T01` c10 | `python3 -m unittest tests.test_failure_artifact_model` | **0** — `Ran 8 … OK` |
+| 2 | 1 | `T02` c10 | `python3 -m unittest tests.test_fingerprint` | **0** — `Ran 8 … OK` |
+| 3 | 1 | `T03` c9 | `python3 -m unittest tests.test_artifact_redaction` | **0** — `Ran 5 … OK` |
+| 4 | 1 | `T01` c3 | `grep -rniE "azure\|appinsights\|servicebus\|kusto" specfuse/monitor/artifact.py specfuse/monitor/adapters.py` | **1** (no match) |
+| 5 | 1 | `T01` c9 | `grep -niE "cron\|schedule\|dialect" specfuse/monitor/artifact.py` | **1** (no match) |
+| 6 | 1 | `T02` c8 | `grep -n "hash(" specfuse/monitor/fingerprint.py` | **1** (no match — no salted builtin hash) |
+| 7 | 1 | `T03` c6 | `grep -n "leak_scan" specfuse/monitor/redaction.py` | **1** (no match — issue #55 holds) |
+| 8 | 1 | `T01`/`T02`/`T03` c11 | three `python3 -c "from specfuse.monitor… import …"` imports | **0**, **0**, **0** |
+| 9 | 2 | `T04` c1/c4/c5 | `python3 -m unittest tests.test_monitoring_cron_dialect` | **1** — `Ran 9`, `FAILED (failures=1)` **← the finding** |
+| 10 | 2 | `T04` c10 | `python3 -m unittest tests.test_monitoring_fenced_blocks` | **0** — `Ran 5 … OK` |
+| 11 | 2 | `T04` c6/c7b | `python3 -m unittest tests.test_derive_monitoring_discovery` | **0** — `Ran 24 … OK` |
+| 12 | 2 | `T05` c11 | `python3 -m unittest tests.test_service_bus_dlq_adapter` | **0** — `Ran 9 … OK` |
+| 13 | 2 | `T06` c11 | `python3 -m unittest tests.test_app_insights_adapters` | **0** — `Ran 12 … OK` |
+| 14 | 2 | `T07` c12 | `python3 -m unittest tests.test_schedule_dialect` | **0** — `Ran 19 … OK` |
+| 15 | 2 | `T07` c12 | `python3 -m unittest tests.test_heartbeat_adapter` | **0** — `Ran 8 … OK` |
+| 16 | 2 | `T04` c9 | `python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml.example` | **0** |
+| 17 | 2 | `T07` c11/c12 | `grep -rniE "azure\|…" specfuse/monitor/schedule.py`; `grep -rn "datetime.now\|time.time" specfuse/monitor/schedule.py` | **1**, **1** (no match) |
+| 18 | 3 | `T08` c13 | `python3 -m unittest tests.test_queue_stalled_adapter` | **0** — `Ran 14 … OK` |
+| 19 | 3 | `T09` c13 | `python3 -m unittest tests.test_monitor_issue_lifecycle` | **0** — `Ran 19 … OK` |
+| 20 | 3 | `T10` c13 | `python3 -m unittest tests.test_monitor_cli` | **0** — `Ran 40 … OK` |
+| 21 | 3 | `T11` c12 | `python3 -m unittest tests.test_monitor_runner_surfaces` | **0** — `Ran 13 … OK` |
+| 22 | 3 | `T09` c12 | `python3 -m unittest tests.test_escalation_emit`; `… tests.test_escalation_contract` | **0** — `Ran 6 … OK`; **0** — `Ran 10 … OK` |
+| 23 | 3 | `T10` c12 | `grep -rniE "azure\|appinsights\|servicebus\|kusto"` over `cli.py artifact.py adapters.py fingerprint.py redaction.py schedule.py issues.py` | **1** (no match — the core stays provider-agnostic **through the CLI**) |
+| 24 | 3 | `T08` c12 | `grep -rn "from specfuse.monitor.providers\|import specfuse.monitor.providers" specfuse/monitor/*.py` | **1** (no match) |
+| 25 | 3 | `T08` c10 | `grep -rn "datetime.now\|time.time" specfuse/monitor/providers/azure_service_bus.py` | **1** (no match — the clock is an argument) |
+| 26 | 3 | `T09` c4 | `grep -n '"--search"' specfuse/monitor/issues.py` | **1** (no match) |
+| 27 | 3 | `T09` c3 | `grep -n "def " specfuse/monitor/issues.py` | **0** — 8 definitions, **none** a re-implementation of the issue-number parse |
+| 28 | 3 | `T10` c6 | `grep -n 'environment\["telemetry"\]\|environment.get("telemetry")' specfuse/monitor/cli.py` | **1** (no match — the #262 seam is not bypassed) |
+| 29 | 3 | `T11` c10 | `ls .github/workflows` | **0** — `ci.yml`, `leak-scan-content.yml`, `release.yml`: the template is **not** installed here |
+| 30 | 3 | `T10` c2 | `python3 -c "from specfuse.monitor.cli import main"`; `python3 -c "from specfuse.monitor.issues import record_finding"` | **0**, **0** — zero-runtime-dependency property holds through the CLI |
+| 31 | 1–3 | the whole `code` gate set | see the sandbox table above | **red at HEAD** on `tests` and `coverage`, from one root cause (FU-E); the other seven gates green |
+
+**FU-C, re-measured rather than repeated.** `azure_service_bus.py` is now at **79%**
+line coverage, down from gate 2's 81% — `T08` extended the same module and the
+uncovered region is still concentrated in the lazy `build_*` transport factories, which
+cannot execute without the SDK on the path. `TOTAL` is 94%, so the 90% floor is met with
+room. Named again so a future tightening reads it as a known shape, not neglect.
+
+## Cost analysis
+
+Read from `events.jsonl`'s `attempt_outcome` payloads. The **as-drafted** figures are
+reported as the honest plan, per `[FEAT-2026-0069/G1-CLOSE-INTERMEDIATE]` — the plan is
+not re-based onto its own outcome and the result then reported as accuracy. **The
+per-gate split is shown because the feature-wide figure hides where the variance came
+from, and here it hides it almost perfectly.**
+
+### Per gate
+
+| gate | planned (as drafted) | actual | delta | note |
+|---|---|---|---|---|
+| gate 1 | $20.00 | **$9.34** | **−$10.66 (−53%)** | `T01` $1.15, `T02` $0.85, `T03` $0.65, `G1-CLOSE-INTERMEDIATE` **$0.00** (auto-closed at `attempts: 0`), `G1-PLAN` $6.69. $4.50 of the underrun is a ceremony that never ran |
+| gate 2 | $27.00 | **$25.68** | −$1.32 (−4.9%) | `T04` $6.25, `T05` $1.53, `T06` $1.18, `T07` $4.37, `G2-CLOSE-INTERMEDIATE` $7.01, `G2-PLAN` $5.34 |
+| gate 3 | $23.00 | **$27.15** *(before this close)* | **+$4.15 (+18%)** | `T08` $1.94, `T09` $2.67, `T10` **$19.77**, `T11` $2.77 |
+| **feature** | **$70.00** | **$62.19** *(before this close)* | −$7.81 (−11%) | Against `PLAN.md`'s `planned_cost_usd: 70.00`, drafted work only |
+
+### Gate 3 per WU — where the whole variance is
+
+| WU | planned | actual | delta |
+|---|---|---|---|
+| `T08` | $4.00 | **$1.94** | −$2.06 (−52%) |
+| `T09` | $5.00 | **$2.67** | −$2.33 (−47%) |
+| `T10` | $5.00 | **$19.77** | **+$14.77 (+295%)** |
+| `T11` | $4.00 | **$2.77** | −$1.23 (−31%) |
+| implementation subtotal | $18.00 | **$27.15** | +$9.15 (+51%) |
+| `G3-CLOSE` | $5.00 | this session — not in `events.jsonl` at write time | — |
+
+**Three of four units under-ran and the gate still blew its plan.** `T08`, `T09` and
+`T11` came in at $7.38 against $13.00 (−43%), landing near the shape gate 2's adapter
+units took. `T10` alone accounts for **$14.77 of overrun on a $23.00 gate**, and its
+$19.77 is three attempts: $5.99 + $5.66 on the two that failed, plus $8.12 on the
+re-armed pass. **The two failed attempts cost $11.65 and produced no committed work.**
+
+**The budget consequence, stated because it nearly bit.** `GATE-03.md` carries
+`cost_budget_usd: 28.00` — $23.00 drafted plus $5.00 of defensive padding for exactly
+one re-attempt of the largest unit. That padding was designed for a single retry and
+`T10` needed two plus a re-arm. Gate 3 stood at **$27.15 against the $28.00 halt
+threshold — 97% consumed — before the terminal close dispatched at all**, so this close
+runs past the threshold. The padding was correctly reasoned and still insufficient,
+which is the honest read: it priced the *number* of retries right at one and the *cost*
+of a retry at the drafted figure, when a retry on the largest unit cost more than the
+unit's whole budget.
+
+**What `GATE-03-REVIEW.md` §5.3 got right, and what it could not see.** §5.3 refused to
+re-price gate 3 off gate 2's cheap adapter actuals and priced `T08` at $4.00 rather than
+~$2.00. Measured: `T08` cost $1.94, so the trim would have been accurate — and refusing
+it cost nothing, exactly as its own "a budget is a halt threshold, not a spend target"
+argument predicted. It also priced `T09` and `T10` above the adapters on the grounds
+that they cross a package boundary and compose six modules. `T09` did not need it
+($2.67). `T10` needed four times it. The signal §5.3 could not price is that **`T10`'s
+overrun was not caused by `T10`'s difficulty** — its first two attempts died on a red
+`leak-scan` gate seeded by a *different* WU's fixture, which no per-unit estimate can
+anticipate. That is a scheduling property, not an estimation error.
+
+## What the loop did NOT verify
+
+**Eleven deferred items, none of them discharged, plus one red gate that is a defect
+rather than a deferral.** This section is the terminal one; it supersedes nothing above
+it and repeats nothing it can point at.
+
+### Gate 3's deferred list — D-9, D-10, D-11
+
+| # | deferred criterion | why the loop could not verify it | where it is actually verified |
+|---|---|---|---|
+| D-9 | `T09` — a second harvest of one fingerprint against a **real repository** creates no second issue | The runner is a stub that returns whatever the test hands it. `gh` is unusable from a work-unit session here: `gh auth status` reports the `GH_TOKEN` and keyring tokens invalid, and `gh issue list` fails with `tls: failed to verify certificate` before reaching the API. The end-to-end run above proves the *composition*, against a fake repository | Operator runs the harvester twice against a scratch repository with a planted finding; both invocations and the resulting issue list recorded in `OPERATOR-JOURNAL.md` |
+| D-10 | `T10` — `specfuse-monitor run` against a real repository and environment files the issues the dry run predicted | The dry-run path is in-loop and green; the write path terminates in `T09`'s `gh` surface and is stub-evidence only | Same operator run, dry-run output and resulting issue list recorded side by side |
+| D-11 | `T11` — the shipped workflow, installed in a consumer repository, completes a scheduled run and files findings | A scheduled GitHub Actions workflow cannot be executed from a work-unit session at all. The template is asserted **structurally only**: it parses, declares `schedule` + `workflow_dispatch`, invokes `specfuse-monitor run`, grants exactly `issues: write` + `contents: read`, and carries no literal secret | Operator installs the template in a scratch repository, triggers it manually, records the run URL, outcome, and issue list |
+
+**The operator journal does not exist.** `GATE-03-REVIEW.md` §6.1 answer 6 named
+`OPERATOR-JOURNAL.md` in this feature folder as the proxy for all three. There is no
+such file at close time. This close read for it and reports its absence rather than
+citing a record it never saw — which is the whole reason D-9, D-10 and D-11 are still
+open and the verdict is hedged.
+
+### D-1 … D-8 carry forward unchanged
+
+Gate 2's eight items are unchanged and are **not** restated here: every adapter is still
+stub-verified, no live Service Bus namespace or App Insights workspace has been reached,
+and no DST transition has been observed in production. The full table is in the gate-2
+section above, under *Gate 2 — the deferred list, which is not empty*. Their oracle is
+the operator run against the downstream .NET backend, which `GATE-02-REVIEW.md` §6.1
+answer 4 records as planned and which has not happened.
+
+### gate 1's auto-close debt — settled, and named literally here
+
+`RETROSPECTIVE.md` carries
+`<!-- specfuse:autoclose-debt gate=1 wus=T01,T02,T03 criteria=32 predicate=v1 -->`.
+**`gate 1` auto-closed on-plan at `attempts: 0`, so its close-intermediate ceremony
+never ran and its 32 acceptance criteria were dumped as `deferred` without anyone
+looking at them.** That debt was **already reconciled in full** by
+`FEAT-2026-0040/G2-CLOSE-INTERMEDIATE` — all 32 criteria dispositioned, 29 re-run fresh,
+the remaining 3 identified as red-before-green claims that are not re-runnable at close
+time by construction. See *Gate 1's auto-close debt, reconciled* above; this terminal
+close does not repeat that work.
+
+What it does do is **re-run gate 1's oracles a second time**, in this session: rows 1–8
+of the oracle table, all green. So the claim "`gate 1`'s deferred list is legitimately
+empty" now rests on two independent fresh runs a gate apart, not on one. The marker
+comment stays in place.
+
+### The red gate at HEAD is a defect, not a deferral
+
+Filed here so it is not mistaken for a deferred item. **`tests` and `coverage` are red
+at HEAD** because `T04`'s tree-wide cron sweep flags `T11`'s GitHub Actions template.
+It is in-loop verifiable, reproducible in one command, diagnosed above, and **not
+fixed** — this unit closes the feature and does not patch a `done` WU's work. It is
+**FU-E**, and it is the main reason the verdict is `partially_met` rather than
+`met_locally`: `T04` criteria 4 and 5 and `T11` criterion 12 do not hold on the tree as
+it stands, which is a stronger statement than "could not be checked here."
+
+### Follow-ups — dispositioned, not dropped
+
+- **FU-A — the fixture-signing contamination. RE-CARRIED, and reproduced again.**
+  `tests/test_autosync_no_cwd_leak.py`'s `_make_repo` still pins only `user.name` and
+  `user.email`, so each `git commit` inherits the host's global `commit.gpgsign = true`.
+  Observed a third time in this session: **exit 1, `Ran 3 tests`, `FAILED (errors=3)`**
+  without the override; **exit 0, `OK`** with
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false`.
+  **Home:** a one-line fixture change on a hygiene WU or a bug branch — no WU in this
+  feature owns the file, and this close does not patch work. Flagged at gate 2's arming,
+  at gate 2's close, and now here; three sightings is the argument for giving it an owner.
+- **FU-B — `queue-stalled` had no adapter. CLOSED.** Discharged by `T08`:
+  `tests.test_queue_stalled_adapter` exits 0 with `Ran 14 tests … OK`, the adapter reads
+  both broker coordinates, decides on age with depth as evidence, refuses an unparseable
+  threshold, and skips a threshold-less target with a recorded reason. The trail
+  `GATE-02-REVIEW.md` §2 → §6.1 answer 3 → FU-B → `T08` is unbroken.
+- **FU-C — `azure_service_bus.py` line coverage. RE-CARRIED, re-measured at 79%**
+  (was 81%; `T08` extended the module). Uncovered lines remain concentrated in the lazy
+  SDK transport factories, unexercisable without the SDK on the path. `TOTAL` 94%.
+  **Home:** whoever tightens the coverage floor, or the operator run that first
+  constructs a real transport — whichever comes first.
+- **FU-D — `stall_after` is unbounded at lint time. RE-CARRIED, home named, citation
+  NOT confirmed.** A typo'd threshold is a runtime refusal, not a lint error. Deliberately
+  out of gate 3 (a severity flip needing `planning-discipline.md` §4's probe, and a second
+  breaking schema change one release after `dialect`). **Home:** a tracked issue, per
+  `GATE-03-REVIEW.md` §6.1 answer 3, which required this close to confirm the issue exists
+  and cite it. **This close could not: `gh` is unusable from this session.** The
+  confirmation is an operator action at the terminal review checkpoint, and criterion 8's
+  citation half is reported unmet rather than fabricated.
+- **FU-E — the cron sweep flags the shipped workflow template. NEW, and it is the red
+  gate.** `tests/test_monitoring_cron_dialect.py`'s `_collect_cron_carrying_targets`
+  treats *any* mapping carrying a `cron` key as a heartbeat target, and
+  `specfuse/loop/data/workflows/specfuse-monitor.yml` carries a GitHub Actions
+  `on.schedule` cron where `dialect` has no meaning. **Home:** a bug branch — 1 bug,
+  1 branch, 1 PR, test-first. The fix is to scope the sweep's discovery (by config-file
+  set, or by requiring the mapping to sit under a `checks[].targets[]` path) while keeping
+  its non-vacuity assertion, **not** to add a `dialect` to a workflow file or to
+  hand-write an exclusion list — a hand-written exclusion is the failure mode
+  `[FEAT-2026-0039/T04]` recorded and the walk exists to avoid.
+
+## Consumer-visible contract changes
+
+Enumerated per `close-discipline.md` §3 across **all three gates**. Writing
+`n/a — no consumer-visible contract change` here would be false: there are fourteen
+entries and one of them is breaking. **This section requires explicit human
+acknowledgment; see *Acknowledgment* below, which is still unsigned.**
+
+### 1. `heartbeat` target `dialect` — **BREAKING** (gate 2, unchanged, still in force)
+
+The full entry is in the gate-2 section above and is not restated. In one line: a
+`heartbeat` target that carries `cron` must now also carry `dialect`
+(`standard-5` / `seconds-first-6`), enforced by four ERROR-severity validator rules, so
+a downstream `monitoring.yml` that lints clean today will not after upgrade. Migration
+is mechanical (count the fields) or automatic (re-run `/derive-monitoring`). **It stays
+in this enumeration because a terminal close's list is the one a consumer reads.**
+
+### 2–6. Gate 2's additive entries
+
+Unchanged, enumerated in the gate-2 section: `CRON_DIALECTS` in `__all__`; both
+`monitoring.yml.example` copies gaining `dialect`; the `derive-monitoring` skill
+emitting it; the `specfuse.monitor.providers` subpackage; and `specfuse.monitor.schedule`.
+
+### 7–14. Gate 3's entries — all additive
+
+| # | surface | change | consumer impact |
+|---|---|---|---|
+| 7 | `pyproject.toml` `[project.scripts]` | new entry point **`specfuse-monitor = "specfuse.monitor.cli:main"`**, alongside the four existing ones | Additive. Does **not** collide with the existing `specfuse-monitor-lint`. A new command appears on `PATH` after upgrade |
+| 8 | **`specfuse.monitor.issues`** (new module) | `record_finding`, `find_finding_issue`, `annotate_if_quiet`, `TruncatedListingError`, `FINDING_LABEL` | Additive, no prior version. Every entry point takes an injected `runner`, defaulting to `escalation.py`'s |
+| 9 | **`specfuse.monitor.cli`** (new module) | `main`, `run_cycle`, `load_monitoring_config`, `MonitorCliError` | Additive. `python3 -c "from specfuse.monitor.cli import main"` exits 0 on a clean checkout with **no cloud SDK installed** — the zero-runtime-dependency property holds through the CLI |
+| 10 | **the GitHub label `monitoring-finding`** | Every filed finding carries it, and the finder lists on it | Additive but **visible in a consumer's repository**: the label is created on first use and becomes the fingerprint registry's index. Named here because a label is a contract a consumer's own automation may key on |
+| 11 | `queue-stalled` adapter + **the `stall_after` grammar** | `<integer><unit>`, unit in `s`/`m`/`h`/`d`. Anything else **raises**, naming the offending value. A target with no `stall_after` is **skipped and reported**, never defaulted | Additive at lint time — the validator is unchanged, so no existing config becomes invalid. But it is a **new runtime contract**: a config that lints clean can now fail at run time on a typo'd threshold. This is FU-D, disclosed rather than buried |
+| 12 | **`specfuse/loop/data/workflows/specfuse-monitor.yml`** (new shipped template) | A scheduled GitHub Actions workflow with `workflow_dispatch`, `permissions: {issues: write, contents: read}` and no literal secret | Additive. Ships in the wheel (`package-data` already globs `data/**/*`, so no packaging change was needed) and is **not** installed into any repository automatically — the consumer copies it |
+| 13 | **the `runner` dial is now honoured** | `specfuse-monitor run --runner {local,gh-actions}` enumerates only components whose `runner` matches; the rest are **named in the summary** with the surface they belong to. `in-cluster` is reported as unhandled-by-design with FEAT-2026-0043 named; an unknown value is an error naming the supported set | Additive — the field already existed in the schema and was inert. After upgrade it **routes**, so a component dialed to a surface nobody runs is now visibly unmonitored instead of invisibly so |
+| 14 | on-disk state and defaults | `.specfuse/monitor-watermarks/<env>.json` (best-effort cache, falls back to a 24h lookback on missing/unreadable/corrupt), a 6h occurrence-update throttle, a 100-row `gh issue list --limit`, quiet annotation after 5 runs | Additive. A new directory appears under `.specfuse/`; consumers may want it gitignored. Every value is a named parameter, not a magic number |
+
+**`docs/concepts/monitoring-runners.md`** documents entries 12 and 13, including — per
+`GATE-03-REVIEW.md` §6.1 answer 2 — the one sentence stating that `--dry-run` **performs
+the read-only `fetch_failures()` calls** and gates only the writes. It is not `--offline`.
+
+### Acknowledgment
+
+> **Status: NOT YET ACKNOWLEDGED — and this is the single human action gating the
+> feature's terminal flip.**
+>
+> `close-discipline.md` §3 requires explicit human acknowledgment of this list, and
+> entry 1 is a breaking schema change for downstream consumers. Gate 2's close left the
+> same block unsigned; this terminal enumeration supersedes it and is the one to sign.
+> Per `operator-escalation.md` the acknowledgment text is the human's to write and is
+> not drafted here. FEAT-2026-0069's precedent is the path: its list was acknowledged by
+> the operator at the terminal review checkpoint, after which the verdict was upgraded.
+>
+> _Operator acknowledgment:_
+
+## Lessons
+
+Three entries appended to `.specfuse/LEARNINGS.md`, tagged `[FEAT-2026-0040/G3-CLOSE]`:
+the `git ls-files` sweep that cannot see the introducing WU's own new file; the
+schema-agnostic structural predicate that collides with a foreign surface sharing its
+key; and the gate budget whose one-retry padding was priced at the drafted figure rather
+than at what a retry on the largest unit actually costs.
+
+Feature-specific observations stay here and are deliberately not promoted: the exact
+stub cardinalities, `azure_service_bus.py`'s coverage shape, the `monitoring-finding`
+label name, and the specific fingerprints the end-to-end run produced.
+
+## Docs and roadmap
+
+- `docs/concepts/monitoring-runners.md` — shipped by `T11`; documents both runner
+  surfaces, the dial, the template's secrets, `in-cluster` as FEAT-2026-0043's, and the
+  `--dry-run` scope sentence. Not edited here.
+- `.specfuse/roadmap.md` — FEAT-2026-0040's detail section gains a gate-3 shipped note
+  that says which surfaces were **never executed**, the terminal verdict and what would
+  upgrade it, and names the four features this feature unblocks: FEAT-2026-0038,
+  FEAT-2026-0041, FEAT-2026-0042, FEAT-2026-0043. The status row and `PLAN.md`'s
+  `status` field are **not** touched — the driver owns the terminal flip and it is gated
+  on the verdict.

@@ -1,11 +1,21 @@
 ---
 id: FEAT-2026-0040/G3-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+verdict: partially_met
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.6.0
+started_at: 2026-07-29T11:58:59.442883+00:00
+duration_seconds: 818.557
+cost_usd: 7.022222
+input_tokens: 98
+output_tokens: 59114
 ---
 
 # Close gate 3 and the feature — terminal ceremony and verdict
