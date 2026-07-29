@@ -8,14 +8,21 @@ import re
 import unittest
 
 from specfuse.loop import escalation, gh_features
+from specfuse.monitor import issues
 from specfuse.loop.labels import LABEL_REGISTRY
 
 _COLOUR_RE = re.compile(r"^[0-9a-f]{6}$")
 
 
 class TestLabelRegistry(unittest.TestCase):
-    def test_registry_has_exactly_seven_entries(self):
-        self.assertEqual(len(LABEL_REGISTRY), 7)
+    def test_registry_has_exactly_eight_entries(self):
+        # Seven at FEAT-2026-0071; the eighth is the harvester's finding label,
+        # added by #300 after `gh issue create` rejected it on a fresh repository.
+        # A bare count is a weak invariant — it fails on every legitimate addition
+        # and catches nothing a coverage assertion does not. The real guard is
+        # tests/test_label_registry_covers_consumers.py, which discovers every
+        # label constant in the package and asserts each is declared here.
+        self.assertEqual(len(LABEL_REGISTRY), 8)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -35,6 +42,7 @@ class TestLabelRegistry(unittest.TestCase):
             {escalation.NEEDS_HUMAN_LABEL}
             | set(escalation.CATEGORY_LABELS)
             | {gh_features.FEATURE_LABEL}
+            | {issues.FINDING_LABEL}
         )
         actual = {entry.name for entry in LABEL_REGISTRY}
         self.assertEqual(actual, expected)

@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from specfuse.loop import escalation, gh_features
+from specfuse.monitor import issues
 
 
 @dataclass(frozen=True)
@@ -69,6 +70,18 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="0e8a16",
         description="A pull request is green and waiting on a merge decision",
         consumer="escalation.py",
+    ),
+    # The harvester's findings carry their own label rather than reusing
+    # `needs-human`: they are failure artifacts, not operator escalations, and a
+    # distinct label lets `gh issue list` scope to exactly that lifecycle. It was
+    # missing here until #300 — `gh issue create` rejects an unknown label, so the
+    # harvester could not file a single finding on any repository that had not had
+    # this label made by hand.
+    LabelSpec(
+        name=issues.FINDING_LABEL,
+        colour="b60205",
+        description="A failure artifact reported by specfuse-monitor",
+        consumer="monitor/issues.py",
     ),
 )
 
