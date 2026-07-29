@@ -198,7 +198,7 @@ and the .NET backend cannot settle them. `gh` is unusable from a work-unit sessi
 `gh auth status` reports both the `GH_TOKEN` and keyring tokens invalid — so every
 `gh` argument list the loop recorded went nowhere.
 
-- [ ] **D-9** — run the harvester **twice** against a scratch repository with a planted finding. The second invocation must create **no** second issue. Record both invocations and the resulting issue list
+- [x] **D-9** — run the harvester **twice** against a scratch repository with a planted finding. The second invocation must create **no** second issue. Record both invocations and the resulting issue list
 - [ ] **D-10** — `specfuse-monitor run` against a real repository and environment files the issues the dry run predicted. Record the dry-run output and the resulting issue list **side by side**
 - [ ] **D-11** — install `specfuse/loop/data/workflows/specfuse-monitor.yml` in the scratch repository, trigger it manually, and record the run URL, outcome, and issue list
 
@@ -278,9 +278,44 @@ total: 2 finding(s) across 1 component(s)
   D-10.**
 - **D-11 — untouched.** The workflow was not installed or triggered.
 
-**Operator: countersign or reject.** The open question is whether D-9 counts as
-discharged on a run that required a manual workaround for #300. A defensible reading
-either way; the run is real, the workaround is recorded, and the decision is yours.
+### Countersigned — 2026-07-29T17:42:05Z
+
+**The operator countersigned this entry and accepted D-9 as discharged**, instructing
+the agent to record that decision. The judgment is the operator's; this paragraph is
+the record of it, not a substitute for it.
+
+**The open question that made this conditional is now closed.** D-9 was reported as
+*conditionally* observed because the run needed a hand-created label to work around
+[#300](https://github.com/specfuse/loop/issues/300). That is fixed and merged
+(`b67b7ce`, PR #301): `monitoring-finding` is now in `LABEL_REGISTRY`, sourced from
+the module that owns it, with a guard that walks the package and asserts every label
+constant is declared.
+
+**Re-verified after the fix, on a second fresh repository**
+(`clabonte/specfuse-label-probe`), with **no manual step**:
+
+```
+ProvisionReport(created=['specfuse:feature', 'needs-human', 'gate-review',
+                         'blocked-wu', 'triage-question', 'drafting-needed',
+                         'merge-approval', 'monitoring-finding'], failed=[])
+
+scratch/scratch-worker: 2 finding(s) — created 2, updated 0, throttled 0
+  #1 [monitor:cf9d2e6800ce]   #2 [monitor:deb48dbe5fe4]
+```
+
+So the dedupe result stands on a run that is now reproducible from a clean install,
+which is a stronger claim than the entry originally made. **D-9 is ticked.**
+
+**D-10 and D-11 remain unticked and are not countersigned.** D-10's CLI path still
+fails without a real Azure transport — `missing required argument(s)
+['fully_qualified_namespace', 'topic_name']` — and D-11's workflow has never been
+installed or triggered. Both need run 1 or a separate Actions run. Ticking them on
+this evidence would be exactly the overreach this journal's header warns about.
+
+**Evidence retained.** `clabonte/specfuse-monitor-scratch` (the original run, which
+found #300) and `clabonte/specfuse-label-probe` (the post-fix re-verification) are
+both private and kept, because this entry cites their issue numbers. Delete them only
+after this record is no longer load-bearing.
 
 ---
 
