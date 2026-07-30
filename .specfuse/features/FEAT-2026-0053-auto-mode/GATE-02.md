@@ -7,8 +7,8 @@ cost_budget_usd: 31.50
 # one re-attempt of the largest ($6.00, G2-PLAN) — the defensive-padding shape
 # planning-discipline §5 recommends.
 baseline:
-  sha: 09047167fd5106c06e6b6b08a65a889dd76df114
-  probed_at: 2026-07-30T21:28:36.655122+00:00
+  sha: b4d707a1c70bfee810f9b06c3dea5960f7c35809
+  probed_at: 2026-07-30T22:10:33.041316+00:00
   failing: []
 ---
 
