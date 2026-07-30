@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 re_arm_count: 1
 re_arm_history:
   -
@@ -18,10 +18,20 @@ produces:
 produces_driver_helper:
   - evaluate_arm_predicate call site at the awaiting_review flip
   - write_baseline_if_absent call site at first dispatch
-duration_seconds: 209.885
-cost_usd: 1.220458
-input_tokens: 58
-output_tokens: 14684
+duration_seconds: 580.185
+cost_usd: 2.536497
+input_tokens: 114
+output_tokens: 22900
+cumulative_cost_usd: 1.220458
+cumulative_duration_seconds: 209.885
+cumulative_input_tokens: 58
+cumulative_output_tokens: 14684
+cumulative_attempts: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T20:40:48.530269+00:00
 ---
 
 # Shadow wiring — evaluate and emit at every `awaiting_review` flip
