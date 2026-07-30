@@ -79,6 +79,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
+| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -978,6 +979,17 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+
+<a id="feat-2026-0060"></a>
+## FEAT-2026-0060 — Driver-local event schema registry: sanction the three unsanctioned event types
+
+**Why.** The loop driver emits `gate_reached` and `attempt_outcome` on every run, and FEAT-2026-0053/T04 adds `arm_predicate_evaluated`. None of the three appear in the envelope `event_type` enum in `specfuse/loop/data/schemas/event.schema.json` (a closed 28-entry list this repo does not own), and none have a per-type payload schema — `PER_TYPE_SCHEMA_DIR` holds four schemas, all core-orchestrator types vendored from another repo. The gap is invisible today only because the driver's emit path (`build_event` / `flush_events` in `loop.py`) never invokes the validator: `validate_event.py` is a standalone CLI. So every driver-emitted event is unvalidated in practice, and anyone who does run `validate_event.py` over a real `events.jsonl` gets failures on the driver's own output. FEAT-2026-0053/T04 blocked on discovering this and was unblocked by narrowing its scope, deliberately deferring the question rather than answering it inside a shadow-mode WU.
+
+**Goal.** Decide and implement where driver-local event schemas live, then bring all three types into conformance so `validate_event.py` passes over a real driver-produced `events.jsonl`. Two candidate shapes, to be chosen as part of this feature: (a) extend the vendored registry and envelope enum in the core repo, keeping one registry — correct but cross-repo; or (b) sanction an explicitly-named loop-local schema tier, with manifest entries in the scaffold sync script and its orphan-file test, leaving the core enum alone. Also decide whether emit-time validation should be wired into `build_event` / `flush_events`, or whether `validate_event.py` stays a CI/manual check — an unvalidated emit path is what let three types drift unnoticed.
+
+**Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
+
+**Status: planned.**
 
 ## Notes
 
