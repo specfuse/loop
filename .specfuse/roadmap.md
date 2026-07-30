@@ -73,6 +73,11 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
+| FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | active | — | — |
+| FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | planned | — | — |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | — |
+| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | — |
+| FEAT-2026-0058 | Feature decision registry + override lint | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -925,6 +930,56 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+
+## FEAT-2026-0054 — Close-ceremony skeleton + in-session closing lint
+
+**Why.** Portfolio telemetry (2026-07-30 review, 25 generator features + cross-repo data): 28% of all closing-WU spend is driver refusals. The `closing_deliverable_missing` class cost ~$42 and `assert_gate_review_exists` alone $53.11 across 15 refusals (issue #261). The guards check literal artifact shape (headings, frontmatter fields, file names) *after* the attempt, so a $4–10 verification pass is re-bought over a missing `### Failure-class breakdown` heading or a misnamed review file. Close-WU prompts now spend ~40% of their text restating guard strings defensively — machine contract leaking into prose, re-paid in tokens on every attempt.
+
+**Goal.** The driver pre-creates the ceremony skeleton at close/close-intermediate/plan-next dispatch: `RETROSPECTIVE.md` with every conditionally-required heading stubbed, a `verdict: TBD` frontmatter placeholder that lints as incomplete, and the correctly-named `GATE-{N+1}-REVIEW.md` stub. Ship `specfuse-lint --closing` so the agent validates the full closing-assertion set in-session before ending its attempt; the post-squash driver assertions become a cheap recheck of surfaces that were pre-created, not a discovery mechanism.
+
+**Benefits.** The format-guard refusal class becomes structurally near-impossible to hit (~$95 of measured portfolio waste to date); close attempts spend their budget on verification substance instead of artifact-shape compliance; the guard-defensive boilerplate can be deleted from `WU.template.md` and every drafted close WU, shrinking both authoring effort and per-attempt input tokens.
+
+**Status: planned.**
+
+## FEAT-2026-0055 — Arm-time WU contract lint: produces satisfiability + boundary consistency
+
+**Why.** FEAT-2026-0066/T04 burned $11.43 across 3 attempts plus a human escalation on a `produces:` path already fully delivered by T03 — unsatisfiable by construction and detectable before dispatch. The same WU's Do-not-touch barred `src/main/**` while its acceptance criteria required an artifact only `src/main/**` could hold — a deadlock no lint catches today. And `assert_declared_deliverables` (literal paths only) vs `assert_produces_in_diff` (literal or fnmatch glob) have divergent path semantics that WU authors now document via folklore comment blocks in every feature (FEAT-2026-0065/T01 paid $10.43 learning it; 0066 re-quoted the warning verbatim). Portfolio cost of the produces/deliverable mismatch classes: ~$55.
+
+**Goal.** At gate-arm time (and in `specfuse-lint`), validate every WU in the arming gate: refuse a `produces:` path that a prior WU's squash already fully delivered; refuse a `produces:` path or acceptance-criteria deliverable that the WU's own Do-not-touch section forbids; unify the path semantics of the two deliverable gates so a single declaration form satisfies both. Refusal happens before any attempt is dispatched, with the conflict named.
+
+**Benefits.** The `produces_not_in_diff` / `no_deliverable_files` / `deliverable_missing` waste class dies at arm time instead of after 3 burned attempts and an escalation; per-WU folklore comments explaining the dual-gate trap become deletable; arm-gate review gets a mechanical consistency report instead of relying on operator eyeballing.
+
+**Status: planned.**
+
+## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
+
+**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
+
+**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
+
+**Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
+
+**Status: planned.**
+
+## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
+
+**Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
+
+**Goal.** `verification.yml` / GATE frontmatter gains named, ordered oracle commands, including environment-prep steps, per gate or per criterion (composing with FEAT-2026-0056's per-criterion state). The driver — or the close agent as a mandatory first action — executes them deterministically and captures output; the close agent's job narrows to interpreting results, judging the DoD, and writing the ledger. Target-project harness scripts (e.g. the generator's SQL Server scenario matrix) stay in the target repo; the loop ships the contract, dispatch, and capture.
+
+**Benefits.** Close attempts become script-run plus interpretation — cheaper, reproducible, and viable on a smaller model tier; environment-freshness lessons become enforced steps instead of prose that each new close may or may not recall; verification evidence gains a consistent, machine-captured form across features.
+
+**Status: planned.**
+
+## FEAT-2026-0058 — Feature decision registry + override lint
+
+**Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
+
+**Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse-lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
+
+**Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
+
+**Status: planned.**
 
 ## Notes
 
