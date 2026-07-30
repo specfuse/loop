@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0055/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces_driver_helper: "lint_plan.check_produces_satisfiability — WARN on produces paths an earlier done WU already delivered"
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_produces_satisfiability.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T15:03:17.145671+00:00
+duration_seconds: 346.435
+cost_usd: 1.132481
+input_tokens: 46
+output_tokens: 10861
 ---
 
 # WARN when a produces path was already delivered by a done WU

@@ -441,6 +441,65 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
 
 _AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
 
+_PRODUCES_DISPATCHABLE_STATUSES = {"draft", "pending", "ready"}
+_PRODUCES_EXEMPT_PATHS = {"events.jsonl"}
+
+
+def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
+    """WARN when a dispatchable WU's `produces:` path was already delivered.
+
+    Exact string match only against a `done` WU's `produces:` entries in the
+    same feature — a glob is compared literally, not expanded (expansion
+    semantics belong to the presence gate, not this lint). Parallel drafts
+    sharing a surface are fine (the earlier WU must be `done`), and a WU's own
+    file / `events.jsonl` never count as a clash. WARN-only; never appends to
+    the errors list. See FEAT-2026-0055/T01, FEAT-2026-0066/T04.
+    """
+    records = []  # (wid, wfile, status, produces_entries)
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            produces_raw = wfm.get("produces")
+            if not produces_raw:
+                continue
+            raw_entries = produces_raw if isinstance(produces_raw, list) else [produces_raw]
+            cleaned = set()
+            for p in raw_entries:
+                p_s = str(p).strip()
+                if not p_s or p_s in _PRODUCES_EXEMPT_PATHS or p_s == wfile:
+                    continue
+                cleaned.add(p_s)
+            if cleaned:
+                records.append((wid, wfile, wfm.get("status", ""), cleaned))
+
+    done_paths: dict = {}  # path -> (wid, wfile), first done WU declaring it
+    for wid, wfile, status, entries in records:
+        if status != "done":
+            continue
+        for p in entries:
+            done_paths.setdefault(p, (wid, wfile))
+
+    for wid, wfile, status, entries in records:
+        if status not in _PRODUCES_DISPATCHABLE_STATUSES:
+            continue
+        for p in entries:
+            match = done_paths.get(p)
+            if match is None or match[0] == wid:
+                continue
+            done_wid, done_wfile = match
+            print(
+                f"WARN: {wfile}: {wid} declares produces path {p!r}, but "
+                f"done WU {done_wid} ({done_wfile}) already delivered it. "
+                f"Drop the path, or state the incremental edit this WU makes "
+                f"to it in the body."
+            )
+
 
 def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
     """WARN when a terminal close WU's body never instructs reconciling a
@@ -890,6 +949,7 @@ def lint(feature_dir: Path) -> list[str]:
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
+    check_produces_satisfiability(feature_dir, gates)
     errs.extend(check_done_feature_gates(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
