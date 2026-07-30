@@ -85,6 +85,7 @@ from .gate_eval import (
     PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
 )
 from .arm_eval import evaluate_arm_predicate
+from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -5831,12 +5832,55 @@ def run(
         backend.set_gate(gate, "awaiting_review")
         # on_gate_passed fires here: WUs all done, gate now awaiting human review
         backend.on_gate_passed(feature_id, gate.number)
-        flush_events(events_path,
-                     [build_event("gate_reached", feature_id, {"gate": gate.number}),
-                      build_arm_predicate_event(feature_dir, feature_id, gate.number)])
+        arm_event = build_arm_predicate_event(feature_dir, feature_id, gate.number)
+        gate_events = [build_event("gate_reached", feature_id, {"gate": gate.number}),
+                       arm_event]
+
+        # Live arm (FEAT-2026-0053/T06): `auto` + a clean predicate verdict
+        # carries the draft->pending / gate awaiting_review->passed writes into
+        # THIS bookkeeping commit — tag-before-write so a crash leaves exactly
+        # one of two states (see docs/dev/auto-arm-recovery.md). The two
+        # escalation flip sites return before reaching this line, so they
+        # never consult the dial.
+        did_arm = False
+        armed_paths: list = []
+        if (feat_fm.get("autonomy_default") == "auto"
+                and arm_event["payload"].get("would_arm")):
+            txn = plan_arm_transaction(feature_dir, gate.number)
+            if txn.paths:
+                # -c tag.gpgSign=false: the revert tag is a plain lightweight
+                # marker, not a release artifact — force that regardless of
+                # the repo's global `tag.gpgSign`, which would otherwise
+                # demand an annotated, signed tag (and a passphrase prompt)
+                # for what needs to be neither.
+                git("-c", "tag.gpgSign=false", "tag", "-f", txn.tag_name)
+                armed_paths = apply_arm_transaction(txn)
+                armed_wu_ids = []
+                for wu_path in txn.draft_wu_paths:
+                    wfm, _ = read_frontmatter(wu_path)
+                    armed_wu_ids.append(wfm.get("id", wu_path.stem))
+                gate_events.append(build_event("gate_auto_armed", feature_id, {
+                    "gate": gate.number,
+                    "tag": txn.tag_name,
+                    "armed_wu_ids": armed_wu_ids,
+                    "predicate_version": arm_event["payload"]["predicate_version"],
+                }))
+                did_arm = True
+
+        flush_events(events_path, gate_events)
+        if did_arm:
+            commit_message = (
+                f"chore(loop): gate {gate.number} auto-armed gate "
+                f"{gate.number + 1} (tag {txn.tag_name})\n\nFeature: {feature_id}"
+            )
+        else:
+            commit_message = (
+                f"chore(loop): gate {gate.number} awaiting_review"
+                f"\n\nFeature: {feature_id}"
+            )
         commit_bookkeeping(
-            [gate.file, events_path],
-            f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
+            [gate.file, events_path, *armed_paths],
+            commit_message,
         )
         is_terminal_gate = gate is gates[-1]
         # FEAT-2026-0018/T11H: in-loop auto-close sets _terminal_auto_closed_wu;

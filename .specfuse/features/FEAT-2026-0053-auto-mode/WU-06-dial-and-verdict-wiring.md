@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 provenance: "RETROSPECTIVE.md Findings section 3 — the predicate's approval path has never run on real input; 43 of 43 real feature directories returned not_evaluable on every class. AC#6 (arm path exercised against a real feature directory, not a hand-built fixture) exists because of that finding."
 produces:
@@ -12,6 +12,15 @@ produces_driver_helper:
   - autonomy_default dial read at the gate-close flip site in loop.py
   - auto-arm branch invoking apply_arm_transaction inside the existing single bookkeeping commit
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T21:41:30.130370+00:00
+duration_seconds: 1014.622
+cost_usd: 5.047327
+input_tokens: 2471
+output_tokens: 63848
 ---
 
 # The dial goes live — read `autonomy_default`, act on the verdict, arm in one commit
