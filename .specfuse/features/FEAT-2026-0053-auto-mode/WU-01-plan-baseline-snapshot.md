@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/plan_baseline.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - write_baseline_if_absent
   - load_baseline
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T19:13:33.876861+00:00
+duration_seconds: 466.378
+cost_usd: 1.128055
+input_tokens: 44
+output_tokens: 10879
 ---
 
 # Snapshot the as-activated plan graph as an immutable baseline
