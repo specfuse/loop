@@ -125,6 +125,13 @@ disagree, the WU's stated verification is fiction.
 > re-run; and a WU burning each of three attempts on a full suite the
 > iteration didn't need.
 
+For `close` / `close-intermediate` WUs specifically, name `specfuse-lint
+--closing` as a verification step (must exit 0 before the WU reports
+`complete`), not the individual guard names it checks — the registry lives in
+`specfuse/loop/closing_requirements.py` and the skeleton is pre-created at
+dispatch (`.specfuse/rules/close-discipline.md` §4). Restating guard strings
+here would be a second copy that drifts from that registry.
+
 ## 5. Escalation triggers — distinguish "my check tripped" from "the bad thing happened"
 
 Triggers should fire on the **real hazard**, not on any flagging condition.

@@ -100,11 +100,8 @@ defect gates later.
 **Close obligations** (REQUIRED only for `close` / `close-intermediate` WUs; omit
 otherwise — see `.specfuse/rules/close-discipline.md`).
 
-> **Read `close-discipline.md` §4 before drafting a closing WU.** It lists the
-> exact strings the driver checks — heading levels, the `GATE-{N+1}-REVIEW.md`
-> filename, the `verdict:` frontmatter field. These are matched literally and
-> checked *after* the WU runs, so a mismatch costs a full re-dispatch rather than
-> a re-arm. 28% of all closing-WU spend has gone to exactly that (#265).
+> Run `specfuse-lint --closing` and confirm it exits 0 before this WU reports
+> `complete` — see `.specfuse/rules/close-discipline.md` §4.
 
 The close's acceptance criteria must cover:
 

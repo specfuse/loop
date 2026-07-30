@@ -1020,7 +1020,7 @@ def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(
         description="Specfuse plan linter.",
-        usage="lint_plan.py <feature_dir> [--just-closed-gate N]",
+        usage="lint_plan.py <feature_dir> [--just-closed-gate N] [--closing]",
     )
     parser.add_argument("feature_dir", type=Path)
     parser.add_argument(
@@ -1031,8 +1031,23 @@ def main() -> int:
         metavar="N",
         help="Also run plan-next-draft lint for gate N+1 draft WUs (warn-only).",
     )
+    parser.add_argument(
+        "--closing",
+        action="store_true",
+        help=(
+            "Lint the feature's in-progress closing WU against the "
+            "closing-requirement registry (see closing_requirements.py), "
+            "pre-squash. Exits 0/CLOSING-READY or 1 with one line per unmet "
+            "requirement. Skips the structural lint entirely."
+        ),
+    )
     args = parser.parse_args()
     feature_dir = args.feature_dir
+
+    if args.closing:
+        from .lint_closing import main_closing
+        return main_closing(feature_dir)
+
     errs = lint(feature_dir)
     if errs:
         print(f"FAIL — {len(errs)} issue(s) in {feature_dir}:")
