@@ -21,9 +21,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import _miniyaml
+from .closing_requirements import gate_review_filename
 from .plan_baseline import load_plan_graph
 
 _FM_DELIM = re.compile(r"^---\s*$")
+
+FEATURE_REVIEW_FILENAME = "FEATURE-REVIEW.md"
+
+_DOUBT_HEADING_RE = re.compile(r"(?m)^## Doubt\s*$")
+_NEXT_H2_RE = re.compile(r"(?m)^## ")
 
 
 def arm_tag_name(feature_id: str, gate: int) -> str:
@@ -39,6 +45,9 @@ class ArmTransaction:
     gate_file_path: "Path | None"
     tag_name: str
     paths: tuple
+    feature_review_path: "Path | None" = None
+    arm_payload: "dict | None" = None
+    arm_timestamp: "str | None" = None
 
 
 def _read_frontmatter(path: Path) -> dict:
@@ -51,11 +60,25 @@ def _read_frontmatter(path: Path) -> dict:
     return _miniyaml.parse("\n".join(lines[1:j])) or {}
 
 
-def plan_arm_transaction(feature_dir: Path, just_closed_gate: int) -> ArmTransaction:
+def plan_arm_transaction(
+    feature_dir: Path,
+    just_closed_gate: int,
+    arm_payload: "dict | None" = None,
+    timestamp: "str | None" = None,
+) -> ArmTransaction:
     """Compute the complete write set for arming the gate after `just_closed_gate`.
 
     Reads the plan graph and the current on-disk status of every gate-`N+1`
     WU and the gate-`N` file; performs no writes.
+
+    `arm_payload` and `timestamp` are the caller's precomputed arm-predicate
+    verdict (FEAT-2026-0053/T04's shadow-evaluation payload) and the arm's
+    wall-clock timestamp. When both are given and the arm is non-empty (at
+    least one drafted WU), `FEATURE-REVIEW.md` joins `paths` so its append
+    lands in the same commit as the status flips (WU-08). Callers that don't
+    pass them get the T05 write set unchanged — a `review`/`supervised`
+    feature never calls this with them set, so it never gets a
+    `FEATURE-REVIEW.md` at all.
     """
     feature_dir = Path(feature_dir)
     plan_fm = _read_frontmatter(feature_dir / "PLAN.md")
@@ -91,6 +114,11 @@ def plan_arm_transaction(feature_dir: Path, just_closed_gate: int) -> ArmTransac
                 gate_file_path = candidate
                 paths.append(gate_file_path)
 
+    feature_review_path = None
+    if draft_wu_paths and arm_payload is not None and timestamp is not None:
+        feature_review_path = feature_dir / FEATURE_REVIEW_FILENAME
+        paths.append(feature_review_path)
+
     seen = set()
     deduped_paths = []
     for p in paths:
@@ -105,6 +133,9 @@ def plan_arm_transaction(feature_dir: Path, just_closed_gate: int) -> ArmTransac
         gate_file_path=gate_file_path,
         tag_name=arm_tag_name(feature_id, just_closed_gate),
         paths=tuple(deduped_paths),
+        feature_review_path=feature_review_path,
+        arm_payload=arm_payload,
+        arm_timestamp=timestamp,
     )
 
 
@@ -124,6 +155,88 @@ def _flip_status_field(path: Path, new_status: str) -> None:
         block.append(f"status: {new_status}")
     new_lines = ["---", *block, "---", *lines[j + 1:]]
     path.write_text("\n".join(new_lines) + "\n")
+
+
+def _extract_doubt_section(body: str) -> "str | None":
+    """Return the verbatim `## Doubt` section (heading through the next `## `
+    heading or EOF), or None when no such section exists."""
+    m = _DOUBT_HEADING_RE.search(body)
+    if m is None:
+        return None
+    nl = body.find("\n", m.end())
+    tail_start = nl + 1 if nl != -1 else len(body)
+    nxt = _NEXT_H2_RE.search(body, tail_start)
+    end = nxt.start() if nxt else len(body)
+    return body[m.start():end].rstrip("\n") + "\n"
+
+
+def _read_gate_review(review_path: Path) -> "tuple[list, str | None]":
+    """Best-effort read of a `GATE-{N}-REVIEW.md`: its frontmatter
+    `open_questions` list and the verbatim `## Doubt` section text.
+
+    Never raises — a missing file, unparseable frontmatter, or an absent
+    section all degrade to recorded absence (empty list / None) rather than
+    an arm-crashing exception (WU-08 AC7).
+    """
+    if not review_path.exists():
+        return [], None
+    text = review_path.read_text()
+    lines = text.splitlines()
+    open_questions: list = []
+    body = text
+    if lines and _FM_DELIM.match(lines[0]):
+        j = 1
+        while j < len(lines) and not _FM_DELIM.match(lines[j]):
+            j += 1
+        try:
+            fm = _miniyaml.parse("\n".join(lines[1:j])) or {}
+        except _miniyaml.MiniYAMLError:
+            fm = {}
+        open_questions = fm.get("open_questions") or []
+        body = "\n".join(lines[j + 1:])
+    return open_questions, _extract_doubt_section(body)
+
+
+def _render_verdict_line(arm_payload: dict) -> str:
+    lines = [f"would_arm: {arm_payload.get('would_arm')}"]
+    for name, v in (arm_payload.get("classes") or {}).items():
+        lines.append(f"- {name}: {v.get('status')} — {v.get('reason')}")
+    return "\n".join(lines)
+
+
+def append_feature_review_entry(
+    feature_dir: Path,
+    just_closed_gate: int,
+    arm_payload: dict,
+    timestamp: str,
+) -> Path:
+    """Append one section for `just_closed_gate` to `FEATURE-REVIEW.md`,
+    sourced from `GATE-{just_closed_gate + 1}-REVIEW.md`. Append-only: an
+    existing file's prior sections are never rewritten or reordered. Returns
+    the path written.
+    """
+    feature_dir = Path(feature_dir)
+    review_path = feature_dir / gate_review_filename(just_closed_gate + 1)
+    open_questions, doubt = _read_gate_review(review_path)
+
+    oq_text = (
+        "\n".join(f"- {q}" for q in open_questions) if open_questions else "(none)"
+    )
+    doubt_text = doubt if doubt is not None else "(no `## Doubt` section found)"
+    verdict_text = _render_verdict_line(arm_payload)
+
+    section = (
+        f"## Gate {just_closed_gate} — armed {timestamp}\n\n"
+        f"**Open questions:**\n\n{oq_text}\n\n"
+        f"{doubt_text}\n"
+        f"**Arm verdict:**\n\n{verdict_text}\n"
+    )
+
+    path = feature_dir / FEATURE_REVIEW_FILENAME
+    existing = path.read_text() if path.exists() else ""
+    sep = "\n" if existing else ""
+    path.write_text(existing + sep + section)
+    return path
 
 
 def apply_arm_transaction(txn: ArmTransaction) -> list:
@@ -146,5 +259,18 @@ def apply_arm_transaction(txn: ArmTransaction) -> list:
         if fm.get("status") == "awaiting_review":
             _flip_status_field(txn.gate_file_path, "passed")
             applied.append(txn.gate_file_path)
+
+    # Gated on `applied` (this call's actual flips), not on
+    # `txn.feature_review_path` alone: a replay against already-flipped
+    # files performs zero flips above, so this stays a true no-op too —
+    # the same idempotency contract as the flips it rides alongside.
+    if txn.feature_review_path is not None and applied:
+        append_feature_review_entry(
+            txn.feature_review_path.parent,
+            txn.just_closed_gate,
+            txn.arm_payload,
+            txn.arm_timestamp,
+        )
+        applied.append(txn.feature_review_path)
 
     return applied

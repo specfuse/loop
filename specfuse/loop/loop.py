@@ -5846,7 +5846,11 @@ def run(
         armed_paths: list = []
         if (feat_fm.get("autonomy_default") == "auto"
                 and arm_event["payload"].get("would_arm")):
-            txn = plan_arm_transaction(feature_dir, gate.number)
+            arm_timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+            txn = plan_arm_transaction(
+                feature_dir, gate.number,
+                arm_payload=arm_event["payload"], timestamp=arm_timestamp,
+            )
             if txn.paths:
                 # -c tag.gpgSign=false: the revert tag is a plain lightweight
                 # marker, not a release artifact — force that regardless of

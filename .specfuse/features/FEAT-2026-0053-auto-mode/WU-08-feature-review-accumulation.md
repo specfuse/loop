@@ -1,12 +1,16 @@
 ---
 id: FEAT-2026-0053/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/arm_txn.py
   - tests/test_feature_review_accumulation.py
+duration_seconds: 937.647
+cost_usd: 3.201158
+input_tokens: 124
+output_tokens: 46053
 ---
 
 # `FEATURE-REVIEW.md` — every auto-armed gate's doubt reaches the one human read
