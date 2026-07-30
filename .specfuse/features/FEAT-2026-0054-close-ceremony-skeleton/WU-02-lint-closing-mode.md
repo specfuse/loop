@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0054/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces_driver_helper: "lint_plan.py — `--closing` mode reading closing_requirements.CLOSING_REQUIREMENTS"
 produces:
   - tests/test_lint_closing.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T12:28:38.091920+00:00
+duration_seconds: 582.043
+cost_usd: 2.135465
+input_tokens: 4339
+output_tokens: 29159
 ---
 
 # `specfuse-lint --closing` — the closing contract, checkable before the attempt ends
