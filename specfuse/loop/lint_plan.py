@@ -34,6 +34,7 @@ from pathlib import Path
 
 from . import _miniyaml
 from . import _wu_sections
+from .closing_requirements import gate_review_filename
 from .loop import VERDICT_VALUES
 
 FM = re.compile(r"^---\s*$")
@@ -1260,6 +1261,24 @@ def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
     next_gate = next((g for g in gates if g.get("gate") == next_gate_num), None)
     if next_gate is None:
         return warns  # Terminal gate: no N+1 — clean
+
+    # open_questions: required explicit list in the GATE-{N+1}-REVIEW.md
+    # frontmatter (FEAT-2026-0053/T02). Missing field != empty list — under
+    # `auto` (gate 2) a missing field parks the feature, so plan-next must
+    # write it explicitly, even as `open_questions: []`. Silent when the
+    # review file itself is absent — assert_gate_review_exists already
+    # owns that failure; this check must not pile on.
+    review_path = feature_dir / gate_review_filename(next_gate_num)
+    if review_path.exists():
+        review_fm, _ = read_frontmatter(review_path)
+        if "open_questions" not in review_fm:
+            warns.append(
+                f"{review_path.name}: missing 'open_questions:' frontmatter "
+                f"field — a required explicit list (empty list means nothing "
+                f"requires an answer before execution; a missing field is not "
+                f"an empty list and parks the feature under `auto`). See "
+                f".specfuse/templates/WU.template.md frontmatter notes."
+            )
 
     units = next_gate.get("work_units") or []
     for ref in units:
