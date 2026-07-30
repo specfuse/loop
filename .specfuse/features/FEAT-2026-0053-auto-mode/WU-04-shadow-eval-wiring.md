@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0053/T04
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.00
 produces:
@@ -10,6 +10,10 @@ produces:
 produces_driver_helper:
   - evaluate_arm_predicate call site at the awaiting_review flip
   - write_baseline_if_absent call site at first dispatch
+duration_seconds: 209.885
+cost_usd: 1.220458
+input_tokens: 58
+output_tokens: 14684
 ---
 
 # Shadow wiring — evaluate and emit at every `awaiting_review` flip
