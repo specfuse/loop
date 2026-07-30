@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0053-auto-mode
 roadmap_goal: Implement the declared-but-dead `auto` autonomy level end to end — the driver arms drafted gates and accepts plan-next's additive plan adjustments on its own, stopping only on mechanical conditions, so a four-gate feature costs one human touch (the PR review) instead of four.
 autonomy_default: review
 status: active
-planned_cost_usd: 28.50
+planned_cost_usd: 54.00
 ---
 
 # Plan: Autonomous feature mode
@@ -158,10 +158,34 @@ gates:
         depends_on: [FEAT-2026-0053/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []
-      # G1-PLAN drafts gate 2: live arming behind the dial — atomic arm
-      # transaction + tag-before-arm, dial read, lint warns -> blocking under
-      # auto, FEATURE-REVIEW.md accumulation, LEARNINGS staging.
+    work_units:
+      - id: FEAT-2026-0053/T05
+        file: WU-05-arm-transaction-module.md
+        depends_on: []
+      - id: FEAT-2026-0053/T06
+        file: WU-06-dial-and-verdict-wiring.md
+        depends_on: [FEAT-2026-0053/T05]
+      - id: FEAT-2026-0053/T07
+        file: WU-07-lint-blocking-under-auto.md
+        depends_on: [FEAT-2026-0053/T06]
+      - id: FEAT-2026-0053/T08
+        file: WU-08-feature-review-accumulation.md
+        depends_on: [FEAT-2026-0053/T06]
+      - id: FEAT-2026-0053/T09
+        file: WU-09-learnings-staging.md
+        depends_on: [FEAT-2026-0053/T06]
+      # --- closing sequence: non-terminal gate ---
+      - id: FEAT-2026-0053/G2-CLOSE-INTERMEDIATE
+        file: WU-90-gate-2-close-intermediate.md
+        depends_on:
+          - FEAT-2026-0053/T05
+          - FEAT-2026-0053/T06
+          - FEAT-2026-0053/T07
+          - FEAT-2026-0053/T08
+          - FEAT-2026-0053/T09
+      - id: FEAT-2026-0053/G2-PLAN
+        file: WU-91-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0053/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
@@ -177,11 +201,21 @@ T01 and T02 are independent (baseline vs contract fields); T03 needs both
 (reads the baseline, tolerates but records the fields); T04 wires T03 into the
 close path.
 
+Gate 2 repeats gate 1's module-then-wiring shape: T05 is the pure arm
+transaction, T06 wires the dial and the verdict into the one flip site that can
+arm. T07, T08 and T09 all hang off T06 and are independent of each other — the
+severity flip, the doubt accumulation, and the LEARNINGS staging touch
+different surfaces and can be re-ordered or dropped individually at arming
+without stranding the others.
+
 ## Notes
 
-- `planned_cost_usd` covers the **drafted** work only: gate 1's six units
-  ($23.50) plus gate 3's close placeholder ($5.00) = $28.50. G1-PLAN
-  re-baselines when it drafts gate 2, delta stated in `GATE-02-REVIEW.md`.
+- `planned_cost_usd` covers the **drafted** work only. Re-baselined by G1-PLAN
+  at the gate-1 → gate-2 boundary: gate 1's six units ($23.50) plus gate 2's
+  seven drafted units ($25.50) plus gate 3's close placeholder ($5.00) =
+  **$54.00**, a **+$25.50** delta against the original $28.50. Gate 3's
+  substantive units are still undrafted, so this figure will move again when
+  G2-PLAN re-baselines; the delta is stated in `GATE-02-REVIEW.md`.
 - The shadow predicate fires for the first time at **this feature's own gate-1
   close** (T04 lands mid-gate). That is passive logging, so the
   `[FEAT-2026-0007/G2-LESSONS]` self-exercise trap does not bite — but the
