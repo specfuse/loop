@@ -908,7 +908,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The `produces_not_in_diff` / `no_deliverable_files` / `deliverable_missing` waste class dies at arm time instead of after 3 burned attempts and an escalation; per-WU folklore comments explaining the dual-gate trap become deletable; arm-gate review gets a mechanical consistency report instead of relying on operator eyeballing.
 
-**Status: planned.**
+**Status: active — gate 1 close returned `not_met` (2026-07-30).** The WARN leg (already-delivered `produces:` path) and the unified literal/glob semantics for `assert_declared_deliverables` / `assert_produces_in_diff` verify end-to-end. The ERROR leg does not: `check_produces_boundary` slices the `Do not touch` section with a helper that keeps only lines *after* the heading line, so it is blind to the `**Do not touch.** <content>` bold-preamble form used by all 327 work-unit bodies in this repo and prescribed by `WU.template.md` — the motivating FEAT-2026-0066/T04 deadlock arms clean — while the continuation lines it does read yield 15 false ERRORs across 4 existing features, against a definition of done requiring zero. Fix-forward: teach `slice_wu_section` the bold-preamble form (its acceptance-criteria sibling already handles both), re-derive the boundary patterns over the whole section, re-run the sweep to zero. Evidence and consumer-visible contract changes: `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/RETROSPECTIVE.md`.
 
 ## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
 

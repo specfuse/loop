@@ -1,14 +1,27 @@
 ---
 id: FEAT-2026-0055/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 # Load-bearing close: §1 fresh oracle re-runs + §3 consumer-visible contract enumeration
 # (template + skill prose changes reach every scaffold consumer; T03 changes an existing
 # guard's accepted inputs). Auto-close must not skip it.
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.7.0
+started_at: 2026-07-30T15:27:18.386869+00:00
+# check_produces_boundary (T02) is blind to the bold-preamble `**Do not touch.**` form used by
+# all 327 real WU bodies, and emits 15 false ERRORs across 4 existing features. The gate's own
+# escalation trigger prescribes not_met on a sweep that ERRORs. See RETROSPECTIVE.md §2a, §3.
+verdict: not_met
+duration_seconds: 956.1
+cost_usd: 5.417419
+input_tokens: 116
+output_tokens: 44091
 ---
 
 # Gate 1 close — the WU contract is armed-checked, unified, and surfaced
