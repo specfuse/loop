@@ -2476,3 +2476,60 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   answer, rather than from its ID's spelling; and when a guard is conditional on a
   derived scope, add a test that the guard actually FIRES for the common membership
   case, not only that it passes when satisfied.
+
+- [FEAT-2026-0055/G1-CLOSE] **A rule that parses a document must be fixture-tested against the
+  document shape the project's own template ships, not against a hand-written shape that happens
+  to parse.** This feature's boundary check slices the `Do not touch` section with a helper that
+  keeps only the lines *after* the heading line. That is correct for `## Do not touch` and wrong
+  for `**Do not touch.** <content on the same line>` — the bold-preamble form used by 327 of 327
+  work-unit bodies in this repo and prescribed by `WU.template.md`. Every fixture was authored in
+  the ATX form, so the unit test suite was green while the rule could not fire on a single real
+  work unit, and the motivating incident it was chartered on (FEAT-2026-0066/T04) would have
+  armed clean. The sibling slicer for acceptance criteria already handles both forms, which is
+  the tell: when two slicers over the same document disagree about what a section looks like, at
+  least one of them is being tested against a shape nobody writes. Rule: for any rule whose input
+  is a document, copy at least one fixture verbatim out of the shipped template, and reproduce
+  the feature's motivating incident as a fixture asserting the rule FIRES — a paraphrase of "the
+  T04 shape" satisfies the acceptance criterion and misses the defect.
+
+- [FEAT-2026-0055/G1-CLOSE] **A cross-corpus sweep that a work unit's acceptance criteria require
+  must be a driver-run gate, not an agent's self-reported observation.** The gate's definition of
+  done required the new ERROR rule to report zero findings across every existing feature folder,
+  and the producing work unit's criteria said "Any ERROR on an existing feature → stop,
+  escalate". That unit reported `passed` on its first attempt. The close ran the same one-line
+  sweep and found 15 ERRORs across 4 features — all false positives, all of which would have
+  blocked arming on this repo's own work. A sweep is a single command with a countable output:
+  the moment it is phrased as something an agent runs and describes, it is only as reliable as
+  the agent's diligence on the attempt it was cheapest to skip. Rule: when a criterion is "rule R
+  reports zero findings over corpus C", add it to `verification.yml` as a gate the driver
+  executes, and treat any criterion whose evidence is a pasted command output as unverified until
+  the close re-runs it.
+
+- [FEAT-2026-0055/G1-CLOSE] **A rule that refuses work must fire only on certainty and degrade
+  everything else to a warning — a rule that guesses is worse than the defect it hunts.** The
+  boundary check's first shipped form matched `produces:` paths against every backtick token it
+  found in a Do-not-touch section, which turned an allow-enumeration ("These files change: … and
+  one new test file `tests/foo.py`") into a deny-list and read a semantic qualifier ("every
+  *existing* `check_*` function") as a literal glob. The result was 15 refusals across 4
+  legitimate features and zero on the deadlock it was chartered to catch. The fix was not a
+  better guess: it was scoping extraction to prohibition clauses and routing anything the
+  scoping could not classify to WARN, which took the tree to zero ERRORs while still surfacing
+  four genuinely ambiguous boundaries as advisory findings a human can confirm at arm time.
+  Rule: for any validation that can block work, split the outcome three ways — fire on an
+  unambiguous violation, warn on a match the rule cannot classify, stay silent otherwise — and
+  size the ERROR leg by what it can prove, not by what it can pattern-match. A false refusal
+  costs a human's trust in the whole check; a WARN costs them ten seconds.
+
+- [FEAT-2026-0055/G1-CLOSE] **A close whose gates pass but whose verdict is `not_met` is
+  recorded as a passed attempt, so the rework it triggers is invisible to failure-class cost
+  analysis.** Every `attempt_outcome` event in this feature carries `outcome: passed`,
+  `failure_class: null`, `re_arm_count: 0` — and $11.08 of the $15.30 spent, 72% of the total,
+  was a chartered repair work unit plus a discarded first close, both caused by a defect the
+  first close found. Grouping portfolio spend by `failure_class` reports this feature as having
+  cost nothing to rework. The under-run on the original implementation work (25% of estimate,
+  four first-attempt passes) was the *signal* of the defect rather than a win: on a feature
+  whose subject is rules that must actually fire, uniformly cheap first-attempt passes mean the
+  gates are measuring the wrong thing. Rule: when reconciling planned against actual, count
+  verdict-driven rework as its own line rather than letting it disappear into "passed" attempts,
+  and treat a large uniform under-run on rule-authoring work as a prompt to check whether the
+  rule has ever been observed firing on a real input.

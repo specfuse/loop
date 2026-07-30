@@ -28,6 +28,7 @@ Usage:  specfuse-lint .specfuse/features/FEAT-XXXX-slug
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -440,6 +441,311 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
 
 
 _AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
+
+_PRODUCES_DISPATCHABLE_STATUSES = {"draft", "pending", "ready"}
+_PRODUCES_EXEMPT_PATHS = {"events.jsonl"}
+
+
+def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
+    """WARN when a dispatchable WU's `produces:` path was already delivered.
+
+    Exact string match only against a `done` WU's `produces:` entries in the
+    same feature — a glob is compared literally, not expanded (expansion
+    semantics belong to the presence gate, not this lint). Parallel drafts
+    sharing a surface are fine (the earlier WU must be `done`), and a WU's own
+    file / `events.jsonl` never count as a clash. WARN-only; never appends to
+    the errors list. See FEAT-2026-0055/T01, FEAT-2026-0066/T04.
+    """
+    records = []  # (wid, wfile, status, produces_entries)
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            produces_raw = wfm.get("produces")
+            if not produces_raw:
+                continue
+            raw_entries = produces_raw if isinstance(produces_raw, list) else [produces_raw]
+            cleaned = set()
+            for p in raw_entries:
+                p_s = str(p).strip()
+                if not p_s or p_s in _PRODUCES_EXEMPT_PATHS or p_s == wfile:
+                    continue
+                cleaned.add(p_s)
+            if cleaned:
+                records.append((wid, wfile, wfm.get("status", ""), cleaned))
+
+    done_paths: dict = {}  # path -> (wid, wfile), first done WU declaring it
+    for wid, wfile, status, entries in records:
+        if status != "done":
+            continue
+        for p in entries:
+            done_paths.setdefault(p, (wid, wfile))
+
+    for wid, wfile, status, entries in records:
+        if status not in _PRODUCES_DISPATCHABLE_STATUSES:
+            continue
+        for p in entries:
+            match = done_paths.get(p)
+            if match is None or match[0] == wid:
+                continue
+            done_wid, done_wfile = match
+            print(
+                f"WARN: {wfile}: {wid} declares produces path {p!r}, but "
+                f"done WU {done_wid} ({done_wfile}) already delivered it. "
+                f"Drop the path, or state the incremental edit this WU makes "
+                f"to it in the body."
+            )
+
+
+_DNT_CARVEOUT_RE = re.compile(r"(?i)\bexcept\b")
+_DNT_ALLOW_ENUM_RE = re.compile(
+    r"(?i)\b(?:files?|paths?)(?:\s+that)?\s+change\b|\badds?\b|\bnew\b"
+)
+_DNT_AMBIGUOUS_PHRASE_RE = re.compile(
+    r"(?i)\bexisting\b|\bgenerated (?:by|from)\b|\boutput of\b"
+    r"|\bhand-edit\b|\bdirect edit\b"
+)
+_DNT_CONTAINER_TOKEN_RE = re.compile(r"(?i)\bin\s*`([^`]+)`")
+_BACKTICK_TOKEN_RE = re.compile(r"`([^`]+)`")
+
+
+def _split_dnt_clauses(dnt_text: str) -> list[str]:
+    """Split Do-not-touch prose into clauses on ';' and sentence-ending '.'.
+
+    Physical lines are joined first (a wrapped sentence spans them; the
+    bold-preamble form's canonical body is prose, not one clause per line),
+    and a delimiter inside backticks never splits a clause — a path like
+    `SKILL.md` must not fracture on its own period.
+    """
+    joined = " ".join(
+        line.strip().lstrip("-*").strip()
+        for line in dnt_text.splitlines()
+        if line.strip()
+    )
+    clauses: list[str] = []
+    buf: list[str] = []
+    in_backtick = False
+    for ch in joined:
+        if ch == "`":
+            in_backtick = not in_backtick
+            buf.append(ch)
+            continue
+        if not in_backtick and ch in ";.":
+            clause = "".join(buf).strip()
+            if clause:
+                clauses.append(clause)
+            buf = []
+            continue
+        buf.append(ch)
+    tail = "".join(buf).strip()
+    if tail:
+        clauses.append(tail)
+    return clauses
+
+
+def _extract_do_not_touch_patterns(dnt_text: str) -> tuple[list[str], list[str], set[str]]:
+    """Return (prohibit_patterns, ambiguous_patterns, allowed_literals) from a
+    Do-not-touch body.
+
+    Only backtick-quoted tokens containing '/', '*', or a file extension count
+    as binding path patterns — a plain-prose mention of a path never fires the
+    boundary check (no semantic judgment, no false ERROR on illustrative
+    prose). Extraction is prohibition-scoped, per clause (split on ';' and
+    sentence-ending '.'):
+
+    - A clause carrying an "except" carve-out (the shape FEAT-2026-0066/T04's
+      re-armed body used) contributes no patterns at all.
+    - A clause carrying an allow-enumeration signal ("These/Paths that
+      change:" / "adds" / "new" — the FEAT-2026-0023/T01 shape, where the
+      WU's own deliverables are listed, not forbidden) contributes no
+      patterns to either bucket. Its backtick tokens are instead recorded as
+      `allowed_literals`: exact paths the WU has explicitly declared it is
+      creating or changing. A later clause's *pattern* may still coincide
+      with one of these paths (e.g. "any other `.github/workflows/*` file"
+      after enumerating the one workflow file this WU adds) — the caller
+      treats an exact `allowed_literals` hit as never a match, regardless of
+      which clause the pattern came from, since the enumeration is a
+      definite allow-list for that literal path.
+    - A clause carrying a semantic qualifier cannot be resolved without
+      knowing something about the WU's own edit that the lint has no way to
+      check. Its path-like tokens go in `ambiguous_patterns` — the caller
+      downgrades a match to WARN, never ERROR, per this WU's design rule:
+      ERROR only on certainty. Two qualifier shapes, both drawn from the
+      retrospective's real fixtures:
+      - "existing" (FEAT-2026-0070/T08: "every existing `check_*`
+        function") — is a given produces path pre-existing or newly
+        created by this WU?
+      - "generated by/output of/hand-edit/direct edit" (FEAT-2026-0069/T08,
+        FEAT-2026-0070/T03: "`.../SKILL.md` as a direct edit — it is an
+        output of `scripts/sync-scaffold.sh`") — the prohibition is on
+        *manual* editing; a produces declaration doesn't say whether the
+        WU reaches the path by hand or by running the generator.
+    - A token immediately preceded by "in" (e.g. "`discover_components()`
+      and `_STACK_A_PATTERNS` in `tests/test_x.py`" — FEAT-2026-0069/T03)
+      names a container, not the prohibition itself: the forbidden things
+      are the symbols named before "in", and the file may otherwise be
+      touched freely. Also goes to `ambiguous_patterns` — the lint can spot
+      the grammatical shape but not verify the symbols went untouched.
+    - Everything else is an unqualified prohibition and goes in
+      `prohibit_patterns`.
+    """
+    prohibit: list[str] = []
+    ambiguous: list[str] = []
+    allowed_literals: set[str] = set()
+    for clause in _split_dnt_clauses(dnt_text):
+        if _DNT_CARVEOUT_RE.search(clause):
+            continue
+        if _DNT_ALLOW_ENUM_RE.search(clause):
+            for tok in _BACKTICK_TOKEN_RE.findall(clause):
+                tok = tok.strip()
+                if tok:
+                    allowed_literals.add(tok)
+            continue
+        clause_ambiguous = bool(_DNT_AMBIGUOUS_PHRASE_RE.search(clause))
+        container_tokens = {
+            m.group(1).strip() for m in _DNT_CONTAINER_TOKEN_RE.finditer(clause)
+        }
+        for tok in _BACKTICK_TOKEN_RE.findall(clause):
+            tok = tok.strip()
+            if not tok:
+                continue
+            if "/" in tok or "*" in tok or re.search(r"\.[A-Za-z0-9]+$", tok.rstrip("/")):
+                bucket = (
+                    ambiguous if (clause_ambiguous or tok in container_tokens)
+                    else prohibit
+                )
+                bucket.append(tok)
+    return prohibit, ambiguous, allowed_literals
+
+
+def _match_dnt_boundary(
+    surface: str,
+    prohibit_patterns: list[str],
+    ambiguous_patterns: list[str],
+    allowed_literals: set[str],
+) -> tuple[str, str] | None:
+    """Return (severity, pattern) for the first pattern `surface` matches —
+    ERROR if prohibited, WARN if only ambiguous. A surface the WU has
+    explicitly enumerated as its own new/changed deliverable never matches,
+    even against a pattern found in an unrelated clause."""
+    if surface in allowed_literals:
+        return None
+    for pat in prohibit_patterns:
+        if fnmatch.fnmatch(surface, pat):
+            return ("ERROR", pat)
+    for pat in ambiguous_patterns:
+        if fnmatch.fnmatch(surface, pat):
+            return ("WARN", pat)
+    return None
+
+
+def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
+    """ERROR when a WU's own `produces:` path (or `produces_driver_helper`
+    surface) falls inside its own Do-not-touch section's paths.
+
+    A structural deadlock, not a review nit: the WU cannot both deliver the
+    path and honor its own boundary, and `assert_produces_in_diff` only
+    catches this AFTER a full dispatch attempt — the cost FEAT-2026-0066/T04
+    paid (3 attempts + an operator re-arm) for a conjunction this lint makes
+    un-armable up front. See FEAT-2026-0070 (earlier-enforcer-names-the-
+    later-one): the ERROR names the post-attempt guard it preempts so the
+    author isn't left to rediscover the connection.
+    """
+    found: list[str] = []
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, wbody = read_frontmatter(wpath)
+            dnt_text = _slice_section(wbody, "Do not touch")
+            if not dnt_text.strip():
+                continue
+            prohibit_patterns, ambiguous_patterns, allowed_literals = (
+                _extract_do_not_touch_patterns(dnt_text)
+            )
+            if not prohibit_patterns and not ambiguous_patterns:
+                continue
+
+            produces_raw = wfm.get("produces")
+            produces_entries = (
+                produces_raw if isinstance(produces_raw, list)
+                else [produces_raw] if produces_raw else []
+            )
+            for p in produces_entries:
+                p_s = str(p).strip()
+                if not p_s:
+                    continue
+                hit = _match_dnt_boundary(
+                    p_s, prohibit_patterns, ambiguous_patterns, allowed_literals
+                )
+                if hit is None:
+                    continue
+                severity, pat = hit
+                if severity == "ERROR":
+                    found.append(
+                        f"ERROR: {wfile}: {wid} declares produces path "
+                        f"{p_s!r}, which its own Do-not-touch section "
+                        f"forbids via {pat!r}. This is a structural "
+                        f"deadlock — assert_produces_in_diff would refuse "
+                        f"it after a full dispatch attempt. Drop the path "
+                        f"from produces, narrow the Do-not-touch pattern, "
+                        f"or add an explicit 'except' carve-out. See "
+                        f"FEAT-2026-0066/T04, FEAT-2026-0070."
+                    )
+                else:
+                    print(
+                        f"WARN: {wfile}: {wid} declares produces path "
+                        f"{p_s!r}, which matches Do-not-touch pattern "
+                        f"{pat!r} — the boundary's wording ('existing', "
+                        f"'generated by', 'in <file>', or similar) makes "
+                        f"this pattern's scope ambiguous without semantic "
+                        f"judgment this lint does not have. Confirm by hand "
+                        f"before arming, or reword the boundary to name the "
+                        f"protected surface unambiguously."
+                    )
+
+            pdh_raw = wfm.get("produces_driver_helper")
+            if pdh_raw:
+                pdh_s = str(pdh_raw).strip()
+                surface = pdh_s.split("—")[0].split("--")[0].strip().strip("`\"'")
+                if surface:
+                    hit = _match_dnt_boundary(
+                        surface, prohibit_patterns, ambiguous_patterns, allowed_literals
+                    )
+                    if hit is not None:
+                        severity, pat = hit
+                        if severity == "ERROR":
+                            found.append(
+                                f"ERROR: {wfile}: {wid} declares "
+                                f"produces_driver_helper surface {surface!r}, "
+                                f"which its own Do-not-touch section forbids "
+                                f"via {pat!r}. This is a structural deadlock — "
+                                f"assert_produces_in_diff would refuse it "
+                                f"after a full dispatch attempt. Drop/narrow "
+                                f"the boundary, or add an explicit 'except' "
+                                f"carve-out. See FEAT-2026-0066/T04, "
+                                f"FEAT-2026-0070."
+                            )
+                        else:
+                            print(
+                                f"WARN: {wfile}: {wid} declares "
+                                f"produces_driver_helper surface {surface!r}, "
+                                f"which matches Do-not-touch pattern {pat!r} "
+                                f"— the boundary's wording makes this "
+                                f"pattern's scope ambiguous without semantic "
+                                f"judgment this lint does not have. Confirm "
+                                f"by hand before arming."
+                            )
+    return found
 
 
 def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
@@ -890,6 +1196,8 @@ def lint(feature_dir: Path) -> list[str]:
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
+    check_produces_satisfiability(feature_dir, gates)
+    errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
