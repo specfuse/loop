@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0055/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces_driver_helper: "_wu_sections.slice_wu_section — bold-preamble label-line content included; lint_plan._extract_do_not_touch_patterns — prohibition-scoped, ambiguous matches degrade to WARN"
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/_wu_sections.py
   - specfuse/loop/lint_plan.py
   - tests/test_lint_boundary_extraction.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T15:56:37.527188+00:00
+duration_seconds: 1269.768
+cost_usd: 5.664788
+input_tokens: 182
+output_tokens: 69357
 ---
 
 # Fix the boundary rule's extraction: see the bold form, ERROR only on certainty
