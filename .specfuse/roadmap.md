@@ -73,11 +73,12 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
-| FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | active | — | — |
+| FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | planned | — | — |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | — |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | — |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | — |
+| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | — |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -931,18 +932,6 @@ machine-checkable contract rather than prose.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
 
-## FEAT-2026-0054 — Close-ceremony skeleton + in-session closing lint
-
-**Why.** Portfolio telemetry (2026-07-30 review, 25 generator features + cross-repo data): 28% of all closing-WU spend is driver refusals. The `closing_deliverable_missing` class cost ~$42 and `assert_gate_review_exists` alone $53.11 across 15 refusals (issue #261). The guards check literal artifact shape (headings, frontmatter fields, file names) *after* the attempt, so a $4–10 verification pass is re-bought over a missing `### Failure-class breakdown` heading or a misnamed review file. Close-WU prompts now spend ~40% of their text restating guard strings defensively — machine contract leaking into prose, re-paid in tokens on every attempt.
-
-**Goal.** The driver pre-creates the ceremony skeleton at close/close-intermediate/plan-next dispatch: `RETROSPECTIVE.md` with every conditionally-required heading stubbed, a `verdict: TBD` frontmatter placeholder that lints as incomplete, and the correctly-named `GATE-{N+1}-REVIEW.md` stub. Ship `specfuse-lint --closing` so the agent validates the full closing-assertion set in-session before ending its attempt; the post-squash driver assertions become a cheap recheck of surfaces that were pre-created, not a discovery mechanism.
-
-**Benefits.** The format-guard refusal class becomes structurally near-impossible to hit (~$95 of measured portfolio waste to date); close attempts spend their budget on verification substance instead of artifact-shape compliance; the guard-defensive boilerplate can be deleted from `WU.template.md` and every drafted close WU, shrinking both authoring effort and per-attempt input tokens.
-
-**What shipped, where it differs from the goal above.** Delivered: `closing_requirements.py` (the registry both the post-squash guards and the new lint read), `specfuse-lint --closing`, dispatch-time skeleton pre-creation, and the `close-discipline.md` §4 / `WU.template.md` prose rewrite. Two deliberate departures from the drafted goal: (1) **no `verdict: TBD` placeholder** — `lint_plan` fails a dispatched close WU mid-flight on an invalid verdict value, so the skeleton leaves the field absent and the lint reports the absence as an actionable finding instead; (2) the `RETROSPECTIVE.md` stubs are **conditional, not exhaustive** — each section is written only when it is derivable from on-disk state at dispatch time, so a terminal close on a gate with no failures is pre-created nothing at all. `close-discipline.md` §4 currently describes the exhaustive version; correcting it is follow-up D3 in the retrospective.
-
-**Status: gate 1 closed `met_locally` on 2026-07-30.** All ten gate-1 acceptance criteria verified fresh in-session; the load-bearing *lint-approves ⇒ guards-pass* property was observed on nine fixture dispatch scenarios with zero divergence. Hedged on two items that no in-repo session can settle: the human acknowledgment close-discipline §3 requires for the consumer-visible contract-change list (D1), and the portfolio success measure — zero closing-format refusals — which verifies on the next generator feature (D2). Two defects found and escalated rather than patched, both inside the work unit's do-not-touch boundary: D3 above and D4 (the failure-class guard cannot fire on implementation-WU failures). The row status stays `active` because the terminal flip is verdict-gated and driver-owned; see `.specfuse/features/FEAT-2026-0054-close-ceremony-skeleton/RETROSPECTIVE.md`.
-
 ## FEAT-2026-0055 — Arm-time WU contract lint: produces satisfiability + boundary consistency
 
 **Why.** FEAT-2026-0066/T04 burned $11.43 across 3 attempts plus a human escalation on a `produces:` path already fully delivered by T03 — unsatisfiable by construction and detectable before dispatch. The same WU's Do-not-touch barred `src/main/**` while its acceptance criteria required an artifact only `src/main/**` could hold — a deadlock no lint catches today. And `assert_declared_deliverables` (literal paths only) vs `assert_produces_in_diff` (literal or fnmatch glob) have divergent path semantics that WU authors now document via folklore comment blocks in every feature (FEAT-2026-0065/T01 paid $10.43 learning it; 0066 re-quoted the warning verbatim). Portfolio cost of the produces/deliverable mismatch classes: ~$55.
@@ -980,6 +969,16 @@ machine-checkable contract rather than prose.
 **Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse-lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
 
 **Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
+
+**Status: planned.**
+
+## FEAT-2026-0059 — Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking
+
+**Why.** First live run of `/accept-hedged-close` (FEAT-2026-0054, 2026-07-30) showed the operator-facing gap: the skill quotes the raw D-entry follow-up record and demands a one-line reason, but never answers the operator's actual questions — *why couldn't this close `met`, and what kind of reason is expected?* On 0054 the answer was derivable but buried: two entries were unclosable in-repo by construction (an operator-signature entry and a future-rate-in-other-repos entry) and two were findings routed to other owners — meaning `met_locally` was the structural ceiling and no rework alternative existed. The operator had to reverse-engineer that from four verbose entries. Routed findings also currently survive only as retrospective prose, with no tracking surface.
+
+**Goal.** (1) `close-discipline.md` §2's hedged-verdict record gains a required `kind:` per entry — `acceptance-discharged` / `externally-verifiable-later` / `routed-finding` — written by the close WU, which has the context. (2) `/accept-hedged-close` reads the classification and leads with a verdict-ceiling headline ("no in-repo rework can raise this verdict" vs "rework exists: <what>"), states the explicit alternative (accept now vs stay hedged until the named upgrade conditions, then recheck), and scaffolds the reason prompt from the classification while still requiring the operator's own words (`operator-escalation.md`'s never-author rule intact). (3) At acceptance, each `routed-finding` entry prompts for a tracking surface — existing issue/roadmap row, or offer `/roadmap-add` / `gh issue create` — so accepted follow-ups land in a queue instead of dying in prose.
+
+**Benefits.** The operator's accept/rework decision becomes a choice between two named options instead of a blank-line prompt after a wall of quotes; acceptance reasons get sharper because the skill names what is being accepted; routed findings stop leaking; the classification lives in the §2 contract (one home) so the skill re-derives nothing.
 
 **Status: planned.**
 

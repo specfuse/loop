@@ -496,3 +496,34 @@ implementation WUs should come from the PLAN.md gate graph rather than from ID p
 if so, `_gate_number_from_wu_id`'s callers are changed to resolve a WU's gate through the
 graph, with a test asserting that a `TNN` blocked attempt makes
 `assert_failure_class_breakdown_when_failures_present` fire for its gate.
+
+## Hedged verdict accepted
+
+- **Accepted verdict:** `met_locally`
+- **Operator reason (verbatim):** "I accept the hedge close as the expected behavior for
+  this feature"
+- **Recorded:** 2026-07-30T14:04:49Z, via `/accept-hedged-close`
+- **Acknowledgment:** the operator was shown the full D1–D4 follow-up record (quoted in
+  session) — including D1's four consumer-visible contract changes (`close-discipline.md`
+  §4 rewrite; `WU.template.md` close-obligations change; the new `specfuse-lint --closing`
+  surface; skeleton files in future closing-WU squashes) — and accepted with the reason
+  above. D1's named upgrade condition (operator acknowledgment via `/accept-hedged-close`)
+  is thereby satisfied; the entry itself, like all four, is carried forward as written.
+
+**Follow-ups carried forward — none discharged, none dropped.** All four entries of the
+§ *Hedged-verdict follow-up record* immediately above are carried forward verbatim and
+remain OPEN as written there:
+
+- **D1 — Human acknowledgment of the contract-change list — OPEN** (upgrade condition now
+  satisfied by this record; closure semantics belong to the verdict recheck, not here)
+- **D2 — Portfolio success measure: zero closing-format refusals — OPEN** (verifies on the
+  next generator-class feature's closing events)
+- **D3 — `close-discipline.md` §4 overstates the skeleton's coverage — OPEN** (routed:
+  rules-prose fix, canonical + mirror + sync)
+- **D4 — Failure-class guard cannot fire on implementation-WU failures — OPEN** (routed:
+  gate attribution via PLAN graph, follow-up feature)
+
+Context note for the audit trail: the verdict-ceiling here was structural — D1 is
+dischargeable only by this acceptance act, D2 only outside this repo; D3/D4 are findings
+routed to their owning surfaces. No in-repo rework existed that could have produced
+`met` on this close.

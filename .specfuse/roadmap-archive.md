@@ -43,6 +43,19 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0054"></a>
+## FEAT-2026-0054 — Close-ceremony skeleton + in-session closing lint
+
+**Why.** Portfolio telemetry (2026-07-30 review, 25 generator features + cross-repo data): 28% of all closing-WU spend is driver refusals. The `closing_deliverable_missing` class cost ~$42 and `assert_gate_review_exists` alone $53.11 across 15 refusals (issue #261). The guards check literal artifact shape (headings, frontmatter fields, file names) *after* the attempt, so a $4–10 verification pass is re-bought over a missing `### Failure-class breakdown` heading or a misnamed review file. Close-WU prompts now spend ~40% of their text restating guard strings defensively — machine contract leaking into prose, re-paid in tokens on every attempt.
+
+**Goal.** The driver pre-creates the ceremony skeleton at close/close-intermediate/plan-next dispatch: `RETROSPECTIVE.md` with every conditionally-required heading stubbed, a `verdict: TBD` frontmatter placeholder that lints as incomplete, and the correctly-named `GATE-{N+1}-REVIEW.md` stub. Ship `specfuse-lint --closing` so the agent validates the full closing-assertion set in-session before ending its attempt; the post-squash driver assertions become a cheap recheck of surfaces that were pre-created, not a discovery mechanism.
+
+**Benefits.** The format-guard refusal class becomes structurally near-impossible to hit (~$95 of measured portfolio waste to date); close attempts spend their budget on verification substance instead of artifact-shape compliance; the guard-defensive boilerplate can be deleted from `WU.template.md` and every drafted close WU, shrinking both authoring effort and per-attempt input tokens.
+
+**What shipped, where it differs from the goal above.** Delivered: `closing_requirements.py` (the registry both the post-squash guards and the new lint read), `specfuse-lint --closing`, dispatch-time skeleton pre-creation, and the `close-discipline.md` §4 / `WU.template.md` prose rewrite. Two deliberate departures from the drafted goal: (1) **no `verdict: TBD` placeholder** — `lint_plan` fails a dispatched close WU mid-flight on an invalid verdict value, so the skeleton leaves the field absent and the lint reports the absence as an actionable finding instead; (2) the `RETROSPECTIVE.md` stubs are **conditional, not exhaustive** — each section is written only when it is derivable from on-disk state at dispatch time, so a terminal close on a gate with no failures is pre-created nothing at all. `close-discipline.md` §4 currently describes the exhaustive version; correcting it is follow-up D3 in the retrospective.
+
+**Status: gate 1 closed `met_locally` on 2026-07-30.** All ten gate-1 acceptance criteria verified fresh in-session; the load-bearing *lint-approves ⇒ guards-pass* property was observed on nine fixture dispatch scenarios with zero divergence. Hedged on two items that no in-repo session can settle: the human acknowledgment close-discipline §3 requires for the consumer-visible contract-change list (D1), and the portfolio success measure — zero closing-format refusals — which verifies on the next generator feature (D2). Two defects found and escalated rather than patched, both inside the work unit's do-not-touch boundary: D3 above and D4 (the failure-class guard cannot fire on implementation-WU failures). The row status stays `active` because the terminal flip is verdict-gated and driver-owned; see `.specfuse/features/FEAT-2026-0054-close-ceremony-skeleton/RETROSPECTIVE.md`.
+
 <a id="feat-2026-0040"></a>
 ## FEAT-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
 

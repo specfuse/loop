@@ -5,7 +5,7 @@ slug: close-ceremony-skeleton
 branch: feat/FEAT-2026-0054-close-ceremony-skeleton
 roadmap_goal: Make the closing-format guard class structurally near-impossible to fail — the driver pre-creates every artifact shape the closing guards assert on at dispatch time, and a new `specfuse-lint --closing` mode lets the close agent validate the full closing contract in-session before ending its attempt, so post-squash guard refusals stop burning full re-attempts.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 28.00
 ---
 
