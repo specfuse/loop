@@ -1,36 +1,11 @@
 ---
 gate: 2
-status: awaiting_review
+status: open
 cost_budget_usd: 31.50
 # Sum of G1-PLAN's seven drafted units ($25.50 — T05 $3.50, T06 $3.50, T07
 # $3.00, T08 $2.50, T09 $2.50, G2-CLOSE-INTERMEDIATE $4.50, G2-PLAN $6.00) plus
 # one re-attempt of the largest ($6.00, G2-PLAN) — the defensive-padding shape
 # planning-discipline §5 recommends.
-baseline:
-  sha: acdf0a205a39f490266e8ac197d18a3abef9adb5
-  probed_at: 2026-07-30T21:19:43.291632+00:00
-  failing:
-    - gate: tests
-      failure_class: tests
-      failure_signature: $ python3 -m unittest discover -s tests -v
-    - gate: coverage
-      failure_class: coverage
-      failure_signature: $ coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90
-    - gate: leak-scan-hook
-      failure_class: other
-      failure_signature: no_gate_marker
-    - gate: sync-scaffold-bats
-      failure_class: other
-      failure_signature: no_gate_marker
-    - gate: sync-scaffold-symlinks-bats
-      failure_class: other
-      failure_signature: no_gate_marker
-    - gate: init-sh-shim-bats
-      failure_class: other
-      failure_signature: no_gate_marker
-    - gate: hookspath-conflict-bats
-      failure_class: other
-      failure_signature: no_gate_marker
 ---
 
 # Gate 2 — Live arming behind the dial
