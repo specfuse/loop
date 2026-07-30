@@ -2533,3 +2533,50 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   verdict-driven rework as its own line rather than letting it disappear into "passed" attempts,
   and treat a large uniform under-run on rule-authoring work as a prompt to check whether the
   rule has ever been observed firing on a real input.
+
+- [FEAT-2026-0053/G1-CLOSE] **A work unit that wires new code into the driver cannot be
+  verified by the driver run that wired it — so a gate whose definition of done asserts driver
+  runtime behavior must name its observation point, and an absent signal must never be read as
+  a false claim.** The driver imports `loop.py` once at process start. Edits a work unit lands
+  mid-run are dead code for the remainder of that invocation, including for every closing unit
+  that follows. Gate 1 wired two call sites into `run()` (a baseline write at first dispatch, an
+  `arm_predicate_evaluated` emit at every `awaiting_review` flip) and neither could fire in the
+  run that landed them: `PLAN.baseline.json` existed in 0 of 43 feature directories at close
+  time, which is the corroborating tell that the running process predated the edit. The trap is
+  not the deferral — it is the inference the gate file had already written down: *"No event =
+  the claim is false — do not arm; escalate."* That reads a stale-process artifact as a defect
+  and escalates a working mechanism. Rule: when a definition-of-done criterion asserts runtime
+  behavior of the driver itself, write the observation point into the criterion at drafting
+  ("verified at the next driver invocation", "verified by the human at the arming checkpoint"),
+  and phrase any absence check to disambiguate first — did a process launched *after* the
+  commit run this path? Only then is silence evidence.
+
+- [FEAT-2026-0053/G1-CLOSE] **A reference snapshot captured at a lifecycle event is meaningless
+  for the feature that installs the capture, because that feature is already past the event.**
+  Gate 1 shipped an immutable `PLAN.baseline.json` written at a feature's first dispatch, so
+  that later gates can measure plan drift against the as-activated graph. This feature's own
+  first dispatch happened hours before the call site existed, so its baseline will instead be
+  written at the next driver invocation — from a PLAN.md that by then contains the next gate's
+  drafted work units. The graph recorded as "as-activated" will be the post-drift graph, the
+  drift classes will report clean, and the report will mean nothing. Write-once immutability
+  makes this permanent rather than self-correcting: the very property that stops drift
+  detection being gamed also freezes the wrong reference in place. Rule: for any mechanism
+  whose reference state is captured at a lifecycle event, check at close time whether the
+  installing feature is already past that event; if it is, say so explicitly in the
+  retrospective and forbid the successor gate from treating the installing feature's own
+  snapshot as evidence the mechanism works. The first honest test is the first feature that
+  starts after the mechanism merges.
+
+- [FEAT-2026-0053/G1-CLOSE] **Sweep a new predicate over the whole real corpus at close, and
+  read a uniformly not-evaluable result as an unproven approval path rather than a pass.**
+  Running the new arm predicate over all 43 real feature directories cost one command and
+  returned `would_arm: False` with every class `not_evaluable: no_baseline` on 43 of 43 — the
+  designed fail-closed behavior, confirmed at scale instead of on fixtures, and worth having.
+  But green-on-fixtures plus refuses-everything-on-real-input is precisely the evidence shape
+  that hid FEAT-2026-0055's defect, where a document-parsing rule passed every hand-authored
+  fixture and could not fire on a single real work unit. A refusal path proven on the corpus
+  says nothing about the approval path, and the approval path is the one that will meet real
+  frontmatter, real `events.jsonl`, and a real review file for the first time in production.
+  Rule: run the sweep, record the counts, and when the corpus is uniformly not-evaluable, name
+  the approval path as unverified in `## What the loop did NOT verify` and carry it into the
+  successor gate's risk list — do not let "no findings across the corpus" read as coverage.
