@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fnmatch
+import glob
 import hashlib
 import json
 import logging
@@ -4517,27 +4518,55 @@ def assert_implementation_touched_files(
 
 
 def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
-    """Deliverable-presence gate (FEAT-2026-0022/T02).
+    """Deliverable-presence gate (FEAT-2026-0022/T02), unified with
+    ``assert_produces_in_diff``'s literal/glob contract (FEAT-2026-0055/T03).
 
-    Verify every path the WU declared in ``produces:`` exists on disk and is
-    non-empty (``test -s`` semantics: ``Path(p).exists()`` and
-    ``Path(p).stat().st_size > 0``). Returns ``(True, "")`` when ``wu.produces``
-    is empty — the opt-out: an undeclared ``produces:`` means no gate, exactly
-    as ``verify_files_changed``'s absence opt-out (loop.py:994) — or when every
-    declared path exists and is non-empty. On the first offending path returns
-    ``(False, summary)`` naming that path and whether it was absent or empty.
+    Returns ``(True, "")`` when ``wu.produces`` is empty — the opt-out: an
+    undeclared ``produces:`` means no gate, exactly as ``verify_files_changed``'s
+    absence opt-out (loop.py:994). Otherwise every declared entry must satisfy
+    one of two forms:
 
-    A path that exists but is zero-length is treated as missing: an empty
-    deliverable is a hollow deliverable. This catches the partial-bundle hollow
-    pass (FEAT-2026-0020/T12: SECURITY.md present, bundled CODE_OF_CONDUCT.md
-    absent). The check is file-level only; symbol-level checks are out of scope
-    (PLAN Scope OUT).
+    - **Literal path** (no ``fnmatch`` metacharacter — none of ``* ? [``):
+      must exist and be non-empty (``test -s`` semantics). Unchanged from the
+      original presence gate.
+    - **Glob** (contains an ``fnmatch`` metacharacter): at least one existing,
+      non-empty file must match, via ``glob.glob`` (same pattern syntax
+      ``assert_produces_in_diff`` matches against the squash diff with
+      ``fnmatch.fnmatch``, so a pattern that satisfies one satisfies the other).
+
+    A path that is, or resolves to, a directory is refused outright with an
+    ``ERROR``-worthy message naming the unified contract: directories were
+    never valid produces: entries (a directory always passed this presence
+    gate while failing ``assert_produces_in_diff``'s diff match — the
+    literal-vs-glob split this WU exists to close); the refusal now says why
+    instead of silently passing one gate and failing the other.
+
+    On the first offending entry returns ``(False, summary)`` naming it.
     """
     if not wu.produces:
         return True, ""
     for raw in wu.produces:
         path = str(raw)
         p = Path(path)
+        if path.endswith("/") or p.is_dir():
+            return False, (
+                f"declared deliverable is a directory: {path} — directories "
+                "are not valid produces: entries under the unified "
+                "literal/glob contract (a directory always passed presence "
+                "while failing assert_produces_in_diff's diff match); declare "
+                "the specific file(s) or a glob instead"
+            )
+        if any(ch in path for ch in "*?["):
+            matches = [
+                m for m in glob.glob(path)
+                if Path(m).is_file() and Path(m).stat().st_size > 0
+            ]
+            if not matches:
+                return False, (
+                    f"declared deliverable glob matched no existing "
+                    f"non-empty file: {path}"
+                )
+            continue
         if not p.exists():
             return False, f"declared deliverable absent: {path}"
         if p.stat().st_size == 0:

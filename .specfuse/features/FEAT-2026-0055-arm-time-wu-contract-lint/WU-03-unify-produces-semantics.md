@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0055/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces_driver_helper: "loop.py assert_declared_deliverables — accepts fnmatch globs (≥1 existing match), aligned with assert_produces_in_diff"
 produces:
   - specfuse/loop/loop.py
   - tests/test_produces_semantics_unified.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T15:16:30.780060+00:00
+duration_seconds: 329.386
+cost_usd: 1.037655
+input_tokens: 38
+output_tokens: 10556
 ---
 
 # One declaration form satisfies both deliverable gates
