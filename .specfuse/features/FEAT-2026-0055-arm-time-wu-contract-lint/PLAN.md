@@ -5,7 +5,7 @@ slug: arm-time-wu-contract-lint
 branch: feat/FEAT-2026-0055-arm-time-wu-contract-lint
 roadmap_goal: Refuse or warn on WU-contract defects at arm time instead of after burned attempts — a produces path the WU's own Do-not-touch forbids is un-armable (ERROR), a produces path an earlier done WU already delivered is flagged (WARN), and the two deliverable gates' path semantics are unified so one declaration form satisfies both.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 27.00
 ---
 

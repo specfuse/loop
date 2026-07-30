@@ -2,7 +2,12 @@
 id: FEAT-2026-0055/G1-CLOSE
 type: close
 status: done
-verdict: met_locally
+verdict: met
+# Provenance per the [FEAT-2026-0070] acceptance-record lesson: keep "genuinely met" and
+# "hedged, accepted" distinguishable to a query, not just a reader.
+verdict_accepted_from: met_locally
+verdict_accepted_reason: "limitation accepted"
+verdict_accepted_at: 2026-07-30T16:45:18Z
 attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local

@@ -376,3 +376,30 @@ The path forward is `/accept-hedged-close` on this feature, which collects the o
 acknowledgment of §8 and re-checks the verdict through the driver. The one follow-up worth
 scheduling as real work is §7's third bullet: promote the tree-wide sweep from a criterion an
 agent reports to a gate the driver runs.
+
+## Hedged verdict accepted
+
+- **Accepted verdict:** `met_locally`
+- **Operator reason (verbatim):** "limitation accepted"
+- **Recorded:** 2026-07-30T16:45:18Z, via `/accept-hedged-close`
+- **Acknowledgment:** the operator was shown §6's two hedge entries and §8's five
+  consumer-visible contract changes in full — including the two flagged as consequential
+  (item 2, directory-`produces:` refusal behavior change; item 5a, `specfuse-lint` exit-code
+  change in blocking consumer CI) — and confirmed explicitly ("confirmed"). §6 entry 2's
+  upgrade condition (operator acknowledgment of §8 via this skill) is thereby satisfied.
+
+**Follow-ups carried forward — none discharged, none dropped.** Both §6 entries remain OPEN as
+written there:
+
+- **§6-1 — Portfolio measure: zero produces-class refusals downstream — OPEN**
+  (externally-verifiable-later: upgrades after the next generator-class feature closes under a
+  driver carrying this branch, via the grep condition §6 states)
+- **§6-2 — Operator acknowledgment of §8 — OPEN as a record entry** (its upgrade condition is
+  satisfied by this acceptance; closure semantics belong to the verdict recheck)
+
+Also carried: §10's scheduled follow-up — promote the tree-wide sweep from agent-reported
+criterion to driver-run gate.
+
+Verdict-ceiling note for the audit trail: both entries were structural — one a measurement over
+a run that had not happened, one a signature this session could not forge. No in-repo rework
+could have produced `met`.
