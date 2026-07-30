@@ -45,7 +45,9 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   (`loop.py`, `lint_plan.py`, adjacent scripts). Lint WARN when body mentions driver-wiring
   keywords but field is absent. See FEAT-2026-0017.
 - `produces` — OPTIONAL. File path(s) this WU must produce; machine-enforced by the driver's
-  presence gate (FEAT-2026-0022). Lint WARN when absent on `implementation` WUs.
+  presence gate (FEAT-2026-0022). Unified contract: a literal path must exist non-empty; a glob
+  needs ≥1 existing non-empty match — either form satisfies both the presence gate and the
+  in-diff gate. Lint WARN when absent on `implementation` WUs.
 
 DRIVER-OWNED FIELDS - the driver writes these at outcome time; authors leave them absent:
 <!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,

@@ -78,6 +78,11 @@ If no gate is in `awaiting_review`, the skill stops with a hint
 
 ### 3. Per-draft accept / revise / reject
 
+Run `specfuse-lint <feature-dir>` before walking the drafts; its WARN/ERROR
+findings (produces-path satisfiability, Do-not-touch boundary collisions,
+etc.) are review input for the accept/revise/reject decision below, not a
+separate gate to pass silently.
+
 > **Runtime probe before arming a default/severity flip (#209 item 6).** If
 > any draft in this gate flips a default value or a severity, do NOT arm it
 > on "mechanical, nothing design-open": apply the change locally, run the

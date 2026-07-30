@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0055/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
   - .specfuse/templates/WU.template.md
   - plugins/specfuse/skills/authoring-work-units/SKILL.md
   - plugins/specfuse/skills/arm-gate/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T15:22:00.266363+00:00
+duration_seconds: 317.996
+cost_usd: 0.675363
+input_tokens: 38
+output_tokens: 5021
 ---
 
 # Surface the lint, delete the folklore
