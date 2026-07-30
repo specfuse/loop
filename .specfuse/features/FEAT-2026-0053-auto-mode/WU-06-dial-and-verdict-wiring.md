@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0053/T06
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.50
 provenance: "RETROSPECTIVE.md Findings section 3 — the predicate's approval path has never run on real input; 43 of 43 real feature directories returned not_evaluable on every class. AC#6 (arm path exercised against a real feature directory, not a hand-built fixture) exists because of that finding."

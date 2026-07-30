@@ -156,7 +156,61 @@ to single-line double-quoted strings.
 
 ### Probe finding list
 
-> **Paste here before arming. Do not arm this gate on an empty section.**
+**Run 2026-07-30 at the gate-2 arming checkpoint, by the human arming the gate.**
+The flipped severity was applied locally — `plan_next_lint`'s exact specified
+shape (call `lint_plan_next_draft(feature_dir, just_closed_gate)`, fire on a
+non-empty warn list, degrade a frontmatter parse failure to a fired verdict per
+AC#5) — and run over **every** feature folder in `.specfuse/features/`, gates
+0–5. The full oracle, not a subset. Repo tree unmodified: the probe ran as a
+scratch script importing the real `lint_plan_next_draft`.
+
+```
+folders scanned      : 44
+(folder, gate) pairs : 264
+  clean              : 239
+  fired              : 24
+  raised (AC#5 gap)  : 1
+```
+
+**The result that decides the arm — the feature being armed reports CLEAN.**
+`lint_plan_next_draft(FEAT-2026-0053-auto-mode, just_closed_gate=1)` returns an
+empty warn list. Under the flipped severity, gate 2's own drafted output does not
+veto its own arm. T07's §2 satisfiability answer ("zero on an input in its
+intended final state") is confirmed against the running code, not against a
+summary of it.
+
+**Fired: 24 (folder, gate) pairs, one finding kind.** All 24 are
+`GATE-NN-REVIEW.md: missing 'open_questions:' frontmatter field` on features
+drafted before T02 shipped the contract. The pre-flip census counted 25 findings
+where this counts 24 firing pairs — the census counted individual findings, this
+counts (folder, gate) pairs that fire, and a pair can carry more than one. No
+new finding kind appeared when the severity flipped, which is the material
+result: the flip changes severity, not the check set.
+
+Confirms the census's reading, now from the post-change side: none of the 24 is
+an input in its intended final state under the new contract, and none is ever
+evaluated by the class, which runs only on the feature being armed. They stay
+evidence, not a migration backlog — consistent with T07's Do-not-touch.
+
+**Raised: 1, and it is a known filed defect.**
+
+```
+FEAT-2026-0020-public-readiness-prep  gate 1
+  MiniYAMLError: line 14: not a `key: value` line — got '<!--'
+```
+
+An HTML comment inside a WU frontmatter block. This is **issue #306** (open),
+filed from FEAT-2026-0055's G1-CLOSE satisfiability sweep the same day — not a
+new discovery by this probe, and not caused by the flip. It reproduces the exact
+condition T07 AC#5 exists to handle: under a blocking flip an unhandled raise
+takes down the close path. AC#5 requires this input to produce a *fired verdict
+naming the parse failure*. The probe confirms the raise is real and reachable,
+so AC#5 is load-bearing rather than defensive.
+
+**Verdict: the §4 precondition is discharged.** The migration surface is empty
+(24 findings that the class never evaluates), the armed feature is clean, and
+the single raise is an already-tracked defect with a matching acceptance
+criterion in the WU that must handle it.
 
 ## Cost
 

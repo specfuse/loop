@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0053/T09
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 provenance: "PLAN.md scope boundary — LEARNINGS staged to a pending file (gate 2, drafted by G1-PLAN). The post-pass invariant (AC#2) is added beyond that sketch because [FEAT-2026-0053/G1-CLOSE]'s own gate-1 lessons went straight to .specfuse/LEARNINGS.md under a human-reviewed gate; under auto nothing but a mechanical check stands between an unread gate and a durable cross-feature rule."
