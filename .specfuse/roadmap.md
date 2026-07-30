@@ -49,7 +49,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
-| FEAT-2026-0034 | Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link | planned | — | — |
+| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | planned | — | [→ detail](#feat-2026-0034) |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
@@ -68,7 +68,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
-| FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | planned | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ detail](#feat-2026-0053) |
+| FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | active | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ detail](#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | — |
@@ -706,13 +706,16 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: deferred.** Parked pending a real trigger (above). Resumable — flip to `active` when a trigger fires; design gate first (the sketch is not yet a committed contract).
 
-## FEAT-2026-0034 — Roadmap-table lint: enforce blocked features carry a resolvable Blocked-by link
+<a id="feat-2026-0034"></a>
+## FEAT-2026-0034 — Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness
 
-**Why.** The `blocked` feature status (shipped in loop 0.3.24) is only meaningful if a blocked feature actually names its unmet dependency — an ADR or an upstream FEAT — and links to it. Nothing enforces that today: `lint_plan` validates feature dirs, PLAN frontmatter, and the gate/WU graph, not the roadmap-table prose. So a row can sit at `status: blocked` with no `**Blocked by.**` block at all (silently collapsing the deliberate `blocked`-vs-`deferred` distinction — `deferred` is the no-named-blocker park), or with a link that has rotted: an ADR path that moved, or a `#feat-yyyy-nnnn` anchor whose target was archived. The one enforcement gap left by the blocked-status work.
+**Why.** The `blocked` feature status (shipped in loop 0.3.24) is only meaningful if a blocked feature actually names its unmet dependency — an ADR or an upstream FEAT — and links to it. Nothing enforces that today: `lint_plan` validates feature dirs, PLAN frontmatter, and the gate/WU graph, not the roadmap-table prose. So a row can sit at `status: blocked` with no `**Blocked by.**` block at all (silently collapsing the deliberate `blocked`-vs-`deferred` distinction — `deferred` is the no-named-blocker park), or with a link that has rotted: an ADR path that moved, or a `#feat-yyyy-nnnn` anchor whose target was archived.
 
-**Goal.** Add a roadmap-table lint pass (extend `lint_plan.py` or a sibling roadmap linter, wired into the same gate) that, for every row whose Status is `blocked`, checks its detail section carries a `**Blocked by.**` block with at least one link, and that each link resolves — an ADR file path exists on disk (or is a well-formed URL), and a feature-dependency link points at a live inline `<a id="feat-…">` anchor or a `roadmap-archive.md#…` target. Symmetrically WARN on a `**Blocked by.**` block attached to a non-`blocked` row (stale block left after an unblock).
+A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four distinct rot shapes and 19 instances, only some of which a resolution-only check would catch. (1) **Unresolvable refs** — 10 prose links to archived features still using the bare `#feat-…` form after the section moved to `roadmap-archive.md`, plus 5 in the archive pointing the other way at sections that live in `roadmap.md`; the rot is bidirectional, so a one-file linter misses half of it. (2) **Missing anchors** — `blocked` rows 0041 and 0047 whose Detail cells linked to sections that never carried an `<a id>`. (3) **Misattached anchors** — the anchor above the 0053 section read `feat-2026-0069`, so 0053's Detail cell was dead *and* 0069's ref silently landed on the wrong feature. (4) **Duplicate IDs across files** — `/roadmap-archive` dragged the preceding live feature's anchor along with each section it moved, leaving `feat-2026-0041` and `feat-2026-0047` defined in *both* files; those refs resolved cleanly to the wrong section, which is strictly worse than a dead link because nothing visibly breaks. Shapes 3 and 4 are the archiver misfiring on every run, so they recur until linted.
 
-**Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches blocker link-rot at lint time instead of when a human clicks a dead link. Closes the enforcement gap the blocked-status feature deliberately deferred, keeping the machine-checkable invariants ahead of the prose conventions.
+**Goal.** A roadmap link-integrity lint pass (extend `lint_plan.py` or a sibling roadmap linter, wired into the same gate) reading `roadmap.md` and `roadmap-archive.md` as one link graph, checking four invariants. **Blocked-by presence and resolution** — every `blocked` row's detail section carries a `**Blocked by.**` block with at least one link; each link resolves (ADR path exists on disk or is a well-formed URL; a feature link points at a live `<a id="feat-…">` anchor in either file). Symmetrically WARN on a `**Blocked by.**` block attached to a non-`blocked` row. **Ref resolution, both directions** — every `#feat-…` ref in either file resolves against the anchor set of the file it names, with a bare `#…` resolving same-file; an ERROR names the correct cross-file form as the fix, since the mechanical repair is a prefix rewrite. **Anchor adjacency** — every `<a id="feat-YYYY-NNNN">` is immediately followed (blank lines allowed) by a `## FEAT-YYYY-NNNN` heading whose ID matches; an anchor followed by a different feature's heading, or by another anchor, is an ERROR. This is the check that catches shape 3 and the archiver's stray-anchor output. **Cross-file ID uniqueness** — no `feat-…` ID is defined in both files, and none twice within a file. Round out with a WARN for a row whose Detail cell is `—` while a detail section for that ID exists (the reverse of link rot: a live section nothing points at).
+
+**Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches all four rot shapes at lint time rather than when a human clicks a dead link — or worse, follows a resolvable link to the wrong feature and reasons from it. Adjacency and uniqueness turn `/roadmap-archive`'s stray-anchor defect from a silent recurring corruption into a failing check the next archive run trips immediately, which is the durable fix; repairing the current instances by hand is not. Keeps the machine-checkable invariants ahead of the prose conventions.
 
 **Status: planned.**
 
@@ -747,7 +750,7 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Benefits.** DLQ depth becomes a true live signal; failure evidence survives TTL; replay-after-fix becomes mechanical, unlocking self-healing level 4.
 
-**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — extends the harvester's peek-mode DLQ adapter
+**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — extends the harvester's peek-mode DLQ adapter
 
 **Status: blocked.**
 
@@ -761,7 +764,7 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 **Benefits.** Turnkey bootstrap: interview ends, user reviews drafted files, first local `--dry-run` is minutes away. The diagnosability audit ensures components are born diagnosable — the property that lets a repo-resident agent outperform external monitoring at root-cause. Schema decided up front keeps the harvester (FEAT-2026-0040) and later autonomy stages purely additive.
 
 **Scope narrowed at drafting (see the feature's `PLAN.md`).** Deliverable (c)'s
-GitHub Actions runner workflow moved to [FEAT-2026-0040](#feat-2026-0040): that
+GitHub Actions runner workflow moved to [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040): that
 workflow invokes the harvester CLI, which does not exist until 0040, and shipping a
 template whose entry point is a nonexistent binary is the `[FEAT-2026-0029/G1-CLOSE]`
 failure verbatim. The local-runner bootstrap artifacts still ship here. Added at
@@ -770,6 +773,7 @@ machine-checkable contract rather than prose.
 
 **Status: done.**
 
+<a id="feat-2026-0041"></a>
 ## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
 
 **Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.
@@ -778,7 +782,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 2: issues arrive pre-diagnosed for opted-in components, at bounded token cost (dedupe caps spend). The per-component manual-to-auto dial lets diagnosis quality be proven with a human watching before automation, component by component.
 
-**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — harvester findings/issue contract must exist
+**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — harvester findings/issue contract must exist
 
 **Status: blocked.**
 
@@ -802,7 +806,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Completes the per-component runner matrix (local for tuning, gh-actions for turnkey, in-cluster for perimeter-bound orgs); schedules honored tightly; credentials never leave Azure.
 
-**Blocked by.** [FEAT-2026-0040](#feat-2026-0040) — packages the harvester CLI
+**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — packages the harvester CLI
 
 **Status: blocked.**
 
@@ -828,6 +832,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
 
 **Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
@@ -836,7 +841,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The operator hears about blockers within minutes wherever they live, answers where the audit trail lives, and can trust that agent silence is itself alarmed — monitoring the monitor at near-zero build cost.
 
-**Blocked by.** [FEAT-2026-0046](#feat-2026-0046) — notifies escalation-contract items; contract must exist first
+**Blocked by.** [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — notifies escalation-contract items; contract must exist first
 
 **Status: blocked.**
 
@@ -849,7 +854,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
 
-**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](#feat-2026-0046) — refusals and guardrail failures escalate through the contract
+**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
 
 **Status: blocked.**
 
@@ -862,7 +867,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-**Blocked by.** [FEAT-2026-0044](#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
+**Blocked by.** [FEAT-2026-0044](#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
 
 **Status: blocked.**
 
@@ -879,9 +884,10 @@ machine-checkable contract rather than prose.
 
 **Status: blocked.**
 
+<a id="feat-2026-0052"></a>
 ## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
 
-**Why.** [FEAT-2026-0051](#feat-2026-0051) stops the bleeding — a gate already red on the base tree halts before any work unit is dispatched — but leaves the operator only two exits: fix the repo-wide debt first, or defer the feature. Neither is right when the debt is real, externally-caused, and slow to resolve (an unpatched transitive advisory with no upstream fix yet), because the feature is then held hostage by a failure it did not cause and cannot repair. The missing third exit is "proceed, with everything the baseline already had held constant and everything new still enforced."
+**Why.** [FEAT-2026-0051](roadmap-archive.md#feat-2026-0051) stops the bleeding — a gate already red on the base tree halts before any work unit is dispatched — but leaves the operator only two exits: fix the repo-wide debt first, or defer the feature. Neither is right when the debt is real, externally-caused, and slow to resolve (an unpatched transitive advisory with no upstream fix yet), because the feature is then held hostage by a failure it did not cause and cannot repair. The missing third exit is "proceed, with everything the baseline already had held constant and everything new still enforced."
 
 **Goal.** Three additions on top of 0051's recorded baseline. First, the **baseline-delta ratchet**: during a gate, a WU fails only on failures beyond the recorded baseline set, so pre-existing debt stops blocking while anything a WU newly introduces still fails normally — the same shape as the coverage floor, and deliberately chosen over a per-gate mute, which would also hide a genuine vulnerability a WU legitimately introduces. Second, the **waiver**: an operator-set flag that activates the ratchet for a gate, survives driver resume, and is visible in the gate review — turning 0051's halt into a decision point rather than a dead end. Third, **tracking-issue emission**: the escalation carries a fully-formed issue body plus the `gh issue create` command, auto-creating the issue only when `gh auth status` passes and printing the command for the operator otherwise, so a waived baseline is always tracked rather than silently accepted.
 
@@ -889,7 +895,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0069"></a>
+<a id="feat-2026-0053"></a>
 ## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
 
 **Why.** The methodology's autonomy field (`auto` / `review` / `supervised`) is written to PLAN.md frontmatter and never read — zero consumers — so every feature stops at every gate boundary exactly like a `review` feature, and a four-gate feature costs four human touches regardless of how routine its gates are. Operator history across features shows those gate reviews are near-universal rubber-stamps whose accepted changes are additive (new work units at gate check, occasionally a new gate), so the per-gate checkpoint spends latency without buying review value; the operator's real read happens at PR review, and merge is always human.
@@ -939,9 +945,11 @@ machine-checkable contract rather than prose.
 **Benefits.** The operator's accept/rework decision becomes a choice between two named options instead of a blank-line prompt after a wall of quotes; acceptance reasons get sharper because the skill names what is being accepted; routed findings stop leaking; the classification lives in the §2 contract (one home) so the skill re-derives nothing.
 
 **Status: planned.**
+
+<a id="feat-2026-0069"></a>
 ## FEAT-2026-0069 — monitoring.yml check targets + queue-stalled check type
 
-**Why.** The first real-repo run of `/derive-monitoring` ([FEAT-2026-0039](#feat-2026-0039) gate 2's FU-1, against a downstream .NET backend with one HTTP API plus one functions host carrying 20 queue-topic subscriptions and 10 timer triggers) found that `monitoring.yml` conflates two axes. `component` is asked to be both the unit of deployment and attribution (role name, trust dials, redeploy boundary) *and* the unit of failure-artifact enumeration (what findings are counted per). Those coincide only when a deployable carries exactly one trigger. On the observed host they diverge 30-to-2: one `dlq` check covers 20 unrelated subscriptions with no per-subscription attribution, and one `heartbeat` covers 10 timers, so a single silent timer among ten is invisible to any config the schema can express. Making each trigger its own component does not fix it — `cloud_RoleName` is per-process, so 30 components would each carry the same `error-logs`/`heartbeat` query (30 duplicate findings per exception) and the design-for-diagnosis property "per-component role name matches `monitoring.yml` `name`" becomes unsatisfiable by construction. This is exactly the class of gap 0039 shipped a schema early in order to surface, and it must be settled before [FEAT-2026-0040](#feat-2026-0040) builds adapters against the contract.
+**Why.** The first real-repo run of `/derive-monitoring` ([FEAT-2026-0039](#feat-2026-0039) gate 2's FU-1, against a downstream .NET backend with one HTTP API plus one functions host carrying 20 queue-topic subscriptions and 10 timer triggers) found that `monitoring.yml` conflates two axes. `component` is asked to be both the unit of deployment and attribution (role name, trust dials, redeploy boundary) *and* the unit of failure-artifact enumeration (what findings are counted per). Those coincide only when a deployable carries exactly one trigger. On the observed host they diverge 30-to-2: one `dlq` check covers 20 unrelated subscriptions with no per-subscription attribution, and one `heartbeat` covers 10 timers, so a single silent timer among ten is invisible to any config the schema can express. Making each trigger its own component does not fix it — `cloud_RoleName` is per-process, so 30 components would each carry the same `error-logs`/`heartbeat` query (30 duplicate findings per exception) and the design-for-diagnosis property "per-component role name matches `monitoring.yml` `name`" becomes unsatisfiable by construction. This is exactly the class of gap 0039 shipped a schema early in order to surface, and it must be settled before [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) builds adapters against the contract.
 
 **Goal.** Separate the axes. Component stays the deployment and attribution unit; checks gain a `targets` list that is the enumeration unit — `dlq` targets carry `subscription` (what the harvester queries) plus `function` (what a human diagnoses by), `heartbeat` targets carry a name plus optional cron and IANA timezone, and `error-logs`/`http-5xx` reject targets because they are role-name keyed and genuinely component-scoped. Gate 1 lands the schema, the structural validation, the migration of every shipped YAML surface, the contract flip that makes `targets` required on `dlq`, and the `queue-stalled` check type (issue #247 — a wedged consumer produces no dead-lettered message, no missed heartbeat, and no error log, and `invariant` cannot see it because queue depth is a broker coordinate a telemetry query cannot reach). Gate 2 re-keys component discovery onto *deployment* evidence (Helm chart, compose service, Dockerfile) with trigger registrations demoted to evidence of a component's type, adds the fixture whose single deployable carries N triggers, and generates target lists mechanically.
 
@@ -967,7 +975,7 @@ machine-checkable contract rather than prose.
 
 **Costs, honestly.** Feature actual **$42.82** against `PLAN.md`'s as-drafted **$34.00** (+25.9%), excluding the terminal close. The plan was never re-baselined, deliberately. The variance does not blend: all nine implementation WUs came in **$16.37 against $25.00 (−34.5%)**, while the two gate-1 closing WUs came in **$26.45 against $10.00 (+164.5%)** — a floor `planning-discipline.md` §5 supplied, not a judgement any author made. Third feature to pay for it; tracked as **issue #260** with the two concrete file targets (§5 itself and `WU.template.md`'s comment quoting it) named in the retrospective's `## Planning-floor revision`. Gate 1's one real defect — a migrate criterion scoped to a sample rather than a sweep — cost $5.26.
 
-**Note for [FEAT-2026-0040](#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
+**Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
 

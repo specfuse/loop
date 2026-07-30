@@ -76,7 +76,7 @@ sections inline in `roadmap.md`.
 
 **Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
 
-**Unblocked 2026-07-26.** [FEAT-2026-0069](#feat-2026-0069) landed the check-target axis and is `done`; [FEAT-2026-0039](#feat-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
+**Unblocked 2026-07-26.** [FEAT-2026-0069](roadmap.md#feat-2026-0069) landed the check-target axis and is `done`; [FEAT-2026-0039](roadmap.md#feat-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
 
 **Binding constraint inherited from FEAT-2026-0069 — do not lose it.** **Fingerprints must include the target key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription attribution 0069 paid two gates for is destroyed at the last step. 0069's terminal close restates this as its own closing obligation; it is this feature's to honour.
 
@@ -100,11 +100,9 @@ sections inline in `roadmap.md`.
 
 **One real defect found by the terminal close's fresh re-run, and left unfixed on purpose.** Gate 2's walk-discovered cron sweep now flags gate 3's shipped workflow template: the sweep collects every tracked mapping carrying a `cron` key, and a GitHub Actions `on.schedule` cron cannot carry the `dialect` the rule requires. Both units are correct by their own lights and the `tests` gate (and with it `coverage`, whose command chains on it) is **red at HEAD**. The introducing unit could not have caught it — the sweep walks `git ls-files` and its own template was untracked at verification time. The close reports it rather than patching a `done` unit's work; the fix is to scope the sweep's discovery, on a bug branch.
 
-**Unblocks.** **FEAT-2026-0038** (DLQ quarantine harvesting extends the peek-mode adapter this feature shipped), [FEAT-2026-0041](#feat-2026-0041) (diagnosis reads the finding/issue contract this feature defines), **FEAT-2026-0042** (autofix consumes diagnosed findings), and **FEAT-2026-0043** (the in-cluster runner is the third surface alongside the two shipped here). Each has a detail section below; only 0041 carries an explicit anchor today, so the other three are named rather than linked.
+**Unblocks.** **FEAT-2026-0038** (DLQ quarantine harvesting extends the peek-mode adapter this feature shipped), [FEAT-2026-0041](roadmap.md#feat-2026-0041) (diagnosis reads the finding/issue contract this feature defines), **FEAT-2026-0042** (autofix consumes diagnosed findings), and **FEAT-2026-0043** (the in-cluster runner is the third surface alongside the two shipped here). Each has a detail section below; only 0041 carries an explicit anchor today, so the other three are named rather than linked.
 
 **Status: active — terminal close ran with verdict `partially_met`.** Hedged deliberately: the fourteen-item consumer-visible contract-change list (entry 1, the `dialect` requirement, is breaking) is **awaiting operator acknowledgment**; eleven deferred items await the two planned operator runs; and the cron-sweep defect above means two shipped acceptance criteria do not hold on the tree as it stands. `/accept-hedged-close` is the path once the acknowledgment is signed; the verdict upgrades toward `met` as the operator-journal entries land.
-
-<a id="feat-2026-0041"></a>
 
 <a id="feat-2026-0072"></a>
 ## FEAT-2026-0072 — Structural-invariant guards: declared surfaces that nothing asserts on
@@ -155,13 +153,11 @@ sections inline in `roadmap.md`.
 
 **Delivered** (gate 1, terminal — see [RETROSPECTIVE](features/FEAT-2026-0046-escalation-contract/RETROSPECTIVE.md)). `specfuse/loop/escalation.py`: `NEEDS_HUMAN_LABEL`, the five-member `CATEGORY_LABELS` frozenset (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval), `render_escalation_body` producing the six-part body from `operator-escalation.md` plus a `Reply with a number` section and the `<!-- specfuse:escalation id=… -->` correlation marker, `validate_escalation_body` holding the renderer to that shape, and `emit_escalation` — idempotent per correlation ID via find-then-create over an injectable runner, mirroring `gh_backend.GitHubBackend`'s `_runner` seam. The `/attention` skill ships canonical at `plugins/specfuse/skills/attention/SKILL.md`, vendored byte-identically into `.specfuse/skills/`, sweeping blocked WUs, `awaiting_review` gates, `blocked` features and stale PRs into one priority-ordered view and delegating per-feature depth to `gate-status`. Its read-only claim is enforced by a grep guard with a positive control over both copies, not by prose. 21 tests across four new modules, plus the 4-test vendoring guard.
 
-**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-2026-0049](#feat-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-2026-0047](#feat-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
+**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-2026-0049](roadmap.md#feat-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-2026-0047](roadmap.md#feat-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
 
 **Operator step before first real use.** No work unit touched live GitHub — every `gh` interaction ran through an injected stub. Create the six labels in the target repository and run one real emission twice to confirm the create call and the idempotency search; the retrospective's `## What the loop did NOT verify` section carries the detail and the fallback if the marker search does not match.
 
 **Status: active.**
-
-<a id="feat-2026-0047"></a>
 
 <a id="feat-2026-0070"></a>
 ## FEAT-2026-0070 — Terminal-flip contract: hedged-verdict acceptance, row-status breadth, auto-close debt
@@ -198,11 +194,9 @@ sections inline in `roadmap.md`.
 
 **Benefits.** Repo-wide debt stops charging rent per work unit: one gate-set run replaces a full attempt budget burned per WU, and the operator gets the conclusion — pre-existing, not yours — in the first escalation instead of deriving it by hand after several spurious ones. Enforcement is untouched: every WU is still gated on the full set with unchanged pass/fail semantics.
 
-**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
+**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](roadmap.md#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
 
 **Status: planned.**
-
-<a id="feat-2026-0052"></a>
 
 <a id="feat-2026-0037"></a>
 ## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
