@@ -6,6 +6,10 @@ cost_budget_usd: 31.50
 # $3.00, T08 $2.50, T09 $2.50, G2-CLOSE-INTERMEDIATE $4.50, G2-PLAN $6.00) plus
 # one re-attempt of the largest ($6.00, G2-PLAN) — the defensive-padding shape
 # planning-discipline §5 recommends.
+baseline:
+  sha: 09047167fd5106c06e6b6b08a65a889dd76df114
+  probed_at: 2026-07-30T21:28:36.655122+00:00
+  failing: []
 ---
 
 # Gate 2 — Live arming behind the dial
