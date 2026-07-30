@@ -1,8 +1,9 @@
 ---
 id: FEAT-2026-0055/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+verdict: met_locally
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 # Load-bearing close: §1 fresh oracle re-runs + §3 consumer-visible contract enumeration
@@ -13,10 +14,14 @@ model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.7.0
-started_at: 2026-07-30T15:27:18.386869+00:00
+started_at: 2026-07-30T16:17:47.405921+00:00
 # Attempt 1 returned not_met (2026-07-30): check_produces_boundary blind to the bold-preamble
 # Do-not-touch form + 15 false ERRORs — see RETROSPECTIVE.md §2a/§3. T05 owns the fix; this
 # close re-runs after it. Prior attempt's driver stats live in events.jsonl.
+duration_seconds: 949.33
+cost_usd: 4.990668
+input_tokens: 96
+output_tokens: 46852
 ---
 
 # Gate 1 close — the WU contract is armed-checked, unified, and surfaced
