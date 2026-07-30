@@ -209,7 +209,7 @@ the field-by-field schema see
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
 
-`outcome` taxonomy, as `loop.py` actually emits it — eleven values,
+`outcome` taxonomy, as `loop.py` actually emits it — twelve values,
 bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 
 | outcome | meaning |
@@ -225,6 +225,7 @@ bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 | `produces_not_in_diff` | `produces:` path exists but is not in the squash |
 | `squash_commit_failed` | `git commit` for the squash was rejected |
 | `smoke_import_failed` | a declared smoke-import line failed post-squash |
+| `learnings_not_staged` | a closing WU under `autonomy_default: auto` touched `.specfuse/LEARNINGS.md` directly instead of staging to `LEARNINGS-pending.md` (FEAT-2026-0053/T09) |
 
 Extending it is a breaking change for every consumer below and requires a
 deliberate versioning decision — **and an update here in the same commit.**
@@ -245,7 +246,7 @@ consumer that queries only those concludes the record is empty when it is not.
 |---|---|
 | `failed`, `files_changed_mismatch`, `produces_not_in_diff` | `failure_class` + `failure_signature` + `failure_excerpt` |
 | `blocked` | **`agent_blocked_reason`** (plus a sibling `human_escalation` event) |
-| `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed` | **`summary`** |
+| `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed`, `learnings_not_staged` | **`summary`** |
 | `files_changed_mismatch` (pre-0.3.23) | **`unchanged_paths`** only — `failure_*` was added by #182 |
 | `zero_token_skip` | nothing, correctly — no attempt ran |
 

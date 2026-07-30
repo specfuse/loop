@@ -21,6 +21,7 @@ _EXPECTED_RELPATHS = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "templates/LEARNINGS-pending.template.md",
     "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/design-for-diagnosis.md",

@@ -70,6 +70,7 @@ from .closing_requirements import (
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
     LEARNINGS_PATH,
+    LEARNINGS_PENDING_FILENAME,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
     RETROSPECTIVE_FILENAME,
@@ -4816,8 +4817,48 @@ def assert_autoclose_debt_reconciled(
     return True, ""
 
 
+def assert_learnings_staged_under_auto(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """Under `autonomy_default: auto`, a closing WU must not land lessons in
+    `.specfuse/LEARNINGS.md` directly (FEAT-2026-0053/T09).
+
+    `.specfuse/LEARNINGS.md` is loaded into planning context for every future
+    feature; under `auto` no human reads the gate before that generalisation
+    compounds. So a closing WU's promoted lessons stage to
+    `LEARNINGS_PENDING_FILENAME` in the feature dir instead, and a human
+    promotes them at PR review. Under `review` and `supervised` this
+    invariant is inert — a human already read the gate, so `LEARNINGS.md`
+    lands straight, as it always has.
+
+    Returns (True, "") when `autonomy_default != "auto"`, or when the diff
+    between `head_before` and `HEAD` does not touch `LEARNINGS_PATH`.
+    """
+    feat_fm, _ = load_graph(feature_dir)
+    if feat_fm.get("autonomy_default") != "auto":
+        return True, ""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True, check=False,
+    )
+    if LEARNINGS_PATH in proc.stdout.splitlines():
+        return (
+            False,
+            f"learnings_not_staged: {wu.wu_id} ({wu.type}) modified "
+            f"{LEARNINGS_PATH} under autonomy_default=auto — stage lessons "
+            f"in {LEARNINGS_PENDING_FILENAME} in the feature directory "
+            f"instead; a human promotes it at PR review",
+        )
+    return True, ""
+
+
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
-    "close": [assert_terminal_flips_fired, assert_autoclose_debt_reconciled],
+    "close": [
+        assert_terminal_flips_fired,
+        assert_autoclose_debt_reconciled,
+        assert_learnings_staged_under_auto,
+    ],
+    "close-intermediate": [assert_learnings_staged_under_auto],
 }
 
 
@@ -5552,6 +5593,36 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
                             )
                             continue
+                        # Auto-mode LEARNINGS staging invariant
+                        # (FEAT-2026-0053/T09): checked HERE, at the WU's own
+                        # squash, with the correct pre-squash head_before —
+                        # NOT via the POST_PASS_INVARIANTS_BY_TYPE["close"]
+                        # dispatch site, which fires after fire_terminal_flips
+                        # with head_before rebound to the already-current
+                        # HEAD (a same-commit diff that can never see this
+                        # WU's own changes). close-intermediate has no
+                        # terminal-flip step, so this is its only guard site.
+                        if wu.type in ("close", "close-intermediate"):
+                            stage_ok, stage_reason = assert_learnings_staged_under_auto(
+                                wu, feature_dir, REPO_ROOT, head_before,
+                            )
+                            if not stage_ok:
+                                reset_preserving_events(
+                                    head_before, events_path,
+                                    untracked_before=untracked_before,
+                                )
+                                wu_events.append(emit_attempt_outcome(
+                                    wu, attempt, "learnings_not_staged",
+                                    attempts_usage[-1],
+                                    extras={"summary": stage_reason},
+                                ))
+                                attempt_notes.append((attempt, stage_reason))
+                                failure_note = stage_reason
+                                print(
+                                    f"   LEARNINGS NOT STAGED attempt "
+                                    f"{attempt}/{MAX_ATTEMPTS} — {stage_reason}"
+                                )
+                                continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but

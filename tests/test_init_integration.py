@@ -34,6 +34,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "templates/LEARNINGS-pending.template.md",
     "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/design-for-diagnosis.md",
@@ -114,6 +115,7 @@ class TestInitFullLayout(unittest.TestCase):
             "templates/GATE.template.md",
             "templates/PLAN.template.md",
             "templates/WU.template.md",
+            "templates/LEARNINGS-pending.template.md",
         ):
             self.assertTrue((self.sf / rel).exists(), f"{rel} not written")
             self.assertEqual(

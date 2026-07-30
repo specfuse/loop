@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 provenance: "PLAN.md scope boundary — LEARNINGS staged to a pending file (gate 2, drafted by G1-PLAN). The post-pass invariant (AC#2) is added beyond that sketch because [FEAT-2026-0053/G1-CLOSE]'s own gate-1 lessons went straight to .specfuse/LEARNINGS.md under a human-reviewed gate; under auto nothing but a mechanical check stands between an unread gate and a durable cross-feature rule."
 produces:
@@ -11,6 +11,15 @@ produces:
 produces_driver_helper:
   - post-pass invariant refusing a closing WU that writes .specfuse/LEARNINGS.md under autonomy_default auto
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T22:41:33.548368+00:00
+duration_seconds: 940.857
+cost_usd: 4.305008
+input_tokens: 156
+output_tokens: 41040
 ---
 
 # LEARNINGS staging — an unread gate may not write a durable cross-feature rule
