@@ -66,46 +66,50 @@ A close carrying this obligation is always load-bearing
 > A silent breaking change is the most expensive false-done, and it is not
 > language-specific — any generated or published contract has this surface.
 
-## 4. What the driver checks — the exact strings
+## 4. What the driver checks — check it before you report, not after you fail
 
-Sections 1–3 are obligations you reason about. **This section is a format
-contract you must match literally.** The driver refuses a closing WU that
-produces correct content in the wrong shape, and it refuses it *after* the WU
-has run — so a mismatch costs a full re-dispatch, not a re-arm.
+Sections 1–3 are obligations you reason about. The driver additionally
+refuses a closing WU that produces correct content in the wrong shape, and it
+refuses it *after* the WU has run — so a mismatch used to cost a full
+re-dispatch, not a re-arm.
 
-That is not hypothetical. Across 158 closing WUs in 9 repositories, **28% of all
-closing-WU spend was burned on attempts the driver refused**, and three guards
-whose requirements appeared in no authoring surface accounted for **45% of that
-waste**. This table exists so that number goes down.
+That used to mean memorizing a table of literal guard strings. It no longer
+does. Two mechanical surfaces replace the table:
 
-| Guard | Applies to | What it requires, exactly |
-|---|---|---|
-| `assert_retrospective_exists` | `close`, `close-intermediate` | `RETROSPECTIVE.md` exists in the feature dir and is non-empty |
-| `assert_retrospective_gate_section` | `close-intermediate` | A heading matching `^#{1,3} Gate <N>` — i.e. `## Gate 1`, for the gate being closed. Not "Gate one", not a bare bold line |
-| `assert_cost_analysis_section_when_met` | `close` with `verdict: met` | A heading matching `^##+ Cost analysis` (case-insensitive) — `## Cost analysis` is the conventional spelling |
-| `assert_failure_class_breakdown_when_failures_present` | `close`, `close-intermediate`, when the gate had ≥1 failed attempt | A literal `### Failure-class breakdown` heading — three hashes, not two |
-| `assert_learnings_appended_or_noop` | `close`, `close-intermediate` | Either ≥1 added line to `.specfuse/LEARNINGS.md` in this WU's squash, **or** the exact phrase `nothing generalizes` (case-insensitive) somewhere in `RETROSPECTIVE.md` |
-| `assert_doc_or_roadmap_diff` | `close`, `close-intermediate` | The squash touches at least one of: `docs/*`, `.specfuse/roadmap.md`, `.specfuse/LEARNINGS.md`, or any `RETROSPECTIVE.md` |
-| `assert_verdict_well_formed` | `close` | A `verdict:` **frontmatter** field on the WU file, one of `met`, `met_locally`, `partially_met`, `not_met`. Not in the body |
-| `assert_gate_review_exists` | `plan-next` | **`GATE-{N+1}-REVIEW.md`** — named for the gate being *drafted*, not the gate being closed. A gate-1 `plan-next` writes `GATE-02-REVIEW.md` |
-| `assert_next_gate_drafted_or_terminal` | `plan-next` | The next gate has ≥1 WU at `status: draft` in `PLAN.md`, or the feature is terminal |
-| `assert_declared_deliverables` | any WU with `produces:` | Every path listed in `produces:` appears in the squash diff |
-| `assert_autoclose_debt_reconciled` | `close` | On a `close` WU, if `RETROSPECTIVE.md` carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker for a gate earlier than the terminal gate, the terminal close's `## What the loop did NOT verify` section must name that gate literally as `gate N`. Marker-gated (fires on none of this repo's pre-FEAT-2026-0070 closes); short-circuits `(True, "")` when the terminal close WU is itself `auto_close: true` |
+- **The skeleton is pre-created at dispatch.** Every `close` /
+  `close-intermediate` / `plan-next` WU starts its session with the
+  guard-required files and headings already scaffolded in place
+  (`RETROSPECTIVE.md`, the `## Gate <N>` / `## Cost analysis` /
+  `### Failure-class breakdown` sections, the `GATE-{N+1}-REVIEW.md`
+  filename) — see `precreate_dispatch_skeleton` in `specfuse/loop/loop.py`.
+  You fill the skeleton in; you do not need to remember its shape from
+  scratch.
+- **`specfuse-lint --closing` is the mandatory pre-report check.** Run it
+  before emitting your `RESULT` block. It reads the same registry the driver
+  itself checks and reports pass/fail per requirement in-session, so a format
+  mismatch is caught while you can still fix it, not after the driver refuses.
 
-**The `GATE-{N+1}` row is the single most expensive guard in the system**
-($53.11 of measured waste across 15 refusals) and the one most likely to
-surprise: the review artifact is named for the gate it *arms*, because that is
-the gate a human reads it to review. See issue #261.
+The registry of record — every guard, what it requires, which WU types it
+applies to — lives in `specfuse/loop/closing_requirements.py`. That module
+and `specfuse/loop/lint_closing.py` (the `--closing` implementation) are the
+one place these requirements are enumerated; this rule does not duplicate
+them.
 
-**If a closing WU retries, read this table before assuming the work was hard.**
-By measured cost, format mismatches are the more likely explanation.
+**Migration posture.** Already-drafted features need no conversion — the
+skeleton applies at dispatch time for any WU dispatched from here forward,
+regardless of when its body was authored. Older WU bodies that restate guard
+strings inline (pre-dating this section) are inert, not wrong: the driver
+never read that prose, only the actual artifacts. Removing such prose from an
+old WU body is optional cleanup, not required migration work.
 
-> **Provenance (issue #265).** Guard requirements are enforced in
-> `specfuse/loop/loop.py`'s `assert_*` functions and were, until this section
-> existed, discoverable only by reading them or by paying for a refusal.
-> `tests/test_closing_guard_contracts.py` binds this table to those functions'
-> own source, so a guard that changes its literal fails a test rather than
-> silently invalidating this documentation.
+> **Provenance (issue #265, FEAT-2026-0054).** Guard requirements are
+> enforced in `specfuse/loop/loop.py`'s `assert_*` functions. They were
+> briefly literal-string-documented in this rule (28% of closing-WU spend
+> going to driver-refused attempts, three undocumented guards accounting for
+> 45% of that waste) — but a second copy of the requirements drifts, so
+> FEAT-2026-0054 replaced the copy with the two mechanical surfaces above and
+> made `closing_requirements.py` the single registry both the driver and the
+> lint read.
 
 ## Split with project-local rules
 

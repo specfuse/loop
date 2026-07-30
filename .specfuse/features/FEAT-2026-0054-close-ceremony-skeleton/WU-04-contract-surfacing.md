@@ -1,17 +1,22 @@
 ---
 id: FEAT-2026-0054/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
   - .specfuse/rules/close-discipline.md
   - .specfuse/templates/WU.template.md
-duration_seconds: 202.227
-cost_usd: 1.21224
-input_tokens: 56
-output_tokens: 14818
+duration_seconds: 399.897
+cost_usd: 1.313798
+input_tokens: 72
+output_tokens: 13760
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.6.0
+started_at: 2026-07-30T13:11:18.637842+00:00
 ---
 
 # Point the prose at the machinery — delete the guard-defensive boilerplate
