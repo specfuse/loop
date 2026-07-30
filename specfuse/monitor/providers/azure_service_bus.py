@@ -32,6 +32,10 @@ from typing import Iterable, Iterator, List, Mapping, Optional, Protocol, Sequen
 from specfuse.monitor.artifact import FailureArtifact
 from specfuse.monitor.redaction import redact_artifact
 
+# Credential construction is shared with the other Azure provider and looked up
+# reflectively by the core as `build_credential` (#302).
+from specfuse.monitor.providers._azure_auth import build_credential  # noqa: F401
+
 _GUID_RE = re.compile(
     r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"
 )

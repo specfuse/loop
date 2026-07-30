@@ -33,6 +33,15 @@ dependencies = []
 # _miniyaml compare its output against yaml.safe_load on every real file.
 # ruff/bandit/coverage are for the reference implementation's own gates.
 [project.optional-dependencies]
+# The Azure provider SDKs. Kept OUT of the runtime dependencies on purpose: the
+# package imports them lazily inside the transport factories, so `specfuse-loop`
+# installs with zero runtime dependencies and the harvester's core stays
+# provider-agnostic. Only an operator actually harvesting from Azure needs these.
+azure = [
+  "azure-identity>=1.15",
+  "azure-servicebus>=7.11",
+  "azure-monitor-query>=1.2",
+]
 dev = [
   "PyYAML>=6.0",
   "ruff>=0.6",

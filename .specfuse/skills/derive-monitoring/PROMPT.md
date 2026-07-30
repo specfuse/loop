@@ -90,6 +90,15 @@ Legitimate question categories — **and only these**, batched into one round:
    this skill.
 3. **The credential environment-variable *names*** for each binding — never
    a value.
+3a. **Additional connection coordinates** each binding needs beyond
+   credentials — what the provider's client needs to know *which* instance
+   to reach. Inline values, not env-var names: addresses, not secrets.
+   Unvalidated by `lint_monitoring` (a missing one fails at runtime, not at
+   lint time — specfuse/loop#302), so asking is the only safeguard. Ask it
+   provider-agnostically; today `azure-service-bus` needs
+   `fully_qualified_namespace` + `topic_name` and `azure-app-insights` needs
+   `workspace_id`. Unknown provider, unknown coordinates → a `[gap]` line,
+   never a guessed address.
 4. **Any `invariant` check's `query` and `fingerprint_by`** — never
    inferred or invented.
 5. **Per-component dial loosening** beyond the conservative defaults

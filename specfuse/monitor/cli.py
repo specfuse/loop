@@ -190,12 +190,39 @@ def _call_filtered(func, **candidate_kwargs):
     return func(**kwargs)
 
 
+def _build_provider_credential(module):
+    """Ask the provider module for its auth object, if it declares one.
+
+    Reflective, exactly like `_find_transport_factory`: the core never names a
+    provider or an SDK. Providers that need no credential simply omit the hook.
+    """
+    builder = getattr(module, "build_credential", None)
+    if builder is None:
+        return None
+    return builder()
+
+
 def _default_transport_resolver(module, check_type: str, binding: Mapping[str, object]):
     """Best-effort real transport construction: find the module's transport
     factory reflectively and call it with whatever the environment binding
-    itself supplies. Never exercised in this repository (no cloud SDK is
-    installed here, by design — see `verification.yml`); tests inject their
-    own resolver."""
+    itself supplies.
+
+    `credential` and `credentials` are distinct, which the factory signatures
+    already implied and #302 established: **`credential` is the auth object** a
+    provider's SDK requires, while **`credentials` stays the env-resolved values**
+    for any factory that genuinely wants a secret string. Passing the mapping as
+    `credential` was the #302 defect — it reached an SDK expecting an object with
+    `get_token()`.
+
+    The credential is built by the **provider module**, looked up reflectively the
+    same way the transport factory is. The core must not know how any provider
+    authenticates — `TestProviderRegistry.test_no_provider_identifier_reaches_the_core`
+    enforces that, and it caught the first attempt at this fix, which imported an SDK
+    here. A module exposing no `build_credential` simply gets `credential=None`.
+
+    Still not exercised against a real cloud SDK in this repository (none is
+    installed, by design); tests inject their own resolver or a fake credential.
+    """
     import os
 
     factory = _find_transport_factory(module, check_type)
@@ -208,7 +235,7 @@ def _default_transport_resolver(module, check_type: str, binding: Mapping[str, o
     extra = {k: v for k, v in binding.items() if k not in ("provider", "credentials")}
     return _call_filtered(
         factory,
-        credential=resolved_credentials or None,
+        credential=_build_provider_credential(module),
         credentials=resolved_credentials or None,
         **extra,
     )
