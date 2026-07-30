@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 27.00
+baseline:
+  sha: 6ef2eb4427226c13616630d5b991bbd102b16dfa
+  probed_at: 2026-07-30T15:01:00.326964+00:00
+  failing: []
 ---
 
 # Gate 1 — WU-contract defects die at arm time, not after burned attempts
