@@ -41,6 +41,7 @@ import unittest
 from pathlib import Path
 
 from specfuse.loop import loop
+from specfuse.loop import closing_requirements as creq
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _RULE = _REPO_ROOT / ".specfuse" / "rules" / "close-discipline.md"
@@ -61,23 +62,42 @@ def _src(fn_name: str) -> str:
     return inspect.getsource(fn)
 
 
-# Guards whose contract is a literal an author must reproduce. The second
-# element extracts that literal FROM the guard's own source; the third is a
-# human label for the failure message.
+# Guards whose contract is a literal an author must reproduce. FEAT-2026-0054/T01
+# moved these literals out of the guard bodies into closing_requirements.py (the
+# registry T02's lint and T03's skeleton writer read from) so the guard no longer
+# spells the string inline; the drift-guard here now checks the guard still
+# references the registry constant by name, and the literal itself comes from
+# the registry rather than a regex match on the guard's own source.
+class _ConstMatch:
+    def __init__(self, value: str) -> None:
+        self._value = value
+
+    def group(self, _n: int) -> str:
+        return self._value
+
+
+def _uses_registry_const(const_name: str, literal: str):
+    def check(src: str):
+        if const_name not in src:
+            return None
+        return _ConstMatch(literal)
+    return check
+
+
 _LITERAL_GUARDS = [
     (
         "assert_cost_analysis_section_when_met",
-        lambda s: re.search(r'\^##\+ (Cost analysis)', s),
+        _uses_registry_const("COST_ANALYSIS_HEADING_RE", creq.COST_ANALYSIS_HEADING),
         "the '## Cost analysis' heading",
     ),
     (
         "assert_failure_class_breakdown_when_failures_present",
-        lambda s: re.search(r'\^#\{3\} (Failure-class breakdown)', s),
+        _uses_registry_const("FAILURE_CLASS_HEADING_RE", creq.FAILURE_CLASS_HEADING),
         "the '### Failure-class breakdown' heading",
     ),
     (
         "assert_learnings_appended_or_noop",
-        lambda s: re.search(r'"(nothing generalizes)"', s),
+        _uses_registry_const("NOTHING_GENERALIZES_PHRASE", creq.NOTHING_GENERALIZES_PHRASE),
         "the 'nothing generalizes' no-op phrase",
     ),
 ]
@@ -104,8 +124,12 @@ class TestGuardLiteralsAreDocumented(unittest.TestCase):
     def test_gate_section_heading_depth_is_documented(self):
         """`^#{1,3} Gate N` — the depth range matters and is easy to get wrong."""
         src = _src("assert_retrospective_gate_section")
-        self.assertRegex(src, r"\^#\{\{1,3\}\} Gate", "guard's heading pattern changed")
-        self.assertIn("#{1,3} Gate", _doc(),
+        self.assertIn(
+            "gate_section_heading_re(gate_n)", src,
+            "guard no longer builds its heading pattern from the registry helper",
+        )
+        expected = f"#{{{creq.GATE_SECTION_HEADING_LEVELS}}} Gate"
+        self.assertIn(expected, _doc(),
                       "§4 does not state the accepted heading depths for the gate section")
 
     def test_gate_review_filename_offset_is_documented(self):

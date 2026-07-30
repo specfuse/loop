@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0054/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces_driver_helper: "specfuse.loop.closing_requirements — CLOSING_REQUIREMENTS registry + requirement dataclass; CLOSING_ASSERTIONS_BY_TYPE guards refactored to read it"
 produces:
   - specfuse/loop/closing_requirements.py
   - tests/test_closing_requirements.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T12:15:18.265773+00:00
+duration_seconds: 799.689
+cost_usd: 3.388021
+input_tokens: 130
+output_tokens: 40668
 ---
 
 # Extract the closing-requirement registry — one contract, one home

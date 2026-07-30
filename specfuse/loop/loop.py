@@ -59,6 +59,23 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import scaffold as _scaffold
+from .closing_requirements import (
+    AUTOCLOSE_DEBT_MARKER_RE,
+    COST_ANALYSIS_HEADING,
+    COST_ANALYSIS_HEADING_RE,
+    DEFERRAL_HEADING_RE,
+    DOCS_PREFIX,
+    FAILURE_CLASS_HEADING_MARKDOWN,
+    FAILURE_CLASS_HEADING_RE,
+    LEARNINGS_PATH,
+    NO_FAILURES_SENTINEL,
+    NOTHING_GENERALIZES_PHRASE,
+    RETROSPECTIVE_FILENAME,
+    ROADMAP_PATH,
+    VERDICT_VALUES,
+    gate_review_filename,
+    gate_section_heading_re,
+)
 from .gate_eval import (
     evaluate_auto_close,
     AutoCloseDecision,
@@ -129,7 +146,6 @@ GATES_FOR_TYPE = {
     "close-intermediate": "plannext",
 }
 
-VERDICT_VALUES = frozenset({"met", "met_locally", "partially_met", "not_met"})
 
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
 # writes the next gate's WUs as drafts, and a human must arm them first.
@@ -3927,11 +3943,11 @@ def assert_retrospective_exists(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
     """(close-a) RETROSPECTIVE.md exists and is non-empty in the feature dir."""
-    retro = feature_dir / "RETROSPECTIVE.md"
+    retro = feature_dir / RETROSPECTIVE_FILENAME
     if not retro.exists() or not retro.read_text().strip():
         return (
             False,
-            "assert_retrospective_exists: RETROSPECTIVE.md absent or empty in feature dir",
+            f"assert_retrospective_exists: {RETROSPECTIVE_FILENAME} absent or empty in feature dir",
         )
     return True, ""
 
@@ -3941,7 +3957,7 @@ def assert_learnings_appended_or_noop(
 ) -> tuple[bool, str]:
     """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
     proc = subprocess.run(
-        ["git", "diff", head_before, "HEAD", "--", ".specfuse/LEARNINGS.md"],
+        ["git", "diff", head_before, "HEAD", "--", LEARNINGS_PATH],
         capture_output=True, text=True, check=False,
     )
     added = any(
@@ -3950,13 +3966,13 @@ def assert_learnings_appended_or_noop(
     )
     if added:
         return True, ""
-    retro = feature_dir / "RETROSPECTIVE.md"
-    if retro.exists() and "nothing generalizes" in retro.read_text().lower():
+    retro = feature_dir / RETROSPECTIVE_FILENAME
+    if retro.exists() and NOTHING_GENERALIZES_PHRASE in retro.read_text().lower():
         return True, ""
     return (
         False,
-        "assert_learnings_appended_or_noop: no LEARNINGS.md additions in squash "
-        "and no 'nothing generalizes' note in RETROSPECTIVE.md",
+        f"assert_learnings_appended_or_noop: no {LEARNINGS_PATH} additions in squash "
+        f"and no '{NOTHING_GENERALIZES_PHRASE}' note in {RETROSPECTIVE_FILENAME}",
     )
 
 
@@ -3977,20 +3993,20 @@ def assert_doc_or_roadmap_diff(
         capture_output=True, text=True, check=False,
     )
     for path in proc.stdout.splitlines():
-        if path == ".specfuse/roadmap.md" or path.startswith("docs/"):
+        if path == ROADMAP_PATH or path.startswith(DOCS_PREFIX):
             return True, ""
-        if path == ".specfuse/LEARNINGS.md":
+        if path == LEARNINGS_PATH:
             return True, ""
-        if path.endswith("/RETROSPECTIVE.md") or path == "RETROSPECTIVE.md":
+        if path.endswith("/" + RETROSPECTIVE_FILENAME) or path == RETROSPECTIVE_FILENAME:
             return True, ""
     # For close-intermediate: skip when the WU spec declares no doc surface.
     if wu.type == "close-intermediate":
-        if "docs/" not in wu.body and "roadmap.md" not in wu.body:
+        if DOCS_PREFIX not in wu.body and "roadmap.md" not in wu.body:
             return True, ""
     return (
         False,
-        "assert_doc_or_roadmap_diff: no docs/, .specfuse/roadmap.md, "
-        ".specfuse/LEARNINGS.md, or RETROSPECTIVE.md file in squash diff",
+        f"assert_doc_or_roadmap_diff: no {DOCS_PREFIX}, {ROADMAP_PATH}, "
+        f"{LEARNINGS_PATH}, or {RETROSPECTIVE_FILENAME} file in squash diff",
     )
 
 
@@ -4022,7 +4038,8 @@ def assert_verdict_well_formed(
 def assert_cost_analysis_section_when_met(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-e) When verdict=='met', RETROSPECTIVE.md must have a '## Cost analysis' header.
+    """(close-e) When verdict=='met', RETROSPECTIVE.md must have the registry's
+    COST_ANALYSIS_HEADING header (see closing_requirements.py, requirement close-e).
 
     Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
     the agent writes `verdict:` during dispatch and `wu.verdict` from
@@ -4033,18 +4050,18 @@ def assert_cost_analysis_section_when_met(
     verdict = fm.get("verdict")
     if verdict != "met":
         return True, ""
-    retro = feature_dir / "RETROSPECTIVE.md"
+    retro = feature_dir / RETROSPECTIVE_FILENAME
     if retro.exists():
-        if re.search(r"^##+ Cost analysis", retro.read_text(), re.MULTILINE | re.IGNORECASE):
+        if COST_ANALYSIS_HEADING_RE.search(retro.read_text()):
             return True, ""
     return (
         False,
-        "assert_cost_analysis_section_when_met: verdict=met but '## Cost analysis' "
-        "section absent from RETROSPECTIVE.md",
+        f"assert_cost_analysis_section_when_met: verdict=met but "
+        f"'## {COST_ANALYSIS_HEADING}' section absent from {RETROSPECTIVE_FILENAME}",
     )
 
 
-_NO_FAILURES_SENTINEL = "### Failure-class breakdown\n\n(no non-passing attempts in scope)\n"
+_NO_FAILURES_SENTINEL = NO_FAILURES_SENTINEL
 
 
 def summarize_attempt_failure_classes(
@@ -4052,7 +4069,7 @@ def summarize_attempt_failure_classes(
     gate_n: int | None = None,
     exclude_correlation_id: str | None = None,
 ) -> str:
-    """Render a '### Failure-class breakdown' markdown table from events.jsonl.
+    """Render the FAILURE_CLASS_HEADING_MARKDOWN table from events.jsonl.
 
     Reads attempt_outcome events whose outcome != 'passed'.  When gate_n is
     provided, restricts to events whose correlation_id belongs to that gate
@@ -4116,7 +4133,7 @@ def summarize_attempt_failure_classes(
     )
 
     lines = [
-        "### Failure-class breakdown",
+        FAILURE_CLASS_HEADING_MARKDOWN,
         "",
         "| failure_class | non-passed attempts | dominant signature |",
         "|---------------|---------------------|--------------------|",
@@ -4134,8 +4151,8 @@ def summarize_attempt_failure_classes(
 def assert_failure_class_breakdown_when_failures_present(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-f / close-intermediate-d) RETROSPECTIVE.md has '### Failure-class breakdown'
-    when non-passing attempt_outcome events exist for the gate.
+    """(close-f / close-intermediate-d) RETROSPECTIVE.md has the FAILURE_CLASS_HEADING_MARKDOWN
+    heading when non-passing attempt_outcome events exist for the gate.
 
     Returns (True, "") when:
     - RETROSPECTIVE.md is absent (assert_retrospective_exists fires first for 'close';
@@ -4145,7 +4162,7 @@ def assert_failure_class_breakdown_when_failures_present(
 
     Returns (False, reason) when non-passing attempts exist but the heading is absent.
     """
-    retro = feature_dir / "RETROSPECTIVE.md"
+    retro = feature_dir / RETROSPECTIVE_FILENAME
     if not retro.exists():
         return True, ""
 
@@ -4162,7 +4179,7 @@ def assert_failure_class_breakdown_when_failures_present(
     if summary == _NO_FAILURES_SENTINEL:
         return True, ""
 
-    if re.search(r"^#{3} Failure-class breakdown\b", retro.read_text(), re.MULTILINE):
+    if FAILURE_CLASS_HEADING_RE.search(retro.read_text()):
         return True, ""
 
     # Count non-passing attempts (excluding the close's own) for the message.
@@ -4198,8 +4215,9 @@ def assert_failure_class_breakdown_when_failures_present(
         False,
         f"assert_failure_class_breakdown_when_failures_present: {count} "
         f"substantive-WU attempt(s) in {gate_label} did not pass, so "
-        f"RETROSPECTIVE.md MUST include a '### Failure-class breakdown' subsection "
-        f"— it is absent. Add exactly this subsection to RETROSPECTIVE.md:\n\n"
+        f"{RETROSPECTIVE_FILENAME} MUST include a '{FAILURE_CLASS_HEADING_MARKDOWN}' "
+        f"subsection — it is absent. Add exactly this subsection to "
+        f"{RETROSPECTIVE_FILENAME}:\n\n"
         f"{summary}",
     )
 
@@ -4214,17 +4232,17 @@ def assert_retrospective_gate_section(
             False,
             "assert_retrospective_gate_section: cannot parse gate number from wu_id",
         )
-    retro = feature_dir / "RETROSPECTIVE.md"
+    retro = feature_dir / RETROSPECTIVE_FILENAME
     if not retro.exists():
         return (
             False,
-            "assert_retrospective_gate_section: RETROSPECTIVE.md absent in feature dir",
+            f"assert_retrospective_gate_section: {RETROSPECTIVE_FILENAME} absent in feature dir",
         )
-    if re.search(rf"^#{{1,3}} Gate {gate_n}\b", retro.read_text(), re.MULTILINE):
+    if gate_section_heading_re(gate_n).search(retro.read_text()):
         return True, ""
     return (
         False,
-        f"assert_retrospective_gate_section: RETROSPECTIVE.md has no "
+        f"assert_retrospective_gate_section: {RETROSPECTIVE_FILENAME} has no "
         f"'## Gate {gate_n}' or '### Gate {gate_n}' section",
     )
 
@@ -4244,11 +4262,12 @@ def assert_gate_review_exists(
     if not any(g.number == gate_n + 1 for g in gates):
         return True, ""
     next_gate = gate_n + 1
-    review = feature_dir / f"GATE-{next_gate:02d}-REVIEW.md"
+    review_name = gate_review_filename(next_gate)
+    review = feature_dir / review_name
     if not review.exists() or not review.read_text().strip():
         return (
             False,
-            f"assert_gate_review_exists: GATE-{next_gate:02d}-REVIEW.md absent or empty",
+            f"assert_gate_review_exists: {review_name} absent or empty",
         )
     return True, ""
 
@@ -4544,8 +4563,8 @@ def assert_terminal_flips_fired(
     return True, ""
 
 
-_AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
-_DEFERRAL_HEADING_RE = re.compile(r"(?m)^#{1,3}\s*What the loop did NOT verify.*$")
+_AUTOCLOSE_DEBT_MARKER_RE = AUTOCLOSE_DEBT_MARKER_RE
+_DEFERRAL_HEADING_RE = DEFERRAL_HEADING_RE
 
 
 def _terminal_deferral_section(retro_text: str) -> str:
@@ -4599,7 +4618,7 @@ def assert_autoclose_debt_reconciled(
     if fm.get("auto_close") in (True, "true", "True"):
         return True, ""
 
-    retro_path = feature_dir / "RETROSPECTIVE.md"
+    retro_path = feature_dir / RETROSPECTIVE_FILENAME
     if not retro_path.exists():
         return True, ""
     retro_text = retro_path.read_text()
