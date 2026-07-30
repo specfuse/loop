@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0055/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: "lint_plan.check_produces_boundary — ERROR on produces paths the WU's own Do-not-touch forbids"
@@ -11,6 +11,15 @@ produces_driver_helper: "lint_plan.check_produces_boundary — ERROR on produces
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_boundary_consistency.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T15:09:03.687261+00:00
+duration_seconds: 446.978
+cost_usd: 1.374473
+input_tokens: 60
+output_tokens: 19576
 ---
 
 # ERROR when a WU declares a deliverable its own Do-not-touch forbids

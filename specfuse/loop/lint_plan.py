@@ -28,6 +28,7 @@ Usage:  specfuse-lint .specfuse/features/FEAT-XXXX-slug
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from pathlib import Path
 
@@ -501,6 +502,112 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
             )
 
 
+_DNT_CARVEOUT_RE = re.compile(r"(?i)\bexcept\b")
+_BACKTICK_TOKEN_RE = re.compile(r"`([^`]+)`")
+
+
+def _extract_do_not_touch_patterns(dnt_text: str) -> list[str]:
+    """Return path-like glob patterns from a Do-not-touch section body.
+
+    Only backtick-quoted tokens containing '/', '*', or a file extension count
+    as binding path patterns — a plain-prose mention of a path never fires the
+    boundary check (no semantic judgment, no false ERROR on illustrative
+    prose). A clause carrying an "except" carve-out (the shape
+    FEAT-2026-0066/T04's re-armed body used) suppresses every pattern in that
+    clause, not just the whole section, so an adjacent binding pattern in the
+    same bullet still fires.
+    """
+    patterns: list[str] = []
+    for line in dnt_text.splitlines():
+        line = line.strip().lstrip("-*").strip()
+        if not line:
+            continue
+        for clause in line.split(";"):
+            if _DNT_CARVEOUT_RE.search(clause):
+                continue
+            for tok in _BACKTICK_TOKEN_RE.findall(clause):
+                tok = tok.strip()
+                if not tok:
+                    continue
+                if "/" in tok or "*" in tok or re.search(r"\.[A-Za-z0-9]+$", tok.rstrip("/")):
+                    patterns.append(tok)
+    return patterns
+
+
+def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
+    """ERROR when a WU's own `produces:` path (or `produces_driver_helper`
+    surface) falls inside its own Do-not-touch section's paths.
+
+    A structural deadlock, not a review nit: the WU cannot both deliver the
+    path and honor its own boundary, and `assert_produces_in_diff` only
+    catches this AFTER a full dispatch attempt — the cost FEAT-2026-0066/T04
+    paid (3 attempts + an operator re-arm) for a conjunction this lint makes
+    un-armable up front. See FEAT-2026-0070 (earlier-enforcer-names-the-
+    later-one): the ERROR names the post-attempt guard it preempts so the
+    author isn't left to rediscover the connection.
+    """
+    found: list[str] = []
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, wbody = read_frontmatter(wpath)
+            dnt_text = _slice_section(wbody, "Do not touch")
+            if not dnt_text.strip():
+                continue
+            patterns = _extract_do_not_touch_patterns(dnt_text)
+            if not patterns:
+                continue
+
+            produces_raw = wfm.get("produces")
+            produces_entries = (
+                produces_raw if isinstance(produces_raw, list)
+                else [produces_raw] if produces_raw else []
+            )
+            for p in produces_entries:
+                p_s = str(p).strip()
+                if not p_s:
+                    continue
+                for pat in patterns:
+                    if fnmatch.fnmatch(p_s, pat):
+                        found.append(
+                            f"ERROR: {wfile}: {wid} declares produces path "
+                            f"{p_s!r}, which its own Do-not-touch section "
+                            f"forbids via {pat!r}. This is a structural "
+                            f"deadlock — assert_produces_in_diff would refuse "
+                            f"it after a full dispatch attempt. Drop the path "
+                            f"from produces, narrow the Do-not-touch pattern, "
+                            f"or add an explicit 'except' carve-out. See "
+                            f"FEAT-2026-0066/T04, FEAT-2026-0070."
+                        )
+                        break
+
+            pdh_raw = wfm.get("produces_driver_helper")
+            if pdh_raw:
+                pdh_s = str(pdh_raw).strip()
+                surface = pdh_s.split("—")[0].split("--")[0].strip().strip("`\"'")
+                if surface:
+                    for pat in patterns:
+                        if fnmatch.fnmatch(surface, pat):
+                            found.append(
+                                f"ERROR: {wfile}: {wid} declares "
+                                f"produces_driver_helper surface {surface!r}, "
+                                f"which its own Do-not-touch section forbids "
+                                f"via {pat!r}. This is a structural deadlock — "
+                                f"assert_produces_in_diff would refuse it "
+                                f"after a full dispatch attempt. Drop/narrow "
+                                f"the boundary, or add an explicit 'except' "
+                                f"carve-out. See FEAT-2026-0066/T04, "
+                                f"FEAT-2026-0070."
+                            )
+                            break
+    return found
+
+
 def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
     """WARN when a terminal close WU's body never instructs reconciling a
     marked predecessor auto-close debt (`FEAT-2026-0070/T07`'s
@@ -950,6 +1057,7 @@ def lint(feature_dir: Path) -> list[str]:
     check_closing_guard_literals(feature_dir, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
+    errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
