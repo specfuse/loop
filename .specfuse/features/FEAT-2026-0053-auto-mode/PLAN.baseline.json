@@ -1,0 +1,103 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Snapshot the as-activated plan graph as an immutable baseline",
+          "id": "FEAT-2026-0053/T01",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Machine-readable plan-next contract fields, warn-only lint",
+          "id": "FEAT-2026-0053/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The arm predicate \u2014 seven stop classes, hardcoded constants, pure evaluation",
+          "id": "FEAT-2026-0053/T03",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Shadow wiring \u2014 evaluate and emit at every `awaiting_review` flip",
+          "id": "FEAT-2026-0053/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs",
+          "id": "FEAT-2026-0053/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 live arming behind the dial",
+          "id": "FEAT-2026-0053/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Arm transaction \u2014 the pure module behind a one-commit arm",
+          "id": "FEAT-2026-0053/T05",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "The dial goes live \u2014 read `autonomy_default`, act on the verdict, arm in one commit",
+          "id": "FEAT-2026-0053/T06",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Contract-field lint warns become blocking \u2014 under `auto` only",
+          "id": "FEAT-2026-0053/T07",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "`FEATURE-REVIEW.md` \u2014 every auto-armed gate's doubt reaches the one human read",
+          "id": "FEAT-2026-0053/T08",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "LEARNINGS staging \u2014 an unread gate may not write a durable cross-feature rule",
+          "id": "FEAT-2026-0053/T09",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 2 \u2014 retrospective, lessons, docs",
+          "id": "FEAT-2026-0053/G2-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 3 \u2014 docs and methodology rewrite",
+          "id": "FEAT-2026-0053/G2-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 3,
+      "work_units": [
+        {
+          "goal": "Close the feature \u2014 terminal verdict (placeholder)",
+          "id": "FEAT-2026-0053/G3-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
