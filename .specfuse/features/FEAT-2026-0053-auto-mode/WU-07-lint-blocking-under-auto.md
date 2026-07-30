@@ -2,7 +2,7 @@
 id: FEAT-2026-0053/T07
 type: implementation
 status: pending
-attempts: 0
+attempts: 1
 planned_cost_usd: 3.00
 human_only: true
 provenance: "RETROSPECTIVE.md, Consumer-visible contract changes item 3 — gate 2 flips open_questions to blocking under auto only; that is the severity flip and it needs its own satisfiability answer and runtime probe. AC#5 (a malformed review file must park, not raise) comes from this feature's own G1-PLAN warn census, which hit MiniYAMLError on one of 43 real feature folders."
