@@ -1,12 +1,16 @@
 ---
 id: FEAT-2026-0053/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/arm_txn.py
   - tests/test_arm_txn.py
+duration_seconds: 625.073
+cost_usd: 1.89687
+input_tokens: 92
+output_tokens: 23119
 ---
 
 # Arm transaction — the pure module behind a one-commit arm
