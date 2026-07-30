@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0054/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 # Load-bearing close (close-discipline.md): carries §1 fresh oracle re-runs and §3
@@ -10,6 +10,16 @@ oracle_env: macos_local
 # scaffold consumer). The auto-close predicate must not skip it — and dispatching it
 # dogfoods T03's skeleton, since this repo's driver runs from source.
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+verdict: met_locally
+driver_version: 0.6.0
+started_at: 2026-07-30T13:17:58.660593+00:00
+duration_seconds: 1199.009
+cost_usd: 5.64515
+input_tokens: 97
+output_tokens: 61068
 ---
 
 # Gate 1 close — the closing contract has one home and two cheap enforcement moments

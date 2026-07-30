@@ -2429,3 +2429,50 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   restarts the attempt counter but not the spend. And padding is more honest as a
   proportion of the gate than as a copy of one unit's estimate: a retry costs what the
   retry costs, not what the plan hoped the unit would.
+
+- [FEAT-2026-0054/G1-CLOSE] **When a contract gains an earlier enforcement moment, the
+  *git state each moment reads* becomes part of the contract, and an equivalence test
+  that does not reproduce the real dispatch ordering will report divergence that is not
+  there.** A pre-squash lint necessarily inspects the **working tree**; the post-squash
+  guard it mirrors inspects a **commit range**. They are the same check over two
+  different views, so they are only comparable in the order a real attempt produces
+  them: mutate the tree, lint the dirty tree, squash, then run the guard over
+  `head_before..HEAD`. Two successive versions of this feature's end-to-end harness
+  linted *after* committing, and both reported the lint refusing artifacts the guards
+  accepted — a false divergence manufactured entirely by the harness, and one that on a
+  worse day gets written up as the feature's core defect. Rule: an equivalence oracle
+  between two enforcement moments must reproduce the sequencing of the real pipeline,
+  not merely call both functions on the same directory; and it must assert agreement in
+  **both** directions (approve/pass and refuse/refuse) on the same tree, because a lint
+  that never approves and a lint that always approves both trivially "agree" with a
+  guard on half the cases.
+
+- [FEAT-2026-0054/G1-CLOSE] **Replacing a duplicated machine-detail table with a pointer
+  removes the drift only if the pointer describes the mechanism's *trigger conditions*
+  rather than the union of its branches.** This feature deleted a table of literal guard
+  strings from a rule file precisely because a second copy of the requirements drifts —
+  and the replacement sentence reintroduced the drift one layer up, promising that every
+  closing work unit "starts its session with the guard-required files and headings
+  already scaffolded in place" and naming five artifacts. Each stub is in fact
+  conditional on WU type, on a next gate existing, or on parseable in-gate failures, and
+  one of the five is never pre-created by design. For the most common shape — a terminal
+  close on a clean gate — the mechanism creates nothing, which is exactly what happened
+  on this feature's own close dispatch. Rule: prose that summarises a conditional
+  mechanism must state when it fires, or make no coverage claim at all and defer to the
+  checker ("run the lint to see what is still missing"). A best-case description is
+  worse than no description, because it tells the reader they can skip the check.
+
+- [FEAT-2026-0054/G1-CLOSE] **A guard scoped to "this gate" by parsing the gate out of a
+  correlation ID silently exempts every ID shape the parser does not recognise — and the
+  unrecognised shape is usually the common one.** The failure-class-breakdown guard
+  restricts non-passing attempts to the current gate via a parser that matches only
+  closing IDs of the form `G<n>-…`; an implementation-WU ID like `FEAT-2026-0054/T04`
+  parses to nothing and is dropped. The consequence is that the retrospective section
+  whose whole purpose is accounting for failed attempts cannot be required on a gate
+  whose only failures were implementation work units — which is most gates. It fails
+  open and silently: the guard and the skeleton writer read the same filter, so they
+  stay consistent with each other while both under-fire, and no divergence test can see
+  it. Rule: derive a work unit's gate from the plan's gate graph, which knows the
+  answer, rather than from its ID's spelling; and when a guard is conditional on a
+  derived scope, add a test that the guard actually FIRES for the common membership
+  case, not only that it passes when satisfied.
