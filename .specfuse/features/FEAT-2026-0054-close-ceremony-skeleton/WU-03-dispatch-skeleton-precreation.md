@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0054/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
 oracle_env: macos_local
 produces_driver_helper: "loop.py dispatch() — closing-skeleton pre-creation from CLOSING_REQUIREMENTS; generalizes write_stub_retrospective_terminal / append_stub_retrospective_intermediate"
 produces:
   - tests/test_dispatch_skeleton.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.0
+started_at: 2026-07-30T12:38:20.272687+00:00
+duration_seconds: 529.766
+cost_usd: 2.253382
+input_tokens: 100
+output_tokens: 24062
 ---
 
 # Pre-create the closing skeleton at dispatch — guards can only pass

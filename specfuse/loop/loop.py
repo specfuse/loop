@@ -64,6 +64,7 @@ from .closing_requirements import (
     COST_ANALYSIS_HEADING,
     COST_ANALYSIS_HEADING_RE,
     DEFERRAL_HEADING_RE,
+    DEFERRAL_HEADING_TEXT,
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
@@ -2136,6 +2137,107 @@ def redact_leak_findings(text: str) -> str:
     return _LEAK_FINDING_RE.sub(_sub, text)
 
 
+# --------------------------------------------------------------------------- #
+# Closing-skeleton pre-creation (FEAT-2026-0054/T03)                          #
+# --------------------------------------------------------------------------- #
+
+
+def _precreate_gate_review_stub(feature_dir: Path, gate_n: int) -> None:
+    """(plan-next-a shape) Pre-create GATE-(N+1)-REVIEW.md, derivation shared
+    with assert_gate_review_exists. No-op when there is no next gate (terminal)
+    or the file already exists (idempotent — never clobbers a drafted review).
+    """
+    _, gates = load_graph(feature_dir)
+    next_gate = gate_n + 1
+    if not any(g.number == next_gate for g in gates):
+        return
+    review = feature_dir / gate_review_filename(next_gate)
+    if review.exists():
+        return
+    review.write_text(
+        f"# Gate {next_gate} review\n\n"
+        "<!-- specfuse:skeleton-stub agent-completable -->\n\n"
+        f"Draft gate {next_gate}'s review here before its first work unit "
+        "dispatches.\n"
+    )
+
+
+def _precreate_retrospective_stub(wu: WorkUnit, feature_dir: Path, gate_n: int) -> None:
+    """(close-intermediate-a / close-f / close-intermediate-d / close-g shapes)
+    Append stub sections to RETROSPECTIVE.md for every requirement derivable
+    from on-disk state at dispatch time. Never writes a `verdict:` value —
+    that field stays owned by assert_verdict_well_formed at outcome time.
+
+    Idempotent: each section is gated on its own on-disk absence check, so a
+    re-dispatch after a failed attempt (or a re-entrant call within the same
+    dispatch) never duplicates a heading. Existing content is only ever
+    appended to, never rewritten.
+    """
+    retro = feature_dir / RETROSPECTIVE_FILENAME
+    existing_text = retro.read_text() if retro.exists() else ""
+    sections: list[str] = []
+
+    if wu.type == "close-intermediate" and not gate_section_heading_re(gate_n).search(existing_text):
+        sections.append(
+            f"## Gate {gate_n}\n\n"
+            "<!-- specfuse:skeleton-stub agent-completable -->\n"
+        )
+
+    failure_summary = summarize_attempt_failure_classes(
+        feature_dir, gate_n, exclude_correlation_id=wu.wu_id)
+    if failure_summary != _NO_FAILURES_SENTINEL and not FAILURE_CLASS_HEADING_RE.search(existing_text):
+        sections.append(failure_summary)
+
+    if wu.type == "close":
+        _, gates = load_graph(feature_dir)
+        terminal_gate_number = gates[-1].number if gates else gate_n
+        predecessor_gates = sorted({
+            int(m.group(1))
+            for m in AUTOCLOSE_DEBT_MARKER_RE.finditer(existing_text)
+            if int(m.group(1)) < terminal_gate_number
+        })
+        if predecessor_gates and not DEFERRAL_HEADING_RE.search(existing_text):
+            names = ", ".join(f"gate {g}" for g in predecessor_gates)
+            sections.append(
+                f"## {DEFERRAL_HEADING_TEXT}\n\n"
+                "<!-- specfuse:skeleton-stub agent-completable -->\n"
+                f"Name and reconcile predecessor auto-close debt for: {names}.\n"
+            )
+
+    if not sections:
+        return
+    addition = "\n\n".join(sections)
+    if retro.exists():
+        with retro.open("a") as fh:
+            fh.write("\n" + addition + "\n")
+    else:
+        retro.write_text(addition + "\n")
+
+
+def precreate_dispatch_skeleton(wu: WorkUnit, feature_dir: Path) -> None:
+    """Pre-create the closing-artifact stub shapes a `close`,
+    `close-intermediate`, or `plan-next` WU will be checked against, before
+    its agent session starts — guards can only pass, not construct format
+    from prose. No-op for every other wu.type. Derivation is shared with the
+    guards via CLOSING_REQUIREMENTS-backed constants (closing_requirements.py)
+    so the skeleton and the guards never drift apart.
+
+    Never writes a placeholder `verdict:` value (owned by
+    assert_verdict_well_formed at outcome time) and never touches
+    verdict-conditional headings such as '## Cost analysis' (owned by the
+    lint once the agent writes its verdict).
+    """
+    if wu.type not in ("close", "close-intermediate", "plan-next"):
+        return
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return
+    if wu.type == "plan-next":
+        _precreate_gate_review_stub(feature_dir, gate_n)
+    else:
+        _precreate_retrospective_stub(wu, feature_dir, gate_n)
+
+
 def dispatch(wu: WorkUnit, failure_note: str | None,
              cost_tracking: bool = True) -> tuple[str, dict | None]:
     """Run a fresh agent session for this WU.
@@ -2895,6 +2997,7 @@ def execute_unit_attempt(
     """
     if verify_fn is None:
         verify_fn = verify
+    precreate_dispatch_skeleton(wu, feature_dir)
     if dispatch_fn is None:
         result = dispatch(wu, failure_note, cost_tracking)
     else:
