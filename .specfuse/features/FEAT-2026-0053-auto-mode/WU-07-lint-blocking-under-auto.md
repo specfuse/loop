@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0053/T07
 type: implementation
-status: pending
+status: blocked_human
 attempts: 1
 planned_cost_usd: 3.00
 human_only: true
@@ -10,6 +10,13 @@ produces:
   - specfuse/loop/arm_eval.py
   - tests/test_arm_eval_lint_class.py
 oracle_env: macos_local
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: $ python3 -m unittest discover -s tests -v
+duration_seconds: 774.183
+cost_usd: 3.32026
+input_tokens: 154
+output_tokens: 43146
 ---
 
 # Contract-field lint warns become blocking — under `auto` only
