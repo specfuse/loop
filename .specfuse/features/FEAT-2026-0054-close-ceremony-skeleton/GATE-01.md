@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 36.00
+baseline:
+  sha: 08f1ee836b433aa02179da6232d46b72ab2b4b97
+  probed_at: 2026-07-30T12:12:58.136996+00:00
+  failing: []
 ---
 
 # Gate 1 — closing-format guard refusals become structurally near-impossible
