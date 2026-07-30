@@ -1,7 +1,7 @@
 ---
 gate: 1
-status: awaiting_review
-cost_budget_usd: 27.00
+status: open
+cost_budget_usd: 32.00
 baseline:
   sha: 6ef2eb4427226c13616630d5b991bbd102b16dfa
   probed_at: 2026-07-30T15:01:00.326964+00:00
@@ -16,8 +16,10 @@ baseline:
   `produces:` path an earlier `done` WU already declared, naming both WUs and the authoring
   response; ERRORs on a `produces:` path the WU's own Do-not-touch section forbids, naming
   `assert_produces_in_diff` as the guard it preempts.
-- The ERROR rule reports zero findings across every existing feature folder in this repo;
-  expected WARNs are enumerated, including this feature's own T01/T02 overlap.
+- The ERROR rule reports zero findings across every existing feature folder in this repo,
+  **firing on the canonical bold-preamble Do-not-touch form** (attempt 1: blind to it, 15
+  false ERRORs — T05); expected WARNs are enumerated (dispatchable WUs only — `done` WUs
+  produce none by design).
 - `assert_declared_deliverables` and `assert_produces_in_diff` accept one declaration form:
   literal paths and fnmatch globs both satisfy both gates (a glob requires ≥1 existing match),
   with the behavior table in the WU and existing guard tests updated deliberately.

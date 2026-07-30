@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0055-arm-time-wu-contract-lint
 roadmap_goal: Refuse or warn on WU-contract defects at arm time instead of after burned attempts — a produces path the WU's own Do-not-touch forbids is un-armable (ERROR), a produces path an earlier done WU already delivered is flagged (WARN), and the two deliverable gates' path semantics are unified so one declaration form satisfies both.
 autonomy_default: review
 status: active
-planned_cost_usd: 22.00
+planned_cost_usd: 27.00
 ---
 
 # Plan: arm-time WU contract lint
@@ -95,9 +95,12 @@ gates:
       - id: FEAT-2026-0055/T04
         file: WU-04-surfacing-and-boilerplate-deletion.md
         depends_on: [FEAT-2026-0055/T03]
+      - id: FEAT-2026-0055/T05
+        file: WU-05-boundary-extraction-fix.md
+        depends_on: [FEAT-2026-0055/T04]
       - id: FEAT-2026-0055/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0055/T04]
+        depends_on: [FEAT-2026-0055/T05]
 ```
 
 ## Notes
