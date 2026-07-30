@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 28.00
 # Sum of drafted WU estimates ($23.50) plus one re-attempt of the largest
 # ($4.50, T03) — the defensive-padding shape planning-discipline recommends.
