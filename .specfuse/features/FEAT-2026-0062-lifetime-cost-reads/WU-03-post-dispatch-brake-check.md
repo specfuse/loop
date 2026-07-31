@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0062/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/loop.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - _should_report_budget_breach
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-07-31T18:41:34.655597+00:00
+duration_seconds: 775.766
+cost_usd: 2.516068
+input_tokens: 110
+output_tokens: 28498
 ---
 
 # Make a final-work-unit overrun visible to the per-gate brake
