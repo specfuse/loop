@@ -87,6 +87,7 @@ from .gate_eval import (
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
+from .cost import wu_lifetime_cost_usd
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -1782,20 +1783,20 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
     """Sum lifetime recorded cost across ALL of the gate's WUs.
 
-    Reads each WU file's frontmatter from `gate["work_units"]` and adds
-    `cost_usd` PLUS `cumulative_cost_usd` (prior re-arm cycles' spend, folded
-    by fold_cumulative_on_rearm — #199) regardless of WU status (#219):
-    write_cost_to_wu records cost on every outcome — pass, blocked, spinning —
-    so cost on a non-done WU is real spend, not an estimate. The pre-#219
-    done-only filter left a blocked WU's re-arm burn invisible to the budget
-    brake until the WU finally passed (FEAT-2026-0049/WU-06: $30.29 across 9
-    attempts, contributing $0 while blocked). WUs whose frontmatter omits both
-    fields — cost tracking off, never dispatched, or the attempt didn't record
-    a cost — contribute 0.0. `plan` is the feature frontmatter dict and is
-    accepted for signature symmetry with the broader gate-budget helpers; the
-    spent total is derived from WU files alone.
+    Delegates to `wu_lifetime_cost_usd` (FEAT-2026-0062/T01) per WU: it sums
+    `payload.cost_usd` across that WU's `attempt_outcome` events in
+    `events.jsonl`, the primary source, and falls back to
+    `cost_usd + cumulative_cost_usd` from the WU's frontmatter only when the
+    WU has no event history at all. This replaces the pre-#199-era frontmatter
+    summation directly (#199, #219) — regardless of WU status, since
+    write_cost_to_wu records cost on every outcome (pass, blocked, spinning),
+    so cost on a non-done WU is real spend, not an estimate. `plan` is the
+    feature frontmatter dict and is accepted for signature symmetry with the
+    broader gate-budget helpers; the spent total is derived from WU files and
+    `events.jsonl` alone.
     """
     del plan  # signature symmetry — sum is derived from WU files only
+    events_path = feature_dir / "events.jsonl"
     total = 0.0
     for ref in gate.get("work_units") or []:
         wu_file = ref.get("file")
@@ -1804,17 +1805,7 @@ def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
         wu_path = feature_dir / wu_file
         if not wu_path.exists():
             continue
-        fm, _ = read_frontmatter(wu_path)
-        # Lifetime spend, not per-cycle (#199): fold_cumulative_on_rearm
-        # moves each prior dispatch cycle's cost into cumulative_cost_usd and
-        # zeroes cost_usd, so summing cost_usd alone undercounts every
-        # re-armed WU (FEAT-2026-0049/WU-06 read as $2.75 of a $30.29 spend).
-        for key in ("cost_usd", "cumulative_cost_usd"):
-            cost = fm.get(key)
-            if isinstance(cost, bool):
-                continue
-            if isinstance(cost, (int, float)):
-                total += float(cost)
+        total += wu_lifetime_cost_usd(wu_path, events_path)
     return total
 
 

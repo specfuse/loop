@@ -37,6 +37,7 @@ from pathlib import Path
 
 from . import _miniyaml
 from .closing_requirements import gate_review_filename
+from .cost import wu_lifetime_cost_usd
 from .plan_baseline import load_baseline, load_plan_graph
 
 PREDICATE_VERSION = "v1"
@@ -168,7 +169,7 @@ def _read_wu(feature_dir: Path, ref: dict) -> "dict | None":
         "id": ref["id"],
         "type": fm.get("type", "implementation"),
         "status": fm.get("status", "pending"),
-        "cost_usd": fm.get("cost_usd", 0.0) or 0.0,
+        "cost_usd": wu_lifetime_cost_usd(path, feature_dir / "events.jsonl"),
         "planned_cost_usd": fm.get("planned_cost_usd"),
         "produces": fm.get("produces") or [],
         "produces_driver_helper": fm.get("produces_driver_helper") or [],

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0062/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/arm_eval.py
@@ -12,6 +12,10 @@ produces:
 produces_driver_helper:
   - gate_spent_usd
 oracle_env: macos_local
+duration_seconds: 1587.677
+cost_usd: 4.296133
+input_tokens: 3986
+output_tokens: 41082
 ---
 
 # Route both cost consumers through the lifetime reader
