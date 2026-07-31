@@ -30,6 +30,7 @@ prose or assertion semantics — it is a path-surface check, nothing more.
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -58,9 +59,55 @@ JUDGE_PATHS = (
     "pyproject.toml",
 )
 
-# Dependency-manifest surfaces (class 3). Same `pyproject.toml` caveat as above.
-_DEPENDENCY_MANIFEST_EXACT = ("pyproject.toml", "package.json")
-_REQUIREMENTS_RE = re.compile(r"(^|/)requirements[^/]*\.txt$")
+# Dependency-manifest recognition surface (class 3). One stated table:
+# `fnmatch` patterns (exact basenames are just patterns with no special
+# characters) matched against `Path(p).name`. Same `pyproject.toml` caveat as
+# JUDGE_PATHS above.
+#
+# Covered: manifests decision_class_paths fires on.
+DEPENDENCY_MANIFEST_COVERED = (
+    "pyproject.toml",
+    "package.json",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "Cargo.toml",
+    "go.mod",
+    "Gemfile",
+    "composer.json",
+    "requirements*.txt",
+    "*.csproj",
+)
+
+# Named-uncovered: manifests we know exist and deliberately do not cover yet.
+# Each entry carries a reason so "why not just cover it" has a written answer
+# on file — an entry whose honest answer is "we should" belongs in the
+# covered tuple above instead. A produced path matching one of these reports
+# not_evaluable (trigger 1), not clean.
+#
+# Lockfiles (package-lock.json, poetry.lock, Cargo.lock, go.sum, Gemfile.lock,
+# yarn.lock) are dependency changes by any reasonable reading, but were not
+# part of FEAT-2026-0061's chartered scope (PLAN.md "Scope boundary"). They
+# are named-uncovered here rather than left undiscussed.
+DEPENDENCY_MANIFEST_NAMED_UNCOVERED = {
+    "mix.exs": "Elixir manifest; Elixir is not yet a Specfuse target ecosystem",
+    "pubspec.yaml": "Dart/Flutter manifest; not yet a Specfuse target ecosystem",
+    "Podfile": "CocoaPods manifest; not yet a Specfuse target ecosystem",
+    "*.gemspec": "Ruby gemspec; Gemfile is covered above, gemspec is not yet",
+    "*.cabal": "Haskell manifest; not yet a Specfuse target ecosystem",
+    "package-lock.json": "lockfile derived from the covered package.json, "
+        "not the dependency declaration itself; out of this feature's scope",
+    "poetry.lock": "lockfile derived from the covered pyproject.toml, not "
+        "the dependency declaration itself; out of this feature's scope",
+    "Cargo.lock": "lockfile derived from the covered Cargo.toml, not the "
+        "dependency declaration itself; out of this feature's scope",
+    "go.sum": "checksum file derived from the covered go.mod, not the "
+        "dependency declaration itself; out of this feature's scope",
+    "Gemfile.lock": "lockfile derived from the covered Gemfile, not the "
+        "dependency declaration itself; out of this feature's scope",
+    "yarn.lock": "lockfile derived from the covered package.json, not the "
+        "dependency declaration itself; out of this feature's scope",
+}
 
 _FM_DELIM = re.compile(r"^---\s*$")
 _TITLE_RE = re.compile(r"^#\s+(.*)$", re.MULTILINE)
@@ -135,10 +182,27 @@ def _matches_judge_path(path: str) -> bool:
     return any(path == jp or path.startswith(jp) for jp in JUDGE_PATHS)
 
 
-def _matches_dependency_manifest(path: str) -> bool:
-    if _REQUIREMENTS_RE.search(path):
-        return True
-    return any(path == p or path.endswith("/" + p) for p in _DEPENDENCY_MANIFEST_EXACT)
+def _is_glob_or_directory(path: str) -> bool:
+    return any(c in path for c in "*?[") or path.endswith("/")
+
+
+def _matches_dependency_manifest(path: str) -> "tuple[str, str]":
+    """Return (verdict, detail) for `path` against the recognition table.
+
+    verdict is one of "covered" / "undecidable" / "no". detail names the
+    matched pattern (covered) or which trigger fired and why (undecidable);
+    it is "" for "no".
+    """
+    if _is_glob_or_directory(path):
+        return "undecidable", "trigger 2: glob or directory in produces:"
+    basename = path.rsplit("/", 1)[-1]
+    for pattern in DEPENDENCY_MANIFEST_COVERED:
+        if fnmatch.fnmatch(basename, pattern):
+            return "covered", pattern
+    for pattern, reason in DEPENDENCY_MANIFEST_NAMED_UNCOVERED.items():
+        if fnmatch.fnmatch(basename, pattern):
+            return "undecidable", f"trigger 1: named-uncovered {pattern} ({reason})"
+    return "no", ""
 
 
 def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecision:
@@ -245,16 +309,32 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
         )
 
     # --- Class 3: decision-class paths ---
-    dep_hits: list[str] = []
+    # Precedence: any covered hit fires, even if a sibling produced path in
+    # the same WU is undecidable — a definite dependency hit is never masked
+    # by an undecidable sibling. Only when nothing is covered does an
+    # undecidable path report not_evaluable instead of clean.
+    dep_covered_hits: list[str] = []
+    dep_undecidable_hits: list[str] = []
     for wu in drafted:
         for p in wu["produces"]:
-            if _matches_dependency_manifest(p):
-                dep_hits.append(f"{wu['id']} produces {p}")
-    if dep_hits:
-        classes["decision_class_paths"] = ClassVerdict("fired", "; ".join(dep_hits))
+            verdict, detail = _matches_dependency_manifest(p)
+            if verdict == "covered":
+                dep_covered_hits.append(f"{wu['id']} produces {p} (matches {detail})")
+            elif verdict == "undecidable":
+                dep_undecidable_hits.append(f"{wu['id']} produces {p}: {detail}")
+    if dep_covered_hits:
+        classes["decision_class_paths"] = ClassVerdict(
+            "fired", "; ".join(dep_covered_hits)
+        )
+    elif dep_undecidable_hits:
+        classes["decision_class_paths"] = ClassVerdict(
+            "not_evaluable", "; ".join(dep_undecidable_hits)
+        )
     else:
         classes["decision_class_paths"] = ClassVerdict(
-            "clean", "no drafted WU touches dependency manifests"
+            "clean",
+            "no drafted WU touches a recognised dependency manifest "
+            f"({', '.join(DEPENDENCY_MANIFEST_COVERED)})",
         )
 
     # --- Class 4: retroactive edits (baseline WUs of already-passed gates) ---
@@ -381,7 +461,9 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
         else:
             classes["plan_next_lint"] = ClassVerdict("clean", "plan-next lint: no findings")
 
-    would_arm = all(classes[name].status != "fired" for name in CLASS_NAMES)
+    # not_evaluable is fail-closed, same as fired — a class with no basis to
+    # evaluate must not let arming proceed on its say-so.
+    would_arm = all(classes[name].status == "clean" for name in CLASS_NAMES)
 
     return ArmDecision(
         would_arm=would_arm,

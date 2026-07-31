@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0061/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/loop/arm_eval.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - _matches_dependency_manifest
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-07-31T13:53:45.917341+00:00
+duration_seconds: 983.375
+cost_usd: 2.612643
+input_tokens: 106
+output_tokens: 26462
 ---
 
 # One stated recognition surface, two `not_evaluable` triggers, a self-describing `clean`
