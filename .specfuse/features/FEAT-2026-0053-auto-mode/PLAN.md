@@ -5,7 +5,7 @@ slug: auto-mode
 branch: feat/FEAT-2026-0053-auto-mode
 roadmap_goal: Implement the declared-but-dead `auto` autonomy level end to end — the driver arms drafted gates and accepts plan-next's additive plan adjustments on its own, stopping only on mechanical conditions, so a four-gate feature costs one human touch (the PR review) instead of four.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 66.00
 ---
 

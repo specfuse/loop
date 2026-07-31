@@ -1303,3 +1303,128 @@ satisfied exactly and still fail; and a budget brake evaluated only before
 dispatch cannot observe the unit that overruns, so a gate can exceed its declared
 budget with the brake reporting clean.
 
+
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Accepted at:** 2026-07-31T10:24:35+00:00
+
+**Operator's reason (verbatim):** "Let's ship it so I can test it"
+
+**Nothing below is discharged.** Accepting the hedge means shipping with these
+items known-open, not resolving them. Seven of the eight upgrade on the same
+event -- the first feature dispatched with `autonomy_default: auto` -- which is
+the event that shipping exists to enable. The verdict returns to the honest
+question it always was: the mechanism is built, and only a production ride can
+prove the headline claim.
+
+Two entries carry a compounding hazard the operator was shown before accepting:
+entry 10 (`judge_editing` blocks any gate shipping documentation) is scoped to
+this repository, because `JUDGE_PATHS` contains the prefix `specfuse/loop/`,
+which exists only here -- a target project vendoring the driver via pipx has no
+such path, so its documentation gates are unaffected. Entry 8's
+`budget_projection` under-read compounds with a separate gap found while
+scoping the first ride: `_DEPENDENCY_MANIFEST_EXACT` matches only
+`pyproject.toml`, `package.json`, and `requirements*.txt`, so
+`decision_class_paths` is blind to `pom.xml` and `build.gradle`. In a
+Maven or Gradle repository, two of the eight stop classes are degraded.
+
+**Standing follow-ups, carried forward verbatim from *What the loop did NOT
+verify*.** Entries 1 and 2 of that record are already closed and are not
+repeated here; entries 3-10 remain open exactly as written:
+
+3. **"A four-gate feature costs one human touch (the PR review) instead of
+   four"** (PLAN.md `roadmap_goal`; GATE-02.md definition of done). *Verified
+   in-loop:* the entire arm path, by `tests/test_arm_wiring.py` (7 tests),
+   including a run against `_copy_real_feature` — a copy of this feature's real
+   folder with its real baseline, real WU frontmatter and real `events.jsonl` —
+   rewound to the moment gate 1 is about to close, asserting one commit via a real
+   `git rev-list --count`. *Not verified:* **one production ride. Zero gates have
+   ever been armed by the predicate.** **Why:** this feature runs
+   `autonomy_default: review` by decision (`[FEAT-2026-0007/G2-LESSONS]` — an
+   enforcement mechanism cannot be exercised by the gate that builds it).
+   **Where it is actually verified:** the first feature dispatched with
+   `autonomy_default: auto` after this branch merges.
+
+4. **"The drift caps measure real drift"** (T03 AC; GATE-01.md definition of
+   done). *Verified in-loop:* every class's firing and quiet behavior by
+   `tests/test_arm_eval.py` (19 cases). *Not verified:* a meaningful `drift_caps`
+   verdict on any real feature. **Why:** this feature's `PLAN.baseline.json` was
+   captured after its own gate-2 drafting — gate 1's Findings §2 predicted it and
+   gate 2 confirmed it on disk — so the baseline already contains gate 2 and gate
+   3's `G3-CLOSE` placeholder. Comparing gate 2 to a baseline containing gate 2
+   returns clean and means nothing. **Where it is actually verified:** a feature
+   whose **first dispatch** postdates this branch. T12's page states this as a
+   property of every pre-existing feature, not of this one.
+
+5. **"`plan_next_lint` blocks a non-compliant plan-next draft under `auto`"**
+   (GATE-02.md definition of done, T07). *Verified in-loop:* firing, quiet, and
+   malformed-frontmatter behavior by `tests/test_arm_eval_lint_class.py` (4
+   tests). *Not verified:* the **firing** path on a real folder. The corpus sweep
+   re-run this session is unchanged at **0 fired / 1 clean / 42 not_evaluable**
+   across 43 real directories. **Where it is actually verified:** the first `auto`
+   feature that reaches a gate boundary with a genuinely non-compliant draft —
+   which, by design, is the case where a human is most needed and least present.
+
+6. **"Every auto-armed gate's doubt reaches the PR read"** (GATE-02.md
+   definition of done; GATE-03.md, T13). **Status changed but not closed.** Gate
+   2 recorded this as *unowned* — `grep -rn "FEATURE-REVIEW" .specfuse/skills
+   specfuse/loop/data` returned zero. T13 built the last hop and that grep now
+   returns matches. *Verified in-loop:* both skill copies byte-match
+   (`tests/test_skills_vendored_in_sync.py`, 4 tests) and the instructions say
+   what they should say. *Not verified:* **that the instructions produce a good PR
+   body.** The deliverable is prose a model executes; no test can run it. **Where
+   it is actually verified:** the first `auto` feature's PR. T13's own
+   Verification section says this in the same words.
+
+7. **"Lessons from an unread gate are staged, not landed"** (GATE-02.md
+   definition of done, T09). *Verified in-loop:* the invariant that forces
+   staging, by `tests/test_learnings_staging.py` (7 tests). *Not verified:* the
+   four-step **human promotion procedure** the template documents. Confirmed
+   again this session: `ls .specfuse/features/*/LEARNINGS-pending.md` matches
+   nothing — **zero such files have ever existed in this repo, so no human has
+   ever performed the step.** **Where it is actually verified:** the PR review of
+   the first `auto` feature.
+
+8. **"`budget_projection` stops a feature heading past 2× its baseline"** (T03
+   AC; GATE-01.md definition of done). *Verified in-loop:* the arithmetic and the
+   threshold, by `tests/test_arm_eval.py`. *Not verified:* that the class reads
+   the right spend — it does not, by $6.228317, re-measured above. **The class
+   has also never fired on anything.** Its projection on this feature ($63.73
+   true, $57.50 as read) is under a $108.00 cap, so even a corrected input would
+   not have exercised the firing path. **Where it is actually verified:** a
+   feature that genuinely approaches 2× its baseline — and the fix must land
+   first, or the class will under-read exactly the re-armed feature most likely
+   to get there.
+
+**New in gate 3:**
+
+9. **"`docs/methodology.md` §9 describes the autonomy dial the run loop actually
+   implements", "a parked `auto` feature is diagnosable from documentation
+   alone", and "an operator can adopt `auto` without reading source"**
+   (GATE-03.md definition of done, T10/T11/T12). *Verified in-loop:* that the
+   mirrored copies byte-match, that all eight `CLASS_NAMES` appear in the
+   reference, that all eight inventory names appear in the migration guide, that
+   the four-condition sketch is gone, and that both pages are registered in all
+   four scaffold registries. *Not verified:* **that any of the prose is correct,
+   or that a real operator can actually diagnose a parked feature from it.** No
+   test can assert either. **Where it is actually verified:** the human at PR
+   review, which `GATE-03.md` names explicitly, and the first operator who has to
+   use the pages under pressure. Two prose defects already found by reading, both
+   in text every oracle passed, are named in the gate-3 narrative above.
+
+10. **"Under `auto`, no gate that ships a documentation file can arm"** — the
+    `judge_editing` v1 approximation, accepted as open question 2 at arming.
+    *Verified in-loop:* that the class **does** fire on exactly this input, by the
+    real `arm_predicate_evaluated` event at `2026-07-31T03:06:03Z` naming T10, T11
+    and T12 by their mirrored `specfuse/loop/data/docs/` paths. *Not verified:*
+    what happens next — **that the fired verdict actually parks an `auto`
+    feature, and that the operator, meeting it, finds the answer on T11's page
+    instead of in `arm_eval.py`.** **Why:** this feature runs `review`, so the
+    fired verdict cost nothing and stopped nothing. **Where it is actually
+    verified:** the first `auto` feature that ships any documentation — which,
+    given that every gate of every feature tends to touch docs, is likely to be
+    the *first* `auto` feature, making this the most probable first encounter any
+    operator will have with the predicate refusing to arm.

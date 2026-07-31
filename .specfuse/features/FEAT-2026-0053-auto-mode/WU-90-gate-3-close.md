@@ -9,7 +9,7 @@ auto_close_disabled: true
 model: opus
 effort: high
 gate_set: plannext
-verdict: met_locally
+verdict: met
 driver_version: 0.7.1
 started_at: 2026-07-31T03:50:00.620387+00:00
 duration_seconds: 919.009
