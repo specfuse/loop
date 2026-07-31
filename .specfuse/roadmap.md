@@ -77,7 +77,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
-| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
+| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
@@ -995,17 +995,6 @@ machine-checkable contract rather than prose.
 **Goal.** Decide and implement where driver-local event schemas live, then bring all three types into conformance so `validate_event.py` passes over a real driver-produced `events.jsonl`. Two candidate shapes, to be chosen as part of this feature: (a) extend the vendored registry and envelope enum in the core repo, keeping one registry — correct but cross-repo; or (b) sanction an explicitly-named loop-local schema tier, with manifest entries in the scaffold sync script and its orphan-file test, leaving the core enum alone. Also decide whether emit-time validation should be wired into `build_event` / `flush_events`, or whether `validate_event.py` stays a CI/manual check — an unvalidated emit path is what let three types drift unnoticed.
 
 **Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
-
-**Status: planned.**
-
-<a id="feat-2026-0062"></a>
-## FEAT-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
-
-**Why.** Two independent cost consumers read only a work unit's current-dispatch-cycle spend. `budget_projection`, the arm-predicate class that stops a feature heading past 2× its baseline, and `gate_spent_usd`, which drives the per-gate budget brake, both read frontmatter `cost_usd` and neither reads `cumulative_cost_usd` or `re_arm_history[].prior_cost_usd`. A re-arm resets `attempts` to `0` and folds prior spend into the cumulative fields, so **every re-armed work unit is invisible to both**. Measured on [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053) itself, recorded in its gate-2 Findings §1: the projection under-read by **$6.23** and the gate spend by **$5.01**. The bias is not random — it under-reports precisely the work units that have already failed and been retried, which are the ones most likely to be heading toward a budget breach. The brake has a second, separate blind spot found in the same feature: `_should_halt_for_budget` is evaluated *before* each dispatch, so an overrun inside the final work unit of a gate cannot be seen at all. Gate 2 closed **$4.94 over** its $31.50 brake without the brake firing.
-
-**Goal.** Make both consumers read lifetime spend — frontmatter `cumulative_cost_usd` plus the current cycle, or the `attempt_outcome` event sum from `events.jsonl`, which is the source of truth the close ceremony already treats as authoritative. Decide which is canonical and use it in both places rather than letting them diverge again. Separately, decide what the per-gate brake should do about a final-work-unit overrun: a post-dispatch check that reports the breach after the fact is honest and cheap; a projected-cost pre-check that refuses to dispatch a unit whose planned cost would breach is stricter and changes dispatch behaviour. State the choice, because "the brake did not fire" currently means two different things.
-
-**Benefits.** The autonomy budget stop class stops the features it exists to stop, instead of systematically under-reading the retried ones. The per-gate brake's reported number matches what the gate actually spent, so a close ceremony reconciling against it is comparing like with like. Both are prerequisites for trusting `auto` on an unattended run, where a budget stop is one of the few mechanical brakes standing between a stuck feature and an unbounded spend.
 
 **Status: planned.**
 

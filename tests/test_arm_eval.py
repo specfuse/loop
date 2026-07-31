@@ -212,6 +212,28 @@ class TestArmPredicate(unittest.TestCase):
             decision = evaluate_arm_predicate(feature, 1)
             self.assertEqual(decision.classes["budget_projection"].status, "clean")
 
+    def test_budget_projection_counts_rearmed_lifetime_spend(self):
+        """FEAT-2026-0062/T02 criterion 1: a re-armed WU's prior-cycle spend
+        sits in `cumulative_cost_usd`, not `cost_usd`. Baseline planned total
+        is $3.00 (T01 $2.00 + G1-CLOSE $1.00), so the ceiling is $6.00.
+        WU-01's `cost_usd` alone ($2.00) plus G1-CLOSE ($1.00) projects to
+        $3.00 — clean on the pre-T02 per-cycle sum. Its actual lifetime spend
+        (cost_usd + cumulative_cost_usd = $12.00) plus G1-CLOSE ($1.00)
+        projects to $13.00, past the $6.00 ceiling — must fire. No
+        events.jsonl exists in this fixture, so the shared reader takes the
+        frontmatter fallback and sums both fields."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp) / "feature"
+            _base_feature(feature)
+            _wu(feature, "WU-01.md", "Do T01", [
+                "type: implementation", "status: done",
+                "cost_usd: 2.0", "cumulative_cost_usd: 10.0",
+                "planned_cost_usd: 2.0",
+            ])
+            decision = evaluate_arm_predicate(feature, 1)
+            self.assertEqual(decision.classes["budget_projection"].status, "fired")
+            self.assertFalse(decision.would_arm)
+
     # --- Class 2: judge-editing ---
 
     def test_judge_editing_fires_on_driver_path(self):

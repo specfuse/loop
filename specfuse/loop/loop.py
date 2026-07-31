@@ -87,6 +87,7 @@ from .gate_eval import (
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
+from .cost import wu_lifetime_cost_usd
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -1782,20 +1783,20 @@ def gate_budget_usd(gate_file: Path) -> float | None:
 def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
     """Sum lifetime recorded cost across ALL of the gate's WUs.
 
-    Reads each WU file's frontmatter from `gate["work_units"]` and adds
-    `cost_usd` PLUS `cumulative_cost_usd` (prior re-arm cycles' spend, folded
-    by fold_cumulative_on_rearm — #199) regardless of WU status (#219):
-    write_cost_to_wu records cost on every outcome — pass, blocked, spinning —
-    so cost on a non-done WU is real spend, not an estimate. The pre-#219
-    done-only filter left a blocked WU's re-arm burn invisible to the budget
-    brake until the WU finally passed (FEAT-2026-0049/WU-06: $30.29 across 9
-    attempts, contributing $0 while blocked). WUs whose frontmatter omits both
-    fields — cost tracking off, never dispatched, or the attempt didn't record
-    a cost — contribute 0.0. `plan` is the feature frontmatter dict and is
-    accepted for signature symmetry with the broader gate-budget helpers; the
-    spent total is derived from WU files alone.
+    Delegates to `wu_lifetime_cost_usd` (FEAT-2026-0062/T01) per WU: it sums
+    `payload.cost_usd` across that WU's `attempt_outcome` events in
+    `events.jsonl`, the primary source, and falls back to
+    `cost_usd + cumulative_cost_usd` from the WU's frontmatter only when the
+    WU has no event history at all. This replaces the pre-#199-era frontmatter
+    summation directly (#199, #219) — regardless of WU status, since
+    write_cost_to_wu records cost on every outcome (pass, blocked, spinning),
+    so cost on a non-done WU is real spend, not an estimate. `plan` is the
+    feature frontmatter dict and is accepted for signature symmetry with the
+    broader gate-budget helpers; the spent total is derived from WU files and
+    `events.jsonl` alone.
     """
     del plan  # signature symmetry — sum is derived from WU files only
+    events_path = feature_dir / "events.jsonl"
     total = 0.0
     for ref in gate.get("work_units") or []:
         wu_file = ref.get("file")
@@ -1804,17 +1805,7 @@ def gate_spent_usd(plan: dict, gate: dict, feature_dir: Path) -> float:
         wu_path = feature_dir / wu_file
         if not wu_path.exists():
             continue
-        fm, _ = read_frontmatter(wu_path)
-        # Lifetime spend, not per-cycle (#199): fold_cumulative_on_rearm
-        # moves each prior dispatch cycle's cost into cumulative_cost_usd and
-        # zeroes cost_usd, so summing cost_usd alone undercounts every
-        # re-armed WU (FEAT-2026-0049/WU-06 read as $2.75 of a $30.29 spend).
-        for key in ("cost_usd", "cumulative_cost_usd"):
-            cost = fm.get(key)
-            if isinstance(cost, bool):
-                continue
-            if isinstance(cost, (int, float)):
-                total += float(cost)
+        total += wu_lifetime_cost_usd(wu_path, events_path)
     return total
 
 
@@ -1822,6 +1813,22 @@ def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
     """Run-loop predicate: should the per-gate budget brake fire before the
     next WU dispatch? True when a budget is declared and the gate's spent
     total has reached or exceeded it. False otherwise (including no budget)."""
+    gate_file = feature_dir / gate["file"]
+    budget = gate_budget_usd(gate_file)
+    if budget is None:
+        return False
+    return gate_spent_usd(plan, gate, feature_dir) >= budget
+
+
+def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
+    """Run-loop predicate: sibling of `_should_halt_for_budget`, evaluated
+    AFTER a work unit's outcome resolves rather than before the next dispatch.
+    Catches the case the pre-dispatch check structurally cannot: an overrun
+    incurred by a gate's own final work unit, where no subsequent dispatch
+    exists to halt in front of. True when a budget is declared and the gate's
+    spent total has reached or exceeded it. False otherwise (including no
+    budget). Reports only — the caller decides whether/how to emit; this WU
+    does not add a pre-dispatch refusal on projected cost (see PLAN.md)."""
     gate_file = feature_dir / gate["file"]
     budget = gate_budget_usd(gate_file)
     if budget is None:
@@ -5734,8 +5741,37 @@ def run(
                             "attempts_lifetime": _prior_attempts + attempt,
                             "planned_cost_usd": _planned,
                         }))
-                        flush_events(events_path, wu_events)
                         done_ids.add(wu.wu_id)
+                        # Post-dispatch budget breach check (#T03): the
+                        # pre-dispatch brake above only ever sees spend
+                        # BEFORE the next WU it would halt in front of, so a
+                        # gate's own final WU can breach budget with no
+                        # subsequent dispatch left to catch it. Evaluated only
+                        # once every WU in this gate is done — a gate with
+                        # more pending WUs already gets the pre-dispatch halt
+                        # on its next iteration, so this never double-reports
+                        # the same overrun.
+                        if all(u.wu_id in done_ids for u in units):
+                            _gate_dict = {"file": gate.file.name,
+                                          "work_units": gate.refs}
+                            if _should_report_budget_breach(
+                                    feat_fm, _gate_dict, feature_dir):
+                                _budget = gate_budget_usd(gate.file)
+                                _spent = gate_spent_usd(
+                                    feat_fm, _gate_dict, feature_dir)
+                                wu_events.append(build_event(
+                                    "human_escalation", feature_id, {
+                                        "reason": "gate_budget_exceeded_post_dispatch",
+                                        "gate": gate.number,
+                                        "budget_usd": _budget,
+                                        "spent_usd": round(_spent, 6),
+                                        "final_wu_id": wu.wu_id,
+                                    }))
+                                print(f"\nGate {gate.number} budget exceeded "
+                                      f"(post-dispatch): spent ${_spent:.4f} "
+                                      f">= budget ${_budget:.4f}. Reported "
+                                      f"after {wu.wu_id}.")
+                        flush_events(events_path, wu_events)
                         print(f"   PASS — committed {sha}")
                         break
 
