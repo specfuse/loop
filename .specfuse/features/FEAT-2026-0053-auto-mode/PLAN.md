@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0053-auto-mode
 roadmap_goal: Implement the declared-but-dead `auto` autonomy level end to end — the driver arms drafted gates and accepts plan-next's additive plan adjustments on its own, stopping only on mechanical conditions, so a four-gate feature costs one human touch (the PR review) instead of four.
 autonomy_default: review
 status: active
-planned_cost_usd: 54.00
+planned_cost_usd: 66.00
 ---
 
 # Plan: Autonomous feature mode
@@ -68,7 +68,21 @@ arm predicate module (seven stop classes, hardcoded constants); shadow event
 emission at every gate close (gate 1). Live arming behind the dial, the atomic
 arm transaction with tag-before-arm, lint warns flipping to blocking under
 `auto`, FEATURE-REVIEW.md accumulation, LEARNINGS staged to a pending file
-(gate 2, drafted by G1-PLAN). Docs and methodology rewrite (gate 3).
+(gate 2, drafted by G1-PLAN). Docs and methodology rewrite (gate 3) — the
+autonomy dial in `docs/methodology.md`, the eight stop classes as an
+operator-facing reference, migration and opt-in guidance for existing features
+and downstream projects.
+
+**Gate 3's scope boundary was widened once, at G2-PLAN, and the revision is
+surfaced here rather than buried in a WU.** Gate 3 was drafted as
+documentation-only. It also carries `T13`, which gives `FEATURE-REVIEW.md` a
+reader in `/wrap-feature`. That is behavior, not documentation. The reason is in
+gate 2's retrospective (Findings §5): the accumulation shipped and nothing
+surfaces it, so under `auto` the mechanism that trades four human gate reads for
+one PR read delivers none of that value. Gate 3 is terminal — there is no later
+gate to hold it — and the alternative is shipping the feature with its headline
+claim undelivered. `T13` is `human_only: true` and strands nothing if rejected
+at the arming checkpoint; a rejection should name a home for the gap.
 
 **OUT, each with a home.** Outbound notifications are
 [FEAT-2026-0047](../../roadmap.md); the policy file owning tunable dials is
@@ -189,12 +203,26 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
+      - id: FEAT-2026-0053/T10
+        file: WU-10-methodology-autonomy-rewrite.md
+        depends_on: []
+      - id: FEAT-2026-0053/T11
+        file: WU-11-stop-class-reference.md
+        depends_on: []
+      - id: FEAT-2026-0053/T12
+        file: WU-12-migration-and-opt-in.md
+        depends_on: [FEAT-2026-0053/T11]
+      - id: FEAT-2026-0053/T13
+        file: WU-13-feature-review-reaches-pr.md
+        depends_on: []
       # --- closing sequence: terminal gate ---
-      # G2-PLAN inserts gate 3's substantive WUs (docs/methodology rewrite,
-      # migration guidance, whatever gate 2's retro surfaces) BEFORE this entry.
       - id: FEAT-2026-0053/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []   # G2-PLAN sets real depends_on when it drafts gate 3
+        depends_on:
+          - FEAT-2026-0053/T10
+          - FEAT-2026-0053/T11
+          - FEAT-2026-0053/T12
+          - FEAT-2026-0053/T13
 ```
 
 T01 and T02 are independent (baseline vs contract fields); T03 needs both
@@ -206,16 +234,32 @@ transaction, T06 wires the dial and the verdict into the one flip site that can
 arm. T07, T08 and T09 all hang off T06 and are independent of each other — the
 severity flip, the doubt accumulation, and the LEARNINGS staging touch
 different surfaces and can be re-ordered or dropped individually at arming
-without stranding the others.
+without stranding the others. **Gate 2's retrospective found that claim to be
+true of their source surfaces and false of their fixtures** (Findings §3: T07's
+new veto class fired on T06's test fixture, $5.01 and three sessions), which is
+why gate 3 declares its own shared surfaces up front.
+
+Gate 3 is three documentation units plus one deliberate scope-boundary
+revision. T10 rewrites the methodology's autonomy section; T11 ships the
+operator-facing stop-class reference; T12 ships migration and opt-in guidance
+and `depends_on` T11 because both edit `docs/README.md` and the scaffold drift
+guard's tracked-docs set — sequential by declaration rather than by luck. T13
+is independent of all three: it gives `FEATURE-REVIEW.md` the reader gate 2's
+retrospective found it never had, and it is marked `human_only: true` because
+it widens the scope boundary below.
 
 ## Notes
 
-- `planned_cost_usd` covers the **drafted** work only. Re-baselined by G1-PLAN
-  at the gate-1 → gate-2 boundary: gate 1's six units ($23.50) plus gate 2's
-  seven drafted units ($25.50) plus gate 3's close placeholder ($5.00) =
-  **$54.00**, a **+$25.50** delta against the original $28.50. Gate 3's
-  substantive units are still undrafted, so this figure will move again when
-  G2-PLAN re-baselines; the delta is stated in `GATE-02-REVIEW.md`.
+- `planned_cost_usd` covers the **drafted** work only, and gate 3's drafting is
+  the last re-baseline this feature gets. Re-baselined by G1-PLAN at the
+  gate-1 → gate-2 boundary to **$54.00** (gate 1's six units $23.50, gate 2's
+  seven $25.50, gate 3's close placeholder $5.00), a +$25.50 delta against the
+  original $28.50 — stated in `GATE-02-REVIEW.md`. Re-baselined again by
+  G2-PLAN at the gate-2 → gate-3 boundary: gate 3's four substantive units add
+  **$12.00** (T10 $3.00, T11 $3.00, T12 $3.00, T13 $3.00) for a new total of
+  **$66.00**, a **+$12.00 (+22.2%)** delta — stated in `GATE-03-REVIEW.md`.
+  Every gate is now drafted, so the figure is complete rather than partial for
+  the first time.
 - The shadow predicate fires for the first time at **this feature's own gate-1
   close** (T04 lands mid-gate). That is passive logging, so the
   `[FEAT-2026-0007/G2-LESSONS]` self-exercise trap does not bite — but the

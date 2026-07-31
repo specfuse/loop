@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0053/G2-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 provenance: "Required by .specfuse/rules/close-discipline.md and by the linter's non-terminal closing-shape check (close-intermediate immediately followed by plan-next); not part of PLAN.md's gate-2 sketch, which enumerated only the five substantive items."
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.7.1
+started_at: 2026-07-31T02:53:04.504731+00:00
+duration_seconds: 778.562
+cost_usd: 7.029853
+input_tokens: 109
+output_tokens: 58533
 ---
 
 # Draft gate 3 — docs and methodology rewrite
