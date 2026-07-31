@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 16.50
+baseline:
+  sha: 190e01d3b61c3e77ab372a6c2537e9579ce20dec
+  probed_at: 2026-07-31T13:51:05.659154+00:00
+  failing: []
 ---
 
 # Gate 1 — `decision_class_paths` sees the ecosystems Specfuse targets, and says what it sees
