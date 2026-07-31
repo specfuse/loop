@@ -95,6 +95,36 @@ _ROADMAP_PLANNED = textwrap.dedent("""\
     Some content here.
     """)
 
+# A done feature whose detail section is immediately followed by the NEXT
+# feature's anchor — the real roadmap's layout, since anchors precede headings.
+# Archiving 9999 must not carry 8888's anchor along with it.
+_ROADMAP_DONE_FOLLOWED_BY_ANCHOR = textwrap.dedent("""\
+    ---
+    project: test
+    ---
+
+    # Roadmap
+
+    | Feature ID | Title | Status | Folder | Detail |
+    |------------|-------|--------|--------|--------|
+    | FEAT-2026-9999 | Test feature | done | — | [→ detail](#feat-2026-9999) |
+    | FEAT-2026-8888 | Next feature | planned | — | [→ detail](#feat-2026-8888) |
+
+    <a id="feat-2026-9999"></a>
+    ## FEAT-2026-9999 — Test feature
+
+    Some content here.
+
+    <a id="feat-2026-8888"></a>
+    ## FEAT-2026-8888 — Next feature
+
+    Content belonging to the still-planned neighbour.
+
+    ## Notes
+
+    Trailing content.
+    """)
+
 _ARCHIVE_SCAFFOLD = textwrap.dedent("""\
     ---
     project: test
@@ -241,6 +271,71 @@ class TestAutoArchiveFeature(unittest.TestCase):
                 archive_before,
                 "roadmap-archive.md must be unchanged on refusal",
             )
+
+
+class TestAutoArchiveLeavesNeighbourAnchor(unittest.TestCase):
+    """Archiving a feature must not move the FOLLOWING feature's anchor.
+
+    Anchors precede their headings, so the next feature's `<a id="...">` line sits
+    immediately after the archived section's last content line. The section regex
+    consumes every following line that is not a `## ` heading, which swallowed that
+    anchor: the neighbour's `[→ detail](#feat-...)` link went dangling in
+    roadmap.md and a stray anchor for a still-planned feature landed in the
+    archive. Observed live on FEAT-2026-0061's auto-archive, which ate
+    FEAT-2026-0062's anchor.
+    """
+
+    def _archive(self, tmp):
+        repo = _make_repo(tmp, roadmap=_ROADMAP_DONE_FOLLOWED_BY_ANCHOR)
+        result = loop.auto_archive_feature("FEAT-2026-9999", repo)
+        self.assertEqual(result, "archived")
+        return (
+            (repo / ".specfuse" / "roadmap.md").read_text(),
+            (repo / ".specfuse" / "roadmap-archive.md").read_text(),
+        )
+
+    def test_neighbour_anchor_stays_in_roadmap(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            roadmap_text, _ = self._archive(tmp)
+            self.assertIn(
+                '<a id="feat-2026-8888"></a>', roadmap_text,
+                "the following feature's anchor must remain in roadmap.md — its "
+                "row still links to #feat-2026-8888",
+            )
+
+    def test_neighbour_anchor_not_copied_into_archive(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            _, archive_text = self._archive(tmp)
+            self.assertNotIn(
+                '<a id="feat-2026-8888"></a>', archive_text,
+                "a still-planned feature's anchor must not be written to the "
+                "archive — that duplicates the ID across both files",
+            )
+
+    def test_neighbour_section_untouched(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            roadmap_text, archive_text = self._archive(tmp)
+            self.assertIn('## FEAT-2026-8888 — Next feature', roadmap_text)
+            self.assertIn(
+                'Content belonging to the still-planned neighbour.', roadmap_text)
+            self.assertNotIn('## FEAT-2026-8888', archive_text)
+
+    def test_archived_feature_still_moves_correctly(self):
+        """The fix must not break the move it is guarding."""
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            roadmap_text, archive_text = self._archive(tmp)
+            # Own anchor and section left roadmap.md...
+            self.assertNotIn('<a id="feat-2026-9999"></a>', roadmap_text)
+            self.assertNotIn('## FEAT-2026-9999 — ', roadmap_text)
+            # ...and landed in the archive, anchor first, content intact.
+            self.assertIn('<a id="feat-2026-9999"></a>', archive_text)
+            self.assertLess(
+                archive_text.index('<a id="feat-2026-9999"></a>'),
+                archive_text.index('## FEAT-2026-9999 — '),
+            )
+            self.assertIn('Some content here.', archive_text)
+            self.assertIn(
+                '[→ archive](roadmap-archive.md#feat-2026-9999)', roadmap_text)
 
 
 if __name__ == "__main__":
