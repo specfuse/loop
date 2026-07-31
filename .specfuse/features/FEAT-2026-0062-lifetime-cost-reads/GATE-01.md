@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 21.00
+baseline:
+  sha: 3e6c4d678743e8da11bae3a3fd0210da2ce83012
+  probed_at: 2026-07-31T18:25:04.051249+00:00
+  failing: []
 ---
 
 # Gate 1 — both cost consumers read lifetime spend, and the brake can see a final-WU overrun
