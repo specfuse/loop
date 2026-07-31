@@ -54,8 +54,6 @@ sections inline in `roadmap.md`.
 
 **Status: active.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
 
-<a id="feat-2026-0062"></a>
-
 <a id="feat-2026-0053"></a>
 ## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
 

@@ -75,13 +75,14 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | — |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | — |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | — |
+| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
+| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
+| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
+| FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
-| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
-| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
-| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -982,6 +983,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0062"></a>
 ## FEAT-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
 
 **Why.** Two independent cost consumers read only a work unit's current-dispatch-cycle spend. `budget_projection`, the arm-predicate class that stops a feature heading past 2× its baseline, and `gate_spent_usd`, which drives the per-gate budget brake, both read frontmatter `cost_usd` and neither reads `cumulative_cost_usd` or `re_arm_history[].prior_cost_usd`. A re-arm resets `attempts` to `0` and folds prior spend into the cumulative fields, so **every re-armed work unit is invisible to both**. Measured on [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053) itself, recorded in its gate-2 Findings §1: the projection under-read by **$6.23** and the gate spend by **$5.01**. The bias is not random — it under-reports precisely the work units that have already failed and been retried, which are the ones most likely to be heading toward a budget breach. The brake has a second, separate blind spot found in the same feature: `_should_halt_for_budget` is evaluated *before* each dispatch, so an overrun inside the final work unit of a gate cannot be seen at all. Gate 2 closed **$4.94 over** its $31.50 brake without the brake firing.
@@ -989,6 +991,21 @@ machine-checkable contract rather than prose.
 **Goal.** Make both consumers read lifetime spend — frontmatter `cumulative_cost_usd` plus the current cycle, or the `attempt_outcome` event sum from `events.jsonl`, which is the source of truth the close ceremony already treats as authoritative. Decide which is canonical and use it in both places rather than letting them diverge again. Separately, decide what the per-gate brake should do about a final-work-unit overrun: a post-dispatch check that reports the breach after the fact is honest and cheap; a projected-cost pre-check that refuses to dispatch a unit whose planned cost would breach is stricter and changes dispatch behaviour. State the choice, because "the brake did not fire" currently means two different things.
 
 **Benefits.** The autonomy budget stop class stops the features it exists to stop, instead of systematically under-reading the retried ones. The per-gate brake's reported number matches what the gate actually spent, so a close ceremony reconciling against it is comparing like with like. Both are prerequisites for trusting `auto` on an unattended run, where a budget stop is one of the few mechanical brakes standing between a stuck feature and an unbounded spend.
+
+**Status: planned.**
+
+<a id="feat-2026-0063"></a>
+## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
+
+**Why.** [FEAT-2026-0061](#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. A sweep of `evaluate_arm_predicate` across all 44 feature folders at that feature's close returned `decision_class_paths`: **42 `not_evaluable` + 2 `clean`**, and every one of the 42 was `no_baseline` — the pre-existing whole-predicate fail-closed path from [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), not either new trigger. So the triggers have never fired on real input, and cannot in this repository: no feature here has both a captured baseline and an uncovered manifest.
+
+This is the exact shape `LEARNINGS [FEAT-2026-0053/G1-CLOSE]` names — *"a refusal path proven on the corpus says nothing about the approval path"* — and it generalises past `decision_class_paths`. The same question is open for every stop class whose fail-closed branch has only ever been exercised by a hand-authored fixture. The predicate's whole value is that it stops things; a stop that has never fired against a real tree is a claim, not a guard.
+
+The auto-close path sharpens it. FEAT-2026-0061's gate auto-closed on-plan, so the close ceremony that would have recorded the gap never ran, and all 26 acceptance criteria were logged as `deferred` debt. The gap was found only because a human ran the sweep by hand at wrap time. That is not a repeatable mechanism.
+
+**Goal.** Verify the arm predicate's fail-closed branches against live input rather than fixtures, and make the verification a standing check rather than a one-off. Three parts, the third being the one that survives. First, run the predicate against a real polyglot target — the Specfuse Generator, a Maven repository, is the intended first `auto` ride and the case FEAT-2026-0061 was built for — with a baseline captured so the classes actually evaluate instead of short-circuiting on `no_baseline`. Second, record which branches fire and which remain unexercised, per class, so "unverified" is a named list rather than an assumption. Third, decide where that sweep lives permanently: a `verification.yml` gate the driver runs, or a close-ceremony criterion an agent reports. Prefer the gate — FEAT-2026-0055's close raised the same choice and flagged promoting its tree-wide sweep from a close-time criterion to a driver-run gate as an open follow-up, and this is the second instance of the same shape, which is when the pattern earns the tooling.
+
+**Benefits.** The autonomy predicate's stop classes are trusted on evidence rather than on fixture coverage. The `no_baseline` short-circuit stops masking every other class's real behaviour in sweeps. A branch that cannot fire on any real input becomes visible as dead rather than passing as a guard — the same false-negative shape FEAT-2026-0061 removed from `decision_class_paths`, applied to the predicate as a whole.
 
 **Status: planned.**
 
