@@ -30,6 +30,10 @@ so an initialized project is self-documenting.
   automatically under `auto`, one section per class mapping a fired verdict to
   the operator action that clears it, plus how to read an
   `arm_predicate_evaluated` event correctly.
+- [`concepts/adopting-auto-mode.md`](concepts/adopting-auto-mode.md) — what a
+  driver at this version puts in any Specfuse project, the mid-life baseline
+  hazard affecting every feature predating this one, and the numbered
+  procedure for moving one feature's `PLAN.md` to `autonomy_default: auto`.
 
 ## Binding rules (under `.specfuse/rules/`)
 

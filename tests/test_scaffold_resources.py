@@ -43,6 +43,7 @@ _EXPECTED_RELPATHS = {
     "docs/concepts/ralph-lineage.md",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/autonomy-stop-classes.md",
+    "docs/concepts/adopting-auto-mode.md",
     "workflows/specfuse-monitor.yml",
 }
 

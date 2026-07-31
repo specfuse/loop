@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T12
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 provenance: "G2-PLAN's dispatch brief names migration guidance for existing features and downstream projects as minimum gate-3 scope. The specific breakage list is not invented here — it is RETROSPECTIVE.md's two 'Consumer-visible contract changes' sections (five items for gate 1, ten for gate 2), which flag items 2, 4 and 8 of gate 2 as needing explicit human acknowledgment. The mid-life baseline hazard comes from gate-1 Findings 2 and gate-2 'What the loop did NOT verify' 2, which record it on this feature and predict it for every feature that predates the wiring."
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/data/docs/concepts/adopting-auto-mode.md
   - docs/README.md
   - tests/test_scaffold_data_in_sync.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-31T03:41:50.002779+00:00
+duration_seconds: 490.502
+cost_usd: 0.884682
+input_tokens: 46
+output_tokens: 8604
 ---
 
 # What `auto` puts in your repo, and how to opt a feature into it

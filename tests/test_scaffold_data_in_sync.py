@@ -52,6 +52,7 @@ DOCS_TRACKED = {
     "docs/concepts/ralph-lineage.md",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/autonomy-stop-classes.md",
+    "docs/concepts/adopting-auto-mode.md",
 }
 
 # Unmirrored manifest — files authored directly under specfuse/loop/data/

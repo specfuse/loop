@@ -60,6 +60,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "features/.gitkeep",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/autonomy-stop-classes.md",
+    "docs/concepts/adopting-auto-mode.md",
     "docs/concepts/ralph-lineage.md",
     "docs/getting-started.md",
     "docs/methodology.md",
