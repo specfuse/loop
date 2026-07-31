@@ -70,6 +70,7 @@ from .closing_requirements import (
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
     LEARNINGS_PATH,
+    LEARNINGS_PENDING_FILENAME,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
     RETROSPECTIVE_FILENAME,
@@ -84,6 +85,9 @@ from .gate_eval import (
     NON_SUBSTANTIVE_TYPES,
     PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
 )
+from .arm_eval import evaluate_arm_predicate
+from .arm_txn import apply_arm_transaction, plan_arm_transaction
+from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
@@ -686,6 +690,36 @@ def build_event(event_type: str, correlation_id: str, payload: dict) -> dict:
         "source_version": DRIVER_VERSION,
         "payload": payload,
     }
+
+
+def build_arm_predicate_event(feature_dir: Path, feature_id: str, gate_number: int) -> dict:
+    """Build the shadow `arm_predicate_evaluated` event for a gate close (T04).
+
+    Pure w.r.t. control flow: evaluation failures degrade to an
+    `evaluation_error` payload field rather than propagating, so a defect in
+    the predicate (T03) or the baseline reader (T01) can never crash a gate
+    close. Not validated by validate_event.py — see the WU's Verification
+    note; `gate_reached` and `attempt_outcome` are the existing precedent for
+    driver-local event types outside the envelope enum and per-type registry.
+    """
+    try:
+        decision = evaluate_arm_predicate(feature_dir, gate_number)
+        payload = {
+            "gate": gate_number,
+            "would_arm": decision.would_arm,
+            "predicate_version": decision.predicate_version,
+            "classes": {
+                name: {"status": v.status, "reason": v.reason}
+                for name, v in decision.classes.items()
+            },
+        }
+    except Exception as exc:  # noqa: BLE001 - shadow trail must never crash a gate close
+        payload = {
+            "gate": gate_number,
+            "would_arm": None,
+            "evaluation_error": f"{type(exc).__name__}: {exc}",
+        }
+    return build_event("arm_predicate_evaluated", feature_id, payload)
 
 
 # Matches macOS ("/Users/" + "<name>/") and Linux ("/home/" + "<name>/") home
@@ -4783,8 +4817,48 @@ def assert_autoclose_debt_reconciled(
     return True, ""
 
 
+def assert_learnings_staged_under_auto(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """Under `autonomy_default: auto`, a closing WU must not land lessons in
+    `.specfuse/LEARNINGS.md` directly (FEAT-2026-0053/T09).
+
+    `.specfuse/LEARNINGS.md` is loaded into planning context for every future
+    feature; under `auto` no human reads the gate before that generalisation
+    compounds. So a closing WU's promoted lessons stage to
+    `LEARNINGS_PENDING_FILENAME` in the feature dir instead, and a human
+    promotes them at PR review. Under `review` and `supervised` this
+    invariant is inert — a human already read the gate, so `LEARNINGS.md`
+    lands straight, as it always has.
+
+    Returns (True, "") when `autonomy_default != "auto"`, or when the diff
+    between `head_before` and `HEAD` does not touch `LEARNINGS_PATH`.
+    """
+    feat_fm, _ = load_graph(feature_dir)
+    if feat_fm.get("autonomy_default") != "auto":
+        return True, ""
+    proc = subprocess.run(
+        ["git", "diff", "--name-only", head_before, "HEAD"],
+        capture_output=True, text=True, check=False,
+    )
+    if LEARNINGS_PATH in proc.stdout.splitlines():
+        return (
+            False,
+            f"learnings_not_staged: {wu.wu_id} ({wu.type}) modified "
+            f"{LEARNINGS_PATH} under autonomy_default=auto — stage lessons "
+            f"in {LEARNINGS_PENDING_FILENAME} in the feature directory "
+            f"instead; a human promotes it at PR review",
+        )
+    return True, ""
+
+
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
-    "close": [assert_terminal_flips_fired, assert_autoclose_debt_reconciled],
+    "close": [
+        assert_terminal_flips_fired,
+        assert_autoclose_debt_reconciled,
+        assert_learnings_staged_under_auto,
+    ],
+    "close-intermediate": [assert_learnings_staged_under_auto],
 }
 
 
@@ -4946,6 +5020,24 @@ def run(
         cfg = load_verification()
         cost_tracking = cfg.get("cost_tracking", True) is not False
 
+        # Shadow wiring (FEAT-2026-0053/T04): snapshot the as-activated plan
+        # graph on first touch so the arm predicate (below, at every
+        # awaiting_review flip) has a baseline to diff against.
+        # write_baseline_if_absent is a no-op once the file exists; a freshly
+        # written baseline is committed here (same shape as the gate probe's
+        # green-path commit just below) so it survives the next attempt's
+        # `git reset --hard` instead of sitting untracked.
+        if not dry_run:
+            baseline_path = feature_dir / "PLAN.baseline.json"
+            baseline_was_absent = not baseline_path.is_file()
+            write_baseline_if_absent(feature_dir, load_plan_graph(feature_dir))
+            if baseline_was_absent:
+                commit_bookkeeping(
+                    [baseline_path],
+                    f"chore(loop): {feature_id} plan baseline snapshot"
+                    f"\n\nFeature: {feature_id}",
+                )
+
         units = [load_wu(feature_dir, ref) for ref in gate.refs]
         print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
               f"({len(units)} work units) ==")
@@ -5014,7 +5106,8 @@ def run(
                         "gate": gate.number,
                         "failing_gates": failing_gates,
                         "message": escalation_message,
-                    })])
+                    }),
+                    build_arm_predicate_event(feature_dir, feature_id, gate.number)])
                 commit_bookkeeping(
                     [gate.file, events_path],
                     f"chore(loop): gate {gate.number} preexisting gate failure "
@@ -5047,7 +5140,8 @@ def run(
                                 "budget_usd": budget,
                                 "spent_usd": round(spent, 6),
                                 "next_wu_id": wu.wu_id,
-                            })])
+                            }),
+                            build_arm_predicate_event(feature_dir, feature_id, gate.number)])
                         commit_bookkeeping(
                             [gate.file, events_path],
                             f"chore(loop): gate {gate.number} budget exceeded "
@@ -5499,6 +5593,36 @@ def run(
                                 f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
                             )
                             continue
+                        # Auto-mode LEARNINGS staging invariant
+                        # (FEAT-2026-0053/T09): checked HERE, at the WU's own
+                        # squash, with the correct pre-squash head_before —
+                        # NOT via the POST_PASS_INVARIANTS_BY_TYPE["close"]
+                        # dispatch site, which fires after fire_terminal_flips
+                        # with head_before rebound to the already-current
+                        # HEAD (a same-commit diff that can never see this
+                        # WU's own changes). close-intermediate has no
+                        # terminal-flip step, so this is its only guard site.
+                        if wu.type in ("close", "close-intermediate"):
+                            stage_ok, stage_reason = assert_learnings_staged_under_auto(
+                                wu, feature_dir, REPO_ROOT, head_before,
+                            )
+                            if not stage_ok:
+                                reset_preserving_events(
+                                    head_before, events_path,
+                                    untracked_before=untracked_before,
+                                )
+                                wu_events.append(emit_attempt_outcome(
+                                    wu, attempt, "learnings_not_staged",
+                                    attempts_usage[-1],
+                                    extras={"summary": stage_reason},
+                                ))
+                                attempt_notes.append((attempt, stage_reason))
+                                failure_note = stage_reason
+                                print(
+                                    f"   LEARNINGS NOT STAGED attempt "
+                                    f"{attempt}/{MAX_ATTEMPTS} — {stage_reason}"
+                                )
+                                continue
                         if wu.type == "close":
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
@@ -5779,11 +5903,59 @@ def run(
         backend.set_gate(gate, "awaiting_review")
         # on_gate_passed fires here: WUs all done, gate now awaiting human review
         backend.on_gate_passed(feature_id, gate.number)
-        flush_events(events_path,
-                     [build_event("gate_reached", feature_id, {"gate": gate.number})])
+        arm_event = build_arm_predicate_event(feature_dir, feature_id, gate.number)
+        gate_events = [build_event("gate_reached", feature_id, {"gate": gate.number}),
+                       arm_event]
+
+        # Live arm (FEAT-2026-0053/T06): `auto` + a clean predicate verdict
+        # carries the draft->pending / gate awaiting_review->passed writes into
+        # THIS bookkeeping commit — tag-before-write so a crash leaves exactly
+        # one of two states (see docs/dev/auto-arm-recovery.md). The two
+        # escalation flip sites return before reaching this line, so they
+        # never consult the dial.
+        did_arm = False
+        armed_paths: list = []
+        if (feat_fm.get("autonomy_default") == "auto"
+                and arm_event["payload"].get("would_arm")):
+            arm_timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+            txn = plan_arm_transaction(
+                feature_dir, gate.number,
+                arm_payload=arm_event["payload"], timestamp=arm_timestamp,
+            )
+            if txn.paths:
+                # -c tag.gpgSign=false: the revert tag is a plain lightweight
+                # marker, not a release artifact — force that regardless of
+                # the repo's global `tag.gpgSign`, which would otherwise
+                # demand an annotated, signed tag (and a passphrase prompt)
+                # for what needs to be neither.
+                git("-c", "tag.gpgSign=false", "tag", "-f", txn.tag_name)
+                armed_paths = apply_arm_transaction(txn)
+                armed_wu_ids = []
+                for wu_path in txn.draft_wu_paths:
+                    wfm, _ = read_frontmatter(wu_path)
+                    armed_wu_ids.append(wfm.get("id", wu_path.stem))
+                gate_events.append(build_event("gate_auto_armed", feature_id, {
+                    "gate": gate.number,
+                    "tag": txn.tag_name,
+                    "armed_wu_ids": armed_wu_ids,
+                    "predicate_version": arm_event["payload"]["predicate_version"],
+                }))
+                did_arm = True
+
+        flush_events(events_path, gate_events)
+        if did_arm:
+            commit_message = (
+                f"chore(loop): gate {gate.number} auto-armed gate "
+                f"{gate.number + 1} (tag {txn.tag_name})\n\nFeature: {feature_id}"
+            )
+        else:
+            commit_message = (
+                f"chore(loop): gate {gate.number} awaiting_review"
+                f"\n\nFeature: {feature_id}"
+            )
         commit_bookkeeping(
-            [gate.file, events_path],
-            f"chore(loop): gate {gate.number} awaiting_review\n\nFeature: {feature_id}",
+            [gate.file, events_path, *armed_paths],
+            commit_message,
         )
         is_terminal_gate = gate is gates[-1]
         # FEAT-2026-0018/T11H: in-loop auto-close sets _terminal_auto_closed_wu;

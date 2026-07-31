@@ -2533,3 +2533,146 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   verdict-driven rework as its own line rather than letting it disappear into "passed" attempts,
   and treat a large uniform under-run on rule-authoring work as a prompt to check whether the
   rule has ever been observed firing on a real input.
+
+- [FEAT-2026-0053/G1-CLOSE] **A work unit that wires new code into the driver cannot be
+  verified by the driver run that wired it — so a gate whose definition of done asserts driver
+  runtime behavior must name its observation point, and an absent signal must never be read as
+  a false claim.** The driver imports `loop.py` once at process start. Edits a work unit lands
+  mid-run are dead code for the remainder of that invocation, including for every closing unit
+  that follows. Gate 1 wired two call sites into `run()` (a baseline write at first dispatch, an
+  `arm_predicate_evaluated` emit at every `awaiting_review` flip) and neither could fire in the
+  run that landed them: `PLAN.baseline.json` existed in 0 of 43 feature directories at close
+  time, which is the corroborating tell that the running process predated the edit. The trap is
+  not the deferral — it is the inference the gate file had already written down: *"No event =
+  the claim is false — do not arm; escalate."* That reads a stale-process artifact as a defect
+  and escalates a working mechanism. Rule: when a definition-of-done criterion asserts runtime
+  behavior of the driver itself, write the observation point into the criterion at drafting
+  ("verified at the next driver invocation", "verified by the human at the arming checkpoint"),
+  and phrase any absence check to disambiguate first — did a process launched *after* the
+  commit run this path? Only then is silence evidence.
+
+- [FEAT-2026-0053/G1-CLOSE] **A reference snapshot captured at a lifecycle event is meaningless
+  for the feature that installs the capture, because that feature is already past the event.**
+  Gate 1 shipped an immutable `PLAN.baseline.json` written at a feature's first dispatch, so
+  that later gates can measure plan drift against the as-activated graph. This feature's own
+  first dispatch happened hours before the call site existed, so its baseline will instead be
+  written at the next driver invocation — from a PLAN.md that by then contains the next gate's
+  drafted work units. The graph recorded as "as-activated" will be the post-drift graph, the
+  drift classes will report clean, and the report will mean nothing. Write-once immutability
+  makes this permanent rather than self-correcting: the very property that stops drift
+  detection being gamed also freezes the wrong reference in place. Rule: for any mechanism
+  whose reference state is captured at a lifecycle event, check at close time whether the
+  installing feature is already past that event; if it is, say so explicitly in the
+  retrospective and forbid the successor gate from treating the installing feature's own
+  snapshot as evidence the mechanism works. The first honest test is the first feature that
+  starts after the mechanism merges.
+
+- [FEAT-2026-0053/G1-CLOSE] **Sweep a new predicate over the whole real corpus at close, and
+  read a uniformly not-evaluable result as an unproven approval path rather than a pass.**
+  Running the new arm predicate over all 43 real feature directories cost one command and
+  returned `would_arm: False` with every class `not_evaluable: no_baseline` on 43 of 43 — the
+  designed fail-closed behavior, confirmed at scale instead of on fixtures, and worth having.
+  But green-on-fixtures plus refuses-everything-on-real-input is precisely the evidence shape
+  that hid FEAT-2026-0055's defect, where a document-parsing rule passed every hand-authored
+  fixture and could not fire on a single real work unit. A refusal path proven on the corpus
+  says nothing about the approval path, and the approval path is the one that will meet real
+  frontmatter, real `events.jsonl`, and a real review file for the first time in production.
+  Rule: run the sweep, record the counts, and when the corpus is uniformly not-evaluable, name
+  the approval path as unverified in `## What the loop did NOT verify` and carry it into the
+  successor gate's risk list — do not let "no findings across the corpus" read as coverage.
+
+- [FEAT-2026-0053/G2-CLOSE] **A work unit that introduces a validation rule must be drafted
+  against the fixtures that already exist, not only against real inputs — a sibling work unit's
+  test fixture is an input too, and it is the one the gate actually runs against.** A WU added a
+  new veto class requiring `planned_cost_usd` on every drafted work unit. The preceding WU's
+  test fixture builder, written before that class existed, emitted frontmatter without the
+  field. The new class therefore vetoed its sibling's fixture, and the failure surfaced as the
+  *sibling's* test failing under a whole-suite signature — in a file the new WU's Do-not-touch
+  clause forbade it to open. Three fresh sessions across two dispatch cycles each re-derived the
+  same wrong hypothesis, because the evidence available to them was identical and pointed
+  nowhere near a fixture builder; the driver escalated `spinning_signature_repeat` at $5.01 and
+  774 seconds, and the fix was one field in one fixture. Note that the WU's satisfiability
+  answer under `planning-discipline.md` §2 was present and correct — it reasoned about real
+  inputs in their intended final state, which is what §2 asks for, and real inputs were never
+  the problem. Rule: when a WU adds a rule that reads artifact X, grep the repo for existing
+  fixtures that *produce* X and either confirm they satisfy the new rule or write the fixture
+  amendment into the WU's scope at drafting time. Related: work units that touch disjoint source
+  surfaces are not thereby independent — check fixture overlap before declaring them so.
+
+- [FEAT-2026-0053/G2-CLOSE] **A cost or usage aggregate that reads a per-cycle field silently
+  under-counts every re-armed unit, and the error concentrates in exactly the work the aggregate
+  exists to catch.** A feature-level budget predicate summed each work unit's `cost_usd`. That
+  field is per-dispatch-cycle: the driver's re-arm fold moves the prior cycle's spend into
+  `cumulative_cost_usd` and zeroes it, and the operator re-arm path zeroes it while recording the
+  prior spend only in `re_arm_history[].prior_cost_usd`. Reconciling the predicate against
+  `events.jsonl` at close found it reading $35.89 of a true $42.12 — 14.8% low, all of it the
+  two re-armed units, i.e. precisely the over-budget work a budget brake is for. A sibling
+  aggregate that had already been fixed for the fold path (#199) was still blind to the operator
+  path, because that path zeroes without folding, so the guard `cost_usd == 0 means already
+  folded` reads a never-folded unit as a folded one. Rule: any aggregate over per-attempt cost,
+  duration, or token counts must sum every field the lifetime is spread across — and a close
+  reconciling planned against actual should compute the same total from `events.jsonl` and
+  compare, because the event log is the only surface that never loses a cycle.
+
+- [FEAT-2026-0053/G2-CLOSE] **An accumulation artifact with no reader delivers none of the
+  value it was built to preserve — the gate that builds the writer must name the consumer or
+  record a deferral with a home.** A feature whose whole premise was replacing four human gate
+  reads with one PR read shipped, tested end to end, the mechanism that accumulates each
+  unread gate's doubt into a feature-local review file. Nothing reads that file: a grep across
+  every skill and every shipped template returned zero references outside the module that
+  writes it and its own tests. Every acceptance criterion passed and the gate's definition of
+  done was satisfied as written, because the criteria were scoped to accumulation. The
+  checkpoint value the feature exists to preserve is nonetheless not delivered, and no gate
+  owns the last hop. The shape is easy to miss precisely because writer-side tests are the
+  natural ones to write and they all go green. Rule: when a gate ships a write-side mechanism
+  whose purpose is to inform a later human or machine read, its definition of done must name
+  the reading surface — or the close must enumerate the missing hop in `## What the loop did
+  NOT verify` and hand it to the planning WU with a decision to make, rather than let a green
+  gate imply an end-to-end path.
+
+- [FEAT-2026-0053/G3-CLOSE] **A path-prefix approximation that is sound as a safety property
+  can still make the feature's headline case unreachable, and "accepted v1 limit" in the docs
+  is not the same as saying so.** An arming predicate refused to auto-arm any gate whose
+  drafted work units produce a path under the driver package prefix — the rule that stops a
+  work unit editing its own judge. Every documentation file in the repo is also mirrored into
+  that package as shipped data, so the prefix test could not tell a mirrored doc from a change
+  to the predicate itself, and *any* gate shipping documentation fired the class. It was
+  predicted at arming, accepted as a v1 approximation, and documented with the correct clearing
+  action ("the human arms it; do not patch the predicate"). All of that was right and none of
+  it changed the consequence: the most probable first encounter an operator has with the new
+  autonomy mode is it refusing to arm, for a path-prefix artifact rather than a hazard, on a
+  feature whose whole premise is fewer human stops. Rule: when a known approximation blocks the
+  *typical* case rather than an edge case, the close must state the reachability consequence in
+  the verdict — not only the class, its clearing action, and the fact that it was accepted.
+  Naming the limit in a reference page tells an operator what happened; only the verdict tells
+  the person deciding whether to adopt it that the headline number is currently out of reach.
+
+- [FEAT-2026-0053/G3-CLOSE] **A definition-of-done criterion must name the surface that
+  *enforces* a property, not the one that *declares* it — a contract spread across registries
+  that do not reference each other is satisfied exactly and still fails.** A work unit shipping
+  a new documentation page had an acceptance criterion naming the drift guard's tracked-file
+  set by variable and file. Three further test files each carried an independent copy of the
+  same shipped-file list, and none of the four referenced the others. The first attempt did
+  precisely what the criterion said, registered the page in the one named registry, and the
+  suite refused it. Cost was one cheap attempt, and only because the assertion named the
+  missing path directly — the same shape surfacing in a sibling work unit's fixture cost $5.01
+  on the prior gate. Rule: before writing "verified by X" into a criterion, grep the repo for
+  an existing member of the same list and count how many files match; name all of them, or name
+  the whole suite rather than one member. Corollary for the close: a criterion satisfied to the
+  letter that still failed the gate is a drafting defect worth recording even when its cost was
+  trivial, because the cost is a property of how loudly the guard fails, not of the mistake.
+
+- [FEAT-2026-0053/G3-CLOSE] **A budget brake evaluated only *before* each unit's dispatch cannot
+  observe the unit that overruns, so a gate can exceed its declared budget while the brake reads
+  clean.** A per-gate `cost_budget_usd` was checked by a halt predicate that runs ahead of each
+  work-unit dispatch. Spend inside the final unit of a gate is therefore structurally invisible
+  to it: the gate ended $4.94 (15.7%) over its declared budget and the brake never fired, and
+  the same gate's close under-predicted the overrun by more than half because it assumed the
+  closing pair would repeat the previous gate's actuals when closing units are the very units
+  the brake cannot see. The defect was then documented in the *next* gate's budget comment
+  rather than fixed, which converts a driver bug into folklore that each gate re-learns. Rule:
+  a spend guard needs a post-unit reconciliation as well as a pre-dispatch check, or the field
+  should be named for what it is — an estimate-checker, not a brake. Related: any close
+  reconciling planned against actual should compute the total from `events.jsonl`, which is the
+  only surface that never loses a cycle, and should state gate spend against the brake rather
+  than against the plan.

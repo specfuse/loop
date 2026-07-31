@@ -1,15 +1,37 @@
 ---
 id: FEAT-2026-0053/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-07-30T20:03:52+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 1.220458
+    prior_duration_seconds: 209.885
+    reason: "AC#2 narrowed to drop the schema requirement; registry gap tracked separately"
 planned_cost_usd: 3.00
 produces:
   - tests/test_arm_eval_wiring.py
-  - specfuse/loop/data/schemas/events/arm_predicate_evaluated.schema.json
 produces_driver_helper:
   - evaluate_arm_predicate call site at the awaiting_review flip
   - write_baseline_if_absent call site at first dispatch
+duration_seconds: 580.185
+cost_usd: 2.536497
+input_tokens: 114
+output_tokens: 22900
+cumulative_cost_usd: 1.220458
+cumulative_duration_seconds: 209.885
+cumulative_input_tokens: 58
+cumulative_output_tokens: 14684
+cumulative_attempts: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T20:40:48.530269+00:00
 ---
 
 # Shadow wiring — evaluate and emit at every `awaiting_review` flip
@@ -37,13 +59,22 @@ before.
 `awaiting_review` before wiring — `grep -n "awaiting_review" specfuse/loop/loop.py`.
 Every flip site is in scope, or the WU blocks naming the extras.
 
-**Cross-surface value (authoring §8):** the event type name
-`arm_predicate_evaluated` and its schema home must match `validate_event.py`'s
-per-type registry — schema files live in the directory `PER_TYPE_SCHEMA_DIR`
-points at, one `<event_type>.schema.json` per type. Verify the exact directory
-and existing schema shapes against the source before locking the payload;
-mirror an existing per-type schema (e.g. `attempt_outcome`) rather than
-inventing a new envelope.
+**Cross-surface value (authoring §8) — resolved, do NOT re-litigate.** An
+earlier attempt of this WU blocked on escalation trigger 2 below, correctly:
+`validate_event.py`'s per-type registry (`PER_TYPE_SCHEMA_DIR`,
+`specfuse/loop/data/schemas/events/`) holds four schemas, all core-orchestrator
+event types vendored from another repo, and the envelope's `event_type` enum in
+`event.schema.json` is a closed 28-entry list this repo does not own. There is
+no sanctioned in-repo mechanism to extend either.
+
+**This WU adds no per-type schema and does not touch the enum.** That matches
+what the driver already does: `gate_reached` and `attempt_outcome` are emitted
+on every run and appear in neither the enum nor the per-type registry, and the
+driver's emit path (`build_event` / `flush_events` in `loop.py`) never invokes
+the validator — `validate_event.py` is a standalone CLI. `arm_predicate_evaluated`
+follows that existing precedent rather than establishing a new one. The
+registry gap is real, spans three driver-local event types and two repos, and is
+tracked as its own roadmap feature; it is explicitly out of scope here.
 
 Binding rules apply by reference: `result-contract.md`, `never-touch.md`,
 `security-boundaries.md`, `correlation-ids.md`.
@@ -54,8 +85,10 @@ Binding rules apply by reference: `result-contract.md`, `never-touch.md`,
    exists and **fails on HEAD before this WU runs** (file does not yet exist —
    red).
 2. Every `awaiting_review` flip appends exactly one `arm_predicate_evaluated`
-   event whose payload validates against the schema this WU adds to the
-   per-type registry.
+   event carrying the full per-class evaluation and the overall `would_arm`.
+   No per-type schema is added and the envelope enum is not touched (see
+   Cross-surface value above) — the test asserts the payload shape directly
+   against the keys it expects.
 3. Driver control flow is verdict-independent — a test closes a gate whose
    evaluation yields `would_arm: True` and asserts the driver still halts at
    `awaiting_review`.
@@ -73,11 +106,19 @@ Generated directories, secrets, `.git/`. The driver owns all git — edit files
 only. See `.specfuse/rules/never-touch.md`.
 
 **Verification.** The `code` set in `.specfuse/verification.yml`. Scoped
-iteration run: `python3 -m unittest tests.test_arm_eval_wiring -v`. Event
-validation: run `validate_event.py` over a generated event in the test.
+iteration run: `python3 -m unittest tests.test_arm_eval_wiring -v`. Do **not**
+run `validate_event.py` over the generated event — `arm_predicate_evaluated` is
+absent from the envelope `event_type` enum by design (above), so that check
+fails for a reason unrelated to this WU's work, exactly as it does today for
+`gate_reached`. Assert the payload's keys and types in the test instead.
 
-**Escalation triggers.** Emit `status: blocked` rather than pushing through if:
+**Escalation triggers.** Emit `status: blocked` rather than pushing through if
 the `awaiting_review` flip enumeration finds sites whose context makes a single
 shared wiring point impossible without refactoring the close path — refactors
-are a different unit; or the per-type schema registry's shape contradicts what
-this WU assumes (name the mismatch; do not invent an envelope).
+are a different unit.
+
+The former trigger 2 (per-type schema registry contradicts this WU's
+assumption) fired on attempt 1 and has been **resolved by the operator**: no
+schema is added, no enum is touched. Do not re-block on it. If some *other*
+cross-surface contract turns out to contradict this WU, that is still a block —
+name the specific mismatch.

@@ -28,6 +28,7 @@ VERDICT_VALUES = frozenset({"met", "met_locally", "partially_met", "not_met"})
 
 RETROSPECTIVE_FILENAME = "RETROSPECTIVE.md"
 LEARNINGS_PATH = ".specfuse/LEARNINGS.md"
+LEARNINGS_PENDING_FILENAME = "LEARNINGS-pending.md"
 ROADMAP_PATH = ".specfuse/roadmap.md"
 DOCS_PREFIX = "docs/"
 NOTHING_GENERALIZES_PHRASE = "nothing generalizes"
@@ -169,6 +170,16 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             applies_when="verdict_met",
             enforced_by="assert_terminal_flips_fired",
         ),
+        Requirement(
+            id="close-i", wu_type="close", phase="post-pass",
+            description=(
+                f"Under autonomy_default=auto, {LEARNINGS_PATH} is not "
+                f"modified — lessons stage to {LEARNINGS_PENDING_FILENAME} "
+                "in the feature directory instead"
+            ),
+            file=LEARNINGS_PATH,
+            enforced_by="assert_learnings_staged_under_auto",
+        ),
     ],
     "close-intermediate": [
         Requirement(
@@ -202,6 +213,16 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             heading_level=FAILURE_CLASS_HEADING_LEVEL,
             applies_when="failures_present",
             enforced_by="assert_failure_class_breakdown_when_failures_present",
+        ),
+        Requirement(
+            id="close-intermediate-e", wu_type="close-intermediate", phase="post-pass",
+            description=(
+                f"Under autonomy_default=auto, {LEARNINGS_PATH} is not "
+                f"modified — lessons stage to {LEARNINGS_PENDING_FILENAME} "
+                "in the feature directory instead"
+            ),
+            file=LEARNINGS_PATH,
+            enforced_by="assert_learnings_staged_under_auto",
         ),
     ],
     "plan-next": [

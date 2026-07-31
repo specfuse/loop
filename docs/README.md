@@ -25,6 +25,15 @@ so an initialized project is self-documenting.
   — the architectural extension that introduces the gate / closing-sequence /
   plan-next / learnings layer, and how it maps onto the orchestrator's state
   machine. The loop is the **near-term author** of these contracts.
+- [`concepts/autonomy-stop-classes.md`](concepts/autonomy-stop-classes.md) —
+  the eight deterministic classes `arm_eval.py` checks before a gate can arm
+  automatically under `auto`, one section per class mapping a fired verdict to
+  the operator action that clears it, plus how to read an
+  `arm_predicate_evaluated` event correctly.
+- [`concepts/adopting-auto-mode.md`](concepts/adopting-auto-mode.md) — what a
+  driver at this version puts in any Specfuse project, the mid-life baseline
+  hazard affecting every feature predating this one, and the numbered
+  procedure for moving one feature's `PLAN.md` to `autonomy_default: auto`.
 
 ## Binding rules (under `.specfuse/rules/`)
 

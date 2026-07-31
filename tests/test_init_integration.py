@@ -34,6 +34,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "templates/LEARNINGS-pending.template.md",
     "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/design-for-diagnosis.md",
@@ -58,6 +59,8 @@ _EXPECTED_SPECFUSE_TREE = {
     "LEARNINGS.md",
     "features/.gitkeep",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "docs/concepts/autonomy-stop-classes.md",
+    "docs/concepts/adopting-auto-mode.md",
     "docs/concepts/ralph-lineage.md",
     "docs/getting-started.md",
     "docs/methodology.md",
@@ -114,6 +117,7 @@ class TestInitFullLayout(unittest.TestCase):
             "templates/GATE.template.md",
             "templates/PLAN.template.md",
             "templates/WU.template.md",
+            "templates/LEARNINGS-pending.template.md",
         ):
             self.assertTrue((self.sf / rel).exists(), f"{rel} not written")
             self.assertEqual(

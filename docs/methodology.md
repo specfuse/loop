@@ -209,7 +209,7 @@ the field-by-field schema see
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
 
-`outcome` taxonomy, as `loop.py` actually emits it — eleven values,
+`outcome` taxonomy, as `loop.py` actually emits it — twelve values,
 bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 
 | outcome | meaning |
@@ -225,6 +225,7 @@ bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 | `produces_not_in_diff` | `produces:` path exists but is not in the squash |
 | `squash_commit_failed` | `git commit` for the squash was rejected |
 | `smoke_import_failed` | a declared smoke-import line failed post-squash |
+| `learnings_not_staged` | a closing WU under `autonomy_default: auto` touched `.specfuse/LEARNINGS.md` directly instead of staging to `LEARNINGS-pending.md` (FEAT-2026-0053/T09) |
 
 Extending it is a breaking change for every consumer below and requires a
 deliberate versioning decision — **and an update here in the same commit.**
@@ -245,7 +246,7 @@ consumer that queries only those concludes the record is empty when it is not.
 |---|---|
 | `failed`, `files_changed_mismatch`, `produces_not_in_diff` | `failure_class` + `failure_signature` + `failure_excerpt` |
 | `blocked` | **`agent_blocked_reason`** (plus a sibling `human_escalation` event) |
-| `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed` | **`summary`** |
+| `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed`, `learnings_not_staged` | **`summary`** |
 | `files_changed_mismatch` (pre-0.3.23) | **`unchanged_paths`** only — `failure_*` was added by #182 |
 | `zero_token_skip` | nothing, correctly — no attempt ran |
 
@@ -387,15 +388,56 @@ of the Ralph loop feeding errors back into the prompt.
 
 ## 9. Autonomy
 
-Three levels — `auto`, `review`, `supervised` — set as a feature default and
-overridable per gate (tightening only; a gate may be more supervised than the
-feature default, never less). Under `auto`, the per-gate stop may be skipped
-(plan-next auto-arms the next gate) **only when all of**: the structural lint
-passes, the not-yet-reached skeleton was not revised, no task in the gate carries
-a `supervised`/auto-forbidden override, and plan-next raised no escalation. If any
-fails, the cycle stops for the human regardless of mode. Auto-arm advances toward
-execution; it never auto-merges — the merge gate stays human until the QA loop is
-trusted. Escalation always overrides autonomy.
+Three levels — `auto`, `review`, `supervised` — set once as a feature default
+in `PLAN.md` frontmatter (`autonomy_default`). No consumer reads a per-gate
+autonomy field: the per-gate, tightening-only override described in earlier
+drafts of this section is designed but **unbuilt**. Likewise `review` and
+`supervised` are, today, the same behavior — every consumer branches only on
+`== "auto"`; the three-way distinction is a name, not yet a mechanism.
+
+At every gate close the driver evaluates `evaluate_arm_predicate` (see
+`specfuse/loop/arm_eval.py`) and emits its verdict as an `arm_predicate_evaluated`
+event, regardless of autonomy level. Under `review` and `supervised` that
+verdict is recorded and nothing acts on it — the gate always halts
+`awaiting_review` for a human. Under `auto`, the verdict is acted on at exactly
+one flip site in `loop.py`: if the predicate's `would_arm` is `True`, the same
+bookkeeping commit that would otherwise just mark the gate `awaiting_review`
+instead also flips every next-gate WU `draft` -> `pending` and the just-closed
+gate `awaiting_review` -> `passed`, logging a `gate_auto_armed` event. If
+`would_arm` is `False`, `auto` takes the same halt-for-human path as the other
+two levels — nothing in the predicate distinguishes an `auto` feature from a
+`review` one except whether the verdict is consulted.
+
+The predicate itself is eight named stop classes (`budget_projection`,
+`judge_editing`, `decision_class_paths`, `retroactive_edits`, `drift_caps`,
+`missing_provenance`, `open_questions_human_only`, `plan_next_lint`), each
+returning `fired` / `clean` / `not_evaluable`; `would_arm` is `True` only if
+none fired. Three of the eight — `missing_provenance`, `open_questions_human_only`,
+`plan_next_lint` — are veto channels fed by model-authored output; the rest
+are mechanical counters, path checks, and hardcoded caps. The full per-class
+meaning is T11's stop-class reference, not restated here.
+
+Escalation overrides autonomy by control flow, not by a checked condition: the
+two escalation flip sites (`blocked_human` after `MAX_ATTEMPTS`, and the
+dry-run/blocked early returns) return before the arm branch in `loop.py` is
+ever reached, so an escalated gate cannot be armed regardless of
+`autonomy_default` — there is no autonomy check to forget. Given that, the
+human checkpoints on an `auto` feature are exactly: any escalation during the
+gate, the PR review, and the merge. Auto-arm advances a feature toward the
+*next* gate's execution; it never auto-merges — the merge gate stays human
+until the QA loop is trusted.
+
+An auto-arm is exactly one commit. Before that commit is written, the driver
+tags the pre-arm `HEAD` as `pre-arm/<feature-id>/gate-<N>`, so an arm crash
+leaves the repository in exactly one of two recoverable states — armed, or not
+armed — never a partial third. See `docs/dev/auto-arm-recovery.md` for the
+recovery procedure; that concept lives here, the procedure lives there.
+
+An `auto` feature also produces two artifacts a `review` feature does not:
+`FEATURE-REVIEW.md` (the closing-gate review a human would otherwise have
+written by hand) and `LEARNINGS-pending.md` (staged LEARNINGS entries held for
+human promotion instead of landing directly). See T12's migration guide for
+when and how these get created.
 
 ## 10. The two execution surfaces
 

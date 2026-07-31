@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0053/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - tests/test_lint_plan_contract_fields.py
 produces_driver_helper:
   - lint_plan_next_draft
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T19:21:20.410152+00:00
+duration_seconds: 274.937
+cost_usd: 1.444301
+input_tokens: 50
+output_tokens: 10318
 ---
 
 # Machine-readable plan-next contract fields, warn-only lint

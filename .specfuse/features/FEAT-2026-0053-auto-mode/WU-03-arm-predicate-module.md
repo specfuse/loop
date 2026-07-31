@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0053/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/arm_eval.py
   - tests/test_arm_eval.py
 produces_driver_helper:
   - evaluate_arm_predicate
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-30T19:25:55.451558+00:00
+duration_seconds: 696.771
+cost_usd: 2.0213
+input_tokens: 52
+output_tokens: 39702
 ---
 
 # The arm predicate — seven stop classes, hardcoded constants, pure evaluation

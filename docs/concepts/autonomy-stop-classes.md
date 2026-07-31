@@ -1,0 +1,212 @@
+# The eight stop classes: an operator-facing reference
+
+`specfuse/loop/arm_eval.py` evaluates eight classes every time a gate closes,
+to decide whether the drafted successor gate may arm without a human. This
+page is the per-class detail: what each class measures, what makes it fire,
+whether it can only veto, and — the thing an operator actually needs when a
+feature parks at `awaiting_review` — the concrete action that clears it.
+
+For the conceptual framing (why arming is a separate decision from closing,
+why model-authored signals may only veto), see `methodology.md` §9. This page
+does not restate that; it documents the eight classes themselves, in the
+order `CLASS_NAMES` defines them.
+
+## Three statuses, not two
+
+Each class returns one of three verdicts: `fired`, `clean`, or
+`not_evaluable`. `fired` blocks the arm. `clean` means the class found nothing
+to object to. `not_evaluable` is the fail-closed path: the class had no basis
+to evaluate at all, and `would_arm` is `False` regardless of what any other
+class found.
+
+The case an operator will actually meet is `not_evaluable: no_baseline` —
+every class returns this together when `PLAN.baseline.json` does not exist for
+the feature. Read `not_evaluable` as "this feature cannot arm, full stop," not
+as "nothing wrong here." A feature stuck at `not_evaluable` needs its baseline
+captured before arming can ever succeed; there is no per-class fix.
+
+## The eight classes
+
+### 1. `budget_projection`
+
+**Measures:** whether the feature's projected total spend (spend to date plus
+remaining planned cost) stays under a ceiling derived from the baseline plan.
+
+**Fires when:** projected spend exceeds `BUDGET_PROJECTION_MULTIPLIER` (2.0)
+times the baseline's total planned cost.
+
+**Veto channel:** no — mechanical, both approves and blocks on its own.
+
+**Clearing action:** the operator must either reduce the drafted successor
+gate's planned cost, or explicitly re-baseline the feature (accepting the
+higher spend) before re-running the arm evaluation. This class cannot be
+cleared by editing driver code; it clears by changing the plan's numbers.
+
+### 2. `judge_editing`
+
+**Measures:** whether any drafted work unit in the successor gate produces a
+file under a judge-path surface — paths that would let a work unit edit its
+own verification.
+
+**Fires when:** a drafted WU's `produces:` list contains a path matching one
+of `JUDGE_PATHS`: `.specfuse/verification.yml`, `.specfuse/hooks/`,
+`.specfuse/rules/`, `.github/workflows/`, `specfuse/loop/`, or
+`pyproject.toml` (matched whole-file); or a WU declares
+`produces_driver_helper`.
+
+**Veto channel:** no.
+
+**Clearing action:** normally, route the WU so it does not produce a path
+under these prefixes.
+
+**Added-at-arming v1 approximation (open question 2).** This class fires on
+*any* path under the `specfuse/loop/` prefix. Every documentation file in this
+repository is mirrored into `specfuse/loop/data/docs/` by the scaffold sync —
+which means, under `auto`, **no gate that ships a documentation file can arm**:
+the prefix test cannot distinguish package data (a mirrored doc) from driver
+source (a change to `arm_eval.py` itself). This is the same v1-approximation
+shape already documented for `pyproject.toml` above — a whole-surface match
+standing in for a diff the predicate does not have. It is the case the first
+`auto` feature to write docs will hit. The clearing action here is **the human
+arm, not a code change** — the operator reviews the drafted gate, confirms the
+documentation-only content is fine, and arms manually. Do not treat this as a
+bug to patch in `arm_eval.py`; it is an accepted v1 limit.
+
+### 3. `decision_class_paths`
+
+**Measures:** whether any drafted WU touches a dependency-manifest surface —
+`pyproject.toml`, `package.json`, or a `requirements*.txt` file — since
+dependency changes are a decision class that should not auto-arm.
+
+**Fires when:** a drafted WU's `produces:` list matches one of these
+manifests.
+
+**Veto channel:** no.
+
+**Clearing action:** the operator reviews the dependency change by hand and
+arms manually; there is no automatic clearance for this class by design.
+
+### 4. `retroactive_edits`
+
+**Measures:** whether any work unit belonging to an already-passed gate has
+been altered or removed from the plan graph since that gate closed — a
+retroactive rewrite of settled history.
+
+**Fires when:** a baseline WU whose gate is `status: passed` has changed
+`type`, changed `goal`, or disappeared from the current plan graph entirely.
+
+**Veto channel:** no.
+
+**Clearing action:** revert the retroactive edit — restore the WU's original
+`type`/`goal`/presence in the plan graph. If the change was intentional,
+escalate to a human to decide whether the passed gate should be reopened;
+this class does not resolve by editing the predicate.
+
+### 5. `drift_caps`
+
+**Measures:** how much the current plan has grown past what the baseline
+declared — new work units, new planned cost, and new gates added since the
+baseline was captured.
+
+**Fires when:** added WU count exceeds `DRIFT_CAP_RATIO` (0.5) times the
+baseline's total WU count, added planned cost exceeds `DRIFT_CAP_RATIO` times
+the baseline's total planned cost, or the number of gates added since baseline
+exceeds `ADDED_GATE_CAP` (1).
+
+**Veto channel:** no.
+
+**Clearing action:** trim the drafted additions back under the caps, or have
+the operator explicitly accept the drift and arm manually. A feature that
+needs to grow past these caps routinely should have its baseline recaptured
+rather than repeatedly clearing this class by hand.
+
+### 6. `missing_provenance`
+
+**Measures:** whether every work unit added since the baseline carries a
+`provenance` field explaining where it came from.
+
+**Fires when:** an added WU has no `provenance` field.
+
+**Veto channel:** yes (`VETO_CLASSES`) — this class can only withhold arming,
+never approve it; a clean verdict here means "nothing to veto," not "this WU
+is good."
+
+**Clearing action:** add a `provenance` field to the WU's frontmatter stating
+where it came from (which decision, which prior finding, which operator
+request), then re-run the arm evaluation.
+
+### 7. `open_questions_human_only`
+
+**Measures:** whether the successor gate's review file declares its open
+questions resolved, and whether any drafted WU is flagged `human_only`.
+
+**Fires when:** the successor gate's `GATE-NN-REVIEW.md` is missing, is
+missing its `open_questions` field, or has a non-empty `open_questions` list;
+or any drafted WU in that gate has `human_only: true`.
+
+**Veto channel:** yes.
+
+**Clearing action:** write the missing review file (or add the
+`open_questions` field), resolve and clear every open question to an empty
+list, and remove `human_only: true` from any WU that no longer needs a human.
+A WU that genuinely requires a human stays `human_only: true` and this class
+stays fired by design — the clearing action is a human arm, not an edit.
+
+### 8. `plan_next_lint`
+
+**Measures:** whether the drafted successor gate passes the plan-next
+contract lint (`lint_plan_next_draft`) — the same structural checks the
+`plan-next` skill enforces on a human-authored draft.
+
+**Fires when:** the lint reports any finding, or the lint itself raises an
+exception (a malformed frontmatter degrades to a fired verdict rather than
+crashing the gate close).
+
+**Veto channel:** yes.
+
+**Clearing action:** fix each lint finding in the drafted gate's WU files
+(malformed frontmatter, missing required fields, whatever the lint names),
+then re-run the arm evaluation. An exception from the lint itself is an
+escalation — read the exception message, fix the file that caused it.
+
+## The v1 constants
+
+These are hardcoded in `arm_eval.py` for v1; there is no per-feature or
+per-project override yet. Tuning them is expected to graduate to
+`agent-policy.yml` ([FEAT-2026-0044](../../.specfuse/roadmap.md)) as a
+**tighten-only** knob — a project may lower these caps, never raise them.
+
+| Constant | Value | Used by |
+| --- | --- | --- |
+| `BUDGET_PROJECTION_MULTIPLIER` | `2.0` | class 1, `budget_projection` |
+| `DRIFT_CAP_RATIO` | `0.5` | class 5, `drift_caps` |
+| `ADDED_GATE_CAP` | `1` | class 5, `drift_caps` |
+| `JUDGE_PATHS` | `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `specfuse/loop/`, `pyproject.toml` | class 2, `judge_editing` |
+
+## Reading an `arm_predicate_evaluated` event
+
+Every gate close appends one `arm_predicate_evaluated` event to
+`events.jsonl`, carrying the full per-class verdict map and a `gate` field.
+
+**What the `gate` field means:** the predicate was evaluated at a flip
+involving gate N — one of the three flip sites in the driver (the normal
+gate-close path, the operator re-arm path, or an escalation halt) fired the
+evaluation while gate N was the gate under consideration.
+
+**What it does not mean:** that gate N closed and would not arm gate N+1. The
+event payload does not record which of the three flip sites emitted it, and
+an escalation halt can fire the same event shape as a normal close.
+
+This is a known trap, documented in `RETROSPECTIVE.md`'s gate-2 Findings §2:
+the first live `arm_predicate_evaluated` event on this feature was emitted
+from an *escalation* flip site — a `preexisting_gate_failure` halt at gate-2
+entry — for a gate that had dispatched zero work units. Its payload read
+`gate: 2`, with `open_questions_human_only` fired on `GATE-03-REVIEW.md
+missing`. Read literally by gate number, that payload looks like "gate 2
+closed and gate 3 would not arm." What it actually recorded was "the
+predicate was evaluated at a flip involving gate 2," triggered by an
+escalation before gate 2 had done any work. A consumer that groups these
+events by gate number alone will misdiagnose which of the three flip sites
+produced a given event — check the event's surrounding context (what halted,
+what path invoked the evaluation) before drawing a conclusion from `gate`
+alone.

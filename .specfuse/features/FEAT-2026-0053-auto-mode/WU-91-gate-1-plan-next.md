@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0053/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.7.1
+started_at: 2026-07-30T20:57:30.962343+00:00
+duration_seconds: 866.84
+cost_usd: 6.684054
+input_tokens: 115
+output_tokens: 64001
 ---
 
 # Draft gate 2 — live arming behind the dial

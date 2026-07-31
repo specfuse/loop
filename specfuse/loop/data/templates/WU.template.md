@@ -48,6 +48,16 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   presence gate (FEAT-2026-0022). Unified contract: a literal path must exist non-empty; a glob
   needs ≥1 existing non-empty match — either form satisfies both the presence gate and the
   in-diff gate. Lint WARN when absent on `implementation` WUs.
+- `human_only` — OPTIONAL, `true`/absent. Veto-only autonomy signal (FEAT-2026-0053): the
+  planner's self-flag on a draft it knows needs a human, e.g. right after writing a defaults
+  flip. Never used to grant more autonomy, only to subtract it.
+- `provenance` — OPTIONAL. Veto-only autonomy signal (FEAT-2026-0053): a string citing the
+  retrospective item or `events.jsonl` failure event that motivated a WU **added** beyond the
+  plan baseline (whether it counts as "added" is the arm predicate's call, not this WU's own).
+- `open_questions` — lives in the gate's `GATE-{N+1}-REVIEW.md` frontmatter, not here. Veto-only
+  autonomy signal (FEAT-2026-0053): a **required explicit list**; `[]` means nothing blocks
+  execution, a **missing field is not an empty list** and parks the feature under `auto`. Lint
+  WARN when absent.
 
 DRIVER-OWNED FIELDS - the driver writes these at outcome time; authors leave them absent:
 <!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,

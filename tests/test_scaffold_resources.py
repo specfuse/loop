@@ -21,6 +21,7 @@ _EXPECTED_RELPATHS = {
     "templates/GATE.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
+    "templates/LEARNINGS-pending.template.md",
     "rules/close-discipline.md",
     "rules/correlation-ids.md",
     "rules/design-for-diagnosis.md",
@@ -41,6 +42,8 @@ _EXPECTED_RELPATHS = {
     "docs/skills.md",
     "docs/concepts/ralph-lineage.md",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "docs/concepts/autonomy-stop-classes.md",
+    "docs/concepts/adopting-auto-mode.md",
     "workflows/specfuse-monitor.yml",
 }
 

@@ -1,9 +1,13 @@
 ---
 gate: 1
-status: open
+status: passed
 cost_budget_usd: 28.00
 # Sum of drafted WU estimates ($23.50) plus one re-attempt of the largest
 # ($4.50, T03) — the defensive-padding shape planning-discipline recommends.
+baseline:
+  sha: cf332a1dbaea7ef3f6c4c2249a005c5bbcf910a9
+  probed_at: 2026-07-30T20:38:28.963592+00:00
+  failing: []
 ---
 
 # Gate 1 — Arm predicate + machine-readable contract (shadow trail live)

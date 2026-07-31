@@ -68,7 +68,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
-| FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | active | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ detail](#feat-2026-0053) |
+| FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | — |
@@ -79,6 +79,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
+| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -895,17 +896,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0053"></a>
-## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
-
-**Why.** The methodology's autonomy field (`auto` / `review` / `supervised`) is written to PLAN.md frontmatter and never read — zero consumers — so every feature stops at every gate boundary exactly like a `review` feature, and a four-gate feature costs four human touches regardless of how routine its gates are. Operator history across features shows those gate reviews are near-universal rubber-stamps whose accepted changes are additive (new work units at gate check, occasionally a new gate), so the per-gate checkpoint spends latency without buying review value; the operator's real read happens at PR review, and merge is always human.
-
-**Goal.** Implement `auto` end-to-end: the driver arms drafted gates and accepts plan-next's additive plan adjustments on its own, stopping only on mechanical conditions. Stop classes: (1) projected budget breach — spent plus planned-remaining exceeds 2× the feature budget; (2) objective-at-risk proxies — hedged close verdict (stays human, unchanged), remaining-work count failing to shrink across two consecutive gate closes, attempt-per-WU trend decay; (3) plan-drift caps — cumulative added WUs above 50% of the original skeleton (counted in planned dollars as well as units), a second added gate, any retroactive edit to passed gates, any addition lacking machine-readable provenance citing the retrospective item or failure event that triggered it; (4) judge-editing — any draft touching verification config, test thresholds, CI workflows, hooks, or the driver itself; (5) decision-class registry hits — human-authored path/keyword registry covering public API shape, schema or data migrations, security posture, dependency additions; (6) model self-flagged must-be-human decisions (self-flags may only subtract autonomy, never grant it). Supporting mechanics: budget projection over the existing per-attempt cost capture in events.jsonl and the per-gate budget brake, tag-before-arm revert points, per-gate doubt summaries accumulated into a FEATURE-REVIEW.md surfaced in the PR body, LEARNINGS entries staged to a pending file promoted at PR review, and a shadow mode that logs would-have-armed / would-have-stopped verdicts on attended features before the dial goes live. Dial read from per-feature frontmatter; policy-file layering may tighten later, never loosen.
-
-**Benefits.** A four-gate feature drops from four human touches to one (the PR review, now fed by the accumulated doubt summaries); unattended runs progress overnight with blast radius bounded by construction — caps, revert tags, and hard floors on judge-editing and retroactive edits — rather than by judgment; shadow-mode telemetry replaces guesswork when tuning stop thresholds; and the declared-but-dead autonomy field finally does what the methodology has promised since it was specified.
-
-**Status: planned.**
-
 ## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
 
 **Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
@@ -978,6 +968,17 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+
+<a id="feat-2026-0060"></a>
+## FEAT-2026-0060 — Driver-local event schema registry: sanction the three unsanctioned event types
+
+**Why.** The loop driver emits `gate_reached` and `attempt_outcome` on every run, and FEAT-2026-0053/T04 adds `arm_predicate_evaluated`. None of the three appear in the envelope `event_type` enum in `specfuse/loop/data/schemas/event.schema.json` (a closed 28-entry list this repo does not own), and none have a per-type payload schema — `PER_TYPE_SCHEMA_DIR` holds four schemas, all core-orchestrator types vendored from another repo. The gap is invisible today only because the driver's emit path (`build_event` / `flush_events` in `loop.py`) never invokes the validator: `validate_event.py` is a standalone CLI. So every driver-emitted event is unvalidated in practice, and anyone who does run `validate_event.py` over a real `events.jsonl` gets failures on the driver's own output. FEAT-2026-0053/T04 blocked on discovering this and was unblocked by narrowing its scope, deliberately deferring the question rather than answering it inside a shadow-mode WU.
+
+**Goal.** Decide and implement where driver-local event schemas live, then bring all three types into conformance so `validate_event.py` passes over a real driver-produced `events.jsonl`. Two candidate shapes, to be chosen as part of this feature: (a) extend the vendored registry and envelope enum in the core repo, keeping one registry — correct but cross-repo; or (b) sanction an explicitly-named loop-local schema tier, with manifest entries in the scaffold sync script and its orphan-file test, leaving the core enum alone. Also decide whether emit-time validation should be wired into `build_event` / `flush_events`, or whether `validate_event.py` stays a CI/manual check — an unvalidated emit path is what let three types drift unnoticed.
+
+**Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
+
+**Status: planned.**
 
 ## Notes
 
