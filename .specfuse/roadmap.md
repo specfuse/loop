@@ -77,7 +77,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
-| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
+| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | active | — | [→ detail](#feat-2026-0062) |
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
@@ -1007,7 +1007,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The autonomy budget stop class stops the features it exists to stop, instead of systematically under-reading the retried ones. The per-gate brake's reported number matches what the gate actually spent, so a close ceremony reconciling against it is comparing like with like. Both are prerequisites for trusting `auto` on an unattended run, where a budget stop is one of the few mechanical brakes standing between a stuck feature and an unbounded spend.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0063"></a>
 ## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
