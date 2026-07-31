@@ -80,7 +80,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
-| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | planned | — | [→ detail](#feat-2026-0061) |
+| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | active | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ detail](#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -991,7 +991,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The dependency-addition guard works in the repositories Specfuse is actually used in, rather than only in Python ones. Removes a false-negative class from the autonomy predicate — the most dangerous failure shape it has, because a stop class that reports `clean` on an input it cannot parse is worse than one that is absent, which at least an operator would notice. Unblocks trusting `auto` in the Generator and any other JVM, .NET, Go, or Rust target.
 
-**Status: planned.**
+**Status: active.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
 
 <a id="feat-2026-0062"></a>
 ## FEAT-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
