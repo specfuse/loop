@@ -2629,3 +2629,50 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the reading surface — or the close must enumerate the missing hop in `## What the loop did
   NOT verify` and hand it to the planning WU with a decision to make, rather than let a green
   gate imply an end-to-end path.
+
+- [FEAT-2026-0053/G3-CLOSE] **A path-prefix approximation that is sound as a safety property
+  can still make the feature's headline case unreachable, and "accepted v1 limit" in the docs
+  is not the same as saying so.** An arming predicate refused to auto-arm any gate whose
+  drafted work units produce a path under the driver package prefix — the rule that stops a
+  work unit editing its own judge. Every documentation file in the repo is also mirrored into
+  that package as shipped data, so the prefix test could not tell a mirrored doc from a change
+  to the predicate itself, and *any* gate shipping documentation fired the class. It was
+  predicted at arming, accepted as a v1 approximation, and documented with the correct clearing
+  action ("the human arms it; do not patch the predicate"). All of that was right and none of
+  it changed the consequence: the most probable first encounter an operator has with the new
+  autonomy mode is it refusing to arm, for a path-prefix artifact rather than a hazard, on a
+  feature whose whole premise is fewer human stops. Rule: when a known approximation blocks the
+  *typical* case rather than an edge case, the close must state the reachability consequence in
+  the verdict — not only the class, its clearing action, and the fact that it was accepted.
+  Naming the limit in a reference page tells an operator what happened; only the verdict tells
+  the person deciding whether to adopt it that the headline number is currently out of reach.
+
+- [FEAT-2026-0053/G3-CLOSE] **A definition-of-done criterion must name the surface that
+  *enforces* a property, not the one that *declares* it — a contract spread across registries
+  that do not reference each other is satisfied exactly and still fails.** A work unit shipping
+  a new documentation page had an acceptance criterion naming the drift guard's tracked-file
+  set by variable and file. Three further test files each carried an independent copy of the
+  same shipped-file list, and none of the four referenced the others. The first attempt did
+  precisely what the criterion said, registered the page in the one named registry, and the
+  suite refused it. Cost was one cheap attempt, and only because the assertion named the
+  missing path directly — the same shape surfacing in a sibling work unit's fixture cost $5.01
+  on the prior gate. Rule: before writing "verified by X" into a criterion, grep the repo for
+  an existing member of the same list and count how many files match; name all of them, or name
+  the whole suite rather than one member. Corollary for the close: a criterion satisfied to the
+  letter that still failed the gate is a drafting defect worth recording even when its cost was
+  trivial, because the cost is a property of how loudly the guard fails, not of the mistake.
+
+- [FEAT-2026-0053/G3-CLOSE] **A budget brake evaluated only *before* each unit's dispatch cannot
+  observe the unit that overruns, so a gate can exceed its declared budget while the brake reads
+  clean.** A per-gate `cost_budget_usd` was checked by a halt predicate that runs ahead of each
+  work-unit dispatch. Spend inside the final unit of a gate is therefore structurally invisible
+  to it: the gate ended $4.94 (15.7%) over its declared budget and the brake never fired, and
+  the same gate's close under-predicted the overrun by more than half because it assumed the
+  closing pair would repeat the previous gate's actuals when closing units are the very units
+  the brake cannot see. The defect was then documented in the *next* gate's budget comment
+  rather than fixed, which converts a driver bug into folklore that each gate re-learns. Rule:
+  a spend guard needs a post-unit reconciliation as well as a pre-dispatch check, or the field
+  should be named for what it is — an estimate-checker, not a brake. Related: any close
+  reconciling planned against actual should compute the total from `events.jsonl`, which is the
+  only surface that never loses a cycle, and should state gate spend against the brake rather
+  than against the plan.

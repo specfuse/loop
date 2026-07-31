@@ -716,3 +716,590 @@ concentrates in exactly the work the aggregate exists to catch; and an
 accumulation artifact with no reader delivers none of the checkpoint value it was
 built to preserve.
 
+## Gate 3 — Terminal: docs, methodology, and the result made legible
+
+Gate 3 made the feature readable by someone who did not build it, and closed the
+one hop gate 2 found missing. Four substantive work units shipped:
+
+- **T10 — `docs/methodology.md` §9 rewritten.** The old §9 was eleven lines
+  written before any of this feature existed; its four auto-arm conditions
+  described a design that was never built. §9 now describes the eight-class
+  predicate, the single flip site that can arm, the one-commit-plus-tag
+  guarantee (concept here, procedure in `docs/dev/auto-arm-recovery.md`), the
+  three real human checkpoints, and the two `auto`-only artifacts. **The two
+  claims with no implementation are recorded as unbuilt rather than deleted:**
+  the per-gate tightening-only override (nothing reads a per-gate autonomy
+  field) and `supervised` as a level distinct from `review` (every consumer
+  branches on `== "auto"`).
+- **T11 — `docs/concepts/autonomy-stop-classes.md`.** One section per class in
+  `CLASS_NAMES` order, each naming what it measures, what makes it fire, whether
+  it is a veto channel, and **the concrete operator action that clears it** —
+  eight classes, eight clearing actions. The three statuses are explained with
+  `not_evaluable` named as the fail-closed path an operator will actually meet,
+  and the page teaches reading an `arm_predicate_evaluated` event, including the
+  trap gate 2's Findings §2 recorded: a payload's `gate` field means "the
+  predicate was evaluated at a flip involving gate N", not "gate N closed and
+  would not arm gate N+1".
+- **T12 — `docs/concepts/adopting-auto-mode.md`.** The artifact inventory, the
+  three consumer-breakage items gate 2 flagged for acknowledgment, the mid-life
+  baseline hazard stated as a property of every feature predating this one
+  rather than a quirk of `FEAT-2026-0053`, and a numbered opt-in procedure with
+  both back-out paths. Merge stays human, stated without exception.
+- **T13 — `FEATURE-REVIEW.md` reaches the PR.** `/wrap-feature`'s step 3 no
+  longer relies on `gh pr create --fill`; when the feature folder holds
+  `FEATURE-REVIEW.md` and/or `LEARNINGS-pending.md` it opens the PR with an
+  explicit `--body-file` carrying their content plus the promotion pointer. Both
+  skill copies edited in lockstep. This is the scope-boundary revision G2-PLAN
+  declared and the operator accepted at arming; it closes gate 2's Findings §5.
+
+**What a green suite proves here, and what it does not.** Three of the four
+units deliver prose. `python3 -m unittest discover -s tests -v` at 1969 tests
+proves that the mirrored scaffold copies byte-match their canonical originals,
+that every new page is registered in all four scaffold registries, that both
+`/wrap-feature` copies are identical, and that nothing regressed. **It proves
+nothing about whether the prose is correct.** `GATE-03.md`'s definition of done
+says so in the same words and names the human at PR review as the oracle for
+correctness; this close repeats it rather than letting a green suite imply more
+than it carries. One concrete instance found while reading the shipped text:
+methodology §9 cross-references its siblings as "T11's stop-class reference" and
+"T12's migration guide" — correlation IDs that mean nothing to a downstream
+reader who has only the docs — and describes `FEATURE-REVIEW.md` as "the
+closing-gate review a human would otherwise have written by hand" when it is in
+fact the accumulated per-gate doubt. Both are prose defects that every oracle
+passed. Neither is fixed here: `docs/methodology.md` is T10's surface and this
+close does not edit source files owned by T01–T13.
+
+### Oracle re-runs (close-discipline §1)
+
+Every oracle T10–T13 name, re-run fresh in this session against the working
+tree, exit codes read directly (`$?` after the command, never after a pipe).
+Interpreter: `.venv/bin/python` (3.14.6).
+
+| Oracle | Exit | Result |
+| --- | --- | --- |
+| `python3 -m unittest discover -s tests -v` | 0 | Ran 1969 tests — OK (skipped=3) |
+| `python3 -m unittest tests.test_scaffold_data_in_sync -v` | 0 | Ran 4 tests — OK |
+| `python3 -m unittest tests.test_skills_vendored_in_sync -v` | 0 | Ran 4 tests — OK |
+| T11 AC#1 class-coverage assertion (`CLASS_NAMES` vs the page) | 0 | printed `[]` — all eight classes present |
+| T10 AC#1 `grep -c "not-yet-reached skeleton was not revised" docs/methodology.md` | 1 | printed `0` — zero matches, which is the criterion; grep exits 1 on no match |
+| T13 AC#1 `grep -rn "FEATURE-REVIEW" plugins/specfuse/skills/wrap-feature/SKILL.md` | 0 | 3 matches (lines 135, 143, 239) — the zero-match finding no longer reproduces |
+| T12 AC#1 inventory greps (eight literal names) | 0 | all eight present in `docs/concepts/adopting-auto-mode.md` |
+| `python3 .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0053-auto-mode` | 0 | structurally valid |
+
+**One honesty note about how the suite was run, because close-discipline §1 is
+about exit codes actually observed.** The first full-suite run in this session
+exited **1** with 11 errors — every one of them `git commit` returning 128 with
+`error: Couldn't get agent socket` inside a test's throwaway temp repo. The
+cause is environmental, not a regression: this session's sandbox denies access
+to the SSH signing-agent socket, and the temp repos inherit the host's
+`commit.gpgsign`. The env-var escape is closed by design — `tests/__init__.py`'s
+`scrub_git_env()` deletes `GIT_CONFIG_GLOBAL` at import so no injected config
+survives. The suite was therefore re-run with the sandbox lifted, which is the
+same environment the driver verifies in, and exited **0** across 1969 tests. The
+table above records that run. The 11 sandbox errors were confined to
+`test_autosync_no_cwd_leak` (3) and `test_lint_closing` (8) and touched nothing
+this gate produced.
+
+**Two oracles beyond the named set**, run because both prior gates' lessons say
+a fixture-only proof is a proof of unknown power:
+
+1. **The corpus sweep, third consecutive run.** `evaluate_arm_predicate(d, 1)`
+   over all **43** real `FEAT-*` directories: zero exceptions, zero `would_arm`,
+   **1 evaluable and 42 `not_evaluable: no_baseline`** on every class. Unchanged
+   from gate 2, and the count of features carrying a `PLAN.baseline.json` is
+   still **1 of 43** — this feature. `plan_next_lint` remains 0 fired / 1 clean /
+   42 not_evaluable; its firing path has still never executed on a real folder.
+2. **The predicate run live against this feature at the terminal gate.**
+   `evaluate_arm_predicate(<this feature>, 3)` returns **`would_arm: True`** with
+   all eight classes clean — `open_questions_human_only` reads "terminal gate: no
+   drafted successor". Recorded because it is the first `would_arm: True` this
+   feature has ever produced against a real folder, and because it is
+   inconsequential: at a terminal gate there is nothing to arm, and the feature
+   runs `review`.
+
+**The predicate's firing path did execute on real input during this gate, and
+the event is on disk.** The `arm_predicate_evaluated` event at
+`2026-07-31T03:06:03.211684+00:00` — emitted at gate 2's close against gate 3's
+drafted WUs — carries `judge_editing: fired` naming T10, T11 and T12 by the
+mirrored copies they produce under `specfuse/loop/data/docs/`, and
+`open_questions_human_only: fired` on `GATE-03-REVIEW.md`'s five open questions.
+That is the v1 path-prefix approximation `GATE-03.md` predicted, observed firing
+on a real feature folder rather than on a fixture, and it is the strongest
+evidence this feature produced that the refusal path works end to end on real
+input. It also demonstrates the limit in *What the loop did NOT verify* below:
+under `auto`, that verdict would have parked this gate.
+
+### Consumer-visible contract changes (close-discipline §3)
+
+Gate 3 adds three items. It is **not** `n/a`: T13 changes what a shipped skill
+does, and two new pages ship to every downstream project.
+
+1. **`/wrap-feature` opens PRs differently.** Step 3 previously ran
+   `gh pr create --fill --base <resolved_base>` unconditionally. It now checks
+   the feature folder for `FEATURE-REVIEW.md` and `LEARNINGS-pending.md` and,
+   when either is present, opens the PR with an explicit `--body-file` carrying
+   their content and the promotion pointer. **When neither file is present the
+   behavior is byte-for-byte what it was** — `--fill`, same resolved base, same
+   single-confirm posture — so every `review` and `supervised` feature's wrap is
+   provably untouched. The change ships in both copies
+   (`plugins/specfuse/skills/wrap-feature/SKILL.md` canonical,
+   `.specfuse/skills/` vendored) and therefore reaches every downstream project
+   on its next upgrade, including projects that will never run `auto`. Skill
+   version block goes to `v0.4`.
+2. **Two new pages under `docs/concepts/`** —
+   `autonomy-stop-classes.md` and `adopting-auto-mode.md` — each mirrored into
+   `specfuse/loop/data/docs/concepts/` and registered in **four** scaffold
+   registries (`DOCS_TRACKED` in `test_scaffold_data_in_sync.py`, plus the
+   expected-file lists in `test_init_integration.py`, `test_scaffold_init.py`
+   and `test_scaffold_resources.py`). They appear in every downstream project's
+   `docs/` tree on the next `init.sh` / upgrade.
+3. **`docs/methodology.md` §9 replaced.** A shipped, mirrored document whose
+   content changed substantively rather than being extended. Anyone who quoted,
+   linked into, or diffed §9 sees a rewrite, and two statements it used to make
+   (the per-gate tightening-only override, `supervised` as a distinct level) are
+   now explicitly labelled unbuilt.
+
+Nothing was removed or renamed. The item needing explicit human acknowledgment
+is **1** — a behavior change in a skill that ships to projects which never opted
+into `auto`, gated on a file's presence rather than on the autonomy dial.
+
+### Consolidated contract-change list — all three gates (close-discipline §3)
+
+Eighteen items, presented here as one list for the explicit human acknowledgment
+§3 requires. Gate 1's five and gate 2's ten are stated verbatim in their own
+sections above and are **not** re-derived here; this is the index plus the
+acknowledgment set.
+
+| # | Gate | Item | Shape |
+| --- | --- | --- | --- |
+| 1 | 1 | `specfuse/loop/plan_baseline.py` — new module | additive |
+| 2 | 1 | `specfuse/loop/arm_eval.py` — new module, constants published | additive |
+| 3 | 1 | `human_only`, `provenance`, `open_questions` template fields | additive, WARN-only |
+| 4 | 1 | **`arm_predicate_evaluated` — new event type on `events.jsonl`** | additive, **acknowledge** |
+| 5 | 1 | `PLAN.baseline.json` — new per-feature artifact + its commit | additive |
+| 6 | 2 | `specfuse/loop/arm_txn.py` — new module | additive |
+| 7 | 2 | **`classes` map goes 7 keys → 8 (`plan_next_lint`)** | **changed payload, acknowledge** |
+| 8 | 2 | `gate_auto_armed` — new event type | additive |
+| 9 | 2 | **`pre-arm/<feature-id>/gate-<N>` tags, created with `-f`** | **new repo objects, acknowledge** |
+| 10 | 2 | `FEATURE-REVIEW.md` — new per-feature artifact (`auto` only) | additive |
+| 11 | 2 | `LEARNINGS-pending.md` — new per-feature artifact (`auto` only) | additive |
+| 12 | 2 | `LEARNINGS-pending.template.md` — ships to every downstream project | additive |
+| 13 | 2 | **Bookkeeping commit message changes on an auto-armed gate** | **changed string, acknowledge** |
+| 14 | 2 | `close-e` / `close-intermediate-e`, `learnings_not_staged` | additive |
+| 15 | 2 | `docs/dev/auto-arm-recovery.md` — new operator doc | additive |
+| 16 | 3 | **`/wrap-feature` opens PRs with `--body-file` when the two `auto` artifacts exist** | **changed behavior, acknowledge** |
+| 17 | 3 | Two new `docs/concepts/` pages, mirrored and registered in four registries | additive |
+| 18 | 3 | `docs/methodology.md` §9 rewritten | changed content |
+
+**The acknowledgment set is five items: 4, 7, 9, 13, 16.** Gate 1 named 4; gate 2
+named 7, 9 and 13 by name and this close carries them forward unchanged; gate 3
+adds 16. Items 7, 9 and 13 are the ones that can break a working consumer
+silently — a length assertion on the `classes` map, a tag namespace that moves
+under `-f`, and a grep on the old bookkeeping string. Item 16 is the one that
+reaches projects with no `auto` feature at all. Item 4's exposure has grown since
+gate 1 stated it: two unregistered event types now exist rather than one, which
+is why FEAT-2026-0060 costs more than it did.
+
+## Cost analysis
+
+**Gate 3.** `planned_cost_usd` for gate 3 is **$17.00** across five units (T10
+$3.00, T11 $3.00, T12 $3.00, T13 $3.00, `G3-CLOSE` $5.00), against `GATE-03.md`'s
+`cost_budget_usd: 22.00`. Actuals are summed from `attempt_outcome` payloads in
+`events.jsonl` across **all** attempts, including the non-passing one (the #221
+discipline: blocked burn is spend).
+
+| Unit | Planned | Actual | Delta |
+| --- | --- | --- | --- |
+| T10 methodology §9 | $3.00 | $0.437655 | −$2.56 (−85.4%) |
+| T11 stop-class reference | $3.00 | $1.761523 | −$1.24 (−41.3%) |
+| T12 migration + opt-in | $3.00 | $0.884682 | −$2.12 (−70.5%) |
+| T13 `FEATURE-REVIEW.md` reaches the PR | $3.00 | $0.827049 | −$2.17 (−72.4%) |
+| **Substantive subtotal** | **$12.00** | **$3.910909** | **−$8.09 (−67.4%)** |
+| G3-CLOSE | $5.00 | in flight | — |
+
+**The named delta: substantive work came in $8.09 under a $12.00 estimate, a
+67.4% under-run — the largest of the three gates in both directions.** Gate-3
+spend against the $22.00 brake stands at **$3.91, 17.8% consumed**, with only
+this close left. No attempt in this gate exceeded $2.00.
+
+**This is the fifth data point on issue #260, and it splits the same way gate 2
+predicted.** Gate 1 (four largely independent modules) ran −35.8%; gate 2 (five
+units wiring behavior into a live driver and into each other) ran +58.3%; gate 3
+(three documentation units and one narrow skill edit, sharing only two append-only
+lists) runs −67.4%. Gate 2's Finding 4 argued the rule should be scoped to
+*independent-module* work rather than to "implementation" as a type; gate 3 is
+independent-surface work and it under-ran harder than gate 1 did. **The model is
+not the variable:** every substantive WU across all three gates ran
+`sonnet`/`medium`, and every closing WU ran `opus`/`high`. The variable is
+coupling.
+
+**Feature level.** `planned_cost_usd` is **$66.00**. Lifetime actual from
+`events.jsonl`, summed over every `attempt_outcome` of all 17 completed units
+including every non-passing attempt and every dispatch cycle before a re-arm, is
+**$58.731832** — with this close still in flight.
+
+| Gate | Planned | Actual | Delta |
+| --- | --- | --- | --- |
+| Gate 1 (6 units) | $23.50 | $18.379824 | −$5.12 (−21.8%) |
+| Gate 2 (7 units) | $25.50 | $36.441099 | +$10.94 (+42.9%) |
+| Gate 3 (4 of 5 units) | $17.00 | $3.910909 | — (close in flight) |
+| **Feature to date** | **$66.00** | **$58.731832** | **89.0% of plan consumed** |
+
+Gate 2 is the whole story: it alone exceeded its own `cost_budget_usd: 31.50`
+brake by **$4.94 (15.7% over)**, and the brake never fired. Gate 2's close
+predicted "roughly $2.3 over" on the assumption its closing pair would repeat
+gate 1's actuals; the pair instead cost $12.701054 against $10.50 planned
+(+21.0%) versus gate 1's $10.029213, so the overrun landed at more than double
+the prediction. **The structural reason is confirmed rather than merely
+restated:** `_should_halt_for_budget` is evaluated *before* each WU dispatch, so
+spend inside the final WU of a gate is invisible to it. A brake that cannot
+observe the last unit cannot stop a gate from ending over budget. If this close
+lands in the range the two prior closes did ($3.35 and $5.67), the feature
+finishes between **$62.1 and $64.4 — under the $66.00 plan** on the strength of
+gate 3's under-run offsetting gate 2's over-run.
+
+**Gate 2's Findings §1, carried forward and re-measured at terminal — not
+re-derived.** The finding is gate 2's and stands as written: the arm predicate's
+`budget_projection` class reads only `cost_usd` (`arm_eval.py:124` in `_read_wu`,
+summed at `arm_eval.py:202`), never `cumulative_cost_usd` and never
+`re_arm_history[].prior_cost_usd`, so it under-reads lifetime spend on every
+re-armed unit. Gate 2 measured $6.23 (14.8%). Re-measured in this session:
+
+| Quantity | Gate 2 close | Terminal |
+| --- | --- | --- |
+| Predicate-visible lifetime spend | $35.891552 | **$52.503515** |
+| `events.jsonl` lifetime spend | $42.119869 | **$58.731832** |
+| Under-read | **$6.228317 (14.8%)** | **$6.228317 (10.6%)** |
+
+**The absolute error did not move by a cent.** It is still exactly
+$1.220458 + $5.007859 — T04's fold-path spend parked in `cumulative_cost_usd`,
+and T07's operator-path spend recorded only in `re_arm_history[].prior_cost_usd`
+after `cost_usd` was zeroed. The percentage fell from 14.8% to 10.6% purely
+because gate 3 added $3.91 of clean, never-re-armed spend to the denominator.
+**The error does not decay; it is diluted.** On a feature that keeps re-arming it
+grows, which is the failure mode gate 2 named: the error concentrates in exactly
+the over-budget work the class exists to catch.
+
+The live verdict at this gate reads `projected spend $57.50 within 2.0x baseline
+planned total $54.00 (cap $108.00)`. The true projection is **$63.73** — still far
+under the cap, so **no verdict flips on this feature at terminal either**, and
+the class remains under-informed rather than wrong. One adjacent observation this
+re-measurement surfaced, which gate 2 did not record: the cap is computed from
+the *baseline* planned total of **$54.00**, not from PLAN.md's current $66.00,
+because `PLAN.baseline.json` was snapshotted before G2-PLAN's re-baseline. That
+is `write_baseline_if_absent` behaving exactly as designed — the baseline is the
+drift reference and must not move — but it means the ceiling tracks the plan as
+first snapshotted, and any close reading the verdict string should not mistake
+`$54.00` for the current plan.
+
+**A home for the fix, named and not taken.** This close does not fix it: a driver
+behavior change inside a terminal close is unreviewable, and the WU forbids it.
+The fix is two small changes in two different owners' surfaces — have `arm_eval`
+sum `cost_usd + cumulative_cost_usd + re_arm_history[].prior_cost_usd`, and have
+the operator re-arm path fold rather than zero (which would also unblind
+`gate_spent_usd`, whose `cost_usd == 0 means already folded` guard misreads a
+never-folded unit). **Recommended home: a bug issue against `arm_eval.py` and
+`loop.py`'s re-arm path, not a roadmap feature.** It is a two-function
+correctness fix with a mechanical oracle — reconcile the predicate's sum against
+`events.jsonl` on this feature and expect $58.731832 — and the bug workflow (one
+bug, one branch, one PR, test-first) fits it exactly, where a feature folder would
+cost more ceremony than the change. `GATE-03-REVIEW.md`'s open question 4 asked
+for this decision and it is now recorded; **the operator's acceptance of the
+recommendation is still required**, because the fix touches the predicate that
+decides arming.
+
+### Failure-class breakdown
+
+One non-passing attempt in gate 3, on one work unit, **$0.786872 — 20.1% of
+substantive gate spend**.
+
+| failure_class | non-passed attempts | dominant signature | spend |
+| --- | --- | --- | --- |
+| `tests` | 1 | `$ python3 -m unittest discover -s tests -v` (T11 attempt 1; `coverage` failed as a consequence of the same break) | $0.786872 |
+
+**The class, named by hand:** *a new shipped file registered in one of four
+registries that assert the shipped file set*. T11 attempt 1's `files_touched`
+records exactly two paths — `docs/concepts/autonomy-stop-classes.md` and its
+mirror under `specfuse/loop/data/docs/concepts/`. The passing attempt touched
+those two plus **four** test files:
+`tests/test_scaffold_data_in_sync.py`, `tests/test_init_integration.py`,
+`tests/test_scaffold_init.py` and `tests/test_scaffold_resources.py`. Each of the
+four carries its own independent list naming every doc the scaffold ships; adding
+a page without appending to all four fails the suite. **T11's AC#8 named only
+`DOCS_TRACKED` in `test_scaffold_data_in_sync.py`** — it was precise, it was
+correct, and it was one quarter of the actual contract. The first attempt did
+what the criterion asked and the suite refused it.
+
+Two observations:
+
+- **The cost was one cheap attempt, and the reason is that the guard is fast and
+  loud.** $0.79 and 489 seconds bought the discovery; the re-attempt passed. Set
+  against T07's $5.01 spin in gate 2, the distinguishing property is that the
+  failing assertion names the missing path directly rather than surfacing three
+  files away in a sibling WU's fixture.
+- **T12 inherited the fix for free and passed first attempt.** It `depends_on`
+  T11 precisely so the two shared-list edits would be sequential, and by the time
+  it ran, all four lists already had an entry to append beside. The declared
+  dependency did the work PLAN.md said it would — which is the counter-example to
+  gate 2's Finding 3, where undeclared fixture coupling cost $5.01.
+
+## What the loop did NOT verify
+
+Ten entries, consolidated across all three gates as criterion 5 requires. Gate 1
+listed two and gate 2 listed six; this close records which of those eight closed,
+which remain open, and adds gate 3's own. **Two closed, six remain open, two are
+new.** No predecessor auto-close debt markers exist anywhere in this feature
+(`grep -rn "specfuse:autoclose-debt"` over the feature folder returns nothing),
+so `close-g` has nothing to name.
+
+**Closed since they were recorded — stated so a reader does not carry them
+forward:**
+
+1. **~~Gate 1 #1: no live `arm_predicate_evaluated` emission.~~ Closed.** Two
+   such events now exist in `events.jsonl`
+   (`2026-07-30T21:22:08.614225+00:00` and `2026-07-31T03:06:03.211684+00:00`),
+   both emitted by driver processes launched after T04's commit. Gate 1's
+   Findings §1 disambiguation was right and `GATE-01.md`'s "no event = the claim
+   is false" inference was wrong.
+2. **~~Gate 1 #2: the baseline write never fired on a real driver run.~~
+   Closed.** `.specfuse/features/FEAT-2026-0053-auto-mode/PLAN.baseline.json`
+   exists. Confirmed this session: **1 of 43** feature directories has one, this
+   feature's.
+
+**Open — the real oracle lies outside this feature:**
+
+3. **"A four-gate feature costs one human touch (the PR review) instead of
+   four"** (PLAN.md `roadmap_goal`; GATE-02.md definition of done). *Verified
+   in-loop:* the entire arm path, by `tests/test_arm_wiring.py` (7 tests),
+   including a run against `_copy_real_feature` — a copy of this feature's real
+   folder with its real baseline, real WU frontmatter and real `events.jsonl` —
+   rewound to the moment gate 1 is about to close, asserting one commit via a real
+   `git rev-list --count`. *Not verified:* **one production ride. Zero gates have
+   ever been armed by the predicate.** **Why:** this feature runs
+   `autonomy_default: review` by decision (`[FEAT-2026-0007/G2-LESSONS]` — an
+   enforcement mechanism cannot be exercised by the gate that builds it).
+   **Where it is actually verified:** the first feature dispatched with
+   `autonomy_default: auto` after this branch merges.
+4. **"The drift caps measure real drift"** (T03 AC; GATE-01.md definition of
+   done). *Verified in-loop:* every class's firing and quiet behavior by
+   `tests/test_arm_eval.py` (19 cases). *Not verified:* a meaningful `drift_caps`
+   verdict on any real feature. **Why:** this feature's `PLAN.baseline.json` was
+   captured after its own gate-2 drafting — gate 1's Findings §2 predicted it and
+   gate 2 confirmed it on disk — so the baseline already contains gate 2 and gate
+   3's `G3-CLOSE` placeholder. Comparing gate 2 to a baseline containing gate 2
+   returns clean and means nothing. **Where it is actually verified:** a feature
+   whose **first dispatch** postdates this branch. T12's page states this as a
+   property of every pre-existing feature, not of this one.
+5. **"`plan_next_lint` blocks a non-compliant plan-next draft under `auto`"**
+   (GATE-02.md definition of done, T07). *Verified in-loop:* firing, quiet, and
+   malformed-frontmatter behavior by `tests/test_arm_eval_lint_class.py` (4
+   tests). *Not verified:* the **firing** path on a real folder. The corpus sweep
+   re-run this session is unchanged at **0 fired / 1 clean / 42 not_evaluable**
+   across 43 real directories. **Where it is actually verified:** the first `auto`
+   feature that reaches a gate boundary with a genuinely non-compliant draft —
+   which, by design, is the case where a human is most needed and least present.
+6. **"Every auto-armed gate's doubt reaches the PR read"** (GATE-02.md
+   definition of done; GATE-03.md, T13). **Status changed but not closed.** Gate
+   2 recorded this as *unowned* — `grep -rn "FEATURE-REVIEW" .specfuse/skills
+   specfuse/loop/data` returned zero. T13 built the last hop and that grep now
+   returns matches. *Verified in-loop:* both skill copies byte-match
+   (`tests/test_skills_vendored_in_sync.py`, 4 tests) and the instructions say
+   what they should say. *Not verified:* **that the instructions produce a good PR
+   body.** The deliverable is prose a model executes; no test can run it. **Where
+   it is actually verified:** the first `auto` feature's PR. T13's own
+   Verification section says this in the same words.
+7. **"Lessons from an unread gate are staged, not landed"** (GATE-02.md
+   definition of done, T09). *Verified in-loop:* the invariant that forces
+   staging, by `tests/test_learnings_staging.py` (7 tests). *Not verified:* the
+   four-step **human promotion procedure** the template documents. Confirmed
+   again this session: `ls .specfuse/features/*/LEARNINGS-pending.md` matches
+   nothing — **zero such files have ever existed in this repo, so no human has
+   ever performed the step.** **Where it is actually verified:** the PR review of
+   the first `auto` feature.
+8. **"`budget_projection` stops a feature heading past 2× its baseline"** (T03
+   AC; GATE-01.md definition of done). *Verified in-loop:* the arithmetic and the
+   threshold, by `tests/test_arm_eval.py`. *Not verified:* that the class reads
+   the right spend — it does not, by $6.228317, re-measured above. **The class
+   has also never fired on anything.** Its projection on this feature ($63.73
+   true, $57.50 as read) is under a $108.00 cap, so even a corrected input would
+   not have exercised the firing path. **Where it is actually verified:** a
+   feature that genuinely approaches 2× its baseline — and the fix must land
+   first, or the class will under-read exactly the re-armed feature most likely
+   to get there.
+
+**New in gate 3:**
+
+9. **"`docs/methodology.md` §9 describes the autonomy dial the run loop actually
+   implements", "a parked `auto` feature is diagnosable from documentation
+   alone", and "an operator can adopt `auto` without reading source"**
+   (GATE-03.md definition of done, T10/T11/T12). *Verified in-loop:* that the
+   mirrored copies byte-match, that all eight `CLASS_NAMES` appear in the
+   reference, that all eight inventory names appear in the migration guide, that
+   the four-condition sketch is gone, and that both pages are registered in all
+   four scaffold registries. *Not verified:* **that any of the prose is correct,
+   or that a real operator can actually diagnose a parked feature from it.** No
+   test can assert either. **Where it is actually verified:** the human at PR
+   review, which `GATE-03.md` names explicitly, and the first operator who has to
+   use the pages under pressure. Two prose defects already found by reading, both
+   in text every oracle passed, are named in the gate-3 narrative above.
+10. **"Under `auto`, no gate that ships a documentation file can arm"** — the
+    `judge_editing` v1 approximation, accepted as open question 2 at arming.
+    *Verified in-loop:* that the class **does** fire on exactly this input, by the
+    real `arm_predicate_evaluated` event at `2026-07-31T03:06:03Z` naming T10, T11
+    and T12 by their mirrored `specfuse/loop/data/docs/` paths. *Not verified:*
+    what happens next — **that the fired verdict actually parks an `auto`
+    feature, and that the operator, meeting it, finds the answer on T11's page
+    instead of in `arm_eval.py`.** **Why:** this feature runs `review`, so the
+    fired verdict cost nothing and stopped nothing. **Where it is actually
+    verified:** the first `auto` feature that ships any documentation — which,
+    given that every gate of every feature tends to touch docs, is likely to be
+    the *first* `auto` feature, making this the most probable first encounter any
+    operator will have with the predicate refusing to arm.
+
+## Findings
+
+Three, all surfaced by this close.
+
+**1. The most likely first experience of `auto` is a refusal to arm, caused by an
+accepted approximation rather than by a hazard.** `judge_editing` matches any path
+under the `specfuse/loop/` prefix; every shipped doc in this repo is mirrored into
+`specfuse/loop/data/docs/`; therefore any gate that ships documentation fires the
+class. This is not a prediction — the event on disk shows it firing on this
+gate's own three documentation WUs. Gate 3's arming discipline named it, T11's
+page documents it with "the human arm, not a code change" as the clearing action,
+and the operator accepted it as a v1 limit at arming. All correct. **The finding
+is about the resulting first impression:** a feature whose entire premise is
+"four human touches become one" will, on its first real outing, most likely stop
+at its first documentation-shipping gate and ask for a human — for a reason that
+is a path-prefix artifact. The documentation is in place, so the operator will
+not be confused. They may reasonably conclude the dial does not work. Narrowing
+`JUDGE_PATHS` to exclude `specfuse/loop/data/` is the obvious candidate and it is
+**not** obviously safe: package data is what downstream projects receive, and a WU
+that edits a shipped template is editing something a judge reads. This needs a
+decision with evidence, not a one-line prefix edit, and it has no home yet.
+
+**2. A criterion can name a real registry, be satisfied exactly, and still fail
+the gate, when the contract is spread across registries that do not reference each
+other.** T11's AC#8 named `DOCS_TRACKED`. Three further test files carry
+independent copies of the same shipped-doc list, and none of the four names the
+others. The attempt that satisfied AC#8's letter failed the suite; the cost was
+$0.79. This is the same *shape* as gate 2's Finding 3 — a contract nobody had
+enumerated — but a different and much cheaper *class*: the assertion named the
+missing path directly, rather than surfacing in a sibling WU's fixture three files
+away. **The cheapness is a property of the guard, not of the drafting.** A
+drafting-time check would have cost nothing: grep the repo for an existing entry
+of the same kind and count how many files match, before writing the criterion.
+
+**3. Gate 3 spent 22.3% of gate 2's dollars on four units of comparable declared
+size, and the coupling explanation now has enough data points to be predictive
+rather than descriptive.** $3.91 against $23.74 substantive, same model, same
+effort, same author process, four units against five. Gate 2's Finding 4 proposed
+scoping issue #260's estimate rule to independent-module work; gate 3 is the
+confirming case from the other direction, and it under-ran by nearly twice gate
+1's margin. The three gates form a clean ordering by coupling: independent
+documentation (−67.4%) < independent modules (−35.8%) < wiring into a live driver
+and into siblings (+58.3%). **Estimating by WU *type* is the error; estimating by
+how many surfaces a WU shares with its siblings is the correction.** Five data
+points on one feature, all `sonnet`/`medium`, is the strongest evidence issue #260
+has had.
+
+## What I'd change
+
+**Write the definition-of-done criterion against the enforcing surface, not
+against the surface you edited.** Both of this gate's avoidable costs are the same
+mistake at different sizes: T11's AC#8 named one of four registries, and gate 2's
+brake was declared against a plan total the brake cannot observe the end of. The
+drafting-time check is mechanical — before writing "verified by X", grep for every
+file that asserts the same property and either name them all or name the *suite*
+rather than one member of it. This is the registry-facing sibling of gate 2's
+fixture-facing lesson, and both belong next to `authoring-work-units` §8's
+cross-surface check.
+
+**Give the gate budget brake a post-gate reconciliation, or stop calling it a
+brake.** Gate 2 exceeded its declared `cost_budget_usd` by $4.94 and the brake did
+not fire, because `_should_halt_for_budget` runs before each dispatch and the
+overrun happened inside the last unit. Gate 3's `cost_budget_usd: 22.00` carries a
+frontmatter comment saying exactly this, which means the defect is now documented
+in the artifact rather than fixed in the driver. A brake that structurally cannot
+observe the final unit of a gate is an estimate-checker, and the honest options are
+to check spend *after* the last WU as well as before it, or to rename the field.
+This is issue #260's neighbour and belongs to the same owner; this retrospective
+adds the second measured overrun rather than proposing the change.
+
+**Nothing about gate 3's execution.** Four units, one cheap correctable failure,
+67% under budget, every deliverable shipped including the scope revision the
+operator accepted at arming. The gate did what it was drafted to do.
+
+## Feature-arc verdict
+
+**Verdict: `met_locally`.** Every drafted work unit across all three gates
+shipped and every local oracle passes — 1969 tests at exit 0, all four named
+oracles re-run fresh in this session, both drift guards green, the plan
+structurally valid. The mechanism is complete: the predicate, the baseline, the
+atomic one-commit arm with its pre-arm tag, the severity flip, the doubt
+accumulation, the LEARNINGS staging, the operator documentation, and — from gate
+3 — the reader that carries accumulated doubt into the one human read. Nothing
+drafted was dropped, and the one scope revision (T13) was surfaced for an explicit
+operator decision rather than absorbed.
+
+**The roadmap goal is "a four-gate feature costs one human touch (the PR review)
+instead of four". That claim is built and unproven, and it must not be reported
+as delivered.** Stated plainly:
+
+- **No feature has ever ridden `auto`. Zero gates have been armed by the
+  predicate.** This feature runs `review` by deliberate decision — an enforcement
+  mechanism cannot be exercised by the gate that builds it — so the arm path's
+  only executions are in tests, one of which does drive the real `loop.run()`
+  against a copy of this feature's own folder and asserts one commit by real
+  `git rev-list --count`. That is a genuine driver invocation and it is not a
+  production ride.
+- **The predicate's *refusal* path is well evidenced; its *approval* path on real
+  input is not.** Three corpus sweeps across 43 real feature directories have
+  returned zero `would_arm: True` and zero exceptions, and one real event shows
+  `judge_editing` and `open_questions_human_only` firing correctly on real drafted
+  WUs. The single `would_arm: True` this feature has ever produced came from this
+  close's own terminal-gate run, where there is nothing to arm.
+- **A structural limit stands between the mechanism and the headline number.**
+  Under `auto`, no gate shipping a documentation file can arm (Findings §1). A
+  four-gate feature whose gates touch docs — most of them — would stop for a human
+  at those gates today. The one-touch claim is therefore not merely unproven; it
+  is **currently unreachable for a large class of features** until `JUDGE_PATHS`
+  is narrowed with evidence.
+- **This feature is itself a three-gate feature, not a four-gate one**, and its
+  own gate boundaries were all human-armed. It cost the four human touches the
+  goal exists to eliminate.
+
+`met_locally` is the honest verdict and it is deliberately not `met`: the
+criteria in *What the loop did NOT verify* §3–§10 are unverifiable in this
+environment, not satisfied. It is deliberately not `partially_met` either —
+nothing drafted is missing or half-built, and every gap above is an environmental
+oracle (no production `auto` ride) rather than an unfinished deliverable. **The
+single condition that upgrades this feature to `met`: one feature dispatched with
+`autonomy_default: auto` after this branch merges, arming at least one gate
+boundary without a human, with its `gate_auto_armed` event and its
+`FEATURE-REVIEW.md` reaching a PR body.** Until that has happened, `auto` is a
+mechanism that works in tests.
+
+## Lessons promoted
+
+**This feature runs `autonomy_default: review`, so T09's staging invariant is
+inert here and these lessons go to the durable `.specfuse/LEARNINGS.md` as
+usual** — no `LEARNINGS-pending.md` was created, and none should have been.
+Verified rather than assumed: `ls .specfuse/features/*/LEARNINGS-pending.md`
+matches nothing anywhere in this repo. Gate 2's close said this for the same
+reason and it is worth repeating at the terminal close of the feature that
+*built* the staging mechanism, because this is exactly where a reader will wonder
+whether it was bypassed. **It was not bypassed; it correctly did not apply.** Its
+first real exercise belongs to the first `auto` feature, and no human has yet
+performed the promotion step its template documents.
+
+Three entries appended to `.specfuse/LEARNINGS.md` under
+`[FEAT-2026-0053/G3-CLOSE]`: a path-prefix approximation that is correct as a
+safety property can still make the feature's headline case unreachable, and the
+close must say so where the prose says "accepted v1 limit"; a definition-of-done
+criterion must name the surface that *enforces* a property rather than the one
+that *declares* it, because contracts spread across unreferencing registries are
+satisfied exactly and still fail; and a budget brake evaluated only before
+dispatch cannot observe the unit that overruns, so a gate can exceed its declared
+budget with the brake reporting clean.
+

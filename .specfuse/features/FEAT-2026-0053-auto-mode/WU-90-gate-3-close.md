@@ -1,11 +1,21 @@
 ---
 id: FEAT-2026-0053/G3-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+verdict: met_locally
+driver_version: 0.7.1
+started_at: 2026-07-31T03:50:00.620387+00:00
+duration_seconds: 919.009
+cost_usd: 5.966443
+input_tokens: 91
+output_tokens: 52910
 ---
 
 # Close the feature — terminal verdict
