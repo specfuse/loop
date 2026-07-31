@@ -5,7 +5,7 @@ slug: lifetime-cost-reads
 branch: feat/FEAT-2026-0062-lifetime-cost-reads
 roadmap_goal: Make both cost consumers — the budget_projection arm-predicate class and the per-gate budget brake — read a work unit's lifetime spend rather than its current dispatch cycle, and make the brake able to see an overrun that happens inside a gate's final work unit.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 16.00
 ---
 
