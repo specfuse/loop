@@ -3178,9 +3178,18 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     if status not in ("done", "abandoned"):
         return f"refused: status={status}"
 
-    # Step 2 — extract inline section
+    # Step 2 — extract inline section.
+    # The section runs from its `## FEAT-ID` heading up to the next section, and
+    # must stop at an `<a id="...">` line as well as at a `## ` heading. Anchors
+    # PRECEDE their headings, so the next feature's anchor sits immediately after
+    # this section's last content line; without the anchor alternative in the
+    # lookahead it is consumed into the match and carried into the archive,
+    # leaving the neighbour's `[→ detail](#feat-…)` link dangling in roadmap.md
+    # and duplicating its ID across both files. Observed live: archiving
+    # FEAT-2026-0061 removed FEAT-2026-0062's anchor. Step 5 below strips this
+    # feature's OWN preceding anchor separately — the two are symmetric.
     section_re = re.compile(
-        r'^(## ' + re.escape(feature_id) + r'[^\n]*(?:\n(?!## )[^\n]*)*\n?)',
+        r'^(## ' + re.escape(feature_id) + r'[^\n]*(?:\n(?!## |<a id=")[^\n]*)*\n?)',
         re.MULTILINE,
     )
     section_m = section_re.search(roadmap_text)
