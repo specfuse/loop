@@ -15,13 +15,13 @@ from `loop.py` (the dependency points the other way: `loop.py` will call
 into this module, T04).
 
 The organizing principle: model-authored signals may only veto; only
-mechanical facts and human-authored constants may approve. Of the seven
-classes below, "missing_provenance" and "open_questions_human_only" are veto
-channels — a clean verdict there withholds nothing, it just declines to
-block; every other class both approves (clean) and blocks (fired) on
-mechanical grounds alone. `would_arm` is True only when all seven classes are
-clean, so the veto classes can only ever pull the decision from True to
-False, never the reverse.
+mechanical facts and human-authored constants may approve. Of the eight
+classes below, "missing_provenance", "open_questions_human_only", and
+"plan_next_lint" (FEAT-2026-0053/T07) are veto channels — a clean verdict
+there withholds nothing, it just declines to block; every other class both
+approves (clean) and blocks (fired) on mechanical grounds alone. `would_arm`
+is True only when all eight classes are clean, so the veto classes can only
+ever pull the decision from True to False, never the reverse.
 
 Honest v1 limit: a draft that weakens an *existing* test's assertions is
 undetectable here. The judge-editing class catches `produces:` paths, not
@@ -73,9 +73,12 @@ CLASS_NAMES = (
     "drift_caps",
     "missing_provenance",
     "open_questions_human_only",
+    "plan_next_lint",
 )
 
-VETO_CLASSES = frozenset({"missing_provenance", "open_questions_human_only"})
+VETO_CLASSES = frozenset(
+    {"missing_provenance", "open_questions_human_only", "plan_next_lint"}
+)
 
 
 @dataclass(frozen=True)
@@ -357,6 +360,26 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
         classes["open_questions_human_only"] = ClassVerdict("fired", "; ".join(reasons7))
     else:
         classes["open_questions_human_only"] = ClassVerdict("clean", clean_reason)
+
+    # --- Class 8: plan-next contract lint (veto channel, FEAT-2026-0053/T07) ---
+    # lint_plan_next_draft is WARN-only for its own CLI caller; here a
+    # non-empty finding list vetoes the arm. A parse failure inside the lint
+    # (malformed frontmatter) must degrade to a fired verdict, not crash the
+    # gate close — same precedent as build_arm_predicate_event's outer catch.
+    try:
+        from .lint_plan import lint_plan_next_draft  # deferred: lint_plan imports loop.py
+
+        lint_warns = lint_plan_next_draft(feature_dir, just_closed_gate)
+    except Exception as exc:  # noqa: BLE001 - a raise is not a verdict
+        classes["plan_next_lint"] = ClassVerdict(
+            "fired",
+            f"plan-next lint raised {type(exc).__name__}: {exc}",
+        )
+    else:
+        if lint_warns:
+            classes["plan_next_lint"] = ClassVerdict("fired", "; ".join(lint_warns))
+        else:
+            classes["plan_next_lint"] = ClassVerdict("clean", "plan-next lint: no findings")
 
     would_arm = all(classes[name].status != "fired" for name in CLASS_NAMES)
 

@@ -145,7 +145,7 @@ gates:
         tnn = wu_id.split("/")[-1]
         (fdir / f"WU-{tnn}.md").write_text(
             f"---\nid: {wu_id}\ntype: {wu_type}\nmodel: claude-haiku-4-5-20251001\n"
-            f"status: {wu_status}\nattempts: 0\n---\n\n# {tnn}{body}"
+            f"status: {wu_status}\nattempts: 0\nplanned_cost_usd: 1.0\n---\n\n# {tnn}{body}"
         )
     (fdir / "GATE-02-REVIEW.md").write_text(
         "---\ngate: 2\nopen_questions: []\n---\n\n# Gate 2 review\n")

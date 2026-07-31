@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 re_arm_count: 1
 re_arm_override: true
 re_arm_history:
@@ -23,10 +23,10 @@ oracle_env: macos_local
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 774.183
-cost_usd: 3.32026
-input_tokens: 154
-output_tokens: 43146
+duration_seconds: 1348.002
+cost_usd: 4.281823
+input_tokens: 208
+output_tokens: 44314
 ---
 
 # Contract-field lint warns become blocking — under `auto` only
