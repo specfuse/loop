@@ -1,0 +1,27 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "One stated recognition surface, two `not_evaluable` triggers, a self-describing `clean`",
+          "id": "FEAT-2026-0061/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document what `decision_class_paths` can and cannot see",
+          "id": "FEAT-2026-0061/T02",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 and the feature \u2014 retrospective, lessons, docs, terminal verdict",
+          "id": "FEAT-2026-0061/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
