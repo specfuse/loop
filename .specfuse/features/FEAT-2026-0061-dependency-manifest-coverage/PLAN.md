@@ -5,7 +5,7 @@ slug: dependency-manifest-coverage
 branch: feat/FEAT-2026-0061-dependency-manifest-coverage
 roadmap_goal: Extend the arm predicate's dependency-manifest surface to the ecosystems Specfuse targets, stated in one place, so the decision_class_paths stop class stops reporting `clean` in repositories whose build files it cannot read.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 11.50
 ---
 
