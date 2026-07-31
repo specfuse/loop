@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 provenance: "PLAN.md's scope boundary names gate 3 as 'docs and methodology rewrite'; this WU is the methodology half. The specific edit surface is fixed by G2-PLAN's read of docs/methodology.md §9 against the shipped code: §9's four auto-arm conditions describe a design that was replaced by the eight-class predicate, and §9's per-gate tightening-only override has no consumer in the run loop at all."
@@ -10,6 +10,15 @@ produces:
   - docs/methodology.md
   - specfuse/loop/data/docs/methodology.md
   - docs/dev/auto-arm-recovery.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-31T03:10:55.186069+00:00
+duration_seconds: 403.063
+cost_usd: 0.437655
+input_tokens: 22
+output_tokens: 3810
 ---
 
 # The autonomy dial, as the run loop actually reads it

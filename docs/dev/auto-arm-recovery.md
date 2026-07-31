@@ -1,5 +1,8 @@
 # Auto-arm recovery (FEAT-2026-0053/T06)
 
+See `docs/methodology.md` §9 for the one-commit-arm concept; this doc is the
+recovery procedure only.
+
 ## The guarantee
 
 An `auto`-feature arm is **exactly one commit**. When a gate closes with
