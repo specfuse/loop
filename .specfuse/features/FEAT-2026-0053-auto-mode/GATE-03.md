@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: open
+status: awaiting_review
 cost_budget_usd: 22.00
 # Sum of G2-PLAN's five drafted units ($17.00 — T10 $3.00, T11 $3.00, T12
 # $3.00, T13 $3.00, G3-CLOSE $5.00) plus one re-attempt of the largest ($5.00,
