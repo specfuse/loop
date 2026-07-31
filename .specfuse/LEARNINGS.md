@@ -2580,3 +2580,52 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Rule: run the sweep, record the counts, and when the corpus is uniformly not-evaluable, name
   the approval path as unverified in `## What the loop did NOT verify` and carry it into the
   successor gate's risk list — do not let "no findings across the corpus" read as coverage.
+
+- [FEAT-2026-0053/G2-CLOSE] **A work unit that introduces a validation rule must be drafted
+  against the fixtures that already exist, not only against real inputs — a sibling work unit's
+  test fixture is an input too, and it is the one the gate actually runs against.** A WU added a
+  new veto class requiring `planned_cost_usd` on every drafted work unit. The preceding WU's
+  test fixture builder, written before that class existed, emitted frontmatter without the
+  field. The new class therefore vetoed its sibling's fixture, and the failure surfaced as the
+  *sibling's* test failing under a whole-suite signature — in a file the new WU's Do-not-touch
+  clause forbade it to open. Three fresh sessions across two dispatch cycles each re-derived the
+  same wrong hypothesis, because the evidence available to them was identical and pointed
+  nowhere near a fixture builder; the driver escalated `spinning_signature_repeat` at $5.01 and
+  774 seconds, and the fix was one field in one fixture. Note that the WU's satisfiability
+  answer under `planning-discipline.md` §2 was present and correct — it reasoned about real
+  inputs in their intended final state, which is what §2 asks for, and real inputs were never
+  the problem. Rule: when a WU adds a rule that reads artifact X, grep the repo for existing
+  fixtures that *produce* X and either confirm they satisfy the new rule or write the fixture
+  amendment into the WU's scope at drafting time. Related: work units that touch disjoint source
+  surfaces are not thereby independent — check fixture overlap before declaring them so.
+
+- [FEAT-2026-0053/G2-CLOSE] **A cost or usage aggregate that reads a per-cycle field silently
+  under-counts every re-armed unit, and the error concentrates in exactly the work the aggregate
+  exists to catch.** A feature-level budget predicate summed each work unit's `cost_usd`. That
+  field is per-dispatch-cycle: the driver's re-arm fold moves the prior cycle's spend into
+  `cumulative_cost_usd` and zeroes it, and the operator re-arm path zeroes it while recording the
+  prior spend only in `re_arm_history[].prior_cost_usd`. Reconciling the predicate against
+  `events.jsonl` at close found it reading $35.89 of a true $42.12 — 14.8% low, all of it the
+  two re-armed units, i.e. precisely the over-budget work a budget brake is for. A sibling
+  aggregate that had already been fixed for the fold path (#199) was still blind to the operator
+  path, because that path zeroes without folding, so the guard `cost_usd == 0 means already
+  folded` reads a never-folded unit as a folded one. Rule: any aggregate over per-attempt cost,
+  duration, or token counts must sum every field the lifetime is spread across — and a close
+  reconciling planned against actual should compute the same total from `events.jsonl` and
+  compare, because the event log is the only surface that never loses a cycle.
+
+- [FEAT-2026-0053/G2-CLOSE] **An accumulation artifact with no reader delivers none of the
+  value it was built to preserve — the gate that builds the writer must name the consumer or
+  record a deferral with a home.** A feature whose whole premise was replacing four human gate
+  reads with one PR read shipped, tested end to end, the mechanism that accumulates each
+  unread gate's doubt into a feature-local review file. Nothing reads that file: a grep across
+  every skill and every shipped template returned zero references outside the module that
+  writes it and its own tests. Every acceptance criterion passed and the gate's definition of
+  done was satisfied as written, because the criteria were scoped to accumulation. The
+  checkpoint value the feature exists to preserve is nonetheless not delivered, and no gate
+  owns the last hop. The shape is easy to miss precisely because writer-side tests are the
+  natural ones to write and they all go green. Rule: when a gate ships a write-side mechanism
+  whose purpose is to inform a later human or machine read, its definition of done must name
+  the reading surface — or the close must enumerate the missing hop in `## What the loop did
+  NOT verify` and hand it to the planning WU with a decision to make, rather than let a green
+  gate imply an end-to-end path.

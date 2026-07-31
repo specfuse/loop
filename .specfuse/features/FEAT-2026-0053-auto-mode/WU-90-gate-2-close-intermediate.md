@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0053/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 auto_close_disabled: true
 provenance: "Required by .specfuse/rules/close-discipline.md and by the linter's non-terminal closing-shape check (close-intermediate immediately followed by plan-next); not part of PLAN.md's gate-2 sketch, which enumerated only the five substantive items."
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.7.1
+started_at: 2026-07-31T02:41:49.822710+00:00
+duration_seconds: 674.554
+cost_usd: 5.671201
+input_tokens: 1882
+output_tokens: 47997
 ---
 
 # Close gate 2 — retrospective, lessons, docs
