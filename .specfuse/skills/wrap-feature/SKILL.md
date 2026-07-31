@@ -132,10 +132,44 @@ this.
   non-empty, else the repo's default branch. Do not rely on
   `--fill` to inherit GitHub's repo default — name it explicitly so
   the PR always targets the feature's actual integration branch.
-- Probe `gh auth status` once. If ✗: per LEARNINGS, print the
-  exact `gh pr create --fill --base <resolved_base>` command for
-  the operator and skip to step 4.
-- If ✓: ask "Open PR via `gh pr create --fill --base <resolved_base>`? (y / n)"
+- Check the feature folder for `FEATURE-REVIEW.md` and
+  `LEARNINGS-pending.md` (both are artifacts of `auto`-mode gates;
+  a `review`/`supervised` feature will have neither).
+  - **Neither present:** behavior is unchanged from v0.3 — proceed
+    with `--fill` below. This is the common case and it is
+    untouched by this step's rewrite.
+  - **Either present:** `--fill` cannot carry a file that is not a
+    commit message, so assemble an explicit PR body instead:
+    - If `FEATURE-REVIEW.md` exists, include its content — every
+      gate section's `## Gate N — armed …` heading, its `Open
+      questions`, and its verbatim `## Doubt` prose — under a `##
+      Accumulated review (auto mode)` heading. Use the file
+      verbatim when it fits comfortably in a PR body; otherwise a
+      faithful digest that keeps every gate's `## Doubt` text and
+      `open_questions` list intact is acceptable, but never drop a
+      gate section silently.
+    - If `LEARNINGS-pending.md` exists, include its `## Entries`
+      content under a `## Pending learnings (needs promotion)`
+      heading, plus one explicit sentence pointing at the file's
+      own four-step promotion procedure (read each entry, copy
+      accepted ones into `.specfuse/LEARNINGS.md`, leave rejected
+      ones with a note, remember planning never reads this file
+      directly) — so the human reviewing the PR is told there is a
+      promotion step to perform, not just handed a diff.
+    - Write the assembled body to a temp file and use
+      `gh pr create --body-file <path> --base <resolved_base>`
+      (no `--fill`) so title still comes from the branch's commits.
+    - **Escalate instead of truncating.** If the assembled body
+      would exceed a limit `gh pr create` enforces, do not silently
+      cut content — emit `status: blocked` per this WU's escalation
+      trigger and let a human choose between a shorter digest and a
+      linked file. A silently truncated doubt summary is worse than
+      stopping to ask.
+- Probe `gh auth status` once. If ✗: per LEARNINGS, print the exact
+  `gh pr create` command for the operator (the `--fill` form above
+  when neither file is present, the `--body-file` form otherwise)
+  and skip to step 4.
+- If ✓: ask "Open PR via `<the resolved command above>`? (y / n)"
 - On y: run it. Capture the PR URL from output; report it.
 - On n: print the command for the operator.
 
@@ -200,6 +234,17 @@ Never author the operator's own justification. Where a field records *why a huma
 decided something*, that text comes from them.
 
 ## Version
+
+**v0.4** (FEAT-2026-0053/T13). Step 3 rewritten: when the feature
+folder holds `FEATURE-REVIEW.md` and/or `LEARNINGS-pending.md`
+(both `auto`-mode-only artifacts), the PR is opened with an
+explicit `--body-file` carrying their content instead of `--fill`,
+so the accumulated doubt and staged lessons reach the one human
+read that `auto` trades four gate reads for. When neither file is
+present the step is unchanged: `--fill` with the resolved base.
+Read-only on both files — this step reads them into a PR body, it
+does not promote or rewrite them; promotion of a pending lesson
+into `.specfuse/LEARNINGS.md` stays the human's act at PR review.
 
 **v0.3** (FEAT-2026-0018/T08). Method §§ 2–3 removed — executive
 recap + manual-verification step are noise on the auto-close path.

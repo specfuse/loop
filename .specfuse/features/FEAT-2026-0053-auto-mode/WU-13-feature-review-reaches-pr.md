@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T13
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 human_only: true
 oracle_env: macos_local
@@ -10,6 +10,15 @@ provenance: "RETROSPECTIVE.md gate-2 Findings 5 and 'What the loop did NOT verif
 produces:
   - plugins/specfuse/skills/wrap-feature/SKILL.md
   - .specfuse/skills/wrap-feature/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.7.1
+started_at: 2026-07-31T03:34:33.864574+00:00
+duration_seconds: 436.02
+cost_usd: 0.827049
+input_tokens: 4470
+output_tokens: 7231
 ---
 
 # `FEATURE-REVIEW.md` reaches the one human read
