@@ -1,10 +1,13 @@
 ---
 id: FEAT-2026-0062/G1-CLOSE
 type: close
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 5.00
 oracle_env: macos_local
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Close gate 1 and the feature — retrospective, lessons, docs, terminal verdict
