@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0062/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/loop/cost.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - wu_lifetime_cost_usd
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-07-31T18:27:44.929695+00:00
+duration_seconds: 829.591
+cost_usd: 1.59496
+input_tokens: 66
+output_tokens: 15079
 ---
 
 # One lifetime-cost reader: events first, frontmatter fallback
