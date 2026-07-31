@@ -8,6 +8,10 @@ cost_budget_usd: 22.00
 # Note the brake is evaluated BEFORE each WU dispatch, so an overrun inside the
 # last WU is structurally invisible to it; gate 2 landed ~$2.3 over its declared
 # budget without the brake firing.
+baseline:
+  sha: 0f04c2e3774c25ebe66b9c086b6d21354078ee32
+  probed_at: 2026-07-31T03:08:14.435746+00:00
+  failing: []
 ---
 
 # Gate 3 — Terminal: docs, methodology, and the honest close
