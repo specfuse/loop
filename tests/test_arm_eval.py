@@ -258,6 +258,122 @@ class TestArmPredicate(unittest.TestCase):
             decision = evaluate_arm_predicate(feature, 1)
             self.assertEqual(decision.classes["decision_class_paths"].status, "clean")
 
+    def test_decision_class_paths_fires_on_maven_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp) / "feature"
+            _base_feature(feature)
+            _wu(feature, "WU-05.md", "Do T05", [
+                "type: implementation", "status: pending",
+                "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                "produces: [pom.xml]",
+                "provenance: RETRO-1",
+            ])
+            decision = evaluate_arm_predicate(feature, 1)
+            self.assertEqual(decision.classes["decision_class_paths"].status, "fired")
+            self.assertFalse(decision.would_arm)
+
+    def test_decision_class_paths_fires_on_each_covered_exact_manifest(self):
+        covered = (
+            "pyproject.toml", "package.json", "pom.xml", "build.gradle",
+            "build.gradle.kts", "Cargo.toml", "go.mod", "Gemfile",
+            "composer.json",
+        )
+        for manifest in covered:
+            with tempfile.TemporaryDirectory() as tmp:
+                feature = Path(tmp) / "feature"
+                _base_feature(feature)
+                _wu(feature, "WU-05.md", "Do T05", [
+                    "type: implementation", "status: pending",
+                    "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                    f"produces: [{manifest}]",
+                    "provenance: RETRO-1",
+                ])
+                decision = evaluate_arm_predicate(feature, 1)
+                self.assertEqual(
+                    decision.classes["decision_class_paths"].status, "fired", manifest
+                )
+
+    def test_decision_class_paths_fires_on_each_covered_pattern(self):
+        cases = ("requirements.txt", "requirements-dev.txt", "App.csproj",
+                 "sub/dir/App.csproj")
+        for path in cases:
+            with tempfile.TemporaryDirectory() as tmp:
+                feature = Path(tmp) / "feature"
+                _base_feature(feature)
+                _wu(feature, "WU-05.md", "Do T05", [
+                    "type: implementation", "status: pending",
+                    "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                    f"produces: [{path}]",
+                    "provenance: RETRO-1",
+                ])
+                decision = evaluate_arm_predicate(feature, 1)
+                self.assertEqual(
+                    decision.classes["decision_class_paths"].status, "fired", path
+                )
+
+    def test_decision_class_paths_not_evaluable_on_glob_or_directory(self):
+        for path in ("src/**", "config/"):
+            with tempfile.TemporaryDirectory() as tmp:
+                feature = Path(tmp) / "feature"
+                _base_feature(feature)
+                _wu(feature, "WU-05.md", "Do T05", [
+                    "type: implementation", "status: pending",
+                    "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                    f"produces: [{path}]",
+                    "provenance: RETRO-1",
+                ])
+                decision = evaluate_arm_predicate(feature, 1)
+                self.assertEqual(
+                    decision.classes["decision_class_paths"].status,
+                    "not_evaluable",
+                    path,
+                )
+                self.assertFalse(decision.would_arm)
+
+    def test_decision_class_paths_covered_precedes_undecidable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp) / "feature"
+            _base_feature(feature)
+            _wu(feature, "WU-05.md", "Do T05", [
+                "type: implementation", "status: pending",
+                "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                "produces: [pom.xml, src/**]",
+                "provenance: RETRO-1",
+            ])
+            decision = evaluate_arm_predicate(feature, 1)
+            self.assertEqual(decision.classes["decision_class_paths"].status, "fired")
+
+    def test_decision_class_paths_clean_reason_names_coverage_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp) / "feature"
+            _base_feature(feature)
+            decision = evaluate_arm_predicate(feature, 1)
+            verdict = decision.classes["decision_class_paths"]
+            self.assertEqual(verdict.status, "clean")
+            self.assertTrue(verdict.reason)
+            self.assertIn("pom.xml", verdict.reason)
+
+    def test_decision_class_paths_not_evaluable_reason_names_path_and_trigger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature = Path(tmp) / "feature"
+            _base_feature(feature)
+            _wu(feature, "WU-05.md", "Do T05", [
+                "type: implementation", "status: pending",
+                "cost_usd: 0.0", "planned_cost_usd: 1.0",
+                "produces: [src/**]",
+                "provenance: RETRO-1",
+            ])
+            decision = evaluate_arm_predicate(feature, 1)
+            reason = decision.classes["decision_class_paths"].reason
+            self.assertIn("src/**", reason)
+            self.assertIn("trigger 2", reason)
+
+    def test_decision_class_paths_named_uncovered_entries_have_reasons(self):
+        from specfuse.loop.arm_eval import DEPENDENCY_MANIFEST_NAMED_UNCOVERED
+
+        for pattern, reason in DEPENDENCY_MANIFEST_NAMED_UNCOVERED.items():
+            self.assertTrue(reason, pattern)
+
     # --- Class 4: retroactive edits ---
 
     def test_retroactive_edits_fires_on_passed_gate_goal_change(self):

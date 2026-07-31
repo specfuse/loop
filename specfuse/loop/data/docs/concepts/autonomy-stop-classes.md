@@ -74,17 +74,71 @@ bug to patch in `arm_eval.py`; it is an accepted v1 limit.
 
 ### 3. `decision_class_paths`
 
-**Measures:** whether any drafted WU touches a dependency-manifest surface —
-`pyproject.toml`, `package.json`, or a `requirements*.txt` file — since
-dependency changes are a decision class that should not auto-arm.
+**Measures:** whether any drafted WU touches a dependency-manifest surface,
+since dependency changes are a decision class that should not auto-arm. The
+covered surface is a fixed table in `arm_eval.py`
+(`DEPENDENCY_MANIFEST_COVERED`), matched by `fnmatch` against the produced
+path's basename: `pyproject.toml`, `package.json`, `pom.xml`,
+`build.gradle`, `build.gradle.kts`, `Cargo.toml`, `go.mod`, `Gemfile`,
+`composer.json`, `requirements*.txt`, `*.csproj`. Verified by reading
+`DEPENDENCY_MANIFEST_COVERED` directly: `python3 -c "from specfuse.loop.arm_eval
+import DEPENDENCY_MANIFEST_COVERED as c; print(c)"`.
 
-**Fires when:** a drafted WU's `produces:` list matches one of these
-manifests.
+**Fires when:** a drafted WU's `produces:` list contains a path whose
+basename matches one of the covered patterns above. Precedence: a covered
+hit fires the class even when an undecidable path (see below) is also
+present in the same WU's `produces:` list — a definite dependency hit is
+never masked by a sibling the predicate cannot classify.
+
+**`not_evaluable` triggers.** Two paths report `not_evaluable` instead of
+`clean`, each fail-closed the same as `fired`:
+
+1. **Named-uncovered manifest.** The produced path's basename matches one of
+   the named-uncovered table (`DEPENDENCY_MANIFEST_NAMED_UNCOVERED`) —
+   manifests the driver recognises by name but does not yet cover, each with
+   a stated reason:
+
+   | Pattern | Reason |
+   | --- | --- |
+   | `mix.exs` | Elixir manifest; Elixir is not yet a Specfuse target ecosystem |
+   | `pubspec.yaml` | Dart/Flutter manifest; not yet a Specfuse target ecosystem |
+   | `Podfile` | CocoaPods manifest; not yet a Specfuse target ecosystem |
+   | `*.gemspec` | Ruby gemspec; `Gemfile` is covered above, gemspec is not yet |
+   | `*.cabal` | Haskell manifest; not yet a Specfuse target ecosystem |
+   | `package-lock.json` | lockfile derived from the covered `package.json`, not the dependency declaration itself; out of this feature's scope |
+   | `poetry.lock` | lockfile derived from the covered `pyproject.toml`, not the dependency declaration itself; out of this feature's scope |
+   | `Cargo.lock` | lockfile derived from the covered `Cargo.toml`, not the dependency declaration itself; out of this feature's scope |
+   | `go.sum` | checksum file derived from the covered `go.mod`, not the dependency declaration itself; out of this feature's scope |
+   | `Gemfile.lock` | lockfile derived from the covered `Gemfile`, not the dependency declaration itself; out of this feature's scope |
+   | `yarn.lock` | lockfile derived from the covered `package.json`, not the dependency declaration itself; out of this feature's scope |
+
+   Operator action: review the manifest by hand — the driver has no basis to
+   call it clean or fired — and arm manually if it is not a decision-class
+   change.
+
+2. **Glob or directory in `produces:`.** A drafted WU's `produces:` entry is
+   a glob or a directory (contains `*`, `?`, `[`, or ends in `/`) rather than
+   a concrete file path, so the class cannot test it against the covered or
+   named-uncovered tables at all. Operator action: review what the glob or
+   directory actually expands to, and either narrow the WU's `produces:` to
+   concrete paths or arm manually once the expansion is confirmed
+   dependency-free.
 
 **Veto channel:** no.
 
 **Clearing action:** the operator reviews the dependency change by hand and
 arms manually; there is no automatic clearance for this class by design.
+
+**v1 limit.** Coverage is a fixed list compiled into the driver
+(`DEPENDENCY_MANIFEST_COVERED` in `arm_eval.py`), not project configuration.
+An ecosystem's manifest that is absent from both tables above is invisible to
+this class — it reports `clean`, not `not_evaluable`, exactly as a Maven
+`pom.xml` did before this table added it. Extending coverage to a new
+ecosystem means shipping a driver release that edits
+`DEPENDENCY_MANIFEST_COVERED` (or, as a stopgap, naming the manifest in
+`DEPENDENCY_MANIFEST_NAMED_UNCOVERED` so it at least reports
+`not_evaluable`); a project cannot widen this surface from its own
+`.specfuse/` configuration.
 
 ### 4. `retroactive_edits`
 

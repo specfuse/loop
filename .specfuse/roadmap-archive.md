@@ -43,6 +43,19 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0061"></a>
+## FEAT-2026-0061 — Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths`
+
+**Why.** `decision_class_paths` is one of the eight arm-predicate stop classes shipped by [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), and its job is to stop an `auto` feature before it adds a dependency without a human seeing it. It recognises exactly three manifest shapes: `_DEPENDENCY_MANIFEST_EXACT` matches `pyproject.toml` and `package.json`, and `_REQUIREMENTS_RE` matches `requirements*.txt`. Every other ecosystem is invisible. Found while scoping the first `auto` ride against the Specfuse Generator, which is a Maven repository: a work unit there adding a Java dependency to `pom.xml` arms without stopping, and the class reports `clean` while doing it — a false negative, not a gap the operator can see. `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `go.mod`, `Gemfile`, `*.csproj`, and `composer.json` are all in the same position. The class is at its least trustworthy exactly where its value is highest, because a repo whose manifests it cannot read is a repo where it silently never fires.
+
+**Goal.** Extend the manifest surface to the ecosystems Specfuse targets, with the recognition rules stated in one place rather than spread across two module-private constants and a regex. Decide as part of this feature whether coverage is a fixed list or a declared surface a target project can extend in `.specfuse/verification.yml` — the fixed list is simpler and cannot drift out of sync with a project's real build files; a declared surface handles the polyglot monorepo the fixed list will eventually meet. Whichever is chosen, an unrecognised-but-plausible manifest should be surfaced rather than silently passed: a class that cannot evaluate its input should report `not_evaluable`, which the predicate already treats as fail-closed, instead of `clean`. Add the coverage list to `docs/concepts/autonomy-stop-classes.md`, which currently documents the class without naming what it can and cannot see.
+
+**Benefits.** The dependency-addition guard works in the repositories Specfuse is actually used in, rather than only in Python ones. Removes a false-negative class from the autonomy predicate — the most dangerous failure shape it has, because a stop class that reports `clean` on an input it cannot parse is worse than one that is absent, which at least an operator would notice. Unblocks trusting `auto` in the Generator and any other JVM, .NET, Go, or Rust target.
+
+**Status: active.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
+
+<a id="feat-2026-0062"></a>
+
 <a id="feat-2026-0053"></a>
 ## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
 

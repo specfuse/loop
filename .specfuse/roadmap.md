@@ -80,7 +80,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
-| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | planned | — | [→ detail](#feat-2026-0061) |
+| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -982,18 +982,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0061"></a>
-## FEAT-2026-0061 — Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths`
-
-**Why.** `decision_class_paths` is one of the eight arm-predicate stop classes shipped by [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), and its job is to stop an `auto` feature before it adds a dependency without a human seeing it. It recognises exactly three manifest shapes: `_DEPENDENCY_MANIFEST_EXACT` matches `pyproject.toml` and `package.json`, and `_REQUIREMENTS_RE` matches `requirements*.txt`. Every other ecosystem is invisible. Found while scoping the first `auto` ride against the Specfuse Generator, which is a Maven repository: a work unit there adding a Java dependency to `pom.xml` arms without stopping, and the class reports `clean` while doing it — a false negative, not a gap the operator can see. `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `go.mod`, `Gemfile`, `*.csproj`, and `composer.json` are all in the same position. The class is at its least trustworthy exactly where its value is highest, because a repo whose manifests it cannot read is a repo where it silently never fires.
-
-**Goal.** Extend the manifest surface to the ecosystems Specfuse targets, with the recognition rules stated in one place rather than spread across two module-private constants and a regex. Decide as part of this feature whether coverage is a fixed list or a declared surface a target project can extend in `.specfuse/verification.yml` — the fixed list is simpler and cannot drift out of sync with a project's real build files; a declared surface handles the polyglot monorepo the fixed list will eventually meet. Whichever is chosen, an unrecognised-but-plausible manifest should be surfaced rather than silently passed: a class that cannot evaluate its input should report `not_evaluable`, which the predicate already treats as fail-closed, instead of `clean`. Add the coverage list to `docs/concepts/autonomy-stop-classes.md`, which currently documents the class without naming what it can and cannot see.
-
-**Benefits.** The dependency-addition guard works in the repositories Specfuse is actually used in, rather than only in Python ones. Removes a false-negative class from the autonomy predicate — the most dangerous failure shape it has, because a stop class that reports `clean` on an input it cannot parse is worse than one that is absent, which at least an operator would notice. Unblocks trusting `auto` in the Generator and any other JVM, .NET, Go, or Rust target.
-
-**Status: planned.**
-
-<a id="feat-2026-0062"></a>
 ## FEAT-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
 
 **Why.** Two independent cost consumers read only a work unit's current-dispatch-cycle spend. `budget_projection`, the arm-predicate class that stops a feature heading past 2× its baseline, and `gate_spent_usd`, which drives the per-gate budget brake, both read frontmatter `cost_usd` and neither reads `cumulative_cost_usd` or `re_arm_history[].prior_cost_usd`. A re-arm resets `attempts` to `0` and folds prior spend into the cumulative fields, so **every re-armed work unit is invisible to both**. Measured on [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053) itself, recorded in its gate-2 Findings §1: the projection under-read by **$6.23** and the gate spend by **$5.01**. The bias is not random — it under-reports precisely the work units that have already failed and been retried, which are the ones most likely to be heading toward a budget breach. The brake has a second, separate blind spot found in the same feature: `_should_halt_for_budget` is evaluated *before* each dispatch, so an overrun inside the final work unit of a gate cannot be seen at all. Gate 2 closed **$4.94 over** its $31.50 brake without the brake firing.
