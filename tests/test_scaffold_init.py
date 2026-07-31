@@ -41,6 +41,7 @@ _EXPECTED_TREE = {
     "LEARNINGS.md",
     "features/.gitkeep",
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
+    "docs/concepts/autonomy-stop-classes.md",
     "docs/concepts/ralph-lineage.md",
     "docs/getting-started.md",
     "docs/methodology.md",

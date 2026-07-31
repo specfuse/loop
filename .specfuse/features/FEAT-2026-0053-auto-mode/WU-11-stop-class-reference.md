@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0053/T11
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.00
 oracle_env: macos_local
 provenance: "G2-PLAN's dispatch brief names 'the seven-plus-one stop classes documented as an operator-facing reference' as minimum gate-3 scope: a parked auto feature is diagnosable only if the reader can map a fired class to a fix. Sharpened by RETROSPECTIVE.md gate-2 Findings 2 — an arm_predicate_evaluated event emitted from an escalation flip site carries a gate number that does not mean what a consumer will read it to mean, so the reference has to teach reading the event, not only the classes."
@@ -11,6 +11,10 @@ produces:
   - specfuse/loop/data/docs/concepts/autonomy-stop-classes.md
   - docs/README.md
   - tests/test_scaffold_data_in_sync.py
+duration_seconds: 1015.283
+cost_usd: 1.761523
+input_tokens: 1540
+output_tokens: 17269
 ---
 
 # The eight stop classes, as an operator-facing reference
