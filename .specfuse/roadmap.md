@@ -34,31 +34,31 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-2026-0016) |
 | FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
 | FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
-| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | done | — | — |
-| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | — |
+| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | done | — | [→ detail](#feat-2026-0019) |
+| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | [→ detail](#feat-2026-0020) |
 | FEAT-2026-0021 | Ceremony proportionality + slim WU template | done | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | [→ archive](roadmap-archive.md#feat-2026-0021) |
 | FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
 | FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
 | FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
 | FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | done | — | [→ archive](roadmap-archive.md#feat-2026-0025) |
 | FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
-| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | — |
-| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | — |
+| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | [→ detail](#feat-2026-0027) |
+| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | [→ detail](#feat-2026-0028) |
 | FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
 | FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
-| FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | — |
+| FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | [→ detail](#feat-2026-0033) |
 | FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | planned | — | [→ detail](#feat-2026-0034) |
-| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | — |
-| FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | — |
+| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-2026-0035) |
+| FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | [→ detail](#feat-2026-0036) |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
-| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | — |
+| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | [→ detail](#feat-2026-0038) |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
-| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | — |
-| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | — |
+| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | [→ detail](#feat-2026-0042) |
+| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
@@ -71,10 +71,10 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | — |
-| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | — |
-| FEAT-2026-0058 | Feature decision registry + override lint | planned | — | — |
-| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | — |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
+| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | [→ detail](#feat-2026-0057) |
+| FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
+| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | planned | — | [→ detail](#feat-2026-0062) |
@@ -359,6 +359,7 @@ templates + lint, one substantive WU to ship the type-keyed guard
 table + tests, then closing ceremony (using the new contract for
 recursive dogfood).
 
+<a id="feat-2026-0019"></a>
 ## FEAT-2026-0019 — Distribution: PyPi-installable driver + Claude Code plugin marketplace
 
 **Why.** Two distribution gaps, one feature.
@@ -484,6 +485,7 @@ package + green test suite via `pip install -e .`; (2) GitHub Actions
 publish path + first tagged release; (3) Claude Code plugin + marketplace
 PR; (4) bridge command + deprecation of `init.sh` v1.0. Each gate
 independently shippable.
+<a id="feat-2026-0020"></a>
 ## FEAT-2026-0020 — Public-readiness prep: secrets audit + OSS hygiene before visibility flip
 
 **Why.** The `specfuse/loop` GitHub repo is currently private. The
@@ -610,6 +612,7 @@ class (secret scan, PR sweep, personal-refs grep, cross-pollination,
 license headers) + closing ceremony; gate 2 = one substantive WU per
 hygiene-file class + the flip-checklist WU + closing ceremony.
 
+<a id="feat-2026-0027"></a>
 ## FEAT-2026-0027 — Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run
 
 **Why.** Even with FEAT-2026-0026, adopting/upgrading a project is still manual:
@@ -661,6 +664,7 @@ commands; legacy init.sh repos migrate cleanly to pip-native.
 in-process init/upgrade) and FEAT-2026-0028 (the umbrella CLI must call the scaffold
 API before auto-sync can drive it). Also packaging/harness-coupled — expect interactive.
 
+<a id="feat-2026-0028"></a>
 ## FEAT-2026-0028 — Umbrella CLI → scaffold-API wiring + docs in the pip seed
 
 **Why.** FEAT-2026-0026 shipped `specfuse.loop.scaffold` (`init_specfuse`,
@@ -692,6 +696,7 @@ FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adopti
 **Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
+<a id="feat-2026-0033"></a>
 ## FEAT-2026-0033 — Sub-repo component scoping: multiple components in one repo
 
 **Why.** The loop assumes component == repo: `.specfuse/` is resolved as `Path(".specfuse")` relative to cwd (`specfuse/loop/loop.py:61-64`), gate commands run with no `cwd=` (`loop.py:1764`), there is one tree lock, one roadmap, and one verification surface per repo. Real projects put multiple shippable deliverables in one repo — a phone app and a kiosk/tablet app sharing generated Flutter libraries, delivered as separate store apps from the same git tree. Today the only way to model that is to flatten every deliverable into a single repo-root-scoped component, so a kiosk-only feature also runs the phone app's gates. Slow, not wrong — but it degrades as deliverables and gate runtimes grow, and it gives ownership/release-cadence-diverged deliverables no independent surface.
@@ -723,6 +728,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Status: planned.**
 
+<a id="feat-2026-0035"></a>
 ## FEAT-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
 
 **Why.** `draft-feature` Step 3 asks a **single batched round** of hat questions — a wall of questions that suits an expert who already knows every answer but overwhelms the newcomers the methodology most needs to onboard, and it hands the driver weakly-validated answers (a batch is skimmed, not deliberated). Onboarding friction and driver alignment both suffer. The improvement: walk the user through the framing decisions **one at a time**, and for each *decision* question present the options with prose pros/cons and a recommendation so they choose well — the shape `/pick-feature` already uses, extended per-question.
@@ -736,6 +742,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Status: done.** Shipped in draft-feature v0.2 (#228).
 
+<a id="feat-2026-0036"></a>
 ## FEAT-2026-0036 — Pin ruff's lint ruleset explicitly; lift the <0.16 version pin
 
 **Why.** CI's lint gate broke on ruff 0.16 with ~300 findings on code clean for months. Investigation (this feature) reframed the original premise: they were **not** 300 real errors, and not import-ordering. ruff 0.16 **changed its implicit default `select`** from the classic `E4,E7,E9,F` to a large opinionated set (B/SIM/PLW/RUF/I/…). The repo's `[tool.ruff]` config selected nothing, so it inherited 0.16's new default overnight — the gate expanded purely from a version bump, no code involved. The emergency `ruff>=0.6,<0.16` pin froze the version to dodge it.
@@ -746,6 +753,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Status: done.** Config-only fix (`pyproject.toml` explicit select + version unpin); no code change.
 
+<a id="feat-2026-0038"></a>
 ## FEAT-2026-0038 — DLQ quarantine harvest mode (per-component)
 
 **Why.** Peek-only DLQ harvesting (monitoring v1) leaves messages in the DLQ: TTL can expire evidence, DLQ depth loses signal value, and replay-after-fix stays manual. Quarantine mode (receive + archive to blob storage) preserves evidence durably and makes replay mechanical, enabling autonomy level 4 (replay-verify-close).
@@ -790,6 +798,7 @@ machine-checkable contract rather than prose.
 
 **Status: blocked.**
 
+<a id="feat-2026-0042"></a>
 ## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
 
 **Why.** With detection (FEAT-2026-0040) and diagnosis (FEAT-2026-0041) in place, the remaining step to a self-healing repo is launching the existing fix-bug skill (1 bug = 1 branch = 1 PR, test-first) from a diagnosed finding — guarded, because a wrong diagnosis can produce a confidently-wrong PR and an incident storm can flood the repo.
@@ -802,6 +811,7 @@ machine-checkable contract rather than prose.
 
 **Status: blocked.**
 
+<a id="feat-2026-0043"></a>
 ## FEAT-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
 
 **Why.** The harvester CLI is host-agnostic by design (FEAT-2026-0040 ships local + gh-actions surfaces), but orgs whose policy forbids external runners touching environments — or who want workload identity instead of exported secrets and tighter schedules than GH Actions cron honors — need an in-cluster surface.
@@ -899,6 +909,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0056"></a>
 ## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
 
 **Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
@@ -909,6 +920,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0057"></a>
 ## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
 
 **Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
@@ -919,6 +931,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0058"></a>
 ## FEAT-2026-0058 — Feature decision registry + override lint
 
 **Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
@@ -929,6 +942,7 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
+<a id="feat-2026-0059"></a>
 ## FEAT-2026-0059 — Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking
 
 **Why.** First live run of `/accept-hedged-close` (FEAT-2026-0054, 2026-07-30) showed the operator-facing gap: the skill quotes the raw D-entry follow-up record and demands a one-line reason, but never answers the operator's actual questions — *why couldn't this close `met`, and what kind of reason is expected?* On 0054 the answer was derivable but buried: two entries were unclosable in-repo by construction (an operator-signature entry and a future-rate-in-other-repos entry) and two were findings routed to other owners — meaning `met_locally` was the structural ceiling and no rework alternative existed. The operator had to reverse-engineer that from four verbose entries. Routed findings also currently survive only as retrospective prose, with no tracking surface.
@@ -997,7 +1011,7 @@ machine-checkable contract rather than prose.
 <a id="feat-2026-0063"></a>
 ## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
 
-**Why.** [FEAT-2026-0061](#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. A sweep of `evaluate_arm_predicate` across all 44 feature folders at that feature's close returned `decision_class_paths`: **42 `not_evaluable` + 2 `clean`**, and every one of the 42 was `no_baseline` — the pre-existing whole-predicate fail-closed path from [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), not either new trigger. So the triggers have never fired on real input, and cannot in this repository: no feature here has both a captured baseline and an uncovered manifest.
+**Why.** [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. A sweep of `evaluate_arm_predicate` across all 44 feature folders at that feature's close returned `decision_class_paths`: **42 `not_evaluable` + 2 `clean`**, and every one of the 42 was `no_baseline` — the pre-existing whole-predicate fail-closed path from [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), not either new trigger. So the triggers have never fired on real input, and cannot in this repository: no feature here has both a captured baseline and an uncovered manifest.
 
 This is the exact shape `LEARNINGS [FEAT-2026-0053/G1-CLOSE]` names — *"a refusal path proven on the corpus says nothing about the approval path"* — and it generalises past `decision_class_paths`. The same question is open for every stop class whose fail-closed branch has only ever been exercised by a hand-authored fixture. The predicate's whole value is that it stops things; a stop that has never fired against a real tree is a claim, not a guard.
 
