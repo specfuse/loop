@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0053/T11
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 oracle_env: macos_local
@@ -84,14 +84,26 @@ either list.
 5. The page contains a section on reading an `arm_predicate_evaluated` event
    that states both what a payload's `gate` field means and what it does not
    mean, per `RETROSPECTIVE.md` gate-2 Findings §2.
-6. `docs/README.md`'s "Concepts (under `concepts/`)" list gains an entry for the
+
+6. **Added at arming (open question 2, accepted as a v1 approximation).** The
+   `judge_editing` section states that the class fires on any path under the
+   `specfuse/loop/` prefix, that every documentation file in this repo is
+   mirrored into `specfuse/loop/data/docs/`, and therefore that **under `auto`
+   no gate shipping a documentation file can arm** — the prefix test cannot
+   distinguish package data from driver source. Name the same v1-approximation
+   shape already documented for `pyproject.toml`. This is the case the first
+   `auto` feature to write docs will hit, and the operator who meets it must be
+   able to find the answer on this page instead of reading `arm_eval.py`. The
+   clearing action required by AC#2 for this class is the human arm, not a code
+   change; say so explicitly.
+7. `docs/README.md`'s "Concepts (under `concepts/`)" list gains an entry for the
    new page.
-7. `specfuse/loop/data/docs/concepts/autonomy-stop-classes.md` exists,
+8. `specfuse/loop/data/docs/concepts/autonomy-stop-classes.md` exists,
    `DOCS_TRACKED` in `tests/test_scaffold_data_in_sync.py` names the new path,
    and `python3 -m unittest tests.test_scaffold_data_in_sync -v` exits `0`.
    Adding the page without registering it in `DOCS_TRACKED` leaves it untracked
    by the drift guard and does not satisfy this criterion.
-8. `python3 -m unittest discover -s tests -v` exits `0`.
+9. `python3 -m unittest discover -s tests -v` exits `0`.
 
 **Do not touch.** `specfuse/loop/arm_eval.py` and every other `.py` file under
 `specfuse/` except the mirrored data copy — this WU documents the predicate and

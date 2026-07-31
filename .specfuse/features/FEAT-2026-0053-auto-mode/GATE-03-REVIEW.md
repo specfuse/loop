@@ -10,6 +10,57 @@ open_questions:
 
 # Gate 3 review — docs, methodology, and the honest close
 
+## Arming decisions (2026-07-31, at the gate-2 → gate-3 checkpoint)
+
+Answers to the five `open_questions`, recorded here because `G3-CLOSE` reads
+this file and several of them change what it must report.
+
+1. **T13 — accepted, scoped in.** Gate 3 is terminal, so there is no later gate
+   in this feature to hold it, and the alternative is shipping a feature whose
+   own retrospective records its headline claim as undelivered. An accumulation
+   file nothing reads is the checkpoint value silently not delivered, not a
+   cosmetic gap. `PLAN.md`'s "docs and methodology rewrite" boundary is
+   knowingly widened by this one WU; `G3-CLOSE` should enumerate that widening
+   in its contract-change list rather than let it pass as documentation.
+
+2. **`judge_editing` on documentation — accepted as a known v1 approximation.**
+   Not fixed here; the fix is not gate 3's to make. Per this file's own
+   recommendation, the decision is written into T11's scope as **AC#5a**: the
+   stop-class page must name the case, state that no `auto` gate shipping
+   documentation can arm, and give the human arm as its clearing action. The
+   underlying narrowing of `JUDGE_PATHS` needs a home outside this feature.
+
+3. **The two unbuilt §9 claims stay unbuilt, recorded as unbuilt.** Confirmed.
+   The per-gate tightening-only override and `supervised`-as-a-distinct-level
+   are design decisions worth preserving in prose; building either is a
+   different feature, and deleting them silently loses the decision. T10's
+   instruction stands.
+
+4. **The `budget_projection` / `gate_spent_usd` under-read needs a roadmap
+   feature, not an issue.** Neither reads `cumulative_cost_usd` nor
+   `re_arm_history[].prior_cost_usd`, so both under-report any WU that was ever
+   re-armed — $6.23 and $5.01 on this feature alone. That is a correctness
+   defect in a stop class that gates autonomy, and it interacts with the
+   `arm_eval` constants graduating to `agent-policy.yml`, which is feature-sized
+   work. `G3-CLOSE` re-measures and names the number, as instructed, and does
+   not fix it.
+
+5. **`cost_budget_usd: 22.00` accepted unchanged.** §5 is right that a
+   closing-WU retry is a defect to diagnose rather than a cost to budget for,
+   and raising the number to cover a predicted breach would convert a signal
+   into noise. If gate 3 breaches it, that is the datum, and `G3-CLOSE` reports
+   it alongside gate 2's true final number.
+
+**§4 runtime probe — confirmed not required.** Checked against the four WU
+bodies rather than taken from this file's claim, because gate 2's arming turned
+on exactly this precondition. T10–T12 produce documentation and its mirrored
+scaffold copies. T13 edits `wrap-feature`'s skill prose; its behavior keys on
+the presence of a file, not on a default value. `G3-CLOSE` is the close. Nothing
+on this gate flips a default or a severity, so §4 does not bind.
+
+**Merge stays human.** Confirmed once more at the terminal gate, as this file
+asks. Nothing in gate 3 touches it and T13 explicitly forbids softening it.
+
 Written by `FEAT-2026-0053/G2-PLAN` at the gate-2 → gate-3 boundary. This file
 supports the human read that arms gate 3, the terminal gate. After gate 3 there
 is no further plan-next: this is the last checkpoint at which the shape of the

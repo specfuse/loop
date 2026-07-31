@@ -1,6 +1,6 @@
 ---
 gate: 2
-status: awaiting_review
+status: passed
 cost_budget_usd: 31.50
 # Sum of G1-PLAN's seven drafted units ($25.50 — T05 $3.50, T06 $3.50, T07
 # $3.00, T08 $2.50, T09 $2.50, G2-CLOSE-INTERMEDIATE $4.50, G2-PLAN $6.00) plus
