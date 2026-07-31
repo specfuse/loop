@@ -1,8 +1,18 @@
 ---
 id: FEAT-2026-0053/T07
 type: implementation
-status: blocked_human
-attempts: 1
+status: pending
+attempts: 0
+re_arm_count: 1
+re_arm_override: true
+re_arm_history:
+  -
+    timestamp: 2026-07-31T02:15:35+00:00
+    prior_status: blocked_human
+    prior_attempts: 3
+    prior_cost_usd: 5.01
+    prior_duration_seconds: 774.183
+    reason: "Operator instruction after root-cause diagnosis: T06's fixture in tests/test_arm_wiring.py omits planned_cost_usd, which this WU's new veto class requires, so the fixture vetoed its own arm every attempt. Do-not-touch amended to permit adding that one field to the fixture builder. Override rather than reproduced_signature: the failing tree was discarded on each attempt, so the escalated failure itself is no longer reproducible; the root cause was reproduced directly against lint_plan_next_draft."
 planned_cost_usd: 3.00
 human_only: true
 provenance: "RETROSPECTIVE.md, Consumer-visible contract changes item 3 — gate 2 flips open_questions to blocking under auto only; that is the severity flip and it needs its own satisfiability answer and runtime probe. AC#5 (a malformed review file must park, not raise) comes from this feature's own G1-PLAN warn census, which hit MiniYAMLError on one of 43 real feature folders."
@@ -146,11 +156,33 @@ under `auto`"*.
    `python3 -m unittest tests.test_arm_eval -v` exit 0 — the pre-existing
    19-case suite must not regress.
 
+**Scope clarification added by the operator after attempt 3 (read this first).**
+Three attempts failed on the same signature, `$ python3 -m unittest discover -s
+tests -v`, and the root cause is a fixture, not this WU's logic. T06's test
+fixture in `tests/test_arm_wiring.py` generates draft WUs whose frontmatter is
+`id / type / model / status / attempts` — with **no `planned_cost_usd`**. This
+WU's `plan_next_lint` requires a positive one, so the fixture fires the new veto,
+`would_arm` becomes `False`, and T06's
+`test_auto_feature_arms_next_gate_in_one_commit` fails. Verified directly
+against `lint_plan_next_draft` using that exact frontmatter shape: one finding,
+`missing 'planned_cost_usd' frontmatter`. The fixture already sets
+`open_questions: []` deliberately; it predates the wider check set this WU
+introduces.
+
+**You are therefore permitted to add `planned_cost_usd` to the WU frontmatter
+that `tests/test_arm_wiring.py`'s fixture builder emits** — that one field, in
+the fixture builder only. A real work unit always carries it, so this makes the
+fixture representative rather than weakening anything. Do not change T06's
+assertions, its production code, or any other part of its tests. This is a
+scope clarification, not a licence to fix T06.
+
 **Do not touch.** The check *content* of `lint_plan_next_draft` — this WU
 changes severity, not what is checked; adding, removing, or loosening a check
-here would make the satisfiability answer above false. The CLI exit code of
+here would make the satisfiability answer above false. Weakening the
+`planned_cost_usd` check to accommodate the fixture is the specific temptation
+here and is forbidden: the fixture is wrong, not the check. The CLI exit code of
 `lint_plan.py`. The other seven predicate classes and their reasons. The
-arm branch itself (T06). `FEATURE-REVIEW.md` accumulation (T08) and LEARNINGS
+arm branch itself (T06), beyond the single fixture field named above. `FEATURE-REVIEW.md` accumulation (T08) and LEARNINGS
 staging (T09). Historical feature folders — the 25 legacy findings are evidence,
 not a migration backlog, and back-filling `open_questions:` into closed features
 is explicitly out of scope. Generated directories, secrets, `.git/`. The driver
