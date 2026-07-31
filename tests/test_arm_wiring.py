@@ -169,16 +169,29 @@ def _copy_real_feature(root: Path, autonomy: str) -> Path:
     real WU frontmatter (produces, provenance, cost fields), real
     events.jsonl — rewound to the moment gate 1 is about to close and gate
     2's real seven WUs sit `draft`, not yet armed by a human. Only the
-    `autonomy_default` dial and gate 1's status are overridden; every other
-    byte, including T05/T06's real `produces:` under `specfuse/loop/` and
-    T07's real `human_only: true`, is the real feature as committed.
+    `autonomy_default` dial, the feature `status`, and gate 1's status are
+    overridden; every other byte, including T05/T06's real `produces:` under
+    `specfuse/loop/` and T07's real `human_only: true`, is the real feature as
+    committed.
+
+    The feature `status` rewind is load-bearing, not cosmetic. `loop.run(None,
+    ...)` resolves its target through `find_feature(None)`, which selects the
+    repo's `active` feature. This fixture copies a real folder whose status
+    moves over that feature's life — it was `active` while the feature was in
+    flight and became `done` the moment its hedged close was accepted. Without
+    this rewind the copy carries `status: done`, `find_feature` finds nothing
+    active and `sys.exit`s, and the test errors for a reason that has nothing
+    to do with arming. A fixture built from a live artifact has to rewind every
+    field the code under test reads, or it silently expires.
     """
     dest = root / ".specfuse/features/FEAT-2026-0053-auto-mode"
     shutil.copytree(REAL_FEATURE_DIR, dest)
 
     plan = dest / "PLAN.md"
-    plan.write_text(plan.read_text().replace(
-        "autonomy_default: review", f"autonomy_default: {autonomy}"))
+    plan.write_text(re.sub(
+        r"^status: .*$", "status: active", plan.read_text().replace(
+            "autonomy_default: review", f"autonomy_default: {autonomy}"),
+        count=1, flags=re.MULTILINE))
 
     gate1 = dest / "GATE-01.md"
     gate1.write_text(re.sub(
