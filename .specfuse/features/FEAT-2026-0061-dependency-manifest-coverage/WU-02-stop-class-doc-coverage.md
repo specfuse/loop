@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0061/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - docs/concepts/autonomy-stop-classes.md
   - specfuse/loop/data/docs/concepts/autonomy-stop-classes.md
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-07-31T14:10:09.427955+00:00
+duration_seconds: 205.677
+cost_usd: 0.444499
+input_tokens: 22
+output_tokens: 3913
 ---
 
 # Document what `decision_class_paths` can and cannot see
