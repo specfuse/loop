@@ -2638,6 +2638,66 @@ def resolve_bash() -> str | None:
     return None
 
 
+# Lines a reader needs in a gate's FAIL report: test-runner verdicts, coverage
+# totals, and the first line of a traceback. Matched against a stripped line.
+_VERDICT_RE = re.compile(
+    r"^(?:"
+    r"OK\b"                                  # unittest pass
+    r"|FAILED\b"                             # unittest fail
+    r"|Ran \d+ tests?\b"                     # unittest count
+    r"|ERROR:|FAIL:"                         # unittest per-test headers
+    r"|AssertionError\b"
+    r"|Traceback \(most recent call last\)"
+    r"|\d+ (?:passed|failed|error)"          # pytest summary
+    r"|TOTAL\s+\d"                           # coverage total
+    r")"
+)
+
+_NO_VERDICT_NOTE = (
+    "NO VERDICT FOUND: the gate command produced no recognisable "
+    "pass/fail summary anywhere in its output — the lines above are the tail "
+    "only, and may be unrelated to the failure. Run the command directly."
+)
+
+
+def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
+    """Return the lines to show in a gate's report — verdict first, tail always.
+
+    A positional tail is not enough (FEAT-2026-0068). `unittest` writes its
+    summary to unbuffered stderr while this repo's integration suites write
+    driver output to block-buffered stdout, which flushes afterwards and pushes
+    the verdict out of the window. Two attempts of FEAT-2026-0060/T01 were shown
+    the same verdict-less tail, produced identical failure signatures for that
+    reason, and escalated `spinning_signature_repeat` having cost $5.31 and
+    produced no diagnosis.
+
+    So: keep the last `window` lines, and additionally pin any verdict line
+    (see `_VERDICT_RE`) found *before* the tail, with an explicit elision marker
+    between the two so nothing is dropped silently. When no verdict is found
+    anywhere, say so rather than presenting unrelated trailing output as though
+    it were the failure.
+    """
+    lines = (out or "").strip().splitlines()
+    if not lines:
+        return []
+
+    tail = lines[-window:] if window > 0 else []
+    head = lines[: len(lines) - len(tail)]
+
+    pinned = [ln for ln in head if _VERDICT_RE.match(ln.strip())]
+    if pinned:
+        # Cap the pinned block so a suite emitting hundreds of `FAIL:` headers
+        # cannot itself flood the report it exists to make readable.
+        pinned = pinned[-window:]
+        elided = len(head) - len(pinned)
+        marker = [f"... ({elided} line(s) elided) ..."] if elided > 0 else []
+        return pinned + marker + tail
+
+    if any(_VERDICT_RE.match(ln.strip()) for ln in tail):
+        return tail
+    return tail + [_NO_VERDICT_NOTE]
+
+
 def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
@@ -2704,7 +2764,7 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
             ok = proc.returncode == 0
-            tail = (out or "").strip().splitlines()[-15:]
+            tail = select_gate_report_lines(out, window=15)
             # A green gate whose oracle silently degraded is a hollow pass
             # (issue #134): force FAIL and name the degradation honestly so the
             # log reads as "oracle couldn't measure it," not "code is clean."
@@ -2726,7 +2786,7 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
                     proc.kill()
             out, _ = proc.communicate()
             ok = False
-            tail = (out or "").strip().splitlines()[-10:] + [
+            tail = select_gate_report_lines(out, window=10) + [
                 f"GATE TIMEOUT: exceeded {GATE_TIMEOUT_SECONDS}s and was killed "
                 f"(process group) — a hang (test reading stdin, infinite loop, "
                 f"or a wedged subprocess)."

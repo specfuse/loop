@@ -81,7 +81,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
-| FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | planned | — | [→ detail](#feat-2026-0068) |
+| FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
@@ -1083,7 +1083,9 @@ Consider also whether test suites that emit driver output on stdout should be qu
 
 **Benefits.** An agent that fails a gate is told why, so the common case becomes a corrected second attempt rather than an identical one. Removes a systematic driver of `spinning_signature_repeat`: two attempts shown the same uninformative tail produce the same signature by construction, so the guard fires on a reporting defect and reads as a work-unit defect. And an operator reading a blocked WU's attempt notes sees the failure instead of a fixture feature's gate ceremony.
 
-**Status: planned.**
+**Status: done.** Executed directly as a bug fix rather than dispatched through the loop — one function, test-first, one branch, one PR, on the same footing as FEAT-2026-0036. Dispatching it would have meant running a work unit whose own gate report carried the defect being fixed.
+
+Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the normal path (15-line window) and the timeout path (10-line window), which carried the identical positional-tail shape. Both mechanisms the row left open were taken, since they compose — verdict lines found before the tail are pinned above it with an explicit `... (N line(s) elided) ...` marker, and output with no recognisable verdict anywhere gets an explicit `NO VERDICT FOUND` note rather than presenting unrelated trailing output as the failure. Twelve tests in `tests/test_gate_report_verdict.py`, red before the change. Verified against the real captured output that motivated the row: the report now opens `Ran 2007 tests in 84.286s` / `OK (skipped=3)` / `... (4564 line(s) elided) ...` where it previously opened on a fixture feature's gate ceremony.
 
 ## Notes
 
