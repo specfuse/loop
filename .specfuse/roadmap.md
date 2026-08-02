@@ -80,6 +80,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
+| FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
@@ -1027,6 +1028,28 @@ The gap widens under autonomy. As more work lands via `auto` features and the bu
 Two decisions to settle when this is drafted, both noted here so they are not discovered mid-gate. Whether the document is a driver-maintained artifact (mechanically appended, lint-enforced) or a human-authored one the driver merely reminds about — the first is enforceable and risks unreadable prose, the second reads well and rots. And how the specfuse umbrella package's own bump-and-tag relates: releasing `specfuse-loop` requires bumping *and* tagging the umbrella before `pipx upgrade` re-resolves the driver, so a release note that documents only the driver's version describes half the release.
 
 **Benefits.** A consumer can answer "what changed, and will it break me" from one document instead of a commit range. Breaking changes get stated once, in prose, at the moment the person who made them still remembers why — which is the only moment that statement is cheap. The close ceremony's consumer-visible enumeration stops being write-only. And every project the scaffold installs into inherits the same discipline rather than reinventing a changelog convention per repo.
+
+**Status: planned.**
+
+<a id="feat-2026-0067"></a>
+## FEAT-2026-0067 — Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two
+
+**Why.** A re-armed work unit's prior-cycle spend lands in one of two different places depending on a condition nobody chose deliberately. `fold_cumulative_on_rearm` moves it into `cumulative_cost_usd` and zeroes `cost_usd`, but it runs only when `detect_rearm_dispatch` returns true — and that helper requires `cost_usd > 0` at dispatch time. When a re-arm path zeroes `cost_usd` before the driver next dispatches, detection fails, the fold never runs, and the spend survives only in `re_arm_history[].prior_cost_usd`. Both shapes exist in this repository right now:
+
+```
+WU-02 (FEAT-2026-0020)  cost=0.539  cum=0.473  priors=[0.473]   fold ran
+WU-03 (FEAT-2026-0069)  cost=2.384  cum=5.261  priors=[5.261]   fold ran
+WU-07 (FEAT-2026-0053)  cost=4.282  cum=—      priors=[5.01]    fold never ran
+WU-04 (FEAT-2026-0020)  cost=0.163  cum=—      priors=[0.163]   fold never ran
+```
+
+[FEAT-2026-0062](roadmap-archive.md#feat-2026-0062) made the two cost *consumers* shape-independent, so nothing the driver decides is wrong today because of this. It deliberately scoped the fold itself OUT: fixing what gets **written** changes every future work unit's frontmatter, a different blast radius from fixing what gets **read**. That deferral was right for that feature and is not a reason to leave this permanently.
+
+What remains is a frontmatter contract that means two different things with no way to tell which. A reader — human or code — cannot distinguish "this unit was never re-armed" from "this unit was re-armed and the fold silently did not run", because both present as an absent `cumulative_cost_usd`. The divergence also guarantees that `cumulative_duration_seconds`, `cumulative_input_tokens`, and `cumulative_output_tokens` carry the identical split; no consumer gates on them yet, so it is invisible rather than absent. And `detect_rearm_dispatch`'s `cost_usd > 0` guard is itself the shape `LEARNINGS [FEAT-2026-0053/G2-CLOSE]` warns about — a guard inferring "already folded" from a zero it cannot distinguish from "never had a cost".
+
+**Goal.** Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way. Two shapes are viable and the feature should choose one rather than splitting the difference. **Converge:** make the fold run on every re-arm regardless of the `cost_usd` value — replacing the value-inferred guard with an explicit signal such as a fold marker or a re-arm-cycle counter — so `cumulative_*` is always the lifetime accumulator and `re_arm_history[].prior_*` becomes a pure audit record. **Or admit two paths:** state in the frontmatter contract that prior spend lives in either place, and give readers one documented helper that resolves it — which is close to what FEAT-2026-0062 already shipped in `wu_lifetime_cost_usd`, and would mean promoting that function from a cost-specific reader to the contract's canonical accessor. Whichever is chosen, existing work units carrying the fold-never-ran shape must be handled explicitly — migrated, or left alone with the reason recorded — not silently outlived.
+
+**Benefits.** The frontmatter stops encoding a distinction nobody intended, so the next person to read `cumulative_cost_usd` is not misled the way FEAT-2026-0062's drafting was. The same fix covers the duration and token accumulators before a consumer starts gating on them and inherits the defect. And a value-inferred "already done" guard — a recurring source of defects in this driver — is removed rather than worked around.
 
 **Status: planned.**
 
