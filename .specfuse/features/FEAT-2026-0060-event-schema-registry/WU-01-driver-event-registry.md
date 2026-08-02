@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 4.50
 produces:
@@ -11,6 +11,13 @@ produces:
 produces_driver_helper:
   - load_validator
 oracle_env: macos_local
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: $ python3 -m unittest discover -s tests -v
+duration_seconds: 1350.329
+cost_usd: 5.308758
+input_tokens: 206
+output_tokens: 56361
 ---
 
 # A driver-owned registry, resolved by fall-through
