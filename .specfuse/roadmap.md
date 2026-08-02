@@ -81,6 +81,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
+| FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | planned | — | [→ detail](#feat-2026-0068) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
@@ -1062,6 +1063,25 @@ What remains is a frontmatter contract that means two different things with no w
 **Goal.** Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way. Two shapes are viable and the feature should choose one rather than splitting the difference. **Converge:** make the fold run on every re-arm regardless of the `cost_usd` value — replacing the value-inferred guard with an explicit signal such as a fold marker or a re-arm-cycle counter — so `cumulative_*` is always the lifetime accumulator and `re_arm_history[].prior_*` becomes a pure audit record. **Or admit two paths:** state in the frontmatter contract that prior spend lives in either place, and give readers one documented helper that resolves it — which is close to what FEAT-2026-0062 already shipped in `wu_lifetime_cost_usd`, and would mean promoting that function from a cost-specific reader to the contract's canonical accessor. Whichever is chosen, existing work units carrying the fold-never-ran shape must be handled explicitly — migrated, or left alone with the reason recorded — not silently outlived.
 
 **Benefits.** The frontmatter stops encoding a distinction nobody intended, so the next person to read `cumulative_cost_usd` is not misled the way FEAT-2026-0062's drafting was. The same fix covers the duration and token accumulators before a consumer starts gating on them and inherits the defect. And a value-inferred "already done" guard — a recurring source of defects in this driver — is removed rather than worked around.
+
+**Status: planned.**
+
+<a id="feat-2026-0068"></a>
+## FEAT-2026-0068 — Gate failure reports must contain the failure: verdict-aware output tail
+
+**Why.** When a verification gate fails, the driver shows the agent the last 15 lines of the command's output (`_run_gate_set`, `loop.py:2707`). For this repository's `tests` and `coverage` gates that window reliably contains no verdict and no failure — it contains the tail of an unrelated fixture feature's driver run.
+
+The cause is buffering, not stream selection. `stderr` is already merged into `stdout` (`stderr=subprocess.STDOUT`), and pass/fail is taken from the exit code (`ok = proc.returncode == 0`), so detection is correct. But `unittest` writes its summary to unbuffered `stderr` while the integration suites' driver output goes to block-buffered `stdout`, which flushes afterwards. The verdict is pushed out of the window by output that arrives later.
+
+Reproduced on a **passing** run: `python3 -m unittest discover -s tests -v` merged to one stream exits 0, and `tail -15 | grep -cE '^(OK|FAILED)'` returns **0**. The window instead ends on `Gate 1 complete (retro, lessons, docs, plan-next); terminal gate but PLAN.md not yet 'done'` — output from `FEAT-2026-9301`, a test fixture, which appears 14 times in a single run. The same holds on a failing run, which is what makes it expensive.
+
+Measured cost, [FEAT-2026-0060](#feat-2026-0060)/T01: two attempts, 1350 seconds, **$5.31**, escalated `spinning_signature_repeat` — with **no artifact and no diagnosis**. Both attempts genuinely failed, and both were shown the identical uninformative tail, which is also precisely why their failure signatures matched and the spinning guard fired. The `git reset --hard` between attempts then destroyed the evidence, so what actually broke is now unrecoverable. A failure report that does not contain the failure converts a one-attempt fix into a spin, and the spinning guard cannot tell the difference.
+
+**Goal.** Guarantee that a gate's FAIL report contains the evidence a reader needs to act. Decide the mechanism as part of the feature; two shapes are viable and they compose. **Verdict-aware selection** — scan the captured output for a recognisable verdict or failure marker (`^FAILED`, `^OK`, `^ERROR:`, `^FAIL:`, a non-zero-exit summary line) and pin those lines into the report regardless of where they fall, rather than taking a positional tail. **Window escalation** — when the tail contains no recognisable verdict, widen it or state plainly that the verdict was not found, so "no diagnosis available" is visible rather than disguised as fifteen lines of unrelated text. Whichever is chosen, the timeout path at `loop.py:2729` takes the same treatment; it has the identical positional-tail shape with a 10-line window.
+
+Consider also whether test suites that emit driver output on stdout should be quieted under the gate, since the noise is what displaces the signal — but prefer fixing the reporting, because a report that depends on every test staying quiet is one noisy test away from breaking again.
+
+**Benefits.** An agent that fails a gate is told why, so the common case becomes a corrected second attempt rather than an identical one. Removes a systematic driver of `spinning_signature_repeat`: two attempts shown the same uninformative tail produce the same signature by construction, so the guard fires on a reporting defect and reads as a work-unit defect. And an operator reading a blocked WU's attempt notes sees the failure instead of a fixture feature's gate ceremony.
 
 **Status: planned.**
 
