@@ -75,7 +75,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | [→ detail](#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
-| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | planned | — | [→ detail](#feat-2026-0060) |
+| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | active | — | [→ detail](#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
 | FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
@@ -999,7 +999,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
 
-**Status: planned.**
+**Status: active.** Pulled 2026-08-02 with the premise re-verified against the tree that day, not taken from this section's filing-time evidence: the envelope enum is still 28 entries, `gate_reached` / `attempt_outcome` / `arm_predicate_evaluated` are all absent from it, and the emit path still never invokes the validator. The gap is also now shaping design rather than merely sitting there — [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062)/T03 was authored with an explicit constraint to reuse `human_escalation` with a new `reason` value rather than mint a fourth unsanctioned type.
 
 <a id="feat-2026-0063"></a>
 ## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
