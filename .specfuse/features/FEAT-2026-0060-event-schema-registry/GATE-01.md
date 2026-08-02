@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 18.00
+baseline:
+  sha: 8b8e0400d5dec1360e0d26bc842ec2a1ff22d8fc
+  probed_at: 2026-08-02T21:56:16.057918+00:00
+  failing: []
 ---
 
 # Gate 1 — the driver's own event log validates, and the next unsanctioned type is caught in CI
