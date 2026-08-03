@@ -1,8 +1,17 @@
 ---
 id: FEAT-2026-0060/T02
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-08-03T11:27:50+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 0.574386
+    prior_duration_seconds: 74.248
+    reason: "blocked correctly on an incomplete T01 registry (gate_auto_armed, re_arm_rejected missing); T01's derivation rule widened to include build_event call sites and T01 re-armed to complete it"
 planned_cost_usd: 3.50
 produces:
   - tests/test_driver_event_registry_covers_emitters.py

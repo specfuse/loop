@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: done
-attempts: 1
-re_arm_count: 2
+status: pending
+attempts: 0
+re_arm_count: 3
 re_arm_override: true
 re_arm_history:
   -
@@ -20,6 +20,13 @@ re_arm_history:
     prior_cost_usd: 4.478344
     prior_duration_seconds: 772.327
     reason: "agent correctly escalated an unsatisfiable criterion 9 (zero total validator errors vs the vendored-schema Do-not-touch); criterion 9 rescoped to event_type, correlation_id gap filed as FEAT-2026-0073"
+  -
+    timestamp: 2026-08-03T11:27:50+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 3.922447
+    prior_duration_seconds: 800.344
+    reason: "registry shipped incomplete — criterion 3 derived the type list from the corpus only, which cannot see gate_auto_armed and re_arm_rejected (emitted in code, never fired in a recorded run); T02 found both and blocked. Criterion 3 widened to union build_event call sites with the corpus; operator raised the gate budget to $28.00 to fund the completion"
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/data/schemas/driver-event.schema.json
@@ -74,15 +81,29 @@ Binding rules apply by reference: `result-contract.md`, `never-touch.md`,
 
 `PLAN.md` records seven unsanctioned types measured on 2026-08-02. **Four of them
 appeared after the roadmap row was written naming three**, so the list is a
-moving measurement, not a constant. Re-derive it from the corpus as the first
-step:
+moving measurement, not a constant. Re-derive it as the first step — from **both**
+sources, unioned:
 
 ```
-scan every .specfuse/features/*/events.jsonl, collect distinct event_type values,
-subtract the vendored envelope enum
+(a) every build_event(...) call site in specfuse/loop/*.py  — what the driver CAN emit
+(b) every .specfuse/features/*/events.jsonl                 — what the driver HAS emitted
+then subtract the vendored envelope enum
 ```
 
-If the result differs from the seven in `PLAN.md`, the corpus is right and
+**Source (a) is not optional, and it is the one a prior attempt missed.** An
+earlier version of this criterion said "re-derive from the corpus", so that
+attempt produced a registry of **seven** types and shipped it — but the corpus is
+a *lagging* indicator. `gate_auto_armed` (`loop.py:6043`) and `re_arm_rejected`
+(`loop.py:5332`) are emitted by real code paths that have never fired in any
+recorded run, so no corpus sweep can see them. T02 derived from call sites,
+found both missing, and correctly blocked rather than editing this WU's registry
+itself. Both belong in the registry.
+
+Note that some `build_event` calls span lines, so a single-line grep undercounts
+— `re_arm_rejected` is one of them. Read the call sites, don't pattern-match a
+tidy one-liner.
+
+If the union differs from the seven in `PLAN.md`, the union is right and
 `PLAN.md` is stale — register what you find and record the difference in the
 result.
 
@@ -112,9 +133,12 @@ thing.
    `7 validation error(s) across 13 event(s)` today.
 2. That test passes after this WU's edits: the same real log validates with zero
    errors.
-3. The unsanctioned-type list is re-derived from the corpus per the section
-   above, and the derived list is quoted in the result alongside `PLAN.md`'s
-   seven, with any difference named.
+3. The unsanctioned-type list is re-derived from **the union of `build_event`
+   call sites and the corpus** per the section above, and the derived list is
+   quoted in the result alongside `PLAN.md`'s seven, with any difference named.
+   The result must state explicitly that `gate_auto_armed` and
+   `re_arm_rejected` are present in the registry, since a corpus-only derivation
+   demonstrably omits them.
 4. Every derived type is sanctioned in
    `specfuse/loop/data/schemas/driver-event.schema.json`, a file this repository
    owns — with an `$id` that does **not** claim the orchestrator namespace.

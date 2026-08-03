@@ -1,7 +1,7 @@
 ---
 gate: 1
 status: open
-cost_budget_usd: 18.00
+cost_budget_usd: 28.00
 baseline:
   sha: c9165e3f811b3d89ea566d8efe1b7710403238d7
   probed_at: 2026-08-03T00:45:36.881758+00:00
@@ -26,10 +26,31 @@ This gate is **terminal**: the closing sequence is a single `close` WU, not
 
 ## Cost budget
 
-`cost_budget_usd: 18.00` — the $13.00 sum of WU estimates ($4.50 / $3.50 /
-$5.00) plus one re-attempt of the largest WU ($5.00, the close), per the
-defensive padding the GATE template prescribes while the closing-WU retry defect
-(#260) is open.
+`cost_budget_usd: 28.00` — **raised from $18.00 by the operator on
+2026-08-03 at $14.28 spent**, with the remaining work planned at $8.50 against
+$3.72 of headroom.
+
+The original $18.00 was the $13.00 sum of WU estimates ($4.50 / $3.50 / $5.00)
+plus one re-attempt of the largest WU ($5.00, the close), per the defensive
+padding the GATE template prescribes while the closing-WU retry defect (#260) is
+open. That estimate was not wrong about the work; it was overrun by three
+distinct causes, none of them scope creep:
+
+- **$5.31** — two T01 attempts lost to a gate-reporting defect that made both
+  undiagnosable and produced identical failure signatures, escalating
+  `spinning_signature_repeat` on what was really one unreadable report. Fixed in
+  #322 (FEAT-2026-0068).
+- **$4.48** — one T01 attempt that correctly escalated an unsatisfiable
+  acceptance criterion: criterion 9 demanded zero total validator errors while
+  criterion 5 forbade the only file that could deliver them. Authoring defect.
+- **$0.57** — one T02 attempt that correctly escalated an incomplete registry,
+  because T01's derivation rule read the corpus (a lagging indicator) rather than
+  the driver's `build_event` call sites. Authoring defect.
+
+Roughly $10.36 of the $14.28 bought escalations rather than deliverables. Both
+authoring defects are now corrected in the WUs themselves, and the reporting
+defect is fixed at the source, so the raise funds work rather than repeating
+those three.
 
 ## Ordering constraint — read before arming or re-ordering
 
