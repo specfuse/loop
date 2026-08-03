@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0060/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.50
 produces:
   - tests/test_driver_event_registry_covers_emitters.py
   - .specfuse/verification.yml
 oracle_env: macos_local
+duration_seconds: 74.248
+cost_usd: 0.574386
+input_tokens: 26
+output_tokens: 5183
 ---
 
 # Catch the eighth type in CI, not in a retrospective
