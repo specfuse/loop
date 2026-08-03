@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The diagnosis contract: one renderer, one parser, one marker",
+          "id": "FEAT-2026-0041/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "`/diagnose-issue NN` \u2014 the interactive entry point",
+          "id": "FEAT-2026-0041/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "The headless entry point \u2014 identical output, second path",
+          "id": "FEAT-2026-0041/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The live round-trip: read a real issue, post to a disposable one",
+          "id": "FEAT-2026-0041/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 and the feature \u2014 retrospective, lessons, docs, terminal verdict",
+          "id": "FEAT-2026-0041/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
