@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0042/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - plugins/specfuse/skills/fix-bug/SKILL.md
   - .specfuse/skills/fix-bug/SKILL.md
   - tests/test_fix_bug_headless.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T23:04:51.558842+00:00
+duration_seconds: 580.502
+cost_usd: 1.647922
+input_tokens: 72
+output_tokens: 17708
 ---
 
 # A headless mode for `fix-bug`: every halt becomes a recorded outcome

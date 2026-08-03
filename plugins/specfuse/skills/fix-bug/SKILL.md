@@ -237,6 +237,70 @@ with their pros and cons; and a recommendation.
 Never author the operator's own justification. Where a field records *why a human
 decided something*, that text comes from them.
 
+## Headless mode
+
+Everything above this section describes the **interactive** path and is
+unchanged by headless mode: same triage, same test-first discipline, same
+`1 bug = 1 branch = 1 PR` contract, same refusal criteria. Headless mode is an
+**invocation mode**, not a different workflow — a caller passes `mode:
+headless` (vs. the default interactive invocation) and every point above that
+would otherwise halt for a human resolves to one of three named, closed
+outcomes instead.
+
+**The closed outcome set** (no fourth outcome exists; a headless run always
+ends in exactly one of these):
+
+- **`refused`** — the skill's existing refusal criteria (Step 2's feature
+  indicators, or the Step 2/"When to break the rules" mid-flow scope-creep
+  escalation) say this is not a bug-sized fix. The recorded reason names
+  which criterion fired.
+- **`could_not_proceed`** — a precondition the workflow needs was missing:
+  the issue has no clear repro (Step 1), the repro cannot be reduced to a
+  falsifiable failing test (Step 4), a gate failure that would otherwise
+  require an operator decision (Step 6/Step 9), or an operational
+  precondition such as `gh auth status` failing (Step 7).
+- **`completed`** — the fix ran end-to-end: failing test authored and
+  verified red on unchanged code, fix applied, all gates green, one commit,
+  branch pushed, PR opened. Same definition of done as the interactive
+  `status: complete` in Step 9.
+
+**The rule (binding, explicit — not implied by the method above).** A
+headless run never asks a question, never waits for input, and never
+silently proceeds past a decision the interactive path would have escalated
+to a human. Every point in the Method above that says "stop", "wait for the
+user's call", "surface to user", or "ask" is, in headless mode, a fork: take
+the branch that the operator's answer would have picked only if the
+workflow's own deterministic criteria already picked it (e.g. a bug
+indicator with no feature indicator firing); otherwise resolve to the named
+outcome that halt maps to and stop. The interactive prompt text itself is
+never shown and never answered — the mapping table below is exhaustive.
+
+**Halt → outcome mapping**, enumerated from the current skill body so the
+mapping stays honest as the method above evolves:
+
+| Interactive halt (Method step) | What it decides | Headless outcome |
+| --- | --- | --- |
+| Step 1 — issue has no clear repro | precondition missing | `could_not_proceed` |
+| Step 2 — a feature indicator fires ("STOP, print... promote to a feature?") | refusal criterion | `refused` |
+| Step 4 — test can't be made to fail on unchanged code | precondition missing | `could_not_proceed` |
+| Step 6 — a gate failure needs an operator decision | precondition missing | `could_not_proceed` |
+| Step 7 — `gh auth status` fails, `gh` unavailable | precondition missing | `could_not_proceed` |
+| "When to break the rules" — scope creep discovered mid-flow | refusal criterion | `refused` |
+| Step 9 RESULT `status: blocked` — issue isn't a bug (feature-scoped) | refusal criterion | `refused` |
+| Step 9 RESULT `status: blocked` — repro can't reduce to a failing test | precondition missing | `could_not_proceed` |
+| Step 9 RESULT `status: blocked` — gate failure requiring operator decision | precondition missing | `could_not_proceed` |
+
+No refusal path is weakened or removed for headless mode: every criterion in
+Step 2 and "When to break the rules" still fires exactly as written, and
+still stops the branch before any PR is opened. Headless mode only replaces
+*who is told* (a recorded outcome instead of a printed question) — never
+*what fires*.
+
+**What headless mode does not add.** It does not invoke itself, does not
+name a caller or an argument schema, and does not run against a real issue —
+that wiring belongs to the caller that invokes `fix-bug` in headless mode
+(see `FEAT-2026-0042` gate 2), not to this skill definition.
+
 ## Version
 
 **v0.1.** Nine steps; the bug-vs-feature triage and the test-first
