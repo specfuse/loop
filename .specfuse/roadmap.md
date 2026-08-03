@@ -56,7 +56,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | planned | — | [→ detail](#feat-2026-0038) |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
-| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | planned | — | — |
+| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | [→ detail](#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
@@ -87,6 +87,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | planned | — | [→ detail](#feat-2026-0073) |
+| FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -787,17 +788,6 @@ machine-checkable contract rather than prose.
 
 **Status: done.**
 
-<a id="feat-2026-0041"></a>
-## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
-
-**Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.
-
-**Goal.** A `/diagnose-issue NN` skill: pulls artifact section + correlation-ID-linked telemetry from the finding issue, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable `confidence` and `fix_scope: small|large|external` fields (the gate FEAT-2026-0042 consumes). Identical comment format from both entry points: interactive first, headless (`claude -p`) second, auto-triggered by the harvester on new fingerprints only for components with `diagnose: auto` (one diagnosis per fingerprint, not per occurrence). Redaction rules apply to diagnosis prose.
-
-**Benefits.** Autonomy level 2: issues arrive pre-diagnosed for opted-in components, at bounded token cost (dedupe caps spend). The per-component manual-to-auto dial lets diagnosis quality be proven with a human watching before automation, component by component.
-
-**Status: planned.**
-
 <a id="feat-2026-0042"></a>
 ## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
 
@@ -1060,6 +1050,17 @@ Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalate
 **Goal.** Make the envelope accept the correlation-ID shapes the methodology documents, or move the driver's ID vocabulary somewhere this repository owns — and decide which, because the same question was answered for `event_type` and the answer may differ here. **Extend the vendored pattern** is simplest and arguably correct at the source, since the orchestrator has closing-sequence work units too and its own logs presumably carry the same IDs; but the file's `$id` points at another repository and its `$comment` is that repository's changelog, so the edit is a cross-repo change that a vendor sync will revert. **Override `correlation_id` in the driver-local registry** keeps ownership local and matches what FEAT-2026-0060 chose for `event_type`; but ID *format* is more plausibly a shared protocol concern than event vocabulary is, and forking it risks the two diverging in a way that breaks a consumer reading both logs. Whichever is chosen, `.specfuse/rules/correlation-ids.md` and the schema must end up stating the same contract, since the whole defect is that they do not.
 
 **Benefits.** The driver's event log validates end to end rather than in the `event_type` dimension alone — the state FEAT-2026-0060 was believed to reach and did not. Unblocks that feature's real-log verification gate, which cannot be green while 279 events fail on a field the gate has no opinion about. And it closes a documented-versus-enforced disagreement that has been silently true for every closing work unit this repository has ever run.
+
+**Status: planned.**
+
+<a id="feat-2026-0074"></a>
+## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
+
+**Why.** [FEAT-2026-0041](#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
+
+**Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
+
+**Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
 
 **Status: planned.**
 
