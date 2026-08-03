@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0063/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - .specfuse/verification.yml
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - arm_sweep_gate_main
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T15:59:44.294644+00:00
+duration_seconds: 660.237
+cost_usd: 1.181719
+input_tokens: 56
+output_tokens: 12211
 ---
 
 # A gate that fails when the sweep goes blind — not when a branch has yet to fire
