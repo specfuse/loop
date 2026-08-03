@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0041/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 unsandboxed: true
 unsandboxed_rationale: "gh fails inside the command sandbox (invalid-token error plus a TLS certificate failure, both reproduced 2026-08-03). This unit verifies the diagnosis comment's real GitHub round-trip, which FEAT-2026-0040 could only stub — its D-9/D-10/D-11 were deferred to an operator journal never written, leaving its close hedged. The escape is confined to this single work unit; every other unit in the gate is stub-verified and forbidden from calling gh."
 produces:
   - tests/test_diagnosis_roundtrip_live.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T20:26:45.484881+00:00
+duration_seconds: 728.332
+cost_usd: 1.382084
+input_tokens: 1746
+output_tokens: 13476
 ---
 
 # The live round-trip: read a real issue, post to a disposable one
