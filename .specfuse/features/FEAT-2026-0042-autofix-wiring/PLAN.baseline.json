@@ -1,0 +1,50 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The autofix predicate: fire, route, or decline \u2014 and say why",
+          "id": "FEAT-2026-0042/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "GitHub is the state: attempt records, the daily cap, and the failure label",
+          "id": "FEAT-2026-0042/T02",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A headless mode for `fix-bug`: every halt becomes a recorded outcome",
+          "id": "FEAT-2026-0042/T03",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs",
+          "id": "FEAT-2026-0042/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the dial goes live, verified end to end",
+          "id": "FEAT-2026-0042/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Close gate 2 and the feature \u2014 retrospective, lessons, docs, terminal verdict",
+          "id": "FEAT-2026-0042/G2-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
