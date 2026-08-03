@@ -8,7 +8,7 @@ oracle_env: macos_local
 model: opus
 effort: high
 gate_set: plannext
-verdict: met_locally
+verdict: met
 driver_version: 0.8.0
 started_at: 2026-08-03T12:11:25.511275+00:00
 duration_seconds: 859.787

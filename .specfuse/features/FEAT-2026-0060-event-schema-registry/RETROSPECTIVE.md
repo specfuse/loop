@@ -459,3 +459,73 @@ does not. The gap is fully diagnosed, separately filed as FEAT-2026-0073, and
 unfixable from inside this feature's do-not-touch boundary — but "diagnosed and
 out of scope" is not the same as "verified", and the hedged verdict is the honest
 one. The upgrade condition is a single named command, recorded above.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Accepted by the operator on:** 2026-08-03T13:53:15+00:00
+
+**Operator's reason (verbatim):**
+
+> items 1-4 are inherent or out of scope
+
+**Standing follow-ups carried forward.** Accepting this hedge ships the feature
+with the items below **open**, not discharged. They are reproduced verbatim from
+`## What the loop did NOT verify` above; none is resolved by this acceptance, and
+none may be treated as closed on the strength of it.
+
+
+**Four items.** This is not an empty list.
+
+1. **Criterion 6's literal wording: "the total error count … must be zero."**
+   Actual: 279, every one a `correlation_id` pattern rejection, zero
+   `event_type`. *Why not verified here:* unsatisfiable within this feature's
+   scope by explicit prior decision — the fix requires editing
+   `specfuse/loop/data/schemas/event.schema.json`, which is this feature's
+   central do-not-touch and the premise of the entire driver-local design. T01's
+   criterion 9 and T02's criterion 7 were both rescoped to `event_type` for
+   exactly this reason after a prior attempt correctly escalated it. *Where it
+   is actually verified:* **FEAT-2026-0073**, filed for it. *Exact re-run
+   condition to upgrade to `met`:* after FEAT-2026-0073 lands, re-run the
+   corpus-wide validator over all `.specfuse/features/*/events.jsonl`; the total
+   error count must read 0.
+
+2. **`gate_auto_armed` and `re_arm_rejected` have never been emitted.** They are
+   registered and the registry is closed around them, but no real event of
+   either type has ever existed to validate. Their inclusion rests on call-site
+   derivation, which is sound but is not the same as an observed event. *Where
+   it is actually verified:* the first recorded run in which either code path
+   fires — `loop.py`'s `gate_events.append` auto-arm branch and the
+   `spinning_reproduction_missing` re-arm-rejection branch respectively.
+
+3. **Payload shapes for all nine driver-local types are unguarded by
+   construction.** The registry and the drift guard cover **event type names
+   only**; `PLAN.md` scopes per-type payload schemas explicitly OUT, and
+   `load_per_type_validator` treats their absence as contract-conformant rather
+   than a gap. A type passing the guard is not a claim its payload is validated.
+   This is stated in the drift guard's own docstring, per
+   `LEARNINGS [FEAT-2026-0071/G1-CLOSE]`. *Where it is actually verified:*
+   nowhere, until per-type payload schemas are authored — which needs its own
+   feature and a failing check behind it.
+
+4. **A live scaffold upgrade of a real target project was not exercised.** That
+   `schemas/driver-event.schema.json` reaches a downstream project is asserted by
+   the manifest and init-integration tests, which run against temp directories.
+   No actual project was upgraded from this session. *Where it is actually
+   verified:* `tests/test_init_integration.py` and `tests/test_scaffold_init.py`
+   at packaging level; a live `specfuse upgrade` against a real target remains
+   unrun.
+
+**Auto-close debt (close-g).** None. Gate 1 is the only gate in this feature, so
+there is no predecessor gate that could have auto-closed, and no
+`specfuse:autoclose-debt` marker exists anywhere in the feature directory. The
+gate ran its full close ceremony.
+
+**Recorded by** `/accept-hedged-close`. This record and the close WU's `verdict:`
+field are the only surfaces this skill wrote. `PLAN.md`'s status, `GATE-01.md`'s
+status, and the roadmap row were not touched here — they are flipped only by
+`fire_terminal_flips`, reached through
+`loop.py --recheck-verdict FEAT-2026-0060`, per `[FEAT-2026-0023/G1-CLOSE]`'s
+single-owner constraint.
+

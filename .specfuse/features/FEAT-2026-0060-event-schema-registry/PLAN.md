@@ -5,7 +5,7 @@ slug: event-schema-registry
 branch: feat/FEAT-2026-0060-event-schema-registry
 roadmap_goal: Give the loop driver a registry that sanctions the event types it actually emits, so validate_event.py passes over a real driver-produced events.jsonl, and add a standing check so the next unsanctioned type is caught in CI rather than accumulating unnoticed.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 13.00
 ---
 
