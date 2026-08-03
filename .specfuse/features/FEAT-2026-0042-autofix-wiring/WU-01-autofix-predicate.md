@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0042/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/monitor/autofix.py
   - tests/test_autofix_predicate.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T22:30:36.351451+00:00
+duration_seconds: 474.273
+cost_usd: 1.163152
+input_tokens: 44
+output_tokens: 14845
 ---
 
 # The autofix predicate: fire, route, or decline — and say why
