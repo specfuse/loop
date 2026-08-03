@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0063/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/arm_sweep.py
@@ -11,6 +11,15 @@ produces_driver_helper:
   - sweep_arm_predicate
   - BranchObservation
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T15:48:38.530981+00:00
+duration_seconds: 665.639
+cost_usd: 1.620276
+input_tokens: 54
+output_tokens: 19087
 ---
 
 # One sweep, one report: what the predicate has actually said on real input
