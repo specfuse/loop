@@ -1,9 +1,12 @@
 ---
 id: FEAT-2026-0063/G1-CLOSE
 type: close
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 5.00
+verdict: met
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Close gate 1 and the feature — retrospective, lessons, docs, terminal verdict
