@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 21.00
+baseline:
+  sha: 8015234bffe3244dcd0a0a1a07682e7271fe6502
+  probed_at: 2026-08-03T15:45:54.981935+00:00
+  failing: []
 ---
 
 # Gate 1 — the sweep is honest, standing, and its unverified list is named
