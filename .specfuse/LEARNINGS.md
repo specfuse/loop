@@ -2893,3 +2893,57 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a test that prints the number so it survives in the run log. Asymmetric failure: the loop
   looks fine (the WU passed, the gate is green) right up until a close needs the number and
   finds only a restatement of the plan.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/oracle-vs-moving-head] **A test that diffs the
+  working tree against `git show HEAD:<path>` is green exactly once — in the session
+  that writes it — and red forever after the driver commits that session.** A WU
+  asserting "my change to this document is purely additive" implemented it as a
+  `difflib` over working-tree-vs-`HEAD`, asserting lines added > 0 and lines removed
+  == 0. It passed the driver's verification, because the driver verifies *before* it
+  commits; the commit then made `HEAD` identical to the working tree, and the
+  assertion has failed on every run since — including CI — with `AssertionError: 0 not
+  greater than 0`. The failure is invisible to the producing WU by construction and
+  invisible to the closing WU's own gate set (`plannext` runs `lint_plan.py`, not the
+  suite); only `close-discipline.md` §1's fresh full-suite re-run surfaced it, one
+  work unit before gate 2 would have been armed on a red branch. Rule: a committed
+  test may never take `HEAD` (or `main`, or "the previous commit") as its reference
+  point — `HEAD` moves under it and the test measures the driver's commit cadence
+  rather than the property. Pin to an immutable SHA the feature already records
+  (`GATE-NN.md`'s `baseline.sha`), embed the expected prior text as a fixture, or —
+  usually best — assert the structural property directly (the section exists, the
+  preserved anchors are all still present) instead of a diff shape. Generalizes to any
+  "only additive", "unchanged since", or "no drift from" criterion.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/ephemeral-runner-state-fails-open] **On an
+  ephemeral runner, a guardrail whose state lives on local disk does not weaken — it
+  disappears, silently, while still reading as present in the source.** "One fix run
+  per fingerprint" and "a daily cap" were both one-line temptations to a state file.
+  The runners are a GitHub Actions container today and an AKS CronJob tomorrow, so
+  each invocation starts with an empty disk: the per-fingerprint guard would fire once
+  per *run* rather than once ever, and the daily counter would never reach its cap.
+  Nothing errors, no log line appears, and code review sees a rate limiter. The fix
+  was to hold the state where the work already lives — an HTML-comment marker on the
+  GitHub issue, reusing the existing module's marker convention rather than inventing
+  a second ledger — and to derive the count from that state on every read instead of
+  maintaining a counter anyone would have to keep in sync. Rule: for any cross-invocation
+  guarantee (dedupe, rate limit, cap, backoff, "already did this"), first ask where
+  the process's memory actually survives to; if the answer is "the runner's disk" and
+  the runner is ephemeral, the guarantee is decorative. Prefer state co-located with
+  the durable artifact the work is about, and prefer re-deriving over counting.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/roadmap-row-verbs-are-claims] **A roadmap row's
+  verbs are unverified capability claims; run the existing-mechanism search against the
+  verbs, not just the nouns.** A row promised to "auto-fire headless `/fix-bug NN`"
+  behind a new dial. The dial existed and was validated — the *nouns* checked out — so
+  the row read as pure wiring. The verb did not: the skill was titled "(interactive)",
+  halted for a human at seven points, and had no headless mode to invoke. Caught at
+  draft time by `planning-discipline.md` §1, which cost one properly-scoped $3.50 work
+  unit; caught mid-attempt it would have cost a blocked WU or silent scope creep inside
+  a wiring unit. Roadmap rows are written before the work and are not re-verified when
+  the feature is drafted, so every capability a row treats as pre-existing is an
+  assumption with no owner. Rule: when drafting from a roadmap row, list the row's
+  verbs ("fire", "invoke", "publish", "roll back") and grep for the concrete mechanism
+  each one names, exactly as §1 requires for the nouns — a row that says "just wire up
+  X" is the highest-risk shape, because "just" is doing the estimating. Record in the
+  retrospective that the row's premise was wrong, so the next feature reading the same
+  row is not misled the same way.
