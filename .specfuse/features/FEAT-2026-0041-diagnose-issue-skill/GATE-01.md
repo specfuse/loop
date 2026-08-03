@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 23.50
+baseline:
+  sha: 26290fb0200643b6cb33a5f89e59544c8c6be566
+  probed_at: 2026-08-03T19:58:42.808561+00:00
+  failing: []
 ---
 
 # Gate 1 — a finding can be diagnosed, in one format, from either entry point
