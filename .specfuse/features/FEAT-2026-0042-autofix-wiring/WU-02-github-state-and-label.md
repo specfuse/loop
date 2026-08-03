@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0042/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/monitor/autofix_state.py
@@ -11,6 +11,15 @@ produces:
 produces_driver_helper:
   - AUTOFIX_FAILED_LABEL
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T22:38:30.799757+00:00
+duration_seconds: 1195.123
+cost_usd: 2.735571
+input_tokens: 94
+output_tokens: 36548
 ---
 
 # GitHub is the state: attempt records, the daily cap, and the failure label

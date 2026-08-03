@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from specfuse.loop import escalation, gh_features
-from specfuse.monitor import issues
+from specfuse.monitor import autofix_state, issues
 
 
 @dataclass(frozen=True)
@@ -82,6 +82,15 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="b60205",
         description="A failure artifact reported by specfuse-monitor",
         consumer="monitor/issues.py",
+    ),
+    # Registered ahead of its consumer (gate 2, FEAT-2026-0042) on purpose:
+    # #300 was `gh issue create`/`--add-label` rejecting every call because
+    # the label a module queried was never declared here.
+    LabelSpec(
+        name=autofix_state.AUTOFIX_FAILED_LABEL,
+        colour="5319e7",
+        description="auto-fix attempted, failed",
+        consumer="monitor/autofix_state.py",
     ),
 )
 
