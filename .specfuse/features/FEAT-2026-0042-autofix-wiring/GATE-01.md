@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 28.00
+baseline:
+  sha: 91dcd22d1836593a2f93f21432e909020cd40a0c
+  probed_at: 2026-08-03T22:27:25.019825+00:00
+  failing: []
 ---
 
 # Gate 1 — the decision layer, complete and incapable of acting
