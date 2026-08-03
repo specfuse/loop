@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0060/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 re_arm_count: 1
 re_arm_history:
   -
@@ -17,10 +17,20 @@ produces:
   - tests/test_driver_event_registry_covers_emitters.py
   - .specfuse/verification.yml
 oracle_env: macos_local
-duration_seconds: 74.248
-cost_usd: 0.574386
-input_tokens: 26
-output_tokens: 5183
+duration_seconds: 883.927
+cost_usd: 1.814714
+input_tokens: 96
+output_tokens: 19279
+cumulative_cost_usd: 0.574386
+cumulative_duration_seconds: 74.248
+cumulative_input_tokens: 26
+cumulative_output_tokens: 5183
+cumulative_attempts: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T11:56:41.409118+00:00
 ---
 
 # Catch the eighth type in CI, not in a retrospective

@@ -60,6 +60,9 @@ coverage run --source=specfuse -m unittest discover -s tests \
 echo "==> [gate: leak-scan] leak_scan --all"
 "$PYTHON" .specfuse/scripts/leak_scan.py --all
 
+echo "==> [gate: event-type-gate] event_type_gate"
+"$PYTHON" .specfuse/scripts/event_type_gate.py
+
 echo "==> [gate: leak-scan-hook] bats"
 bats tests/leak_scan_hook.bats
 

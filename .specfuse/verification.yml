@@ -39,6 +39,15 @@ code:
     # scan on the staged diff; this gate is the can't-bypass backstop.
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
+  - name: event-type-gate
+    # FEAT-2026-0060/T02: validate_event.py over every .specfuse/features/*/
+    # events.jsonl, scoped to event_type errors only. NOT scoped to every
+    # validation error class: 279 correlation_id errors remain across 36 files
+    # (the vendored pattern rejects the G<n>-CLOSE/G<n>-PLAN closing-sequence
+    # and TNNH hygiene ID shapes correlation-ids.md documents as valid — see
+    # FEAT-2026-0073, a separate feature). Widen once 0073 lands.
+    command: "python3 .specfuse/scripts/event_type_gate.py"
+
   - name: monitoring-example-lint
     # Targets the shipped EXAMPLE, not a live config: this repo is a CLI tool
     # with no deployable components and will never carry a real
