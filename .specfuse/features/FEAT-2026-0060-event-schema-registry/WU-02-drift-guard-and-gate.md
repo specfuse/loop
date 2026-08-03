@@ -77,11 +77,26 @@ the file.
 6. The test's docstring states which fields it covers (type names) and which are
    unguarded by construction (payload shapes), per the LEARNINGS entry above.
 7. A `verification.yml` gate runs the validator over this repository's
-   `.specfuse/features/*/events.jsonl` and fails on any validation error. Give it
-   a name consistent with the file's existing convention.
+   `.specfuse/features/*/events.jsonl` and fails on any **`event_type`**
+   validation error. Give it a name consistent with the file's existing
+   convention.
+
+   **The gate is scoped to `event_type`, and that scoping is deliberate.** A gate
+   failing on *any* validation error cannot be green on this tree: **279
+   `correlation_id` errors across 36 files** remain, because the vendored
+   envelope's pattern rejects the closing-sequence (`G<n>-CLOSE`, `G<n>-PLAN`, …)
+   and hygiene (`TNNH`) ID shapes `.specfuse/rules/correlation-ids.md` documents
+   as valid. That gap is filed as
+   [FEAT-2026-0073](../../roadmap.md#feat-2026-0073) and is **not this feature's
+   work** — wiring an unconditional gate would make the `code` set red for every
+   subsequent WU including this gate's own close. Widen the gate to all error
+   classes only once 0073 has landed.
+
 8. The new gate is confirmed to exit **0** on the current tree — run it and quote
-   the command and exit code. If it is non-zero, T01 is incomplete and this WU
-   must block rather than weaken the gate to make it pass.
+   the command and exit code. If it is non-zero **on `event_type` errors**, T01 is
+   incomplete and this WU must block rather than weaken the gate to make it pass.
+   A non-zero `correlation_id` count is expected per criterion 7 and is not a
+   reason to block.
 9. If the new test suite is a bats suite rather than a Python test,
    `tests/test_bats_suites_gated.py` requires it to be registered in
    `verification.yml` — check which applies and satisfy it.
@@ -106,9 +121,11 @@ on the current tree).
 T01 is not `done` — see the Context; the emitted-type set cannot be derived at
 test time without hard-coding, which would make the guard cosmetic and is a
 design problem worth surfacing rather than papering over; the new gate is
-non-zero on the current tree, which means T01 is incomplete — **do not** narrow
-the gate's scope or exclude a failing file to make it green; or a feature's
-`events.jsonl` fails for a reason unrelated to event types (a malformed line, a
-correlation-ID pattern violation), which is a different defect and should be
+non-zero **on `event_type` errors** on the current tree, which means T01 is
+incomplete — **do not** narrow the gate further or exclude a failing file to make
+it green (the `event_type` scoping in criterion 7 is the only narrowing
+sanctioned, and it is already applied); or a feature's
+`events.jsonl` fails for a reason that is neither an event-type nor the known
+correlation-ID gap (a malformed line, say), which is a different defect and should be
 reported, not fixed here. If `.specfuse/verification.yml` is absent from the
 files you edited, emit `status: blocked` — do not claim complete.

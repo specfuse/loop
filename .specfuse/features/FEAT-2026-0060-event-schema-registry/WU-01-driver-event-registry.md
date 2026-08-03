@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
-re_arm_count: 1
+re_arm_count: 2
 re_arm_override: true
 re_arm_history:
   -
@@ -13,6 +13,13 @@ re_arm_history:
     prior_cost_usd: 5.308758
     prior_duration_seconds: 1350.329
     reason: "reporting defect made both attempts undiagnosable; fixed in #322, retrying clean"
+  -
+    timestamp: 2026-08-03T00:43:43+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 4.478344
+    prior_duration_seconds: 772.327
+    reason: "agent correctly escalated an unsatisfiable criterion 9 (zero total validator errors vs the vendored-schema Do-not-touch); criterion 9 rescoped to event_type, correlation_id gap filed as FEAT-2026-0073"
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/data/schemas/driver-event.schema.json
@@ -115,11 +122,28 @@ thing.
    vendored-only validation rather than raising — matching
    `load_per_type_validator`'s additive contract.
 9. The validator is run over **every** `.specfuse/features/*/events.jsonl` in the
-   repository and the total error count is recorded in the result. It must be
-   **zero**; if any file still fails, name the file and the type.
-10. The stale comment at `loop.py:704` is corrected — it currently cites the gap
+   repository and the **`event_type` error count** is recorded in the result. It
+   must be **zero**; if any file still fails on `event_type`, name the file and
+   the type.
+
+   **Scoped to `event_type` deliberately — read this before widening it.** The
+   original wording demanded zero *total* validator errors, which this WU cannot
+   deliver: **279 `correlation_id` errors across 36 files** remain, because the
+   vendored envelope's pattern
+   `^(FEAT|INIT)-\d{4}-\d{4}(/F\d{2})?(/T\d{2})?$` rejects the
+   closing-sequence (`G<n>-CLOSE`, `G<n>-PLAN`, …) and hygiene (`TNNH`) ID shapes
+   that `.specfuse/rules/correlation-ids.md` documents as valid. Fixing that means
+   editing the vendored schema this WU is forbidden to touch. That gap is filed as
+   [FEAT-2026-0073](../../roadmap.md#feat-2026-0073) and is **not this WU's work**.
+   The contradiction between the old criterion 9 and criterion 5 was authored, not
+   discovered — a prior attempt correctly escalated on it rather than proceeding.
+
+10. The `correlation_id` error count is **also** recorded in the result, as a
+    known and separately-filed gap rather than a failure of this WU. Report the
+    number; do not attempt to reduce it.
+11. The stale comment at `loop.py:704` is corrected — it currently cites the gap
     as precedent, and after this WU that is no longer true.
-11. The `code` gate set passes: `tests`, `lint`, `security`, `coverage` (≥90%),
+12. The `code` gate set passes: `tests`, `lint`, `security`, `coverage` (≥90%),
     `leak-scan`.
 
 **Do not touch.** `specfuse/loop/data/schemas/event.schema.json` — the vendored
@@ -141,7 +165,8 @@ contains a type whose correct home is genuinely the vendored schema rather than
 the driver-local one — that is a cross-repo decision, not this WU's call;
 resolving a driver event against two registries cannot be done without changing
 `validate_line`'s contract in a way that affects orchestrator-sourced events,
-which would widen the blast radius past what `PLAN.md` scoped; or criterion 9
-cannot reach zero. If
+which would widen the blast radius past what `PLAN.md` scoped; or criterion 9's
+**`event_type`** count cannot reach zero — note that a non-zero `correlation_id`
+count is expected and is NOT a reason to block, see criterion 10. If
 `specfuse/loop/data/schemas/driver-event.schema.json` is absent from the files
 you edited, emit `status: blocked` — do not claim complete.
