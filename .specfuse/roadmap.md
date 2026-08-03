@@ -78,7 +78,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
-| FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | planned | — | [→ detail](#feat-2026-0063) |
+| FEAT-2026-0063 | Branch-observation sweep for the arm predicate | done | — | [→ archive](roadmap-archive.md#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
 | FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
@@ -981,33 +981,6 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
-
-<a id="feat-2026-0063"></a>
-## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
-
-**Why.** [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. The same is true of `budget_projection`'s firing branch after [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062): no baselined feature has been over budget, so the branch that fix exists to correct has never fired on real input.
-
-**A correction, recorded because the original framing of this row was wrong and was nearly drafted against.** This row previously argued that a sweep of `evaluate_arm_predicate` across all 44 feature folders returned 42 `not_evaluable — no_baseline`, and concluded the predicate could not be verified against real input at all. That measurement is misleading. Those 42 features predate `write_baseline_if_absent`, which shipped with [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053); they are `done` and will never be dispatched again, so they will never carry a baseline. Sweeping them is asking the predicate about work that no longer exists, and `no_baseline` is the correct answer rather than blindness.
-
-Restricted to the three features that actually carry a baseline, the picture inverts:
-
-```
-FEAT-2026-0053  g1/g2  arm=False  fired=[judge_editing, retroactive_edits, open_questions_human_only]
-FEAT-2026-0061  g1/g2  arm=True   fired=-
-FEAT-2026-0062  g1/g2  arm=True   fired=-
-
-class-verdict totals: 42 clean, 6 fired, 0 not_evaluable
-```
-
-The **approval path is proven on real input** — `would_arm: True` twice, on real features with real frontmatter — and three classes fire on real input. `LEARNINGS [FEAT-2026-0053/G1-CLOSE]` warned that a refusal path proven on fixtures says nothing about the approval path; that warning has since been answered by the corpus itself, and this row should not keep citing it as open.
-
-**What actually remains.** Three narrower things. Specific branches have still never fired: `decision_class_paths`' two new `not_evaluable` triggers, and `budget_projection`'s firing branch — the totals above show zero `not_evaluable` of any kind. The evaluable sample is **three features**, which is thin, though it grows by one per feature with no work from us. And a sweep run over all feature folders reports false blindness by including the 42 that structurally cannot be evaluated, which is how this row acquired its original wrong premise in the first place.
-
-**Goal.** Make the sweep honest and standing rather than ad-hoc. Exclude baseline-less features so the sweep stops reporting `no_baseline` as though it were a finding. Record, per class and per branch, which have fired on real input and which have not, so "unverified" is a named list rather than an assumption — and so a branch that can never fire becomes visible as dead. Decide where that report lives permanently: a `verification.yml` gate the driver runs, or a close-ceremony criterion an agent reports. Prefer the gate — FEAT-2026-0055's close raised the same choice and flagged promoting its tree-wide sweep from a close-time criterion to a driver-run gate as an open follow-up, and this would be the second instance, which is when the pattern earns the tooling. The first `auto` ride against the Specfuse Generator remains the strongest single source of live input, but it is no longer a precondition for this row.
-
-**Benefits.** A sweep that reports only what it can actually evaluate, so its output is evidence instead of noise. A named list of never-fired branches, which is the honest form of "unverified" and the thing a human can act on. And the report becomes a mechanism rather than something a human runs by hand at wrap time — which is how the original mistaken figure survived long enough to reach this roadmap.
-
-**Status: planned.** Pulled to `active` on 2026-08-02 and returned to `planned` the same day: drafting recon showed the 42-of-44 figure this row was built on was an artifact of sweeping features that predate baselines, and the operator chose to re-pick rather than draft against a corrected and much smaller premise. The framing above is the corrected one.
 
 <a id="feat-2026-0064"></a>
 ## FEAT-2026-0064 — Release-notes document maintained as work lands, tied to versions and tags

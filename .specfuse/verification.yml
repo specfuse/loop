@@ -48,6 +48,18 @@ code:
     # FEAT-2026-0073, a separate feature). Widen once 0073 lands.
     command: "python3 .specfuse/scripts/event_type_gate.py"
 
+  - name: arm-sweep-gate
+    # FEAT-2026-0063/T02: sweep the arm predicate over every baselined
+    # feature and fail when the SWEEP goes blind, not when a branch has yet
+    # to fire. NOT scoped to branch coverage: five of the eight stop classes
+    # (budget_projection, decision_class_paths, drift_caps,
+    # missing_provenance, plan_next_lint) have never fired on real input as
+    # of authoring, and asserting they must is unsatisfiable today — see
+    # PLAN.md §2 for FEAT-2026-0063. This gate only asserts every evaluable
+    # feature landed in `evaluated` (never dropped) and that no
+    # `not_evaluable` verdict appeared among evaluable features.
+    command: "python3 .specfuse/scripts/arm_sweep_gate.py"
+
   - name: monitoring-example-lint
     # Targets the shipped EXAMPLE, not a live config: this repo is a CLI tool
     # with no deployable components and will never carry a real
