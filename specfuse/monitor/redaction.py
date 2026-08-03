@@ -58,10 +58,15 @@ def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:8]
 
 
-def _redact_text(text: str) -> str:
+def redact_text(text: str) -> str:
     """Replace each secret-shaped match in *text* with `<redacted:sha8>`,
     keyed on the matched value so repeats of the same secret redact to the
-    same token and distinct secrets redact to distinct tokens."""
+    same token and distinct secrets redact to distinct tokens.
+
+    Public (FEAT-2026-0041/T01): promoted from the module-private
+    `_redact_text` so the diagnosis contract can route prose through the
+    same patterns without duplicating them.
+    """
     for pattern in _SECRET_PATTERNS:
         def _sub(match: re.Match) -> str:
             matched = match.group(0)
@@ -84,14 +89,14 @@ def redact_artifact(artifact: FailureArtifact) -> FailureArtifact:
     target_coordinates = artifact.target_coordinates
     if target_coordinates is not None:
         target_coordinates = {
-            key: _redact_text(value) for key, value in target_coordinates.items()
+            key: redact_text(value) for key, value in target_coordinates.items()
         }
 
     return replace(
         artifact,
-        component=_redact_text(artifact.component),
-        check_type=_redact_text(artifact.check_type),
-        failure_class=_redact_text(artifact.failure_class),
-        observed_text=_redact_text(artifact.observed_text),
+        component=redact_text(artifact.component),
+        check_type=redact_text(artifact.check_type),
+        failure_class=redact_text(artifact.failure_class),
+        observed_text=redact_text(artifact.observed_text),
         target_coordinates=target_coordinates,
     )
