@@ -53,16 +53,16 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-2026-0035) |
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | [→ detail](#feat-2026-0036) |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
-| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | blocked | — | [→ detail](#feat-2026-0038) |
+| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | planned | — | [→ detail](#feat-2026-0038) |
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
-| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | blocked | — | — |
+| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | planned | — | — |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | [→ detail](#feat-2026-0042) |
-| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | blocked | — | [→ detail](#feat-2026-0043) |
+| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
-| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | blocked | — | — |
+| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
@@ -766,9 +766,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Benefits.** DLQ depth becomes a true live signal; failure evidence survives TTL; replay-after-fix becomes mechanical, unlocking self-healing level 4.
 
-**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — extends the harvester's peek-mode DLQ adapter
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0039"></a>
 ## FEAT-2026-0039 — Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap)
@@ -798,9 +796,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 2: issues arrive pre-diagnosed for opted-in components, at bounded token cost (dedupe caps spend). The per-component manual-to-auto dial lets diagnosis quality be proven with a human watching before automation, component by component.
 
-**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — harvester findings/issue contract must exist
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0042"></a>
 ## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
@@ -824,9 +820,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Completes the per-component runner matrix (local for tuning, gh-actions for turnkey, in-cluster for perimeter-bound orgs); schedules honored tightly; credentials never leave Azure.
 
-**Blocked by.** [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) — packages the harvester CLI
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0044"></a>
 ## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
@@ -859,9 +853,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The operator hears about blockers within minutes wherever they live, answers where the audit trail lives, and can trust that agent silence is itself alarmed — monitoring the monitor at near-zero build cost.
 
-**Blocked by.** [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — notifies escalation-contract items; contract must exist first
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0048"></a>
 ## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
