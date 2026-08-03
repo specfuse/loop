@@ -5,7 +5,7 @@ slug: arm-predicate-branch-coverage
 branch: feat/FEAT-2026-0063-arm-predicate-branch-coverage
 roadmap_goal: Make the arm-predicate sweep honest and standing rather than ad-hoc — exclude baseline-less features, and record per class which branches have been observed on real input and which have not, so "unverified" is a named list rather than an assumption.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 16.00
 ---
 

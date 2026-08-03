@@ -78,7 +78,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
-| FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | active | — | [→ detail](#feat-2026-0063) |
+| FEAT-2026-0063 | Live-input verification for the arm predicate's fail-closed branches | done | — | [→ archive](roadmap-archive.md#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
 | FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
@@ -981,53 +981,6 @@ machine-checkable contract rather than prose.
 **Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
-
-<a id="feat-2026-0063"></a>
-## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
-
-**Why.** [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. The same is true of `budget_projection`'s firing branch after [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062): no baselined feature has been over budget, so the branch that fix exists to correct has never fired on real input.
-
-**A correction, recorded because the original framing of this row was wrong and was nearly drafted against.** This row previously argued that a sweep of `evaluate_arm_predicate` across all 44 feature folders returned 42 `not_evaluable — no_baseline`, and concluded the predicate could not be verified against real input at all. That measurement is misleading. Those 42 features predate `write_baseline_if_absent`, which shipped with [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053); they are `done` and will never be dispatched again, so they will never carry a baseline. Sweeping them is asking the predicate about work that no longer exists, and `no_baseline` is the correct answer rather than blindness.
-
-Restricted to the features that actually carry a `PLAN.baseline.json`, the picture inverts (re-measured 2026-08-03; the sample grows by one per baselined feature, so these figures are dated by construction):
-
-```
-FEAT-2026-0053  g1  arm=False  fired=[judge_editing, retroactive_edits, open_questions_human_only]
-FEAT-2026-0053  g2  arm=False  fired=[judge_editing, retroactive_edits, open_questions_human_only]
-FEAT-2026-0053  g3  arm=False  fired=[retroactive_edits]
-FEAT-2026-0060  g1  arm=True   fired=-
-FEAT-2026-0061  g1  arm=True   fired=-
-FEAT-2026-0062  g1  arm=True   fired=-
-
-4 baselined features; class-verdict totals: 41 clean, 7 fired, 0 not_evaluable
-```
-
-The **approval path is proven on real input** — `would_arm: True` on three real features with real frontmatter — and three classes fire on real input. `LEARNINGS [FEAT-2026-0053/G1-CLOSE]` warned that a refusal path proven on fixtures says nothing about the approval path; that warning has since been answered by the corpus itself, and this row should not keep citing it as open.
-
-**What actually remains — wider than this row previously stated.** A per-class sweep of which *branches* have been observed on real input, rather than which classes exist, gives:
-
-```
-budget_projection          clean            NEVER fired, NEVER not_evaluable
-decision_class_paths       clean            NEVER fired, NEVER not_evaluable
-drift_caps                 clean            NEVER fired, NEVER not_evaluable
-missing_provenance         clean            NEVER fired, NEVER not_evaluable
-plan_next_lint             clean            NEVER fired, NEVER not_evaluable
-judge_editing              clean, fired     NEVER not_evaluable
-retroactive_edits          clean, fired     NEVER not_evaluable
-open_questions_human_only  clean, fired     NEVER not_evaluable
-```
-
-**Five of the eight stop classes have never fired on real input**, and `not_evaluable` has never been observed for *any* class — so the fail-closed path this row is named for is entirely unexercised outside fixtures. All firing evidence comes from a **single feature**, FEAT-2026-0053: the same three classes fire at each of its gates and nothing else has ever fired anywhere. This row previously named only two unverified branches (`decision_class_paths`' two `not_evaluable` triggers and `budget_projection`'s firing branch); the real figure is five never-fired classes plus eight never-`not_evaluable` ones. Scope the work to the measured list, not the remembered one.
-
-Two caveats on the sample. It is **four features**, which is thin, though it grows by one per baselined feature with no work from us. And a sweep run over all feature folders reports false blindness by including the 42 that structurally cannot be evaluated, which is how this row acquired its original wrong premise in the first place.
-
-**Goal.** Make the sweep honest and standing rather than ad-hoc. Exclude baseline-less features so the sweep stops reporting `no_baseline` as though it were a finding. Record, per class and per branch, which have fired on real input and which have not, so "unverified" is a named list rather than an assumption — and so a branch that can never fire becomes visible as dead. Decide where that report lives permanently: a `verification.yml` gate the driver runs, or a close-ceremony criterion an agent reports. Prefer the gate — FEAT-2026-0055's close raised the same choice and flagged promoting its tree-wide sweep from a close-time criterion to a driver-run gate as an open follow-up, and this would be the second instance, which is when the pattern earns the tooling. The first `auto` ride against the Specfuse Generator remains the strongest single source of live input, but it is no longer a precondition for this row.
-
-**Benefits.** A sweep that reports only what it can actually evaluate, so its output is evidence instead of noise. A named list of never-fired branches, which is the honest form of "unverified" and the thing a human can act on. And the report becomes a mechanism rather than something a human runs by hand at wrap time — which is how the original mistaken figure survived long enough to reach this roadmap.
-
-**Status: active.** Pulled to `active` on 2026-08-02 and returned to `planned` the same day: drafting recon showed the 42-of-44 figure this row was built on was an artifact of sweeping features that predate baselines, and the operator chose to re-pick rather than draft against a corrected and much smaller premise.
-
-Re-measured 2026-08-03 before the second draft attempt, and the premise had drifted again: FEAT-2026-0060 shipped and carries a baseline, so the sample is four features rather than three (41 clean / 7 fired / 0 `not_evaluable`, `would_arm: True` on three). More materially, the per-*branch* sweep above shows the unverified surface is **five never-fired classes and eight never-`not_evaluable` ones**, not the two branches this row named. Both corrections are folded in above. That this row's figures went stale twice in two days is itself the argument for its Goal: a premise re-derived by hand at pick time is a premise that will be wrong again.
 
 <a id="feat-2026-0064"></a>
 ## FEAT-2026-0064 — Release-notes document maintained as work lands, tied to versions and tags
