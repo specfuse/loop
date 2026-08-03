@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0041/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/monitor/diagnose_cli.py
   - tests/test_diagnose_headless.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T20:38:54.003375+00:00
+duration_seconds: 645.125
+cost_usd: 1.236018
+input_tokens: 70
+output_tokens: 12163
 ---
 
 # The headless entry point — identical output, second path
