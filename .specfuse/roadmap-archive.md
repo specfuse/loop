@@ -43,6 +43,21 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0041"></a>
+## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
+
+**Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.
+
+**Goal.** A `/diagnose-issue NN` skill: pulls artifact section + correlation-ID-linked telemetry from the finding issue, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable `confidence` and `fix_scope: small|large|external` fields (the gate FEAT-2026-0042 consumes). Identical comment format from both entry points: interactive first, headless second. Redaction rules apply to diagnosis prose.
+
+**Scope narrowed at draft time (recorded in `PLAN.md`).** The auto-trigger — harvester firing diagnosis on new fingerprints, the per-component `diagnose: auto` dial, one diagnosis per fingerprint rather than per occurrence — was cut from this feature by operator decision and is now [FEAT-2026-0074](#feat-2026-0074). The seam is that the dial is a *scheduling* concern, not a *diagnosis* concern: FEAT-2026-0042 consumes only the output contract and does not care how the diagnosis came to be written, and building the auto-trigger first would have automated a diagnosis quality nobody had read yet.
+
+**Shipped.** `specfuse/monitor/diagnosis.py` (the `Diagnosis` model, `render`, `parse`, one `<!-- specfuse:diagnosis confidence=... fix_scope=... -->` marker; prose redacted at the render boundary via `redaction.redact_text`, promoted from module-private); the `/diagnose-issue` skill on all three surfaces; `specfuse/monitor/diagnose_cli.py` as the headless entry point, rendering exclusively through the same renderer with byte-identical output asserted; and a live `gh` round-trip — create, comment, read back, parse, close — verified against a real scratch issue rather than a stub, which refuted the `gh` ban in `LEARNINGS [FEAT-2026-0014/T01/gh-claudeP-broken]`. **Diagnosis correctness itself is not verified and cannot be in-loop**; the gate asserts format, contract, and round-trip fidelity only.
+
+**Benefits.** Autonomy level 2 groundwork: a finding can be turned into a structured, machine-readable diagnosis by hand or headlessly, in one format, so FEAT-2026-0042 has a contract to gate on. The per-component manual-to-auto dial (FEAT-2026-0074) then lets diagnosis quality be proven with a human watching before automation, component by component.
+
+**Status: active.**
+
 <a id="feat-2026-0063"></a>
 ## FEAT-2026-0063 — Branch-observation sweep for the arm predicate
 

@@ -5,7 +5,7 @@ slug: diagnose-issue-skill
 branch: feat/FEAT-2026-0041-diagnose-issue-skill
 roadmap_goal: A /diagnose-issue NN skill that reads a harvester finding, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable confidence and fix_scope fields — in an identical format from both the interactive and headless entry points.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 18.50
 ---
 

@@ -452,3 +452,41 @@ Promoted to `.specfuse/LEARNINGS.md` by this close:
 Until then the driver correctly leaves gate 1 `awaiting_review`, the roadmap row
 `active`, and `PLAN.md` `active`. Nothing about the engineering is
 outstanding — the acknowledgment is.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator reason (verbatim):** contract changes reviewed and accepted; nothing to rework
+
+**Acknowledgment.** The operator was shown the five consumer-visible contract
+changes enumerated above — the `_redact_text` -> `redact_text` promotion, the new
+`specfuse.monitor.diagnosis` module and its `<!-- specfuse:diagnosis ... -->`
+marker as a wire contract FEAT-2026-0042 will parse, the new
+`specfuse.monitor.diagnose_cli` module, and the `/diagnose-issue` skill — and
+acknowledged them explicitly. That acknowledgment is the act D1 was withheld for.
+
+**Recorded:** 2026-08-03T21:16:21Z
+
+**Standing follow-ups, carried forward — accepted, NOT discharged.** These remain
+exactly as open as they were before this acceptance:
+
+### D1 — Human acknowledgment of the contract-change list — OPEN
+
+- **The criterion, verbatim:** "The close enumerates every consumer-visible
+  addition, removal, or rename the feature makes across ALL its producing WUs —
+  API surface, generated models, published schemas, CLI flags, whatever contract
+  consumers depend on — and blocks on explicit human acknowledgment of the
+  list." (`close-discipline.md` §3)
+- **Why it is unverifiable in this environment:** the list is enumerated (four
+  additions and one promotion, above). The acknowledgment is not something a
+  dispatched agent can produce; the rule names a human as the actor.
+- **The exact re-run condition that would upgrade the verdict to `met`:** an
+  operator reads the *Consumer-visible contract changes* section above,
+  acknowledges the five items — in particular `_redact_text` → `redact_text` and
+  the `<!-- specfuse:diagnosis ... -->` marker becoming a wire contract that
+  FEAT-2026-0042 will parse — and runs `/accept-hedged-close FEAT-2026-0041`,
+  which records the acknowledgment and re-checks the verdict through the
+  driver's `--recheck-verdict` primitive so the terminal flips fire through
+  their one owner.
+
