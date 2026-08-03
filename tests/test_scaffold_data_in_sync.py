@@ -61,8 +61,13 @@ DOCS_TRACKED = {
 # (FEAT-2026-0040/T11): this repository never installs it into its own
 # .github/workflows/ (see test_monitor_runner_surfaces.py), so there is no
 # canonical copy for it to drift from. Existence-only, checked below.
+# `schemas/driver-event.schema.json` (FEAT-2026-0060) is a driver-local
+# registry this repository owns outright — unlike event.schema.json, it is
+# not vendored from the orchestrator core, so .specfuse/schemas/ has no
+# counterpart to byte-match against.
 UNMIRRORED_TRACKED = {
     "workflows/specfuse-monitor.yml",
+    "schemas/driver-event.schema.json",
 }
 
 

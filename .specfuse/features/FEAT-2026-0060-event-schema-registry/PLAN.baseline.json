@@ -1,0 +1,27 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "A driver-owned registry, resolved by fall-through",
+          "id": "FEAT-2026-0060/T01",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Catch the eighth type in CI, not in a retrospective",
+          "id": "FEAT-2026-0060/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 and the feature \u2014 retrospective, lessons, docs, terminal verdict",
+          "id": "FEAT-2026-0060/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

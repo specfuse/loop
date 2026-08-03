@@ -699,9 +699,10 @@ def build_arm_predicate_event(feature_dir: Path, feature_id: str, gate_number: i
     Pure w.r.t. control flow: evaluation failures degrade to an
     `evaluation_error` payload field rather than propagating, so a defect in
     the predicate (T03) or the baseline reader (T01) can never crash a gate
-    close. Not validated by validate_event.py — see the WU's Verification
-    note; `gate_reached` and `attempt_outcome` are the existing precedent for
-    driver-local event types outside the envelope enum and per-type registry.
+    close. Validated by validate_event.py via fall-through: `arm_predicate_evaluated`
+    is sanctioned in the driver-local registry (specfuse/loop/data/schemas/
+    driver-event.schema.json), alongside `gate_reached` and `attempt_outcome`
+    (FEAT-2026-0060).
     """
     try:
         decision = evaluate_arm_predicate(feature_dir, gate_number)
