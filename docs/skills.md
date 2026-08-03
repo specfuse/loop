@@ -136,6 +136,14 @@ Safe to run on an already-`done` or still-hedged feature — it writes nothing.
 - **`/fix-bug`** — triage and fix a reported bug *outside* the feature
   methodology: 1 bug = 1 branch = 1 PR, test-first. Refuses and proposes
   promoting to a feature if the work is large or risky.
+- **`/diagnose-issue NN`** — read a harvester finding issue and the component
+  source it implicates, then post one structured diagnosis comment: root cause,
+  evidence trail, candidate fix, plus machine-readable `confidence` and
+  `fix_scope`. It diagnoses; it does not decide whether to fix anything. Runs
+  interactively, or headlessly via `python3 -m specfuse.monitor.diagnose_cli`,
+  which renders through the same renderer so both entry points emit a
+  byte-identical body. Nothing fires it automatically yet — the per-component
+  `diagnose: auto` dial is a separate, later feature.
 - **`/feature-conversion`** — bring an existing feature folder into conformance
   with the current scaffold's structural contract. Runs after `specfuse upgrade`
   flags a feature as `FAIL`. Interactive, lint-driven.

@@ -580,34 +580,45 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   agent is explicitly authorized to touch); current behavior is
   documented as a gotcha until that lands.
 
-- [FEAT-2026-0014/T01/gh-claudeP-broken] `gh auth status` fails inside
-  the dispatched `claude -p` subprocess even when the same `GH_TOKEN`
-  succeeds via the operator's shell `gh` AND via shell `curl
-  https://api.github.com/user`. Crucially the failure persists when
-  claude -p is invoked with `--dangerously-skip-permissions` — so it
-  is NOT the claude-p sandbox and the WU-level `unsandboxed: true`
-  escape hatch does NOT fix it. Token is valid; gh's local state knows
-  the account ("Active account: true" still prints); the API
-  verification call inside claude-p returns "X Failed to log in to
-  github.com using token (GH_TOKEN)". Root cause lives in the
-  `gh`-binary ↔ claude-p subprocess interaction, unidentified as of
-  2026-06-11. Reproducible from any shell: `gh auth status` ✓ + `curl
-  -H "Authorization: token $GH_TOKEN" https://api.github.com/user` ✓,
-  but `echo "Run \`gh auth status\` and dump raw output between
-  MARK_BEGIN and MARK_END" | claude -p` (with or without
-  `--dangerously-skip-permissions`) shows `X Failed`. Rule for WU
-  authoring: any AC or escalation trigger that invokes `gh` from the
-  dispatched agent's bash MUST NOT be written today. Instead choose
-  one of: (a) operator-manual verification post-merge, recorded as a
-  named step in `RETROSPECTIVE.md`; (b) replace `gh` with shell-side
-  preflight + a simpler agent AC (operator runs `gh auth status`
-  outside the loop, agent only edits the file); (c) `curl` with
-  `$GH_TOKEN` from inside the agent — note the agent's safety filter
-  may refuse curl with `Authorization` headers, so this path is
-  unproven and requires its own probe at WU author time. Audit the
-  unsandboxed escape hatch as INSUFFICIENT for this surface; the flag
-  is still useful for other surfaces but is not a generic "make
-  external CLIs work" lever.
+- [FEAT-2026-0014/T01/gh-claudeP-broken] **CORRECTED 2026-08-03 by
+  FEAT-2026-0041/G1-CLOSE. The original diagnosis below was wrong at the
+  layer it blamed, and the ban it imposed cost two features.** Symptom
+  (unchanged, still real): `gh auth status` fails inside a dispatched
+  `claude -p` session — "The token in GH_TOKEN is invalid" / "X Failed to
+  log in to github.com using token (GH_TOKEN)", and in a later probe
+  `tls: failed to verify certificate x509 -26276` — while the same
+  `GH_TOKEN` succeeds from the operator's shell.
+  **Cause: the command sandbox, not the `gh` binary and not a
+  `gh`↔claude-p subprocess interaction.** The original entry ruled the
+  sandbox out because the failure persisted under
+  `--dangerously-skip-permissions`; that flag governs permission
+  *prompts*, not the sandbox, so it was never going to help and its
+  not-helping was not evidence. Probed 2026-08-03 with raw-output
+  discipline: sandboxed, `gh auth status` → invalid-token and
+  `gh issue view` → TLS certificate failure; unsandboxed, both exit 0
+  against the real API.
+  **A dispatched work unit CAN exercise `gh` — it must run unsandboxed.**
+  Evidence: FEAT-2026-0041/T04 ran with `unsandboxed: true` and completed
+  a full live round-trip on attempt 1 — `✓ Logged in to github.com`, a
+  real `gh issue view` returning issue JSON, then create → comment →
+  read-back → parse → close against scratch issue #327, with every raw
+  `gh` dump quoted in its RESULT and in that feature's `RETROSPECTIVE.md`.
+  **Rule for WU authoring (replaces the old ban):** a `gh` acceptance
+  criterion IS writable, in a WU that carries `unsandboxed: true` plus its
+  `unsandboxed_rationale`. Confine the escape to the single WU that needs
+  it and say in the gate document that a second WU wanting the flag is an
+  escalation, not a copy-paste. A `gh` call from a WU *without* the flag
+  fails with an invalid-token or TLS error that reads like a broken
+  feature rather than a sandbox artifact — that misreading is what cost
+  FEAT-2026-0040 its D-9/D-10/D-11 (deferred to an `OPERATOR-JOURNAL.md`
+  never written, close hedged to this day) and what nearly cost
+  FEAT-2026-0041 the same. The old fallbacks — operator-manual
+  post-merge verification, shell-side preflight, `curl` with `$GH_TOKEN`
+  — remain available but are no longer the *only* options and should not
+  be preferred over an unsandboxed WU when the surface under test is the
+  `gh` round-trip itself. The old entry's closing claim that
+  `unsandboxed: true` is INSUFFICIENT for this surface is withdrawn: it
+  is sufficient, and it is the right lever.
 
 - [FEAT-2026-0014/T01/preflight-must-dump-raw] When a preflight or
   diagnostic asks a `claude -p` session to classify the result of an
@@ -2752,3 +2763,40 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a `FAILED (failures=1)` naming the offender in its message. Rule: when a criterion says "the
   guard is confirmed to fail", the evidence must be the guard's own assertion raising, with
   the failure message quoted. A helper-level check is a useful unit test and a false close.
+
+- [FEAT-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors] **The `git commit` exit-128 errors in
+  `test_lint_closing.py` and `test_autosync_no_cwd_leak.py` are a command-sandbox
+  artifact, not a regression — stop re-diagnosing them.** Signature: 11 errors,
+  every traceback ending `subprocess.CalledProcessError: Command '['git', '-C',
+  '/tmp/.../tmpXXXXXXXX', 'commit', ...]' returned non-zero exit status 128` in a
+  throwaway temp repo. Three consecutive WUs of one feature each spent attention
+  independently establishing this. Rule: when a sandboxed suite reports errors whose
+  tracebacks are all `git` subprocess calls against temp directories, re-run just
+  those modules unsandboxed (`python3 -m unittest tests.test_lint_closing
+  tests.test_autosync_no_cwd_leak` → `Ran 11 tests ... OK`) and quote that as the
+  evidence, rather than bisecting the change under test. These two modules are safe
+  to run unsandboxed: both operate exclusively inside `TemporaryDirectory` repos and
+  `chdir` back on exit. Applies to any suite mixing real-`git` fixtures with a
+  sandboxed gate run.
+
+- [FEAT-2026-0041/G1-CLOSE/live-roundtrip-must-name-its-artifact] **A work unit that creates a remote artifact must have
+  the automated TEST report the artifact's identifier, not only the hand-driven
+  probe.** A live-round-trip WU satisfied "report the scratch issue's number" from
+  its manual probe (#327, closed) while the committed unittest independently created
+  and closed a *second* scratch issue whose number appears nowhere. A residue search
+  bounded the risk to zero, but the artifact was unnameable. Rule: when an acceptance
+  criterion asks for a created remote object's identifier, word it as "the test
+  prints the identifier it created" and have the test emit it, so the number survives
+  in the run log rather than in whatever the agent happened to do by hand.
+
+- [FEAT-2026-0041/G1-CLOSE/one-renderer-two-callers] **When one format must be identical across two entry
+  points, ship one renderer, make both entry points callers, and assert
+  byte-identical output.** The interactive skill and the headless CLI both build a
+  model and call the single `render()`; neither holds a marker string or a
+  section-heading template of its own, and a test greps each caller's source for the
+  marker literal and heading templates to keep it that way. The equality assertion is
+  on the rendered *strings*, not field-by-field — a field-wise comparison passes while
+  whitespace, ordering, and marker placement silently diverge, which is exactly the
+  drift a downstream parser then has to absorb. Rule: for any "identical output from N
+  surfaces" criterion, the oracle is `assertEqual(render_a(x), render_b(x))` plus a
+  no-restated-template check on each caller.
