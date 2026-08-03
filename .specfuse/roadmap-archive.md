@@ -44,7 +44,7 @@ sections inline in `roadmap.md`.
 
 <!-- Archived sections appended below -->
 <a id="feat-2026-0063"></a>
-## FEAT-2026-0063 — Live-input verification for the arm predicate's fail-closed branches
+## FEAT-2026-0063 — Branch-observation sweep for the arm predicate
 
 **Why.** [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. The same is true of `budget_projection`'s firing branch after [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062): no baselined feature has been over budget, so the branch that fix exists to correct has never fired on real input.
 
