@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0041/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - plugins/specfuse/skills/diagnose-issue/SKILL.md
   - .specfuse/skills/diagnose-issue/SKILL.md
   - tests/test_diagnose_issue_skill.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T20:12:23.114993+00:00
+duration_seconds: 862.191
+cost_usd: 2.293991
+input_tokens: 114
+output_tokens: 17265
 ---
 
 # `/diagnose-issue NN` — the interactive entry point
