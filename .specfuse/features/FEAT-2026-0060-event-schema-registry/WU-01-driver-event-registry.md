@@ -1,8 +1,18 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
+re_arm_count: 1
+re_arm_override: true
+re_arm_history:
+  -
+    timestamp: 2026-08-03T00:12:33+00:00
+    prior_status: blocked_human
+    prior_attempts: 2
+    prior_cost_usd: 5.308758
+    prior_duration_seconds: 1350.329
+    reason: "reporting defect made both attempts undiagnosable; fixed in #322, retrying clean"
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/data/schemas/driver-event.schema.json
