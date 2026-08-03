@@ -264,3 +264,39 @@ events by gate number alone will misdiagnose which of the three flip sites
 produced a given event — check the event's surrounding context (what halted,
 what path invoked the evaluation) before drawing a conclusion from `gate`
 alone.
+
+## Observed on real input
+
+Measured 2026-08-03 by `python3 .specfuse/scripts/arm_sweep_gate.py`, which sweeps
+every feature folder under `.specfuse/features/` that carries a
+`PLAN.baseline.json` and records which verdict branches `evaluate_arm_predicate`
+has actually returned. Re-run that command to regenerate this table; its output
+is the source of the rows below, not a hand-transcribed copy.
+
+| Class | Observed on real input |
+| --- | --- |
+| `budget_projection` | `clean` only — **unverified**: never `fired`, never `not_evaluable` |
+| `decision_class_paths` | `clean` only — **unverified**: never `fired`, never `not_evaluable` |
+| `drift_caps` | `clean` only — **unverified**: never `fired`, never `not_evaluable` |
+| `missing_provenance` | `clean` only — **unverified**: never `fired`, never `not_evaluable` |
+| `plan_next_lint` | `clean` only — **unverified**: never `fired`, never `not_evaluable` |
+| `judge_editing` | `clean`, `fired` — never `not_evaluable` |
+| `retroactive_edits` | `clean`, `fired` — never `not_evaluable` |
+| `open_questions_human_only` | `clean`, `fired` — never `not_evaluable` |
+
+At measurement time, 5 of 5 evaluable features swept clean with no
+`not_evaluable` verdicts; 42 features were excluded for predating
+`PLAN.baseline.json` and cannot be evaluated at all. Every `fired` observation
+in the corpus so far traces back to a single feature, FEAT-2026-0053.
+
+Five of the eight classes above are marked **unverified**: they have never
+fired on real input, and `not_evaluable` — the fail-closed path — has never
+been observed for *any* class outside fixtures. A class reporting `clean` on
+every real input to date is not the same as a class known to work; it means
+this branch has not yet met an input that should trip it. This is not
+evidence the branch is broken, and it is not evidence it works — it is an
+honest gap. Do not read the all-`clean` rows as reassurance.
+
+The sample is small — five evaluable features as of this writing — and grows
+by one each time a new feature is baselined, with no additional work required
+to keep it current. Re-run the command above to see the current counts.

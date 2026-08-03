@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0063/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - docs/concepts/autonomy-stop-classes.md
   - specfuse/loop/data/docs/concepts/autonomy-stop-classes.md
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T16:10:44.674582+00:00
+duration_seconds: 673.854
+cost_usd: 0.828136
+input_tokens: 48
+output_tokens: 6594
 ---
 
 # The unverified list, dated and readable, where an operator already looks
