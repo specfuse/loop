@@ -18,6 +18,15 @@ Schema-root resolution (first match wins):
        importlib.resources — the same mechanism scaffold.py uses for packaged
        data.
 
+A driver-emitted event's event_type resolves in two steps (FEAT-2026-0060):
+first against the vendored envelope's event_type enum (event.schema.json,
+do-not-touch — owned by the orchestrator repo this schema is vendored from);
+only when absent there does it fall through to driver-event.schema.json, a
+registry this repository owns for driver-local mechanics the orchestrator has
+no concept of (gate_reached, attempt_outcome, ...). A missing or unreadable
+driver-event.schema.json degrades to vendored-only validation rather than
+raising, mirroring load_per_type_validator's additive contract.
+
 Supported invocation patterns (only two):
 
     # Stdin — pipe a single event or a JSONL file:
@@ -41,6 +50,7 @@ escalation component-agent skills.
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.resources
 import json
 import os
@@ -83,6 +93,37 @@ def _resolve_schema_root():
 SCHEMA_ROOT = _resolve_schema_root()
 SCHEMA_PATH = SCHEMA_ROOT / "event.schema.json"
 PER_TYPE_SCHEMA_DIR = SCHEMA_ROOT / "events"
+DRIVER_SCHEMA_PATH = SCHEMA_ROOT / "driver-event.schema.json"
+
+
+_DRIVER_EVENT_TYPES_CACHE: frozenset[str] | None = None
+
+
+def load_driver_event_types() -> frozenset[str]:
+    """Return the driver-local event-type registry (FEAT-2026-0060).
+
+    Additive to the vendored envelope's event_type enum: types listed here are
+    driver mechanics the orchestrator schema has no concept of (gate_reached,
+    attempt_outcome, ...). task_started/task_completed/human_escalation are
+    already in the vendored enum and must not appear here — see
+    driver-event.schema.json's own description.
+
+    A missing or unreadable registry file degrades to an empty set rather than
+    raising, matching load_per_type_validator's additive contract.
+    """
+    global _DRIVER_EVENT_TYPES_CACHE
+    if _DRIVER_EVENT_TYPES_CACHE is not None:
+        return _DRIVER_EVENT_TYPES_CACHE
+
+    try:
+        with DRIVER_SCHEMA_PATH.open("r", encoding="utf-8") as f:
+            schema = json.load(f)
+        types = frozenset(schema.get("event_types", []))
+    except (OSError, json.JSONDecodeError):
+        types = frozenset()
+
+    _DRIVER_EVENT_TYPES_CACHE = types
+    return types
 
 
 def load_validator() -> Draft202012Validator:
@@ -95,6 +136,17 @@ def load_validator() -> Draft202012Validator:
         sys.exit(2)
     with SCHEMA_PATH.open("r", encoding="utf-8") as f:
         schema = json.load(f)
+
+    # Fall-through resolution (FEAT-2026-0060): a driver event's event_type
+    # resolves against the vendored envelope enum first; only types absent
+    # there are admitted from the driver-local registry. Implemented as a
+    # union on a deep copy so the vendored schema on disk is never touched.
+    driver_types = load_driver_event_types()
+    if driver_types:
+        schema = copy.deepcopy(schema)
+        enum = schema["properties"]["event_type"]["enum"]
+        enum.extend(sorted(t for t in driver_types if t not in enum))
+
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema)
 

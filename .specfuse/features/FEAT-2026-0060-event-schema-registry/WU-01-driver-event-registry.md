@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 re_arm_count: 2
 re_arm_override: true
 re_arm_history:
@@ -31,10 +31,20 @@ oracle_env: macos_local
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 772.327
-cost_usd: 4.478344
-input_tokens: 156
-output_tokens: 41202
+duration_seconds: 800.344
+cost_usd: 3.922447
+input_tokens: 154
+output_tokens: 35879
+cumulative_cost_usd: 4.478344
+cumulative_duration_seconds: 772.327
+cumulative_input_tokens: 156
+cumulative_output_tokens: 41202
+cumulative_attempts: 3
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-03T00:48:21.920822+00:00
 ---
 
 # A driver-owned registry, resolved by fall-through

@@ -46,6 +46,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "rules/verification-discipline.md",
     "rules/operator-escalation.md",
     "schemas/event.schema.json",
+    "schemas/driver-event.schema.json",
     "schemas/events/initiative_created.schema.json",
     "schemas/events/spec_validated.schema.json",
     "schemas/events/spec_issue_resolved.schema.json",

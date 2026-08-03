@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specfuse.dev/loop/schemas/driver-event.schema.json",
+  "title": "Driver-local event type registry",
+  "description": "Additive to the vendored orchestrator envelope (event.schema.json): event_type values the loop driver emits with no orchestrator-side counterpart. validate_event.py resolves an event's event_type against the vendored envelope enum first; only when absent there does it fall through to this list. task_started, task_completed, and human_escalation are already sanctioned in the vendored enum and must not be duplicated here — this file exists only for types the vendored schema has no concept of.",
+  "$comment": "FEAT-2026-0060/T01: registry seeded from a corpus sweep of every .specfuse/features/*/events.jsonl, subtracting the vendored envelope enum. attempt_outcome and gate_reached were already-known precedent (loop.py's build_arm_predicate_event docstring); auto_close_decision, arm_predicate_evaluated, re_arm_dispatched, plan_next_draft_lint, and unsandboxed_dispatch are additional driver-local mechanics the orchestrator has no concept of.",
+  "event_types": [
+    "attempt_outcome",
+    "gate_reached",
+    "auto_close_decision",
+    "arm_predicate_evaluated",
+    "re_arm_dispatched",
+    "plan_next_draft_lint",
+    "unsandboxed_dispatch"
+  ]
+}
