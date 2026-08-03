@@ -510,12 +510,30 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   artifact's actual contract status against the script under test before
   dispatching — not after. T02's AC 4 originally read "assert
   `validate-event.py` accepts a real event line from FEAT-2026-0008's
-  events.jsonl"; the agent correctly identified that the orchestrator's
-  schema rejects driver-emitted events by design (the schema's source
-  enum is the orchestrator protocol; loop-driver events use
-  `source: "driver"` and follow a different contract owned by `loop.py`).
+  events.jsonl"; the agent identified that the orchestrator's schema rejects
+  driver-emitted events, and attributed that rejection to the schema's
+  `source` enum being the orchestrator protocol.
   The re-arm fix inverted the AC to "rejects this real event" — semantically
-  the right boundary evidence, polarity corrected. Rule: every AC of the
+  the right boundary evidence, polarity corrected.
+
+  > **Correction [FEAT-2026-0060/G1-CLOSE].** The parenthetical attribution
+  > above was wrong, and being wrong is what made the gap look intentional
+  > for four features. The vendored `specfuse/loop/data/schemas/event.schema.json`
+  > in this repository has **no `source` enum at all** — `properties.source`
+  > carries exactly `type`, `description`, `pattern`, and its description
+  > explicitly names *"the loop's single-repo `driver`"* as a legitimate
+  > emitter. The schema anticipated the driver; it merely lacked its
+  > vocabulary. The only thing rejecting driver events was the closed 28-entry
+  > `event_type` enum. Read as "by design", that misattribution licensed
+  > `loop.py`'s own comment to cite the gap as *precedent to follow*, and four
+  > more unsanctioned types accumulated before FEAT-2026-0060 measured it at
+  > 359 of 1043 corpus events (34%). Meta-rule: a lesson that explains **why a
+  > tool rejects an artifact** must name the schema construct doing the
+  > rejecting and be re-checked against the vendored file before it is cited,
+  > because a wrong *reason* attached to a right *observation* is the most
+  > durable kind of wrong — the observation keeps confirming it.
+
+  Rule: every AC of the
   form "tool X accepts/rejects existing artifact Y" must include, in the
   WU's Context section, the contract claim that justifies the polarity
   (e.g., "Y's `source` field is in X's enum, therefore X accepts Y"). If
@@ -2676,3 +2694,61 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   reconciling planned against actual should compute the total from `events.jsonl`, which is the
   only surface that never loses a cycle, and should state gate spend against the brake rather
   than against the plan.
+
+- [FEAT-2026-0060/G1-CLOSE] **A registry derived from a corpus is derived from a lagging
+  indicator: code paths that exist but have never executed are invisible to it by
+  construction, and no amount of care in running the sweep recovers them.** A work unit was
+  told to re-derive the driver's unsanctioned event types "from the corpus", did exactly
+  that, found seven, and shipped an incomplete registry. Two further types — `gate_auto_armed`
+  and `re_arm_rejected` — are emitted by real `build_event` call sites that have never fired
+  in any recorded run. The next work unit derived from call sites, found both, and correctly
+  blocked rather than editing the registry it exists to guard; the fix cost a full re-arm plus
+  a gate-budget raise. The measurement decayed fast enough to make the point on its own: the
+  roadmap row named 3 types, a deliberate corpus sweep one day before implementation found 7,
+  the shipped union found 9 — 33% and 78% of the truth respectively. Rule: when a criterion
+  asks for a set to be *computed*, name every source that can contribute a member and say
+  which is authoritative when they disagree — "what has happened" (logs, corpus, telemetry)
+  and "what can happen" (call sites, enum members, route tables) are different sets, and a
+  guard built on the first silently under-covers. Corollary: bake the union into the guard
+  itself, so a later derivation cannot regress to the cheap source.
+
+- [FEAT-2026-0060/G1-CLOSE] **A code comment that records a known gap as *precedent* converts
+  a defect into a convention, and every subsequent author learns the defect as house style.**
+  `loop.py` documented an unvalidated event type with "…`gate_reached` and `attempt_outcome`
+  are the existing precedent for driver-local event types outside the envelope enum and
+  per-type registry." The gap was known, written down, and framed as a pattern to follow; four
+  more unsanctioned types arrived after it, and by the time it was measured 34% of every event
+  the driver had ever emitted failed validation. The comment was also the *only* hit for a
+  mandatory existing-mechanism grep — the search found the admission, not a mechanism. Rule:
+  when documenting a limitation in code, write it as a defect with its cost ("X is not
+  validated; this is a gap, see ISSUE"), never as precedent or prior art. And when an
+  existing-mechanism search returns a comment acknowledging the gap rather than a mechanism
+  addressing it, that is evidence the gap is load-bearing and under-owned, not evidence the
+  decision was already made.
+
+- [FEAT-2026-0060/G1-CLOSE] **A close's consumer-visible contract list must be verified
+  against the packaging manifest, not inferred from where a file lives — the one artifact
+  whose entire job is accuracy about what consumers see is also the easiest to fill in from
+  assumption.** This feature's close was instructed to treat a new `verification.yml` gate as
+  the headline consumer-visible change, on the stated grounds that downstream projects
+  upgrading the scaffold would gain a gate that could fail their builds. Checking the manifests
+  rather than the file's plausible-looking location showed the gate script appears in no
+  scaffold manifest and no shipped `verification.yml.example`, and a repo-wide grep returned
+  three hits, all internal. The real shipped surface was a permissive schema plus three
+  additive symbols: nothing downstream could go red. Rule: enumerate contract changes by
+  grepping the packaging manifests and shipped templates for each changed path, and state the
+  blast radius you measured rather than the one the work unit predicted. This cuts both ways —
+  the same assumption that overstates risk here understates it when a file *is* shipped and
+  nobody checked.
+
+- [FEAT-2026-0060/G1-CLOSE] **A test that exercises a guard's helper function is not the guard
+  observed failing; only driving the real assertion proves the guard is not cosmetic.** A
+  drift guard shipped with a self-check named "the guard fails on an unregistered type", which
+  called the comparison helper directly with a synthetic input and asserted on its return
+  value. That verifies the helper's arithmetic; it does not verify that the guard's actual
+  test method fails, names the offender, or is even wired to the same derivation. The close
+  re-ran the check properly — importing the test module, monkeypatching its derivation
+  out-of-tree to inject a synthetic type, and executing the real test method — and confirmed
+  a `FAILED (failures=1)` naming the offender in its message. Rule: when a criterion says "the
+  guard is confirmed to fail", the evidence must be the guard's own assertion raising, with
+  the failure message quoted. A helper-level check is a useful unit test and a false close.
