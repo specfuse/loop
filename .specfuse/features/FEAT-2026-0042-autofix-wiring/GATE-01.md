@@ -1,11 +1,17 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 28.00
 baseline:
-  sha: f9d47a26252ab6d3a6e7fa831efafeaba7e8b7d9
-  probed_at: 2026-08-03T23:02:08.182525+00:00
-  failing: []
+  sha: 8c69b64d5636e3ca240f66ea49860fb3667dec13
+  probed_at: 2026-08-03T23:32:32.424063+00:00
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: test_interactive_sections_unchanged_only_additions
+    - gate: coverage
+      failure_class: coverage
+      failure_signature: $ coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90
 ---
 
 # Gate 1 — the decision layer, complete and incapable of acting
