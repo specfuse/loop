@@ -57,7 +57,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
-| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | blocked | — | [→ detail](#feat-2026-0042) |
+| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | active | — | [→ detail](#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
@@ -784,9 +784,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
 
-**Blocked by.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
-
-**Status: blocked.**
+**Status: active.**
 
 <a id="feat-2026-0043"></a>
 ## FEAT-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
