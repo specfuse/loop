@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0060/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 re_arm_count: 3
 re_arm_override: true
 re_arm_history:
@@ -38,10 +38,10 @@ oracle_env: macos_local
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: $ python3 -m unittest discover -s tests -v
-duration_seconds: 800.344
-cost_usd: 3.922447
-input_tokens: 154
-output_tokens: 35879
+duration_seconds: 1358.683
+cost_usd: 2.593786
+input_tokens: 4073
+output_tokens: 22300
 cumulative_cost_usd: 4.478344
 cumulative_duration_seconds: 772.327
 cumulative_input_tokens: 156

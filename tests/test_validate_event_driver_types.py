@@ -107,9 +107,13 @@ class TestDriverEventTypes(_RealSchemaRootTestCase):
 class TestDriverLocalRegistrySanctionsDerivedTypes(_RealSchemaRootTestCase):
     """Criterion 4: every corpus-derived type is sanctioned in the registry."""
 
-    # The seven types re-derived from a corpus sweep (see result for the full
-    # derivation) — identical to PLAN.md's list; counts differ (corpus grew
-    # between the plan's measurement and this WU) but the set of types does not.
+    # Union of every build_event(...) call site in specfuse/loop/loop.py and a
+    # corpus sweep of every .specfuse/features/*/events.jsonl (see result for
+    # the full derivation), minus the vendored envelope enum. Seven of these
+    # match PLAN.md's corpus-only measurement; gate_auto_armed and
+    # re_arm_rejected are additional — both are emitted by real code paths
+    # that have never fired in a recorded run, so a corpus-only sweep cannot
+    # see them.
     DERIVED_TYPES = frozenset({
         "attempt_outcome",
         "gate_reached",
@@ -118,12 +122,28 @@ class TestDriverLocalRegistrySanctionsDerivedTypes(_RealSchemaRootTestCase):
         "re_arm_dispatched",
         "plan_next_draft_lint",
         "unsandboxed_dispatch",
+        "gate_auto_armed",
+        "re_arm_rejected",
     })
+
+    # Call-site-only types: absent from any recorded corpus, present only
+    # because a build_event(...) call site emits them (FEAT-2026-0060/T01
+    # attempt 3 — a corpus-only derivation demonstrably omits these).
+    CALL_SITE_ONLY_TYPES = frozenset({"gate_auto_armed", "re_arm_rejected"})
 
     def test_registry_contains_every_derived_type(self) -> None:
         registered = ve.load_driver_event_types()
         missing = self.DERIVED_TYPES - registered
         self.assertFalse(missing, f"types missing from registry: {missing}")
+
+    def test_registry_contains_call_site_only_types(self) -> None:
+        registered = ve.load_driver_event_types()
+        missing = self.CALL_SITE_ONLY_TYPES - registered
+        self.assertFalse(
+            missing,
+            f"call-site-only types missing from registry (a corpus-only "
+            f"derivation would miss these): {missing}",
+        )
 
     def test_each_derived_type_validates_via_fallthrough(self) -> None:
         validator = ve.load_validator()

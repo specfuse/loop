@@ -104,9 +104,13 @@ def load_driver_event_types() -> frozenset[str]:
 
     Additive to the vendored envelope's event_type enum: types listed here are
     driver mechanics the orchestrator schema has no concept of (gate_reached,
-    attempt_outcome, ...). task_started/task_completed/human_escalation are
-    already in the vendored enum and must not appear here — see
-    driver-event.schema.json's own description.
+    attempt_outcome, gate_auto_armed, re_arm_rejected, ...). The last two are
+    emitted by real code paths that have never fired in a recorded run, so a
+    corpus-only sweep misses them — the registry is derived from the union of
+    build_event(...) call sites and the corpus, not the corpus alone.
+    task_started/task_completed/human_escalation are already in the vendored
+    enum and must not appear here — see driver-event.schema.json's own
+    description.
 
     A missing or unreadable registry file degrades to an empty set rather than
     raising, matching load_per_type_validator's additive contract.

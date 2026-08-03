@@ -3,7 +3,7 @@
   "$id": "https://specfuse.dev/loop/schemas/driver-event.schema.json",
   "title": "Driver-local event type registry",
   "description": "Additive to the vendored orchestrator envelope (event.schema.json): event_type values the loop driver emits with no orchestrator-side counterpart. validate_event.py resolves an event's event_type against the vendored envelope enum first; only when absent there does it fall through to this list. task_started, task_completed, and human_escalation are already sanctioned in the vendored enum and must not be duplicated here — this file exists only for types the vendored schema has no concept of.",
-  "$comment": "FEAT-2026-0060/T01: registry seeded from a corpus sweep of every .specfuse/features/*/events.jsonl, subtracting the vendored envelope enum. attempt_outcome and gate_reached were already-known precedent (loop.py's build_arm_predicate_event docstring); auto_close_decision, arm_predicate_evaluated, re_arm_dispatched, plan_next_draft_lint, and unsandboxed_dispatch are additional driver-local mechanics the orchestrator has no concept of.",
+  "$comment": "FEAT-2026-0060/T01: registry derived from the union of every build_event(...) call site in specfuse/loop/loop.py and a corpus sweep of every .specfuse/features/*/events.jsonl, subtracting the vendored envelope enum. attempt_outcome and gate_reached were already-known precedent (loop.py's build_arm_predicate_event docstring); auto_close_decision, arm_predicate_evaluated, re_arm_dispatched, plan_next_draft_lint, and unsandboxed_dispatch are additional driver-local mechanics the orchestrator has no concept of. gate_auto_armed (loop.py build_event call under gate_events.append) and re_arm_rejected (loop.py build_event call under the spinning_reproduction_missing re-arm check) are emitted by real code paths that have never fired in a recorded run, so a corpus-only sweep cannot see them; they are included because call-site derivation does.",
   "event_types": [
     "attempt_outcome",
     "gate_reached",
@@ -11,6 +11,8 @@
     "arm_predicate_evaluated",
     "re_arm_dispatched",
     "plan_next_draft_lint",
-    "unsandboxed_dispatch"
+    "unsandboxed_dispatch",
+    "gate_auto_armed",
+    "re_arm_rejected"
   ]
 }
