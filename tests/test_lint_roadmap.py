@@ -24,6 +24,8 @@ from specfuse.loop.lint_roadmap import (
     lint_roadmap,
 )
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
 ROADMAP_HEADER = (
     "---\nproject: test\n---\n\n# Roadmap\n\n"
     "| Feature ID | Title | Status | Folder | Detail |\n"
@@ -260,3 +262,92 @@ class TestLintRoadmap(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSectionStatusMatchesRow(unittest.TestCase):
+    """Issue #465 — a detail section's `**Status:**` must agree with its row.
+
+    A dead link is visible the moment someone clicks it. A section confidently
+    reading `**Status: active.**` under a row saying `done` reads as
+    authoritative and is simply wrong, which is the same resolvable-but-wrong
+    shape this linter's duplicate-anchor check exists for. 21 of 42 archived
+    sections carried this disagreement before it was repaired by hand.
+    """
+
+    def test_section_status_disagreeing_with_row_is_an_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            roadmap = ROADMAP_HEADER + _row("FEAT-2026-0001", "done", "[→ archive](roadmap-archive.md#feat-2026-0001)")
+            archive = (
+                ARCHIVE_HEADER
+                + '<a id="feat-2026-0001"></a>\n'
+                + "## FEAT-2026-0001 — Title\n\n"
+                + "**Status: active.**\n"
+            )
+            _write_repo(tmp, roadmap, archive)
+            findings = lint_roadmap(tmp)
+
+        matches = [f for f in findings if "Status" in f.message and "0001" in f.message]
+        self.assertEqual(len(matches), 1, msg=[f.message for f in findings])
+        self.assertEqual(matches[0].severity, SEVERITY_ERROR)
+        self.assertIn("done", matches[0].message,
+                      "the finding must name the row's value as the fix")
+
+    def test_section_status_matching_row_is_clean(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            roadmap = ROADMAP_HEADER + _row("FEAT-2026-0001", "done", "[→ archive](roadmap-archive.md#feat-2026-0001)")
+            archive = (
+                ARCHIVE_HEADER
+                + '<a id="feat-2026-0001"></a>\n'
+                + "## FEAT-2026-0001 — Title\n\n"
+                + "**Status: done.** Shipped with a paragraph of close commentary.\n"
+            )
+            _write_repo(tmp, roadmap, archive)
+            findings = lint_roadmap(tmp)
+
+        self.assertEqual(
+            [f for f in findings if "Status" in f.message], [],
+            "a matching status must not fire, and trailing prose must not confuse it")
+
+    def test_absent_status_line_is_not_an_error(self):
+        """Nine real sections carry no Status line. Whether it is mandatory is a
+        close-discipline.md contract question; this check must not decide it."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            roadmap = ROADMAP_HEADER + _row("FEAT-2026-0001", "done", "[→ archive](roadmap-archive.md#feat-2026-0001)")
+            archive = (
+                ARCHIVE_HEADER
+                + '<a id="feat-2026-0001"></a>\n'
+                + "## FEAT-2026-0001 — Title\n\n"
+                + "**Why.** No Status line anywhere in this section.\n"
+            )
+            _write_repo(tmp, roadmap, archive)
+            findings = lint_roadmap(tmp)
+
+        self.assertEqual(
+            [f for f in findings if f.severity == SEVERITY_ERROR and "Status" in f.message], [],
+            "an absent Status line must not be an ERROR")
+
+    def test_status_in_roadmap_side_section_is_checked_too(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            roadmap = (
+                ROADMAP_HEADER
+                + _row("FEAT-2026-0001", "planned", "[→ detail](#feat-2026-0001)")
+                + '\n<a id="feat-2026-0001"></a>\n'
+                + "## FEAT-2026-0001 — Title\n\n"
+                + "**Status: active.**\n"
+            )
+            _write_repo(tmp, roadmap)
+            findings = lint_roadmap(tmp)
+
+        matches = [f for f in findings if "Status" in f.message and "0001" in f.message]
+        self.assertEqual(len(matches), 1, msg=[f.message for f in findings])
+        self.assertIn("planned", matches[0].message)
+
+    def test_real_tree_has_no_status_disagreement(self):
+        findings = lint_roadmap(REPO_ROOT)
+        offenders = [f.message for f in findings
+                     if f.severity == SEVERITY_ERROR and "Status" in f.message]
+        self.assertEqual(offenders, [], msg="\n".join(offenders))

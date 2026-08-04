@@ -611,7 +611,7 @@ or sensitive content in a non-takedown-friendly channel. Don't.
   scope because we're going public; if the public path is wrong,
   re-evaluate before 0020 starts, not inside it.
 
-**Status: planned.** Two-gate feature, must precede 0019's first
+**Status: done.** Two-gate feature, must precede 0019's first
 public release. Likely shape: gate 1 = one substantive WU per audit
 class (secret scan, PR sweep, personal-refs grep, cross-pollination,
 license headers) + closing ceremony; gate 2 = one substantive WU per
