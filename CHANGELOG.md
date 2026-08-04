@@ -29,6 +29,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 ### Fixed
 
 - A `produces:` entry that is a directory is now an ERROR in `specfuse-lint` and refused before dispatch, instead of after a full session. The driver already refused it correctly, but only post-session and three times over — $6.42 and 20.6 minutes observed on a real feature for a `Path.is_dir()` call on static frontmatter (#593)
+- An unterminated frontmatter block is now a lint finding naming the missing `---`, instead of a traceback blaming an arbitrary body line. A file the parser cannot read no longer makes its whole feature folder unevaluable by every check (#306)
 
 ## [0.9.1+umbrella.0.9.1] - 2026-08-04
 

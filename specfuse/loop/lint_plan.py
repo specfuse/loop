@@ -240,6 +240,15 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     j = 1
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
+    if j >= len(lines):
+        # See loop.read_frontmatter: an opening `---` with no closing one made
+        # the scan run off the end and parse the document as frontmatter,
+        # reporting the failure against an arbitrary body line (#306).
+        raise _miniyaml.MiniYAMLError(
+            f"{path}: frontmatter block opened with `---` on line 1 but is "
+            f"never closed — add a `---` line to end it. Every line after it "
+            f"was read as frontmatter, so no check could evaluate this file."
+        )
     return _miniyaml.parse("\n".join(lines[1:j])) or {}, "\n".join(lines[j + 1:])
 
 
@@ -947,6 +956,21 @@ def check_planning_sections(
 
 
 def lint(feature_dir: Path) -> list[str]:
+    """Lint a feature folder, converting an unparseable file into a finding.
+
+    A malformed WU used to abort the whole run with a traceback, which made
+    the folder unevaluable by *every* check rather than one (#306). The lint's
+    job is to report what is wrong with a folder; a file it cannot parse is
+    the most basic thing that can be wrong with one, so it is a finding like
+    any other. Callers still get a non-empty error list and a non-zero exit.
+    """
+    try:
+        return _lint_impl(feature_dir)
+    except _miniyaml.MiniYAMLError as exc:
+        return [f"ERROR: unparseable frontmatter — {exc}"]
+
+
+def _lint_impl(feature_dir: Path) -> list[str]:
     errs: list[str] = []
     plan = feature_dir / "PLAN.md"
     if not plan.exists():
