@@ -59,6 +59,10 @@ _LINK_RE = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
 _REF_RE = re.compile(r'^(roadmap\.md|roadmap-archive\.md)?#(feat-\d{4}-\d{4})$', re.IGNORECASE)
 _BLOCKED_BY_RE = re.compile(r'^\*\*Blocked by\.\*\*\s*(.*)$')
 _ORPHAN_DETAIL_CELLS = {"—", "-", ""}
+# A detail section's status marker. Trailing prose on the same line is common
+# and intentional (`**Status: done.** <close commentary>`), so the pattern
+# captures only the word (#465).
+_SECTION_STATUS_RE = re.compile(r"^\*\*Status:\s*([a-z_]+)\.?\*\*", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -126,6 +130,7 @@ def _lint_roadmap_impl(repo_root: Path) -> list:
     rows = _parse_table_rows(roadmap_doc.lines)
     findings += _check_blocked_by(roadmap_doc, archive_doc, rows)
     findings += _check_orphan_sections(roadmap_doc, archive_doc, rows)
+    findings += _check_section_status(roadmap_doc, archive_doc, rows)
 
     return findings
 
@@ -388,6 +393,57 @@ def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows) -> lis
                     f"'{row['status']}', not blocked — remove the block or set "
                     "status: blocked",
                 ))
+    return findings
+
+
+def _check_section_status(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows) -> list:
+    """A detail section's `**Status:**` must agree with its table row (#465).
+
+    The row is authoritative -- `fire_terminal_flips` owns it and deliberately
+    does not touch section prose, which is a human record. So a section only
+    stays accurate if its feature's close ceremony had a criterion naming it,
+    and the closes that lacked one drifted: 21 of 42 archived sections
+    disagreed with their rows before #464 repaired them by hand.
+
+    ERROR rather than WARN, unlike the orphan-detail check. An orphan section
+    is untidy; a section stating `active` under a row saying `done` means the
+    roadmap asserts two different facts about one feature and a reader has no
+    way to tell which is authoritative -- the same resolvable-but-wrong shape
+    the duplicate-anchor check exists for.
+
+    An ABSENT status line is not a finding. Nine real sections carry none, and
+    whether the line is mandatory is a close-discipline.md contract question
+    this check must not settle by fiat.
+    """
+    findings = []
+    by_file = (
+        (roadmap_doc, _detail_sections(roadmap_doc.lines)),
+        (archive_doc, _detail_sections(archive_doc.lines)),
+    )
+    for row in rows:
+        row_status = row["status"].strip().lower()
+        if not row_status:
+            continue
+        fid = row["id"].lower()
+        for doc, sections in by_file:
+            if fid not in sections:
+                continue
+            _, body_start, body_end = sections[fid]
+            body = "\n".join(doc.lines[body_start:body_end])
+            m = _SECTION_STATUS_RE.search(body)
+            if m is None:
+                continue
+            section_status = m.group(1).lower()
+            if section_status == row_status:
+                continue
+            offset = body[:m.start()].count("\n")
+            findings.append(Finding(
+                SEVERITY_ERROR, doc.filename, body_start + offset + 1,
+                f"{row['id']}'s detail section says '**Status: {section_status}.**' "
+                f"but its roadmap row says '{row_status}' \u2014 the row is "
+                f"authoritative; rewrite the section marker to "
+                f"'**Status: {row_status}.**' and keep any prose after it",
+            ))
     return findings
 
 
