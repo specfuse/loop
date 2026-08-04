@@ -61,11 +61,36 @@ CORE_FILES=(
   schemas/events/spec_issue_routed.schema.json
 )
 
+# Baseline of what was last vendored, so a destination that differs from core
+# can be classified rather than clobbered (#581). A destination matching its
+# recorded hash means core moved forward -> fast-forward. A destination that
+# does NOT match means the loop edited a core-owned file -> stop and let a
+# human decide. Before this, both cases looked identical ("differs from core")
+# and the sync silently reverted loop-local edits: FEAT-2026-0073's
+# enforcement-surfaces block was deleted with only a routine `vendored:` line.
+VENDOR_BASELINE="$SRC/.vendored.json"
+
+baseline_hash() {  # $1=rel — recorded hash, or empty when unknown
+  # awk with a literal index() match: relpaths contain `/`, which collides with
+  # sed's default substitute delimiter and made this silently abort mid-run.
+  [[ -f "$VENDOR_BASELINE" ]] || return 0
+  awk -v key="\"$1\":" '
+    index($0, key) && match($0, /"[a-f0-9][a-f0-9]*"[[:space:]]*,?[[:space:]]*$/) {
+      print substr($0, RSTART + 1, RLENGTH - 2)
+    }' "$VENDOR_BASELINE" | tr -d '", \t'
+}
+
+file_hash() {  # $1=path
+  if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | cut -d' ' -f1
+  else sha256sum "$1" | cut -d' ' -f1; fi
+}
+
 vendored=0
 echo "Vendoring shared substrate from core:"
 if [[ -d "$CORE" ]]; then
   echo "  from: $CORE"
   echo "  to:   $SRC"
+  diverged=()
   for rel in "${CORE_FILES[@]}"; do
     core_path="$CORE/$rel"
     dest_path="$SRC/$rel"
@@ -76,12 +101,55 @@ if [[ -d "$CORE" ]]; then
     mkdir -p "$(dirname "$dest_path")"
     if cmp -s "$core_path" "$dest_path" 2>/dev/null; then
       echo "  unchanged: $rel"
-    else
-      cp "$core_path" "$dest_path"
-      echo "  vendored:  $rel"
-      vendored=$((vendored + 1))
+      continue
     fi
+    # Differs from core. Local edit, or core moving forward?
+    if [[ -f "$dest_path" ]]; then
+      recorded="$(baseline_hash "$rel")"
+      if [[ -n "$recorded" && "$(file_hash "$dest_path")" != "$recorded" ]]; then
+        diverged+=("$rel")
+        continue
+      fi
+    fi
+    cp "$core_path" "$dest_path"
+    echo "  vendored:  $rel"
+    vendored=$((vendored + 1))
   done
+
+  if [[ ${#diverged[@]} -gt 0 ]]; then
+    {
+      echo
+      echo "error: core-vendored file(s) edited locally; refusing to overwrite:"
+      for rel in "${diverged[@]}"; do echo "  $rel"; done
+      echo
+      echo "These files are owned by the methodology core ($CORE) and this repo"
+      echo "has changed them since they were last vendored. Overwriting would"
+      echo "silently revert that work, which is how FEAT-2026-0073's"
+      echo "enforcement-surfaces block was lost."
+      echo
+      echo "Resolve by choosing one, then re-run:"
+      echo "  - the change belongs to everyone: land it in core, then re-vendor;"
+      echo "  - the change is loop-specific: move it out of the vendored file"
+      echo "    (a loop-local rule, repo docs, or a comment at the code it"
+      echo "    describes) and restore the file to core-identical;"
+      echo "  - the local copy is the one to keep for now: update the baseline"
+      echo "    hash in $VENDOR_BASELINE deliberately, recording why."
+    } >&2
+    exit 1
+  fi
+
+  # Record what is now vendored, so the next run can classify a difference.
+  {
+    echo "{"
+    last=$((${#CORE_FILES[@]} - 1))
+    for i in "${!CORE_FILES[@]}"; do
+      rel="${CORE_FILES[$i]}"
+      sep=","; [[ "$i" -eq "$last" ]] && sep=""
+      printf '  "%s": "%s"%s\n' "$rel" "$(file_hash "$SRC/$rel")" "$sep"
+    done
+    echo "}"
+  } > "$VENDOR_BASELINE"
+
   echo "  $vendored file(s) updated from core."
 else
   echo "  core not found at $CORE — skipping (dev-only stage)."

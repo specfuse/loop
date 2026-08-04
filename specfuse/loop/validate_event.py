@@ -146,6 +146,11 @@ def load_driver_correlation_patterns() -> dict | None:
     A missing, unreadable, or structurally incomplete registry file degrades
     to None (no widening — vendored-only validation) rather than raising,
     matching ``load_driver_event_types``'s existing contract.
+
+    ADDING A NEW ``<NAME>`` SEGMENT: update ``closing_names`` here AND
+    ``lint_plan.CORRELATION_ID_RE``, or the linter will accept IDs that
+    envelope validation rejects. The two surfaces enforce one contract and
+    must move together (#581).
     """
     global _DRIVER_CORRELATION_PATTERNS_CACHE
     if _DRIVER_CORRELATION_PATTERNS_CACHE is not _UNSET:

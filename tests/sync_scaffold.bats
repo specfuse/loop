@@ -99,3 +99,60 @@ teardown() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"error"* ]]
 }
+
+# --- #581: a local edit to a core-vendored file must halt, not be clobbered ---
+
+setup_core() {
+  # Vendored-from-core layout: core is the source for CORE_FILES, and the
+  # sync must be able to tell "core moved forward" from "the loop edited this".
+  mkdir -p "$TESTDIR/core/rules" "$TESTDIR/core/schemas/events"
+  printf 'corr\n'        > "$TESTDIR/core/rules/correlation-ids.md"
+  printf 'never\n'       > "$TESTDIR/core/rules/never-touch.md"
+  printf 'security\n'    > "$TESTDIR/core/rules/security-boundaries.md"
+  printf 'verifdisc\n'   > "$TESTDIR/core/rules/verification-discipline.md"
+  printf '{"event":1}\n' > "$TESTDIR/core/schemas/event.schema.json"
+  printf '{"e":1}\n'     > "$TESTDIR/core/schemas/events/initiative_created.schema.json"
+  printf '{"e":2}\n'     > "$TESTDIR/core/schemas/events/spec_validated.schema.json"
+  printf '{"e":3}\n'     > "$TESTDIR/core/schemas/events/spec_issue_resolved.schema.json"
+  printf '{"e":4}\n'     > "$TESTDIR/core/schemas/events/spec_issue_routed.schema.json"
+}
+
+@test "vendor records a baseline so a later local edit is detectable" {
+  setup_core
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [ -f "$TESTDIR/.specfuse/.vendored.json" ]
+}
+
+@test "core moving forward is a clean fast-forward, not a conflict" {
+  setup_core
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  printf 'corr v2\n' > "$TESTDIR/core/rules/correlation-ids.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  result="$(cat "$TESTDIR/.specfuse/rules/correlation-ids.md")"
+  [ "$result" = "corr v2" ]
+}
+
+@test "a local edit to a vendored file halts the sync and names the file" {
+  setup_core
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  # The loop edits a core-owned file (what FEAT-2026-0073 did).
+  printf 'corr\nplus a loop-local block\n' > "$TESTDIR/.specfuse/rules/correlation-ids.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rules/correlation-ids.md"* ]]
+}
+
+@test "the halt does not clobber the local edit" {
+  setup_core
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  printf 'corr\nplus a loop-local block\n' > "$TESTDIR/.specfuse/rules/correlation-ids.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  # The whole point: the edit survives the refusal.
+  [[ "$(cat "$TESTDIR/.specfuse/rules/correlation-ids.md")" == *"loop-local block"* ]]
+}
