@@ -177,27 +177,44 @@ class TestChangelogSchema(unittest.TestCase):
         "FEAT-2026-0073", "FEAT-2026-0073/T01", "FEAT-2026-0073/T02",
     }
 
-    def test_shipped_changelog_backfill_is_exactly_the_frozen_exception(self):
-        """Every entry traces to FEAT-2026-0064 or to the frozen exception set.
+    def test_frozen_exception_entries_all_remain(self):
+        """No grandfathered entry may vanish from the document.
 
-        Exact equality, both directions: an unlisted backfilled trace fails
-        (the original no-backfill guard, intact), and a listed trace that has
-        vanished from the document fails too (the exception cannot be quietly
-        widened by editing the list instead of the file).
+        The exception cannot be quietly widened by editing the list instead of
+        the file, nor narrowed by deleting inconvenient history.
         """
-        text = (REPO_ROOT / "CHANGELOG.md").read_text()
-        result = parse_changelog(text)
-        found = {
-            entry.trace
-            for section in result.sections
-            for entry in section.entries
-            if not entry.trace.startswith("FEAT-2026-0064")
-        }
+        result = parse_changelog((REPO_ROOT / "CHANGELOG.md").read_text())
+        present = {e.trace for s in result.sections for e in s.entries}
         self.assertEqual(
-            found,
-            self._GRANDFATHERED_SINCE_V080,
-            "backfilled entries drifted from the frozen since-v0.8.0 exception",
+            self._GRANDFATHERED_SINCE_V080 - present,
+            set(),
+            "grandfathered since-v0.8.0 entries went missing",
         )
+
+    def test_released_sections_never_gain_a_backfilled_trace(self):
+        """A *released* section may hold only FEAT-2026-0064 or frozen traces.
+
+        This is where the no-backfill guard now bites. `Unreleased` is
+        deliberately unconstrained -- it is what the collection points (the
+        close ceremony, `fix-bug`) append to, and constraining it blocked the
+        first legitimate forward entry the moment one arrived (#562). Once
+        stamped, a section is immutable by `stamp_release`'s own refusal, so
+        pinning released sections pins the historical block for good: the
+        since-v0.8.0 exception can never grow a 26th entry.
+        """
+        result = parse_changelog((REPO_ROOT / "CHANGELOG.md").read_text())
+        allowed = self._GRANDFATHERED_SINCE_V080
+        for section in result.sections:
+            if section.kind == "unreleased":
+                continue
+            for entry in section.entries:
+                if entry.trace.startswith("FEAT-2026-0064"):
+                    continue
+                self.assertIn(
+                    entry.trace,
+                    allowed,
+                    f"released section gained a backfilled entry: {entry.trace}",
+                )
 
     def test_shipped_changelog_explains_no_backfill_before_first_entry(self):
         text = (REPO_ROOT / "CHANGELOG.md").read_text()

@@ -167,6 +167,16 @@ def parse_changelog(text: str) -> ParseResult:
 
     for section in sections:
         if not section.entries:
+            # An empty `Unreleased` is the correct state immediately after a
+            # release: `stamp_release` freezes the accumulated entries under the
+            # new version and opens a fresh empty `Unreleased` above it, so the
+            # next append has a home nobody has to create by hand (T03's
+            # criterion 4). Flagging it made every release produce a document
+            # that failed this parser -- T01 and T03 disagreeing about the same
+            # post-stamp state. An empty *released* section is still a finding:
+            # a version that shipped nothing is a mistake, not a resting state.
+            if section.kind == "unreleased":
+                continue
             findings.append(f"line {section.heading_line}: section has no entries")
 
     return ParseResult(sections=sections, findings=findings)
