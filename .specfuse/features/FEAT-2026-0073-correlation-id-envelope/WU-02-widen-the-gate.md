@@ -1,18 +1,18 @@
 ---
 id: FEAT-2026-0073/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - .specfuse/scripts/event_type_gate.py
   - .specfuse/verification.yml
   - tests/test_event_gate_full_envelope.py
 oracle_env: macos_local
-duration_seconds: 2510.488
-cost_usd: 5.46923
-input_tokens: 278
-output_tokens: 54985
+duration_seconds: 669.524
+cost_usd: 1.646662
+input_tokens: 80
+output_tokens: 20573
 re_arm_count: 1
 re_arm_history:
   -
@@ -22,6 +22,16 @@ re_arm_history:
     prior_cost_usd: 5.46923
     prior_duration_seconds: 2510.488
     reason: "Agent-authored on the operator's standing overnight instruction; the operator was away. The WU body was amended, not retried as-is: its own rename invitation contradicted its produces list, so a rename made the declared deliverable absent (attempt 1 DELIVERABLE MISSING) and keeping the name left a declared path with no diff (attempts 2-3 FILES_CHANGED MISMATCH). The invitation is withdrawn and criterion 6 now names the exact verification.yml comment to rewrite."
+cumulative_cost_usd: 5.46923
+cumulative_duration_seconds: 2510.488
+cumulative_input_tokens: 278
+cumulative_output_tokens: 54985
+cumulative_attempts: 3
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T05:57:52.272479+00:00
 ---
 
 # Widen the gate from one field to the whole envelope

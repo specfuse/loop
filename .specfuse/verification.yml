@@ -40,12 +40,13 @@ code:
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
   - name: event-type-gate
-    # FEAT-2026-0060/T02: validate_event.py over every .specfuse/features/*/
-    # events.jsonl, scoped to event_type errors only. NOT scoped to every
-    # validation error class: 279 correlation_id errors remain across 36 files
-    # (the vendored pattern rejects the G<n>-CLOSE/G<n>-PLAN closing-sequence
-    # and TNNH hygiene ID shapes correlation-ids.md documents as valid — see
-    # FEAT-2026-0073, a separate feature). Widen once 0073 lands.
+    # FEAT-2026-0073/T02: validate_event.py over every .specfuse/features/*/
+    # events.jsonl, over the full envelope. Originally scoped to event_type
+    # errors only (FEAT-2026-0060/T02) because the vendored correlation_id
+    # pattern rejected the G<n>-CLOSE/G<n>-PLAN closing-sequence and TNNH
+    # hygiene ID shapes correlation-ids.md documents as valid. FEAT-2026-0073
+    # widened that pattern (driver-local, deep-copy fall-through in
+    # validate_event.py), so this gate now checks the whole envelope.
     command: "python3 .specfuse/scripts/event_type_gate.py"
 
   - name: roadmap-link-gate
