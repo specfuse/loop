@@ -97,6 +97,8 @@ DRIVER_SCHEMA_PATH = SCHEMA_ROOT / "driver-event.schema.json"
 
 
 _DRIVER_EVENT_TYPES_CACHE: frozenset[str] | None = None
+_UNSET = object()
+_DRIVER_CORRELATION_PATTERNS_CACHE: dict | None | object = _UNSET
 
 
 def load_driver_event_types() -> frozenset[str]:
@@ -130,6 +132,68 @@ def load_driver_event_types() -> frozenset[str]:
     return types
 
 
+def load_driver_correlation_patterns() -> dict | None:
+    """Return the driver-local correlation_id shape registry, or None.
+
+    Additive to the vendored envelope's ``correlation_id`` pattern
+    (FEAT-2026-0073): closing-sequence units (``G<n>-<NAME>``) and hygiene
+    units (``T<NN>H[N...]``) are shapes `.specfuse/rules/correlation-ids.md`
+    documents but the vendored pattern rejects. ``closing_names`` and
+    ``hygiene_suffix_pattern`` here are read by ``_widen_correlation_id_pattern``
+    to build a widened pattern on a deep copy of the vendored schema; the file
+    on disk is never touched.
+
+    A missing, unreadable, or structurally incomplete registry file degrades
+    to None (no widening — vendored-only validation) rather than raising,
+    matching ``load_driver_event_types``'s existing contract.
+    """
+    global _DRIVER_CORRELATION_PATTERNS_CACHE
+    if _DRIVER_CORRELATION_PATTERNS_CACHE is not _UNSET:
+        return _DRIVER_CORRELATION_PATTERNS_CACHE
+
+    patterns: dict | None
+    try:
+        with DRIVER_SCHEMA_PATH.open("r", encoding="utf-8") as f:
+            schema = json.load(f)
+        raw = schema.get("correlation_id")
+        if (
+            isinstance(raw, dict)
+            and isinstance(raw.get("closing_names"), list)
+            and raw["closing_names"]
+            and isinstance(raw.get("hygiene_suffix_pattern"), str)
+        ):
+            patterns = {
+                "closing_names": sorted(str(n) for n in raw["closing_names"]),
+                "hygiene_suffix_pattern": raw["hygiene_suffix_pattern"],
+            }
+        else:
+            patterns = None
+    except (OSError, json.JSONDecodeError):
+        patterns = None
+
+    _DRIVER_CORRELATION_PATTERNS_CACHE = patterns
+    return patterns
+
+
+def _widen_correlation_id_pattern(vendored_pattern: str, patterns: dict) -> str:
+    """Widen the vendored ``(/T\\d{2})?$`` task-id tail to also admit the
+    closing-sequence and hygiene shapes ``patterns`` describes.
+
+    Additive only: every string the vendored pattern accepted still matches
+    the result, since ``T\\d{2}`` remains one branch of the widened
+    alternation. If the vendored pattern's tail does not look as expected,
+    the pattern is returned unchanged rather than guessing.
+    """
+    old_tail = r"(/T\d{2})?$"
+    if not vendored_pattern.endswith(old_tail):
+        return vendored_pattern
+
+    closing_alt = "|".join(patterns["closing_names"])
+    hygiene = patterns["hygiene_suffix_pattern"]
+    new_tail = rf"(/(T\d{{2}}({hygiene})?|G\d+-({closing_alt})))?$"
+    return vendored_pattern[: -len(old_tail)] + new_tail
+
+
 def load_validator() -> Draft202012Validator:
     if not SCHEMA_PATH.is_file():
         sys.stderr.write(
@@ -146,10 +210,20 @@ def load_validator() -> Draft202012Validator:
     # there are admitted from the driver-local registry. Implemented as a
     # union on a deep copy so the vendored schema on disk is never touched.
     driver_types = load_driver_event_types()
-    if driver_types:
+    correlation_patterns = load_driver_correlation_patterns()
+    if driver_types or correlation_patterns:
         schema = copy.deepcopy(schema)
-        enum = schema["properties"]["event_type"]["enum"]
-        enum.extend(sorted(t for t in driver_types if t not in enum))
+        if driver_types:
+            enum = schema["properties"]["event_type"]["enum"]
+            enum.extend(sorted(t for t in driver_types if t not in enum))
+        if correlation_patterns:
+            # Same deep-copy fall-through (FEAT-2026-0073): widen
+            # correlation_id to also admit closing-sequence and hygiene
+            # shapes documented in correlation-ids.md, on the same copy.
+            correlation_id_prop = schema["properties"]["correlation_id"]
+            correlation_id_prop["pattern"] = _widen_correlation_id_pattern(
+                correlation_id_prop["pattern"], correlation_patterns
+            )
 
     Draft202012Validator.check_schema(schema)
     return Draft202012Validator(schema)

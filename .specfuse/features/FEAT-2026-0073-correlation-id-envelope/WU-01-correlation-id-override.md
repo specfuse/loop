@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0073/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 4.00
 produces:
   - specfuse/loop/data/schemas/driver-event.schema.json
@@ -12,6 +12,10 @@ produces:
 produces_driver_helper:
   - load_driver_correlation_patterns
 oracle_env: macos_local
+duration_seconds: 1655.569
+cost_usd: 4.984844
+input_tokens: 206
+output_tokens: 59780
 ---
 
 # The correlation-ID override: widen on a deep copy, never edit the vendored file

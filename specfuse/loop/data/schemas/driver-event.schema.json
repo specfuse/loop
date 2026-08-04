@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://specfuse.dev/loop/schemas/driver-event.schema.json",
-  "title": "Driver-local event type registry",
-  "description": "Additive to the vendored orchestrator envelope (event.schema.json): event_type values the loop driver emits with no orchestrator-side counterpart. validate_event.py resolves an event's event_type against the vendored envelope enum first; only when absent there does it fall through to this list. task_started, task_completed, and human_escalation are already sanctioned in the vendored enum and must not be duplicated here — this file exists only for types the vendored schema has no concept of.",
-  "$comment": "FEAT-2026-0060/T01: registry derived from the union of every build_event(...) call site in specfuse/loop/loop.py and a corpus sweep of every .specfuse/features/*/events.jsonl, subtracting the vendored envelope enum. attempt_outcome and gate_reached were already-known precedent (loop.py's build_arm_predicate_event docstring); auto_close_decision, arm_predicate_evaluated, re_arm_dispatched, plan_next_draft_lint, and unsandboxed_dispatch are additional driver-local mechanics the orchestrator has no concept of. gate_auto_armed (loop.py build_event call under gate_events.append) and re_arm_rejected (loop.py build_event call under the spinning_reproduction_missing re-arm check) are emitted by real code paths that have never fired in a recorded run, so a corpus-only sweep cannot see them; they are included because call-site derivation does.",
+  "title": "Driver-local envelope registry",
+  "description": "Additive to the vendored orchestrator envelope (event.schema.json): shapes the loop driver emits with no orchestrator-side counterpart. validate_event.py resolves each shape against the vendored envelope first; only when absent there does it fall through to this registry. `event_types` (FEAT-2026-0060) widens the event_type enum; task_started, task_completed, and human_escalation are already sanctioned in the vendored enum and must not be duplicated here. `correlation_id` (FEAT-2026-0073) widens the correlation_id pattern to admit the closing-sequence and hygiene shapes `.specfuse/rules/correlation-ids.md` documents; `closing_names` and `hygiene_suffix_pattern` here must state the same set of shapes as that rules file's combined pattern (and as specfuse/loop/lint_plan.py's CORRELATION_ID_RE, which independently enforces the same contract on PLAN.md graphs).",
+  "$comment": "FEAT-2026-0060/T01: event_types derived from the union of every build_event(...) call site in specfuse/loop/loop.py and a corpus sweep of every .specfuse/features/*/events.jsonl, subtracting the vendored envelope enum. attempt_outcome and gate_reached were already-known precedent (loop.py's build_arm_predicate_event docstring); auto_close_decision, arm_predicate_evaluated, re_arm_dispatched, plan_next_draft_lint, and unsandboxed_dispatch are additional driver-local mechanics the orchestrator has no concept of. gate_auto_armed (loop.py build_event call under gate_events.append) and re_arm_rejected (loop.py build_event call under the spinning_reproduction_missing re-arm check) are emitted by real code paths that have never fired in a recorded run, so a corpus-only sweep cannot see them; they are included because call-site derivation does. FEAT-2026-0073/T01: correlation_id added — closing_names and hygiene_suffix_pattern mirror correlation-ids.md's documented shapes and lint_plan.py's CORRELATION_ID_RE verbatim, so the envelope, the rules file, and the PLAN-graph linter state one contract.",
   "event_types": [
     "attempt_outcome",
     "gate_reached",
@@ -14,5 +14,16 @@
     "unsandboxed_dispatch",
     "gate_auto_armed",
     "re_arm_rejected"
-  ]
+  ],
+  "correlation_id": {
+    "closing_names": [
+      "CLOSE",
+      "CLOSE-INTERMEDIATE",
+      "DOCS",
+      "LESSONS",
+      "PLAN",
+      "RETRO"
+    ],
+    "hygiene_suffix_pattern": "H\\d*"
+  }
 }

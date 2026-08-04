@@ -145,6 +145,17 @@ The session running `plan-next` mints the next gate's substantive IDs as drafts;
 the human arms them. When adding a new closing WU type to `lint_plan.py`, also
 add its `<NAME>` segment to `CORRELATION_ID_RE` so the new IDs pass validation.
 
+**Two enforcement surfaces, one contract.** `lint_plan.py`'s `CORRELATION_ID_RE`
+enforces this format on `PLAN.md` graphs and WU frontmatter. The event envelope
+(`specfuse/loop/data/schemas/event.schema.json`) enforces a narrower vendored
+`correlation_id` pattern that does not yet know the closing-sequence or hygiene
+shapes; the loop widens it without editing the vendored file, via a driver-local
+registry (`specfuse/loop/data/schemas/driver-event.schema.json`'s `correlation_id`
+key, read by `validate_event.py`'s `load_validator`) — the same deep-copy
+fall-through FEAT-2026-0060 established for `event_type` (FEAT-2026-0073). When
+adding a new `<NAME>` segment, update `CORRELATION_ID_RE` **and** that registry's
+`closing_names` so both surfaces admit the new shape together.
+
 Do not reuse an ordinal even after a unit is abandoned. Once an ID has appeared in
 the event log, it is spent. Reusing it would make history ambiguous.
 
