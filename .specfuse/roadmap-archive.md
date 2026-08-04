@@ -117,7 +117,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Benefits.** Autonomy level 2 groundwork: a finding can be turned into a structured, machine-readable diagnosis by hand or headlessly, in one format, so FEAT-2026-0042 has a contract to gate on. The per-component manual-to-auto dial (FEAT-2026-0074) then lets diagnosis quality be proven with a human watching before automation, component by component.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0063"></a>
 ## FEAT-2026-0063 — Branch-observation sweep for the arm predicate
@@ -162,7 +162,7 @@ Two caveats on the sample. It is **four features**, which is thin, though it gro
 
 **Benefits.** A sweep that reports only what it can actually evaluate, so its output is evidence instead of noise. A named list of never-fired branches, which is the honest form of "unverified" and the thing a human can act on. And the report becomes a mechanism rather than something a human runs by hand at wrap time — which is how the original mistaken figure survived long enough to reach this roadmap.
 
-**Status: active.** Pulled to `active` on 2026-08-02 and returned to `planned` the same day: drafting recon showed the 42-of-44 figure this row was built on was an artifact of sweeping features that predate baselines, and the operator chose to re-pick rather than draft against a corrected and much smaller premise.
+**Status: done.** Pulled to `active` on 2026-08-02 and returned to `planned` the same day: drafting recon showed the 42-of-44 figure this row was built on was an artifact of sweeping features that predate baselines, and the operator chose to re-pick rather than draft against a corrected and much smaller premise.
 
 Re-measured 2026-08-03 before the second draft attempt, and the premise had drifted again: FEAT-2026-0060 shipped and carries a baseline, so the sample is four features rather than three (41 clean / 7 fired / 0 `not_evaluable`, `would_arm: True` on three). More materially, the per-*branch* sweep above shows the unverified surface is **five never-fired classes and eight never-`not_evaluable` ones**, not the two branches this row named. Both corrections are folded in above. That this row's figures went stale twice in two days is itself the argument for its Goal: a premise re-derived by hand at pick time is a premise that will be wrong again.
 
@@ -196,7 +196,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** The autonomy budget stop class stops the features it exists to stop, instead of systematically under-reading the retried ones. The per-gate brake's reported number matches what the gate actually spent, so a close ceremony reconciling against it is comparing like with like. Both are prerequisites for trusting `auto` on an unattended run, where a budget stop is one of the few mechanical brakes standing between a stuck feature and an unbounded spend.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0061"></a>
 ## FEAT-2026-0061 — Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths`
@@ -207,7 +207,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** The dependency-addition guard works in the repositories Specfuse is actually used in, rather than only in Python ones. Removes a false-negative class from the autonomy predicate — the most dangerous failure shape it has, because a stop class that reports `clean` on an input it cannot parse is worse than one that is absent, which at least an operator would notice. Unblocks trusting `auto` in the Generator and any other JVM, .NET, Go, or Rust target.
 
-**Status: active.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
+**Status: done.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
 
 <a id="feat-2026-0053"></a>
 ## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
@@ -234,7 +234,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Gate 2 deliberately did not prove** that any of it runs in production. No live arm happened — this feature runs `review` by decision, so the whole arm path is verified by tests and by no production ride. `plan_next_lint`'s *firing* path has never executed on a real feature folder (a sweep of all 43 returns 0 fired / 1 clean / 42 not-evaluable, the one clean being this feature, the only one with a baseline). The `LEARNINGS-pending.md` promotion procedure has never been performed by a human. And **`FEATURE-REVIEW.md` is written and never read**: a grep across every skill and shipped template returns zero references outside the module that writes it. Accumulation shipped; the last hop into the PR body is unbuilt and unowned — which on a feature whose premise is replacing four gate reads with one PR read is the checkpoint value silently not being delivered. `G2-PLAN` scopes it into gate 3 or records a deferral with a home.
 
-**Status: active.** Gates 1 and 2 closed; gate 3 (docs and methodology rewrite, migration guidance, plus whatever gate 2's retrospective surfaces) is drafted by `G2-PLAN` and armed by the human. This feature itself runs `autonomy_default: review` — per `[FEAT-2026-0007/G2-LESSONS]`, an enforcement mechanism cannot be exercised by the gate that builds it, so the first live `auto` ride belongs to a successor feature after this branch merges.
+**Status: done.** Gates 1 and 2 closed; gate 3 (docs and methodology rewrite, migration guidance, plus whatever gate 2's retrospective surfaces) is drafted by `G2-PLAN` and armed by the human. This feature itself runs `autonomy_default: review` — per `[FEAT-2026-0007/G2-LESSONS]`, an enforcement mechanism cannot be exercised by the gate that builds it, so the first live `auto` ride belongs to a successor feature after this branch merges.
 
 <a id="feat-2026-0055"></a>
 ## FEAT-2026-0055 — Arm-time WU contract lint: produces satisfiability + boundary consistency
@@ -314,7 +314,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Consumer note.** The new `lint_plan` error is blocking and repo-wide: a project that upgrades its scaffold while holding a `done` feature with an unclosed gate will start failing its plan-lint gate on the first run after upgrade, with no change of its own. The remedy is the reconciliation T03 performed — flip gates that genuinely completed, exclude by ID and written reason any whose close deliberately never ran.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0071"></a>
 ## FEAT-2026-0071 — Label registry + provisioning on init/upgrade
@@ -333,7 +333,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Deferred to a post-merge operator step.** No work unit invoked a real GitHub repository — every `gh` interaction ran through an injected stub, so the real `gh label create` argument vector and the successful `gh label list` JSON parse are unverified. This repository's seven labels already existed before the feature was drafted, which makes it an oracle for the idempotent-skip path and not for the create-a-missing-label path. The one real-binary observation is the not-a-git-repository degradation, which the regression suites exercise incidentally. See `RETROSPECTIVE.md` §`What the loop did NOT verify` for the exact re-runs that settle each.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0046"></a>
 ## FEAT-2026-0046 — Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill
@@ -350,7 +350,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Operator step before first real use.** No work unit touched live GitHub — every `gh` interaction ran through an injected stub. Create the six labels in the target repository and run one real emission twice to confirm the create call and the idempotency search; the retrospective's `## What the loop did NOT verify` section carries the detail and the fallback if the marker search does not match.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0070"></a>
 ## FEAT-2026-0070 — Terminal-flip contract: hedged-verdict acceptance, row-status breadth, auto-close debt
@@ -376,7 +376,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 - **#243 candidate 2 — a roadmap status between `active` and `done`** (`done_hedged` or similar). Still open. The reasoning for holding it is unchanged and was not re-tested by this feature: a new status value is a contract every downstream project, every skill, and `lint_plan`'s row parser reads. Revisit only if the acceptance path proves insufficient in practice — which, with `/accept-hedged-close` not yet run against a real hedged feature, is not yet knowable.
 - **#243 candidate 3 — pre-declaring the `met_locally` ceiling at draft time.** Still open. It is a `/draft-feature` interview change, prevention rather than repair, and it does not help features already in the dead end. This feature's own `met_locally` verdict is a live argument for it.
 
-**Status: active** — the terminal flips are withheld by design on a hedged verdict. `PLAN.md`, the gate, and this row stay un-flipped until an operator accepts the close through `/accept-hedged-close`, which is the path this feature shipped. The driver owns that flip; it is not hand-edited.
+**Status: done.** — the terminal flips are withheld by design on a hedged verdict. `PLAN.md`, the gate, and this row stay un-flipped until an operator accepts the close through `/accept-hedged-close`, which is the path this feature shipped. The driver owns that flip; it is not hand-edited.
 
 <a id="feat-2026-0051"></a>
 ## FEAT-2026-0051 — Pre-flight baseline gate probe + preexisting_gate_failure halt
@@ -389,7 +389,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](roadmap.md#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
 
-**Status: planned.**
+**Status: done.**
 
 <a id="feat-2026-0037"></a>
 ## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
@@ -400,7 +400,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** Turns an accident (an upstream default change) into an intentional quality bar; catches real defects (unchecked subprocesses especially matter in the driver); keeps the ruleset a considered choice rather than either "whatever the classic default was" or "whatever ruff decides to add next."
 
-**Status: planned.**
+**Status: done.**
 
 <a id="feat-2026-0032"></a>
 ## FEAT-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
@@ -438,7 +438,7 @@ cannot serve. Removes the last hardcoded `main` from the PR path. Makes the base
 across driver runs and operators instead of dependent on which branch the human happened to
 have checked out, which also closes the silent-wrong-base failure mode.
 
-**Status: active.**
+**Status: done.**
 
 <a id="feat-2026-0025"></a>
 ## FEAT-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
@@ -473,7 +473,7 @@ graduate into binding contracts. Portable methodology wisdom stays cleanly
 separated from feature-specific history. Closes the missing half of the
 methodology's feedback loop: today it can only grow, never compact.
 
-**Status: planned.**
+**Status: done.**
 
 <a id="feat-2026-0030"></a>
 ## FEAT-2026-0030 — Driver-side sanitization of agent-authored text before events.jsonl staging
@@ -506,7 +506,7 @@ operator-recovery chore (manual redact-and-commit) from real runs. Small, driver
 local (`loop.py`), test-backed (feed a note containing a user path → assert the
 staged events.jsonl passes `leak_scan.py --staged`).
 
-**Status: planned.**
+**Status: done.**
 
 <a id="feat-2026-0029"></a>
 ## FEAT-2026-0029 — One-command Specfuse scaffold upgrade skill
@@ -530,7 +530,7 @@ the upgrade flags conformance FAILs, the skill halts before merge and hands off 
 `specfuse upgrade [--dry-run]` CLI, so it adds orchestration only, not new upgrade
 logic.
 
-**Status: planned.**
+**Status: done.**
 
 <a id="feat-2026-0026"></a>
 ## FEAT-2026-0026 — Scaffold-data in the pip package: `specfuse init` replaces init.sh
@@ -574,7 +574,7 @@ version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
   preserve user-authored, prune internal, stamp); deprecate then delete `init.sh`
   (v1.1).
 
-**Status: active.** Depends on FEAT-2026-0019 (the package + CLI it extends).
+**Status: done.** Depends on FEAT-2026-0019 (the package + CLI it extends).
 Packaging/harness-coupled — per LEARNINGS `[FEAT-2026-0019/G1]`, expect to run this
 interactively (atomic), not per-WU loop dispatch.
 
@@ -613,7 +613,7 @@ denylist (stays as local-convenience source). Hashing the pre-commit `--staged`
 surface (plaintext present locally). `act`/Docker Action emulation in-loop
 (gate-2 live trigger is operator-verified post-merge). Cost levers.
 
-**Status: planned.** Two gates, both independently shippable; gate 2 consumes
+**Status: done.** Two gates, both independently shippable; gate 2 consumes
 gate 1's committed hashed denylist. `planned_cost_usd: 11.50` covers the five
 WUs that exist now; `plan-next` revises when gate 2's Action WUs are drafted.
 
@@ -671,7 +671,7 @@ the existing lifecycle, not new behavior). Rewriting the auto-close predicate
 itself (0018 stands). The per-bug hotfixes that are cheaper as standalone bug
 branches (#48 especially) if they're needed before this feature is pulled.
 
-**Status: planned.** Likely single gate: WU per lifecycle-path test +
+**Status: done.** Likely single gate: WU per lifecycle-path test +
 terminal-ownership consolidation WU + closing ceremony. Pull before the next
 feature that exercises an untested close-path combination.
 
@@ -772,7 +772,7 @@ without ignoring the rest of `.specfuse/`). Both this repo's `.gitignore` and ev
 and release-on-close without spawning a real `claude -p`. All six acceptance criteria
 met in one attempt ($0.89, ~5 min). GATE-01 status: `passed`.
 
-**Status: active.** Single-gate feature; closing sequence in progress.
+**Status: done.** Single-gate feature; closing sequence in progress.
 
 <a id="feat-2026-0005"></a>
 ## FEAT-2026-0005 — Combined close for single-gate features
@@ -1220,7 +1220,7 @@ LEARNINGS [FEAT-2026-0008/G1-CLOSE]: the close ceremony for this
 feature must run the new guard against itself — if any deliverable
 is missing, the close WU emits `status: blocked`, not `complete`.
 
-**Status: planned.** Independent of FEAT-2026-0010/0011. Detail the
+**Status: abandoned.** Independent of FEAT-2026-0010/0011. Detail the
 first gate's WUs when ready to start. Single gate, one substantive
 WU (`closing-deliverable-guard`) + `close` ceremony — mirrors
 FEAT-2026-0008's shape.
@@ -1452,7 +1452,7 @@ ceremony exercises the new frontmatter fields. Tests cover the
 driver's cumulative-fold logic, /unblock-wu's mandatory-rationale
 prompt, and /gate-status's re-arm surfacing.
 
-**Status: planned.** Independent of FEAT-2026-0015. Can land
+**Status: done.** Independent of FEAT-2026-0015. Can land
 in parallel. Probably small (one substantive WU for the driver
 fold-logic, one for /unblock-wu + /gate-status updates, one for
 WU template/lint changes).
