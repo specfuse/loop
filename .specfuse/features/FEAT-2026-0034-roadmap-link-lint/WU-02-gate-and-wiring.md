@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0034/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - .specfuse/scripts/roadmap_link_gate.py
   - .specfuse/verification.yml
   - tests/test_roadmap_link_gate.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T03:55:48.893168+00:00
+duration_seconds: 721.288
+cost_usd: 1.169444
+input_tokens: 50
+output_tokens: 11123
 ---
 
 # The gate: fail on rot, green on this tree, loud about the fix
