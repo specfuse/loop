@@ -5,7 +5,7 @@ slug: correlation-id-envelope
 branch: feat/FEAT-2026-0073-correlation-id-envelope
 roadmap_goal: Make the event envelope accept the correlation-ID shapes correlation-ids.md documents — closing-sequence G<n>-<NAME> and hygiene TNNH — so the driver's event log validates end to end rather than in the event_type dimension alone.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 12.50
 ---
 
