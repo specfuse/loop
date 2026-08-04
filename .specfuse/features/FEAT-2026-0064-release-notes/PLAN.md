@@ -5,7 +5,7 @@ slug: release-notes
 branch: feat/FEAT-2026-0064-release-notes
 roadmap_goal: Maintain a CHANGELOG per project, written incrementally as features and bug fixes land rather than reconstructed at release time, and tie its sections to the version tags they shipped in — so a consumer can answer "what changed, and will it break me" from one document.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 16.00
 ---
 
