@@ -2800,3 +2800,42 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   drift a downstream parser then has to absorb. Rule: for any "identical output from N
   surfaces" criterion, the oracle is `assertEqual(render_a(x), render_b(x))` plus a
   no-restated-template check on each caller.
+
+- [FEAT-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them] **Before
+  drafting a feature that automates a check, run that check by hand over the real corpus
+  — the result decides whether the feature's headline criterion is satisfiable on
+  arrival, and it is usually cheaper than one blocked attempt.** This feature's gate
+  asserts "the new lint exits 0 on this tree", which is unsatisfiable if the tree carries
+  rot. Checking the four invariants by hand at draft time found two live violations,
+  which were then repaired in a commit *ahead* of the feature — turning a day-one-red
+  gate into a green one and letting `PLAN.md` state the exact inherited state (30 anchors
+  here, 39 there, zero duplicates, four `blocked` rows all carrying their block). Both
+  implementation WUs then landed first-attempt and under estimate, because neither spent
+  an attempt discovering the problem the feature was about. Rule: `planning-discipline.md`
+  §2's satisfiability question has an operational answer for any check-shaped feature —
+  execute the check manually first. Then make the *repair* a separate commit before the
+  feature and say so in `PLAN.md`, because a feature that both repairs and checks cannot
+  demonstrate its checker ever fires. Corollary the close must record: when the tree is
+  cleaned first, every red-before test is a **fixture**, and the suite's green does not
+  prove the checker fires on real producer output — say so, or a reader concludes the
+  lint found nothing because there was nothing to find.
+
+- [FEAT-2026-0034/G1-CLOSE/re-verify-the-producer-not-the-audit] **A defect described in a
+  roadmap row is a dated observation, not a current fact; before a close repeats it, drive
+  the *producer* and read what it emits today.** Three planning documents — the roadmap
+  row, `PLAN.md`, and the close WU body — all asserted that `auto_archive_feature`
+  "produces rot shapes 3 and 4 on every run", inherited unchallenged from an audit ~5 days
+  older than the feature. Driving the real function over a temp-directory copy of the real
+  corpus, for all 9 archivable features, produced **zero** instances of either shape: both
+  had been fixed in the producer in the interim (its section regex now stops at the next
+  `<a id="`, and it strips its own preceding anchor). What *is* still live is a third shape
+  the documents did not name — the archiver moves a section without rewriting the refs
+  pointing at it or carried inside it, so 2 of 9 archives introduced two dead refs each,
+  one in each direction. Rule: when a feature exists to catch a defect, the close's
+  evidence for "the defect is still outstanding" must be an executed run of the producer
+  with the findings quoted — never a restatement of the motivating audit. The stale-shape
+  failure is asymmetric and quiet: had the shapes been fixed *entirely*, the close would
+  have shipped a confident claim about a defect that no longer existed, with a green gate
+  agreeing. This is also the cheapest way to satisfy "the checker has met real producer
+  output" when the tree was cleaned before the feature ran — copy the corpus to a temp
+  dir, run the producer, lint the result, diff the findings against baseline.
