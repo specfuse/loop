@@ -2947,3 +2947,74 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   X" is the highest-risk shape, because "just" is doing the estimating. Record in the
   retrospective that the row's premise was wrong, so the next feature reading the same
   row is not misled the same way.
+
+- [FEAT-2026-0042/G2-CLOSE/result-block-yaml-subset] **A RESULT block that opens with a
+  YAML folded or literal scalar (`summary: >`, `evidence: |`) is unparseable by the
+  driver, and an honest `status: blocked` is silently recorded as `passed`.** A work
+  unit ended with a well-reasoned `blocked` — one acceptance criterion marked
+  `met: false`, a `blocked_reason` naming the gap — and the driver recorded
+  `outcome: passed`, `agent_status: complete`. Reproduced against the exact recorded
+  text: `parse_result_block()` returns `None` because `_miniyaml.parse` raises
+  `MiniYAMLError line 2: literal/folded block scalars unsupported` on the `summary: >`
+  line, *before* it ever reads `status`. `agent_reported_blocked()` then returns
+  `(False, None)` — its documented contract is that a malformed block "falls through to
+  `verify()` as usual" — and `verify()` passed, because the WU's gate set (`tests`,
+  `lint`, `security`, `coverage`, `leak-scan`) cannot see a criterion like "a pull
+  request exists". The forgiving-parse decision is right in isolation: the alternative
+  is crashing the driver on free-form LLM output. What is wrong is that the fall-through
+  is **indistinguishable from a well-formed pass**, in both directions — the agent has
+  no way to learn its report was discarded, and the operator reading `events.jsonl` sees
+  a clean gate. Rule, for agents: keep the RESULT block inside the parser's subset —
+  plain scalars and simple lists, no `>`/`|`, no anchors; a multi-paragraph `summary` or
+  `evidence` belongs in the prose above the block, not in it. Rule, for drivers and any
+  agent-to-orchestrator contract: an *unparseable* report is a third state, not a
+  synonym for "no objection". Record it as its own outcome (`result_block_unparseable`),
+  surface it in the attempt event, and never let the absence of a signal read as the
+  presence of a positive one. Generalizes to every hand-rolled parser sitting between an
+  agent's self-report and an automated decision.
+
+- [FEAT-2026-0042/G2-CLOSE/green-gate-narrower-than-criteria] **When the automated gate
+  set is narrower than a work unit's acceptance criteria, the agent's self-report is the
+  only oracle for the difference — so discarding it discards the whole verification.**
+  A live-run WU's real criteria were "quote raw `gh` output", "name the pull-request
+  number", "state that nothing was merged". No gate in any gate set can evaluate those;
+  the `code` set checks the suite, the linter, `bandit`, coverage, and a leak scan, all
+  of which were green on a tree where the central claim had failed. The gap is
+  structural, not a mistake in the drafting: some criteria are only checkable by a
+  session that watched the command run. Rule: when a WU's criteria include claims no
+  gate can evaluate, say so in the WU itself, and treat the agent's RESULT as
+  **load-bearing verification** for exactly those criteria rather than as advisory
+  commentary on top of the gates. Corollary for closes: a green gate on such a WU is
+  evidence the gates passed and nothing more — re-read the producing WU's own report
+  before repeating its `done` as a fact.
+
+- [FEAT-2026-0042/G2-CLOSE/registered-is-not-provisioned] **Registering an identifier in
+  a code-side registry does not create it in the external system; the first live call is
+  where that distinction gets discovered.** A label was added to `LABEL_REGISTRY`
+  one gate ahead of its consumer *specifically* to avoid a known failure where code
+  queried a label the registry did not declare — and the first live run still crashed
+  with `gh issue edit --add-label` exiting non-zero, because the label had never been
+  created on the actual repository. Registration and provisioning are two steps with two
+  owners: the registry is a compile-time-ish declaration, the provisioning pass is a
+  runtime action somebody has to run against each target. Rule: for any registry of
+  external names (labels, topics, queues, buckets, webhooks, feature flags), the code
+  path that *uses* a name must either tolerate its absence or provision it on demand —
+  and the feature that adds the name must name which of the two it chose. "It is in the
+  registry" answers a different question than "it exists". Applies identically to
+  anything a scaffold declares and a downstream project is expected to sync.
+
+- [FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed] **A skip-guarded live test
+  is skip-guarded on the sandbox, not on intent — so any later session that runs the
+  suite unsandboxed silently reaches the real external system.** A live-reach test was
+  written correctly: it skips by name when `gh` is unauthenticated, which is the state
+  inside the command sandbox, so it never fires during normal gated runs. The terminal
+  close then had to re-run the suite unsandboxed — because ~11 unrelated tests are
+  falsely red under the sandbox — and in doing so created and closed scratch issues on
+  the live repository, from a work unit explicitly forbidden to reach it. Nothing
+  errored and nothing warned; the skip condition simply stopped being true. Rule: gate a
+  live test on an **explicit opt-in** the environment cannot supply by accident (an env
+  var like `SPECFUSE_LIVE=1`, a marker/tag excluded from the default run), never on the
+  ambient availability of the credential it needs — availability is a property of who is
+  running the suite, not of whether they meant to fire. And when a close is obliged to
+  re-run oracles fresh, read the suite's live-reach inventory first: `close-discipline.md`
+  §1 and a live test are on a collision course by default.

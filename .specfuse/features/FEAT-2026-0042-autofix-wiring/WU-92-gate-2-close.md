@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0042/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
+verdict: partially_met
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.8.0
+started_at: 2026-08-04T03:15:55.439455+00:00
+duration_seconds: 861.893
+cost_usd: 7.715448
+input_tokens: 150
+output_tokens: 53921
 ---
 
 # Close gate 2 and the feature — retrospective, lessons, docs, terminal verdict
