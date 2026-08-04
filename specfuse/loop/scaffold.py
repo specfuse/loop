@@ -13,6 +13,9 @@ from pathlib import Path
 
 from . import _miniyaml
 from . import labels as _labels
+# The one name for the file close-k reads; scaffold seeds what that guard
+# requires, so both must agree on the path (#575).
+from .closing_requirements import CHANGELOG_PATH
 
 try:
     from importlib.resources.abc import Traversable  # Python 3.11+
@@ -163,8 +166,11 @@ _SEED_RENAME: dict[str, str] = {
 
 # Seed files handled by other work units; skip during init.
 # - gitignore.snippet: handled by T05 (wire_claude)
+# - CHANGELOG.seed.md: a repo-root file, not a .specfuse/ one; wire_claude
+#   writes it to the project root (#575)
 _SKIP_SEEDS: frozenset[str] = frozenset({
     "gitignore.snippet",
+    "CHANGELOG.seed.md",
 })
 
 
@@ -258,6 +264,26 @@ def _write_gitignore(target_path: Path) -> None:
     if existing and not existing.endswith("\n"):
         existing += "\n"
     gitignore.write_text(existing + snippet, encoding="utf-8")
+
+
+def _write_changelog(target_path: Path) -> None:
+    """Seed a root CHANGELOG.md when the project has none (#575).
+
+    `close-k` fails a close whose §3 enumeration names a real consumer-visible
+    change unless `CHANGELOG.md`'s Unreleased gained a matching entry. Before
+    this, `specfuse init` never created the file, so a fresh project's first
+    such feature failed at its terminal close — the most expensive point in a
+    feature to be blocked — on a file the scaffold owed it.
+
+    Create-only. An existing CHANGELOG.md is a project's own document and is
+    never read, merged, or overwritten: `upgrade` routes through `wire_claude`
+    too, and silently rewriting a consumer-facing file on upgrade is worse than
+    the gap this closes.
+    """
+    changelog = target_path / CHANGELOG_PATH
+    if changelog.exists():
+        return
+    changelog.write_bytes(read_scaffold("CHANGELOG.seed.md"))
 
 
 def _write_claude_md(target_path: Path) -> None:
@@ -355,6 +381,7 @@ def wire_claude(target: str | Path) -> None:
     """
     target_path = Path(target)
     _write_gitignore(target_path)
+    _write_changelog(target_path)
     _write_claude_md(target_path)
     _write_settings_json(target_path)
     refresh_claude_plugin_config(target_path)

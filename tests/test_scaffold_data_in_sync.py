@@ -22,6 +22,7 @@ TRACKED = {
     "monitoring.overrides.yml.example",
     "monitoring-secrets-checklist.md",
     "roadmap.template.md",
+    "CHANGELOG.seed.md",
     "LEARNINGS.template.md",
     "templates/GATE.template.md",
     "templates/PLAN.template.md",

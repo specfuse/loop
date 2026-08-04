@@ -216,3 +216,43 @@ class TestChangelogCollection(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMissingChangelogMessage(unittest.TestCase):
+    """#575 — the absent-file halt must name the fix, not just the absence.
+
+    The bare message reported that CHANGELOG.md does not exist without saying
+    the operator should create one or that the scaffold now seeds it, so a
+    first-time user read a terminal-close halt as a broken install.
+    """
+
+    def _reason_for_missing_changelog(self, root: Path) -> str:
+        fdir = root / "feature"
+        fdir.mkdir()
+        (fdir / "RETROSPECTIVE.md").write_text(
+            "# Retrospective\n\n"
+            "## Consumer-visible contract changes\n\n"
+            "1. **New CLI flag `--foo`.** Additive, no removal.\n\n"
+            "## Cost analysis\n\nAll cheap.\n"
+        )
+        wu = _make_wu(file=fdir / "WU-close.md", wu_id="FEAT-2026-9999/G1-CLOSE")
+        ok, reason = loop.assert_changelog_entry_for_contract_changes(
+            wu, fdir, root, DUMMY_HEAD,
+        )
+        self.assertFalse(ok, "a missing CHANGELOG.md must still fail close-k")
+        return reason
+
+    def test_message_names_the_remedy_and_the_legal_classes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            reason = self._reason_for_missing_changelog(Path(tmp))
+        self.assertIn("[Unreleased]", reason)
+        self.assertIn("specfuse upgrade", reason)
+        self.assertIn("#575", reason)
+        for cls in ("added", "changed", "fixed", "breaking"):
+            self.assertIn(cls, reason, f"message omits legal class {cls!r}")
+
+    def test_message_says_upgrade_preserves_an_existing_file(self):
+        """Telling an operator to run `upgrade` is only safe if it cannot clobber."""
+        with tempfile.TemporaryDirectory() as tmp:
+            reason = self._reason_for_missing_changelog(Path(tmp))
+        self.assertIn("without touching an existing file", reason)
