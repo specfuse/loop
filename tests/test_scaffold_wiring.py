@@ -323,3 +323,84 @@ class TestInitOrchestrator(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestChangelogSeed(unittest.TestCase):
+    """#575 — init must leave a CHANGELOG.md that close-k can satisfy.
+
+    `close-k` fails a close whose §3 enumeration names a real change unless
+    `CHANGELOG.md`'s Unreleased gained an entry. `specfuse init` never created
+    the file, so a fresh downstream project's first feature with any
+    consumer-visible change failed at its terminal close on a file the
+    scaffold owed it.
+    """
+
+    def test_wire_claude_seeds_changelog(self):
+        from specfuse.loop.scaffold import wire_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            wire_claude(target)
+            self.assertTrue(
+                (target / "CHANGELOG.md").exists(),
+                "wire_claude left no CHANGELOG.md for close-k to read",
+            )
+
+    def test_seeded_changelog_parses_clean_and_has_unreleased(self):
+        """The seed is a contract: it ships into every downstream project."""
+        from specfuse.loop.changelog import parse_changelog
+        from specfuse.loop.scaffold import wire_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            wire_claude(target)
+            result = parse_changelog(
+                (target / "CHANGELOG.md").read_text(encoding="utf-8")
+            )
+            self.assertEqual(result.findings, [], f"seed rejected: {result.findings}")
+            self.assertIsNotNone(result.unreleased(), "seed has no Unreleased section")
+
+    def test_seeded_changelog_accepts_an_append(self):
+        """A close must be able to append to the seed without editing it first."""
+        from specfuse.loop.changelog import append_entry, parse_changelog
+        from specfuse.loop.scaffold import wire_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            wire_claude(target)
+            path = target / "CHANGELOG.md"
+            path.write_text(
+                append_entry(
+                    path.read_text(encoding="utf-8"),
+                    entry_class="added", summary="a thing", trace="FEAT-2026-0001",
+                ),
+                encoding="utf-8",
+            )
+            result = parse_changelog(path.read_text(encoding="utf-8"))
+            self.assertEqual(result.findings, [])
+            self.assertEqual(
+                [e.trace for e in result.unreleased().entries], ["FEAT-2026-0001"]
+            )
+
+    def test_existing_changelog_is_never_overwritten(self):
+        """Upgrade routes through wire_claude too; a project's own file wins."""
+        from specfuse.loop.scaffold import wire_claude
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            own = "# Changelog\n\n## [Unreleased]\n\n### Added\n\n- mine (#1)\n"
+            (target / "CHANGELOG.md").write_text(own, encoding="utf-8")
+            wire_claude(target)
+            wire_claude(target)
+            self.assertEqual(
+                (target / "CHANGELOG.md").read_text(encoding="utf-8"), own
+            )
+
+    def test_init_end_to_end_leaves_a_changelog(self):
+        """The failure in #575 was reported against `init`, so assert on `init`."""
+        from specfuse.loop.scaffold import init
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = pathlib.Path(tmp)
+            init(target, no_labels=True)
+            self.assertTrue((target / "CHANGELOG.md").exists())

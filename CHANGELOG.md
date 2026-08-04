@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- `specfuse init` now seeds a root `CHANGELOG.md`, and `specfuse upgrade` creates one when absent without touching an existing file. Without it, the first feature in a fresh project carrying any consumer-visible change failed `close-k` at its terminal close, on a file the scaffold never created (#575)
+
 ## [0.9.0+umbrella.0.9.0] - 2026-08-04
 
 <!--

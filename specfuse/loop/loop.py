@@ -60,7 +60,7 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import scaffold as _scaffold
-from .changelog import parse_changelog
+from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
     AUTOCLOSE_DEBT_MARKER_RE,
     CHANGELOG_PATH,
@@ -4674,7 +4674,12 @@ def assert_changelog_entry_for_contract_changes(
         return (
             False,
             f"assert_changelog_entry_for_contract_changes: '{CONSUMER_VISIBLE_HEADING}' "
-            f"names a real change but {CHANGELOG_PATH} does not exist",
+            f"names a real change but {CHANGELOG_PATH} does not exist. Create it at "
+            f"the repo root with a '## [Unreleased]' heading, then append this "
+            f"feature's enumeration under one of: "
+            f"{', '.join(sorted(ENTRY_CLASSES))}. Projects scaffolded before "
+            f"{CHANGELOG_PATH} was seeded will not have one; `specfuse upgrade` "
+            f"creates it without touching an existing file (#575)",
         )
     result = parse_changelog(changelog.read_text())
     unreleased = result.unreleased()
