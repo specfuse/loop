@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0059/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - plugins/specfuse/skills/accept-hedged-close/SKILL.md
   - .specfuse/skills/accept-hedged-close/SKILL.md
   - tests/test_routed_finding_tracking.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T12:49:28.516045+00:00
+duration_seconds: 775.879
+cost_usd: 1.318926
+input_tokens: 60
+output_tokens: 11738
 ---
 
 # A routed finding gets a queue, not a paragraph

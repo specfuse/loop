@@ -122,6 +122,23 @@ FEATURE_ID` directly; this skill has no role.
     operator reason about it unaided.
 - After the headline (or the unclassified-entry notice), quote every entry
   to the operator in full, as before.
+- **For each `routed-finding` entry, prompt for its tracking surface —
+  non-blocking.** `routed-finding` is the one kind whose whole meaning is
+  *"someone else owns this now"*, and today that someone is named only in
+  retrospective prose nobody reopens. Ask, per entry: `"entry <N> is
+  routed-finding — where is it tracked? give an existing issue or roadmap
+  reference, or say 'create' to run `/roadmap-add` or `gh issue create`, or
+  say 'nowhere, deliberately' if it is untracked on purpose"`. Any answer is
+  accepted, including "nowhere, deliberately", and it is recorded as given —
+  this prompt is not a gate: `/accept-hedged-close` is a single-confirm
+  skill, and a mandatory sub-decision here would turn it into a multi-step
+  interrogation, the exact friction this feature exists to remove. The other
+  three kinds never trigger this prompt: `acceptance-discharged` is
+  discharged by the acceptance itself, `inherent` is never actionable by
+  anyone, and `externally-verifiable-later` already carries its exact re-run
+  condition in the record, which *is* its tracking surface. This skill does
+  not create the issue or roadmap row itself — it offers the commands; the
+  operator runs them.
 
 ### 3. Require the operator's input before any write
 
@@ -178,6 +195,11 @@ acceptance record naming:
 - every outstanding follow-up, carried forward **verbatim** from the
   hedged-follow-up record surfaced in step 2 — do not paraphrase, do not
   drop entries, do not mark any as discharged;
+- for each `routed-finding` entry, the tracking-surface answer collected in
+  step 2, written immediately next to that entry — never as a loose
+  appendix at the end of the record. An untracked routed finding and its
+  tracking reference (or "tracked nowhere, deliberately") must be readable
+  together, not stitched together by the reader;
 - the timestamp (ISO 8601 UTC) the acceptance was recorded.
 
 This record is the only file this skill writes before invoking the driver.
