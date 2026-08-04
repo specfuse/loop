@@ -78,15 +78,50 @@ FEATURE_ID` directly; this skill has no role.
 - On a `met_locally` or `partially_met` verdict with the close WU `done`,
   continue.
 
-### 2. Surface the hedged-verdict follow-up record
+### 2. Lead with the verdict ceiling, then the record
 
 - Locate the close-discipline follow-up record the close WU was required to
-  produce (`RETROSPECTIVE.md` or the gate review) — one entry per unmet
-  criterion: the criterion verbatim, why it is unverifiable here, and the
-  exact re-run condition that would upgrade the verdict.
-- Quote every entry to the operator. If no such record exists, stop and
-  say so — accepting a hedge with no follow-up record to carry forward
-  defeats the point of this skill; the close WU itself is incomplete.
+  produce (`RETROSPECTIVE.md` or the gate review) — one `### `-titled entry
+  per unmet criterion: the criterion verbatim, why it is unverifiable here,
+  the exact re-run condition that would upgrade the verdict, and a `kind:`
+  per [`close-discipline.md`](../../rules/close-discipline.md) §2. If no
+  such record exists, stop and say so — accepting a hedge with no follow-up
+  record to carry forward defeats the point of this skill; the close WU
+  itself is incomplete.
+- **Read every entry's `kind:` field before printing anything.** This
+  answers the operator's first question — *why isn't this `met`?* — before
+  they have to ask it.
+  - **Every entry carries a `kind:` recognized by
+    `closing_requirements.FOLLOW_UP_KINDS`.** Compute the ceiling over the
+    set of kinds present with `closing_requirements.verdict_ceiling_for_kinds`
+    and print the **headline first, before quoting any entry detail**:
+    - if every entry is `acceptance-discharged`, `routed-finding`, or
+      `inherent`, the ceiling is `verdict_ceiling_for_kinds`'
+      `NO_IN_REPO_REWORK` value — print exactly: **"no in-repo rework can
+      raise this verdict"**.
+    - if **any** entry is `externally-verifiable-later`, the ceiling is
+      `verdict_ceiling_for_kinds`' `REWORK_EXISTS` value — print: **"rework
+      exists: `<the named re-run condition, quoted verbatim from that
+      entry>`"**. The operator now has a real choice between accepting now
+      and staying hedged until that condition is met.
+
+    Only `externally-verifiable-later` implies rework exists. The other
+    three kinds all collapse to "no in-repo rework can raise this verdict",
+    for different reasons: `acceptance-discharged` needs a human signature
+    (accepting *is* the discharge), `routed-finding` is owned on another
+    surface, and `inherent` is not assertable, ever. This mapping is
+    `close-discipline.md` §2's table; this skill reads the computed answer,
+    it does not re-derive the rule.
+  - **Any entry has no `kind:`, or an unrecognized one** (a record written
+    before this contract shipped, or a typo): do **not** compute a ceiling
+    and do **not** guess one from the entry's wording — `kind` is written by
+    the close WU, which has the context; a reader sees only prose after the
+    fact and would be guessing. Report plainly, naming the entry: `"entry
+    <N> carries no recognized kind: — ceiling not computed"`, then fall back
+    to today's behaviour for that entry: quote it in full and let the
+    operator reason about it unaided.
+- After the headline (or the unclassified-entry notice), quote every entry
+  to the operator in full, as before.
 
 ### 3. Require the operator's input before any write
 
@@ -96,14 +131,36 @@ Before writing anything, require, in order:
 2. **Confirmation the close WU is `done` with a hedged verdict** (already
    checked in step 1 — state it back: `"<wu_id> is done, verdict: <verdict>"`).
 3. **A one-line operator reason** for accepting the hedge now rather than
-   reworking the feature. Empty or whitespace-only input is refused:
-
-   ```
-   acceptance reason required — type a one-line reason or Ctrl-C to abort
-   ```
-
-   and the prompt repeats. This mirrors `/unblock-wu`'s rationale discipline
-   exactly — the reason is the audit signal, not a formality.
+   reworking the feature. The prompt is scaffolded from step 2's computed
+   ceiling — naming *what is being accepted*, never suggesting words for the
+   reason itself:
+   - ceiling `NO_IN_REPO_REWORK`:
+     ```
+     acceptance reason required — you are accepting that no in-repo rework
+     can raise this verdict; type a one-line reason or Ctrl-C to abort
+     ```
+   - ceiling `REWORK_EXISTS`:
+     ```
+     acceptance reason required — you are accepting now instead of waiting
+     for: <the named re-run condition>; type a one-line reason or Ctrl-C to
+     abort
+     ```
+   - no ceiling computed (an unclassified entry is present): fall back to
+     today's wording, unchanged:
+     ```
+     acceptance reason required — type a one-line reason or Ctrl-C to abort
+     ```
+   Empty or whitespace-only input is refused and the prompt repeats. This is
+   [`operator-escalation.md`](../../rules/operator-escalation.md)'s
+   never-author rule made concrete: the skill names what is being accepted,
+   the human supplies every word of the reason — the prompt above contains
+   no reason text an operator could accept unread, only the name of the
+   thing being accepted. A version of this skill that pre-filled a plausible
+   reason string would be worse than a blank line, because it invites
+   accepting a sentence the operator never thought, and must be rejected at
+   review even if every other criterion passes. This mirrors `/unblock-wu`'s
+   rationale discipline exactly — the reason is the audit signal, not a
+   formality.
 4. **Explicit acknowledgment of the standing follow-up list** quoted in step
    2 — the operator must confirm they have read every entry, not just that
    a list exists. A blanket "yes" to an unquoted list does not satisfy this.
