@@ -3018,3 +3018,56 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   running the suite, not of whether they meant to fire. And when a close is obliged to
   re-run oracles fresh, read the suite's live-reach inventory first: `close-discipline.md`
   §1 and a live test are on a collision course by default.
+
+- [FEAT-2026-0059/G1-CLOSE/classify-beats-prose] **A contract that makes the party with
+  the context emit one bounded token beats one that asks them for prose — because every
+  downstream reader then gets a mechanical answer instead of a reading.** A hedged
+  close's follow-up record required three prose fields (criterion, why unverifiable,
+  re-run condition) and no classification. Two consumers needed the same thing from it —
+  is `met` reachable at all? — and neither could get it: the operator reverse-engineered
+  it from four paragraphs, and the acceptance skill could only quote. Adding a required
+  `kind:` from a closed four-value set moved that answer from "read carefully and infer"
+  to a one-line function over the set of kinds. The generalization is not about hedged
+  verdicts: whenever a producer's prose is repeatedly parsed by consumers for one
+  recurring decision, add a required enum field written **by the producer** and compute
+  the decision from it in **one** place. Two corollaries earned the hard way. (a) The
+  producer writes it, never a reader — the close knows why a criterion went unmet
+  because it just tried to meet it; a reader sees only the prose afterwards, and a
+  confident guess on an ambiguous entry is worse than an unclassified one. (b) Scope the
+  new requirement to records written **after** it ships, not to a corpus sweep — two
+  pre-existing records without the field would have made the lint red on arrival and
+  unfixable without rewriting closed history, and "the check reads only the artifact
+  currently under lint" is a testable property, not a promise.
+
+- [FEAT-2026-0059/G1-CLOSE/never-vs-not-here] **A "no test can assert this" category
+  needs the *who* and *when*, not just the *whether* — otherwise every claim the suite
+  is silent about gets filed as permanently unassertable.** Classifying a follow-up as
+  "whether the new output actually helps a human decide faster", the first instinct was
+  the never-assertable category, because *"no test can measure this"* pattern-matches to
+  "not assertable, ever". It was wrong: no test can measure it, but a named party (an
+  operator) at a named moment (the next real run) can, which makes it upgradeable and
+  changes the verdict ceiling and therefore the operator's options. The line that
+  resolves it: **ever-unassertable means nobody can assert it, at any time, by any
+  means; externally-verifiable means no automated check *here* can, but somebody
+  specific can, later.** If a taxonomy has both categories, its definitions must draw
+  that line explicitly — a one-line gloss like "not assertable, ever" does not, and the
+  failure mode is silent and one-directional: over-filing under "never" makes work look
+  permanently impossible, and nobody re-audits an entry marked never.
+
+- [FEAT-2026-0059/G1-CLOSE/signing-agent-in-sandbox] **A command sandbox that denies the
+  commit-signing agent socket turns every test that builds a scratch git repository red,
+  with an error that names neither the sandbox nor the test.** Five tests failed with
+  `error: Couldn't get agent socket?` / `fatal: failed to write commit object` /
+  `returned non-zero exit status 128` from a `git commit` inside a temp-dir fixture —
+  because commit signing is configured globally and the signing agent's unix socket is
+  outside the sandbox, not because anything under test was broken. All five passed
+  unsandboxed. Rule for any session obliged to re-run oracles fresh: before reporting a
+  red, reproduce the failing primitive in isolation (`git init` + `git commit` in a temp
+  dir) — a sandbox-caused failure reproduces there with zero test code involved, and the
+  distinction between "the suite is red" and "the environment is red" is worth the ten
+  seconds every time. Sibling trap, in the opposite direction
+  ([FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the unsandboxed re-run
+  that fixes these false reds is also the run where credential-gated live tests stop
+  skipping and reach the real external system. Both are the same underlying fact — the
+  sandbox boundary silently changes which tests are meaningful — and a close that
+  re-runs oracles crosses it in both directions.

@@ -69,6 +69,11 @@ from .closing_requirements import (
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
+    FOLLOW_UP_KINDS,
+    HEDGED_RECORD_HEADING,
+    HEDGED_RECORD_HEADING_RE,
+    HEDGED_VERDICT_VALUES,
+    KIND_FIELD_RE,
     LEARNINGS_PATH,
     LEARNINGS_PENDING_FILENAME,
     NO_FAILURES_SENTINEL,
@@ -4572,6 +4577,67 @@ def assert_next_gate_drafted_or_terminal(
     )
 
 
+def assert_hedged_followup_kinds_classified(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-j) On a hedged verdict, every §2 follow-up entry has a valid `kind:`.
+
+    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
+    the agent writes `verdict:` during dispatch. Scoped to THIS close's own
+    RETROSPECTIVE.md only — never reads another feature's files, per the
+    satisfiability guarantee in FEAT-2026-0059's PLAN.md: a corpus sweep
+    would be red on arrival because FEAT-2026-0041 and FEAT-2026-0042 hedged
+    before `kind:` existed.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict")
+    if verdict not in HEDGED_VERDICT_VALUES:
+        return True, ""
+    retro = feature_dir / RETROSPECTIVE_FILENAME
+    if not retro.exists():
+        return (
+            False,
+            f"assert_hedged_followup_kinds_classified: {RETROSPECTIVE_FILENAME} "
+            f"absent — cannot locate the '{HEDGED_RECORD_HEADING}' section",
+        )
+    text = retro.read_text()
+    heading_match = HEDGED_RECORD_HEADING_RE.search(text)
+    if not heading_match:
+        return (
+            False,
+            f"assert_hedged_followup_kinds_classified: verdict={verdict!r} but no "
+            f"'{HEDGED_RECORD_HEADING}' section in {RETROSPECTIVE_FILENAME}",
+        )
+    start = heading_match.end()
+    next_heading = re.search(r"^## ", text[start:], re.MULTILINE)
+    section = text[start:start + next_heading.start()] if next_heading else text[start:]
+    entries = re.split(r"^### ", section, flags=re.MULTILINE)[1:]
+    if not entries:
+        return (
+            False,
+            f"assert_hedged_followup_kinds_classified: '{HEDGED_RECORD_HEADING}' "
+            f"section in {RETROSPECTIVE_FILENAME} has no per-entry ('### ') "
+            "records to classify",
+        )
+    for entry in entries:
+        title = entry.splitlines()[0].strip() if entry.strip() else "(untitled entry)"
+        kind_match = KIND_FIELD_RE.search(entry)
+        if not kind_match:
+            return (
+                False,
+                f"assert_hedged_followup_kinds_classified: entry {title!r} in the "
+                f"'{HEDGED_RECORD_HEADING}' section has no **kind:** field",
+            )
+        kind = kind_match.group(1)
+        if kind not in FOLLOW_UP_KINDS:
+            return (
+                False,
+                f"assert_hedged_followup_kinds_classified: entry {title!r} has "
+                f"kind {kind!r}, not one of {sorted(FOLLOW_UP_KINDS)}",
+            )
+    return True, ""
+
+
 CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
     "close": [
         assert_retrospective_exists,
@@ -4580,6 +4646,7 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_verdict_well_formed,
         assert_cost_analysis_section_when_met,
         assert_failure_class_breakdown_when_failures_present,
+        assert_hedged_followup_kinds_classified,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,

@@ -123,7 +123,10 @@ The close's acceptance criteria must cover:
    artifacts.
 2. **Hedged follow-up record** (§2): on `met_locally`, a named record per
    unmet criterion — criterion, why unverifiable here, exact re-run condition
-   that upgrades it to `met`.
+   that upgrades it to `met`, and a `kind:` (one of `acceptance-discharged`,
+   `externally-verifiable-later`, `routed-finding`, `inherent`) written as
+   `- **kind:** \`<value>\``. `specfuse-lint --closing` refuses a hedged close
+   whose record has an entry with no `kind:` or an unrecognised one.
 3. **Consumer-visible contract changes** (§3): enumerate every addition /
    removal / rename across the feature's producing WUs and block on human
    acknowledgment, or write exactly `n/a — no consumer-visible contract

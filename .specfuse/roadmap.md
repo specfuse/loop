@@ -74,7 +74,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | [→ detail](#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
-| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
+| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
@@ -899,17 +899,6 @@ machine-checkable contract rather than prose.
 **Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse-lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
 
 **Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
-
-**Status: planned.**
-
-<a id="feat-2026-0059"></a>
-## FEAT-2026-0059 — Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking
-
-**Why.** First live run of `/accept-hedged-close` (FEAT-2026-0054, 2026-07-30) showed the operator-facing gap: the skill quotes the raw D-entry follow-up record and demands a one-line reason, but never answers the operator's actual questions — *why couldn't this close `met`, and what kind of reason is expected?* On 0054 the answer was derivable but buried: two entries were unclosable in-repo by construction (an operator-signature entry and a future-rate-in-other-repos entry) and two were findings routed to other owners — meaning `met_locally` was the structural ceiling and no rework alternative existed. The operator had to reverse-engineer that from four verbose entries. Routed findings also currently survive only as retrospective prose, with no tracking surface.
-
-**Goal.** (1) `close-discipline.md` §2's hedged-verdict record gains a required `kind:` per entry — `acceptance-discharged` / `externally-verifiable-later` / `routed-finding` — written by the close WU, which has the context. (2) `/accept-hedged-close` reads the classification and leads with a verdict-ceiling headline ("no in-repo rework can raise this verdict" vs "rework exists: <what>"), states the explicit alternative (accept now vs stay hedged until the named upgrade conditions, then recheck), and scaffolds the reason prompt from the classification while still requiring the operator's own words (`operator-escalation.md`'s never-author rule intact). (3) At acceptance, each `routed-finding` entry prompts for a tracking surface — existing issue/roadmap row, or offer `/roadmap-add` / `gh issue create` — so accepted follow-ups land in a queue instead of dying in prose.
-
-**Benefits.** The operator's accept/rework decision becomes a choice between two named options instead of a blank-line prompt after a wall of quotes; acceptance reasons get sharper because the skill names what is being accepted; routed findings stop leaking; the classification lives in the §2 contract (one home) so the skill re-derives nothing.
 
 **Status: planned.**
 

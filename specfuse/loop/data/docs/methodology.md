@@ -152,12 +152,19 @@ locally verifiable passed; something structurally could not be verified here)
 leaves every terminal surface un-flipped (driver >= 0.3.21: gate
 `awaiting_review`, roadmap row `active`, PLAN.md `active`) AND must produce a
 follow-up record — in the gate review or `RETROSPECTIVE.md` — naming each
-unmet criterion, why it was unverifiable in this environment, and the exact
-re-run condition that would upgrade the verdict to `met`. Without the record,
-`met_locally` is a dead end; with it, the feature is resumable by anyone. See
-`.specfuse/rules/close-discipline.md` §2 for the record's shape and the other
-close-time obligations (fresh oracle re-runs, consumer-visible-change
-enumeration).
+unmet criterion, why it was unverifiable in this environment, the exact
+re-run condition that would upgrade the verdict to `met`, and (FEAT-2026-0059)
+a `kind:` classifying *why* it is unmet: `acceptance-discharged`,
+`externally-verifiable-later`, `routed-finding`, or `inherent`. The verdict
+ceiling follows mechanically from the set of kinds present — any
+`externally-verifiable-later` entry means rework exists; otherwise `met` is
+unreachable by any in-repo work — so `/accept-hedged-close` can answer "why
+isn't this `met`?" before the operator asks. `kind` is written by the close
+WU, which has the context; a reader never infers it from prose. Without the
+record, `met_locally` is a dead end; with it, the feature is resumable by
+anyone. See `.specfuse/rules/close-discipline.md` §2 for the record's shape
+and the other close-time obligations (fresh oracle re-runs,
+consumer-visible-change enumeration).
 
 **Exiting a hedged verdict** (FEAT-2026-0070) — a hedge left the feature with no
 supported path to `done`, because `fire_terminal_flips` runs at close-WU-*outcome*
