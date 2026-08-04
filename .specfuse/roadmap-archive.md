@@ -102,7 +102,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Where the goal's phrasing is now true, and where it is not.** "Headless `/fix-bug NN`" is true: the mode exists and a real session was launched from a real diagnosed finding. "**Auto**-fire" is **not** true. The firing path lives behind its own entry point, `python3 -m specfuse.monitor.autofix_run`, deliberately *not* wired into the harvest cycle and not registered as a console script — so nothing fires on a schedule and a human or a later feature must call it. And the chain's last link is unobserved: the one live end-to-end run decided `FIRE`, recorded the attempt, launched the session, and returned `could_not_proceed`, so **no pull request has ever been produced by this path**. Fix correctness is an inherent, permanent non-guarantee, not deferred work. See `RETROSPECTIVE.md` for the raw evidence, the residue report, and the follow-up record naming what a re-armed live run would have to show to upgrade the verdict.
 
-**Status: active.**
+**Status: done.** Two gates. Gate 1 shipped the decision layer, the GitHub-held rate-limit state and a headless `fix-bug` mode — all inert. Gate 2 made the dial live and fired it once for real. Closed `partially_met` and accepted by the operator: the single live fire returned `could_not_proceed` (the planted bug was too thin for `fix-bug` to reduce to a falsifying test), so the mechanism is proven end to end but **no pull request has yet been produced** — that follow-up is carried forward open. Auto-merge remains impossible here; FEAT-2026-0048 owns it.
 
 <a id="feat-2026-0041"></a>
 ## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
