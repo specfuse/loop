@@ -84,6 +84,20 @@ MODEL_ALIASES = frozenset({"sonnet", "opus", "haiku"})
 VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
+# Two enforcement surfaces, one contract. This pattern governs PLAN.md graphs
+# and WU frontmatter. The event envelope enforces its own, narrower
+# `correlation_id` pattern (`data/schemas/event.schema.json`, vendored from the
+# methodology core and never edited here); the driver widens it via the
+# driver-local registry `data/schemas/driver-event.schema.json`, read by
+# `validate_event.load_validator` on a deep copy — the fall-through
+# FEAT-2026-0060 established for `event_type` and FEAT-2026-0073 extended to
+# correlation IDs.
+#
+# ADDING A NEW `<NAME>` SEGMENT: update this pattern AND that registry's
+# `closing_names`, or IDs the linter accepts will be rejected by envelope
+# validation. This note lives here, at the change site, rather than in
+# `rules/correlation-ids.md` — that file is vendored from core, so a loop-local
+# addition to it is reverted by the next `sync-scaffold.sh` run (#581).
 CORRELATION_ID_RE = re.compile(
     r"^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|"
     r"INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$"
