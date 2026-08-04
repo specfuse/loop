@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import unittest
@@ -165,13 +166,31 @@ class TestAutofixState(unittest.TestCase):
         self.assertTrue(spec.description)
 
     def test_label_registry_covers_consumers_suite_passes(self):
-        result = subprocess.run(
-            ["python3", "-m", "pytest", "-q", "tests/test_label_registry_covers_consumers.py"],
-            capture_output=True,
-            text=True,
-            check=False,
+        """The #300 guard must be green once this feature's label is registered.
+
+        Run in-process through unittest, NOT by shelling out to pytest. pytest is
+        not a dependency of this project — it appears in no pyproject.toml extra
+        and no CI workflow — so the subprocess form failed on the runner with
+        `No module named pytest` while passing on any machine whose virtualenv
+        happened to have it. The whole repository runs on
+        `python3 -m unittest discover -s tests`; this test now uses the same
+        runner as everything it sits beside.
+        """
+        suite = unittest.defaultTestLoader.loadTestsFromName(
+            "tests.test_label_registry_covers_consumers"
         )
-        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertGreater(
+            suite.countTestCases(), 0,
+            "the #300 guard suite loaded zero tests — a vacuous pass is exactly "
+            "the failure this assertion exists to prevent")
+        result = unittest.TextTestRunner(
+            stream=io.StringIO(), verbosity=0,
+        ).run(suite)
+        self.assertTrue(
+            result.wasSuccessful(),
+            msg="\n".join(
+                text for _, text in (result.failures + result.errors)
+            ) or "guard suite failed with no captured output")
 
     def test_finding_label_constant_used_for_daily_cap_scoping(self):
         # Documents the scoping this module relies on rather than asserting
