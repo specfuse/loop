@@ -86,7 +86,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
-| FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | planned | — | [→ detail](#feat-2026-0073) |
+| FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | active | — | [→ detail](#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -1038,7 +1038,7 @@ Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalate
 
 **Benefits.** The driver's event log validates end to end rather than in the `event_type` dimension alone — the state FEAT-2026-0060 was believed to reach and did not. Unblocks that feature's real-log verification gate, which cannot be green while 279 events fail on a field the gate has no opinion about. And it closes a documented-versus-enforced disagreement that has been silently true for every closing work unit this repository has ever run.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0074"></a>
 ## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
