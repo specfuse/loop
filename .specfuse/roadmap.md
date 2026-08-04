@@ -74,7 +74,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | [→ detail](#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
-| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | planned | — | [→ detail](#feat-2026-0059) |
+| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | active | — | [→ detail](#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
@@ -911,7 +911,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The operator's accept/rework decision becomes a choice between two named options instead of a blank-line prompt after a wall of quotes; acceptance reasons get sharper because the skill names what is being accepted; routed findings stop leaking; the classification lives in the §2 contract (one home) so the skill re-derives nothing.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0069"></a>
 ## FEAT-2026-0069 — monitoring.yml check targets + queue-stalled check type
