@@ -152,15 +152,52 @@ class TestChangelogSchema(unittest.TestCase):
 
     # -- criterion 7: no backfill --
 
-    def test_shipped_changelog_has_no_pre_feature_entries(self):
+    # The one-time since-v0.8.0 exception, frozen. FEAT-2026-0064 shipped this
+    # file mid-release-cycle, so the v0.9.0 release would otherwise document
+    # only the feature that built the document — while two changes in that same
+    # release BREAK a downstream project on upgrade (`close-k` fails a close on
+    # a project with no root CHANGELOG.md; `event-type-gate` widened from one
+    # field to the whole envelope). Those were backfilled from each feature's
+    # RETROSPECTIVE.md § "Consumer-visible contract changes" — the enumeration
+    # its close was already required to write — never from commit subjects.
+    #
+    # This set is a grandfather list, NOT a relaxation. It is compared for
+    # EXACT equality below, so a 26th backfilled entry fails this test just as
+    # it did before the exception existed. Do not add to it: the collection
+    # points (close ceremony, fix-bug) are the only way in from here.
+    _GRANDFATHERED_SINCE_V080 = {
+        "#259", "#280", "#314", "#360", "#465", "#519",
+        "FEAT-2026-0034", "FEAT-2026-0034/T02",
+        "FEAT-2026-0041", "FEAT-2026-0041/T01", "FEAT-2026-0041/T03",
+        "FEAT-2026-0042", "FEAT-2026-0042/T02", "FEAT-2026-0042/T03",
+        "FEAT-2026-0059", "FEAT-2026-0059/T01",
+        "FEAT-2026-0060", "FEAT-2026-0061", "FEAT-2026-0062",
+        "FEAT-2026-0063/T01", "FEAT-2026-0063/T02",
+        "FEAT-2026-0068",
+        "FEAT-2026-0073", "FEAT-2026-0073/T01", "FEAT-2026-0073/T02",
+    }
+
+    def test_shipped_changelog_backfill_is_exactly_the_frozen_exception(self):
+        """Every entry traces to FEAT-2026-0064 or to the frozen exception set.
+
+        Exact equality, both directions: an unlisted backfilled trace fails
+        (the original no-backfill guard, intact), and a listed trace that has
+        vanished from the document fails too (the exception cannot be quietly
+        widened by editing the list instead of the file).
+        """
         text = (REPO_ROOT / "CHANGELOG.md").read_text()
         result = parse_changelog(text)
-        for section in result.sections:
-            for entry in section.entries:
-                self.assertTrue(
-                    entry.trace.startswith("FEAT-2026-0064"),
-                    f"unexpected backfilled entry: {entry.trace}",
-                )
+        found = {
+            entry.trace
+            for section in result.sections
+            for entry in section.entries
+            if not entry.trace.startswith("FEAT-2026-0064")
+        }
+        self.assertEqual(
+            found,
+            self._GRANDFATHERED_SINCE_V080,
+            "backfilled entries drifted from the frozen since-v0.8.0 exception",
+        )
 
     def test_shipped_changelog_explains_no_backfill_before_first_entry(self):
         text = (REPO_ROOT / "CHANGELOG.md").read_text()
