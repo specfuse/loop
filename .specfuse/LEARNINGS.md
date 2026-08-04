@@ -3071,3 +3071,49 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   skipping and reach the real external system. Both are the same underlying fact — the
   sandbox boundary silently changes which tests are meaningful — and a close that
   re-runs oracles crosses it in both directions.
+
+- [FEAT-2026-0064/G1-CLOSE/write-the-compressed-artifact-first] **When a ceremony
+  already produces material that a second audience needs, relocate it instead of
+  commissioning a second write — and write the compressed rendering FIRST, because the
+  order is what decides whether the second surface costs anything.** Every close was
+  already required to enumerate consumer-visible contract changes in prose; nothing
+  collected it, so release notes were re-derived at release time from commit subjects,
+  worse. Relocating it was right. But "it is the same material, not a second write" is
+  imprecise as guidance and this close is the evidence: the *thinking* happens once and
+  serves both surfaces, while the *writing* genuinely happens twice, at two compression
+  levels — six sentences of context in the retrospective, one clause in the changelog.
+  The near-free version is only available in one direction. Writing the one-liners
+  first forces you to decide what the change **is** before you write the paragraph
+  explaining why it matters, and the paragraph comes out better; writing the prose
+  first and "extracting" entries from it means summarizing your own summary — one more
+  lossy hop, which is exactly the degradation a release-time generator produces, just
+  performed by hand. Two corollaries. (a) **Name the second audience.** An artifact a
+  ceremony produces and nobody reads is the failure being repeated, not fixed — before
+  adding any close deliverable, say who reads it and when. (b) **Classify by the
+  consumer's experience, not by the diff.** The one item of six that was hard to
+  classify was a new lint check: unambiguously an addition in the diff, unambiguously
+  breaking from a downstream project's chair, where it starts failing a close that
+  passed last week. The consumer's chair is the tiebreak. Sibling of
+  [FEAT-2026-0059/G1-CLOSE/classify-beats-prose], which is the same move one level up:
+  make the party holding the context emit the bounded token.
+
+- [FEAT-2026-0064/G1-CLOSE/patch-the-instance-ask-why] **Patch the instance, ask what
+  authoring shape produced it, or it ships again — and the trigger for "ask why" is the
+  SECOND occurrence, not the third.** A `python3 -m pytest` subprocess in a repository
+  where pytest is a dependency of nothing shipped **five times across three work units
+  in two features** (FEAT-2026-0042/T02; FEAT-2026-0059/T02; FEAT-2026-0059/T03) before
+  anyone wrote `tests/test_no_pytest_subprocess.py`. Every instance was individually
+  patched and every patch was correct, which is precisely why nobody escalated: a fixed
+  defect looks finished. The root cause was never in the tests — it was a recurring
+  **work-unit acceptance-criterion shape**, "run suite X by name and quote the result",
+  which invites reaching for a runner instead of loading the suite in-process. The
+  batches also landed inside a single feature, as close as this loop gets to being told
+  twice in one sitting, and the fourth and fifth instances still shipped. Rule for any
+  session fixing a defect it has seen before: before writing the patch, ask **what
+  authoring shape produced this**, and if the answer is a template, a rule, or a
+  criterion phrasing rather than this one file, the deliverable is a guard plus a fix to
+  that shape — a repeat is a defect in the thing that generates the code, not in the
+  code. A guard that fires on the *shape* (AST over the tree, one test) costs about the
+  same as the third patch and retires the whole class. Companion to
+  [FEAT-2026-0039/G2-CLOSE], which names the specific criterion-writing mistake; this
+  entry is the general escalation rule that would have caught it two instances earlier.
