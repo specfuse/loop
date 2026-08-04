@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 21.00
+baseline:
+  sha: d6a7a6108c0f1a0700f31a6d83fb50f72ee2eaa4
+  probed_at: 2026-08-04T14:03:16.071430+00:00
+  failing: []
 ---
 
 # Gate 1 — what changed, and will it break me, answerable from one document
