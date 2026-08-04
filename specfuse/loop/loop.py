@@ -2905,6 +2905,7 @@ def baseline_evidence_diffstat(feat_fm: dict) -> "str | None":
 
 def format_preexisting_gate_failure(
     gate_number: int, failing_gates: list[dict], feat_fm: dict,
+    done_unit_ids: "list[str] | None" = None,
 ) -> str:
     """Render the `preexisting_gate_failure` halt as a message a non-expert
     operator can act on without reading driver source (FEAT-2026-0051/T03).
@@ -2918,30 +2919,65 @@ def format_preexisting_gate_failure(
     is future work tracked as FEAT-2026-0052, never offered here as if it
     already existed.
     """
-    lines = [
-        f"Gate {gate_number} is blocked: the automated checks it depends on "
-        f"were already failing before this feature touched any file.",
-        "",
-        "Failing check(s) found at gate entry:",
-    ]
+    # A RESUMED gate -- one where work units already ran and committed -- has a
+    # baseline that INCLUDES this feature's own landed work, so the fresh-gate
+    # claims below are false for it (#360). Observed on FEAT-2026-0042 gate 1:
+    # four units done, the fifth halted, and the failing signature named a test
+    # that a previous unit of the same gate had added two commits earlier.
+    done_unit_ids = list(done_unit_ids or [])
+    resumed = bool(done_unit_ids)
+
+    if resumed:
+        lines = [
+            f"Gate {gate_number} is blocked: the automated checks it depends on "
+            f"are failing, and this gate has ALREADY LANDED WORK.",
+            "",
+            "Failing check(s) found at gate entry:",
+        ]
+    else:
+        lines = [
+            f"Gate {gate_number} is blocked: the automated checks it depends on "
+            f"were already failing before this feature touched any file.",
+            "",
+            "Failing check(s) found at gate entry:",
+        ]
     for g in failing_gates:
         lines.append(
             f"  - {g['gate']}: {g['failure_class']} "
             f"(signature: {g['failure_signature']})"
         )
     lines.append("")
-    lines.append(
-        "No work unit caused this failure: the checks were run once, before "
-        "any work unit was dispatched, and this is what they found. Zero "
-        "work units were dispatched for this gate."
-    )
+    if resumed:
+        lines.append(
+            f"{len(done_unit_ids)} work unit(s) in this gate are already `done` "
+            f"and committed, so the baseline these checks measured includes this "
+            f"feature's own work. The failure may well have been introduced by "
+            f"one of them -- do NOT assume it predates the feature:"
+        )
+        for wu_id in done_unit_ids:
+            lines.append(f"  - {wu_id}")
+    else:
+        lines.append(
+            "No work unit caused this failure: the checks were run once, before "
+            "any work unit was dispatched, and this is what they found. Zero "
+            "work units were dispatched for this gate."
+        )
     lines.append("")
     diffstat = baseline_evidence_diffstat(feat_fm)
     if diffstat is not None:
-        lines.append(
-            "Proof the feature's tree matches its integration branch "
-            "(so the failure predates this feature):"
-        )
+        if resumed:
+            # NOT offered as proof of anything: on a resumed gate this diff is
+            # the feature's own changeset, which would refute the fresh-gate
+            # claim rather than support it.
+            lines.append(
+                "What this feature has landed since the integration branch "
+                "(context, not proof -- the failing check may be in here):"
+            )
+        else:
+            lines.append(
+                "Proof the feature's tree matches its integration branch "
+                "(so the failure predates this feature):"
+            )
         lines.append(diffstat)
     else:
         lines.append(
@@ -2952,11 +2988,22 @@ def format_preexisting_gate_failure(
         )
     lines.append("")
     lines.append("What to do next:")
-    lines.append(
-        "  1. Fix the failing check(s) on the integration branch — typically "
-        "with /fix-bug — so this feature's branch inherits the fix on rebase."
-    )
-    lines.append("  2. Or defer this feature until the integration branch is green.")
+    if resumed:
+        lines.append(
+            "  1. Find which of this gate's landed work units introduced the "
+            "failing check, and fix it ON THIS BRANCH. `git log -S<signature> "
+            "<base>..HEAD` answers that directly."
+        )
+        lines.append(
+            "  2. Only if the check also fails on the integration branch is "
+            "this pre-existing debt — verify before assuming it."
+        )
+    else:
+        lines.append(
+            "  1. Fix the failing check(s) on the integration branch — typically "
+            "with /fix-bug — so this feature's branch inherits the fix on rebase."
+        )
+        lines.append("  2. Or defer this feature until the integration branch is green.")
     lines.append("")
     lines.append(
         "There is no way to proceed past this halt in this version. A "
@@ -5176,7 +5223,8 @@ def run(
             if failing_gates:
                 backend.set_gate(gate, "awaiting_review")
                 escalation_message = format_preexisting_gate_failure(
-                    gate.number, failing_gates, feat_fm)
+                    gate.number, failing_gates, feat_fm,
+                    done_unit_ids=[u.wu_id for u in units if u.status == "done"])
                 flush_events(events_path, [build_event(
                     "human_escalation", feature_id, {
                         "reason": "preexisting_gate_failure",
