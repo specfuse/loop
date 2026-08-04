@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 29.50
+baseline:
+  sha: 580ba31bf6d53251c51afe7e58d0468859d4917a
+  probed_at: 2026-08-04T02:00:06.844353+00:00
+  failing: []
 ---
 
 # Gate 2 — the dial goes live, verified end to end
