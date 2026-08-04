@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0042/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/monitor/autofix_invoke.py
@@ -10,6 +10,13 @@ produces:
 oracle_env: macos_local
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T02:03:12.434578+00:00
+duration_seconds: 663.471
+cost_usd: 0.961605
+input_tokens: 36
+output_tokens: 7840
 ---
 
 # The headless `fix-bug` invoker: build the call, classify the result
