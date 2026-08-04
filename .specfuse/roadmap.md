@@ -784,7 +784,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
 
-**Blocked by.** [FEAT-2026-0041](#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
+**Blocked by.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
 
 **Status: blocked.**
 
@@ -1043,7 +1043,7 @@ Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalate
 <a id="feat-2026-0074"></a>
 ## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
 
-**Why.** [FEAT-2026-0041](#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
+**Why.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
 
 **Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
 
