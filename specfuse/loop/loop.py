@@ -60,8 +60,11 @@ from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
 from . import scaffold as _scaffold
+from .changelog import parse_changelog
 from .closing_requirements import (
     AUTOCLOSE_DEBT_MARKER_RE,
+    CHANGELOG_PATH,
+    CONSUMER_VISIBLE_HEADING,
     COST_ANALYSIS_HEADING,
     COST_ANALYSIS_HEADING_RE,
     DEFERRAL_HEADING_RE,
@@ -81,6 +84,9 @@ from .closing_requirements import (
     RETROSPECTIVE_FILENAME,
     ROADMAP_PATH,
     VERDICT_VALUES,
+    changelog_has_entry_for,
+    consumer_visible_section_is_na,
+    find_consumer_visible_section,
     gate_review_filename,
     gate_section_heading_re,
 )
@@ -4638,6 +4644,52 @@ def assert_hedged_followup_kinds_classified(
     return True, ""
 
 
+def assert_changelog_entry_for_contract_changes(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-k) A real §3 enumeration must land an Unreleased entry.
+
+    `close-discipline.md` §3 already requires the close to enumerate every
+    consumer-visible contract change, or write the explicit `n/a` line. This
+    guard does not re-derive that enumeration — it only checks that when the
+    enumeration is real (not `n/a`), the same material also reached
+    `CHANGELOG.md`'s Unreleased section, carrying this feature's FEAT-ID.
+
+    Absent-heading is out of scope (see `find_consumer_visible_section`):
+    enforcing that §3 exists at all is a larger, separate surface. An `n/a`
+    section requires no entry — a changelog padded with "no user-facing
+    change" lines is noise. No backfill: this only ever evaluates the close
+    currently under dispatch, never a historical feature's RETROSPECTIVE.md.
+    """
+    retro = feature_dir / RETROSPECTIVE_FILENAME
+    if not retro.exists():
+        return True, ""  # assert_retrospective_exists already fires for this
+    section = find_consumer_visible_section(retro.read_text())
+    if section is None:
+        return True, ""
+    if consumer_visible_section_is_na(section):
+        return True, ""
+    changelog = repo_root / CHANGELOG_PATH
+    if not changelog.exists():
+        return (
+            False,
+            f"assert_changelog_entry_for_contract_changes: '{CONSUMER_VISIBLE_HEADING}' "
+            f"names a real change but {CHANGELOG_PATH} does not exist",
+        )
+    result = parse_changelog(changelog.read_text())
+    unreleased = result.unreleased()
+    feature_id = wu.wu_id.rsplit("/", 1)[0]
+    entries = unreleased.entries if unreleased else []
+    if changelog_has_entry_for(entries, feature_id):
+        return True, ""
+    return (
+        False,
+        f"assert_changelog_entry_for_contract_changes: '{CONSUMER_VISIBLE_HEADING}' "
+        f"names a real change but {CHANGELOG_PATH}'s Unreleased section has no "
+        f"entry tracing to {feature_id}",
+    )
+
+
 CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
     "close": [
         assert_retrospective_exists,
@@ -4647,6 +4699,7 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_cost_analysis_section_when_met,
         assert_failure_class_breakdown_when_failures_present,
         assert_hedged_followup_kinds_classified,
+        assert_changelog_entry_for_contract_changes,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,

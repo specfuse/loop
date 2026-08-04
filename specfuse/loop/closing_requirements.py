@@ -74,6 +74,56 @@ AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\
 
 
 # --------------------------------------------------------------------------- #
+# §3 contract-change enumeration -> CHANGELOG.md linkage (FEAT-2026-0064/T02) #
+# --------------------------------------------------------------------------- #
+
+#: `close-discipline.md` §3's heading, formalized so it is machine-findable —
+#: matches the `## ` or `### ` level already in use across existing closes.
+CONSUMER_VISIBLE_HEADING = "Consumer-visible contract changes"
+CONSUMER_VISIBLE_HEADING_RE = re.compile(
+    rf"^#{{2,3}} {re.escape(CONSUMER_VISIBLE_HEADING)}\b.*$", re.MULTILINE,
+)
+
+#: §3's required exact line when a feature makes no consumer-visible change.
+#: Matched by substring, case-insensitively, so an em-dash/hyphen variant
+#: still counts — the words are the contract, not the punctuation.
+CONSUMER_VISIBLE_NA_PHRASE = "n/a — no consumer-visible contract change"
+
+CHANGELOG_PATH = "CHANGELOG.md"
+
+
+def find_consumer_visible_section(retrospective_text: str) -> str | None:
+    """Body text of the §3 section, or None if the heading is absent.
+
+    A missing heading is out of this check's scope — enforcing that §3 was
+    *written at all* is a separate, larger surface than the one this feature
+    builds: linking an enumeration that already exists to `CHANGELOG.md`.
+    """
+    m = CONSUMER_VISIBLE_HEADING_RE.search(retrospective_text)
+    if not m:
+        return None
+    start = m.end()
+    next_heading = re.search(r"^##+\s", retrospective_text[start:], re.MULTILINE)
+    if next_heading:
+        return retrospective_text[start:start + next_heading.start()]
+    return retrospective_text[start:]
+
+
+def consumer_visible_section_is_na(section_text: str) -> bool:
+    """True if a §3 section body is the explicit `n/a` line, not a real list."""
+    lowered = section_text.lower()
+    return "n/a" in lowered and "no consumer-visible contract change" in lowered
+
+
+def changelog_has_entry_for(unreleased_entries, feature_id: str) -> bool:
+    """True if any Unreleased entry's trace names *feature_id* (or a sub-WU of it)."""
+    return any(
+        entry.trace == feature_id or entry.trace.startswith(feature_id + "/")
+        for entry in unreleased_entries
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Hedged-verdict follow-up `kind:` contract (FEAT-2026-0059/T01)              #
 # --------------------------------------------------------------------------- #
 
@@ -236,6 +286,18 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             file=RETROSPECTIVE_FILENAME,
             applies_when="verdict_hedged",
             enforced_by="assert_hedged_followup_kinds_classified",
+        ),
+        Requirement(
+            id="close-k", wu_type="close", phase="pre-squash",
+            description=(
+                f"When the '{CONSUMER_VISIBLE_HEADING}' section (close-discipline.md "
+                f"§3) is not the '{CONSUMER_VISIBLE_NA_PHRASE}' line, "
+                f"{CHANGELOG_PATH}'s Unreleased section gains an entry carrying "
+                "this feature's FEAT-ID — the same enumeration §3 already "
+                "requires, appended where a consumer reads it, not re-derived"
+            ),
+            file=RETROSPECTIVE_FILENAME,
+            enforced_by="assert_changelog_entry_for_contract_changes",
         ),
     ],
     "close-intermediate": [

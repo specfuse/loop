@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import closing_requirements as creq
+from .changelog import parse_changelog
 from .loop import _gate_number_from_wu_id, summarize_attempt_failure_classes
 from .lint_plan import _find_task_graph_block, read_frontmatter
 
@@ -278,6 +279,41 @@ def _check_hedged_followup_kinds_classified(req: creq.Requirement, ctx: ClosingC
     return True, ""
 
 
+def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: ClosingContext):
+    """Pre-squash analogue of `assert_changelog_entry_for_contract_changes`.
+
+    Scoped to `ctx.feature_dir`'s own RETROSPECTIVE.md and this close's own
+    FEAT-ID only — never reads another feature's folder, and only ever
+    evaluates the closing WU currently in progress, so an already-`done`
+    feature (all fifty-one predate this check) is never re-flagged.
+    """
+    retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
+    if not retro.exists():
+        return True, ""  # assert_retrospective_exists already covers this
+    section = creq.find_consumer_visible_section(retro.read_text())
+    if section is None:
+        return True, ""
+    if creq.consumer_visible_section_is_na(section):
+        return True, ""
+    changelog = ctx.repo_root / creq.CHANGELOG_PATH
+    if not changelog.exists():
+        return False, (
+            f"'{creq.CONSUMER_VISIBLE_HEADING}' names a real change but "
+            f"{creq.CHANGELOG_PATH} does not exist"
+        )
+    result = parse_changelog(changelog.read_text())
+    unreleased = result.unreleased()
+    feature_id = ctx.wu_id.rsplit("/", 1)[0]
+    entries = unreleased.entries if unreleased else []
+    if creq.changelog_has_entry_for(entries, feature_id):
+        return True, ""
+    return False, (
+        f"'{creq.CONSUMER_VISIBLE_HEADING}' names a real change but "
+        f"{creq.CHANGELOG_PATH}'s Unreleased section has no entry tracing to "
+        f"{feature_id}"
+    )
+
+
 _CHECKS = {
     "assert_retrospective_exists": _check_retrospective_exists,
     "assert_learnings_appended_or_noop": _check_learnings_appended_or_noop,
@@ -290,6 +326,7 @@ _CHECKS = {
     "assert_gate_review_exists": _check_gate_review_exists,
     "assert_next_gate_drafted_or_terminal": _check_next_gate_drafted_or_terminal,
     "assert_hedged_followup_kinds_classified": _check_hedged_followup_kinds_classified,
+    "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
 }
 
 

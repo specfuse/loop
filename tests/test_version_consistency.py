@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,6 +40,7 @@ def _load_bump():
     path = REPO_ROOT / "scripts" / "bump_version.py"
     spec = importlib.util.spec_from_file_location("bump_version", path)
     mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
     spec.loader.exec_module(mod)
     return mod
 

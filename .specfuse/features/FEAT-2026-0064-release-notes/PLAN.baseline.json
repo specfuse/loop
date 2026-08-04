@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The document, its schema, and a parser that reads it back",
+          "id": "FEAT-2026-0064/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Two collection points, because bugs have no close ceremony",
+          "id": "FEAT-2026-0064/T02",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Cutting a version stamps the section, and freezes it",
+          "id": "FEAT-2026-0064/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 and the feature \u2014 retrospective, lessons, docs, terminal verdict",
+          "id": "FEAT-2026-0064/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

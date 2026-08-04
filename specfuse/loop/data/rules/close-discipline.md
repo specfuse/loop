@@ -94,6 +94,24 @@ fabricate an empty enumeration; the n/a line is the reviewed claim).
 A close carrying this obligation is always load-bearing
 (`auto_close_disabled: true`).
 
+**Also append it to `CHANGELOG.md`'s `Unreleased` section (FEAT-2026-0064).**
+When this section is a real enumeration — not the `n/a` line — the close
+appends each item to `Unreleased`, classified `added` / `changed` / `fixed` /
+`breaking` and carrying the feature's `FEAT-YYYY-NNNN` ID, via
+`specfuse/loop/changelog.py`'s schema. **This is the same material the
+paragraph above already requires you to write, put where a consumer will
+read it — not a second write.** An author who treats the changelog append as
+new work will write the enumeration twice, badly; write it once, in both
+places, from the same understanding. `closing_requirements.py`'s `close-k`
+requirement (enforced by `assert_changelog_entry_for_contract_changes` in
+`loop.py`, and pre-squash by `specfuse-lint --closing`) fires when this
+section names a real change and `Unreleased` gained no entry tracing to this
+feature's FEAT-ID.
+
+**An `n/a` close appends nothing to `Unreleased`, and that is correct.** A
+changelog padded with "no user-facing change" entries is noise that trains
+readers to skip it — the `close-k` check does not fire on an `n/a` section.
+
 > **Provenance.** A breaking removal from a generated model survived four
 > gates unreviewed because no close surface owned the breaking-change list.
 > A silent breaking change is the most expensive false-done, and it is not

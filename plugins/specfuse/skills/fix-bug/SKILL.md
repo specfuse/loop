@@ -166,6 +166,14 @@ narrowly scoped + commented.
 
   Co-Authored-By: <as configured>
   ```
+- **Before opening the PR**, append one entry to `CHANGELOG.md`'s
+  `Unreleased` section (FEAT-2026-0064) via `specfuse/loop/changelog.py`'s
+  schema: classified `added` / `changed` / `fixed` / `breaking`, one line
+  derived from the same root-cause/fix understanding the commit message
+  above already captures, carrying `#<issue-number>` as its trace. This is
+  the bug side's collection point — bugs have no close ceremony to collect
+  through, so `fix-bug` is where the entry is written or it is dropped.
+  Include the `CHANGELOG.md` change in the same commit as the fix.
 - `git push -u origin fix/issue-<#>-<short-slug>`.
 - `gh pr create --title "fix(<scope>): <summary> (closes #<#>)" --body <markdown-body>`.
   PR body sections: Root cause, Fix, Tests, Verification. Reference
