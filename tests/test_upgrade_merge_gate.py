@@ -179,3 +179,106 @@ class TestCollectReports(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPackageEraTarget(unittest.TestCase):
+    """#309 — a package-era target has no in-repo lint shim.
+
+    `collect_reports` invoked `<target>/.specfuse/scripts/lint_plan.py`
+    directly. Post-package targets do not ship it (the scripts come from the
+    installed `specfuse-loop`), so every folder reported a garbled FAIL whose
+    detail was Python's own "can't open file" message, and `decide` returned a
+    **false halt** on a perfectly conformant repo.
+    """
+
+    _GOOD_PLAN = _VALID_FM + """
+```yaml
+gates:
+  - gate: 1
+    work_units: []
+```
+"""
+
+    def _target(self, tmp: str, *, with_shim: bool = False,
+                extra_dirs: tuple = ()) -> Path:
+        root = Path(tmp)
+        feat = root / ".specfuse" / "features" / "FEAT-2026-0099-real"
+        feat.mkdir(parents=True)
+        (feat / "PLAN.md").write_text(self._GOOD_PLAN)
+        for name in extra_dirs:
+            (root / ".specfuse" / "features" / name).mkdir(parents=True)
+        if with_shim:
+            shim = root / ".specfuse" / "scripts"
+            shim.mkdir(parents=True)
+            # A shim that always passes, so its use is observable: if the
+            # fallback is not taken, the package path runs instead and this
+            # test's marker never appears.
+            (shim / "lint_plan.py").write_text(
+                "import sys\nprint('SHIM MARKER')\nsys.exit(0)\n"
+            )
+        return root
+
+    def test_conformant_feature_passes_without_an_in_target_shim(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp)
+            reports = umg.collect_reports(root)
+            self.assertEqual(len(reports), 1, reports)
+            self.assertTrue(
+                reports[0]["ok"],
+                f"false FAIL on a package-era target: {reports[0]['detail']!r}",
+            )
+
+    def test_decide_does_not_falsely_halt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp)
+            verdict, reason = umg.decide(True, umg.collect_reports(root))
+            self.assertEqual((verdict, reason), ("merge", ""))
+
+    def test_non_feature_directories_are_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp, extra_dirs=(".claude", "notes"))
+            names = [r["feature"] for r in umg.collect_reports(root)]
+            self.assertEqual(names, ["FEAT-2026-0099-real"], names)
+
+    def test_pre_package_shim_is_still_honoured(self):
+        """Old targets that DO ship the shim must keep using it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp, with_shim=True)
+            reports = umg.collect_reports(root)
+            self.assertTrue(reports[0]["ok"])
+            self.assertTrue(
+                reports[0].get("used_shim"),
+                "in-target shim present but not used — pre-package repos "
+                "would silently switch linters on upgrade",
+            )
+
+    def test_a_genuinely_broken_feature_still_fails(self):
+        """Guard the guard: the fix must not make everything pass."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp)
+            bad = root / ".specfuse" / "features" / "FEAT-2026-0098-broken"
+            bad.mkdir()
+            (bad / "PLAN.md").write_text("---\nnot: a valid plan\n---\n")
+            reports = {r["feature"]: r for r in umg.collect_reports(root)}
+            self.assertTrue(reports["FEAT-2026-0099-real"]["ok"])
+            self.assertFalse(reports["FEAT-2026-0098-broken"]["ok"])
+            self.assertTrue(reports["FEAT-2026-0098-broken"]["detail"].strip())
+
+    def test_an_unrunnable_linter_says_so_instead_of_blaming_features(self):
+        """The #309 failure shape, generalised.
+
+        If the linter cannot run at all, every feature fails with the same
+        interpreter-level error and `decide` blames the features by name. That
+        is precisely how the original bug read in the field. The gate must
+        distinguish "this repo is non-conformant" from "I could not check".
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._target(tmp)
+            reports = umg.collect_reports(root, python=str(Path(tmp) / "no-python"))
+            verdict, reason = umg.decide(True, reports)
+            self.assertEqual(verdict, "halt")
+            self.assertNotIn(
+                "FEAT-2026-0099-real", reason,
+                "blamed a conformant feature for a broken linter",
+            )
+            self.assertIn("could not", reason.lower())
