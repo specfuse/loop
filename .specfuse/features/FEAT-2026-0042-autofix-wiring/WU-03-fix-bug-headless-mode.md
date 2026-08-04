@@ -92,9 +92,17 @@ it live; gate 1 fires nothing.
 4. A test asserts every existing refusal path is reachable in headless mode and maps
    to the refused outcome — the refusal criteria are unchanged and none is weakened.
    Enumerate them from the current skill body rather than assuming a count.
-5. A test asserts the interactive path is **unchanged**: diff the interactive
-   sections against HEAD and assert the only additions are headless-mode content.
-   Quote the diff summary.
+5. A test asserts the interactive path is **unchanged**, using only the working
+   tree — **never a diff against `git show HEAD:`**. A HEAD-relative diff is
+   self-invalidating: while this WU runs, HEAD is the pre-WU commit and the
+   additions exist, so it passes; the moment this WU's own commit lands, HEAD
+   *becomes* the working tree, the diff goes empty, and the test fails
+   permanently. It can only ever be green in the single attempt that writes it.
+   "Only additions" is a review-time property of a diff, not an invariant of a
+   file. Assert instead that every interactive halt enumerated above still
+   appears verbatim in the working tree, and that the headless section is one
+   contiguous block positioned after all of them — which catches a reworded
+   interactive rule, needs no git, and holds forever.
 6. `plugins/specfuse/skills/fix-bug/SKILL.md` and `.specfuse/skills/fix-bug/SKILL.md`
    are byte-identical. Assert with `diff` and quote the (empty) output.
 7. `tests/test_skill_discovery_links.py` and the scaffold sync tests pass. Run them

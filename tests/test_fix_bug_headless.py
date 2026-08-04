@@ -118,34 +118,43 @@ class TestFixBugHeadless(unittest.TestCase):
                 flat_anchor, self.flat_text,
                 f"precondition halt {anchor!r} was removed or reworded")
 
-    def test_interactive_sections_unchanged_only_additions(self):
-        """Diff the working-tree SKILL.md against the pre-WU HEAD version:
-        the interactive Method/rules content must be byte-identical, and the
-        only difference allowed is a new, wholly-additive headless-mode
-        section (plus its "## Version" reflow, if any)."""
-        pre_lines = self.head_text.splitlines()
-        post_lines = self.text.splitlines()
+    def test_headless_section_is_additive_and_does_not_interleave(self):
+        """The headless mode must be ONE contiguous block appended after the
+        interactive content — never interleaved into the Method, which is how
+        an "addition" silently changes what an interactive run does.
 
-        import difflib
-        diff = list(difflib.unified_diff(pre_lines, post_lines, lineterm=""))
-        removed = [
-            line for line in diff
-            if line.startswith("-") and not line.startswith("---")
-        ]
-        added = [
-            line for line in diff
-            if line.startswith("+") and not line.startswith("+++")
-        ]
+        This replaces an earlier `difflib` assertion that compared the working
+        tree against `git show HEAD:` and required added lines > 0. That test
+        was self-invalidating: while the authoring WU ran, HEAD was the pre-WU
+        commit and additions existed, so it passed; the moment its own commit
+        landed, HEAD *became* the working tree, the diff went empty, and it
+        failed permanently. It could only ever be green in the single attempt
+        that wrote it, and it halted this gate's baseline probe on the next run.
 
-        summary = f"{len(removed)} line(s) removed, {len(added)} line(s) added"
+        "Only additions" is a review-time property of a diff, not an invariant
+        of a file, so it cannot be a durable test. The durable residue is here
+        and in the anchor tests above, which assert every interactive halt still
+        appears verbatim in the working tree — that is what catches a reworded
+        interactive rule, and it needs no git and no moving reference.
+        """
         self.assertEqual(
-            removed, [],
-            f"interactive content was removed or reworded, not just added "
-            f"to — diff summary: {summary}\nremoved lines: {removed[:10]}")
-        self.assertGreater(
-            len(added), 0,
-            f"expected additive headless-mode content but diff summary is "
-            f"{summary}")
+            self.text.count(f"\n{HEADLESS_SECTION_HEADING}"), 1,
+            f"{HEADLESS_SECTION_HEADING!r} must appear exactly once — a second "
+            f"headless block means the mode is described in two places")
+
+        headless_start = self.text.index(HEADLESS_SECTION_HEADING)
+
+        # Every interactive halt this WU promised to preserve must sit BEFORE
+        # the headless section. One appearing after it means headless content
+        # was spliced into the interactive Method rather than appended.
+        for anchor in REFUSAL_HALT_ANCHORS + COULD_NOT_PROCEED_HALT_ANCHORS:
+            flat_anchor = _collapse_whitespace(anchor)
+            flat_interactive = _collapse_whitespace(self.text[:headless_start])
+            self.assertIn(
+                flat_anchor, flat_interactive,
+                f"interactive halt {anchor!r} is not in the interactive region "
+                f"(before {HEADLESS_SECTION_HEADING!r}) — the headless section "
+                f"was interleaved into the Method instead of appended")
 
     def test_canonical_and_vendored_skill_are_byte_identical(self):
         result = subprocess.run(
