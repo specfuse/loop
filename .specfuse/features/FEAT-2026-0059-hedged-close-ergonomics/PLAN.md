@@ -5,7 +5,7 @@ slug: hedged-close-ergonomics
 branch: feat/FEAT-2026-0059-hedged-close-ergonomics
 roadmap_goal: Make a hedged close answer the operator's two real questions — why couldn't this be `met`, and what kind of reason is expected — by classifying each follow-up entry at close time and having /accept-hedged-close lead with the verdict ceiling instead of a wall of quotes.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 14.50
 ---
 
