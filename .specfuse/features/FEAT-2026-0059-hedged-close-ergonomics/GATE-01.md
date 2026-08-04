@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 19.50
+baseline:
+  sha: 305c857d283e7b787400bd1ad864aca13617e4d4
+  probed_at: 2026-08-04T12:14:58.565075+00:00
+  failing: []
 ---
 
 # Gate 1 — a hedged close answers "why not `met`" before it is asked
