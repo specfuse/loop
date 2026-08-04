@@ -255,3 +255,77 @@ gates:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestResumedGateAttribution(unittest.TestCase):
+    """Issue #360 — a RESUMED gate's baseline includes the feature's own work.
+
+    The probe runs before dispatch, so on a fresh gate "these checks were
+    already failing before this feature touched any file" is true. On a
+    resumed gate — some work units already `done` and committed — it is false,
+    and the `git diff base...HEAD` printed as "proof the feature's tree matches
+    its integration branch" is the feature's whole changeset, refuting the
+    sentence above it.
+
+    Observed on FEAT-2026-0042 gate 1: four units done, the fifth halted, and
+    the failing signature named a test T03 had added two commits earlier.
+    """
+
+    def setUp(self):
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
+    _FAILING = [{"gate": "tests", "failure_class": "tests",
+                 "failure_signature": "test_added_by_this_feature"}]
+
+    def test_resumed_gate_does_not_blame_the_integration_branch(self):
+        msg = loop.format_preexisting_gate_failure(
+            1, self._FAILING, {}, done_unit_ids=["FEAT-2026-0042/T01",
+                                                 "FEAT-2026-0042/T03"])
+        self.assertNotIn("before this feature touched any file", msg)
+        self.assertNotIn("No work unit caused this failure", msg)
+
+    def test_resumed_gate_names_the_landed_units(self):
+        msg = loop.format_preexisting_gate_failure(
+            1, self._FAILING, {}, done_unit_ids=["FEAT-2026-0042/T01",
+                                                 "FEAT-2026-0042/T03"])
+        self.assertIn("FEAT-2026-0042/T01", msg)
+        self.assertIn("FEAT-2026-0042/T03", msg)
+
+    def test_resumed_gate_points_remediation_at_the_branch_not_main(self):
+        msg = loop.format_preexisting_gate_failure(
+            1, self._FAILING, {}, done_unit_ids=["FEAT-2026-0042/T01"])
+        self.assertNotIn(
+            "Fix the failing check(s) on the integration branch", msg,
+            "a resumed gate's defect lives on the feature branch; sending the "
+            "operator to /fix-bug against main is the wrong repair")
+
+    def test_fresh_gate_message_is_unchanged(self):
+        """No done units — every original claim is true and must survive."""
+        msg = loop.format_preexisting_gate_failure(1, self._FAILING, {})
+        self.assertIn("before this feature touched any file", msg)
+        self.assertIn("No work unit caused this failure", msg)
+        self.assertIn("Fix the failing check(s) on the integration branch", msg)
+
+    def test_fresh_gate_with_empty_done_list_is_still_fresh(self):
+        msg = loop.format_preexisting_gate_failure(
+            1, self._FAILING, {}, done_unit_ids=[])
+        self.assertIn("before this feature touched any file", msg)
+
+    def test_resumed_gate_never_calls_its_diff_proof_of_a_matching_tree(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            subprocess.run(["git", "-C", str(root), "checkout", "-q",
+                            "-b", "feat/resumed"], check=True)
+            (root / "landed.txt").write_text("work from a done unit\n")
+            subprocess.run(["git", "-C", str(root), "add", "landed.txt"], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m",
+                            "feat: a work unit that already landed"], check=True)
+            msg = loop.format_preexisting_gate_failure(
+                1, self._FAILING, {}, done_unit_ids=["FEAT-2026-0001/T01"])
+
+        self.assertNotIn("Proof the feature's tree matches its integration branch", msg,
+                         "the diff shows the feature's own changeset; calling it "
+                         "proof of a matching tree is self-refuting")

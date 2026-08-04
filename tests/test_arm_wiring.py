@@ -364,6 +364,44 @@ class TestAutoArm(unittest.TestCase):
             self.assertFalse(
                 [e for e in events if e["event_type"] == "gate_auto_armed"])
 
+    def test_resumed_gate_halt_message_blames_the_branch_not_main(self):
+        """#360 — the halt fired here is on a RESUMED gate (T01 is `done`), so
+        the message must not claim the failure predates the feature, and must
+        not offer its own diff as proof the tree matches the integration branch.
+
+        This drives the real dispatch path rather than the formatter alone: the
+        first cut of the fix passed every formatter unit test while the call
+        site read a non-existent `u.id`, and only an unrelated integration test
+        caught it.
+        """
+        with integration_workspace() as root:
+            os.chdir(root)
+            (root / ".specfuse/verification.yml").write_text(
+                "code:\n  - name: fail\n    command: \"false\"\n"
+                "doc:\n  - name: noop\n    command: \"true\"\n"
+                "plannext:\n  - name: noop\n    command: \"true\"\n"
+            )
+            fdir = write_armable_feature(
+                root, "FEAT-2026-9005", "resumed-halt", "auto",
+                [("FEAT-2026-9005/T01", "implementation", "done")],
+            )
+            loop.run(None, dry_run=False)
+
+            events = _read_events(fdir / "events.jsonl")
+            halts = [e for e in events
+                     if e["event_type"] == "human_escalation"
+                     and e["payload"].get("reason") == "preexisting_gate_failure"]
+            self.assertEqual(len(halts), 1, msg=[e["event_type"] for e in events])
+            msg = halts[0]["payload"]["message"]
+
+        self.assertIn("ALREADY LANDED WORK", msg)
+        self.assertIn("FEAT-2026-9005/T01", msg,
+                      "the landed unit must be named so the operator knows where to look")
+        self.assertNotIn("before this feature touched any file", msg)
+        self.assertNotIn("No work unit caused this failure", msg)
+        self.assertNotIn("Proof the feature's tree matches its integration branch", msg)
+        self.assertNotIn("Fix the failing check(s) on the integration branch", msg)
+
     def test_preexisting_gate_failure_does_not_arm_even_if_would_arm_true(self):
         with integration_workspace() as root:
             os.chdir(root)
