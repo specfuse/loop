@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0073/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.50
 produces:
@@ -9,6 +9,10 @@ produces:
   - .specfuse/verification.yml
   - tests/test_event_gate_full_envelope.py
 oracle_env: macos_local
+duration_seconds: 2510.488
+cost_usd: 5.46923
+input_tokens: 278
+output_tokens: 54985
 ---
 
 # Widen the gate from one field to the whole envelope
