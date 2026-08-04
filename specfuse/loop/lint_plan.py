@@ -659,6 +659,60 @@ def _match_dnt_boundary(
     return None
 
 
+def check_produces_shape(feature_dir: Path, gates: list) -> list[str]:
+    """ERROR when a WU's `produces:` entry is a directory rather than a file
+    or glob.
+
+    Same family as `check_produces_boundary` below, and the same argument: the
+    driver refuses this outright, but only after a full `claude -p` session.
+    Since the agent cannot edit its own frontmatter, every retry is
+    byte-identical -- a real feature paid $6.42 and 20.6 minutes across three
+    of them before `spinning_detected` fired, while `specfuse-lint` reported
+    `OK - structurally valid` throughout (#593).
+
+    Every input is static, so this belongs in the pre-dispatch checklist. The
+    message is rendered by `loop.produces_shape_error`, the same function the
+    driver's guards call, so all three surfaces read identically rather than
+    drifting into three descriptions of one rule.
+
+    Applies to every WU with a `produces:` entry regardless of status: a `done`
+    WU with a directory entry is a folder authored against the pre-0.9.0
+    contract, and reporting it is how a migrating project finds them all at
+    once instead of one dispatch at a time.
+    """
+    from .loop import produces_shape_error
+
+    found: list[str] = []
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            produces_raw = wfm.get("produces")
+            if not produces_raw:
+                continue
+            raw_entries = (
+                produces_raw if isinstance(produces_raw, list) else [produces_raw]
+            )
+            for p in raw_entries:
+                p_s = str(p).strip()
+                if not p_s:
+                    continue
+                err = produces_shape_error(p_s)
+                if err:
+                    found.append(
+                        f"ERROR: {wfile}: {wid} {err}. assert_declared_"
+                        f"deliverables refuses this after a full dispatch "
+                        f"attempt, and a retry cannot help — the agent cannot "
+                        f"edit its own frontmatter. See #593."
+                    )
+    return found
+
+
 def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
     """ERROR when a WU's own `produces:` path (or `produces_driver_helper`
     surface) falls inside its own Do-not-touch section's paths.
@@ -1212,6 +1266,7 @@ def lint(feature_dir: Path) -> list[str]:
     check_closing_guard_literals(feature_dir, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
+    errs.extend(check_produces_shape(feature_dir, gates))
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
 

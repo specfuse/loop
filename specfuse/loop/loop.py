@@ -4800,6 +4800,52 @@ def assert_implementation_touched_files(
     )
 
 
+def produces_shape_error(path: str) -> "str | None":
+    """Return why *path* is an invalid ``produces:`` entry, or None if it is fine.
+
+    Shape only -- never presence. A path that does not exist yet is perfectly
+    valid at draft time; whether it was actually produced is the dispatch
+    gate's question, asked after the session.
+
+    Split out of ``assert_declared_deliverables`` so the one fact that needs no
+    session output can be checked by every surface that has the frontmatter:
+    ``lint_plan`` at draft/arm/conformance time, and the driver before it
+    spends a token (#593). A real feature paid $6.42 across three byte-identical
+    refusals for a ``Path.is_dir()`` call, with ``specfuse-lint`` reporting
+    ``OK - structurally valid`` the whole time.
+
+    The three surfaces must read identically, so all render this one string.
+    """
+    if path.endswith("/") or Path(path).is_dir():
+        return (
+            f"declared deliverable is a directory: {path} — directories "
+            "are not valid produces: entries under the unified "
+            "literal/glob contract (a directory always passed presence "
+            "while failing assert_produces_in_diff's diff match); declare "
+            "the specific file(s) or a glob instead"
+        )
+    return None
+
+
+def assert_produces_shape(wu: WorkUnit) -> tuple[bool, str]:
+    """Pre-dispatch half of ``assert_declared_deliverables`` (#593).
+
+    Every input is static: the WU's own frontmatter and the filesystem. None
+    of it depends on what a session did, so refusing here converts a $2.46
+    attempt into a $0.00 refusal -- the lever ``planning-discipline.md`` §5
+    already names, where ``assert_verdict_well_formed`` fired 10 times for
+    nothing because it is checked before the agent spends anything.
+
+    The agent cannot edit its own frontmatter, so a WU that fails this cannot
+    be fixed by retrying it; escalating immediately is the only honest move.
+    """
+    for raw in wu.produces or []:
+        err = produces_shape_error(str(raw))
+        if err:
+            return False, err
+    return True, ""
+
+
 def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     """Deliverable-presence gate (FEAT-2026-0022/T02), unified with
     ``assert_produces_in_diff``'s literal/glob contract (FEAT-2026-0055/T03).
@@ -4831,14 +4877,11 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     for raw in wu.produces:
         path = str(raw)
         p = Path(path)
-        if path.endswith("/") or p.is_dir():
-            return False, (
-                f"declared deliverable is a directory: {path} — directories "
-                "are not valid produces: entries under the unified "
-                "literal/glob contract (a directory always passed presence "
-                "while failing assert_produces_in_diff's diff match); declare "
-                "the specific file(s) or a glob instead"
-            )
+        # Shape refusal is shared with the pre-dispatch guard and lint_plan so
+        # all three surfaces render one message (#593).
+        shape_err = produces_shape_error(path)
+        if shape_err:
+            return False, shape_err
         if any(ch in path for ch in "*?["):
             matches = [
                 m for m in glob.glob(path)
@@ -5513,6 +5556,34 @@ def run(
                         f"\n\nFeature: {wu.wu_id}",
                     )
                     print(f"   RE-ARM REJECTED — {repro_reason}")
+                    blocked = True
+                    continue
+
+                # produces: shape gate (#593). Same posture as the re-arm gate
+                # above: fires BEFORE any dispatch state change, so a WU the
+                # driver is guaranteed to refuse costs $0.00 instead of a full
+                # session. Every input is static frontmatter plus the
+                # filesystem, and the agent cannot edit its own frontmatter --
+                # so retrying is provably useless. A real feature paid $6.42
+                # across three byte-identical refusals before spinning fired.
+                shape_ok, shape_reason = assert_produces_shape(wu)
+                if not shape_ok:
+                    backend.set_wu(wu, "status", "blocked_human")
+                    flush_events(events_path, [build_event(
+                        "human_escalation", wu.wu_id, {
+                            "reason": "produces_shape_invalid",
+                            "blocked_reason": shape_reason,
+                            "attempts": 0,
+                            "failure_class": "guard_refusal",
+                            "failure_signature": "assert_produces_shape",
+                        })])
+                    commit_bookkeeping(
+                        [wu.file, events_path],
+                        f"chore(loop): {wu.wu_id} blocked "
+                        f"(produces: shape invalid)"
+                        f"\n\nFeature: {wu.wu_id}",
+                    )
+                    print(f"   BLOCKED before dispatch (no cost) — {shape_reason}")
                     blocked = True
                     continue
 
