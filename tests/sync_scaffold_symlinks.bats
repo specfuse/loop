@@ -37,6 +37,7 @@ setup() {
   printf '!.specfuse/\n' > "$TESTDIR/.specfuse/gitignore.snippet"
   printf 'roadmap\n'     > "$TESTDIR/.specfuse/roadmap.template.md"
   printf 'learnings\n'   > "$TESTDIR/.specfuse/LEARNINGS.template.md"
+  printf 'changelog\n'  > "$TESTDIR/.specfuse/CHANGELOG.seed.md"
   printf 'verify\n'      > "$TESTDIR/.specfuse/verification.yml.example"
   printf 'monitor\n'     > "$TESTDIR/.specfuse/monitoring.yml.example"
   printf 'overrides\n'   > "$TESTDIR/.specfuse/monitoring.overrides.yml.example"
