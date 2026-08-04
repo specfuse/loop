@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0064/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - CHANGELOG.md
@@ -12,6 +12,15 @@ produces_driver_helper:
   - ENTRY_CLASSES
   - parse_changelog
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T14:06:58.722240+00:00
+duration_seconds: 979.34
+cost_usd: 1.721612
+input_tokens: 56
+output_tokens: 22671
 ---
 
 # The document, its schema, and a parser that reads it back
