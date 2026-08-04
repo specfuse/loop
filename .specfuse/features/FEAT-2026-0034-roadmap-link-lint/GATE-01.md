@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 17.50
+baseline:
+  sha: 84122a67ee2130ad63be3edd04f12bd21a0a0d81
+  probed_at: 2026-08-04T03:37:37.770296+00:00
+  failing: []
 ---
 
 # Gate 1 — the four rot shapes fail a check instead of a reader
