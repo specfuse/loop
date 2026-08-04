@@ -314,5 +314,56 @@ class TestReleaseWiringPortability(unittest.TestCase):
             self.assertNotEqual(config.tag_prefix, "v")
 
 
+class TestStampParseRoundTrip(unittest.TestCase):
+    """The document a stamp produces must satisfy the parser that reads it.
+
+    Regression: `stamp_release` opens a fresh empty `Unreleased` above the
+    frozen section (criterion 4 — the next append needs a home nobody creates
+    by hand), and the parser flagged every empty section as `has no entries`.
+    The two shipped in the same feature and disagreed, so cutting any release
+    produced a CHANGELOG that failed its own parse test.
+    """
+
+    STAMPED = (
+        "## [Unreleased]\n\n"
+        "### Added\n\n"
+        "- a thing (FEAT-2026-0064/T01)\n"
+    )
+
+    def test_stamped_document_parses_clean(self):
+        stamped = stamp_release(
+            self.STAMPED, version="0.9.0", date="2026-08-04",
+            umbrella_version="0.9.0",
+        )
+        result = parse_changelog(stamped)
+        self.assertEqual(result.findings, [], f"stamped output rejected: {result.findings}")
+
+    def test_fresh_unreleased_is_empty_and_appendable(self):
+        stamped = stamp_release(
+            self.STAMPED, version="0.9.0", date="2026-08-04",
+            umbrella_version="0.9.0",
+        )
+        self.assertEqual(parse_changelog(stamped).unreleased().entries, [])
+        appended = append_entry(
+            stamped, entry_class="fixed", summary="a later fix", trace="#999",
+        )
+        result = parse_changelog(appended)
+        self.assertEqual(result.findings, [])
+        self.assertEqual([e.trace for e in result.unreleased().entries], ["#999"])
+
+    def test_empty_released_section_is_still_a_finding(self):
+        """The exemption is scoped to `Unreleased`, not to emptiness at large."""
+        result = parse_changelog(
+            "## [Unreleased]\n\n"
+            "### Added\n\n"
+            "- a thing (FEAT-2026-0064/T01)\n\n"
+            "## [0.8.0] - 2026-01-01\n"
+        )
+        self.assertTrue(
+            any("no entries" in f for f in result.findings),
+            "an empty released section must still be reported",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

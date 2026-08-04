@@ -96,3 +96,4 @@ prevent.
 - Tests no longer shell out to `python3 -m pytest`, which is a dependency of nothing in this repository and absent from CI — five instances across three features passed locally and failed only on the runner. `tests/test_no_pytest_subprocess.py` guards against a sixth (#519)
 - The all-gates-passed poll no longer writes `PLAN.md status: complete`, a value absent from the valid-status vocabulary (#280)
 - `lint_plan`'s bare-root-path warning and the driver's in-diff cross-check no longer disagree on how a repo-root deliverable must be spelled, fixed in PR #279 (#259)
+- Stamping a release no longer produces a CHANGELOG that fails its own parser. `stamp_release` opens a fresh empty `Unreleased` and `parse_changelog` flagged every empty section, so cutting any release emitted a document failing its own parse test (#562)
