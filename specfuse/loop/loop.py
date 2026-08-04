@@ -245,6 +245,17 @@ def read_frontmatter(path: Path) -> tuple[dict, str]:
     j = 1
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
+    if j >= len(lines):
+        # Unterminated block: an opening `---` with no closing one. Without
+        # this check the scan runs off the end, the whole document is parsed
+        # as frontmatter, and the failure is reported against whatever body
+        # line happens to be first — which sent #306 chasing an HTML comment
+        # that was never the problem. Name the actual defect instead.
+        raise _miniyaml.MiniYAMLError(
+            f"{path}: frontmatter block opened with `---` on line 1 but is "
+            f"never closed — add a `---` line to end it. Every line after it "
+            f"was read as frontmatter, so no check could evaluate this file."
+        )
     try:
         fm = _miniyaml.parse("\n".join(lines[1:j])) or {}
     except _miniyaml.MiniYAMLError as exc:
