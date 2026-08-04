@@ -161,12 +161,13 @@ class TestChangelogSchema(unittest.TestCase):
     # RETROSPECTIVE.md § "Consumer-visible contract changes" — the enumeration
     # its close was already required to write — never from commit subjects.
     #
-    # This set is a grandfather list, NOT a relaxation. It is compared for
-    # EXACT equality below, so a 26th backfilled entry fails this test just as
-    # it did before the exception existed. Do not add to it: the collection
-    # points (close ceremony, fix-bug) are the only way in from here.
+    # This set is a grandfather list, NOT a relaxation. It is pinned to the
+    # v0.9.0 released section below for EXACT equality, so the historical block
+    # can never grow a 26th entry. Do not add to it: the collection points (the
+    # close ceremony, `fix-bug`) are the only way into any later release.
+    _V090_SECTION = "0.9.0+umbrella.0.9.0"
     _GRANDFATHERED_SINCE_V080 = {
-        "#259", "#280", "#314", "#360", "#465", "#519",
+        "#259", "#280", "#314", "#360", "#465", "#519", "#562",
         "FEAT-2026-0034", "FEAT-2026-0034/T02",
         "FEAT-2026-0041", "FEAT-2026-0041/T01", "FEAT-2026-0041/T03",
         "FEAT-2026-0042", "FEAT-2026-0042/T02", "FEAT-2026-0042/T03",
@@ -191,30 +192,36 @@ class TestChangelogSchema(unittest.TestCase):
             "grandfathered since-v0.8.0 entries went missing",
         )
 
-    def test_released_sections_never_gain_a_backfilled_trace(self):
-        """A *released* section may hold only FEAT-2026-0064 or frozen traces.
+    def test_v090_section_holds_exactly_the_frozen_exception(self):
+        """The one release carrying backfill is pinned, entry for entry.
 
-        This is where the no-backfill guard now bites. `Unreleased` is
-        deliberately unconstrained -- it is what the collection points (the
-        close ceremony, `fix-bug`) append to, and constraining it blocked the
-        first legitimate forward entry the moment one arrived (#562). Once
-        stamped, a section is immutable by `stamp_release`'s own refusal, so
-        pinning released sections pins the historical block for good: the
-        since-v0.8.0 exception can never grow a 26th entry.
+        Scoped to the v0.9.0 section by version, not to "released sections" at
+        large: stamping moves EVERY entry into a released section, so position
+        cannot distinguish a backfilled entry from a forward-collected one, and
+        a released-sections-wide rule would fail every future release. Nothing
+        constrains v0.10.0 and later -- they have collection points, which is
+        the whole point of FEAT-2026-0064.
+
+        `#562` is in the frozen set but is not backfill: it is the first entry
+        the `fix-bug` collection point ever appended, and it landed before the
+        stamp. The set pins what v0.9.0 shipped; the comment above records
+        which part of it was the exception.
         """
         result = parse_changelog((REPO_ROOT / "CHANGELOG.md").read_text())
-        allowed = self._GRANDFATHERED_SINCE_V080
-        for section in result.sections:
-            if section.kind == "unreleased":
-                continue
-            for entry in section.entries:
-                if entry.trace.startswith("FEAT-2026-0064"):
-                    continue
-                self.assertIn(
-                    entry.trace,
-                    allowed,
-                    f"released section gained a backfilled entry: {entry.trace}",
-                )
+        section = next(
+            (s for s in result.sections if s.version == self._V090_SECTION), None
+        )
+        self.assertIsNotNone(section, f"no {self._V090_SECTION} section found")
+        found = {
+            e.trace
+            for e in section.entries
+            if not e.trace.startswith("FEAT-2026-0064")
+        }
+        self.assertEqual(
+            found,
+            self._GRANDFATHERED_SINCE_V080,
+            "the v0.9.0 released section drifted from its frozen contents",
+        )
 
     def test_shipped_changelog_explains_no_backfill_before_first_entry(self):
         text = (REPO_ROOT / "CHANGELOG.md").read_text()

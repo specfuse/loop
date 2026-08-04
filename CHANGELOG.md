@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.9.0+umbrella.0.9.0] - 2026-08-04
+
 <!--
 ONE-TIME EXCEPTION to this file's no-backfill rule, recorded so it is not read as
 precedent. The backfilled entries below cover work merged between
