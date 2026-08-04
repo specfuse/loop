@@ -79,7 +79,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
 | FEAT-2026-0063 | Branch-observation sweep for the arm predicate | done | — | [→ archive](roadmap-archive.md#feat-2026-0063) |
-| FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | planned | — | [→ detail](#feat-2026-0064) |
+| FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | active | — | [→ detail](#feat-2026-0064) |
 | FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
 | FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
@@ -950,7 +950,7 @@ Two decisions to settle when this is drafted, both noted here so they are not di
 
 **Benefits.** A consumer can answer "what changed, and will it break me" from one document instead of a commit range. Breaking changes get stated once, in prose, at the moment the person who made them still remembers why — which is the only moment that statement is cheap. The close ceremony's consumer-visible enumeration stops being write-only. And every project the scaffold installs into inherits the same discipline rather than reinventing a changelog convention per repo.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0067"></a>
 ## FEAT-2026-0067 — Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two
