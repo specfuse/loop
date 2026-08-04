@@ -5,7 +5,7 @@ slug: roadmap-link-lint
 branch: feat/FEAT-2026-0034-roadmap-link-lint
 roadmap_goal: Read roadmap.md and roadmap-archive.md as one link graph and check four invariants — blocked-by presence and resolution, ref resolution in both directions, anchor adjacency, and cross-file ID uniqueness — so the four rot shapes fail a gate instead of a human clicking a dead link.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 12.50
 ---
 
