@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0034/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/loop/lint_roadmap.py
@@ -10,6 +10,15 @@ produces:
 produces_driver_helper:
   - lint_roadmap
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T03:40:21.155355+00:00
+duration_seconds: 927.631
+cost_usd: 2.210732
+input_tokens: 74
+output_tokens: 33435
 ---
 
 # One link graph, four invariants, findings not exceptions
