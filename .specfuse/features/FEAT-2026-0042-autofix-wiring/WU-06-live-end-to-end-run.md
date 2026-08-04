@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0042/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
 unsandboxed: true
 unsandboxed_rationale: "The whole point of this work unit is that the firing path reaches a real repository: it makes live `gh` calls (create/view/label/close an issue, view/close a pull request) and launches a real headless `fix-bug` session. `gh` fails inside the command sandbox with an invalid-token error and a TLS certificate failure — LEARNINGS [FEAT-2026-0014/T01/gh-claudeP-broken], corrected 2026-08-03 by FEAT-2026-0041/G1-CLOSE, whose T04 ran unsandboxed and completed a full live round-trip on attempt 1. The escape is confined to this single work unit; T04 and T05 are sandboxed, stub-verified, and forbidden from writing `gh` calls."
@@ -11,6 +11,13 @@ produces:
 oracle_env: macos_local
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T02:31:08.430717+00:00
+duration_seconds: 1226.046
+cost_usd: 5.233972
+input_tokens: 166
+output_tokens: 49581
 ---
 
 # The live run: fire the dial for real against a disposable target
