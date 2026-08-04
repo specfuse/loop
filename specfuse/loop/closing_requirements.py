@@ -74,6 +74,52 @@ AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\
 
 
 # --------------------------------------------------------------------------- #
+# Hedged-verdict follow-up `kind:` contract (FEAT-2026-0059/T01)              #
+# --------------------------------------------------------------------------- #
+
+#: The four classifications a close-discipline.md §2 follow-up entry may
+#: carry, and what each means for the verdict ceiling. `inherent` is not in
+#: the roadmap row's original three — see PLAN.md for why it was added.
+FOLLOW_UP_KIND_MEANINGS: dict[str, str] = {
+    "acceptance-discharged": "needs a human signature; accepting IS the discharge",
+    "externally-verifiable-later": (
+        "needs a real run or environment; upgradeable at the named condition"
+    ),
+    "routed-finding": "now owned elsewhere; tracked on another surface",
+    "inherent": "not assertable, ever",
+}
+
+FOLLOW_UP_KINDS: frozenset[str] = frozenset(FOLLOW_UP_KIND_MEANINGS)
+
+#: Verdicts that require a §2 follow-up record at all (close-discipline §2).
+HEDGED_VERDICT_VALUES: frozenset[str] = frozenset({"met_locally", "partially_met"})
+
+HEDGED_RECORD_HEADING = "Hedged-verdict follow-up record"
+HEDGED_RECORD_HEADING_RE = re.compile(
+    rf"^##+ {re.escape(HEDGED_RECORD_HEADING)}\b.*$", re.MULTILINE,
+)
+
+#: Matches a per-entry `- **kind:** `<value>`` line inside a §2 record.
+KIND_FIELD_RE = re.compile(r"\*\*kind:\*\*\s*`([a-zA-Z0-9-]+)`")
+
+REWORK_EXISTS = "rework exists"
+NO_IN_REPO_REWORK = "no in-repo rework can raise this verdict"
+
+
+def verdict_ceiling_for_kinds(kinds) -> str:
+    """The verdict ceiling implied by a hedged close's set of follow-up kinds.
+
+    Mechanical, not a judgment call: if any entry is
+    `externally-verifiable-later`, a real re-run condition exists and the
+    operator has a choice. Otherwise `met` is unreachable by any in-repo
+    work — the empty set (no entries at all) also lands here.
+    """
+    if any(kind == "externally-verifiable-later" for kind in kinds):
+        return REWORK_EXISTS
+    return NO_IN_REPO_REWORK
+
+
+# --------------------------------------------------------------------------- #
 # Requirement records                                                         #
 # --------------------------------------------------------------------------- #
 
@@ -83,7 +129,7 @@ class Requirement:
     """One closing-artifact requirement, as data.
 
     ``applies_when`` names the condition under which the requirement fires:
-    ``always``, ``verdict_met``, ``failures_present``, or
+    ``always``, ``verdict_met``, ``verdict_hedged``, ``failures_present``, or
     ``autoclose_debt_marker``. ``phase`` is ``pre-squash`` (checked by
     ``assert_closing_deliverables`` right after the WU's own squash) or
     ``post-pass`` (checked by ``verify_post_pass_invariants`` after the
@@ -179,6 +225,17 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             file=LEARNINGS_PATH,
             enforced_by="assert_learnings_staged_under_auto",
+        ),
+        Requirement(
+            id="close-j", wu_type="close", phase="pre-squash",
+            description=(
+                "On a hedged verdict, every entry in the "
+                f"'{HEDGED_RECORD_HEADING}' section carries a valid `kind:` "
+                f"field ({', '.join(sorted(FOLLOW_UP_KINDS))})"
+            ),
+            file=RETROSPECTIVE_FILENAME,
+            applies_when="verdict_hedged",
+            enforced_by="assert_hedged_followup_kinds_classified",
         ),
     ],
     "close-intermediate": [

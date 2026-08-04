@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0059/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - .specfuse/rules/close-discipline.md
@@ -12,6 +12,15 @@ produces:
 produces_driver_helper:
   - FOLLOW_UP_KINDS
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T12:18:07.407747+00:00
+duration_seconds: 1155.843
+cost_usd: 2.774868
+input_tokens: 104
+output_tokens: 28315
 ---
 
 # `kind:` on every hedged follow-up, and a lint that means it

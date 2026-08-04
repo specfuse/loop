@@ -307,8 +307,18 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 # the "nothing generalizes" sentinel so closing-deliverable
                 # assertions pass. Required since the diff-only-touches-wu
                 # bypass was removed (FEAT-2026-0017/G1-CLOSE-attempt-3 fix).
+                # Also write a classified §2 record (FEAT-2026-0059/T01):
+                # met_locally requires the hedged-verdict follow-up record
+                # with a valid `kind:` on every entry.
                 (fdir / "RETROSPECTIVE.md").write_text(
-                    "# Retrospective\n\nNothing generalizes from this gate.\n"
+                    "# Retrospective\n\nNothing generalizes from this gate.\n\n"
+                    "## Hedged-verdict follow-up record (close-discipline §2)\n\n"
+                    "### D1 — stub entry — OPEN\n\n"
+                    "- **The criterion, verbatim:** \"stub\"\n"
+                    "- **Why it is unverifiable in this environment:** stub.\n"
+                    "- **The exact re-run condition that would upgrade the "
+                    "verdict to `met`:** stub.\n"
+                    "- **kind:** `inherent`\n"
                 )
                 return ("", {"input_tokens": 10, "output_tokens": 5, "cost_usd": 0.001})
 

@@ -36,18 +36,51 @@ output directory before asserting — stale output satisfies any assertion.
 
 ## 2. Hedged-verdict follow-up record
 
-On `met_locally`, the close must produce a named record — in the gate review
-or `RETROSPECTIVE.md` — with one entry per unmet criterion:
+On `met_locally` or `partially_met`, the close must produce a named record —
+in the gate review or `RETROSPECTIVE.md`, under a `## Hedged-verdict
+follow-up record` heading, one `### `-titled entry per unmet criterion —
+with:
 
 - the criterion, verbatim;
 - why it is unverifiable in this environment;
-- the exact re-run condition that would upgrade the verdict to `met`.
+- the exact re-run condition that would upgrade the verdict to `met`;
+- a `kind:`, one of the four below.
 
 The driver (>= 0.3.21) already guarantees the surfaces stay un-flipped on a
 hedged verdict (gate `awaiting_review`, roadmap `active`, PLAN `active`);
 this record is the other half: without it, `met_locally` is a dead end —
 no artifact says what would make it `met`, and the honest hedged verdict
 degrades into a polite synonym for "unknown".
+
+### The four `kind`s
+
+Each entry's `kind:` classifies *why* the criterion is unmet, and follows
+mechanically into a verdict-ceiling contribution — whether any in-repo work
+could ever raise this verdict to `met`:
+
+| `kind` | meaning | can a re-run upgrade it? |
+| --- | --- | --- |
+| `acceptance-discharged` | needs a human signature; accepting IS the discharge | no — but accepting the verdict *is* the discharge |
+| `externally-verifiable-later` | needs a real run or environment; upgradeable at the named condition | **yes**, at the named re-run condition |
+| `routed-finding` | now owned elsewhere; tracked on another surface | no — tracked on another surface |
+| `inherent` | not assertable, ever | **never** |
+
+The ceiling follows mechanically from the set of kinds present: if **any**
+entry is `externally-verifiable-later`, rework exists and the operator has a
+real choice between accepting now and waiting for that condition. If none
+is, `met` is unreachable by any in-repo work — the only question is whether
+to accept the hedge as final. `closing_requirements.verdict_ceiling_for_kinds`
+is the one place this rule is computed; a consumer reads the answer rather
+than re-deriving it.
+
+**`kind` is written by the close WU, never inferred by a reader.** The close
+has the context — it just tried to meet the criterion and knows why it
+didn't. A reader (human or skill) sees only the prose after the fact and
+would be guessing; a confident guess on an ambiguous entry is worse than an
+unclassified one. `specfuse-lint --closing` refuses a hedged close whose
+record — the one belonging to the WU currently under lint — has an entry
+with no `kind:` or an unrecognised one; it does not read any other feature's
+retrospective.
 
 ## 3. Consumer-visible contract changes enumerated, human-acknowledged
 
