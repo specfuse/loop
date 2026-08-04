@@ -2839,3 +2839,57 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   agreeing. This is also the cheapest way to satisfy "the checker has met real producer
   output" when the tree was cleaned before the feature ran — copy the corpus to a temp
   dir, run the producer, lint the result, diff the findings against baseline.
+
+- [FEAT-2026-0073/G1-CLOSE/measure-every-error-class-not-just-yours] **Before authoring a
+  criterion of the form "zero X corpus-wide", run the checker over the real corpus and read
+  the breakdown by *every* class it can report — not only the class the feature is about.**
+  FEAT-2026-0060 measured `event_type` failures, found zero, and authored "the validator
+  reports zero total errors" while its Do-not-touch list forbade the only file that could
+  deliver them; 285 `correlation_id` failures it never looked at made the criterion
+  unsatisfiable by construction. Cost: one blocked attempt, $4.48, and a whole follow-up
+  feature. This feature ran the same measurement *first* — `288 errors, by kind
+  {'correlation_id': 288}, shapes G<n>-CLOSE 101 / G<n>-PLAN 87 / …` — and recorded it in
+  `PLAN.md` as the satisfiability answer, so both WUs landed against a criterion that was
+  known reachable. Rule: a "zero errors" criterion's satisfiability evidence is a
+  **breakdown, not a total**. Report counts per class; a zero in your class with a non-zero
+  elsewhere is exactly the shape that passes review and fails execution. Corollary the plan
+  should state up front: the total will have moved by the time the WU runs, so commit to the
+  *distribution* ("no new error class") as the block criterion and say explicitly that a
+  larger count of the same class is time passing, not a discrepancy. Companion to
+  [FEAT-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them], which says run
+  the check by hand; this says read all of what it prints.
+
+- [FEAT-2026-0073/G1-CLOSE/never-invite-what-produces-forbids] **A WU body must not invite a
+  change that its own `produces:` list makes impossible — rename permissions, "move this if
+  it fits better", "split the file if it grows" are all mutually exclusive with a declared
+  path, and the guard is machine-checked while the invitation is prose.** T02's body said
+  "rename it if the name no longer fits" while `produces:` declared
+  `.specfuse/scripts/event_type_gate.py`. Rename, and the presence gate fires `DELIVERABLE
+  MISSING`; keep the name, and the only honest diff lives in another WU's forbidden file, so
+  the declared path shows no change and the cross-check fires `FILES_CHANGED MISMATCH`. No
+  correct execution satisfies both, which is why three fresh sessions converged on the same
+  signature before escalating `spinning_detected` — $5.47, 63% of the feature's total spend,
+  on an authoring defect. Same class as the contradiction that halted FEAT-2026-0042's
+  baseline; that makes two. Rule when authoring: read the body against `produces:` line by
+  line and delete any sentence that permits a path to differ from what is declared. Rule when
+  re-arming: three attempts with an identical failure signature means **amend the body, do
+  not retry it** — and when you withdraw an invitation, say inline that it was withdrawn and
+  why, or a future reader helpfully reinstates it. Cosmetic improvements a WU notices in
+  passing (this one was a genuinely bad file name) are a follow-up bug, never an in-scope
+  option.
+
+- [FEAT-2026-0073/G1-CLOSE/passing-attempts-leave-no-measurement-trail] **If a WU's
+  acceptance criterion is "measure X and record the numbers", name the artifact the numbers
+  land in — a passing attempt leaves no `work/` note and the squash commit body carries no
+  RESULT block, so the measurement dies with the session.** T01's criterion 9 required
+  reporting the corpus error count and breakdown before and after. It passed on attempt 2, so
+  no `work/FEAT-2026-0073_T01/` directory was ever created, and its squash commit is the bare
+  `feat:` subject. At close time the only in-repo trace of T01's figure was a *different*
+  commit restating `PLAN.md`'s drafting-time 285/38 — which is the exact
+  restate-the-planned-number defect FEAT-2026-0063 exists to prevent, reproduced in prose
+  because the real measurement was unrecoverable. The close had to re-derive it (288/39, +3
+  `G<n>-CLOSE` from three features closing in between). Rule: measurement criteria must write
+  to a durable path — a committed fixture, a section in a doc the WU already `produces:`, or
+  a test that prints the number so it survives in the run log. Asymmetric failure: the loop
+  looks fine (the WU passed, the gate is green) right up until a close needs the number and
+  finds only a restatement of the plan.
