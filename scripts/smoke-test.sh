@@ -40,37 +40,22 @@ echo "==> [scaffold] Dry-running the loop driver"
 "$PYTHON" .specfuse/scripts/loop.py --dry-run --feature FEAT-2026-0001-health-endpoint
 
 # --- 2. Methodology `code` gates ---
-# These mirror .specfuse/verification.yml `code` set verbatim. Keep in sync.
+# Derived from .specfuse/verification.yml, NOT copied from it (#592). The old
+# hand-maintained mirror carried the comment "Keep in sync" and drifted by six
+# gates; two of them shipped with features and were never once executed here.
+# A declared-but-unrun gate is worse than an absent one, because the
+# declaration reads as coverage.
+#
+# The declared commands say `python3` because that is what a target project's
+# driver invokes. This script substitutes "$PYTHON" so the gates run under the
+# virtualenv interpreter that actually has the dependencies.
 
-echo "==> [gate: tests] unittest"
-# -b buffers stdout/stderr per test so the integration tests' verbose
-# driver output doesn't dominate the CI log (it's only printed on failure).
-"$PYTHON" -m unittest discover -s tests -v -b
-
-echo "==> [gate: lint] ruff"
-ruff check specfuse .specfuse/scripts tests scripts
-
-echo "==> [gate: security] bandit"
-bandit -r specfuse .specfuse/scripts -ll
-
-echo "==> [gate: coverage] coverage --fail-under=90"
-coverage run --source=specfuse -m unittest discover -s tests \
-  && coverage report --fail-under=90
-
-echo "==> [gate: leak-scan] leak_scan --all"
-"$PYTHON" .specfuse/scripts/leak_scan.py --all
-
-echo "==> [gate: event-type-gate] event_type_gate"
-"$PYTHON" .specfuse/scripts/event_type_gate.py
-
-echo "==> [gate: leak-scan-hook] bats"
-bats tests/leak_scan_hook.bats
-
-echo "==> [gate: sync-scaffold-bats] bats"
-bats tests/sync_scaffold.bats
-
-echo "==> [gate: init-skills-bats] bats"
-bats tests/init_skills_idempotent.bats
+while IFS=$'\t' read -r gate command; do
+  [ -n "$gate" ] || continue
+  echo "==> [gate: $gate] ${command%% *}"
+  # shellcheck disable=SC2086  # commands are declared, not user input
+  eval "${command/#python3 /$PYTHON }"
+done < <("$PYTHON" -m specfuse.loop.gate_commands .specfuse/verification.yml)
 
 echo
 echo "smoke test: OK"

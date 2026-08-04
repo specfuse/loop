@@ -1,11 +1,15 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# CI: run the repo's scaffold smoke-test PLUS the methodology `code` gates
-# (tests, lint, security, coverage) on push and PR. The script does both —
-# this workflow just sets up Python and invokes it. The gate commands here
-# are intentionally the same ones declared in .specfuse/verification.yml
-# and run by scripts/smoke-test.sh; keep all three in sync.
+# CI: run the repo's scaffold smoke-test PLUS every methodology `code` gate on
+# push and PR. The script does both — this workflow just sets up Python and
+# invokes it.
+#
+# There is no gate list here, and there must not be one. smoke-test.sh derives
+# the gates from .specfuse/verification.yml at run time (#592); that file is
+# the single source of truth. The previous "keep all three in sync" instruction
+# was the drift: the hand-maintained copy fell six gates behind, and two of
+# them shipped with features and were never once executed.
 
 name: ci
 
