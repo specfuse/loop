@@ -13,10 +13,17 @@ auto_close_disabled: true
 generalizable lessons, reconcile documentation and roadmap, and record the terminal
 verdict for the feature.
 
-**Context.** Correlation ID `FEAT-2026-0042/G2-CLOSE`. Placeholder, pre-declared at
-draft time so the linter reads gate 2 as the terminal gate. `FEAT-2026-0042/G1-PLAN`
-inserts gate 2's substantive work units **before** this one and updates its
-`depends_on`. This body is refined by `G1-PLAN` once gate 2's real shape is known.
+**Context.** Correlation ID `FEAT-2026-0042/G2-CLOSE`. Pre-declared at draft time so
+the linter reads gate 2 as the terminal gate; refined by `FEAT-2026-0042/G1-PLAN`
+once gate 2's real shape was known. Read `PLAN.md`, `GATE-02.md`, `GATE-02-REVIEW.md`,
+and the gate-1 section of `RETROSPECTIVE.md` first — this close appends gate 2's
+section to that existing retrospective and writes the feature's terminal verdict.
+
+Gate 2's three substantive work units: **T04** `specfuse/monitor/autofix_invoke.py`
+(builds the headless `fix-bug` call, classifies its result), **T05**
+`specfuse/monitor/autofix_run.py` (the firing wiring — decide, record, fire, label),
+**T06** the live end-to-end run (the only `unsandboxed: true` work unit in the
+feature).
 
 **Why `auto_close_disabled: true`.** A terminal close carrying §1–§3 obligations is
 load-bearing per `close-discipline.md`, and this one carries the feature's
@@ -49,12 +56,47 @@ where it is asserted.
 
 **Acceptance criteria.**
 
-<Refined by `G1-PLAN` against gate 2's actual work units. At minimum, carry forward:
-a `## Cost analysis` section reconciling planned against `events.jsonl`; the
-deferred-verification list or its explicit empty line; the inherent fix-quality
-limitation; the live-run evidence with raw output; the residue report; the safety-floor
-assertion; consumer-visible contract changes per §3 or the `n/a` line; roadmap row and
-detail reconciled with what was built; and `specfuse-lint --closing` exiting 0.>
+1. `RETROSPECTIVE.md` gains a `## Gate 2` section covering T04, T05, and T06 — what
+   each shipped, and the decisions worth carrying past this feature. Gate 1's section
+   is appended to, never rewritten.
+2. A `## Cost analysis` section reconciles each gate-2 work unit's
+   `planned_cost_usd` against its `attempt_outcome` payload in `events.jsonl` (the
+   authoritative source), and against the `$29.50` `cost_budget_usd` in `GATE-02.md`.
+   Where the two surfaces disagree, say which is right rather than averaging them.
+3. A failure-class breakdown for every non-passing gate-2 attempt, or the explicit
+   "(no non-passing attempts in scope)" line when there were none. An attempt killed
+   by infrastructure emits no `attempt_outcome` and is absent by construction — say
+   so rather than classifying it as passing, the way gate 1's close did.
+4. **The live-run evidence, quoted raw.** Reproduce T06's raw command output from its
+   result, not a summary of it. If T06 skipped rather than actually firing, or fired
+   and returned `refused` / `could_not_proceed`, the mechanism claim is **not**
+   verified end to end and this close must say so plainly regardless of the gate being
+   green — the same discipline FEAT-2026-0041's close applied to its `gh` round-trip.
+5. **The residue report.** Name the scratch issue number, every branch T06 created,
+   and the pull-request number, each with its final state — closed, or still open and
+   why. A killed attempt leaving residue is information about attempt behaviour, not
+   litter to hide.
+6. **The safety-floor assertion.** State explicitly that no pull request was merged,
+   that auto-merge was not enabled, and that nothing was pushed to a protected
+   branch — or report the violation. This is the feature's central safety claim.
+7. A `## What the loop did NOT verify` section carrying, at minimum: **fix
+   correctness as inherent** — not a gap for a later feature to close with tests; that
+   one live run is one live run on one machine against a planted bug, and is not
+   evidence about ephemeral runners, real findings, or concurrency; and that nothing
+   fires on a schedule, because the harvest cycle is deliberately not wired to the
+   firing path.
+8. Consumer-visible contract changes enumerated per `close-discipline.md` §3 — the two
+   new public modules and any new entry point — with blast radius **measured, not
+   assumed**: state for each whether it appears in a shipped scaffold surface. Or the
+   explicit `n/a` line if nothing changed for a consumer.
+9. Generalizable lessons promoted to `.specfuse/LEARNINGS.md`, and the roadmap row and
+   detail section for [FEAT-2026-0042](../../roadmap.md#feat-2026-0042) reconciled
+   with what was actually built — including whether its "auto-fire headless
+   `/fix-bug NN`" phrasing is now true.
+10. A terminal `verdict` in this WU's frontmatter, well-formed and honest.
+    `met_locally` with the inherent fix-quality limitation carried forward is an
+    acceptable outcome and is **not** a failure of this close.
+11. `specfuse-lint --closing` exits 0 before this WU reports `complete`.
 
 **Do not touch.** `PLAN.md`'s `status` field — the driver owns the terminal flip via
 `fire_terminal_flips`, gated on `verdict_permits_terminal_flips`, on both the
@@ -69,3 +111,11 @@ and hedge the verdict rather than asserting verification that did not happen; th
 safety floor was violated; or the `events.jsonl` cost sum cannot be reconciled against
 frontmatter. A verdict of `met_locally` with the inherent fix-quality limitation
 carried forward is an acceptable outcome and is **not** a block.
+
+This work unit is sandboxed and reads its evidence from `events.jsonl` and from T06's
+recorded result. Do **not** write a `gh` call: `FEAT-2026-0042/T06` is the only work
+unit in this feature permitted to reach a real repository, and re-running its live
+path from a close would create objects nobody is tracking. If T06's residue needs
+chasing, name it for the operator rather than closing it here. Do **not** merge a
+pull request, enable auto-merge, or push to a protected branch under any
+circumstance — that is FEAT-2026-0048's territory and an escalation to the operator.

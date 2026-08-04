@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0042-autofix-wiring
 roadmap_goal: Make the per-component `autofix` dial do something — fire headless fix-bug on a diagnosed finding only when the diagnosis is confident and its fix_scope is small, route large/external findings to a human, and bound the whole thing with one-run-per-fingerprint, a daily cap, and a failure label.
 autonomy_default: review
 status: active
-planned_cost_usd: 27.00
+planned_cost_usd: 43.50
 ---
 
 # Plan: Autofix wiring — headless `fix-bug` from diagnosed findings
@@ -100,10 +100,22 @@ default for every component and this feature does not flip one. Gate 2 introduce
 firing behaviour behind that dial; `G1-PLAN` must re-answer §4 for gate 2 rather
 than inherit this answer.
 
+**Re-answered for gate 2 by `G1-PLAN`, and it was not "not applicable".** The probe
+was run — the dial flipped to `"on"` locally, the full oracle run, the failure list
+recorded — and it found one real failure that would otherwise have surfaced inside a
+gate-2 implementation attempt. The command, the raw output, and the reading are in
+`GATE-02-REVIEW.md`; the shipped default is back at `"off"` and the probe left no
+diff.
+
 ## Flag-scope table (§3)
 
-Not applicable. No new behaviour flag is introduced — `autofix` already exists in the
-schema. This feature adds its consumer.
+Not applicable **in gate 1**. No new behaviour flag is introduced — `autofix` already
+exists in the schema, and gate 1 ships no code that reads it.
+
+**Applicable in gate 2, where the flag acquires its first consumer.**
+`FEAT-2026-0042/T05` carries the table, and its load-bearing row is the one that says
+the harvest cycle is *not* wired: the firing path lives behind its own entry point, so
+a routine `specfuse-monitor run` cannot launch a fix.
 
 ## Scope boundary — explicitly OUT
 
@@ -167,9 +179,25 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Substantive WUs are drafted by G1-PLAN and inserted BEFORE this close.
+      # Drafted by G1-PLAN. T04 -> T05 -> T06 is a real chain, not a convenience
+      # ordering: T05 calls T04's invoker, and T06 fires T05's wiring for real.
+      # T06 is the only unsandboxed WU in the feature; T04 and T05 are stub-verified.
+      - id: FEAT-2026-0042/T04
+        file: WU-04-headless-fix-invoker.md
+        depends_on: []
+      - id: FEAT-2026-0042/T05
+        file: WU-05-autofix-firing-wiring.md
+        depends_on:
+          - FEAT-2026-0042/T04
+      - id: FEAT-2026-0042/T06
+        file: WU-06-live-end-to-end-run.md
+        depends_on:
+          - FEAT-2026-0042/T05
       # The terminal close is pre-declared so the linter reads gate 2 as terminal.
       - id: FEAT-2026-0042/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0042/T04
+          - FEAT-2026-0042/T05
+          - FEAT-2026-0042/T06
 ```

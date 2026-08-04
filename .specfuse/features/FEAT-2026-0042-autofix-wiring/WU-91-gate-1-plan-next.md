@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0042/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.8.0
+started_at: 2026-08-04T01:41:40.665623+00:00
+duration_seconds: 977.489
+cost_usd: 10.310943
+input_tokens: 172
+output_tokens: 69629
 ---
 
 # Draft gate 2 — the dial goes live, verified end to end
