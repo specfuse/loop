@@ -18,9 +18,9 @@
 # AC7: both SKILL.md copies are byte-identical; skill discovery + scaffold
 #      sync tests still pass.
 
+import io
 import pathlib
 import subprocess
-import sys
 import unittest
 
 _REPO_ROOT = pathlib.Path(__file__).parent.parent
@@ -44,6 +44,31 @@ def _step_2_text(text: str) -> str:
 
 def _step_4_text(text: str) -> str:
     return _step_text(text, "4", "5")
+
+
+def _run_suites_in_process(test_case, module_names):
+    """Run named unittest modules in-process and assert they pass.
+
+    NOT a `python3 -m pytest` subprocess: pytest is a dependency of nothing in
+    this repository -- it appears in no pyproject.toml extra and no CI workflow --
+    so the subprocess form passes on a developer venv that happens to have it and
+    fails on the runner with `No module named pytest`. The whole repository runs
+    on `python3 -m unittest discover -s tests`. See tests/test_no_pytest_subprocess.py,
+    which exists to stop this recurring a fourth time.
+    """
+    suite = unittest.TestSuite()
+    for name in module_names:
+        loaded = unittest.defaultTestLoader.loadTestsFromName(name)
+        test_case.assertGreater(
+            loaded.countTestCases(), 0,
+            f"{name} loaded zero tests -- a vacuous pass is exactly the failure "
+            f"this assertion exists to prevent")
+        suite.addTest(loaded)
+    result = unittest.TextTestRunner(stream=io.StringIO(), verbosity=0).run(suite)
+    test_case.assertTrue(
+        result.wasSuccessful(),
+        msg=chr(10).join(t for _, t in (result.failures + result.errors))
+            or "suite failed with no captured output")
 
 
 class TestRoutedFindingTracking(unittest.TestCase):
@@ -142,21 +167,11 @@ class TestBothSkillCopiesByteIdentical(unittest.TestCase):
         self.assertEqual(result.stdout, "")
 
     def test_skill_discovery_links_suite_passes(self):
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q",
-             str(_REPO_ROOT / "tests" / "test_skill_discovery_links.py")],
-            capture_output=True, text=True, cwd=_REPO_ROOT, check=False,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        _run_suites_in_process(self, ["tests.test_skill_discovery_links"])
 
     def test_scaffold_sync_suite_passes(self):
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q",
-             str(_REPO_ROOT / "tests" / "test_skills_vendored_in_sync.py"),
-             str(_REPO_ROOT / "tests" / "test_prepare_scaffold_sync.py")],
-            capture_output=True, text=True, cwd=_REPO_ROOT, check=False,
-        )
-        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        _run_suites_in_process(self, ["tests.test_skills_vendored_in_sync",
+                                      "tests.test_prepare_scaffold_sync"])
 
 
 if __name__ == "__main__":
