@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 17.50
+baseline:
+  sha: 568810a3aa87ecf04736f771e7e58bc8713a6e00
+  probed_at: 2026-08-04T04:37:12.519610+00:00
+  failing: []
 ---
 
 # Gate 1 — the event log validates end to end
