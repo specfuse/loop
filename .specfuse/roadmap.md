@@ -49,7 +49,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | [→ detail](#feat-2026-0033) |
-| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | planned | — | [→ detail](#feat-2026-0034) |
+| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | active | — | [→ detail](#feat-2026-0034) |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-2026-0035) |
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | [→ detail](#feat-2026-0036) |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
@@ -731,7 +731,7 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches all four rot shapes at lint time rather than when a human clicks a dead link — or worse, follows a resolvable link to the wrong feature and reasons from it. Adjacency and uniqueness turn `/roadmap-archive`'s stray-anchor defect from a silent recurring corruption into a failing check the next archive run trips immediately, which is the durable fix; repairing the current instances by hand is not. Keeps the machine-checkable invariants ahead of the prose conventions.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0035"></a>
 ## FEAT-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
