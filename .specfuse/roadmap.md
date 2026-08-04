@@ -86,7 +86,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
 | FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
-| FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | planned | — | [→ detail](#feat-2026-0073) |
+| FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -1018,27 +1018,6 @@ Consider also whether test suites that emit driver output on stdout should be qu
 **Status: done.** Executed directly as a bug fix rather than dispatched through the loop — one function, test-first, one branch, one PR, on the same footing as FEAT-2026-0036. Dispatching it would have meant running a work unit whose own gate report carried the defect being fixed.
 
 Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the normal path (15-line window) and the timeout path (10-line window), which carried the identical positional-tail shape. Both mechanisms the row left open were taken, since they compose — verdict lines found before the tail are pinned above it with an explicit `... (N line(s) elided) ...` marker, and output with no recognisable verdict anywhere gets an explicit `NO VERDICT FOUND` note rather than presenting unrelated trailing output as the failure. Twelve tests in `tests/test_gate_report_verdict.py`, red before the change. Verified against the real captured output that motivated the row: the report now opens `Ran 2007 tests in 84.286s` / `OK (skipped=3)` / `... (4564 line(s) elided) ...` where it previously opened on a fixture feature's gate ceremony.
-
-<a id="feat-2026-0073"></a>
-## FEAT-2026-0073 — Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs
-
-**Why.** The vendored event envelope constrains `correlation_id` with
-
-```
-^(FEAT|INIT)-\d{4}-\d{4}(/F\d{2})?(/T\d{2})?$
-```
-
-which accepts a substantive work unit (`/T01`) and nothing else. `.specfuse/rules/correlation-ids.md` §31-41 documents two further shapes as valid: closing-sequence units use `G<n>-<NAME>` (`RETRO`, `LESSONS`, `DOCS`, `PLAN`, `CLOSE`, `CLOSE-INTERMEDIATE`), and hygiene units use `TNNH[N…]`. The envelope accepts neither, so **every event a closing work unit has ever emitted fails validation**.
-
-Measured across the corpus: **279 failures in 36 of 45 feature folders**. The distribution is exactly what the gap predicts — `G1-CLOSE` 61, `G1-PLAN` 59, `G2-PLAN` 24, `G1-CLOSE-INTERMEDIATE` 20, `G2-CLOSE` 18, `G3-CLOSE` 13. This is not drift: the rules file and the schema have disagreed since closing units were given their own ID shape.
-
-Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalated rather than proceed. That WU's registry work resolved cleanly — **zero `event_type` errors corpus-wide** — but its acceptance demanded zero *total* validator errors while its Do-not-touch list forbade the vendored schema, the only file that could deliver them. The two criteria contradicted each other and the work unit could not pass as written. The contradiction was authored, not discovered: FEAT-2026-0060's recon measured `event_type` failures only and never ran the validator's other checks, so its satisfiability answer was wrong. Cost of finding out: one blocked attempt, $4.48.
-
-**Goal.** Make the envelope accept the correlation-ID shapes the methodology documents, or move the driver's ID vocabulary somewhere this repository owns — and decide which, because the same question was answered for `event_type` and the answer may differ here. **Extend the vendored pattern** is simplest and arguably correct at the source, since the orchestrator has closing-sequence work units too and its own logs presumably carry the same IDs; but the file's `$id` points at another repository and its `$comment` is that repository's changelog, so the edit is a cross-repo change that a vendor sync will revert. **Override `correlation_id` in the driver-local registry** keeps ownership local and matches what FEAT-2026-0060 chose for `event_type`; but ID *format* is more plausibly a shared protocol concern than event vocabulary is, and forking it risks the two diverging in a way that breaks a consumer reading both logs. Whichever is chosen, `.specfuse/rules/correlation-ids.md` and the schema must end up stating the same contract, since the whole defect is that they do not.
-
-**Benefits.** The driver's event log validates end to end rather than in the `event_type` dimension alone — the state FEAT-2026-0060 was believed to reach and did not. Unblocks that feature's real-log verification gate, which cannot be green while 279 events fail on a field the gate has no opinion about. And it closes a documented-versus-enforced disagreement that has been silently true for every closing work unit this repository has ever run.
-
-**Status: planned.**
 
 <a id="feat-2026-0074"></a>
 ## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe

@@ -1,0 +1,1 @@
+declared deliverable absent: .specfuse/scripts/event_type_gate.py
