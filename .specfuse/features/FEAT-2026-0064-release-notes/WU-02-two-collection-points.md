@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0064/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - .specfuse/rules/close-discipline.md
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/closing_requirements.py
   - tests/test_changelog_collection.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T14:23:18.219020+00:00
+duration_seconds: 1202.458
+cost_usd: 5.031107
+input_tokens: 168
+output_tokens: 45846
 ---
 
 # Two collection points, because bugs have no close ceremony
