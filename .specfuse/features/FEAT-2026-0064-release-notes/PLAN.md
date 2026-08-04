@@ -83,7 +83,9 @@ Reuse:   scripts/bump_version.py already sets all four version sources atomicall
 
 ## Escalation-predicate satisfiability (`.specfuse/rules/planning-discipline.md` §2)
 
-**A lint requiring a CHANGELOG entry per shipped unit of work is red on arrival.**
+Answered before drafting, because the obvious lint is unsatisfiable on this tree.
+
+A lint requiring a CHANGELOG entry per shipped unit of work is red on arrival.
 Fifty-one features are `done` and every one predates this feature; so does every bug
 PR ever merged. A check demanding retrospective coverage could not pass without
 fabricating fifty-one entries from git archaeology, which is exactly the re-derivation
@@ -96,6 +98,15 @@ one feature old and has the same reasoning written into it.
 
 The close must say plainly that history was **not** audited, so a reader does not
 mistake an empty early CHANGELOG for a claim that nothing changed.
+
+## A lint warning that is expected, recorded so it is not "fixed"
+
+`lint_plan` warns that T01's `produces: CHANGELOG.md` is a bare filename with no such
+file at the repo root. That is correct and intentional: the file does not exist yet
+because **T01 creates it**, and the bare spelling is the required one — `git diff
+--name-only` emits root paths bare, and a `./` prefix makes the in-diff cross-check
+fail every attempt (#259, #77). The warning clears the moment T01 runs. Do not add a
+`./`, and do not pre-create an empty file to silence it.
 
 ## Runtime probe for a default/severity flip (§4)
 
