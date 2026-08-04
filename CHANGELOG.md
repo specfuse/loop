@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.9.2+umbrella.0.9.2] - 2026-08-04
+
 ### Fixed
 
 - A `produces:` entry that is a directory is now an ERROR in `specfuse-lint` and refused before dispatch, instead of after a full session. The driver already refused it correctly, but only post-session and three times over — $6.42 and 20.6 minutes observed on a real feature for a `Path.is_dir()` call on static frontmatter (#593)
