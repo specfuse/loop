@@ -2893,3 +2893,128 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a test that prints the number so it survives in the run log. Asymmetric failure: the loop
   looks fine (the WU passed, the gate is green) right up until a close needs the number and
   finds only a restatement of the plan.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/oracle-vs-moving-head] **A test that diffs the
+  working tree against `git show HEAD:<path>` is green exactly once — in the session
+  that writes it — and red forever after the driver commits that session.** A WU
+  asserting "my change to this document is purely additive" implemented it as a
+  `difflib` over working-tree-vs-`HEAD`, asserting lines added > 0 and lines removed
+  == 0. It passed the driver's verification, because the driver verifies *before* it
+  commits; the commit then made `HEAD` identical to the working tree, and the
+  assertion has failed on every run since — including CI — with `AssertionError: 0 not
+  greater than 0`. The failure is invisible to the producing WU by construction and
+  invisible to the closing WU's own gate set (`plannext` runs `lint_plan.py`, not the
+  suite); only `close-discipline.md` §1's fresh full-suite re-run surfaced it, one
+  work unit before gate 2 would have been armed on a red branch. Rule: a committed
+  test may never take `HEAD` (or `main`, or "the previous commit") as its reference
+  point — `HEAD` moves under it and the test measures the driver's commit cadence
+  rather than the property. Pin to an immutable SHA the feature already records
+  (`GATE-NN.md`'s `baseline.sha`), embed the expected prior text as a fixture, or —
+  usually best — assert the structural property directly (the section exists, the
+  preserved anchors are all still present) instead of a diff shape. Generalizes to any
+  "only additive", "unchanged since", or "no drift from" criterion.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/ephemeral-runner-state-fails-open] **On an
+  ephemeral runner, a guardrail whose state lives on local disk does not weaken — it
+  disappears, silently, while still reading as present in the source.** "One fix run
+  per fingerprint" and "a daily cap" were both one-line temptations to a state file.
+  The runners are a GitHub Actions container today and an AKS CronJob tomorrow, so
+  each invocation starts with an empty disk: the per-fingerprint guard would fire once
+  per *run* rather than once ever, and the daily counter would never reach its cap.
+  Nothing errors, no log line appears, and code review sees a rate limiter. The fix
+  was to hold the state where the work already lives — an HTML-comment marker on the
+  GitHub issue, reusing the existing module's marker convention rather than inventing
+  a second ledger — and to derive the count from that state on every read instead of
+  maintaining a counter anyone would have to keep in sync. Rule: for any cross-invocation
+  guarantee (dedupe, rate limit, cap, backoff, "already did this"), first ask where
+  the process's memory actually survives to; if the answer is "the runner's disk" and
+  the runner is ephemeral, the guarantee is decorative. Prefer state co-located with
+  the durable artifact the work is about, and prefer re-deriving over counting.
+
+- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/roadmap-row-verbs-are-claims] **A roadmap row's
+  verbs are unverified capability claims; run the existing-mechanism search against the
+  verbs, not just the nouns.** A row promised to "auto-fire headless `/fix-bug NN`"
+  behind a new dial. The dial existed and was validated — the *nouns* checked out — so
+  the row read as pure wiring. The verb did not: the skill was titled "(interactive)",
+  halted for a human at seven points, and had no headless mode to invoke. Caught at
+  draft time by `planning-discipline.md` §1, which cost one properly-scoped $3.50 work
+  unit; caught mid-attempt it would have cost a blocked WU or silent scope creep inside
+  a wiring unit. Roadmap rows are written before the work and are not re-verified when
+  the feature is drafted, so every capability a row treats as pre-existing is an
+  assumption with no owner. Rule: when drafting from a roadmap row, list the row's
+  verbs ("fire", "invoke", "publish", "roll back") and grep for the concrete mechanism
+  each one names, exactly as §1 requires for the nouns — a row that says "just wire up
+  X" is the highest-risk shape, because "just" is doing the estimating. Record in the
+  retrospective that the row's premise was wrong, so the next feature reading the same
+  row is not misled the same way.
+
+- [FEAT-2026-0042/G2-CLOSE/result-block-yaml-subset] **A RESULT block that opens with a
+  YAML folded or literal scalar (`summary: >`, `evidence: |`) is unparseable by the
+  driver, and an honest `status: blocked` is silently recorded as `passed`.** A work
+  unit ended with a well-reasoned `blocked` — one acceptance criterion marked
+  `met: false`, a `blocked_reason` naming the gap — and the driver recorded
+  `outcome: passed`, `agent_status: complete`. Reproduced against the exact recorded
+  text: `parse_result_block()` returns `None` because `_miniyaml.parse` raises
+  `MiniYAMLError line 2: literal/folded block scalars unsupported` on the `summary: >`
+  line, *before* it ever reads `status`. `agent_reported_blocked()` then returns
+  `(False, None)` — its documented contract is that a malformed block "falls through to
+  `verify()` as usual" — and `verify()` passed, because the WU's gate set (`tests`,
+  `lint`, `security`, `coverage`, `leak-scan`) cannot see a criterion like "a pull
+  request exists". The forgiving-parse decision is right in isolation: the alternative
+  is crashing the driver on free-form LLM output. What is wrong is that the fall-through
+  is **indistinguishable from a well-formed pass**, in both directions — the agent has
+  no way to learn its report was discarded, and the operator reading `events.jsonl` sees
+  a clean gate. Rule, for agents: keep the RESULT block inside the parser's subset —
+  plain scalars and simple lists, no `>`/`|`, no anchors; a multi-paragraph `summary` or
+  `evidence` belongs in the prose above the block, not in it. Rule, for drivers and any
+  agent-to-orchestrator contract: an *unparseable* report is a third state, not a
+  synonym for "no objection". Record it as its own outcome (`result_block_unparseable`),
+  surface it in the attempt event, and never let the absence of a signal read as the
+  presence of a positive one. Generalizes to every hand-rolled parser sitting between an
+  agent's self-report and an automated decision.
+
+- [FEAT-2026-0042/G2-CLOSE/green-gate-narrower-than-criteria] **When the automated gate
+  set is narrower than a work unit's acceptance criteria, the agent's self-report is the
+  only oracle for the difference — so discarding it discards the whole verification.**
+  A live-run WU's real criteria were "quote raw `gh` output", "name the pull-request
+  number", "state that nothing was merged". No gate in any gate set can evaluate those;
+  the `code` set checks the suite, the linter, `bandit`, coverage, and a leak scan, all
+  of which were green on a tree where the central claim had failed. The gap is
+  structural, not a mistake in the drafting: some criteria are only checkable by a
+  session that watched the command run. Rule: when a WU's criteria include claims no
+  gate can evaluate, say so in the WU itself, and treat the agent's RESULT as
+  **load-bearing verification** for exactly those criteria rather than as advisory
+  commentary on top of the gates. Corollary for closes: a green gate on such a WU is
+  evidence the gates passed and nothing more — re-read the producing WU's own report
+  before repeating its `done` as a fact.
+
+- [FEAT-2026-0042/G2-CLOSE/registered-is-not-provisioned] **Registering an identifier in
+  a code-side registry does not create it in the external system; the first live call is
+  where that distinction gets discovered.** A label was added to `LABEL_REGISTRY`
+  one gate ahead of its consumer *specifically* to avoid a known failure where code
+  queried a label the registry did not declare — and the first live run still crashed
+  with `gh issue edit --add-label` exiting non-zero, because the label had never been
+  created on the actual repository. Registration and provisioning are two steps with two
+  owners: the registry is a compile-time-ish declaration, the provisioning pass is a
+  runtime action somebody has to run against each target. Rule: for any registry of
+  external names (labels, topics, queues, buckets, webhooks, feature flags), the code
+  path that *uses* a name must either tolerate its absence or provision it on demand —
+  and the feature that adds the name must name which of the two it chose. "It is in the
+  registry" answers a different question than "it exists". Applies identically to
+  anything a scaffold declares and a downstream project is expected to sync.
+
+- [FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed] **A skip-guarded live test
+  is skip-guarded on the sandbox, not on intent — so any later session that runs the
+  suite unsandboxed silently reaches the real external system.** A live-reach test was
+  written correctly: it skips by name when `gh` is unauthenticated, which is the state
+  inside the command sandbox, so it never fires during normal gated runs. The terminal
+  close then had to re-run the suite unsandboxed — because ~11 unrelated tests are
+  falsely red under the sandbox — and in doing so created and closed scratch issues on
+  the live repository, from a work unit explicitly forbidden to reach it. Nothing
+  errored and nothing warned; the skip condition simply stopped being true. Rule: gate a
+  live test on an **explicit opt-in** the environment cannot supply by accident (an env
+  var like `SPECFUSE_LIVE=1`, a marker/tag excluded from the default run), never on the
+  ambient availability of the credential it needs — availability is a property of who is
+  running the suite, not of whether they meant to fire. And when a close is obliged to
+  re-run oracles fresh, read the suite's live-reach inventory first: `close-discipline.md`
+  §1 and a live test are on a collision course by default.
