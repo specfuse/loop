@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0064/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - scripts/bump_version.py
   - specfuse/loop/changelog.py
   - tests/test_changelog_release_wiring.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T14:43:21.010611+00:00
+duration_seconds: 1164.828
+cost_usd: 2.884429
+input_tokens: 398
+output_tokens: 43176
 ---
 
 # Cutting a version stamps the section, and freezes it

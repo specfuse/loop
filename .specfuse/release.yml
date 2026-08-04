@@ -1,0 +1,20 @@
+# .specfuse/release.yml — release wiring: tag convention + version-source
+# list, read by scripts/bump_version.py (FEAT-2026-0064/T03).
+#
+# These are THIS repository's values, made configuration rather than
+# hardcoded into the script — a target project that installs the scaffold
+# supplies its own tag_prefix and/or version_sources here instead of
+# inheriting this repo's release process. If this file is absent,
+# bump_version.py falls back to exactly the defaults below.
+
+tag_prefix: v
+
+version_sources:
+  - path: pyproject.toml
+    kind: pyproject_version
+  - path: specfuse/loop/loop.py
+    kind: driver_version_constant
+  - path: .specfuse/VERSION
+    kind: plain_version_file
+  - path: specfuse/loop/data/VERSION
+    kind: plain_version_file
