@@ -49,7 +49,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
 | FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
 | FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | [→ detail](#feat-2026-0033) |
-| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | planned | — | [→ detail](#feat-2026-0034) |
+| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | done | — | [→ archive](roadmap-archive.md#feat-2026-0034) |
 | FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-2026-0035) |
 | FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | [→ detail](#feat-2026-0036) |
 | FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
@@ -720,19 +720,6 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: deferred.** Parked pending a real trigger (above). Resumable — flip to `active` when a trigger fires; design gate first (the sketch is not yet a committed contract).
 
-<a id="feat-2026-0034"></a>
-## FEAT-2026-0034 — Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness
-
-**Why.** The `blocked` feature status (shipped in loop 0.3.24) is only meaningful if a blocked feature actually names its unmet dependency — an ADR or an upstream FEAT — and links to it. Nothing enforces that today: `lint_plan` validates feature dirs, PLAN frontmatter, and the gate/WU graph, not the roadmap-table prose. So a row can sit at `status: blocked` with no `**Blocked by.**` block at all (silently collapsing the deliberate `blocked`-vs-`deferred` distinction — `deferred` is the no-named-blocker park), or with a link that has rotted: an ADR path that moved, or a `#feat-yyyy-nnnn` anchor whose target was archived.
-
-A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four distinct rot shapes and 19 instances, only some of which a resolution-only check would catch. (1) **Unresolvable refs** — 10 prose links to archived features still using the bare `#feat-…` form after the section moved to `roadmap-archive.md`, plus 5 in the archive pointing the other way at sections that live in `roadmap.md`; the rot is bidirectional, so a one-file linter misses half of it. (2) **Missing anchors** — `blocked` rows 0041 and 0047 whose Detail cells linked to sections that never carried an `<a id>`. (3) **Misattached anchors** — the anchor above the 0053 section read `feat-2026-0069`, so 0053's Detail cell was dead *and* 0069's ref silently landed on the wrong feature. (4) **Duplicate IDs across files** — `/roadmap-archive` dragged the preceding live feature's anchor along with each section it moved, leaving `feat-2026-0041` and `feat-2026-0047` defined in *both* files; those refs resolved cleanly to the wrong section, which is strictly worse than a dead link because nothing visibly breaks. Shapes 3 and 4 are the archiver misfiring on every run, so they recur until linted.
-
-**Goal.** A roadmap link-integrity lint pass (extend `lint_plan.py` or a sibling roadmap linter, wired into the same gate) reading `roadmap.md` and `roadmap-archive.md` as one link graph, checking four invariants. **Blocked-by presence and resolution** — every `blocked` row's detail section carries a `**Blocked by.**` block with at least one link; each link resolves (ADR path exists on disk or is a well-formed URL; a feature link points at a live `<a id="feat-…">` anchor in either file). Symmetrically WARN on a `**Blocked by.**` block attached to a non-`blocked` row. **Ref resolution, both directions** — every `#feat-…` ref in either file resolves against the anchor set of the file it names, with a bare `#…` resolving same-file; an ERROR names the correct cross-file form as the fix, since the mechanical repair is a prefix rewrite. **Anchor adjacency** — every `<a id="feat-YYYY-NNNN">` is immediately followed (blank lines allowed) by a `## FEAT-YYYY-NNNN` heading whose ID matches; an anchor followed by a different feature's heading, or by another anchor, is an ERROR. This is the check that catches shape 3 and the archiver's stray-anchor output. **Cross-file ID uniqueness** — no `feat-…` ID is defined in both files, and none twice within a file. Round out with a WARN for a row whose Detail cell is `—` while a detail section for that ID exists (the reverse of link rot: a live section nothing points at).
-
-**Benefits.** Makes `blocked` trustworthy: the roadmap cannot display `blocked` without stating, resolvably, what it waits on. Catches all four rot shapes at lint time rather than when a human clicks a dead link — or worse, follows a resolvable link to the wrong feature and reasons from it. Adjacency and uniqueness turn `/roadmap-archive`'s stray-anchor defect from a silent recurring corruption into a failing check the next archive run trips immediately, which is the durable fix; repairing the current instances by hand is not. Keeps the machine-checkable invariants ahead of the prose conventions.
-
-**Status: planned.**
-
 <a id="feat-2026-0035"></a>
 ## FEAT-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
 
@@ -797,7 +784,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
 
-**Blocked by.** [FEAT-2026-0041](#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
+**Blocked by.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) — diagnosis confidence/fix_scope fields gate autofix
 
 **Status: blocked.**
 
@@ -1056,7 +1043,7 @@ Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalate
 <a id="feat-2026-0074"></a>
 ## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
 
-**Why.** [FEAT-2026-0041](#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
+**Why.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
 
 **Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
 

@@ -48,6 +48,17 @@ code:
     # FEAT-2026-0073, a separate feature). Widen once 0073 lands.
     command: "python3 .specfuse/scripts/event_type_gate.py"
 
+  - name: roadmap-link-gate
+    # FEAT-2026-0034/T02: lint_roadmap.py's four link-graph invariants over
+    # roadmap.md + roadmap-archive.md as one graph. ERROR findings (dead
+    # refs, missing/duplicate anchors, an unresolvable **Blocked by.** link)
+    # fail this gate. WARN findings (a Blocked-by block on a non-blocked
+    # row, an orphan detail section) print but deliberately do NOT fail it —
+    # they flag tidiness, not a broken link, and a gate red for tidiness
+    # gets ignored, which is how this rot survived long enough to need a
+    # linter.
+    command: "python3 .specfuse/scripts/roadmap_link_gate.py"
+
   - name: arm-sweep-gate
     # FEAT-2026-0063/T02: sweep the arm predicate over every baselined
     # feature and fail when the SWEEP goes blind, not when a branch has yet
