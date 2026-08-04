@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0042/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - specfuse/monitor/autofix_run.py
@@ -10,6 +10,13 @@ produces:
 oracle_env: macos_local
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.8.0
+started_at: 2026-08-04T02:14:16.067475+00:00
+duration_seconds: 1012.239
+cost_usd: 2.914637
+input_tokens: 88
+output_tokens: 41559
 ---
 
 # The firing wiring: decide, record, fire, label
