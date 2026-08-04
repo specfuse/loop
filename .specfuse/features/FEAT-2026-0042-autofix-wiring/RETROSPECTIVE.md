@@ -739,3 +739,35 @@ outcome is worth more than one that describes it afterwards.
 not, and fix correctness never was and never will be. The hedged-verdict follow-up
 record above names the one criterion a re-armed T06 would have to satisfy to upgrade
 this to `met`.*
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `partially_met`
+
+**Operator reason (verbatim):** The fact that fix-bug was called indicates that the feature is working as expected
+
+**Acknowledgment.** The operator was shown all three entries of the hedged-verdict
+follow-up record below — the unproduced pull request, the reset-marker caveat on the
+already-attempted guard, and the inherent fix-correctness limit — and accepted the
+hedge with the reason above.
+
+**Recorded:** 2026-08-04T11:12:15Z
+
+**Standing follow-ups, carried forward — accepted, NOT discharged.** These remain
+exactly as open as they were before this acceptance. In particular, row 1 is still
+unmet: no fired run has reached `completed`, so no branch and no pull request have
+been produced by this pipeline. The first real finding that qualifies will be the
+end-to-end proof this feature did not demonstrate.
+
+### Hedged-verdict follow-up record
+
+Required by `close-discipline.md` §2 for a hedged verdict. One entry per unmet
+criterion: the criterion verbatim, why it is unverifiable as things stand, and the
+exact condition that would upgrade the verdict to `met`.
+
+| Criterion (verbatim) | Why unmet / unverifiable here | Exact re-run condition to upgrade to `met` |
+| --- | --- | --- |
+| `FEAT-2026-0042/T06` #7 — "**On `completed`: a real pull request exists, and the safety floor held.** Name the branch and the pull-request number, and quote raw `gh pr view` output showing its state." | The single live fire returned `could_not_proceed`, so no branch and no pull request were produced. The criterion is satisfiable only by a fired run that reaches `completed`; the draft said so at arming time and routed it to an escalation trigger rather than hiding it. | A re-armed T06 that plants the bug against an **existing, already-tested function with a real caller** — rather than a one-file, never-committed function with no caller or test, which is the shape the session itself identified as too thin for `fix-bug`'s "clear repro" and "reduce to a falsifying test" steps — fires once, reaches `completed`, and quotes raw `gh pr view` output plus the branch name. |
+| `FEAT-2026-0042/T06` #6, second half — "the run returned one of the three named outcomes. Name which one it returned." *(met, but on a reset guard)* | Met: `could_not_proceed`. The caveat is that the run which produced it fired on a fingerprint whose attempt marker had been manually cleared after an earlier crash, so it is not evidence about the guard's crash behaviour. | A fired run on a fingerprint whose marker was never hand-edited, plus a deliberate mid-run kill showing the next call returns `DECLINE / already_attempted`. |
+| Fix correctness | **Inherent** — see above. Not deferred, not scheduled, not a gap. | **Never.** Mitigated structurally; asserted nowhere. This row exists so no future reader mistakes it for outstanding work. |
+

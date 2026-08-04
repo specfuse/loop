@@ -5,7 +5,7 @@ slug: autofix-wiring
 branch: feat/FEAT-2026-0042-autofix-wiring
 roadmap_goal: Make the per-component `autofix` dial do something — fire headless fix-bug on a diagnosed finding only when the diagnosis is confident and its fix_scope is small, route large/external findings to a human, and bound the whole thing with one-run-per-fingerprint, a daily cap, and a failure label.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 43.50
 ---
 

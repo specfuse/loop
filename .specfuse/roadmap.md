@@ -57,7 +57,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
 | FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
-| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | active | — | [→ detail](#feat-2026-0042) |
+| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
@@ -774,21 +774,6 @@ drafting: a committed structural validator for the schema, so 0040 inherits a
 machine-checkable contract rather than prose.
 
 **Status: done.**
-
-<a id="feat-2026-0042"></a>
-## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
-
-**Why.** With detection (FEAT-2026-0040) and diagnosis (FEAT-2026-0041) in place, the remaining step to a self-healing repo is launching the existing fix-bug skill (1 bug = 1 branch = 1 PR, test-first) from a diagnosed finding — guarded, because a wrong diagnosis can produce a confidently-wrong PR and an incident storm can flood the repo.
-
-**Goal.** Per-component `autofix: on|off` (default off). Auto-fire headless `/fix-bug NN` only when the diagnosis self-reports confident + `fix_scope: small`; `large`/`external` findings route to human triage or roadmap promotion instead. One fix run per fingerprint, daily auto-fix cap, and an "auto-fix attempted, failed" label so refusals and failures surface instead of dying silently. Human merge on a protected branch is the default floor; auto-merge is governed by the agent-level dial and hardcoded guardrails defined in FEAT-2026-0048 (supersession recorded 2026-07-25 — small test-first bug diffs are cheap to revert, so bugs may graduate to auto-merge; features never do here).
-
-**Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
-
-**Built (reconciled at the terminal close, `FEAT-2026-0042/G2-CLOSE`, verdict `partially_met`).** Two gates. Gate 1 shipped the decision layer with no caller: `specfuse/monitor/autofix.py` (`decide()` over `FIRE`/`ROUTE_TO_HUMAN`/`DECLINE`, `CONFIDENCE_THRESHOLD = 0.8` as a module constant), `specfuse/monitor/autofix_state.py` (attempt state as a marker on the finding issue, `DAILY_CAP = 5` over a rolling 24h window, both failing closed), the `auto-fix-attempted-failed` label in `LABEL_REGISTRY`, and a headless mode for the `fix-bug` skill — which this row's goal assumed already existed and did not. Gate 2 shipped the firing path: `specfuse/monitor/autofix_invoke.py` (builds the headless invocation, classifies its result into `refused`/`could_not_proceed`/`completed`) and `specfuse/monitor/autofix_run.py` (read the diagnosis, decide, record the attempt **before** firing, invoke, label).
-
-**Where the goal's phrasing is now true, and where it is not.** "Headless `/fix-bug NN`" is true: the mode exists and a real session was launched from a real diagnosed finding. "**Auto**-fire" is **not** true. The firing path lives behind its own entry point, `python3 -m specfuse.monitor.autofix_run`, deliberately *not* wired into the harvest cycle and not registered as a console script — so nothing fires on a schedule and a human or a later feature must call it. And the chain's last link is unobserved: the one live end-to-end run decided `FIRE`, recorded the attempt, launched the session, and returned `could_not_proceed`, so **no pull request has ever been produced by this path**. Fix correctness is an inherent, permanent non-guarantee, not deferred work. See `RETROSPECTIVE.md` for the raw evidence, the residue report, and the follow-up record naming what a re-armed live run would have to show to upgrade the verdict.
-
-**Status: active.**
 
 <a id="feat-2026-0043"></a>
 ## FEAT-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
