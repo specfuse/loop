@@ -4,9 +4,15 @@
 # Authored by hand (deliberately; the derive-verification skill flagged four
 # gaps in a prior dogfood — see the commit that introduced this file).
 #
-# CI (.github/workflows/ci.yml) runs the same commands as scripts/smoke-test.sh,
-# which runs the same commands declared below. If you change one, change all
-# three — drift defeats the verification-as-oracle property.
+# THIS FILE IS THE SINGLE SOURCE OF TRUTH for what CI runs. scripts/smoke-test.sh
+# derives its gate list from here at run time (#592) and .github/workflows/ci.yml
+# just invokes that script — neither carries a copy, and neither should grow one.
+# A gate added below is executed by CI with no other edit.
+#
+# The previous instruction here was "keep all three in sync". That is exactly
+# how six gates ended up declared and never run, two of them shipped with
+# features that week. A declared-but-unrun gate is worse than an absent one,
+# because the declaration reads as coverage.
 #
 # AUTHORING RULE: gate commands are self-contained. No `--no-build`,
 # `--no-restore`, or any "skip-build" flag — see
@@ -14,7 +20,12 @@
 
 code:
   - name: tests
-    command: "python3 -m unittest discover -s tests -v"
+    # -b buffers stdout/stderr per test and prints it only on failure, so the
+    # integration tests' verbose driver output does not dominate the log.
+    # Declared here rather than added by the CI runner: the runner derives its
+    # commands from this file (#592), so a flag it needs belongs in the
+    # declaration, not in a wrapper that would reintroduce the drift.
+    command: "python3 -m unittest discover -s tests -v -b"
 
   - name: lint
     command: "ruff check specfuse .specfuse/scripts tests scripts"
