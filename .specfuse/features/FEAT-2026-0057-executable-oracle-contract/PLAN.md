@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0057-executable-oracle-contract
 roadmap_goal: Make a work unit's environment prep and verification oracles run deterministically before its session starts, with the captured output as the agent's input, so a close ceremony interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt.
 autonomy_default: review
 status: active
-planned_cost_usd: 15.00
+planned_cost_usd: 18.50
 ---
 
 # Plan: Executable oracle contract — pre-dispatch prep steps and captured oracles
@@ -105,11 +105,39 @@ feature lands (the harness-migration hazard in `.specfuse/LEARNINGS.md`).
 
 ## Sizing note
 
-Three substantive work units — at or under the `docs/methodology.md §6`
-ceremony-proportionality threshold, so this is a **single gate with a single
-terminal `close`**. No `close-intermediate`, no `plan-next`. Should the gate go
-off-plan, the `gate_eval` auto-close predicate disables auto-close and the close
-WU dispatches as a normal reflective session.
+Four substantive work units — at the `docs/methodology.md §6`
+ceremony-proportionality threshold, so this remains a **single gate with a single
+terminal `close`**. No `close-intermediate`, no `plan-next`. The gate has already
+gone off-plan once (see below), so the `gate_eval` auto-close predicate will not
+auto-close it; the close dispatches as a normal reflective session, which is what
+`auto_close_disabled: true` on `WU-90` already forced.
+
+## Off-plan record — the wiring gap
+
+The first pass through this gate closed `partially_met`. T01, T02, and T03 each
+passed every oracle they named, and together they built a mechanism the driver
+never calls: `WorkUnit` carried neither `prep` nor `oracles`, `load_wu` parsed
+neither key, and `format_oracle_capture` had no caller outside its own test file.
+
+The cause was a boundary error in this plan, not in the units. Keeping the change
+additive meant putting the dispatch path on every unit's **Do not touch** list —
+which worked, and which also guaranteed that no unit owned the call site. All
+three came in 44–76% under their estimates because their specs removed the
+ambiguity those estimates were priced for; the same precision is why the wiring
+was absent. The underspend and the unmet definition of done are one fact seen
+twice.
+
+T04 is the correction: it owns the dispatch call site, and it is the only unit in
+this gate for which `specfuse/loop/loop.py` is in scope. Exit-time verification
+(`verify()`, `_run_gate_set`, `select_gate_report_lines`) stays out of scope for
+every unit including T04 — that boundary was right and is retained.
+
+Recorded spend on the first pass: T01 $0.98, T02 $1.67, T03 $1.40, close $10.69 —
+$14.74 against a $15.00 plan. The close alone ran 2.1× its own $5.00 estimate and
+consumed 72% of the feature's spend, on a feature whose purpose is reducing close
+cost. `planned_cost_usd` is raised to $18.50 to carry T04; the gate's
+`cost_budget_usd` is raised to $30.00 because the per-gate brake sums **lifetime**
+cost (FEAT-2026-0062), so the first pass's $14.74 counts against it.
 
 ## Decisions taken at draft time
 
@@ -146,6 +174,16 @@ gates:
       - id: FEAT-2026-0057/T03
         file: WU-03-adoption-proof-docs.md
         depends_on: [FEAT-2026-0057/T01, FEAT-2026-0057/T02]
+      # Added after the first close returned `partially_met`: T01-T03 built the
+      # mechanism and nothing called it, because every one of their Do-not-touch
+      # lists forbade the dispatch path and no unit owned the call site. See
+      # RETROSPECTIVE.md FU-1 and FU-2.
+      - id: FEAT-2026-0057/T04
+        file: WU-04-wire-dispatch-path.md
+        depends_on:
+          - FEAT-2026-0057/T01
+          - FEAT-2026-0057/T02
+          - FEAT-2026-0057/T03
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0057/G1-CLOSE
         file: WU-90-gate-1-close.md
@@ -153,6 +191,7 @@ gates:
           - FEAT-2026-0057/T01
           - FEAT-2026-0057/T02
           - FEAT-2026-0057/T03
+          - FEAT-2026-0057/T04
 ```
 
 ## Notes

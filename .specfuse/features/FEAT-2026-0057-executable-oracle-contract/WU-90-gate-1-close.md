@@ -1,11 +1,13 @@
 ---
 id: FEAT-2026-0057/G1-CLOSE
 type: close
-status: done
-attempts: 2
+status: pending
+attempts: 0
+re_arm_count: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+oracles: [oracles]
 verdict: partially_met
 produces:
   - .specfuse/features/FEAT-2026-0057-executable-oracle-contract/RETROSPECTIVE.md
@@ -22,9 +24,27 @@ output_tokens: 103947
 of done, record what was learned, and write the terminal verdict.
 
 **Context.** Correlation ID `FEAT-2026-0057/G1-CLOSE`, the terminal close for
-this feature's only gate. `FEAT-2026-0057/T01`, `/T02`, and `/T03` are `done`.
-Read `PLAN.md` for the framing, the scope boundary, and the draft-time decisions;
-read `GATE-01.md` for the definition of done you are judging against.
+this feature's only gate. `FEAT-2026-0057/T01`, `/T02`, `/T03`, and `/T04` are
+`done`. Read `PLAN.md` for the framing, the scope boundary, the draft-time
+decisions, and the *Off-plan record* section; read `GATE-01.md` for the definition
+of done you are judging against.
+
+**This is the second pass.** The first close returned `partially_met` and its
+`RETROSPECTIVE.md` is on disk — read it first. It found that T01–T03 built the
+mechanism and nothing called it, and it raised four follow-ups. T04 was added to
+discharge FU-1 and FU-2. **Your job includes re-running that close's own probes
+and reporting whether they now return the opposite result.** Rewrite
+`RETROSPECTIVE.md` for the feature as a whole rather than appending to it; the
+first pass's findings are history to be reflected, not a document to preserve.
+
+**You have oracle output injected into this prompt.** This work unit declares
+`oracles: [oracles]`, so if T04 landed correctly you will find a section headed
+`## Captured oracle output (pre-dispatch)` below, carrying `git log --oneline -20`
+and `git --no-pager diff --stat main` — run for you, before this session started.
+Read it instead of re-deriving that information; your **Do not touch** rule
+forbids you from running `git` yourself, and that set exists precisely to serve
+you the answer. **If that section is absent, say so in the retrospective** — its
+absence is the FU-2 defect surviving, and it is a finding, not an inconvenience.
 
 `auto_close_disabled: true` is deliberate and load-bearing. This feature adds two
 frontmatter keys to the scaffold's work-unit template, which is a consumer-visible
@@ -46,15 +66,29 @@ Binding rules apply by reference: `.specfuse/rules/close-discipline.md`,
 
 1. **Oracles re-run fresh.** Every oracle this feature's criteria name is re-run
    with its full command and its exit code read directly — never a producing work
-   unit's self-report. That includes each scoped red→green test named in T01 and
-   T02, the symbol-existence checks in all three units, and the `code` gate set.
+   unit's self-report. That includes each scoped red→green test named in T01, T02,
+   and T04, the symbol-existence checks in all four units, and the `code` gate set.
+1b. **The first close's negative probes are re-run, and their new results
+   recorded.** The prior `RETROSPECTIVE.md` proved the defect three ways: the
+   `WorkUnit` dataclass field list, a real WU file declaring both keys loaded
+   through `load_wu` and passed to `run_pre_dispatch`, and a repo-wide caller grep
+   for the five produced symbols. Re-run all three. FU-1 and FU-2 are discharged
+   only if the field list now contains `prep` and `oracles`, the probe returns
+   non-empty `prep_results` and `oracle_results`, and the grep finds callers in
+   `specfuse/loop/loop.py`. Report the actual output of each, not a summary of it.
 2. **Cost analysis.** `RETROSPECTIVE.md` contains a `## Cost analysis` heading,
    written with exactly that text. Under it, actual spend is reconciled against
-   `planned_cost_usd: 15.00` and against each unit's own estimate (T01 $4.00,
-   T02 $3.50, T03 $2.50, this close $5.00), read from `events.jsonl` rather than
-   recalled. Name any unit whose actual diverged from plan by more than a third,
-   and say why. The heading is checked after dispatch, so omitting it costs a
-   full re-attempt.
+   `planned_cost_usd: 18.50` and against each unit's own estimate (T01 $4.00,
+   T02 $3.50, T03 $2.50, T04 $3.50, this close $5.00). Read `events.jsonl` first;
+   where it is silent, read the work unit's own frontmatter and say which source
+   each figure came from. **The first pass's close cost $10.69 over 2005s** — that
+   figure exists in `WU-90`'s frontmatter but was absent from `events.jsonl` when
+   the first retrospective was written (FU-3), so state the feature's lifetime
+   cost across both passes rather than this pass alone. `re_arm_count: 1` on this
+   unit means the driver folded the prior cycle into `cumulative_cost_usd`; use
+   the lifetime figure. Name any unit whose actual diverged from plan by more than
+   a third, and say why. The heading is checked after dispatch, so omitting it
+   costs a full re-attempt.
 3. **Deferred-verification list.** Every acceptance criterion not verified
    in-loop is listed with the criterion, the reason it could not be verified
    here, and where it actually gets checked — or the section contains exactly

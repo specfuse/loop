@@ -1,7 +1,7 @@
 ---
 gate: 1
-status: awaiting_review
-cost_budget_usd: 19.00
+status: open
+cost_budget_usd: 30.00
 baseline:
   sha: a2af1d084a1c2e1aa12661e5b9d4430521fdd279
   probed_at: 2026-08-05T11:51:01.346653+00:00
@@ -28,9 +28,11 @@ This is the feature's only gate, so its closing sequence is a single `close` wor
 unit (`docs/methodology.md §6`, ceremony proportionality). There is no
 `close-intermediate` and no `plan-next`.
 
-`cost_budget_usd: 19.00` is the $15.00 sum of the four work units' planned costs
-plus one re-attempt of the largest ($4.00, T01) — the defensive padding the GATE
-template prescribes, since first-attempt success runs 51–74%.
+`cost_budget_usd: 30.00`. The original $19.00 was the $15.00 plan plus one
+re-attempt of the largest unit. It is raised because the per-gate brake sums
+**lifetime** cost across the gate's work units (FEAT-2026-0062), so the first
+pass's recorded $14.74 counts against the ceiling even though those units are
+`done`. $30.00 leaves roughly $15 of headroom for T04 and the re-armed close.
 
 ## Arming discipline (see `.specfuse/rules/planning-discipline.md`)
 
