@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 generated_surfaces: []
@@ -13,6 +13,15 @@ produces_driver_helper:
   - run_pre_dispatch
   - resolve_prerun_sets
   - PREP_HALT_CLASS
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T11:55:19.147577+00:00
+duration_seconds: 383.207
+cost_usd: 0.97731
+input_tokens: 3585
+output_tokens: 13952
 ---
 
 # Add the pre-dispatch runner for `prep` and `oracles` work-unit frontmatter
