@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0067/G1-CLOSE
 type: close
-status: pending
+status: done
 planned_cost_usd: 5.00
 auto_close_disabled: true
 
@@ -9,12 +9,12 @@ model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.9.2
-started_at: 2026-08-05T04:40:04.750040+00:00
-attempts: 0
-duration_seconds: 953.536
-cost_usd: 8.102319
-input_tokens: 140
-output_tokens: 60331
+started_at: 2026-08-05T10:20:24.342563+00:00
+attempts: 1
+duration_seconds: 835.56
+cost_usd: 7.250347
+input_tokens: 138
+output_tokens: 53540
 re_arm_count: 1
 re_arm_history:
   -
@@ -24,6 +24,13 @@ re_arm_history:
     prior_cost_usd: 8.102319
     prior_duration_seconds: 953.536
     reason: "Operator chose fix-and-re-close over accepting the hedge; T04 discharges FU-1 so this close re-verifies the reconciliation."
+cumulative_cost_usd: 8.102319
+cumulative_duration_seconds: 953.536
+cumulative_input_tokens: 140
+cumulative_output_tokens: 60331
+cumulative_attempts: 1
+folded_through_re_arm: 1
+verdict: met
 ---
 
 # Close gate 1 and the feature — retrospective, lessons, docs, terminal verdict

@@ -37,6 +37,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 - `task_completed` events carry the corrected accumulator: the emitter reads `cumulative_cost_usd` from frontmatter, so a re-arm the old guard skipped now reports a larger lifetime figure. Anything aggregating `events.jsonl` for cost will see the step (FEAT-2026-0067)
 - `WU.template.md`, in both the packaged and vendored copies, documents `folded_through_re_arm` and states that `cumulative_*` is unconditionally the lifetime accumulator. `cost.py`'s module docstring no longer presents the fold-never-ran shape as a supported ongoing design and names it as a pre-migration legacy its fallback still tolerates (FEAT-2026-0067)
 
+### Fixed
+
+- `rearm_migration.py` no longer double-counts a work unit that was re-armed and never re-dispatched. When `cost_usd` already agrees with the `re_arm_history` prior-cost sum within tolerance the money is already in the file, so `cost_usd` and `duration_seconds` are reset to `0.0` in the same write set instead of a second copy being added to `cumulative_*`. A project whose feature folders hold `completed_out_of_loop` units — or any unit re-armed without a subsequent dispatch — would otherwise have had those records inflated by exactly one prior cycle on the first migration run. The re-armed-and-re-dispatched case is unchanged (FEAT-2026-0067)
+
 ## [0.9.2+umbrella.0.9.2] - 2026-08-04
 
 ### Fixed

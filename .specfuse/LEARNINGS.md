@@ -3168,3 +3168,31 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   somewhere else in the same file. Companion to
   [FEAT-2026-0067/G1-CLOSE/state-not-value], which is the same defect stated as a
   contract rule; this entry is the reviewer's question that catches it at authoring.
+
+- [FEAT-2026-0067/G1-CLOSE/hedge-is-machinery] **Write a hedged verdict's follow-up
+  entry as a specification, not as a regret — a re-run condition precise enough to
+  author a work unit from is what turns `partially_met` into a fix instead of a dead
+  end.** `close-discipline.md` §2 requires the record; this feature is the first
+  end-to-end demonstration in this repository that the record *pays*. The close
+  reconciled every re-armed WU's frontmatter against its own `events.jsonl` — a
+  measurement none of its own acceptance criteria asked for — and found a defect the
+  feature had introduced. It was structurally forbidden from fixing it: the module
+  belonged to another WU and the damaged record to an already-`done` feature, both on
+  its **Do not touch** list. So it wrote FU-1 naming the exact branch, the exact
+  tolerance the branch should compare against, the one record to repair, the
+  no-invented-numbers constraint, and the exact reconciliation table that would prove
+  the repair. The operator armed a fix WU against that text; the WU passed first try
+  at $1.38; the re-armed close re-ran the same table and the hedge cleared to `met`.
+  Rule for any close returning `met_locally` or `partially_met`: the follow-up entry
+  must be authorable-from — a reader must be able to write the fix WU's acceptance
+  criteria out of it without re-deriving the diagnosis. "Needs more investigation" and
+  "revisit when X is clearer" fail that test and are how a hedge becomes permanent.
+  Two supporting details worth copying. (a) **The entry must also say what is
+  deliberately excluded, by name.** FU-1 excluded a pre-existing $9.23 under-count on
+  a different record that `PLAN.md` had scoped out at plan time — so the fix WU could
+  not accidentally widen, and the re-close could not quietly claim a cleaner number
+  than the plan authorised. (b) **A close that only asserts cannot produce this
+  entry.** The defect was invisible to every criterion and to the full test suite; it
+  surfaced only because the close computed a sum and compared it to another sum.
+  Companion to [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant], which is the
+  defect FU-1 happened to be about; this entry is about the record, not the defect.
