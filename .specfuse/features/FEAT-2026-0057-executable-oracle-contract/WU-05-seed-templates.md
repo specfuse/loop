@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 generated_surfaces: []
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/data/templates/WU.template.md
   - specfuse/loop/data/verification.yml.example
   - tests/test_seed_documents_prerun_keys.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T14:36:14.068871+00:00
+duration_seconds: 519.344
+cost_usd: 0.887866
+input_tokens: 44
+output_tokens: 7061
 ---
 
 # Document `prep`, `oracles`, and `extra_gates` in the shipped scaffold seeds
