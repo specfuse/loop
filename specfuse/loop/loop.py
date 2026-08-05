@@ -4009,6 +4009,60 @@ def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str
     return marker + "\n\n" + "\n".join(rendered)
 
 
+def stamp_gate_auto_close_note(
+    feature_dir: Path,
+    gate_number: int,
+    decision: AutoCloseDecision,
+) -> None:
+    """Record in `GATE-NN.md` that this gate auto-closed without a ceremony (#294).
+
+    A reviewer at the arm-gate checkpoint opens the GATE file to answer "did this
+    gate actually pass, and on what evidence?" Before this, that file read
+    `status: passed` and said nothing else: `passed` looked identical whether a
+    close agent verified the definition of done or the predicate skipped it. The
+    honest signal existed — the `specfuse:autoclose-debt` marker, the
+    RETROSPECTIVE section, `auto_close: true` on the close WU — but every piece
+    of it lived in a different file.
+
+    Mirrors what `write_stub_retrospective_terminal` already computes into the
+    file a reviewer actually opens, and names where the per-criterion deferred
+    list lives rather than only asserting that it is missing.
+
+    The issue proposed stamping the template's `## Verdict` placeholder. That
+    section was removed from `GATE.template.md` after the issue was filed, which
+    did not fix the gap so much as delete the hint that something was missing —
+    so the note gets its own heading instead.
+
+    Idempotent on the heading, matching the retrospective stub writers' guard: a
+    re-arm or re-entry must not stack duplicates. A missing GATE file is a no-op;
+    a legibility improvement must never crash the close path.
+    """
+    gate_file = feature_dir / f"GATE-{gate_number:02d}.md"
+    if not gate_file.is_file():
+        return
+    text = gate_file.read_text()
+    if "## Auto-close note" in text:
+        return
+    metrics = decision.metrics
+    budget = metrics.get("gate_budget")
+    budget_str = f"${budget:.2f}" if budget is not None else "<unset>"
+    total_cost = metrics.get("gate_total_cost", 0.0)
+    note = (
+        f"\n## Auto-close note\n\n"
+        f"**PASSED — auto-closed** (`evaluate_auto_close`, "
+        f"predicate={decision.predicate_version}). The close ceremony "
+        f"**did not run**.\n\n"
+        f"- gate_total_cost: ${total_cost:.2f} of {budget_str}\n"
+        f"- reasons: {decision.reasons} (auto=True)\n\n"
+        f"The per-criterion deferred-verification list was **not** enumerated. "
+        f"Before treating this gate as fully verified, read `RETROSPECTIVE.md` "
+        f"§ \"What the loop did NOT verify\" and the "
+        f"`specfuse:autoclose-debt` marker it carries.\n"
+    )
+    with gate_file.open("a") as fh:
+        fh.write(note if text.endswith("\n") else "\n" + note)
+
+
 def write_stub_retrospective_terminal(
     feature_dir: Path,
     gate_number: int,
@@ -4151,6 +4205,9 @@ def maybe_auto_close_terminal(
             predicate_version=decision.predicate_version,
         )
     write_stub_retrospective_terminal(feature_dir, gate.number, decision)
+    # #294: mirror the skip into the file a reviewer opens at the gate
+    # boundary, not only into RETROSPECTIVE.md.
+    stamp_gate_auto_close_note(feature_dir, gate.number, decision)
     mark_close_wu_auto_closed(close_wu_for_terminal, decision)
     metrics = decision.metrics
     flush_events(events_path, [build_event(
@@ -4287,6 +4344,7 @@ def maybe_auto_close_intermediate(
             predicate_version=decision.predicate_version,
         )
     append_stub_retrospective_intermediate(feature_dir, gate.number, decision)
+    stamp_gate_auto_close_note(feature_dir, gate.number, decision)  # #294
     if close_intermediate_wu is not None:
         write_frontmatter_field(close_intermediate_wu.file, "status", "done")
         write_frontmatter_field(close_intermediate_wu.file, "auto_close", "true")

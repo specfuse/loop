@@ -350,6 +350,18 @@ class LifecycleIntegrationTest(unittest.TestCase):
             self.assertEqual(close_fm.get("verdict"), "met")
             self.assertIn(close_fm.get("auto_close"), ("true", "True"))
 
+            # #294: the gate file itself must say the ceremony was skipped. All
+            # three signals above (the event, the frontmatter, the retrospective)
+            # live in files a reviewer does NOT open at the arm-gate checkpoint —
+            # they open GATE-NN.md, which read `status: passed` and nothing else.
+            gate_text = (feature_dir / "GATE-01.md").read_text()
+            self.assertIn(
+                "## Auto-close note", gate_text,
+                "an auto-closed gate must record the skip in the file a "
+                "reviewer opens, not only in RETROSPECTIVE.md")
+            self.assertIn("did not run", gate_text)
+            self.assertIn("specfuse:autoclose-debt", gate_text)
+
     def test_dispatched_close_lifecycle_terminal_invariant(self):
         """AC3: with auto-close disabled, the feature closes via a dispatched
         close WU passing with verdict: met; the full terminal invariant holds."""
