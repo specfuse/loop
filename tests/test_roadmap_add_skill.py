@@ -45,6 +45,8 @@ def scan_feat_ids(
     Source (a): table rows in roadmap_path (lines matching ``^| FEAT-``).
     Source (b): ``feature_id:`` lines in features_dir/*/PLAN.md.
     Source (c): any occurrence in extra_paths (LEARNINGS.md, RETROSPECTIVE.md).
+        ADVISORY ONLY (#771): these files quote illustrative IDs as examples,
+        so a (c) hit is reported for collision but never raises the max.
     Source (d): GitHub issue/PR titles+bodies — modelled here as an injected
         ``github_reserved`` map ``{feat_id: "GitHub issue/PR #<n>"}`` so the
         fold-into-max + collision logic is exercised hermetically (no network).
@@ -54,18 +56,20 @@ def scan_feat_ids(
     Returns dict mapping feat_id (str) -> (location_str, line_no) for the
     first occurrence of each ID seen.
     """
-    sources: dict[str, tuple[str, int]] = {}
+    sources: dict[str, tuple[str, int, str]] = {}
 
-    def record(feat_id: str, filepath, lineno: int) -> None:
+    def record(feat_id: str, filepath, lineno: int, source: str) -> None:
+        # Provenance is recorded because it is load-bearing, not decorative:
+        # source (c) is ADVISORY and must not raise the max (#771).
         if feat_id not in sources:
-            sources[feat_id] = (str(filepath), lineno)
+            sources[feat_id] = (str(filepath), lineno, source)
 
     # (a) roadmap table rows
     if roadmap_path.exists():
         for lineno, line in enumerate(roadmap_path.read_text().splitlines(), 1):
             m = FEAT_ROW_RE.match(line)
             if m:
-                record(m.group(1), roadmap_path, lineno)
+                record(m.group(1), roadmap_path, lineno, "a")
 
     # (b) feature_id: in PLAN.md files
     if features_dir.exists():
@@ -73,56 +77,100 @@ def scan_feat_ids(
             for lineno, line in enumerate(plan.read_text().splitlines(), 1):
                 m = PLAN_FEAT_RE.match(line)
                 if m:
-                    record(m.group(1), plan, lineno)
+                    record(m.group(1), plan, lineno, "b")
 
     # (c) any FEAT-YYYY-NNNN in LEARNINGS.md / RETROSPECTIVE.md
     for path in extra_paths:
         if path.exists():
             for lineno, line in enumerate(path.read_text().splitlines(), 1):
                 for m in FEAT_RE.finditer(line):
-                    record(m.group(0), path, lineno)
+                    record(m.group(0), path, lineno, "c")
 
     # (d) GitHub issue/PR-reserved IDs (None = GitHub unreachable, skip source).
     if github_reserved:
         for feat_id, ref in github_reserved.items():
             # location is the issue/PR ref; lineno 0 (not a file line)
             if feat_id not in sources:
-                sources[feat_id] = (ref, 0)
+                sources[feat_id] = (ref, 0, "d")
 
     return sources
+
+
+# Sources whose hits are authoritative for the sequence maximum. Source (c) is
+# excluded on purpose: LEARNINGS/RETROSPECTIVE prose quotes illustrative IDs
+# (this repo's retrospectives contain FEAT-2026-9301, 0099, 0098 and 0000 as
+# examples), and counting them put the computed next ID at FEAT-2026-9302 and
+# reported ~9200 phantom gaps. See #771.
+_AUTHORITATIVE_SOURCES = frozenset({"a", "b", "d"})
+
+
+def _year_ordinals(year: int, sources: dict, authoritative_only: bool = True) -> list[int]:
+    year_str = str(year)
+    out = []
+    for fid, meta in sources.items():
+        if not fid.startswith(f"FEAT-{year_str}-"):
+            continue
+        source = meta[2] if len(meta) > 2 else "a"
+        if authoritative_only and source not in _AUTHORITATIVE_SOURCES:
+            continue
+        out.append(int(fid.split("-")[2]))
+    return sorted(out)
+
+
+def sequence_gaps(year: int, sources: dict) -> list[str]:
+    """Return the year's missing ordinals, zero-padded, as an INFORMATIONAL list.
+
+    Reported to the operator, never raised on the auto-computed path — see
+    `next_feat_id`.
+    """
+    ordinals = _year_ordinals(year, sources)
+    if not ordinals:
+        return []
+    present = set(ordinals)
+    return [f"{n:04d}" for n in range(ordinals[0], ordinals[-1] + 1)
+            if n not in present]
+
+
+def assert_requested_id_is_not_a_gap(feat_id: str, year: int, sources: dict) -> None:
+    """Refuse an EXPLICITLY requested ID that fills a gap (#771).
+
+    This is where the original hard stop belongs. On the auto-computed path the
+    next ID is `max + 1`, which can never fill a gap, so blocking there guarded
+    a risk the algorithm does not take. When an operator names an ID by hand,
+    the risk is real: a gap may be an ID reserved somewhere this scan cannot
+    see, and reusing it is exactly the collision the check exists to prevent.
+    """
+    gaps = sequence_gaps(year, sources)
+    ordinal = feat_id.split("-")[2]
+    if ordinal in gaps:
+        raise ValueError(
+            f"{feat_id} fills a gap in the FEAT-{year} sequence "
+            f"(gaps: {gaps}). A gap may be an ID reserved outside this scan's "
+            f"reach — confirm it is free before reusing it."
+        )
 
 
 def next_feat_id(year: int, sources: dict) -> tuple[str, int]:
     """Return (next_feat_id_str, next_ordinal) for the given year.
 
-    Raises ValueError if a gap is detected in the year's ordinal sequence.
+    Computed from the AUTHORITATIVE sources only (a, b, d). Gaps do not raise:
+    the returned ordinal is `max + 1`, which fills none of them. Callers that
+    want to surface gaps to the operator call `sequence_gaps`; callers honouring
+    an operator-supplied `--id` call `assert_requested_id_is_not_a_gap`.
     """
     year_str = str(year)
-    ordinals = sorted(
-        int(fid.split("-")[2])
-        for fid in sources
-        if fid.startswith(f"FEAT-{year_str}-")
-    )
+    ordinals = _year_ordinals(year, sources)
     if not ordinals:
         return f"FEAT-{year_str}-0001", 1
 
-    # Gap detection: check for missing ordinals between min and max observed
-    min_n, max_n = ordinals[0], ordinals[-1]
-    expected = list(range(min_n, max_n + 1))
-    if ordinals != expected:
-        missing = [n for n in expected if n not in set(ordinals)]
-        raise ValueError(
-            f"FEAT-{year_str} sequence has gap(s): {[f'{n:04d}' for n in missing]}"
-        )
-
-    next_n = max_n + 1
+    next_n = ordinals[-1] + 1
     return f"FEAT-{year_str}-{next_n:04d}", next_n
 
 
 def check_collision(feat_id: str, sources: dict) -> tuple[bool, str | None, int | None]:
     """Return (True, filepath, lineno) if feat_id in sources, else (False, None, None)."""
     if feat_id in sources:
-        filepath, lineno = sources[feat_id]
+        filepath, lineno, _source = sources[feat_id]
         return True, filepath, lineno
     return False, None, None
 
@@ -462,10 +510,138 @@ class TestNextFeatId(unittest.TestCase):
         empty_features = self.d / "empty_features2"
         empty_features.mkdir()
         sources = scan_feat_ids(gap_roadmap, empty_features, [])
+
+        # #771: the gap is still DETECTED and reported...
+        self.assertEqual(sequence_gaps(2026, sources), ["0002"])
+        # ...but it no longer blocks the auto-computed path, because max + 1
+        # fills no gap. Previously this raised, which meant any repo with a
+        # permanently burned ordinal could never use the skill again.
+        feat_id, _ = next_feat_id(2026, sources)
+        self.assertEqual(feat_id, "FEAT-2026-0004")
+        # The hard stop moved to where the risk is real: naming 0002 by hand.
         with self.assertRaises(ValueError) as ctx:
-            next_feat_id(2026, sources)
-        self.assertIn("gap", str(ctx.exception).lower())
+            assert_requested_id_is_not_a_gap("FEAT-2026-0002", 2026, sources)
         self.assertIn("0002", str(ctx.exception))
+
+    # ── #771: illustrative IDs in prose, and gaps that never get filled ─────
+
+    def test_illustrative_ids_in_prose_do_not_raise_the_max(self):
+        """Retrospectives QUOTE FEAT IDs as examples; those are not reservations.
+
+        On the real repo, source (c) read as "any occurrence" yields max 9301 --
+        FEAT-2026-9301 is an example inside FEAT-2026-0064's retrospective -- so
+        the next ID computes as FEAT-2026-9302 and ~9200 ordinals report as gaps.
+        """
+        roadmap = self.d / "prose_roadmap.md"
+        roadmap.write_text(textwrap.dedent("""\
+            | Feature ID     | Title  | Status | Folder | Detail |
+            |----------------|--------|--------|--------|--------|
+            | FEAT-2026-0001 | One    | done   | —      | —      |
+            | FEAT-2026-0002 | Two    | done   | —      | —      |
+
+            ## Notes
+        """))
+        retro = self.d / "RETROSPECTIVE.md"
+        retro.write_text(
+            "An example ID a reader might see is FEAT-2026-9301, and a fixture\n"
+            "in the suite uses FEAT-2026-0099.\n"
+        )
+        empty = self.d / "prose_features"
+        empty.mkdir()
+
+        sources = scan_feat_ids(roadmap, empty, [retro])
+        feat_id, ordinal = next_feat_id(2026, sources)
+
+        self.assertEqual(feat_id, "FEAT-2026-0003")
+        self.assertEqual(ordinal, 3)
+
+    def test_prose_ids_are_still_reported_for_collision(self):
+        """Advisory, not ignored: an explicitly requested ID that appears only in
+        prose must still be reported, so the operator can check it by hand."""
+        roadmap = self.d / "collide_roadmap.md"
+        roadmap.write_text(
+            "| Feature ID | Title | Status | Folder | Detail |\n"
+            "|---|---|---|---|---|\n"
+            "| FEAT-2026-0001 | One | done | — | — |\n\n## Notes\n"
+        )
+        retro = self.d / "RETRO2.md"
+        retro.write_text("Reserved verbally: FEAT-2026-0044.\n")
+        empty = self.d / "collide_features"
+        empty.mkdir()
+
+        sources = scan_feat_ids(roadmap, empty, [retro])
+
+        hit, where, _ = check_collision("FEAT-2026-0044", sources)
+        self.assertTrue(hit, "a prose-only ID must still be collision-visible")
+        self.assertIn("RETRO2.md", str(where))
+
+    def test_a_permanent_gap_does_not_block_the_auto_computed_next_id(self):
+        """next = max + 1 never fills a gap, so a gap is not a risk on this path.
+
+        This repo's 2026 sequence has three permanently burned ordinals (0009,
+        0065, 0066 -- the latter two are cross-repo references, per PR #319).
+        A hard stop on the auto-computed path fires on every invocation forever,
+        which trains an operator to override the check that exists to catch a
+        real collision.
+        """
+        roadmap = self.d / "burned_roadmap.md"
+        roadmap.write_text(textwrap.dedent("""\
+            | Feature ID     | Title  | Status | Folder | Detail |
+            |----------------|--------|--------|--------|--------|
+            | FEAT-2026-0001 | One    | done   | —      | —      |
+            | FEAT-2026-0003 | Three  | done   | —      | —      |
+
+            ## Notes
+        """))
+        empty = self.d / "burned_features"
+        empty.mkdir()
+        sources = scan_feat_ids(roadmap, empty, [])
+
+        feat_id, ordinal = next_feat_id(2026, sources)
+
+        self.assertEqual(feat_id, "FEAT-2026-0004")
+        self.assertEqual(ordinal, 4)
+
+    def test_gaps_are_reported_even_though_they_do_not_block(self):
+        """Informational, not silent: the operator still gets told."""
+        roadmap = self.d / "report_roadmap.md"
+        roadmap.write_text(textwrap.dedent("""\
+            | Feature ID     | Title  | Status | Folder | Detail |
+            |----------------|--------|--------|--------|--------|
+            | FEAT-2026-0001 | One    | done   | —      | —      |
+            | FEAT-2026-0003 | Three  | done   | —      | —      |
+
+            ## Notes
+        """))
+        empty = self.d / "report_features"
+        empty.mkdir()
+        sources = scan_feat_ids(roadmap, empty, [])
+
+        self.assertEqual(sequence_gaps(2026, sources), ["0002"])
+
+    def test_explicitly_requesting_a_gap_ordinal_is_refused(self):
+        """The hard stop is retained where the risk is real: an operator naming
+        a gap ordinal via --id could be reusing something reserved elsewhere."""
+        roadmap = self.d / "explicit_roadmap.md"
+        roadmap.write_text(textwrap.dedent("""\
+            | Feature ID     | Title  | Status | Folder | Detail |
+            |----------------|--------|--------|--------|--------|
+            | FEAT-2026-0001 | One    | done   | —      | —      |
+            | FEAT-2026-0003 | Three  | done   | —      | —      |
+
+            ## Notes
+        """))
+        empty = self.d / "explicit_features"
+        empty.mkdir()
+        sources = scan_feat_ids(roadmap, empty, [])
+
+        with self.assertRaises(ValueError) as ctx:
+            assert_requested_id_is_not_a_gap("FEAT-2026-0002", 2026, sources)
+        self.assertIn("0002", str(ctx.exception))
+        self.assertIn("gap", str(ctx.exception).lower())
+
+        # And an ID beyond max is fine.
+        assert_requested_id_is_not_a_gap("FEAT-2026-0004", 2026, sources)
 
     # ── Source (d): GitHub issue/PR-reserved IDs (specfuse#16) ──────────────
 
@@ -497,9 +673,19 @@ class TestNextFeatId(unittest.TestCase):
         sources = scan_feat_ids(
             self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
         )
-        with self.assertRaises(ValueError) as ctx:
-            next_feat_id(2026, sources)
-        self.assertIn("gap", str(ctx.exception).lower())
+
+        # The reservation still raises the max and still exposes 0011-0015 as
+        # genuine gaps -- that part of the contract is unchanged (#771 narrowed
+        # the DISPOSITION of a gap, not its detection).
+        self.assertEqual(
+            sequence_gaps(2026, sources),
+            ["0011", "0012", "0013", "0014", "0015"],
+        )
+        feat_id, _ = next_feat_id(2026, sources)
+        self.assertEqual(feat_id, "FEAT-2026-0017")
+        # Reusing one of the exposed ordinals by hand is still refused.
+        with self.assertRaises(ValueError):
+            assert_requested_id_is_not_a_gap("FEAT-2026-0013", 2026, sources)
 
 
 class TestCollisionRejection(unittest.TestCase):
