@@ -55,6 +55,50 @@ thing.
 The gates are a **conjunction**: all must pass. A single failure means the unit is
 not done.
 
+## Pre-dispatch: `prep` and `oracles` (before dispatch, not at exit)
+
+Everything above runs at work-unit **exit** — `verify()` is the exit oracle, and a
+failing gate reaches an agent only as retry feedback. A work unit's frontmatter can
+additionally declare two keys that run **before** the session is dispatched at all:
+
+| Key        | Semantics                                    | Purpose |
+|------------|-----------------------------------------------|---------|
+| `prep`     | Fail-fast — first non-zero exit halts, no dispatch | Environment setup whose failure is a setup problem, not a verdict (e.g. a stale clone) |
+| `oracles`  | Capture-all — every entry runs regardless of others' outcome | Informational commands whose output is injected into the session prompt so the agent reads real repo state instead of re-deriving it from prose |
+
+Both resolve against **set names in this same `verification.yml`**, exactly like a WU
+`type`'s gate set or `extra_gates` — a name absent from the file is a named
+CONFIGURATION ERROR, never a silent pass. A work unit declaring neither key gets no
+pre-dispatch behavior at all. See `specfuse/loop/prerun.py` for the runner and
+`specfuse/loop/prerun_capture.py` for how captured `oracles` output is bounded and
+formatted into the prompt.
+
+This repo declares one `oracles` set (also named `oracles`, in `verification.yml`) as
+its own adoption proof — `git log` and `git diff --stat` against `main`, so a close
+session reads recent history instead of running those commands itself.
+
+### `oracles` vs `extra_gates` — which one you want
+
+`extra_gates` (WU frontmatter, unioned onto the type-selected set by `verify()`) is a
+**different, older mechanism that already existed** — it runs at **exit**, alongside
+the rest of the `code` (or `doc`/`plannext`) set, as a pass/fail mergeability check.
+
+The rule for choosing:
+
+- Want a command's **result to gate whether the unit passes**, evaluated after the
+  work is done? Use `extra_gates`. It ANDs into the same pass/fail verdict as the
+  rest of the exit set.
+- Want a command's **output available to the agent before it starts working** —
+  environment state, a changeset summary, anything that would otherwise be
+  re-derived from prose every attempt? Use `prep` (if failure should halt
+  dispatch outright) or `oracles` (if the output is informational and every entry
+  should still run even if one fails).
+
+Do not declare the same set under both `oracles` and `extra_gates` on one WU unless
+you deliberately want it evaluated twice, once before dispatch as input and once at
+exit as a verdict — that is a legitimate combination, not a mistake, but it is easy
+to do by accident when the names look interchangeable.
+
 ## The plannext gate (forward-design integrity)
 
 For a `plan-next` unit, "done" means the next gate you drafted is actually

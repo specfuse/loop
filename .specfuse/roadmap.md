@@ -72,7 +72,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
-| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | planned | — | [→ detail](#feat-2026-0057) |
+| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
@@ -877,17 +877,6 @@ machine-checkable contract rather than prose.
 **Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
 
 **Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
-
-**Status: planned.**
-
-<a id="feat-2026-0057"></a>
-## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
-
-**Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
-
-**Goal.** `verification.yml` / GATE frontmatter gains named, ordered oracle commands, including environment-prep steps, per gate or per criterion (composing with FEAT-2026-0056's per-criterion state). The driver — or the close agent as a mandatory first action — executes them deterministically and captures output; the close agent's job narrows to interpreting results, judging the DoD, and writing the ledger. Target-project harness scripts (e.g. the generator's SQL Server scenario matrix) stay in the target repo; the loop ships the contract, dispatch, and capture.
-
-**Benefits.** Close attempts become script-run plus interpretation — cheaper, reproducible, and viable on a smaller model tier; environment-freshness lessons become enforced steps instead of prose that each new close may or may not recall; verification evidence gains a consistent, machine-captured form across features.
 
 **Status: planned.**
 

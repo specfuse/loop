@@ -216,7 +216,7 @@ the field-by-field schema see
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
 
-`outcome` taxonomy, as `loop.py` actually emits it — twelve values,
+`outcome` taxonomy, as `loop.py` actually emits it — thirteen values,
 bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 
 | outcome | meaning |
@@ -224,6 +224,7 @@ bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 | `passed` | verify + all driver-side guards clean |
 | `failed` | a verification gate failed |
 | `blocked` | the agent reported `status: blocked` |
+| `prep_halted` | a declared `prep`/`oracles` set halted before dispatch — no session spawned (FEAT-2026-0057/T04) |
 | `zero_token_skip` | the session produced no tokens; nothing ran |
 | `files_changed_mismatch` | RESULT declared paths that show no diff |
 | `closing_deliverable_missing` | a closing-WU guard refused (see `close-discipline.md` §4) |
@@ -253,6 +254,7 @@ consumer that queries only those concludes the record is empty when it is not.
 |---|---|
 | `failed`, `files_changed_mismatch`, `produces_not_in_diff` | `failure_class` + `failure_signature` + `failure_excerpt` |
 | `blocked` | **`agent_blocked_reason`** (plus a sibling `human_escalation` event) |
+| `prep_halted` | **`halt_class`** + **`summary`** (plus a sibling `human_escalation` event) |
 | `closing_deliverable_missing`, `no_deliverable_files`, `deliverable_missing`, `squash_commit_failed`, `learnings_not_staged` | **`summary`** |
 | `files_changed_mismatch` (pre-0.3.23) | **`unchanged_paths`** only — `failure_*` was added by #182 |
 | `zero_token_skip` | nothing, correctly — no attempt ran |

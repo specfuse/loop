@@ -41,6 +41,18 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
 - `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
   `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions
   oracle-like verbs but this field is absent.
+- `prep` — OPTIONAL. Name of a `verification.yml` set to run **before dispatch**,
+  fail-fast: the first non-zero exit halts dispatch outright, no session runs. For
+  environment setup whose failure is a setup problem, not a verdict. See
+  `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
+- `oracles` — OPTIONAL. Name of a `verification.yml` set to run **before dispatch**,
+  capture-all: every entry runs regardless of others' outcome, and its output is
+  injected into the session prompt as real repo state. See
+  `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
+- `extra_gates` — OPTIONAL. Name of a `verification.yml` set unioned onto the
+  type-selected gate set **at exit**: it ANDs into the same pass/fail verdict as
+  the rest of the `code`/`doc`/`plannext` set. See
+  `.specfuse/skills/verification/SKILL.md` § `oracles` vs `extra_gates`.
 - `produces_driver_helper` — OPTIONAL. Symbol(s) this WU adds or modifies in the driver
   (`loop.py`, `lint_plan.py`, adjacent scripts). Lint WARN when body mentions driver-wiring
   keywords but field is absent. See FEAT-2026-0017.

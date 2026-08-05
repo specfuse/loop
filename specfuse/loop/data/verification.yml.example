@@ -66,3 +66,11 @@ doc:
 plannext:
   - name: plan-lint
     command: "specfuse-lint {feature_dir}"
+
+# Pre-dispatch sets, referenced by a WU's `prep`/`oracles` frontmatter keys —
+# they run BEFORE the session is dispatched, not at exit. Entries here are
+# informational captures, not pass/fail gates; see
+# .specfuse/skills/verification/SKILL.md § Pre-dispatch for prep vs oracles.
+# oracles:
+#   - name: recent-history
+#     command: "git log --oneline -10 && git diff --stat main"

@@ -3196,3 +3196,183 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   surfaced only because the close computed a sum and compared it to another sum.
   Companion to [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant], which is the
   defect FU-1 happened to be about; this entry is about the record, not the defect.
+
+- [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] **When a feature's value is that an
+  existing code path starts calling something new, one work unit must own the call
+  site, and its acceptance criteria must assert the call — not the callee.** Every
+  acceptance criterion in this feature's three implementation units was satisfiable by
+  a module in isolation: a red→green test on the module, an import of its symbols, a
+  structural guard on a config key. All three passed honestly, first or second try, at
+  60% under estimate — and the driver still does not read the two frontmatter keys the
+  feature exists to add. `WorkUnit` gained no `prep` or `oracles` field, `load_wu`
+  gained no parse branch, and nothing imports either new module outside its own test
+  file. The close found it by grepping for callers of every symbol the units declared
+  in `produces_driver_helper` and by loading a real WU file through `load_wu`: a unit
+  declaring `prep: [code]` and `oracles: [oracles]` returns the identical empty
+  outcome as one declaring nothing, because `resolve_prerun_sets` reads
+  `getattr(wu, "prep", None)` and the attribute does not exist. Rule at authoring
+  time: for any feature whose goal sentence contains "the driver/pipeline/runner now
+  does X", name the file and function of the call site in some unit's `produces:`, and
+  write at least one criterion whose oracle **fails if the call is deleted**. Two
+  corollaries. (a) **A symbol-existence check proves existence, not integration.**
+  `produces_driver_helper` plus `python3 -c "from … import foo"` is a real and useful
+  guard — it fills the gap where a green test suite cannot detect an absent symbol —
+  but it is silent on whether anything calls `foo`, and both units here declared their
+  symbols accurately while the feature went unwired. (b) **Scope boundaries that
+  correctly protect a seam can also orphan it.** This feature's `PLAN.md` scoped
+  `verify()`, `_run_gate_set`, and `extra_gates` out by construction, which was right
+  and is why sibling units stayed green — but "do not modify the exit path" was never
+  paired with "one unit adds the pre-dispatch call", so the seam was protected by
+  three units and crossed by none.
+
+- [FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question] **Re-running every
+  producing unit's own oracle is not the feature-level re-run `close-discipline.md` §1
+  asks for; a close must ask a question no unit's criteria asked.** Fifteen oracles
+  re-ran green in this close — three scoped red→green tests, two symbol imports, a
+  structural config guard, and the full sixteen-entry `code` gate set at 2325 tests
+  and 93% coverage — and not one of them could observe the defect, because none of
+  them asserts on the path the feature was supposed to change. The escalation trigger
+  for "a re-run oracle disagrees with a producing unit's self-report" correctly did
+  not fire: no oracle disagreed, every unit's `done` was honest, and the definition of
+  done was still unmet. Rule: a close's re-run must include at least one measurement
+  derived from the **gate's definition of done**, not from the union of the units'
+  criteria — the composite question the units were each individually too small to ask.
+  Cheap forms that work: grep for callers of every symbol the units declared, load a
+  real artifact through the production parser rather than a test double, or run the
+  feature's headline sentence as a one-line probe. Companion to
+  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam], which is the authoring-time half of
+  the same failure; this entry is the close-time detection.
+
+- [FEAT-2026-0057/G1-CLOSE/close-is-blind-to-its-own-ledger] **A work unit's
+  `attempt_outcome` events are buffered and flushed only at its terminal outcome, so a
+  close reading `events.jsonl` mid-session sees every prior unit and **nothing about
+  itself** — including nothing about its own earlier attempts. State the close's own
+  spend from frontmatter, and never from memory.** (Corrects this entry's first
+  version, which read the same observation as "a guard-refused close attempt leaves no
+  event at all". It does leave one: `emit_attempt_outcome` appends to the in-memory
+  `wu_events` list, and `flush_events` writes the batch when the WU reaches
+  `done`/`blocked_human`. A close authored mid-flight sees a file that genuinely holds
+  zero events for its own correlation ID, and generalising from that to "the ledger is
+  never written" was wrong — the events for a $10.69 two-attempt close appeared on
+  disk the moment it completed.) Two practical rules follow. (a) For a close whose
+  cost-analysis criterion names its own estimate: `events.jsonl` cannot answer it, but
+  a **re-armed** close can, because the driver folds the prior cycle into
+  `cumulative_cost_usd` / `cumulative_duration_seconds` and stamps
+  `folded_through_re_arm` — read those, say the source is frontmatter, and state
+  this pass's own spend as not-yet-written rather than estimating it. (b) A
+  `closing_requirements` guard refusal produces an `attempt_outcome` whose `outcome`
+  names the guard (e.g. `closing_deliverable_missing`) while `failure_class` and
+  `failure_signature` are both **null** and `files_touched` is `[]` — so a
+  failure-class breakdown that groups only on `failure_class` silently drops the most
+  expensive attempt in the feature. Group on `outcome` too. Here that one refused
+  attempt was $5.73 of a $19.87 lifetime, 29%, for a missing `CHANGELOG.md` append.
+
+- [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart] **A work unit that edits the
+  driver has no effect on anything the same driver process dispatches afterwards —
+  including the close work unit armed to verify it. Restart the driver between the
+  wiring unit and its proof, or the proof measures the old code.** Observed here in
+  its most expensive form: T04 wired the pre-dispatch hook into `execute_unit_attempt`
+  correctly, in one attempt, with eight passing tests; the very next unit dispatched
+  was the close designed to read the injected output, and its prompt carried none.
+  Timestamps were decisive — the driver process imported `specfuse/loop/loop.py` at
+  13:30:46 UTC (matching `GATE-01.md`'s `baseline.probed_at` to the second), T04's
+  session began at 13:35:25 and ran 1413s, and the close began at 13:58:59. Python
+  caches modules in `sys.modules` at first import, so the `execute_unit_attempt` in
+  memory was the pre-T04 function object with no call site at all. **A deferred import
+  inside the new code does not save you** — deferral moves the *callee's* import to
+  call time, but the call site lives in the stale caller and is never reached. Nothing
+  in the gate can catch this: unit tests, symbol imports, and close-time probes all
+  run in fresh interpreters and all report the new behaviour correctly, which is
+  precisely why the disagreement reads as a mystery instead of an obvious staleness
+  bug. Rules. (a) When any work unit's `produces:` names a driver module, plan a
+  driver restart before the unit that verifies it — treat "restart the loop" as a step
+  in the gate, not an operator afterthought. (b) A close that cannot explain why a
+  driver behaviour it can reproduce in-process did not happen in its own dispatch
+  should check the driver process's start time (`ps -eo pid,lstart,command`) against
+  the wiring unit's `started_at` before writing anything else. (c) This is the
+  self-hosting form of the harness-migration hazard already in this file: there, a WU
+  editing `verification.yml` or the test loader breaks its siblings' oracles; here, a
+  WU editing the dispatch path silently fails to reach them.
+
+- [FEAT-2026-0057/G1-CLOSE/informational-output-has-no-verdict] **Do not run
+  informational captured output through a pass/fail verdict selector — it will
+  confidently report that the verdict is missing, and tell the reader to go run the
+  command themselves.** `format_oracle_capture` budgets each captured `oracles` entry
+  through `select_gate_report_lines`, which was the right budgeting primitive
+  (FEAT-2026-0068's verdict-aware selection, versus a positional tail) and the wrong
+  *semantic* one. An `oracles` entry is informational by construction — `git log
+  --oneline -20` has no pass/fail summary and never will — so every captured block,
+  including short complete untruncated ones, comes back carrying `NO VERDICT FOUND:
+  the gate command produced no recognisable pass/fail summary anywhere in its output —
+  the lines above are the tail only, and may be unrelated to the failure. Run the
+  command directly.` Both halves are actively harmful: the claim is false for a
+  complete capture, and the instruction is the exact re-derivation the injection
+  exists to eliminate — and in this repo's case, the reading agent is a close WU whose
+  **Do not touch** list forbids running those `git` commands at all. Rule when reusing
+  a gate-shaped primitive for a non-gate purpose: check whether its *failure* text is
+  addressed to the same reader. Budgeting, truncation, and line selection generalise
+  across gate and non-gate output; verdict language does not, and a banner authored
+  for "this gate failed and you should investigate" reads as an instruction when it
+  lands in a prompt. **Extended by the third close, which measured where the banner
+  actually comes from:** `_run_gate_set` composes each result's `report` string from
+  `select_gate_report_lines` output *before* returning it, so by the time an
+  oracle-specific formatter sees a report the banner is already inside it. Filtering
+  it downstream in `format_oracle_capture` therefore edits a copy, not the source —
+  see [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] for how that
+  turned a green fix into a live defect.
+
+- [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] **When a work
+  unit fixes a function whose input is produced by other code in the same repo, its
+  test must build that input by calling the real producer — a hand-written fixture
+  can green a fix that never runs in production.** T06 was armed to stop captured
+  oracle blocks carrying a false `NO VERDICT FOUND ... Run the command directly.`
+  banner. It shipped in one attempt at $0.68 against a $2.50 estimate, with a new
+  named test, every existing test still passing, and the full `code` gate green — and
+  the very next close session found the banner in its own injected prompt. The
+  fixture was `"\n".join(f"abc{i:04d} commit message {i} " + "x"*40 for i in range(300))`:
+  a raw ~18 KB log, hand-built, containing no banner. Production input is
+  `_run_gate_set`'s report — a fenced block with the banner already composed in, and
+  usually small enough to skip truncation entirely. The test therefore matched
+  neither condition under which the defect occurs. Rule at authoring time: for a
+  formatter/parser/filter fix, name the producing function in the WU body and require
+  at least one criterion whose fixture is obtained by **calling it**, not by writing
+  a string that resembles its output. The cheap version is one line — build the input
+  with the real producer, assert on the real consumer. Corollary: a suspiciously
+  large underspend on a fix unit is worth a second look. T06 was the cheapest unit in
+  a seven-unit feature and the only one that did not do its job; the same spec
+  precision that makes a unit cheap also makes it possible to satisfy the letter of
+  the criteria without meeting them.
+
+- [FEAT-2026-0057/G1-CLOSE/name-the-branch-not-just-the-function] **A fix targeting a
+  function with an early return must say which branch it lands on, or it will land on
+  the wrong one and every oracle will still be green.** `_fit_to_budget` has exactly
+  two paths: `if len(raw_bytes) <= budget: return report, 0` and, below it, a
+  select-and-trim path. The common case — a capture that fits — takes the early
+  return. T06's edit added its filter to the *second* path only, so it applied
+  exclusively to reports large enough to need truncation, which is the case that
+  matters least. Nothing in the unit's acceptance criteria, grounding-file list, or
+  escalation triggers distinguished the branches, and no gate can: both branches are
+  covered, and the tests that cover them pass. Rule: when a WU's `produces:` names a
+  function the author has read, the body should quote the specific lines the edit is
+  expected to change, or state the branch condition in the acceptance criterion
+  ("...for a report **within** its budget share as well as one exceeding it"). This
+  is the same class as
+  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] one level down: there, no unit
+  owned the call site; here, the unit owned the function but not the path through it.
+
+- [FEAT-2026-0057/G1-CLOSE/restart-buys-honesty-not-correctness] **Sequencing a
+  driver restart around a fix buys you a truthful observation of that fix, not a
+  working one — budget for the possibility that the honest observation is
+  "still broken".** This gate did the sequencing exactly right: it held its close at
+  `blocked_human` through the run that dispatched the fix units, then re-armed it
+  under a freshly started driver process so the modules it imported were the
+  post-fix ones (the mitigation from
+  [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]). The close then read its own
+  injected prompt and found the defect the fix was armed to remove, still present.
+  The restart worked perfectly and the round still cost a full extra invocation plus
+  a hold, because the fix was ineffective for an unrelated reason. Two rules. (a) Do
+  not treat "we restarted the driver" as evidence the fix landed — the restart makes
+  the observation *valid*, and a valid observation can be negative. (b) When a gate
+  is already paying a sequencing tax to prove one unit, that is the cheapest moment
+  to also strengthen that unit's own test, because a second sequencing round costs
+  the same as the first and the round you are in is already sunk.
