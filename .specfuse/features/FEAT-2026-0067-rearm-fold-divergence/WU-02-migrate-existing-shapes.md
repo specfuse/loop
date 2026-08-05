@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0067/T02
 type: implementation
-status: pending
+status: done
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/rearm_migration.py
@@ -10,6 +10,13 @@ oracle_env: macos_local
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.9.2
+started_at: 2026-08-05T04:15:13.908982+00:00
+attempts: 1
+duration_seconds: 824.828
+cost_usd: 2.200223
+input_tokens: 202
+output_tokens: 32098
 ---
 
 # Every existing re-armed WU carries one shape, explicitly

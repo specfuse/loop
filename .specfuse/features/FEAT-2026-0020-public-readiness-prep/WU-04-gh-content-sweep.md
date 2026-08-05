@@ -22,6 +22,9 @@ re_arm_history:
     prior_cost_usd: 0.16309
     prior_duration_seconds: 42.693
     reason: "gh CLI auth requires unsandboxed subprocess"
+cumulative_cost_usd: 0.16309
+cumulative_duration_seconds: 42.693
+folded_through_re_arm: 1
 ---
 
 # Pull all PRs + issues via gh CLI; grep for sensitive references; triage in AUDIT.md

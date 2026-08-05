@@ -32,6 +32,7 @@ effort: medium
 gate_set: code
 driver_version: 0.7.1
 started_at: 2026-07-30T20:40:48.530269+00:00
+folded_through_re_arm: 1
 ---
 
 # Shadow wiring — evaluate and emit at every `awaiting_review` flip

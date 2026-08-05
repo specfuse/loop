@@ -52,6 +52,7 @@ effort: medium
 gate_set: code
 driver_version: 0.8.0
 started_at: 2026-08-03T00:48:21.920822+00:00
+folded_through_re_arm: 3
 ---
 
 # A driver-owned registry, resolved by fall-through
