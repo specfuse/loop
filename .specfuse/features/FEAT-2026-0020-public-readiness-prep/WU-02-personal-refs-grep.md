@@ -24,6 +24,7 @@ cumulative_cost_usd: 0.472695
 cumulative_duration_seconds: 221.721
 cumulative_input_tokens: 13
 cumulative_output_tokens: 14145
+folded_through_re_arm: 1
 ---
 
 # Grep main for personal/internal references; triage in AUDIT.md §personal-refs

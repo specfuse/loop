@@ -27,6 +27,9 @@ duration_seconds: 1348.002
 cost_usd: 4.281823
 input_tokens: 208
 output_tokens: 44314
+cumulative_cost_usd: 5.01
+cumulative_duration_seconds: 774.183
+folded_through_re_arm: 1
 ---
 
 # Contract-field lint warns become blocking — under `auto` only

@@ -1672,20 +1672,35 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
 
 
 def detect_rearm_dispatch(wu: WorkUnit) -> bool:
-    """Return True when wu is a re-arm dispatch whose prior cycle's cost has
-    not yet been folded into the cumulative accumulators.
+    """Return True when wu is a re-arm dispatch whose prior cycle has not yet
+    been folded into the cumulative accumulators.
 
-    Reads re_arm_count and cost_usd from the WU's on-disk frontmatter because
-    load_wu does not load those fields into the WorkUnit object.
+    Reads re_arm_count and folded_through_re_arm from the WU's on-disk
+    frontmatter because load_wu does not load those fields into the
+    WorkUnit object. A fold is owed when re_arm_count > folded_through_re_arm;
+    fold_cumulative_on_rearm stamps folded_through_re_arm = re_arm_count as
+    part of the same write set it uses for the accumulators, so this is a
+    marker comparison, not an inference from a value that a fold can also
+    produce as a side effect (FEAT-2026-0067/T01).
+
     Returns False for first-time dispatches (re_arm_count absent or 0) and for
-    re-arms where cost was already folded (cost_usd == 0 after a prior fold).
+    re-arms already folded (folded_through_re_arm == re_arm_count).
+
+    Exposure left for FEAT-2026-0067/T02: a WU re-armed under the prior
+    cost_usd-based guard has no folded_through_re_arm field at all, so it
+    reads as 0 here — indistinguishable from "never folded" even when it was.
+    This WU does not add a value-inferring fallback to paper over that; T02
+    owns the migration of existing WU shapes.
     """
     fm, _ = read_frontmatter(wu.file)
     re_arm_count = fm.get("re_arm_count", 0)
-    if not isinstance(re_arm_count, int) or re_arm_count <= 0:
+    if not isinstance(re_arm_count, int) or isinstance(re_arm_count, bool) \
+            or re_arm_count <= 0:
         return False
-    cost_usd = fm.get("cost_usd", 0)
-    return isinstance(cost_usd, (int, float)) and float(cost_usd) > 0
+    folded_through = fm.get("folded_through_re_arm", 0)
+    if not isinstance(folded_through, int) or isinstance(folded_through, bool):
+        folded_through = 0
+    return re_arm_count > folded_through
 
 
 def rearm_reproduction_gate(wu: WorkUnit) -> tuple[bool, str]:
@@ -1744,6 +1759,12 @@ def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
 
     Backward-compatible: existing WUs with no cumulative_* fields initialise
     from 0 — no KeyError on first re-arm of a WU that pre-dates this contract.
+
+    Idempotent: a second call for the same re-arm reads cost_usd/duration_seconds/
+    input_tokens/output_tokens back as 0 (this call already reset them), so it
+    adds 0 to each cumulative_* accumulator and re-stamps the same
+    folded_through_re_arm value. Two calls for one re-arm produce the same
+    accumulators as one (FEAT-2026-0067/T01).
     """
     fm, _ = read_frontmatter(wu.file)
     prior_cost = float(fm.get("cost_usd") or 0)
@@ -1782,6 +1803,14 @@ def fold_cumulative_on_rearm(wu: WorkUnit, backend: Backend) -> None:
     backend.set_wu(wu, "duration_seconds", 0.0)
     backend.set_wu(wu, "input_tokens", 0)
     backend.set_wu(wu, "output_tokens", 0)
+
+    # Explicit fold marker (FEAT-2026-0067/T01): stamped in the same write set
+    # as the accumulators above so detect_rearm_dispatch can tell "folded" from
+    # "cost was zero" without inferring it from cost_usd's value.
+    re_arm_count = fm.get("re_arm_count", 0)
+    if not isinstance(re_arm_count, int) or isinstance(re_arm_count, bool):
+        re_arm_count = 0
+    backend.set_wu(wu, "folded_through_re_arm", re_arm_count)
 
 
 def gate_budget_usd(gate_file: Path) -> float | None:

@@ -32,6 +32,7 @@ effort: medium
 gate_set: code
 driver_version: 0.8.0
 started_at: 2026-08-04T05:57:52.272479+00:00
+folded_through_re_arm: 1
 ---
 
 # Widen the gate from one field to the whole envelope

@@ -31,6 +31,7 @@ effort: medium
 gate_set: code
 driver_version: 0.8.0
 started_at: 2026-08-03T11:56:41.409118+00:00
+folded_through_re_arm: 1
 ---
 
 # Catch the eighth type in CI, not in a retrospective

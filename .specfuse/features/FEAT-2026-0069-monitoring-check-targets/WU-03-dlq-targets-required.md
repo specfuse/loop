@@ -33,6 +33,7 @@ effort: medium
 gate_set: code
 driver_version: 0.4.0
 started_at: 2026-07-26T17:56:54.853206+00:00
+folded_through_re_arm: 1
 ---
 
 # Contract: make `targets` required on `dlq` checks
