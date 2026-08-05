@@ -223,6 +223,87 @@ def _unreferenced_code_gates(
             if not any(tok in low for tok in tokens)]
 
 
+# §1-§3 obligations from close-discipline.md, matched on the phrasing an author
+# actually writes. Imprecise by nature — the same heuristic shape the oracle_env
+# WARN already uses, on the same reasoning: a false positive costs one flag, a
+# false negative costs an unverified feature (#293).
+LOAD_BEARING_CLOSE_PATTERNS = (
+    re.compile(r"\bre-?run\s+fresh\b", re.IGNORECASE),
+    re.compile(r"\bre-?verif(?:y|ied|ication)\b", re.IGNORECASE),
+    re.compile(r"\bre-?observe\b", re.IGNORECASE),
+    re.compile(r"\bfresh\b[^.\n]{0,40}\b(?:run|output|dir|directory|clone)\b",
+               re.IGNORECASE),
+    re.compile(r"\bnever\s+a?\s*producing\b", re.IGNORECASE),
+    re.compile(r"\bself-?report\b", re.IGNORECASE),
+    re.compile(r"\bexit\s+codes?\s+read\b", re.IGNORECASE),
+    re.compile(r"\bhedged\b", re.IGNORECASE),
+    re.compile(r"\bmet_locally\b|\bpartially_met\b", re.IGNORECASE),
+    re.compile(r"\bconsumer-?visible\b", re.IGNORECASE),
+    re.compile(r"\bcontract\s+change", re.IGNORECASE),
+    re.compile(r"\boracles?\s+re-?run\b", re.IGNORECASE),
+)
+
+# Durable surfaces a close may be the SOLE writer of. Naming one of these is a
+# load-bearing signal by construction rather than by wording — the gap the
+# phrase match above cannot close, reported on #293 after FEAT-2026-0063 lost a
+# roadmap-reconciliation criterion that contained no verification verb at all.
+#
+# `LEARNINGS.md` is deliberately NOT in this list, despite being a durable
+# surface a skipped close genuinely corrupts (FEAT-2026-0031 lost every entry
+# that way). Measured on this repo: 68 of 71 close WUs mention it and 3 declare
+# it in `produces:`. A signal present in ~96% of the population separates
+# nothing — including it fired this warning on 29 of 55 features, which is the
+# shape that trains an operator to ignore it (the #771 lesson). The lesson-loss
+# risk is real and stays owned by close-discipline's own guards; this lint
+# targets the criteria a phrase match and a *selective* surface test can
+# actually discriminate.
+_DURABLE_SURFACE_RE = re.compile(
+    r"(?:^|[\s`(\[])"
+    r"(?:\.specfuse/)?"
+    r"(?:roadmap(?:-archive)?\.md"
+    r"|CHANGELOG\.md"
+    r"|docs/[\w./-]+"
+    r"|\.specfuse/rules/[\w./-]+)",
+    re.IGNORECASE,
+)
+
+
+def detect_load_bearing_close(ac_section_text: str, feature_dir_name: str) -> bool:
+    """Return True iff a close WU's acceptance criteria make it load-bearing (#293).
+
+    Two independent signals, either sufficient:
+
+    1. **Verification phrasing** — a §1-§3 obligation from
+       `close-discipline.md`: a fresh oracle re-run, a hedged-verdict record, a
+       consumer-visible contract enumeration.
+    2. **Surface scope** — the criteria name a durable surface *outside the
+       feature's own folder*. Such a close is the only thing that reconciles
+       that surface with what the gate produced, so skipping it silently
+       corrupts a project surface. This signal is mechanical, which is the
+       point: it catches criteria that carry no verification wording.
+
+    `feature_dir_name` scopes signal 2. A close naming files inside its own
+    folder — `RETROSPECTIVE.md`, its own `PLAN.md` — is not reaching outside it,
+    and treating that as load-bearing would fire on every close in existence and
+    turn the warning into noise.
+    """
+    if not ac_section_text or not ac_section_text.strip():
+        return False
+
+    for pat in LOAD_BEARING_CLOSE_PATTERNS:
+        if pat.search(ac_section_text):
+            return True
+
+    # Signal 2. Drop any mention of the feature's own folder first, so a close
+    # citing its own PLAN.md does not read as an outside-surface write.
+    scoped = ac_section_text
+    if feature_dir_name:
+        scoped = re.sub(
+            r"\.specfuse/features/" + re.escape(feature_dir_name) + r"[\w./-]*",
+            " ", scoped)
+    return bool(_DURABLE_SURFACE_RE.search(scoped))
+
+
 def detect_oracle_verbs(ac_section_text: str) -> list[str]:
     """Return matched oracle-verb strings found in the AC section text."""
     found = []
@@ -1136,6 +1217,39 @@ def _lint_impl(feature_dir: Path) -> list[str]:
                         f"ERROR: {wfile}: 'verdict' frontmatter is only meaningful for "
                         f"closing types (close, close-intermediate); remove it from "
                         f"this {wu_type_val!r} WU."
+                    )
+
+            # Load-bearing close WARN (#293). A close carrying a §1-§3
+            # obligation, or one that is the sole writer of a surface outside
+            # its own folder, must set `auto_close_disabled: true` or
+            # `evaluate_auto_close` can skip it at attempts: 0 — silently, with
+            # every acceptance criterion in its body left unfulfilled.
+            #
+            # The selection effect is why this warns rather than informs: a gate
+            # only auto-closes when it is on-plan and under budget, so these
+            # criteria are dropped precisely on the features that behaved well
+            # and therefore attract the least scrutiny.
+            # Scoped to a close that can still be dispatched. On a `done` or
+            # `abandoned` WU the flag is unactionable — the close already ran or
+            # already didn't, and setting it now changes nothing. Measured: all
+            # 22 features this fired on before the filter were `done`, so the
+            # unfiltered rule was pure noise on exactly the runs that lint for
+            # other reasons (feature-conversion, upgrade health reports).
+            if (wu_type_val in {"close", "close-intermediate"}
+                    and wu_status not in {"done", "abandoned"}):
+                ac_text = _slice_ac_section(wbody)
+                flag = wfm.get("auto_close_disabled")
+                flag_set = flag in (True, "true", "True")
+                if not flag_set and detect_load_bearing_close(
+                        ac_text, feature_dir.name):
+                    print(
+                        f"WARN: {wfile}: close WU's acceptance criteria are "
+                        f"load-bearing (a close-discipline §1-§3 obligation, or "
+                        f"a write to a surface outside this feature's folder) "
+                        f"but frontmatter lacks 'auto_close_disabled: true' — "
+                        f"evaluate_auto_close may skip this WU at attempts: 0 "
+                        f"and every criterion in its body would go unfulfilled. "
+                        f"See .specfuse/rules/close-discipline.md and #293."
                     )
 
             # Oracle-env WARN (FEAT-2026-0015/T05).
