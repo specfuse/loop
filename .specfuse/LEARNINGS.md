@@ -3313,4 +3313,66 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   addressed to the same reader. Budgeting, truncation, and line selection generalise
   across gate and non-gate output; verdict language does not, and a banner authored
   for "this gate failed and you should investigate" reads as an instruction when it
-  lands in a prompt.
+  lands in a prompt. **Extended by the third close, which measured where the banner
+  actually comes from:** `_run_gate_set` composes each result's `report` string from
+  `select_gate_report_lines` output *before* returning it, so by the time an
+  oracle-specific formatter sees a report the banner is already inside it. Filtering
+  it downstream in `format_oracle_capture` therefore edits a copy, not the source —
+  see [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] for how that
+  turned a green fix into a live defect.
+
+- [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] **When a work
+  unit fixes a function whose input is produced by other code in the same repo, its
+  test must build that input by calling the real producer — a hand-written fixture
+  can green a fix that never runs in production.** T06 was armed to stop captured
+  oracle blocks carrying a false `NO VERDICT FOUND ... Run the command directly.`
+  banner. It shipped in one attempt at $0.68 against a $2.50 estimate, with a new
+  named test, every existing test still passing, and the full `code` gate green — and
+  the very next close session found the banner in its own injected prompt. The
+  fixture was `"\n".join(f"abc{i:04d} commit message {i} " + "x"*40 for i in range(300))`:
+  a raw ~18 KB log, hand-built, containing no banner. Production input is
+  `_run_gate_set`'s report — a fenced block with the banner already composed in, and
+  usually small enough to skip truncation entirely. The test therefore matched
+  neither condition under which the defect occurs. Rule at authoring time: for a
+  formatter/parser/filter fix, name the producing function in the WU body and require
+  at least one criterion whose fixture is obtained by **calling it**, not by writing
+  a string that resembles its output. The cheap version is one line — build the input
+  with the real producer, assert on the real consumer. Corollary: a suspiciously
+  large underspend on a fix unit is worth a second look. T06 was the cheapest unit in
+  a seven-unit feature and the only one that did not do its job; the same spec
+  precision that makes a unit cheap also makes it possible to satisfy the letter of
+  the criteria without meeting them.
+
+- [FEAT-2026-0057/G1-CLOSE/name-the-branch-not-just-the-function] **A fix targeting a
+  function with an early return must say which branch it lands on, or it will land on
+  the wrong one and every oracle will still be green.** `_fit_to_budget` has exactly
+  two paths: `if len(raw_bytes) <= budget: return report, 0` and, below it, a
+  select-and-trim path. The common case — a capture that fits — takes the early
+  return. T06's edit added its filter to the *second* path only, so it applied
+  exclusively to reports large enough to need truncation, which is the case that
+  matters least. Nothing in the unit's acceptance criteria, grounding-file list, or
+  escalation triggers distinguished the branches, and no gate can: both branches are
+  covered, and the tests that cover them pass. Rule: when a WU's `produces:` names a
+  function the author has read, the body should quote the specific lines the edit is
+  expected to change, or state the branch condition in the acceptance criterion
+  ("...for a report **within** its budget share as well as one exceeding it"). This
+  is the same class as
+  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] one level down: there, no unit
+  owned the call site; here, the unit owned the function but not the path through it.
+
+- [FEAT-2026-0057/G1-CLOSE/restart-buys-honesty-not-correctness] **Sequencing a
+  driver restart around a fix buys you a truthful observation of that fix, not a
+  working one — budget for the possibility that the honest observation is
+  "still broken".** This gate did the sequencing exactly right: it held its close at
+  `blocked_human` through the run that dispatched the fix units, then re-armed it
+  under a freshly started driver process so the modules it imported were the
+  post-fix ones (the mitigation from
+  [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]). The close then read its own
+  injected prompt and found the defect the fix was armed to remove, still present.
+  The restart worked perfectly and the round still cost a full extra invocation plus
+  a hold, because the fix was ineffective for an unrelated reason. Two rules. (a) Do
+  not treat "we restarted the driver" as evidence the fix landed — the restart makes
+  the observation *valid*, and a valid observation can be negative. (b) When a gate
+  is already paying a sequencing tax to prove one unit, that is the cheapest moment
+  to also strengthen that unit's own test, because a second sequencing round costs
+  the same as the first and the round you are in is already sunk.
