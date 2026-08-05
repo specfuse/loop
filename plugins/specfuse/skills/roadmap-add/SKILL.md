@@ -22,10 +22,13 @@ issue/PR titles are not reused.
 - **Never write if the chosen ID already appears in any scanned source.** Report
   the collision with the exact file path and line number so the operator can
   resolve before retrying.
-- **Detect sequence gaps and stop.** If the scan finds gaps in the year's FEAT
-  sequence (e.g. `0009` missing while `0010` and `0011` exist), emit
-  `status: blocked` — a gap may be a verbally-reserved ID; auto-filling it is the
-  failure mode this check exists to prevent.
+- **Report sequence gaps; stop only when one would be filled.** Gaps in the
+  year's FEAT sequence (e.g. `0009` missing while `0010` and `0011` exist) are
+  printed for the operator but do **not** block the auto-computed path, because
+  that path returns `max + 1` and fills no gap. Emit `status: blocked` only when
+  an explicitly supplied `--id` names a gap ordinal — a gap may be a
+  verbally-reserved ID, and reusing it is the failure mode this check exists to
+  prevent. See "Computing the next ID" §4–5 and #771.
 - **Canonical column order only.** The skill writes rows in
   `| ID | Title | Status | Folder | Detail |` order. If the roadmap table header
   does not match that shape exactly, refuse with a clear error naming the mismatch.
@@ -86,12 +89,33 @@ For every file matching `.specfuse/features/*/PLAN.md`, scan lines that match
 `^feature_id:\s*FEAT-<YYYY>-<NNNN>`. Record the FEAT ID and its file path + line
 number.
 
-### Source (c) — LEARNINGS.md and RETROSPECTIVE.md files
+### Source (c) — LEARNINGS.md and RETROSPECTIVE.md files — **ADVISORY ONLY**
 
 Read `.specfuse/LEARNINGS.md`. Read every file matching
 `.specfuse/features/*/RETROSPECTIVE.md`. For every occurrence of
 `FEAT-<YYYY>-<NNNN>` anywhere in those files, record the ID and its first
 occurrence (file path + line number).
+
+**A source-(c) hit NEVER raises the maximum and NEVER feeds the gap report.**
+It is used for the collision check only. Retrospectives *quote* FEAT IDs as
+examples — in prose, in fixture snippets, in sample output — and nothing in the
+text distinguishes an example from a reservation.
+
+This is not hypothetical (#771). Counting source (c) toward the maximum on this
+repository produced:
+
+```
+min 0000   max 9301   next FEAT-2026-9302   ~9200 reported gaps
+```
+
+`FEAT-2026-9301` is an illustration inside `FEAT-2026-0064`'s retrospective;
+`0098`, `0099` and `0000` are likewise examples elsewhere. Sources (a), (b) and
+(d) are safe to count because their patterns are **positional** — a table row, a
+`feature_id:` frontmatter field, an issue/PR reference — rather than free prose.
+
+A genuine reservation that exists **only** in a retrospective, with no roadmap
+row, no `PLAN.md`, and no GitHub issue, is caught by the collision check when an
+operator names it explicitly. It does not need to move the maximum.
 
 ### Source (d) — GitHub issue and PR titles + bodies
 
@@ -129,20 +153,39 @@ different repo (cross-repo reservations) are out of scope for the automatic scan
 
 ### Computing the next ID
 
-1. Collect all `NNNN` ordinals for the current year from sources (a), (b), (c),
-   and (d) when GitHub was reachable.
+1. Collect all `NNNN` ordinals for the current year from the **authoritative**
+   sources — (a), (b), and (d) when GitHub was reachable. Source (c) is
+   advisory and is excluded here; see its section above.
 2. If none found: next ordinal is `0001`.
 3. Otherwise: next ordinal is `max(ordinals) + 1`.
-4. **Gap check:** verify the ordinals form a contiguous sequence from `0001` to
-   `max`. A GitHub-reserved ID (source d) counts as **present** — it fills its
-   own ordinal and raises `max`; it is never itself reported as the gap. But a
-   reserved ID beyond the local max still exposes the intervening ordinals as
-   genuinely unaccounted (e.g. roadmap reaches `0010`, issue reserves `0016` →
-   `0011`–`0015` are gaps). If any ordinal is missing, stop immediately:
+4. **Gap report — informational, NOT a stop.** Compute the missing ordinals
+   between `min` and `max` and print them. A GitHub-reserved ID (source d)
+   counts as **present** — it fills its own ordinal and raises `max`; it is
+   never itself reported as the gap. But a reserved ID beyond the local max
+   still exposes the intervening ordinals as genuinely unaccounted (e.g.
+   roadmap reaches `0010`, issue reserves `0016` → `0011`–`0015` are gaps).
+
    ```
-   ERROR: FEAT-<YYYY> sequence has gap at <NNNN> — resolve before adding.
-   Seen ordinals: 0001 0002 0003 0005 0006 ...
-   Missing: 0004
+   NOTE: FEAT-<YYYY> sequence has gaps: 0004, 0009
+         The ID below is max + 1 and fills none of them.
+   ```
+
+   **Do not stop on a gap on this path.** The next ordinal is `max + 1`, which
+   by construction fills no gap, so blocking here guarded a risk the algorithm
+   does not take. Some gaps are permanent by design: on this repository `0065`
+   and `0066` are deliberately burned as cross-repo references to another
+   project's features (PR #319's numbering note), so a hard stop fired on
+   *every* invocation, forever. A check that is always wrong gets overridden
+   reflexively — including the one time it is right (#771).
+
+5. **When the operator supplies `--id` explicitly, the hard stop applies.**
+   That is where the risk is real: a gap may be an ID reserved somewhere this
+   scan cannot see, and reusing it is exactly the collision the check exists to
+   prevent. If the requested ordinal is in the gap list, stop:
+   ```
+   ERROR: <FEAT-YYYY-NNNN> fills a gap in the FEAT-<YYYY> sequence.
+   Gaps: 0004 0009
+   A gap may be an ID reserved outside this scan's reach — confirm it is free.
    ```
    This is an escalation condition; emit `status: blocked` with the gap named.
 
@@ -150,7 +193,11 @@ different repo (cross-repo reservations) are out of scope for the automatic scan
 
 Before writing, verify the proposed ID does not appear in any of the four
 sources — including, when GitHub is reachable, an issue/PR title or body that
-reserves it. If it does:
+reserves it. **Source (c) counts here.** It is advisory for the *maximum* and
+the *gap report* (it cannot be trusted to distinguish an example from a
+reservation), but a hit is still worth surfacing when an operator has named a
+specific ID — reporting a false positive costs one check, reusing a real
+reservation costs an ambiguous citation forever. If it does: 
 
 ```
 ERROR: <FEAT-YYYY-NNNN> already exists.
