@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0056/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/criteria_state.py
   - tests/test_criteria_state.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T23:44:16.612217+00:00
+duration_seconds: 285.082
+cost_usd: 0.599546
+input_tokens: 14
+output_tokens: 5024
 ---
 
 # Add the per-criterion state schema and its parser/renderer
