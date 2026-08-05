@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0067/T03
 type: implementation
-status: pending
+status: done
 planned_cost_usd: 2.00
 produces:
   - specfuse/loop/data/templates/WU.template.md
@@ -12,6 +12,13 @@ oracle_env: macos_local
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.9.2
+started_at: 2026-08-05T04:28:58.942822+00:00
+attempts: 1
+duration_seconds: 665.581
+cost_usd: 1.109617
+input_tokens: 46
+output_tokens: 8979
 ---
 
 # The written contract says what the code now does

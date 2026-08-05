@@ -62,10 +62,18 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
 DRIVER-OWNED FIELDS - the driver writes these at outcome time; authors leave them absent:
 <!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,
      cumulative_cost_usd, cumulative_duration_seconds, cumulative_input_tokens,
-     cumulative_output_tokens, re_arm_count, re_arm_history -->
+     cumulative_output_tokens, re_arm_count, re_arm_history, folded_through_re_arm -->
 <!-- driver-stamped at dispatch (resolved execution metadata, visible in this .md):
      model, effort (override or type default), gate_set (the verification.yml set
      that is this WU's exit oracle), driver_version, started_at (UTC ISO). -->
+<!-- `folded_through_re_arm` (FEAT-2026-0067): the `re_arm_count` value already
+     folded into the `cumulative_*` accumulators. On every re-arm the driver folds
+     the prior cycle's cost/duration/token spend into `cumulative_cost_usd`,
+     `cumulative_duration_seconds`, `cumulative_input_tokens`, and
+     `cumulative_output_tokens` — unconditionally, one fold path, including a
+     re-arm whose prior cycle cost nothing. `cumulative_*` is the lifetime
+     accumulator across every re-arm; `re_arm_history[].prior_*` is a pure audit
+     record of what each cycle cost, not a second place the fold might live. -->
 <!-- Full field semantics in docs/methodology.md §2 and events.jsonl outcome payloads. -->
 
 Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not

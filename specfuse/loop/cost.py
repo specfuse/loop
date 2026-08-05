@@ -5,22 +5,27 @@
 """One lifetime-cost reader shared by both cost-gated consumers.
 
 `wu_lifetime_cost_usd` answers "what has this work unit cost over its whole
-life," correctly on both re-arm shapes recorded in FEAT-2026-0062/PLAN.md:
+life." FEAT-2026-0067 converged the fold onto one path: every re-arm now
+unconditionally folds the prior cycle's spend into `cumulative_cost_usd`
+(driven by an explicit `folded_through_re_arm` marker, not by inferring state
+from a value), so `cumulative_cost_usd` is the lifetime accumulator and
+`re_arm_history[].prior_cost_usd` is a pure audit record of what each cycle
+cost — not a second place the fold might or might not have run.
 
-  * fold-ran   — a re-arm folded the prior cycle's spend into
-                 `cumulative_cost_usd`, and `re_arm_history[].prior_cost_usd`
-                 names the same money.
-  * fold-never-ran — the prior cycle's spend survives only in
-                 `re_arm_history[].prior_cost_usd`; `cumulative_cost_usd` is
-                 absent.
+Before that migration, some already-re-armed WUs had a prior cycle's spend
+survive only in `re_arm_history[].prior_cost_usd` with `cumulative_cost_usd`
+absent — a pre-migration legacy shape that this module's frontmatter fallback
+still tolerates for projects that have not run the FEAT-2026-0067 migration,
+not an ongoing design a reader needs to branch on.
 
-Summing frontmatter fields cannot distinguish these shapes without replaying
-fold history, and naive summation double-counts the fold-ran shape. Instead
-this module sums `payload.cost_usd` across every `attempt_outcome` event for
-the work unit in `events.jsonl` — a source that already carries every
-dispatch cycle's cost exactly once, independent of fold shape. Frontmatter is
-used only as a fallback for the units this repo's corpus shows have no usable
-event history (see FEAT-2026-0062 criterion 9's measurement).
+Summing frontmatter fields cannot distinguish "already folded" from "never
+folded" without replaying fold history, and naive summation double-counts a
+folded record. Instead this module sums `payload.cost_usd` across every
+`attempt_outcome` event for the work unit in `events.jsonl` — a source that
+already carries every dispatch cycle's cost exactly once, independent of fold
+shape. Frontmatter is used only as a fallback for the units this repo's
+corpus shows have no usable event history (see FEAT-2026-0062 criterion 9's
+measurement).
 
 Deliberately dependency-light: this module must not import `loop.py` or
 `arm_eval.py` (see `arm_eval.py`'s module docstring on the `loop -> arm_eval`
