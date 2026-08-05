@@ -213,6 +213,14 @@ class WorkUnit:
     # (e.g. `extra_gates: [live-verify]`). A name absent from verification.yml is a
     # CONFIGURATION ERROR, never a silent pass. See issue #62.
     extra_gates: list[str] = field(default_factory=list)
+    # OPTIONAL pre-dispatch sets (FEAT-2026-0057/T04), resolved against
+    # verification.yml the same way extra_gates is. `prep` runs fail-fast
+    # before the session is dispatched; `oracles` runs capture-all and its
+    # output is appended to the session's prompt. See
+    # specfuse/loop/prerun.py for the runner, prerun_capture.py for the
+    # capture formatter.
+    prep: list[str] = field(default_factory=list)
+    oracles: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -621,6 +629,30 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `extra_gates` must be a string or list of strings, "
             f"got {type(raw_extra_gates).__name__!r}"
         )
+    raw_prep = fm.get("prep")
+    if raw_prep is None:
+        prep: list[str] = []
+    elif isinstance(raw_prep, str):
+        prep = [raw_prep]
+    elif isinstance(raw_prep, list):
+        prep = [str(g) for g in raw_prep]
+    else:
+        raise ValueError(
+            f"{path}: `prep` must be a string or list of strings, "
+            f"got {type(raw_prep).__name__!r}"
+        )
+    raw_oracles = fm.get("oracles")
+    if raw_oracles is None:
+        oracles: list[str] = []
+    elif isinstance(raw_oracles, str):
+        oracles = [raw_oracles]
+    elif isinstance(raw_oracles, list):
+        oracles = [str(g) for g in raw_oracles]
+    else:
+        raise ValueError(
+            f"{path}: `oracles` must be a string or list of strings, "
+            f"got {type(raw_oracles).__name__!r}"
+        )
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -638,6 +670,8 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         produces_driver_helper=produces_driver_helper,
         produces=produces,
         extra_gates=extra_gates,
+        prep=prep,
+        oracles=oracles,
     )
 
 
@@ -3166,14 +3200,19 @@ def execute_unit_attempt(
     verify_fn=None,
     cost_tracking: bool = True,
     head_before: str | None = None,
+    prerun_cfg: dict | None = None,
 ) -> tuple[str, object, dict | None]:
-    """One dispatch + parse + (if not blocked) verify cycle.
+    """Pre-dispatch + dispatch + parse + (if not blocked) verify cycle.
 
     Factored out of run() so the parse-and-decision logic is unit-testable
     without spawning a real agent — pass stub callables for dispatch_fn and
     verify_fn from a test.
 
     Returns (outcome, payload, usage) where outcome is one of:
+      "prep_halted"              — wu's declared `prep`/`oracles` halted
+                                  before dispatch (FEAT-2026-0057/T04);
+                                  payload is run_pre_dispatch's outcome dict;
+                                  usage is None, no session was spawned
       "zero_token"              — usage reports input_tokens=0 (agent never
                                   ran); payload is None
       "blocked"                 — agent explicitly emitted status: blocked
@@ -3195,7 +3234,26 @@ def execute_unit_attempt(
     `head_before` is the pre-attempt HEAD SHA the files_changed guard
     diffs against. None disables the guard — preserved for unit tests that
     exercise this function in isolation without a git working tree.
+
+    `prerun_cfg` is a `verification.yml`-shaped dict injectable for testing;
+    None reads it from VERIFICATION_PATH via `load_verification()`, mirroring
+    `verify()`'s own `cfg` parameter.
+
+    Deferred imports (not module-level): `specfuse.loop.prerun` imports
+    `_run_gate_set` from this module, so importing it at module load time
+    would be circular. Imported here, at call time, instead.
     """
+    from specfuse.loop.prerun import run_pre_dispatch
+    from specfuse.loop.prerun_capture import format_oracle_capture
+
+    cfg = prerun_cfg if prerun_cfg is not None else load_verification()
+    prerun_outcome = run_pre_dispatch(wu, feature_dir, cfg)
+    if prerun_outcome["halted"]:
+        return "prep_halted", prerun_outcome, None
+    oracle_section = format_oracle_capture(prerun_outcome["oracle_results"])
+    if oracle_section:
+        wu.body = wu.body + "\n\n" + oracle_section
+
     if verify_fn is None:
         verify_fn = verify
     precreate_dispatch_skeleton(wu, feature_dir)
@@ -5703,7 +5761,7 @@ def run(
                     t0 = time.monotonic()
                     outcome, payload, usage = execute_unit_attempt(
                         wu, feature_dir, failure_note, cost_tracking=cost_tracking,
-                        head_before=head_before,
+                        head_before=head_before, prerun_cfg=cfg,
                     )
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,
@@ -5733,9 +5791,43 @@ def run(
                               f"— no agent output, skipping")
                         continue
 
+                    if outcome == "prep_halted":
+                        # Pre-dispatch `prep`/`oracles` halt (FEAT-2026-0057/T04):
+                        # execute_unit_attempt returned before dispatch() ever ran
+                        # — no session spawned, no cost incurred. Mirrors the
+                        # `blocked` branch's bookkeeping shape but with a distinct
+                        # reason so it is never confused with an agent-reported
+                        # block or an exit-time verification failure.
+                        reset_preserving_events(head_before, events_path,
+                                                untracked_before=untracked_before)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        wu_events.append(emit_attempt_outcome(
+                            wu, attempt, "prep_halted",
+                            attempts_usage[-1],
+                            extras={
+                                "halt_class": payload.get("halt_class"),
+                                "summary": payload.get("message"),
+                            },
+                        ))
+                        wu_events.append(build_event("human_escalation", wu.wu_id, {
+                            "reason": "prep_halted",
+                            "blocked_reason": payload.get("message"),
+                            "attempts": attempt,
+                            "attempts_usage": attempts_usage,
+                        }))
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(prep halt)\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   PREP HALT — {payload.get('message')}")
+                        blocked = True
+                        break
+
                     if outcome == "blocked":
                         # Reset agent work first; THEN write our bookkeeping; THEN
-                        # commit it. Doing the flip before the reset would let the
                         # reset wipe the flip — the silent-state-loss bug.
                         # Use reset_preserving_events to keep prior WU's
                         # flushed-but-uncommitted events.jsonl entries.

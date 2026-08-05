@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 generated_surfaces: []
@@ -13,6 +13,15 @@ produces:
 produces_driver_helper:
   - WorkUnit.prep
   - WorkUnit.oracles
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T13:35:25.427248+00:00
+duration_seconds: 1413.382
+cost_usd: 5.136799
+input_tokens: 4138
+output_tokens: 31669
 ---
 
 # Wire the pre-dispatch runner into the driver's dispatch path
