@@ -34,6 +34,23 @@ _SECTION_HEADER = "## Captured oracle output (pre-dispatch)\n\n"
 _BLOCK_SEP = "\n\n"
 
 
+def _strip_verdict_note(report: str) -> str:
+    """Remove `_NO_VERDICT_NOTE` lines from *report*, preserving everything else.
+
+    The report handed to this module is composed by `_run_gate_set`
+    (`loop.py:2883`) as `### <name>: <PASS|FAIL>` + a fenced block whose body is
+    `select_gate_report_lines` output — so when the command emitted no pass/fail
+    summary, the banner is **already embedded in the report** before this module
+    is reached. Filtering only the selector's return value (as the original fix
+    did) therefore missed every real capture; see issue #756.
+    """
+    if _NO_VERDICT_NOTE not in report:
+        return report
+    kept = [ln for ln in report.splitlines() if ln.strip() != _NO_VERDICT_NOTE]
+    stripped = "\n".join(kept)
+    return stripped + "\n" if report.endswith("\n") else stripped
+
+
 def _fit_to_budget(report: str, budget: int) -> tuple[str, int]:
     """Return (fitted_text, dropped_byte_count) for *report* within *budget*.
 
@@ -51,7 +68,14 @@ def _fit_to_budget(report: str, budget: int) -> tuple[str, int]:
     dropped here: it would be a false claim for a capture that was never a
     failure report, and "run the command directly" is the exact behaviour
     this feature exists to eliminate.
+
+    The strip happens **before** the budget check, not after it. Issue #756:
+    the note is embedded in the incoming report by `_run_gate_set`, and the
+    within-budget early return below sends that report straight through — so a
+    strip applied only to the selector's output ran exclusively on the
+    truncation path and never on the reports real oracles produce.
     """
+    report = _strip_verdict_note(report)
     raw_bytes = report.encode("utf-8")
     if len(raw_bytes) <= budget:
         return report, 0
