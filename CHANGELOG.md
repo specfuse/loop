@@ -26,6 +26,17 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- Work-unit frontmatter gains `folded_through_re_arm`, an integer marker stamped by the driver's re-arm fold in the same write set as the accumulators. `detect_rearm_dispatch` now compares it against `re_arm_count` instead of reading `cost_usd`'s value, so a re-arm whose prior cycle genuinely cost nothing still folds. An absent marker reads as `0`, so the field is additive and an un-migrated project keeps working (FEAT-2026-0067)
+- `specfuse/loop/rearm_migration.py` stamps the new marker onto work units that were already re-armed before this contract, and folds forward the shape whose prior spend survived only in `re_arm_history[].prior_cost_usd`. Importable as `census`, `migrate_file`, and `migrate_repo`; run it once against `.specfuse/features/` after upgrading (FEAT-2026-0067)
+
+### Changed
+
+- `cumulative_cost_usd`, `cumulative_duration_seconds`, `cumulative_input_tokens`, and `cumulative_output_tokens` now accumulate on every re-arm unconditionally, including one whose prior cycle cost $0.00. Previously the fold ran only when `cost_usd > 0` at dispatch, so a zero-cost cycle left its duration and token counts unaccumulated too — anything reading these four fields now reads a more complete quantity than before (FEAT-2026-0067)
+- `task_completed` events carry the corrected accumulator: the emitter reads `cumulative_cost_usd` from frontmatter, so a re-arm the old guard skipped now reports a larger lifetime figure. Anything aggregating `events.jsonl` for cost will see the step (FEAT-2026-0067)
+- `WU.template.md`, in both the packaged and vendored copies, documents `folded_through_re_arm` and states that `cumulative_*` is unconditionally the lifetime accumulator. `cost.py`'s module docstring no longer presents the fold-never-ran shape as a supported ongoing design and names it as a pre-migration legacy its fallback still tolerates (FEAT-2026-0067)
+
 ## [0.9.2+umbrella.0.9.2] - 2026-08-04
 
 ### Fixed

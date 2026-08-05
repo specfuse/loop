@@ -3117,3 +3117,54 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   same as the third patch and retires the whole class. Companion to
   [FEAT-2026-0039/G2-CLOSE], which names the specific criterion-writing mistake; this
   entry is the general escalation rule that would have caught it two instances earlier.
+
+- [FEAT-2026-0067/G1-CLOSE/state-not-value] **A guard that infers "already done" from a
+  value cannot distinguish it from "never happened" — replace the inference with an
+  explicit marker, do not improve the inference.** Four instances in this driver.
+  `detect_rearm_dispatch` read `cost_usd > 0` to mean "a fold is owed", where a zero
+  means *the prior cycle cost nothing* or *a prior fold already moved it*; the fold
+  silently skipped and the spend survived only in `re_arm_history[].prior_cost_usd`.
+  **#306**: a frontmatter scan advanced its index to `len(lines)` and the caller read
+  the terminal value as "closing `---` found", so *found it* and *ran off the end*
+  were the same number — an unterminated block parsed the whole document as
+  frontmatter and blamed an arbitrary body line. **#593** (the presence half, not the
+  timing half — see below): a directory satisfied the `produces:` presence gate,
+  exists-and-non-empty, while failing the diff match, so *the deliverable was
+  produced* and *a directory happens to sit at that path* were the same truthy value.
+  **And the fix's own migration**, which is the instance worth remembering: folding
+  `re_arm_history[].prior_cost_usd` into `cumulative_cost_usd` without resetting
+  `cost_usd` double-counted a work unit that was re-armed and never re-dispatched,
+  because offline `cost_usd` means *prior cycle* or *current cycle* depending on
+  history the file does not state. Rule: when a check answers "has X already
+  happened", the answer must come from a field whose only job is to record that X
+  happened — a marker, a counter, a monotone cycle number, written in the same
+  atomic write set as the effect it marks. Never from a value the effect *also*
+  produces as a side effect, however reliable that side effect looks; that reliability
+  is a coincidence and the debugging cost when it breaks is a silent wrong number, not
+  a crash. Two corollaries. (a) The marker must be stamped with the effect, not after
+  it — a partial write leaving the effect applied and unmarked is worse than the
+  inference it replaced. (b) Removing a value guard removes whatever protection it
+  gave *by accident*: `cost_usd > 0` prevented a double-fold because a fold zeroes
+  `cost_usd`, so the replacement had to provide idempotence deliberately and prove it
+  by calling twice. **Scope note, checked rather than assumed:** #593's *headline* —
+  a correct check running post-session instead of pre-dispatch, $6.42 across three
+  identical refusals — is a **timing** defect and this pattern does not hold on it.
+  Do not cite #593 as a value-ambiguity instance without naming which half.
+
+- [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant] **A guard that reads a field is
+  not the same guard when it runs somewhere else — before moving a read, ask what the
+  old call site guaranteed that the new one does not.** `fold_cumulative_on_rearm` may
+  read `cost_usd` safely because it runs at dispatch, where the field provably holds
+  the prior cycle. A migration module reading the same field offline inherited the code
+  and not the guarantee: offline, `cost_usd` holds the prior cycle for a unit that was
+  never re-dispatched and the current cycle for one that was, and nothing in the file
+  says which. The invariant lived in the **call site**, not in the field, so the copied
+  read was silently wrong on exactly the shape the fixtures did not model. Rule: when
+  lifting a field read out of the function that owns it — into a migration, a lint, a
+  report, an offline audit — write down the precondition the original call site
+  established, then either assert it at the new site or find a field that carries it
+  unconditionally. A cross-check against another source proves the value you are
+  *using* is correct; it does not prove the same money is not already recorded
+  somewhere else in the same file. Companion to
+  [FEAT-2026-0067/G1-CLOSE/state-not-value], which is the same defect stated as a
+  contract rule; this entry is the reviewer's question that catches it at authoring.

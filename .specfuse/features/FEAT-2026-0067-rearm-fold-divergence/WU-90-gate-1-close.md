@@ -1,12 +1,20 @@
 ---
 id: FEAT-2026-0067/G1-CLOSE
 type: close
-status: pending
+status: done
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: partially_met
 model: opus
 effort: high
 gate_set: plannext
+driver_version: 0.9.2
+started_at: 2026-08-05T04:40:04.750040+00:00
+attempts: 1
+duration_seconds: 953.536
+cost_usd: 8.102319
+input_tokens: 140
+output_tokens: 60331
 ---
 
 # Close gate 1 and the feature — retrospective, lessons, docs, terminal verdict
