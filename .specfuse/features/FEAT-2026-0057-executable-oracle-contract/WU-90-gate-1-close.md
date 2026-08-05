@@ -1,14 +1,19 @@
 ---
 id: FEAT-2026-0057/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+verdict: partially_met
 produces:
   - .specfuse/features/FEAT-2026-0057-executable-oracle-contract/RETROSPECTIVE.md
   - .specfuse/LEARNINGS.md
+duration_seconds: 2005.895
+cost_usd: 10.687821
+input_tokens: 13472
+output_tokens: 103947
 ---
 
 # Close gate 1 — retrospective, lessons, docs, and terminal verdict

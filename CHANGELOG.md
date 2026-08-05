@@ -26,6 +26,12 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- `specfuse/loop/prerun.py`, a new importable module shipped in the wheel. `run_pre_dispatch(wu, feature_dir, cfg)` resolves a work unit's `prep` and `oracles` set names against `verification.yml` and runs them — `prep` fail-fast in declared order with a distinct `PREP_HALT_CLASS`, `oracles` capture-all — by calling `_run_gate_set` rather than reimplementing gate execution. An unknown set name returns a named CONFIGURATION ERROR mirroring `verify()`'s `extra_gates` phrasing, never a silent pass. Additive: nothing previously occupied that import path, and the driver does not yet call it, so upgrading changes no observable driver behaviour (FEAT-2026-0057)
+- `specfuse/loop/prerun_capture.py`, a new importable module shipped in the wheel. `format_oracle_capture(results)` turns captured oracle output into a prompt section bounded by `ORACLE_CAPTURE_BUDGET_BYTES` (8000, reused from `truncate_failure_note`'s existing budget for the same class of injected content), splitting the budget evenly across oracles, selecting retained lines through `select_gate_report_lines` rather than a positional tail, and marking any truncation with the exact byte count dropped. Same caveat: no caller in the driver yet (FEAT-2026-0057)
+- The `verification` skill documents a `prep` / `oracles` work-unit frontmatter contract, in both the plugin-shipped and vendored copies, stating that both keys resolve against `verification.yml` set names and both run before dispatch — with a table and a choosing rule against `extra_gates`, which runs at exit. **The driver does not yet honour these keys**: `WorkUnit` carries no `prep` or `oracles` field and `load_wu` parses neither, so a work unit declaring them gets no pre-dispatch run, no captured output, and no warning that the key was ignored. Read the skill section as the intended contract, not as current behaviour (FEAT-2026-0057)
+
 ## [0.9.3+umbrella.0.9.3] - 2026-08-05
 
 ### Added

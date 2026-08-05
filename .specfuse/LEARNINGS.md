@@ -3196,3 +3196,65 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   surfaced only because the close computed a sum and compared it to another sum.
   Companion to [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant], which is the
   defect FU-1 happened to be about; this entry is about the record, not the defect.
+
+- [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] **When a feature's value is that an
+  existing code path starts calling something new, one work unit must own the call
+  site, and its acceptance criteria must assert the call — not the callee.** Every
+  acceptance criterion in this feature's three implementation units was satisfiable by
+  a module in isolation: a red→green test on the module, an import of its symbols, a
+  structural guard on a config key. All three passed honestly, first or second try, at
+  60% under estimate — and the driver still does not read the two frontmatter keys the
+  feature exists to add. `WorkUnit` gained no `prep` or `oracles` field, `load_wu`
+  gained no parse branch, and nothing imports either new module outside its own test
+  file. The close found it by grepping for callers of every symbol the units declared
+  in `produces_driver_helper` and by loading a real WU file through `load_wu`: a unit
+  declaring `prep: [code]` and `oracles: [oracles]` returns the identical empty
+  outcome as one declaring nothing, because `resolve_prerun_sets` reads
+  `getattr(wu, "prep", None)` and the attribute does not exist. Rule at authoring
+  time: for any feature whose goal sentence contains "the driver/pipeline/runner now
+  does X", name the file and function of the call site in some unit's `produces:`, and
+  write at least one criterion whose oracle **fails if the call is deleted**. Two
+  corollaries. (a) **A symbol-existence check proves existence, not integration.**
+  `produces_driver_helper` plus `python3 -c "from … import foo"` is a real and useful
+  guard — it fills the gap where a green test suite cannot detect an absent symbol —
+  but it is silent on whether anything calls `foo`, and both units here declared their
+  symbols accurately while the feature went unwired. (b) **Scope boundaries that
+  correctly protect a seam can also orphan it.** This feature's `PLAN.md` scoped
+  `verify()`, `_run_gate_set`, and `extra_gates` out by construction, which was right
+  and is why sibling units stayed green — but "do not modify the exit path" was never
+  paired with "one unit adds the pre-dispatch call", so the seam was protected by
+  three units and crossed by none.
+
+- [FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question] **Re-running every
+  producing unit's own oracle is not the feature-level re-run `close-discipline.md` §1
+  asks for; a close must ask a question no unit's criteria asked.** Fifteen oracles
+  re-ran green in this close — three scoped red→green tests, two symbol imports, a
+  structural config guard, and the full sixteen-entry `code` gate set at 2325 tests
+  and 93% coverage — and not one of them could observe the defect, because none of
+  them asserts on the path the feature was supposed to change. The escalation trigger
+  for "a re-run oracle disagrees with a producing unit's self-report" correctly did
+  not fire: no oracle disagreed, every unit's `done` was honest, and the definition of
+  done was still unmet. Rule: a close's re-run must include at least one measurement
+  derived from the **gate's definition of done**, not from the union of the units'
+  criteria — the composite question the units were each individually too small to ask.
+  Cheap forms that work: grep for callers of every symbol the units declared, load a
+  real artifact through the production parser rather than a test double, or run the
+  feature's headline sentence as a one-line probe. Companion to
+  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam], which is the authoring-time half of
+  the same failure; this entry is the close-time detection.
+
+- [FEAT-2026-0057/G1-CLOSE/close-attempts-leave-no-ledger] **A close attempt refused
+  post-session by a `closing_requirements` guard leaves no `attempt_outcome` event, so
+  a terminal close cannot reconcile its own estimate — read the gap, do not fill it
+  from memory.** Observed here: `WU-90` carried `attempts: 2` with no `cost_usd`, and
+  the feature's `events.jsonl` held ten events, all for the implementation units and
+  **zero** carrying the close's correlation ID. The three implementation figures
+  reconciled to the cent against frontmatter; the fourth, which the close's own
+  acceptance criterion named explicitly, had no source at all. Rule for any close
+  whose cost-analysis criterion names its own estimate: state the feature total as a
+  **lower bound** with the missing cycles named, rather than producing a plausible
+  number — the criterion's whole point is "read from `events.jsonl` rather than
+  recalled", and a recalled close figure is the one line in the table nothing can
+  check. Rule for anyone reading a retrospective's spend: `attempt_outcome` sums are
+  complete for gate-verified attempts and silent about guard-refused ones, so an
+  expensive close can look free.
