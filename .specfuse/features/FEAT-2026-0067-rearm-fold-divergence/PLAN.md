@@ -5,7 +5,7 @@ slug: rearm-fold-divergence
 branch: feat/FEAT-2026-0067-rearm-fold-divergence
 roadmap_goal: Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way — so a reader cannot mistake "never re-armed" for "re-armed and the fold silently did not run".
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 16.50
 ---
 

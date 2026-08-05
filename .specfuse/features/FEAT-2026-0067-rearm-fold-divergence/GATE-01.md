@@ -1,6 +1,6 @@
 ---
 number: 1
-status: awaiting_review
+status: passed
 cost_budget_usd: 20.00
 baseline:
   sha: 4ebc96cb69635b54b299e5eaf1488d492336756c
