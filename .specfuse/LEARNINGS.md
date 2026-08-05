@@ -3243,18 +3243,74 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam], which is the authoring-time half of
   the same failure; this entry is the close-time detection.
 
-- [FEAT-2026-0057/G1-CLOSE/close-attempts-leave-no-ledger] **A close attempt refused
-  post-session by a `closing_requirements` guard leaves no `attempt_outcome` event, so
-  a terminal close cannot reconcile its own estimate — read the gap, do not fill it
-  from memory.** Observed here: `WU-90` carried `attempts: 2` with no `cost_usd`, and
-  the feature's `events.jsonl` held ten events, all for the implementation units and
-  **zero** carrying the close's correlation ID. The three implementation figures
-  reconciled to the cent against frontmatter; the fourth, which the close's own
-  acceptance criterion named explicitly, had no source at all. Rule for any close
-  whose cost-analysis criterion names its own estimate: state the feature total as a
-  **lower bound** with the missing cycles named, rather than producing a plausible
-  number — the criterion's whole point is "read from `events.jsonl` rather than
-  recalled", and a recalled close figure is the one line in the table nothing can
-  check. Rule for anyone reading a retrospective's spend: `attempt_outcome` sums are
-  complete for gate-verified attempts and silent about guard-refused ones, so an
-  expensive close can look free.
+- [FEAT-2026-0057/G1-CLOSE/close-is-blind-to-its-own-ledger] **A work unit's
+  `attempt_outcome` events are buffered and flushed only at its terminal outcome, so a
+  close reading `events.jsonl` mid-session sees every prior unit and **nothing about
+  itself** — including nothing about its own earlier attempts. State the close's own
+  spend from frontmatter, and never from memory.** (Corrects this entry's first
+  version, which read the same observation as "a guard-refused close attempt leaves no
+  event at all". It does leave one: `emit_attempt_outcome` appends to the in-memory
+  `wu_events` list, and `flush_events` writes the batch when the WU reaches
+  `done`/`blocked_human`. A close authored mid-flight sees a file that genuinely holds
+  zero events for its own correlation ID, and generalising from that to "the ledger is
+  never written" was wrong — the events for a $10.69 two-attempt close appeared on
+  disk the moment it completed.) Two practical rules follow. (a) For a close whose
+  cost-analysis criterion names its own estimate: `events.jsonl` cannot answer it, but
+  a **re-armed** close can, because the driver folds the prior cycle into
+  `cumulative_cost_usd` / `cumulative_duration_seconds` and stamps
+  `folded_through_re_arm` — read those, say the source is frontmatter, and state
+  this pass's own spend as not-yet-written rather than estimating it. (b) A
+  `closing_requirements` guard refusal produces an `attempt_outcome` whose `outcome`
+  names the guard (e.g. `closing_deliverable_missing`) while `failure_class` and
+  `failure_signature` are both **null** and `files_touched` is `[]` — so a
+  failure-class breakdown that groups only on `failure_class` silently drops the most
+  expensive attempt in the feature. Group on `outcome` too. Here that one refused
+  attempt was $5.73 of a $19.87 lifetime, 29%, for a missing `CHANGELOG.md` append.
+
+- [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart] **A work unit that edits the
+  driver has no effect on anything the same driver process dispatches afterwards —
+  including the close work unit armed to verify it. Restart the driver between the
+  wiring unit and its proof, or the proof measures the old code.** Observed here in
+  its most expensive form: T04 wired the pre-dispatch hook into `execute_unit_attempt`
+  correctly, in one attempt, with eight passing tests; the very next unit dispatched
+  was the close designed to read the injected output, and its prompt carried none.
+  Timestamps were decisive — the driver process imported `specfuse/loop/loop.py` at
+  13:30:46 UTC (matching `GATE-01.md`'s `baseline.probed_at` to the second), T04's
+  session began at 13:35:25 and ran 1413s, and the close began at 13:58:59. Python
+  caches modules in `sys.modules` at first import, so the `execute_unit_attempt` in
+  memory was the pre-T04 function object with no call site at all. **A deferred import
+  inside the new code does not save you** — deferral moves the *callee's* import to
+  call time, but the call site lives in the stale caller and is never reached. Nothing
+  in the gate can catch this: unit tests, symbol imports, and close-time probes all
+  run in fresh interpreters and all report the new behaviour correctly, which is
+  precisely why the disagreement reads as a mystery instead of an obvious staleness
+  bug. Rules. (a) When any work unit's `produces:` names a driver module, plan a
+  driver restart before the unit that verifies it — treat "restart the loop" as a step
+  in the gate, not an operator afterthought. (b) A close that cannot explain why a
+  driver behaviour it can reproduce in-process did not happen in its own dispatch
+  should check the driver process's start time (`ps -eo pid,lstart,command`) against
+  the wiring unit's `started_at` before writing anything else. (c) This is the
+  self-hosting form of the harness-migration hazard already in this file: there, a WU
+  editing `verification.yml` or the test loader breaks its siblings' oracles; here, a
+  WU editing the dispatch path silently fails to reach them.
+
+- [FEAT-2026-0057/G1-CLOSE/informational-output-has-no-verdict] **Do not run
+  informational captured output through a pass/fail verdict selector — it will
+  confidently report that the verdict is missing, and tell the reader to go run the
+  command themselves.** `format_oracle_capture` budgets each captured `oracles` entry
+  through `select_gate_report_lines`, which was the right budgeting primitive
+  (FEAT-2026-0068's verdict-aware selection, versus a positional tail) and the wrong
+  *semantic* one. An `oracles` entry is informational by construction — `git log
+  --oneline -20` has no pass/fail summary and never will — so every captured block,
+  including short complete untruncated ones, comes back carrying `NO VERDICT FOUND:
+  the gate command produced no recognisable pass/fail summary anywhere in its output —
+  the lines above are the tail only, and may be unrelated to the failure. Run the
+  command directly.` Both halves are actively harmful: the claim is false for a
+  complete capture, and the instruction is the exact re-derivation the injection
+  exists to eliminate — and in this repo's case, the reading agent is a close WU whose
+  **Do not touch** list forbids running those `git` commands at all. Rule when reusing
+  a gate-shaped primitive for a non-gate purpose: check whether its *failure* text is
+  addressed to the same reader. Budgeting, truncation, and line selection generalise
+  across gate and non-gate output; verdict language does not, and a banner authored
+  for "this gate failed and you should investigate" reads as an instruction when it
+  lands in a prompt.

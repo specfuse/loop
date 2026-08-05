@@ -1,21 +1,32 @@
 ---
 id: FEAT-2026-0057/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 re_arm_count: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
 oracles: [oracles]
-verdict: partially_met
+verdict: met_locally
 produces:
   - .specfuse/features/FEAT-2026-0057-executable-oracle-contract/RETROSPECTIVE.md
   - .specfuse/LEARNINGS.md
-duration_seconds: 2005.895
-cost_usd: 10.687821
-input_tokens: 13472
-output_tokens: 103947
+duration_seconds: 1026.518
+cost_usd: 5.331691
+input_tokens: 6721
+output_tokens: 56396
+cumulative_cost_usd: 10.687821
+cumulative_duration_seconds: 2005.895
+cumulative_input_tokens: 13472
+cumulative_output_tokens: 103947
+cumulative_attempts: 0
+folded_through_re_arm: 1
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.9.3
+started_at: 2026-08-05T13:58:59.057829+00:00
 ---
 
 # Close gate 1 — retrospective, lessons, docs, and terminal verdict
