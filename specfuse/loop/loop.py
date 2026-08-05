@@ -2736,6 +2736,12 @@ _VERDICT_RE = re.compile(
     r"|Traceback \(most recent call last\)"
     r"|\d+ (?:passed|failed|error)"          # pytest summary
     r"|TOTAL\s+\d"                           # coverage total
+    # ruff (#723). Its summary is the verdict for this repo's own `lint` gate,
+    # the second entry in the `code` set. Without these two the selector pinned
+    # nothing on a lint failure, appended _NO_VERDICT_NOTE, and fell back to the
+    # positional tail FEAT-2026-0068 exists to prevent.
+    r"|Found \d+ errors?\b"                  # ruff failure summary
+    r"|All checks passed!"                   # ruff clean summary
     r")"
 )
 
