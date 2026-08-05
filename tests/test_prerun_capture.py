@@ -68,6 +68,23 @@ class TestCapture(unittest.TestCase):
         self.assertIn("OK", section)
         self.assertNotIn("dropped", section)
 
+    def test_complete_capture_carries_no_verdict_banner(self):
+        # An informational oracle (e.g. `git log --oneline -20`) has no
+        # pass/fail summary and never will. Even when its capture must be
+        # truncated to fit the budget, it must not be told it has "NO
+        # VERDICT FOUND" — that claim is false for a complete, non-failure
+        # capture — and must never be instructed to re-run the command
+        # itself, which this feature exists to eliminate.
+        log_lines = "\n".join(f"abc{i:04d} commit message {i} " + "x" * 40 for i in range(300))
+        results = [{"name": "git_log", "ok": True, "report": log_lines}]
+
+        section = format_oracle_capture(results)
+
+        self.assertNotIn("NO VERDICT FOUND", section)
+        self.assertNotIn("Run the command directly.", section)
+        self.assertIn("[", section)  # dropped-bytes marker still present
+        self.assertIn("byte(s) dropped by ORACLE_CAPTURE_BUDGET_BYTES", section)
+
 
 if __name__ == "__main__":
     unittest.main()

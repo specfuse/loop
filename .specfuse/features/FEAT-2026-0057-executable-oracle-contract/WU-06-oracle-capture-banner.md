@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 generated_surfaces: []
@@ -12,6 +12,15 @@ produces:
   - tests/test_prerun_capture.py
 produces_driver_helper:
   - format_oracle_capture
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T14:44:53.569905+00:00
+duration_seconds: 565.945
+cost_usd: 0.680581
+input_tokens: 38
+output_tokens: 7225
 ---
 
 # Stop informational oracle captures carrying a false "NO VERDICT FOUND" banner

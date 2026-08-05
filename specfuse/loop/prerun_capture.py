@@ -21,7 +21,7 @@ truncation policy.
 
 from __future__ import annotations
 
-from specfuse.loop.loop import select_gate_report_lines
+from specfuse.loop.loop import _NO_VERDICT_NOTE, select_gate_report_lines
 
 # `truncate_failure_note` (`loop.py:2169`) already injects captured/failure
 # text into a work-unit-facing prompt in this codebase, at `max_chars=8000`.
@@ -42,12 +42,21 @@ def _fit_to_budget(report: str, budget: int) -> tuple[str, int]:
     exceed *budget*, lines are kept front-to-back (preserving pinned verdict
     lines, which `select_gate_report_lines` places first) until the budget is
     spent.
+
+    `select_gate_report_lines` is a pass/fail verdict selector built for gate
+    FAIL reports (FEAT-2026-0068); it appends `_NO_VERDICT_NOTE` — including
+    the instruction to re-run the command directly — when it finds no
+    pass/fail summary. An `oracles` capture is informational by design (e.g.
+    `git log --oneline -20` has no verdict and never will), so that note is
+    dropped here: it would be a false claim for a capture that was never a
+    failure report, and "run the command directly" is the exact behaviour
+    this feature exists to eliminate.
     """
     raw_bytes = report.encode("utf-8")
     if len(raw_bytes) <= budget:
         return report, 0
 
-    lines = select_gate_report_lines(report, window=15)
+    lines = [ln for ln in select_gate_report_lines(report, window=15) if ln != _NO_VERDICT_NOTE]
     fitted = "\n".join(lines)
     fitted_bytes = fitted.encode("utf-8")
     if len(fitted_bytes) <= budget:
