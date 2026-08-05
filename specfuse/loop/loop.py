@@ -5886,6 +5886,8 @@ def run(
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "squash_commit_failed",
                                 attempts_usage[-1],
+                                failure_class="squash_commit_failed",
+                                failure_signature="squash_commit_rejected",
                                 extras={"summary": summary},
                             ))
                             attempt_notes.append((attempt, summary))
@@ -5913,6 +5915,8 @@ def run(
                                 wu_events.append(emit_attempt_outcome(
                                     wu, attempt, "smoke_import_failed",
                                     attempts_usage[-1],
+                                    failure_class="smoke_import_failed",
+                                    failure_signature="run_smoke_imports",
                                     extras={"summary": smoke_summary},
                                 ))
                                 attempt_notes.append((attempt, smoke_summary))
@@ -5933,14 +5937,21 @@ def run(
                             # may list several; the first `assert_*` token is the
                             # primary one and keeps the event field queryable.
                             _assert_m = re.search(r"assert_\w+", closing_summary)
+                            _closing_assertion = (
+                                _assert_m.group(0) if _assert_m
+                                else closing_summary.split(":", 1)[0].strip()
+                            )
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "closing_deliverable_missing",
                                 attempts_usage[-1],
+                                failure_class="guard_refusal",
+                                # The SPECIFIC failing assertion, not a constant:
+                                # assert_changelog_entry_for_contract_changes and
+                                # assert_cost_analysis_section_when_met are
+                                # different failures and must not share a cluster.
+                                failure_signature=_closing_assertion,
                                 extras={
-                                    "assertion": (
-                                        _assert_m.group(0) if _assert_m
-                                        else closing_summary.split(":", 1)[0].strip()
-                                    ),
+                                    "assertion": _closing_assertion,
                                     "summary": closing_summary,
                                 },
                             ))
@@ -5969,6 +5980,8 @@ def run(
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "deliverable_missing",
                                 attempts_usage[-1],
+                                failure_class="guard_refusal",
+                                failure_signature="assert_declared_deliverables",
                                 extras={"summary": deliv_summary,
                                         "missing": missing},
                             ))
@@ -5995,6 +6008,8 @@ def run(
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "no_deliverable_files",
                                 attempts_usage[-1],
+                                failure_class="guard_refusal",
+                                failure_signature="assert_implementation_touched_files",
                                 extras={"summary": impl_summary},
                             ))
                             attempt_notes.append((attempt, impl_summary))
@@ -6067,6 +6082,8 @@ def run(
                                 wu_events.append(emit_attempt_outcome(
                                     wu, attempt, "learnings_not_staged",
                                     attempts_usage[-1],
+                                    failure_class="guard_refusal",
+                                    failure_signature="assert_learnings_staged_under_auto",
                                     extras={"summary": stage_reason},
                                 ))
                                 attempt_notes.append((attempt, stage_reason))
