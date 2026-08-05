@@ -80,7 +80,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
 | FEAT-2026-0063 | Branch-observation sweep for the arm predicate | done | — | [→ archive](roadmap-archive.md#feat-2026-0063) |
 | FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | done | — | [→ archive](roadmap-archive.md#feat-2026-0064) |
-| FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | planned | — | [→ detail](#feat-2026-0067) |
+| FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | active | `.specfuse/features/FEAT-2026-0067-rearm-fold-divergence/` | [→ detail](#feat-2026-0067) |
 | FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
 | FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
 | FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
@@ -955,7 +955,7 @@ What remains is a frontmatter contract that means two different things with no w
 
 **Benefits.** The frontmatter stops encoding a distinction nobody intended, so the next person to read `cumulative_cost_usd` is not misled the way FEAT-2026-0062's drafting was. The same fix covers the duration and token accumulators before a consumer starts gating on them and inherits the defect. And a value-inferred "already done" guard — a recurring source of defects in this driver — is removed rather than worked around.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0068"></a>
 ## FEAT-2026-0068 — Gate failure reports must contain the failure: verdict-aware output tail
