@@ -1214,3 +1214,34 @@ confirmed still open.
   `NO VERDICT FOUND` nor `Run the command directly.` — the same observation this
   pass just made in the negative.
 - **kind:** `externally-verifiable-later`
+
+
+---
+
+### Post-acceptance amendment — FU-5R fixed on-branch (2026-08-05)
+
+**This note is additive. No entry above is rewritten, and none is marked
+discharged** — the record must keep reading as what was true at acceptance time.
+
+After the acceptance was recorded, the operator elected to fix FU-5R on this
+feature's own branch rather than as a follow-on bug, so the branch would not merge
+a mechanism that instructs its reader to do the thing the mechanism exists to
+prevent. Landed as `5043f9c`, *fix(prerun): strip the no-verdict banner before the
+budget check*.
+
+The fix moves the `_NO_VERDICT_NOTE` strip above `_fit_to_budget`'s
+within-budget early return, so it applies on both branches rather than only the
+truncation path. Verified through the production pipeline — real
+`verification.yml`, real `run_pre_dispatch`, real `format_oracle_capture` — with
+**zero banner lines** in the injected section and `Run the command directly.`
+absent. `TestGateSetShapedCapture` was added with fixtures built the way
+`_run_gate_set` actually composes a report, plus a guard test asserting the
+fixture still carries the banner so the new tests cannot pass vacuously.
+
+Issue specfuse/loop#756 stays open until this branch merges.
+
+**Unchanged by this amendment:** FU-2R (specfuse/loop#758), FU-4
+(specfuse/loop#723), and FU-6R (specfuse/loop#757) remain open exactly as
+recorded above. FU-1R's final proof — a clean injected capture observed in a real
+dispatched session — still requires a driver process started after this fix, per
+FU-6R, and will occur naturally on the next feature's first close.
