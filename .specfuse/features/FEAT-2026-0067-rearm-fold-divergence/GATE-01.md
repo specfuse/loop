@@ -1,7 +1,7 @@
 ---
 number: 1
-status: awaiting_review
-cost_budget_usd: 14.00
+status: open
+cost_budget_usd: 20.00
 baseline:
   sha: 723c5d3b8227f69c644539f1bee5ff4407bcb513
   probed_at: 2026-08-05T03:58:06.691421+00:00

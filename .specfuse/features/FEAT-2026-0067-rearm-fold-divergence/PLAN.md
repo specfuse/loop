@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0067-rearm-fold-divergence
 roadmap_goal: Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way — so a reader cannot mistake "never re-armed" for "re-armed and the fold silently did not run".
 autonomy_default: review
 status: active
-planned_cost_usd: 14.00
+planned_cost_usd: 16.50
 ---
 
 # Plan: one fold path
@@ -120,6 +120,11 @@ gates:
       - id: FEAT-2026-0067/T03
         file: WU-03-contract-and-accessor.md
         depends_on: [FEAT-2026-0067/T01]
+      # T04: fix WU added after G1-CLOSE hedged on a defect T02 introduced and
+      # the close was not permitted to repair. See RETROSPECTIVE.md FU-1.
+      - id: FEAT-2026-0067/T04
+        file: WU-04-fix-offline-fold-double-count.md
+        depends_on: [FEAT-2026-0067/T02]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0067/G1-CLOSE
         file: WU-90-gate-1-close.md
@@ -127,4 +132,5 @@ gates:
           - FEAT-2026-0067/T01
           - FEAT-2026-0067/T02
           - FEAT-2026-0067/T03
+          - FEAT-2026-0067/T04
 ```
