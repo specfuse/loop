@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 generated_surfaces: []
@@ -10,6 +10,15 @@ produces:
   - .specfuse/verification.yml
   - tests/test_oracle_set_declared.py
   - .specfuse/skills/verification/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T12:21:19.821013+00:00
+duration_seconds: 754.855
+cost_usd: 1.39874
+input_tokens: 4
+output_tokens: 1195
 ---
 
 # Declare this repo's oracle set and document the pre-dispatch contract

@@ -148,3 +148,19 @@ doc:
 plannext:
   - name: plan-lint
     command: "python3 .specfuse/scripts/lint_plan.py {feature_dir}"
+
+# oracles: pre-dispatch, capture-all (FEAT-2026-0057/T01, prerun.py). Distinct
+# from `code`: these are not mergeability gates re-run at exit, they are
+# informational commands whose captured output is injected into the session
+# prompt *before* dispatch so a session (a close, most commonly) reads real
+# repo state instead of re-deriving it from prose. Selected per-WU via the
+# `oracles:` frontmatter key — see .specfuse/skills/verification/SKILL.md.
+oracles:
+  - name: recent-commits
+    # What landed since baseline, for a close session to read instead of
+    # re-running `git log` itself and burning a turn on it.
+    command: "git log --oneline -20"
+
+  - name: diff-stat
+    # Shape of the changeset against main, same reasoning as recent-commits.
+    command: "git --no-pager diff --stat main"
