@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0057/G1-CLOSE
 type: close
-status: draft
+status: blocked_human
 attempts: 0
 re_arm_count: 2
 planned_cost_usd: 5.00
@@ -30,6 +30,18 @@ started_at: 2026-08-05T13:58:59.057829+00:00
 ---
 
 # Close gate 1 — retrospective, lessons, docs, and terminal verdict
+
+> **Operator note — why this unit is `blocked_human` and not a failure.**
+> Nothing went wrong here. This status is a deliberate hold so the T05/T06 run
+> cannot dispatch this close in the same driver process. `execute_unit_attempt`
+> imports `specfuse.loop.prerun_capture` at call time but calls it for **every**
+> work unit, so dispatching T05 caches the pre-T06 module and this close would
+> read the banner T06 exists to remove. `draft` cannot be used for the hold — the
+> arm check rejects a whole gate containing any draft WU.
+>
+> The human action this unit is blocked on is: **start a fresh driver process.**
+> Flip to `pending` (`/unblock-wu`) and run the driver again once T05 and T06 are
+> `done`. See PLAN.md, *Two-invocation sequencing*.
 
 **Objective.** Close the feature: re-run its oracles fresh, judge the definition
 of done, record what was learned, and write the terminal verdict.

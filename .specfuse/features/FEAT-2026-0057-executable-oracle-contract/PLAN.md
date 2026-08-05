@@ -173,12 +173,22 @@ that same run would receive the old banner.
 
 Therefore this gate completes in **two driver invocations**:
 
-1. **Run 1** — `G1-CLOSE` sits at `status: draft` (not in `DISPATCHABLE`). The
-   driver dispatches T05 and T06 only.
-2. **Run 2** — a human flips `G1-CLOSE` to `pending`, bumps `re_arm_count`, and
-   starts a **fresh** driver process. Its first `execute_unit_attempt` call is the
-   close's, so it imports the post-T06 modules and the injected capture reflects
-   both T04's wiring and T06's fix.
+1. **Run 1** — `G1-CLOSE` sits at `status: blocked_human`. The driver dispatches
+   T05 and T06 only.
+2. **Run 2** — a human flips `G1-CLOSE` to `pending` (`/unblock-wu`) and starts a
+   **fresh** driver process. Its first `execute_unit_attempt` call is the close's,
+   so it imports the post-T06 modules and the injected capture reflects both T04's
+   wiring and T06's fix.
+
+**Why `blocked_human` rather than `draft` for the hold.** `draft` was tried first
+and refused: the arm check (`loop.py:5436`) rejects an entire gate containing any
+`draft` work unit, because `draft` means "plan-next drafted this and a human has
+not reviewed it." `blocked_human` is excluded from `DISPATCHABLE` by `ready()`
+(`loop.py:5295`) and is skipped cleanly, and `/unblock-wu` is its supported route
+back to `pending`. The status is honest here in substance: this close genuinely
+cannot run correctly until a human performs an action outside the loop — starting
+a new driver process — which is what `blocked_human` means. The work unit body
+carries an operator note saying so, so it is not misread as a failure.
 
 Run 2 is also what discharges FU-1R, which needs nothing but a restarted driver.
 Collapsing these into one invocation reproduces the exact defect this round exists
