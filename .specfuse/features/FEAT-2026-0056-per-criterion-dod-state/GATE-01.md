@@ -2,6 +2,10 @@
 gate: 1
 status: open        # open | awaiting_review | passed
 cost_budget_usd: 29.00
+baseline:
+  sha: fd59b7b2e9edaae139769a2d8b9325ea48d51204
+  probed_at: 2026-08-05T23:40:22.255818+00:00
+  failing: []
 ---
 
 # Gate 1 — a close records per-criterion state that survives a re-arm
