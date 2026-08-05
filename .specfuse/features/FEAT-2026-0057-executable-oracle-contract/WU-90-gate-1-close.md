@@ -8,7 +8,7 @@ planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
 oracles: [oracles]
-verdict: met_locally
+verdict: met
 produces:
   - .specfuse/features/FEAT-2026-0057-executable-oracle-contract/RETROSPECTIVE.md
   - .specfuse/LEARNINGS.md

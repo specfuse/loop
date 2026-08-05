@@ -1056,3 +1056,161 @@ The gate lands at `awaiting_review` and `PLAN.md` stays `active`
 choice is between accepting the hedge and arming one small unit for FU-5R —
 a two-line branch fix plus a test built from a `_run_gate_set`-shaped input —
 followed by a driver restart, per FU-6R.
+
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Recorded:** 2026-08-05T16:11:28Z
+
+**Verdict ceiling at acceptance:** `rework exists` — computed by
+`closing_requirements.verdict_ceiling_for_kinds` over the kinds present. All four
+standing entries are `externally-verifiable-later`, so in-repo rework or an
+operator action could raise this verdict. The operator accepted now instead of
+waiting for those conditions.
+
+**Operator's reason, verbatim:**
+
+> Mechanism is working and gaps found will be covered later
+
+**Tracking surfaces.** None of the four entries is `routed-finding`, so this
+skill's per-entry tracking prompt did not apply. The operator nonetheless filed
+each as a GitHub issue before accepting:
+
+| Entry | Issue |
+|---|---|
+| FU-2R | specfuse/loop#758 |
+| FU-5R | specfuse/loop#756 |
+| FU-4  | specfuse/loop#723 |
+| FU-6R | specfuse/loop#757 |
+
+**These follow-ups are NOT discharged.** They are carried forward exactly as open
+as they were when the close wrote them. Accepting a hedge means shipping with
+known-open items, not resolving them. The four entries below are reproduced
+verbatim from the *Hedged-verdict follow-up record* above; none is paraphrased,
+dropped, or marked complete.
+
+---
+
+### FU-2R — `prep`'s operator-facing halt path has never fired on real input
+
+- **The criterion, verbatim:** `GATE-01.md`'s definition of done — *"The driver
+  runs prep fail-fast and oracles capture-all **before** dispatching the session,
+  and halts distinctly when prep fails."*
+- **Why it is unmet here:** the oracles-capture-all half is now **met by direct
+  observation** — this session's prompt carries both declared oracles' output,
+  run before dispatch. The fail-fast half is verified in code:
+  `test_failing_prep_halts_before_dispatch` asserts `execute_unit_attempt`
+  returns `"prep_halted"` and `dispatch_fn` is never called, re-run green this
+  session. The *distinct halt* half is the `run()` branch: tree reset,
+  `blocked_human` flip, `attempt_outcome` with `halt_class`, `human_escalation`
+  with `reason: "prep_halted"`, a bookkeeping commit, and a `PREP HALT` operator
+  line. No work unit in this repository declares `prep:`, so none of that has
+  executed against a real failing prep entry.
+- **Why it was not fixed in this session:** `specfuse/loop/loop.py` and `tests/`
+  are on this unit's **Do not touch** list, and declaring a `prep:` set on a live
+  work unit is an implementation edit, not a close's.
+- **The exact re-run condition that would upgrade the verdict to `met`:** dispatch
+  a work unit declaring a `prep:` set whose first entry exits non-zero. It
+  upgrades to `met` when the WU's status is `blocked_human`, `events.jsonl`
+  carries an `attempt_outcome` with `outcome: "prep_halted"` and
+  `halt_class: "prep_halt"` plus a `human_escalation` with
+  `reason: "prep_halted"`, no session was spawned (the attempt's cost is $0.00),
+  and no later `prep` entry in the set executed.
+- **kind:** `externally-verifiable-later`
+
+### FU-5R — the captured-oracle banner survives T06; the fix sits on an unreachable branch
+
+- **The criterion, verbatim:** T06's criterion 3 — *"The string `Run the command
+  directly.` never appears in a section returned by `format_oracle_capture`, for
+  any input — truncated or not. An `oracles` capture must never instruct its
+  reader to re-run the command."* And `GATE-01.md`'s definition of done — *"under
+  a byte budget that preserves verdicts rather than tails."*
+- **Why it is unmet here:** measured three ways this session, all recorded in
+  full above. (a) `format_oracle_capture` on a report shaped as `_run_gate_set`
+  actually builds one returns a section containing both `NO VERDICT FOUND` and
+  `Run the command directly.`. (b) `run_pre_dispatch` returns `oracle_results`
+  whose `report` values **already contain** the banner, because `_run_gate_set`
+  composes each report from `select_gate_report_lines` output before
+  `format_oracle_capture` is reached. (c) This session's own injected prompt
+  carries the banner on both oracle blocks — the defect in production, telling a
+  work unit forbidden to run `git` to go run `git`. Root cause:
+  `prerun_capture.py`'s filter at line 59 sits after the
+  `if len(raw_bytes) <= budget: return report, 0` early return at lines 56–57, so
+  it runs only on the truncation path. T06's test
+  (`test_complete_capture_carries_no_verdict_banner`) builds an ~18 KB raw log
+  with no banner in it, exercising the one branch where the filter lives and
+  neither condition under which the defect appears.
+- **Why it was not fixed in this session:** `specfuse/loop/prerun_capture.py`,
+  `select_gate_report_lines`, and `tests/` are all on this unit's **Do not
+  touch** list. This is a reflective unit; a defect found here is routed.
+- **The exact re-run condition that would upgrade the verdict to `met`:** strip
+  `_NO_VERDICT_NOTE` from the report on **both** branches of `_fit_to_budget` —
+  including the within-budget early return — or, better, stop composing the
+  banner into `oracles` reports at their source in `prerun.py`. It upgrades to
+  `met` when, for a report built the way `_run_gate_set` builds one (fenced
+  block, `select_gate_report_lines` output, no pass/fail verdict in the command's
+  output), `format_oracle_capture` returns a section containing **neither**
+  `NO VERDICT FOUND` nor `Run the command directly.` at any size — under budget
+  and over it — while an over-budget report still carries the explicit
+  `[N byte(s) dropped by ORACLE_CAPTURE_BUDGET_BYTES]` marker; and when a real
+  dispatched session's injected capture is clean.
+- **kind:** `externally-verifiable-later`
+
+### FU-4 — `select_gate_report_lines` does not treat ruff's summary as a verdict
+
+Carried forward from both prior passes unchanged; re-run this session and
+confirmed still open.
+
+- **The criterion, verbatim:** T02's criterion 3 — *"When an oracle's output
+  exceeds its share of the budget, the retained lines are selected via
+  `select_gate_report_lines`, so a verdict line near the top of the output
+  survives while the middle is dropped."*
+- **Why it is unmet here:** met for the gates FEAT-2026-0068 tuned it against,
+  not universally. Re-run on the exact captured `lint` output from T02's own
+  attempt-1 `failure_excerpt`, the selector returns the file line, the
+  `Found 1 error.` line, and a `NO VERDICT FOUND` banner; on ruff's passing
+  output it returns `All checks passed!` and the same banner. Neither ruff
+  verdict is recognised, so nothing is pinned and `_fit_to_budget` degrades to a
+  positional tail for this repository's `lint` gate. Not yet harmful — ruff's
+  output fits inside an 8000-byte share — but the stated guarantee does not hold
+  across this repo's own gate set.
+- **Why it was not fixed in this session:** `select_gate_report_lines` lives in
+  `specfuse/loop/loop.py`, on this unit's **Do not touch** list and on T02's.
+- **The exact re-run condition that would upgrade the verdict to `met`:** teach
+  `select_gate_report_lines` to recognise ruff's `Found N error(s).` and
+  `All checks passed!` as verdict lines. It upgrades to `met` when
+  `select_gate_report_lines(<ruff failing output>, 15)` returns the
+  `Found 1 error.` line without the `NO VERDICT FOUND` banner, and when a
+  synthetic ruff report of 500+ lines still shows that summary after
+  `format_oracle_capture` bounds it.
+- **kind:** `externally-verifiable-later`
+
+### FU-6R — a fix to the capture path cannot be proved by the same driver process that dispatched its prover
+
+- **The criterion, verbatim:** `GATE-01.md`'s definition of done — *"The captured
+  oracle output reaches the session as input, under a byte budget that preserves
+  verdicts rather than tails."* Specifically the standing constraint on how any
+  future fix to it gets proved.
+- **Why it is unmet here:** recorded as a follow-up rather than a lesson-only
+  note because it binds the FU-5R re-run condition above.
+  `execute_unit_attempt` imports `specfuse.loop.prerun_capture` at call time but
+  calls it unconditionally for **every** work unit, so the first dispatch of any
+  driver process caches the module. A unit that fixes `prerun_capture.py` and a
+  close that reads its own injected prompt to verify the fix therefore cannot
+  share a driver process — the close would read the pre-fix formatter. This gate
+  already paid for the one-layer-up version of this (T04, pass 2, $5.33) and
+  spent a whole planned invocation avoiding it for T06 — and T06's fix still did
+  not land, for an unrelated reason, which means the sequencing cost was paid for
+  nothing this round.
+- **Why it was not fixed in this session:** it is not a code defect. It is a
+  property of Python module caching plus the driver's own dispatch shape, and the
+  mitigation is operational.
+- **The exact re-run condition that would upgrade the verdict to `met`:** land the
+  FU-5R fix in one driver invocation, stop the driver, and re-arm this close in a
+  **freshly started** process. It upgrades to `met` when that session's injected
+  `## Captured oracle output (pre-dispatch)` section contains neither
+  `NO VERDICT FOUND` nor `Run the command directly.` — the same observation this
+  pass just made in the negative.
+- **kind:** `externally-verifiable-later`

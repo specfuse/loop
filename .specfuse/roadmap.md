@@ -72,7 +72,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
-| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | active | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ detail](#feat-2026-0057) |
+| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
@@ -879,19 +879,6 @@ machine-checkable contract rather than prose.
 **Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
 
 **Status: planned.**
-
-<a id="feat-2026-0057"></a>
-## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
-
-**Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
-
-**Goal.** A work unit's environment prep and verification oracles run deterministically *before* its session starts, with the captured output as the agent's input — so a close interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt. Two opt-in frontmatter keys, `prep:` (fail-fast, distinct halt class) and `oracles:` (capture-all, injected under a byte budget that preserves verdicts), both resolving against `verification.yml` set names. Target-project harness scripts (e.g. the generator's SQL Server scenario matrix) stay in the target repo; the loop ships the contract, dispatch, and capture.
-
-**Scope narrowed at draft time (2026-08-05).** The existing-mechanism search found most of the originally-framed goal already shipped: `verification.yml` sets are already named and ordered and readable by any name (`gate_commands.py`); `extra_gates` (`loop.py:212`, issue #62) already selects arbitrary sets per work unit; `_run_gate_set` (`loop.py:2753`) already executes and captures with timeout, process-group kill, and Windows routing; FEAT-2026-0068 already made capture verdict-aware. All of it runs at **exit** — `verify()` calls itself "the exit oracle" — so an agent needing results before writing a verdict still hand-drives, and a fail-fast prep step has nowhere to live. This feature therefore builds only the pre-dispatch timing hook and reuses the rest unchanged. **Dropped:** oracle declarations in GATE frontmatter (per-work-unit selection already exists — a second declaration surface would duplicate a working one). **Still out:** per-criterion binding, which remains FEAT-2026-0056's.
-
-**Benefits.** Close attempts become script-run plus interpretation — cheaper, reproducible, and viable on a smaller model tier; environment-freshness lessons become enforced steps instead of prose that each new close may or may not recall; verification evidence gains a consistent, machine-captured form across features.
-
-**Status: active.**
 
 <a id="feat-2026-0058"></a>
 ## FEAT-2026-0058 — Feature decision registry + override lint

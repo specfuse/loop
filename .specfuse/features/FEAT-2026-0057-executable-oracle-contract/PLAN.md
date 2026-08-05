@@ -5,7 +5,7 @@ slug: executable-oracle-contract
 branch: feat/FEAT-2026-0057-executable-oracle-contract
 roadmap_goal: Make a work unit's environment prep and verification oracles run deterministically before its session starts, with the captured output as the agent's input, so a close ceremony interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 23.50
 ---
 

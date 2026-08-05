@@ -43,6 +43,21 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0057"></a>
+## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
+
+**Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
+
+**Goal.** A work unit's environment prep and verification oracles run deterministically *before* its session starts, with the captured output as the agent's input — so a close interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt. Two opt-in frontmatter keys, `prep:` (fail-fast, distinct halt class) and `oracles:` (capture-all, injected under a byte budget that preserves verdicts), both resolving against `verification.yml` set names. Target-project harness scripts (e.g. the generator's SQL Server scenario matrix) stay in the target repo; the loop ships the contract, dispatch, and capture.
+
+**Scope narrowed at draft time (2026-08-05).** The existing-mechanism search found most of the originally-framed goal already shipped: `verification.yml` sets are already named and ordered and readable by any name (`gate_commands.py`); `extra_gates` (`loop.py:212`, issue #62) already selects arbitrary sets per work unit; `_run_gate_set` (`loop.py:2753`) already executes and captures with timeout, process-group kill, and Windows routing; FEAT-2026-0068 already made capture verdict-aware. All of it runs at **exit** — `verify()` calls itself "the exit oracle" — so an agent needing results before writing a verdict still hand-drives, and a fail-fast prep step has nowhere to live. This feature therefore builds only the pre-dispatch timing hook and reuses the rest unchanged. **Dropped:** oracle declarations in GATE frontmatter (per-work-unit selection already exists — a second declaration surface would duplicate a working one). **Still out:** per-criterion binding, which remains FEAT-2026-0056's.
+
+**Benefits.** Close attempts become script-run plus interpretation — cheaper, reproducible, and viable on a smaller model tier; environment-freshness lessons become enforced steps instead of prose that each new close may or may not recall; verification evidence gains a consistent, machine-captured form across features.
+
+**Shipped hedged.** Closed at `verdict: met_locally`, accepted by the operator on 2026-08-05 with four follow-ups carried forward open — see the feature's `RETROSPECTIVE.md` § *Hedged verdict accepted*. Tracked as specfuse/loop#758 (prep halt path unobserved), #756 (captured-oracle banner), #723 (ruff verdict unrecognised), #757 (driver-editing units need a fresh process).
+
+**Status: done.**
+
 <a id="feat-2026-0067"></a>
 ## FEAT-2026-0067 — Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two
 
