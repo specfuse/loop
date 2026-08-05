@@ -71,7 +71,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | active | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ detail](#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
@@ -879,7 +879,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0058"></a>
 ## FEAT-2026-0058 — Feature decision registry + override lint
