@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0057/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 oracle_env: macos_local
 generated_surfaces: []
@@ -12,6 +12,10 @@ produces:
 produces_driver_helper:
   - format_oracle_capture
   - ORACLE_CAPTURE_BUDGET_BYTES
+duration_seconds: 1177.004
+cost_usd: 1.673048
+input_tokens: 70
+output_tokens: 26110
 ---
 
 # Bound the captured oracle output and inject it into the session prompt
