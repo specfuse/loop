@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0057-executable-oracle-contract
 roadmap_goal: Make a work unit's environment prep and verification oracles run deterministically before its session starts, with the captured output as the agent's input, so a close ceremony interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt.
 autonomy_default: review
 status: active
-planned_cost_usd: 18.50
+planned_cost_usd: 23.50
 ---
 
 # Plan: Executable oracle contract — pre-dispatch prep steps and captured oracles
@@ -158,6 +158,32 @@ otherwise re-litigate them:
   validation rule, not less work. The close path is what gets tested and
   documented.
 
+## Two-invocation sequencing (binding for this gate)
+
+The second close discovered that **a work unit editing the driver cannot take
+effect for any work unit dispatched by the same driver process**: Python caches
+modules in `sys.modules` at first import, so T04's wiring was invisible to the
+close dispatched 28 minutes later by a process that had imported `loop.py` before
+T04 ran. That is why the verdict was `met_locally` rather than `met`.
+
+The same hazard applies one layer down to T06. `execute_unit_attempt` imports
+`specfuse.loop.prerun_capture` at call time, but calls it **unconditionally for
+every work unit** — so dispatching T05 caches the pre-T06 module, and a close in
+that same run would receive the old banner.
+
+Therefore this gate completes in **two driver invocations**:
+
+1. **Run 1** — `G1-CLOSE` sits at `status: draft` (not in `DISPATCHABLE`). The
+   driver dispatches T05 and T06 only.
+2. **Run 2** — a human flips `G1-CLOSE` to `pending`, bumps `re_arm_count`, and
+   starts a **fresh** driver process. Its first `execute_unit_attempt` call is the
+   close's, so it imports the post-T06 modules and the injected capture reflects
+   both T04's wiring and T06's fix.
+
+Run 2 is also what discharges FU-1R, which needs nothing but a restarted driver.
+Collapsing these into one invocation reproduces the exact defect this round exists
+to clear.
+
 ## Task graph
 
 ```yaml
@@ -184,7 +210,20 @@ gates:
           - FEAT-2026-0057/T01
           - FEAT-2026-0057/T02
           - FEAT-2026-0057/T03
+      # Added after the second close returned `met_locally`. T05 discharges
+      # FU-3R (keys live in the driver, absent from every shipped seed); T06
+      # discharges FU-5 (informational captures carry a false NO VERDICT FOUND
+      # banner instructing the reader to run the command itself).
+      - id: FEAT-2026-0057/T05
+        file: WU-05-seed-templates.md
+        depends_on: [FEAT-2026-0057/T04]
+      - id: FEAT-2026-0057/T06
+        file: WU-06-oracle-capture-banner.md
+        depends_on: [FEAT-2026-0057/T04]
       # --- closing sequence: 1-WU close (terminal gate) ---
+      # Held at `status: draft` for the T05/T06 run — see "Two-invocation
+      # sequencing" below. Flipped to `pending` and dispatched by a SECOND,
+      # freshly-started driver process.
       - id: FEAT-2026-0057/G1-CLOSE
         file: WU-90-gate-1-close.md
         depends_on:
@@ -192,6 +231,8 @@ gates:
           - FEAT-2026-0057/T02
           - FEAT-2026-0057/T03
           - FEAT-2026-0057/T04
+          - FEAT-2026-0057/T05
+          - FEAT-2026-0057/T06
 ```
 
 ## Notes

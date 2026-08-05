@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0057/G1-CLOSE
 type: close
-status: done
-attempts: 1
-re_arm_count: 1
+status: draft
+attempts: 0
+re_arm_count: 2
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
@@ -40,22 +40,45 @@ this feature's only gate. `FEAT-2026-0057/T01`, `/T02`, `/T03`, and `/T04` are
 decisions, and the *Off-plan record* section; read `GATE-01.md` for the definition
 of done you are judging against.
 
-**This is the second pass.** The first close returned `partially_met` and its
-`RETROSPECTIVE.md` is on disk — read it first. It found that T01–T03 built the
-mechanism and nothing called it, and it raised four follow-ups. T04 was added to
-discharge FU-1 and FU-2. **Your job includes re-running that close's own probes
-and reporting whether they now return the opposite result.** Rewrite
-`RETROSPECTIVE.md` for the feature as a whole rather than appending to it; the
-first pass's findings are history to be reflected, not a document to preserve.
+**This is the third pass.** Pass 1 returned `partially_met` (the mechanism was
+built and nothing called it); pass 2 returned `met_locally` after T04 wired it.
+The pass-2 `RETROSPECTIVE.md` is on disk — read it first. Rewrite it for the
+feature as a whole rather than appending; prior findings are history to reflect
+on, not a document to preserve.
 
-**You have oracle output injected into this prompt.** This work unit declares
-`oracles: [oracles]`, so if T04 landed correctly you will find a section headed
-`## Captured oracle output (pre-dispatch)` below, carrying `git log --oneline -20`
-and `git --no-pager diff --stat main` — run for you, before this session started.
-Read it instead of re-deriving that information; your **Do not touch** rule
-forbids you from running `git` yourself, and that set exists precisely to serve
-you the answer. **If that section is absent, say so in the retrospective** — its
-absence is the FU-2 defect surviving, and it is a finding, not an inconvenience.
+Since pass 2, three things changed:
+
+- **T05** discharges FU-3R — `prep`, `oracles`, and `extra_gates` are now
+  documented in the canonical shipped seeds, with an `oracles:` example.
+- **T06** discharges FU-5 — informational captures no longer carry a false
+  `NO VERDICT FOUND` banner, and no capture ever tells its reader to run the
+  command directly.
+- **You are running on a freshly started driver process.** Pass 2's single
+  unmet-by-observation criterion (FU-1R) was caused by module caching: the driver
+  had imported `loop.py` before T04 edited it, so the wiring could not take effect
+  for a session that same process dispatched. This process started after all of
+  T04, T05, and T06 landed.
+
+**Re-verify each of those, and report the actual output rather than a summary.**
+FU-3R is discharged only if both key names appear in both shipped template copies
+and `^oracles:` matches in both example copies. FU-5 is discharged only if
+`format_oracle_capture` returns no `NO VERDICT FOUND` substring for a short
+complete capture and never emits `Run the command directly.` for any input.
+
+**You should have oracle output injected into this prompt.** This work unit
+declares `oracles: [oracles]`, so look below for a section headed
+`## Captured oracle output (pre-dispatch)` carrying `git log --oneline -20` and
+`git --no-pager diff --stat main` — run for you, before this session started. Read
+it instead of re-deriving that information; your **Do not touch** rule forbids you
+from running `git` yourself, and that set exists precisely to serve you the answer.
+
+**This is the FU-1R proof and the single thing standing between `met_locally` and
+`met`.** If the section is present, quote it and say so explicitly. **If it is
+absent, say so just as explicitly and hold the verdict at `met_locally`** — a
+third pass that claims `met` without this observation would be claiming from the
+wrong environment, which your escalation triggers forbid. Do not infer its
+presence from the code being correct; pass 2 proved the code correct and still
+received nothing.
 
 `auto_close_disabled: true` is deliberate and load-bearing. This feature adds two
 frontmatter keys to the scaffold's work-unit template, which is a consumer-visible
@@ -89,17 +112,18 @@ Binding rules apply by reference: `.specfuse/rules/close-discipline.md`,
    `specfuse/loop/loop.py`. Report the actual output of each, not a summary of it.
 2. **Cost analysis.** `RETROSPECTIVE.md` contains a `## Cost analysis` heading,
    written with exactly that text. Under it, actual spend is reconciled against
-   `planned_cost_usd: 18.50` and against each unit's own estimate (T01 $4.00,
-   T02 $3.50, T03 $2.50, T04 $3.50, this close $5.00). Read `events.jsonl` first;
-   where it is silent, read the work unit's own frontmatter and say which source
-   each figure came from. **The first pass's close cost $10.69 over 2005s** — that
-   figure exists in `WU-90`'s frontmatter but was absent from `events.jsonl` when
-   the first retrospective was written (FU-3), so state the feature's lifetime
-   cost across both passes rather than this pass alone. `re_arm_count: 1` on this
-   unit means the driver folded the prior cycle into `cumulative_cost_usd`; use
-   the lifetime figure. Name any unit whose actual diverged from plan by more than
-   a third, and say why. The heading is checked after dispatch, so omitting it
-   costs a full re-attempt.
+   `planned_cost_usd: 23.50` and against each unit's own estimate (T01 $4.00,
+   T02 $3.50, T03 $2.50, T04 $3.50, T05 $2.50, T06 $2.50, this close $5.00).
+   Read `events.jsonl` for every unit other than yourself. **For your own line,
+   read `cumulative_cost_usd` in this file's frontmatter** — `re_arm_count: 2`
+   means the driver folded both prior cycles there. Your own current attempt is
+   NOT in `events.jsonl` while you run: a close's attempt events are buffered in
+   `wu_events` and flushed only at terminal outcome, so the file shows you
+   everything about every other unit and nothing about your current attempt. Say
+   which source each figure came from. State the feature's **lifetime** cost across
+   all three passes, not this pass alone. Name any unit whose actual diverged from
+   plan by more than a third, and say why. The heading is checked after dispatch,
+   so omitting it costs a full re-attempt.
 3. **Deferred-verification list.** Every acceptance criterion not verified
    in-loop is listed with the criterion, the reason it could not be verified
    here, and where it actually gets checked — or the section contains exactly
