@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Add the pre-dispatch runner for `prep` and `oracles` work-unit frontmatter",
+          "id": "FEAT-2026-0057/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Bound the captured oracle output and inject it into the session prompt",
+          "id": "FEAT-2026-0057/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Declare this repo's oracle set and document the pre-dispatch contract",
+          "id": "FEAT-2026-0057/T03",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs, and terminal verdict",
+          "id": "FEAT-2026-0057/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
