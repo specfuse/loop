@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.9.3+umbrella.0.9.3] - 2026-08-05
+
 ### Added
 
 - Work-unit frontmatter gains `folded_through_re_arm`, an integer marker stamped by the driver's re-arm fold in the same write set as the accumulators. `detect_rearm_dispatch` now compares it against `re_arm_count` instead of reading `cost_usd`'s value, so a re-arm whose prior cycle genuinely cost nothing still folds. An absent marker reads as `0`, so the field is additive and an un-migrated project keeps working (FEAT-2026-0067)
