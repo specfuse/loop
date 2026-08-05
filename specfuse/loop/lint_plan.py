@@ -1229,7 +1229,14 @@ def _lint_impl(feature_dir: Path) -> list[str]:
             # only auto-closes when it is on-plan and under budget, so these
             # criteria are dropped precisely on the features that behaved well
             # and therefore attract the least scrutiny.
-            if wu_type_val in {"close", "close-intermediate"}:
+            # Scoped to a close that can still be dispatched. On a `done` or
+            # `abandoned` WU the flag is unactionable — the close already ran or
+            # already didn't, and setting it now changes nothing. Measured: all
+            # 22 features this fired on before the filter were `done`, so the
+            # unfiltered rule was pure noise on exactly the runs that lint for
+            # other reasons (feature-conversion, upgrade health reports).
+            if (wu_type_val in {"close", "close-intermediate"}
+                    and wu_status not in {"done", "abandoned"}):
                 ac_text = _slice_ac_section(wbody)
                 flag = wfm.get("auto_close_disabled")
                 flag_set = flag in (True, "true", "True")

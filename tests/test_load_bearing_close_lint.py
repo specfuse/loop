@@ -36,7 +36,11 @@ features that behaved well and therefore attract the least scrutiny.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+import tempfile
 import unittest
+from pathlib import Path
 
 from tests._loop_loader import load_loop
 
@@ -136,6 +140,53 @@ class TestNonLoadBearingCloses(unittest.TestCase):
         # A close naming its own folder is not reaching outside it.
         ac = "Read .specfuse/features/FEAT-2026-9001-x/PLAN.md for the framing."
         self.assertFalse(detect_load_bearing_close(ac, "FEAT-2026-9001-x"))
+
+
+class TestStatusScope(unittest.TestCase):
+    """The warning is only actionable while the close can still be dispatched."""
+
+    def _lint(self, tmp: Path, wu_status: str) -> str:
+        fdir = tmp / "FEAT-2026-9002-scoped"
+        fdir.mkdir(parents=True)
+        (fdir / "PLAN.md").write_text(
+            "---\nfeature_id: FEAT-2026-9002\ntitle: Scoped\nslug: scoped\n"
+            "branch: feat/FEAT-2026-9002-scoped\nroadmap_goal: x\n"
+            "status: active\n---\n\n# Plan\n\n```yaml\ngates:\n  - gate: 1\n"
+            "    file: GATE-01.md\n    work_units:\n"
+            "      - id: FEAT-2026-9002/G1-CLOSE\n"
+            "        file: WU-90-close.md\n        depends_on: []\n```\n")
+        (fdir / "GATE-01.md").write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+        (fdir / "WU-90-close.md").write_text(
+            f"---\nid: FEAT-2026-9002/G1-CLOSE\ntype: close\n"
+            f"status: {wu_status}\nattempts: 0\nverdict: met\n---\n\n# Close\n\n"
+            "**Context.** x\n\n"
+            "**Acceptance criteria.** The roadmap row in `.specfuse/roadmap.md` "
+            "reflects what shipped.\n\n"
+            "**Do not touch.** x\n\n**Verification.** x\n\n"
+            "**Escalation triggers.** x\n")
+        # check=False: the lint exits non-zero on ERRORs, and these fixtures are
+        # deliberately minimal — we assert on the WARN text, not the exit code.
+        return subprocess.run(
+            [sys.executable, "-m", "specfuse.loop.lint_plan", str(fdir)],
+            capture_output=True, text=True, check=False,
+            cwd=str(Path(__file__).resolve().parent.parent)).stdout
+
+    def test_a_dispatchable_close_still_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("load-bearing", self._lint(Path(tmp), "pending"))
+
+    def test_a_done_close_does_not_warn(self):
+        # Unactionable: the close already ran or already didn't, and setting the
+        # flag now changes nothing. Every one of the 22 features this fired on
+        # before the filter was `done` — pure noise on the runs that lint for
+        # other reasons.
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertNotIn("load-bearing", self._lint(Path(tmp), "done"))
+
+    def test_a_blocked_close_still_warns(self):
+        # blocked_human is re-armable, so the flag can still matter.
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("load-bearing", self._lint(Path(tmp), "blocked_human"))
 
 
 if __name__ == "__main__":
