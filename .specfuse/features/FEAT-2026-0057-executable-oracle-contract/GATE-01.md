@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 19.00
+baseline:
+  sha: a2af1d084a1c2e1aa12661e5b9d4430521fdd279
+  probed_at: 2026-08-05T11:51:01.346653+00:00
+  failing: []
 ---
 
 # Gate 1 — a work unit can declare prep steps and oracles that run before its session
