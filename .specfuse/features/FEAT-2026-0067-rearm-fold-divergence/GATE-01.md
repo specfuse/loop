@@ -2,6 +2,10 @@
 number: 1
 status: open
 cost_budget_usd: 14.00
+baseline:
+  sha: 723c5d3b8227f69c644539f1bee5ff4407bcb513
+  probed_at: 2026-08-05T03:58:06.691421+00:00
+  failing: []
 ---
 
 # Gate 1 — one fold path, contract and code agreeing
