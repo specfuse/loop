@@ -965,6 +965,50 @@ def detect_spinning_signature_repeat(
     return current == prior
 
 
+def detect_deterministic_refusal_repeat(
+    summary: "str | None",
+    prior_summary: "str | None",
+    files_touched: "list[str] | None",
+) -> bool:
+    """Return True iff a guard refusal repeated on a provably untouched tree (#597).
+
+    A guard refusal whose inputs are static frontmatter cannot be fixed by
+    retrying — the agent cannot edit its own frontmatter — yet the driver
+    retried to MAX_ATTEMPTS before escalating. A real feature paid $6.42 across
+    three byte-identical `deliverable_missing` refusals; $3.96 of that bought
+    nothing.
+
+    Both conditions are required and the second is load-bearing:
+
+    * the refusal summary repeats exactly (compared stripped: trailing
+      whitespace is not a real difference and a retry cannot fix it either),
+      and
+    * ``files_touched`` is empty, which is what says the session changed
+      nothing so the next run has no new input.
+
+    Identical summary ALONE is deliberately not enough: a work unit can fail
+    the same guard twice while making real progress toward passing it.
+
+    Returns False when there is no prior refusal to compare, and when either
+    summary is blank — a non-informative summary collapses distinct refusals
+    into one bucket and would false-fire the halt, the same defence
+    `_is_noninformative_signature` gives the signature-repeat check.
+
+    Distinct from `detect_spinning_signature_repeat`, which compares failure
+    (class, signature) on the GATE-failure path. This is narrower and stricter,
+    and fires earlier — before the next session is dispatched, not after.
+    """
+    if prior_summary is None or summary is None:
+        return False
+    if files_touched:
+        return False
+    current = summary.strip()
+    prior = prior_summary.strip()
+    if not current or not prior:
+        return False
+    return current == prior
+
+
 def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     """Return the last max_chars of failure-relevant lines from gate stdout.
 
@@ -5756,7 +5800,45 @@ def run(
 
                 failure_note = None
                 prior_failure_signature: tuple[str | None, str | None] | None = None
+                # (summary, files_touched) per guard refusal, newest last (#597).
+                refusal_history: list[tuple[str, list]] = []
                 for attempt in range(1, MAX_ATTEMPTS + 1):
+                    # #597: a guard refusal that repeated on a provably
+                    # untouched tree cannot be fixed by running again -- the
+                    # agent cannot edit its own frontmatter. Checked BEFORE the
+                    # attempt counter is bumped and before dispatch, so the
+                    # session that would buy nothing is never paid for.
+                    if len(refusal_history) >= 2 and detect_deterministic_refusal_repeat(
+                            refusal_history[-1][0], refusal_history[-2][0],
+                            refusal_history[-1][1]):
+                        _rsum = refusal_history[-1][0]
+                        note_paths = persist_attempt_notes(
+                            work_dir, wu.wu_id, attempt_notes)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        backend.set_wu(wu, "escalation_reason",
+                                       "deterministic_refusal_repeat")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        wu_events.append(build_event(
+                            "human_escalation", wu.wu_id, {
+                                "reason": "deterministic_refusal_repeat",
+                                "blocked_reason": _rsum,
+                                "attempts": attempt - 1,
+                                "attempts_usage": attempts_usage,
+                            }))
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path, *note_paths],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(deterministic_refusal_repeat, "
+                            f"attempt {attempt - 1})"
+                            f"\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   BLOCKED — identical guard refusal on an "
+                              f"untouched tree at attempt {attempt - 1}"
+                              f"/{MAX_ATTEMPTS}; a retry cannot change the "
+                              f"inputs. Not dispatching attempt {attempt}.")
+                        blocked = True
+                        break
                     backend.set_wu(wu, "attempts", attempt)
                     print(f"   [{time.strftime('%H:%M:%S')}] attempt "
                           f"{attempt}/{MAX_ATTEMPTS} model={wu.model} "
@@ -5781,6 +5863,11 @@ def run(
                     cum_usage["duration_seconds"] = round(
                         cum_usage["duration_seconds"] + duration, 3)
                     attempt_outcomes.append(outcome)
+                    # Measured HERE, before any guard branch calls
+                    # reset_preserving_events -- afterwards the evidence is
+                    # gone and files_touched would read empty by construction,
+                    # which is what made #597's second condition vacuous.
+                    _refusal_touched = git_diff_names(head_before, "HEAD")
 
                     if outcome == "zero_token":
                         # Agent never produced output (input_tokens=0). Skip
@@ -5894,8 +5981,10 @@ def run(
                                 attempts_usage[-1],
                                 failure_class="squash_commit_failed",
                                 failure_signature="squash_commit_rejected",
+                                files_touched=_refusal_touched,
                                 extras={"summary": summary},
                             ))
+                            refusal_history.append((summary, _refusal_touched))
                             attempt_notes.append((attempt, summary))
                             failure_note = summary
                             print(f"   SQUASH COMMIT REJECTED attempt "
@@ -5923,8 +6012,11 @@ def run(
                                     attempts_usage[-1],
                                     failure_class="smoke_import_failed",
                                     failure_signature="run_smoke_imports",
+                                    files_touched=_refusal_touched,
                                     extras={"summary": smoke_summary},
                                 ))
+                                refusal_history.append(
+                                    (smoke_summary, _refusal_touched))
                                 attempt_notes.append((attempt, smoke_summary))
                                 failure_note = smoke_summary
                                 print(f"   SMOKE FAIL attempt "
@@ -5956,11 +6048,14 @@ def run(
                                 # assert_cost_analysis_section_when_met are
                                 # different failures and must not share a cluster.
                                 failure_signature=_closing_assertion,
+                                files_touched=_refusal_touched,
                                 extras={
                                     "assertion": _closing_assertion,
                                     "summary": closing_summary,
                                 },
                             ))
+                            refusal_history.append(
+                                (closing_summary, _refusal_touched))
                             attempt_notes.append((attempt, closing_summary))
                             failure_note = closing_summary
                             print(
@@ -5988,9 +6083,12 @@ def run(
                                 attempts_usage[-1],
                                 failure_class="guard_refusal",
                                 failure_signature="assert_declared_deliverables",
+                                files_touched=_refusal_touched,
                                 extras={"summary": deliv_summary,
                                         "missing": missing},
                             ))
+                            refusal_history.append(
+                                (deliv_summary, _refusal_touched))
                             attempt_notes.append((attempt, deliv_summary))
                             failure_note = deliv_summary
                             print(
@@ -6016,8 +6114,11 @@ def run(
                                 attempts_usage[-1],
                                 failure_class="guard_refusal",
                                 failure_signature="assert_implementation_touched_files",
+                                files_touched=_refusal_touched,
                                 extras={"summary": impl_summary},
                             ))
+                            refusal_history.append(
+                                (impl_summary, _refusal_touched))
                             attempt_notes.append((attempt, impl_summary))
                             failure_note = impl_summary
                             print(
@@ -6090,8 +6191,11 @@ def run(
                                     attempts_usage[-1],
                                     failure_class="guard_refusal",
                                     failure_signature="assert_learnings_staged_under_auto",
+                                    files_touched=_refusal_touched,
                                     extras={"summary": stage_reason},
                                 ))
+                                refusal_history.append(
+                                    (stage_reason, _refusal_touched))
                                 attempt_notes.append((attempt, stage_reason))
                                 failure_note = stage_reason
                                 print(
