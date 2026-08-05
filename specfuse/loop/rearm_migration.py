@@ -29,6 +29,22 @@ Two shapes, two treatments:
     are left unset rather than backfilled from `events.jsonl` — that would be
     a second, undeclared source of truth for the same accumulator.
 
+    **A value with two meanings, read as if it had one.** `cost_usd` may be
+    folded safely by `fold_cumulative_on_rearm` because that fold runs *at
+    dispatch*, where `cost_usd` provably holds the prior cycle's spend. This
+    module runs *offline*, where `cost_usd` means "the prior cycle" **or**
+    "the current cycle" depending on whether a re-dispatch ever happened —
+    the exact defect class this feature exists to remove, reproduced by its
+    own fix. When a WU was re-armed and never re-dispatched, `cost_usd`
+    still holds the prior cycle's spend, and folding `re_arm_history`'s copy
+    of that same spend into `cumulative_cost_usd` without resetting
+    `cost_usd` double-counts it. The fold-never-ran branch below detects this
+    case — `cost_usd` agrees with the `re_arm_history` prior-cost sum within
+    `_COST_TOLERANCE_USD` — and resets `cost_usd` / `duration_seconds` to
+    `0.0` in the same write set, rather than adding a second copy of money
+    that is already accounted for in `cumulative_*`. Anyone adding a new
+    offline reader of `cost_usd` should assume it needs the same treatment.
+
 A WU never re-armed (`re_arm_count` absent or `0`) is untouched: no read,
 no write, not even a no-op frontmatter round-trip.
 
@@ -221,12 +237,25 @@ def migrate_file(wu_path: Path, *, events_path: Path | None = None) -> Migration
                 f"(tolerance {_COST_TOLERANCE_USD})"
             )
 
+    cost_usd = fm.get("cost_usd")
+    money_already_present = (
+        isinstance(cost_usd, (int, float))
+        and not isinstance(cost_usd, bool)
+        and abs(float(cost_usd) - prior_cost) <= _COST_TOLERANCE_USD
+    )
+
     _loop.write_frontmatter_field(
         wu_path, "cumulative_cost_usd", round(prior_cost, 6)
     )
     _loop.write_frontmatter_field(
         wu_path, "cumulative_duration_seconds", round(prior_duration, 3)
     )
+    if money_already_present:
+        # Never re-dispatched: `cost_usd` still holds the same spend now
+        # folded into `cumulative_cost_usd`. Reset it in this write set so
+        # the two fields don't both carry a copy of one cycle's spend.
+        _loop.write_frontmatter_field(wu_path, "cost_usd", 0.0)
+        _loop.write_frontmatter_field(wu_path, "duration_seconds", 0.0)
     _loop.write_frontmatter_field(wu_path, "folded_through_re_arm", re_arm_count)
     return MigrationOutcome(wu_path, "fold_never_ran_migrated")
 

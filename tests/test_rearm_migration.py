@@ -219,6 +219,65 @@ class TestRearmMigration(unittest.TestCase):
         after = wu_file.read_text()
         self.assertEqual(before, after, "a disagreement must not write anything")
 
+    # -- fold-never-ran double-count fix (FEAT-2026-0067/T04) --------------
+
+    def test_never_redispatched_unit_is_not_double_counted(self):
+        wu_file = self._write_wu(
+            "WU-09.md",
+            "re_arm_count: 1\ncost_usd: 0.16309\nduration_seconds: 42.693\n"
+            "re_arm_history:\n"
+            "  -\n"
+            "    timestamp: 2026-06-15T03:10:00+00:00\n"
+            "    prior_status: blocked_human\n"
+            "    prior_attempts: 0\n"
+            "    prior_cost_usd: 0.16309\n"
+            "    prior_duration_seconds: 42.693\n",
+        )
+        outcome = migration.migrate_file(wu_file)
+        self.assertEqual(outcome.action, "fold_never_ran_migrated")
+
+        fm, _ = loop.read_frontmatter(wu_file)
+        self.assertEqual(fm.get("cumulative_cost_usd"), 0.16309)
+        self.assertEqual(fm.get("cumulative_duration_seconds"), 42.693)
+        self.assertEqual(
+            fm.get("cost_usd", 0) + fm.get("cumulative_cost_usd", 0),
+            0.16309,
+            "the spend must be recorded once, not twice",
+        )
+        self.assertEqual(
+            fm.get("duration_seconds", 0) + fm.get("cumulative_duration_seconds", 0),
+            42.693,
+        )
+
+        # second call must be a no-op
+        after_first = wu_file.read_text()
+        migration.migrate_file(wu_file)
+        self.assertEqual(wu_file.read_text(), after_first)
+
+    def test_redispatched_unit_still_folds_both_cycles(self):
+        wu_file = self._write_wu(
+            "WU-10.md",
+            "re_arm_count: 1\ncost_usd: 5.0\nduration_seconds: 60.0\n"
+            "re_arm_history:\n"
+            "  -\n"
+            "    timestamp: 2026-06-15T03:10:00+00:00\n"
+            "    prior_status: blocked_human\n"
+            "    prior_attempts: 0\n"
+            "    prior_cost_usd: 0.16309\n"
+            "    prior_duration_seconds: 42.693\n",
+        )
+        outcome = migration.migrate_file(wu_file)
+        self.assertEqual(outcome.action, "fold_never_ran_migrated")
+
+        fm, _ = loop.read_frontmatter(wu_file)
+        self.assertEqual(fm.get("cumulative_cost_usd"), 0.16309)
+        self.assertEqual(fm.get("cumulative_duration_seconds"), 42.693)
+        self.assertEqual(
+            fm.get("cost_usd"), 5.0,
+            "a genuine new cycle's cost_usd must not be reset",
+        )
+        self.assertEqual(fm.get("duration_seconds"), 60.0)
+
     def test_prior_cost_agreement_within_tolerance_migrates(self):
         wu_file = self._write_wu(
             "WU-08.md",

@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0067/T04
 type: implementation
-status: pending
+status: done
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/rearm_migration.py
@@ -10,6 +10,13 @@ oracle_env: macos_local
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.9.2
+started_at: 2026-08-05T10:08:21.800053+00:00
+attempts: 1
+duration_seconds: 722.285
+cost_usd: 1.375653
+input_tokens: 62
+output_tokens: 11502
 ---
 
 # The offline migration must not fold money that is already there

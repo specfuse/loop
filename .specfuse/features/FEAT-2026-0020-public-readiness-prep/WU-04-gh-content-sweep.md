@@ -7,8 +7,8 @@ completed_out_of_loop: true
 completed_note: "Executed in operator's main Claude session (unsandboxed shell, gh exit 0) rather than via loop.py dispatch — the claude-p subprocess gh-auth bug (LEARNINGS FEAT-2026-0014/T01) made in-loop dispatch unviable. Deliverable verified: symbol-presence + file-presence gates PASS."
 oracle_env: macos_local
 planned_cost_usd: 2.00
-duration_seconds: 42.693
-cost_usd: 0.16309
+duration_seconds: 0.0
+cost_usd: 0.0
 input_tokens: 9
 output_tokens: 1785
 unsandboxed: true
