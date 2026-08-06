@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0056/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.9.3
+started_at: 2026-08-06T00:58:18.017457+00:00
+duration_seconds: 858.488
+cost_usd: 6.413651
+input_tokens: 3034
+output_tokens: 64855
 ---
 
 # Draft gate 2 — the incremental re-close policy

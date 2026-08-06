@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0056-per-criterion-dod-state
 roadmap_goal: Each close attempt records per-criterion pass/fail state, and a re-dispatched close re-verifies only failed and newly-added criteria plus the oracles whose scope cannot be bounded.
 autonomy_default: review
 status: active
-planned_cost_usd: 28.00
+planned_cost_usd: 41.00   # re-derived by G1-PLAN once gate 2 had work units; see GATE-02-REVIEW.md
 ---
 
 # Plan: Per-criterion DoD state + incremental re-close
@@ -162,12 +162,31 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      - id: FEAT-2026-0056/T05
+        file: WU-05-criteria-artifact-survives-attempt-reset.md
+        depends_on: []
+      - id: FEAT-2026-0056/T06
+        file: WU-06-pristine-entries-are-not-findings.md
+        depends_on: []
+      - id: FEAT-2026-0056/T07
+        file: WU-07-reverification-worklist.md
+        depends_on: [FEAT-2026-0056/T05]
+      - id: FEAT-2026-0056/T08
+        file: WU-08-worklist-reaches-the-close-session.md
+        depends_on: [FEAT-2026-0056/T06, FEAT-2026-0056/T07]
       # --- closing sequence: 1-WU close (terminal gate) ---
-      # Scaffolded now so lint can identify gate 1 as non-terminal.
-      # G1-PLAN fills in gate 2's substantive WUs above this entry.
+      # OPERATOR STEP between T08 and G2-CLOSE: restart the driver. T05 and T08
+      # edit loop.py's reset and dispatch paths; a running driver caches
+      # specfuse.loop.loop in sys.modules and cannot execute them. See
+      # GATE-02.md § Arming discipline and
+      # [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart].
       - id: FEAT-2026-0056/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []   # G1-PLAN sets real depends_on when it drafts gate 2
+        depends_on:
+          - FEAT-2026-0056/T05
+          - FEAT-2026-0056/T06
+          - FEAT-2026-0056/T07
+          - FEAT-2026-0056/T08
 ```
 
 ## Notes
