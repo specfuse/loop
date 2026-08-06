@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0056/G2-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+duration_seconds: 1001.041
+cost_usd: 3.658889
+input_tokens: 76
+output_tokens: 38635
 ---
 
 # Close gate 2 — terminal close for FEAT-2026-0056
