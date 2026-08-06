@@ -2036,7 +2036,9 @@ def _clean_attempt_untracked(
     scratch dirs.
 
     Never deletes: paths in *untracked_before* (the operator's, per #150),
-    *events_path* (driver-managed, and untracked on a fresh branch), or
+    *events_path* (driver-managed, and untracked on a fresh branch), any file
+    whose basename matches `criteria_state.CRITERIA_FILENAME_RE`
+    (driver-managed per-criterion close state — FEAT-2026-0056/T05), or
     gitignored paths (`untracked_paths` honors .gitignore, so a feature's
     `work/` scratch dir never enters the delete set).
 
@@ -2056,6 +2058,8 @@ def _clean_attempt_untracked(
         target = root / rel
         try:
             if keep is not None and target.resolve() == keep:
+                continue
+            if criteria_state.CRITERIA_FILENAME_RE.match(target.name):
                 continue
             if target.is_file() or target.is_symlink():
                 target.unlink()
@@ -2435,7 +2439,7 @@ def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
     if not fresh:
         return
 
-    path = feature_dir / f"GATE-{gate_n:02d}-CRITERIA.md"
+    path = feature_dir / criteria_state.criteria_filename(gate_n)
     existing = criteria_state.parse_criteria_state(path.read_text()) if path.is_file() else []
     existing_ids = {e.criterion_id for e in existing}
 

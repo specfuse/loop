@@ -331,7 +331,7 @@ def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext)
     """
     if ctx.gate_num is None:
         return []
-    path = ctx.feature_dir / f"GATE-{ctx.gate_num:02d}-CRITERIA.md"
+    path = ctx.feature_dir / criteria_state.criteria_filename(ctx.gate_num)
     if not path.is_file():
         return []
     entries = criteria_state.parse_criteria_state(path.read_text())
@@ -476,7 +476,7 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
         elif req.applies_when == "criteria_artifact_present":
             if ctx.gate_num is None:
                 continue
-            artifact_path = ctx.feature_dir / f"GATE-{ctx.gate_num:02d}-CRITERIA.md"
+            artifact_path = ctx.feature_dir / criteria_state.criteria_filename(ctx.gate_num)
             if not artifact_path.is_file():
                 continue
 

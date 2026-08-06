@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 model: sonnet
@@ -13,6 +13,13 @@ produces_driver_helper:
 produces:
   - tests/test_loop_criteria_survival.py
 generated_surfaces: []
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-06T01:57:04.061725+00:00
+duration_seconds: 829.982
+cost_usd: 1.320755
+input_tokens: 64
+output_tokens: 10231
 ---
 
 # Keep the criteria artifact alive across a failed close attempt

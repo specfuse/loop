@@ -57,6 +57,16 @@ class CriterionStateEntry:
     attempt: Optional[str]
 
 
+#: Matches `GATE-NN-CRITERIA.md` basenames (any `NN`), and nothing else —
+#: not `GATE-NN.md`, not `GATE-NN-REVIEW.md`, not `RETROSPECTIVE.md`.
+CRITERIA_FILENAME_RE = re.compile(r"^GATE-\d+-CRITERIA\.md$")
+
+
+def criteria_filename(gate_n: int) -> str:
+    """The single source of truth for a gate's criteria-artifact basename."""
+    return f"GATE-{gate_n:02d}-CRITERIA.md"
+
+
 def criterion_id_for(wu_sub_id: str, ordinal: int) -> str:
     """Stable criterion identity: producing WU's sub-ID + 1-based ordinal.
 
