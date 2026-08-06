@@ -2462,6 +2462,72 @@ def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
     path.write_text(criteria_state.render_criteria_state(existing + appended))
 
 
+def format_reverification_worklist(wu: WorkUnit, feature_dir: Path) -> str:
+    """Render T07's per-criterion partition into a `close` / `close-intermediate`
+    dispatch's session prompt (FEAT-2026-0056/T08).
+
+    Returns `""` for any WU type other than `close`/`close-intermediate`, when
+    the gate's `GATE-NN-CRITERIA.md` artifact does not exist, or when it
+    parses to zero entries — a close dispatched into a gate with no recorded
+    state gets no section, not an empty one.
+
+    Partitioning itself is `criteria_state.build_reverification_worklist`'s
+    job (T07); this function only renders that partition. `current_attempt`
+    is `wu.attempts`, which the driver's attempt loop sets on `wu` before
+    `execute_unit_attempt` runs.
+    """
+    if wu.type not in ("close", "close-intermediate"):
+        return ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return ""
+    path = feature_dir / criteria_state.criteria_filename(gate_n)
+    if not path.is_file():
+        return ""
+    entries = criteria_state.parse_criteria_state(path.read_text())
+    if not entries:
+        return ""
+
+    worklist = criteria_state.build_reverification_worklist(
+        entries, current_attempt=str(wu.attempts)
+    )
+
+    lines = [
+        f"## Re-verification worklist (gate {gate_n})",
+        "",
+        f"{len(worklist.carry_forward)} criterion/criteria carried forward from a "
+        f"prior attempt; {len(worklist.reverify)} require re-verification this "
+        "attempt.",
+        "",
+    ]
+
+    if worklist.carry_forward:
+        lines.append("### Carried forward — do not re-verify")
+        lines.append("")
+        for entry in worklist.carry_forward:
+            lines.append(
+                f"- `{entry.criterion_id}` — oracle: `{entry.oracle}` — "
+                f"proved on attempt `{entry.attempt}`"
+            )
+        lines.append("")
+
+    if worklist.oracle_groups:
+        lines.append("### Re-verify — grouped by oracle command")
+        lines.append("")
+        for oracle, criterion_ids in worklist.oracle_groups:
+            lines.append(f"- `{oracle}` — covers: {', '.join(criterion_ids)}")
+        lines.append("")
+
+    lines.append(
+        "This worklist bounds per-criterion re-verification only. The close's "
+        "own feature-level question (close-discipline.md §1's fresh, "
+        "feature-level re-run) is never carried forward by this worklist and "
+        "runs this attempt regardless of the above."
+    )
+
+    return "\n".join(lines) + "\n"
+
+
 def dispatch(wu: WorkUnit, failure_note: str | None,
              cost_tracking: bool = True) -> tuple[str, dict | None]:
     """Run a fresh agent session for this WU.
@@ -3359,6 +3425,9 @@ def execute_unit_attempt(
     if verify_fn is None:
         verify_fn = verify
     precreate_dispatch_skeleton(wu, feature_dir)
+    worklist_section = format_reverification_worklist(wu, feature_dir)
+    if worklist_section:
+        wu.body = wu.body + "\n\n" + worklist_section
     if dispatch_fn is None:
         result = dispatch(wu, failure_note, cost_tracking)
     else:

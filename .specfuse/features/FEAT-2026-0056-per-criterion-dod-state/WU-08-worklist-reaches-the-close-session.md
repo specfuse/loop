@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 model: sonnet
@@ -12,6 +12,13 @@ produces_driver_helper:
 produces:
   - tests/test_loop_worklist_injection.py
 generated_surfaces: []
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-06T02:36:22.272477+00:00
+duration_seconds: 796.448
+cost_usd: 2.027098
+input_tokens: 96
+output_tokens: 19000
 ---
 
 # Put the re-verification worklist in the close session's prompt
