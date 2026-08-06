@@ -1,7 +1,14 @@
 ---
 gate: 2
-status: open        # open | awaiting_review | passed
+status: awaiting_review
 cost_budget_usd: 23.00
+baseline:
+  sha: 1d79328bfdd0e84fa79a2a1f7817825e1bd030e6
+  probed_at: 2026-08-06T01:28:16.297850+00:00
+  failing:
+    - gate: coverage
+      failure_class: coverage
+      failure_signature: $ coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90
 ---
 
 # Gate 2 — a re-dispatched close re-verifies only the worklist
