@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper:
@@ -11,6 +11,15 @@ produces_driver_helper:
 produces:
   - tests/test_loop_criteria_skeleton.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-05T23:49:01.960860+00:00
+duration_seconds: 962.767
+cost_usd: 2.093737
+input_tokens: 2530
+output_tokens: 22663
 ---
 
 # Pre-create the criteria-state artifact on every close dispatch

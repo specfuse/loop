@@ -59,6 +59,7 @@ from pathlib import Path
 from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
+from . import criteria_state
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
@@ -2408,6 +2409,53 @@ def precreate_dispatch_skeleton(wu: WorkUnit, feature_dir: Path) -> None:
         _precreate_gate_review_stub(feature_dir, gate_n)
     else:
         _precreate_retrospective_stub(wu, feature_dir, gate_n)
+        _precreate_criteria_state_stub(feature_dir, gate_n)
+
+
+def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
+    """Seed/extend `GATE-NN-CRITERIA.md` from the gate's substantive WUs'
+    acceptance criteria, ahead of a `close` / `close-intermediate` session.
+
+    Additive: a criterion already recorded in the artifact keeps its entry
+    untouched (a close may have already set its `state`); a criterion that
+    has appeared since the last seed is appended as `unverified`; a
+    criterion no longer produced by any WU is left in place rather than
+    deleted — the close, not this stub, gets to say whether that was
+    intended. Every appended entry is seeded with only `criterion_id` and
+    `criterion`/`state: unverified` — `oracle`, `kind`, `proved_at_sha`, and
+    `attempt` are absent until the close's own session fills them in.
+    """
+    fresh: list[tuple[str, str]] = []
+    for wc in extract_wu_criteria(feature_dir, gate_n):
+        if wc.status != "ok":
+            continue
+        for ordinal, criterion in enumerate(wc.criteria, start=1):
+            fresh.append((criteria_state.criterion_id_for(wc.sub_id, ordinal), criterion))
+
+    if not fresh:
+        return
+
+    path = feature_dir / f"GATE-{gate_n:02d}-CRITERIA.md"
+    existing = criteria_state.parse_criteria_state(path.read_text()) if path.is_file() else []
+    existing_ids = {e.criterion_id for e in existing}
+
+    appended = [
+        criteria_state.CriterionStateEntry(
+            criterion_id=cid,
+            criterion=criterion,
+            oracle=None,
+            kind=None,
+            state="unverified",
+            proved_at_sha=None,
+            attempt=None,
+        )
+        for cid, criterion in fresh
+        if cid not in existing_ids
+    ]
+    if not appended and existing:
+        return
+
+    path.write_text(criteria_state.render_criteria_state(existing + appended))
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
@@ -3917,6 +3965,66 @@ def _truncate_debt_criterion(text: str) -> str:
     return text
 
 
+@dataclass(frozen=True)
+class WUCriteria:
+    """One gate ref's acceptance-criteria extraction result.
+
+    `status` is `"ok"` (substantive WU, frontmatter+body read cleanly —
+    `criteria` may still be empty if the body has no parseable AC list),
+    `"missing"` (WU file absent), `"unparseable"` (frontmatter read failed),
+    or `"skipped"` (non-substantive `wu.type`, per `NON_SUBSTANTIVE_TYPES`).
+    `sub_id` is set only for `"ok"`.
+    """
+
+    wu_id: str
+    ref_file: str
+    sub_id: str | None
+    criteria: list[str]
+    status: str
+
+
+def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]:
+    """Walk a gate's WU refs and extract each substantive WU's ordered
+    acceptance-criterion strings, from disk, in ref order.
+
+    Shared by `build_autoclose_debt_enumeration` and
+    `_precreate_criteria_state_stub` — one parser for "what are this gate's
+    acceptance criteria" so the two surfaces cannot silently disagree.
+    """
+    try:
+        _fm, gates = load_graph(feature_dir)
+    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
+        gates = []
+    gate = next((g for g in gates if g.number == gate_number), None)
+    refs = gate.refs if gate is not None else []
+
+    results: list[WUCriteria] = []
+    for ref in refs:
+        wu_file = feature_dir / ref["file"]
+        wu_id = ref.get("id", ref["file"])
+
+        if not wu_file.is_file():
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "missing"))
+            continue
+
+        try:
+            fm, body = read_frontmatter(wu_file)
+        except (_miniyaml.MiniYAMLError, OSError):
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "unparseable"))
+            continue
+
+        wu_type = fm.get("type", "implementation")
+        if wu_type in NON_SUBSTANTIVE_TYPES:
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "skipped"))
+            continue
+
+        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
+        ac_text = _wu_sections.slice_acceptance_criteria(body)
+        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
+        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok"))
+    return results
+
+
 def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
     """Return the deferred-verification worklist for an auto-closed gate.
 
@@ -3926,52 +4034,33 @@ def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str
     `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
     call: this only reads files the driver has already located.
     """
-    try:
-        _fm, gates = load_graph(feature_dir)
-    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
-        gates = []
-    gate = next((g for g in gates if g.number == gate_number), None)
-    refs = gate.refs if gate is not None else []
-
     sub_ids: list[str] = []
     entries: list[str] = []
     total_criteria = 0
 
-    for ref in refs:
-        wu_file = feature_dir / ref["file"]
-        wu_id = ref.get("id", ref["file"])
-        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
-
-        if not wu_file.is_file():
+    for wc in extract_wu_criteria(feature_dir, gate_number):
+        if wc.status == "skipped":
+            continue
+        if wc.status == "missing":
             entries.append(
-                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
                 f"  - deferred: <criteria not parseable> (file not found)"
             )
             continue
-
-        try:
-            fm, body = read_frontmatter(wu_file)
-        except (_miniyaml.MiniYAMLError, OSError):
+        if wc.status == "unparseable":
             entries.append(
-                f"- **{wu_id}** (`{ref['file']}`)\n"
-                f"  - deferred: <criteria not parseable> ({ref['file']})"
+                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
+                f"  - deferred: <criteria not parseable> ({wc.ref_file})"
             )
             continue
 
-        wu_type = fm.get("type", "implementation")
-        if wu_type in NON_SUBSTANTIVE_TYPES:
-            continue
-
-        sub_ids.append(sub_id)
-        ac_text = _wu_sections.slice_acceptance_criteria(body)
-        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
-
-        lines = [f"- **{wu_id}** (`{ref['file']}`)"]
-        if not criteria:
-            lines.append(f"  - deferred: <criteria not parseable> ({ref['file']})")
+        sub_ids.append(wc.sub_id)
+        lines = [f"- **{wc.wu_id}** (`{wc.ref_file}`)"]
+        if not wc.criteria:
+            lines.append(f"  - deferred: <criteria not parseable> ({wc.ref_file})")
         else:
-            total_criteria += len(criteria)
-            for criterion in criteria:
+            total_criteria += len(wc.criteria)
+            for criterion in wc.criteria:
                 lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
         entries.append("\n".join(lines))
 
