@@ -126,6 +126,27 @@ own output.
   a *truthful* observation, not a working one — budget for the honest answer being
   "the worklist was empty".
 
+- **Operator decision on `GATE-02-REVIEW.md`'s open question 3 — gate 1's
+  contract-change list.** The operator has **deferred acknowledgment of gate 1's
+  `close-discipline.md` §3 list to `G2-CLOSE`'s combined enumeration.** Gate 1's list
+  in `RETROSPECTIVE.md` § *Consumer-visible contract changes* therefore stands
+  un-acknowledged by design, not by oversight. `G2-CLOSE`'s criterion 9 is answering
+  **both gates at once**: restate gate 1's item 1 with the behaviour `T06` gave it,
+  carry the other four forward, add gate 2's own additions, and block on one
+  acknowledgment covering the whole list.
+
+- **Operator record — the first `G2-CLOSE` dispatch was voided, not merely retried.**
+  The driver process that dispatched `T05`–`T08` started at 21:57, before `T05`
+  landed, so it executed pre-`T05` code throughout: `_clean_attempt_untracked`
+  deleted `GATE-02-CRITERIA.md` between attempts, and `format_reverification_worklist`
+  was absent from its dispatch path. The close annotated the artifact from scratch
+  three times, never reached the retrospective or a verdict, and escalated
+  `spinning_detected` at $3.66 — `assert_doc_or_roadmap_diff` and
+  `assert_verdict_well_formed` unmet on all three attempts, and criterion 2's own
+  restart check never fired. **This gate's restart precondition was violated, and the
+  cost of violating it is on record above.** The re-arm below runs against a driver
+  started after `a41e8c3`.
+
 - **Flag-scope table (§3).** Not applicable. No work unit in this gate introduces,
   gates on, or flips a behavior flag. `narrow` / `broad` are data on a criterion
   entry and `carry_forward` / `reverify` are a partition of that data; neither gates

@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0056/G2-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
