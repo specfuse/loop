@@ -112,6 +112,64 @@ def parse_criteria_state(text: str) -> list[CriterionStateEntry]:
     return entries
 
 
+@dataclass(frozen=True)
+class ReverificationWorklist:
+    """Partition of a gate's recorded entries for a re-dispatched close attempt.
+
+    `carry_forward` entries are provably safe to skip re-verifying this
+    attempt; `reverify` entries must re-run their oracle. `oracle_groups`
+    collapses byte-identical oracle commands among `reverify` entries so each
+    runs once per attempt rather than once per criterion.
+    """
+
+    carry_forward: list[CriterionStateEntry]
+    reverify: list[CriterionStateEntry]
+    oracle_groups: list[tuple[str, list[str]]]
+
+
+def build_reverification_worklist(
+    entries: list[CriterionStateEntry], current_attempt: str
+) -> ReverificationWorklist:
+    """Partition recorded entries into what a re-close may carry vs. re-verify.
+
+    An entry carries forward only when it is provably safe: `kind ==
+    "narrow"`, `state == "pass"`, a non-empty `oracle`, and a non-empty
+    `attempt`. Everything else — a missing or unrecognized `kind`, `state:
+    fail` or `state: unverified`, and every `broad` entry regardless of
+    state — goes to `reverify`. Fail-safe default: unclassifiable entries
+    land in `reverify`, never in `carry_forward`.
+    """
+    carry_forward: list[CriterionStateEntry] = []
+    reverify: list[CriterionStateEntry] = []
+    for entry in entries:
+        if (
+            entry.kind == "narrow"
+            and entry.state == "pass"
+            and entry.oracle
+            and entry.attempt
+        ):
+            carry_forward.append(entry)
+        else:
+            reverify.append(entry)
+
+    groups: dict[str, list[str]] = {}
+    order: list[str] = []
+    for entry in reverify:
+        if not entry.oracle:
+            continue
+        if entry.oracle not in groups:
+            groups[entry.oracle] = []
+            order.append(entry.oracle)
+        groups[entry.oracle].append(entry.criterion_id)
+    oracle_groups = [(oracle, groups[oracle]) for oracle in order]
+
+    return ReverificationWorklist(
+        carry_forward=carry_forward,
+        reverify=reverify,
+        oracle_groups=oracle_groups,
+    )
+
+
 def render_criteria_state(entries: list[CriterionStateEntry]) -> str:
     """Render entries back into `GATE-NN-CRITERIA.md` markdown.
 

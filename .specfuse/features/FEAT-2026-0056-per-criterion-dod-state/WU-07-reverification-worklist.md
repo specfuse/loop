@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 model: sonnet
@@ -12,6 +12,13 @@ produces_driver_helper:
 produces:
   - tests/test_criteria_worklist.py
 generated_surfaces: []
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-06T02:23:20.799682+00:00
+duration_seconds: 781.154
+cost_usd: 0.873341
+input_tokens: 37
+output_tokens: 7545
 ---
 
 # Partition recorded criterion state into a re-verification worklist
