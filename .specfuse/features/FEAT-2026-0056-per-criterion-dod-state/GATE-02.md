@@ -3,8 +3,8 @@ gate: 2
 status: open
 cost_budget_usd: 23.00
 baseline:
-  sha: bd4ab9d9d9cc836e4e8b32f66ec8ad551832697f
-  probed_at: 2026-08-06T01:52:54.061963+00:00
+  sha: 2815cffbdc3ac12b3bb61d523dbf30d1b0fb2212
+  probed_at: 2026-08-06T03:09:26.460226+00:00
   failing: []
 ---
 
