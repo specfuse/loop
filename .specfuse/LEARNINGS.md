@@ -3417,3 +3417,45 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   distinguish "correctly silent" from "not running" has measured nothing. This is the
   same shape as [FEAT-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
   run, here it was run against the wrong binary.
+
+- [FEAT-2026-0056/G2-CLOSE/evidence-clause-needs-its-own-oracle] **When an acceptance
+  criterion names both a property and the place that must assert it — "X holds, asserted
+  in <module>" — the oracle that runs <module> cannot detect that the assertion is
+  missing, because a module with no assertion about X passes whether or not X holds. The
+  evidence clause needs an oracle of its own.** Here a unit was required to keep an
+  existing carve-out intact "asserted in the same test module"; the carve-out was intact,
+  the module was green, and the module contained one test that constructed the relevant
+  path, passed it to the function under test, never created the file and never asserted
+  on its survival. Every oracle the unit declared reported pass, and so did the driver's
+  produces-vs-diff guard, because the source really was edited. Only the close's own
+  re-run caught it, and only because it read the test rather than running it. Rules.
+  (a) Write two-clause criteria as two criteria, each with its own oracle — the property
+  gets a behavioural probe, the evidence clause gets a countable one
+  (`grep -c 'def test_'`, an assertion count, a coverage delta on the specific branch).
+  (b) Treat "still works / still intact / unchanged" criteria as the high-risk class:
+  they are satisfied by the absence of a regression, and absence is what a missing test
+  also looks like. (c) A close re-running a producing unit's oracle should ask what the
+  oracle would report if the deliverable were absent — if the answer is "the same
+  thing", the oracle is measuring nothing.
+
+- [FEAT-2026-0056/G2-CLOSE/a-cache-cannot-prove-itself-on-attempt-one] **A feature whose
+  value is that a second run is cheaper than the first cannot be demonstrated by its own
+  terminal close, because that close is a first run: its carried-forward set is empty by
+  construction, not by defect. Plan the gate to measure wiring, and hand the saving to a
+  falsifiable prediction instead.** Recorded state, memoized results, incremental
+  regeneration, warm caches and skip policies all share this shape — the mechanism reads
+  state a *prior attempt* wrote, and on attempt 1 no prior attempt exists, so every
+  correct implementation and every broken one produce the identical empty result. Here
+  the close's own dispatch was the designed experiment; it received the section, the
+  section was correct, and it carried 0 of 44 criteria forward, because the artifact is
+  seeded with exactly the fields the carry-forward predicate requires to be absent. Rules.
+  (a) Do not write an acceptance criterion asserting a non-empty cache hit in a close
+  that will run as attempt 1 — it is unsatisfiable, and a unit that must report "empty"
+  to be honest reads as a failure to everyone who skims it. Say in the criterion that an
+  empty result is a legitimate answer, and why. (b) Verify the mechanism on synthetic
+  state instead: drive the partition and the renderer over hand-built entries covering
+  every branch, which *is* checkable at attempt 1. (c) Close with the prediction rather
+  than the measurement — record the exact counts the next attempt's prompt must print
+  ("37 carried forward, 7 re-verify, 3 oracle groups"). That is a cheap, dated, falsifiable
+  claim, and it converts an unmeasurable close into one that a later run either confirms
+  or refutes for free.
