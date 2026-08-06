@@ -245,6 +245,7 @@ FILES=(
   rules/correlation-ids.md
   rules/design-for-diagnosis.md
   rules/never-touch.md
+  rules/operator-escalation.md
   rules/planning-discipline.md
   rules-local/README.md
   rules/result-contract.md
