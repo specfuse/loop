@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 model: sonnet
@@ -13,6 +13,13 @@ produces_driver_helper:
 produces:
   - tests/test_lint_closing_criteria_pristine.py
 generated_surfaces: []
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-06T02:10:54.310255+00:00
+duration_seconds: 746.265
+cost_usd: 2.205899
+input_tokens: 4228
+output_tokens: 15682
 ---
 
 # Stop a freshly seeded criteria artifact from failing its own lint

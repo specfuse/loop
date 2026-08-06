@@ -328,6 +328,13 @@ def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext)
     contributes at most one finding — the first problem found. Returns an
     empty list when the artifact does not exist yet; a close that has not
     started recording state is not this requirement's concern.
+
+    A **pristine** entry — `state: unverified`, no `kind:`, no `oracle:`,
+    byte for byte what `_precreate_criteria_state_stub` seeds and nothing
+    else — is likewise not this requirement's concern: no close has
+    annotated it yet, so there is nothing to have gotten wrong. Any
+    deviation (a `state` other than `unverified`, or an `oracle` recorded)
+    means a close has begun touching the entry, and it re-enters scope.
     """
     if ctx.gate_num is None:
         return []
@@ -338,6 +345,8 @@ def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext)
     current_attempt = str(ctx.wfm.get("attempts"))
     findings: list[str] = []
     for entry in entries:
+        if entry.kind is None and entry.oracle is None and entry.state == "unverified":
+            continue
         if entry.kind is None:
             findings.append(f"{entry.criterion_id}: missing kind:")
             continue
