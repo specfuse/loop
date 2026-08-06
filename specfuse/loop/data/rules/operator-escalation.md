@@ -29,6 +29,55 @@ been following. Lead with the shape of the problem; put the evidence after.
    choice legible.
 6. **A recommendation**, with the one reason it wins *here*.
 
+## The feature briefing — required when the halt is at feature scope
+
+The six parts frame a **decision**. When the halt is at feature or gate scope —
+a hedged terminal verdict, a feature that stopped partway and needs a human —
+the decision is not the whole question. The operator also needs to know whether
+the work *achieved what it was funded to achieve*, and that is a separate
+question from whether the tasks passed.
+
+Lead with this briefing. The six parts follow inside part 6.
+
+1. **Why we picked this.** The business problem, in the terms that justified the
+   spend — the cost, the risk, the recurring pain. Take it from the roadmap
+   row's own framing; do not invent a rationale that sounds better.
+2. **What we set out to accomplish — and whether that claim still stands.** If
+   the goal or the expected benefit changed during the work, say so plainly and
+   say what it is now. A business case that quietly shrank is the single most
+   important thing an operator can be told, and the easiest to omit.
+3. **What was delivered**, in outcome terms. What can be done now that could not
+   before.
+4. **Where it fell short, and why.** Including — stated as a headline, not
+   buried — whether the feature has actually been *shown* to deliver its benefit.
+   Separate "not proven" from "disproven"; they are different, and conflating
+   them either oversells or buries real work.
+5. **What it cost**, against what was planned.
+6. **What the operator must do to bring it to completion**, in order, with the
+   decision framed per the six parts above.
+7. **What to be aware of going forward.** Expectations to reset, limits that
+   outlive this feature, anything a reader would otherwise assume wrongly.
+
+### The rule this briefing exists to enforce
+
+**"Every work unit passed" is not "the feature worked."** Answer the second
+question explicitly, and answer it first. A feature can land every task green,
+every gate clean, and under budget, while the outcome it was funded for remains
+unmeasured — that is a normal result, not a shameful one, and reporting it as
+success is the failure this section prevents.
+
+### What to leave out
+
+- **Per-work-unit narration.** Which unit passed on which attempt is machinery.
+  It belongs below the briefing or in an answer to a follow-up question, never
+  in the briefing itself.
+- **Guard names, correlation IDs, verdict literals, file paths** as the *carrier*
+  of meaning. Say what happened; name the artifact afterwards for anyone who
+  wants to look.
+- **Anything not traceable to an artifact.** Every claim comes from the roadmap
+  row, the retrospective, the follow-up record, or the cost reconciliation.
+  Business rationale is never reconstructed from the diff.
+
 ## What "plain English" means
 
 - **No unexplained jargon on first use.** Write "the list of criteria nobody
@@ -53,6 +102,16 @@ been following. Lead with the shape of the problem; put the evidence after.
   An agent that drafts it has removed the signature it was collecting. Ask; do not
   supply.
 
+> **Provenance — the feature briefing.** Requested by the operator on
+> 2026-08-06 at FEAT-2026-0056's hedged close. The escalation satisfied the six
+> parts and was still the wrong answer: it reported which work units passed, what
+> each cost, and which guard withheld the flips, when the question was *"why did
+> we build this, did it work, and what do I do now?"* The operator's own words —
+> *"I don't care about the machinery and how each WU succeeded or not."* That
+> feature also demonstrated the rule above: eleven work units green, both gates
+> under budget, and the benefit it was funded for still unmeasured, because the
+> saving only appears on a repeat close and only a first close had run.
+>
 > **Provenance.** Requested by the operator on 2026-07-27 at FEAT-2026-0070's
 > hedged close. Escalations to that point led with correlation IDs, guard names,
 > and cost deltas — accurate, and unreadable to anyone deciding rather than

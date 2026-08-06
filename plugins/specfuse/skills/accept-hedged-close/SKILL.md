@@ -78,7 +78,36 @@ FEATURE_ID` directly; this skill has no role.
 - On a `met_locally` or `partially_met` verdict with the close WU `done`,
   continue.
 
-### 2. Lead with the verdict ceiling, then the record
+### 2. Brief the operator on the feature, then the verdict ceiling and the record
+
+- **Print the feature briefing first — before the ceiling, before any entry,
+  before any prompt.** The shape is
+  [`operator-escalation.md`](../../rules/operator-escalation.md)'s
+  § *The feature briefing — required when the halt is at feature scope*: why we
+  picked this, what we set out to accomplish and whether that claim still
+  stands, what was delivered, where it fell short and why, what it cost, what
+  the operator must do, and what to be aware of going forward. Do not restate
+  those seven parts here — read them there.
+
+  The operator arriving at a hedged close is deciding whether to **ship a
+  feature**, not whether to dismiss a lint finding. They may not have followed
+  the run at all. Sources, in order: the roadmap row's `**Why.**` /
+  `**Goal.**` / `**Benefits.**` for parts 1–2, `RETROSPECTIVE.md` for parts 3–5,
+  the follow-up record and this skill's own steps for part 6.
+
+  Two things this skill is uniquely placed to get right, and uniquely likely to
+  get wrong:
+
+  - **Say whether the feature's benefit was actually demonstrated.** A hedged
+    close is *precisely* the case where every work unit passed and the outcome
+    is still open. `RETROSPECTIVE.md`'s close-cost-delta or equivalent
+    outcome section is the source; quote its own honest verdict rather than
+    softening it. "Not proven" and "disproven" are different answers.
+  - **Say if the goal or benefit was re-baselined mid-flight.** If a producing
+    work unit rewrote the roadmap's `**Benefits.**` paragraph, the operator is
+    about to accept a feature whose business case changed after they approved
+    it. Diff the roadmap row against what the retrospective says was promised,
+    and lead with the difference if there is one.
 
 - Locate the close-discipline follow-up record the close WU was required to
   produce (`RETROSPECTIVE.md` or the gate review) — one `### `-titled entry
@@ -259,6 +288,15 @@ rationale/acknowledgment in step 3.
   stays; this skill is the path that makes the feature `done` first.
 
 ## Version
+
+**v0.2.** Step 2 now opens with the feature briefing from
+`operator-escalation.md` § *The feature briefing* — why we picked this, whether
+the business case still stands, what was delivered, whether the benefit was
+actually demonstrated, cost against plan, what to do, what to expect. Requested
+by the operator at FEAT-2026-0056's hedged close, where the escalation satisfied
+the six parts and still answered the wrong question: it reported which work
+units passed and what each cost, when the question was why we built it, whether
+it worked, and what to do now.
 
 **v0.1** (FEAT-2026-0070/T03). First cut: propose-and-confirm, mandatory
 rationale, acceptance record in `RETROSPECTIVE.md`, flip fired exclusively
