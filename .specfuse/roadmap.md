@@ -877,7 +877,7 @@ machine-checkable contract rather than prose.
 
 **Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
 
-**Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
+**Benefits.** This repository's `tests` gate (`python3 -m unittest discover -s tests -v -b`) is a `broad` oracle with no diff awareness, so it re-runs in full on every close attempt — the design does not reduce that cost. What it saves is the per-criterion agent reasoning, the regeneration, and the scenario matrix that a re-dispatched close otherwise redoes from scratch on criteria already proven green. A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices that portion of the ceremony.
 
 **Status: active.**
 

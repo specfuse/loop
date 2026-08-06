@@ -162,6 +162,23 @@ old WU body is optional cleanup, not required migration work.
 > made `closing_requirements.py` the single registry both the driver and the
 > lint read.
 
+## 5. Per-criterion state and the narrow/broad oracle contract
+
+A gate may carry a `GATE-NN-CRITERIA.md` artifact recording, per acceptance
+criterion, which oracle proved it, that oracle's exit code, and the tree state it
+ran against. Each entry also carries a `kind` (`narrow` or `broad`) and a `state`
+(the pass/fail result the oracle produced).
+
+A `narrow` oracle has a knowable scope — a scoped test nodeid, a symbol-existence
+import, a structural assert, a grep with a countable output — so its green may be
+carried forward across close attempts. A `broad` oracle — the full test suite, a
+full regeneration, a scenario matrix — has no knowable scope, so a carried-forward
+green would be an unsound coverage claim; it re-runs on every close attempt.
+
+`kind` and `state` are written by the close that ran the oracle and are never
+inferred by a reader, the same posture §2 already takes on the hedged-record
+`kind:`. `specfuse-lint --closing` is the check.
+
 ## Split with project-local rules
 
 These are the generic obligations. The concrete grounding — which command is

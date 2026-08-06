@@ -151,6 +151,9 @@ The close's acceptance criteria must cover:
    removal / rename across the feature's producing WUs and block on human
    acknowledgment, or write exactly `n/a — no consumer-visible contract
    change`.
+4. **Per-criterion state** (§5): if a `GATE-NN-CRITERIA.md` artifact exists for
+   this gate, `kind` and `state` per entry are written by this close, never
+   inferred — see `.specfuse/rules/close-discipline.md` §5.
 
 A close whose criteria include any of these is load-bearing — set
 `auto_close_disabled: true` in this WU's frontmatter so the auto-close

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
@@ -13,6 +13,10 @@ generated_surfaces:
   - .specfuse/rules/close-discipline.md
   - .specfuse/templates/GATE.template.md
   - .specfuse/templates/WU.template.md
+duration_seconds: 1191.003
+cost_usd: 1.983739
+input_tokens: 7446
+output_tokens: 15215
 ---
 
 # Document the per-criterion state contract and re-baseline the roadmap claim
