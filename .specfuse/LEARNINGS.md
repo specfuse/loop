@@ -3376,3 +3376,44 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   is already paying a sequencing tax to prove one unit, that is the cheapest moment
   to also strengthen that unit's own test, because a second sequencing round costs
   the same as the first and the round you are in is already sunk.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/survival-needs-the-whole-path-set] **When a
+  work unit's job is to make state survive a retry, enumerate every path that destroys
+  that state and test against each — the path the plan names is the one the author
+  already thought about, and therefore rarely the one that kills you.** Here the plan
+  named `fold_cumulative_on_rearm` and the unit tested it correctly against the real
+  function; the property was also unfalsifiable, because the fold rewrites work-unit
+  frontmatter and the artifact is a separate file, so no possible fold could have
+  touched it. The path that actually deletes the artifact is the per-attempt reset:
+  the untracked-file snapshot is taken once per work unit *before* the attempt loop,
+  the artifact is created *inside* each attempt, so a failing attempt's cleanup sees
+  it as "appeared since the snapshot" and unlinks it — and it stays untracked until a
+  passing attempt commits it, meaning the state is wiped on exactly the multi-attempt
+  runs it exists to serve. `events.jsonl` survives only because it has an explicit
+  hand-written carve-out in that cleanup. Rules. (a) Write the destroyer list before
+  the test list: for a file, that is at minimum the hard reset, the untracked clean,
+  the regeneration, and any fold; for a field, every writer of its container. (b) Be
+  suspicious of a survival test that passes on the first attempt with no scaffolding —
+  ask what would have to change for it to fail, and if the answer is "nothing
+  reachable", it is a tautology and the real path is untested. (c) An artifact is only
+  as durable as its most recent commit; anything created at dispatch and read across
+  attempts is untracked for its whole useful life.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/console-script-is-not-the-tree] **A console
+  script installed into the environment and the source checkout you are editing are two
+  different programs — any sweep, probe, or corpus check must name which one it ran, or
+  it is evidence about neither.** A gate-arming baseline and a work unit's
+  "reports zero findings across every existing feature" criterion both invoked the
+  project's installed CLI entry point, which resolves the package from `site-packages`
+  at whatever version was last pip-installed — in this case an older release that did
+  not contain the requirement being measured. Both reported the expected zero, and both
+  would have reported it had the work unit shipped nothing at all. The repo's own
+  script shims path-insert the repo root and do resolve from source, so the correct
+  command existed and was one character-class away from the one used. Rules. (a) In a
+  repo that both ships a CLI and dogfoods it, prefer the from-source invocation in
+  every acceptance criterion, and say in the criterion which one it is. (b) A
+  "zero findings over corpus C" criterion needs a positive control: run the check
+  against one input you know should fire, and paste that too — a sweep that cannot
+  distinguish "correctly silent" from "not running" has measured nothing. This is the
+  same shape as [FEAT-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
+  run, here it was run against the wrong binary.
