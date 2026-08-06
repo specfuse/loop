@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0056/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces_driver_helper:
@@ -10,6 +10,15 @@ produces_driver_helper:
 produces:
   - tests/test_lint_closing_criteria.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-06T00:05:04.968833+00:00
+duration_seconds: 900.023
+cost_usd: 2.313287
+input_tokens: 6723
+output_tokens: 31154
 ---
 
 # Refuse a close whose criteria-state artifact is malformed

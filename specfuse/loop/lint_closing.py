@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import closing_requirements as creq
+from . import criteria_state
 from .changelog import parse_changelog
 from .loop import _gate_number_from_wu_id, summarize_attempt_failure_classes
 from .lint_plan import _find_task_graph_block, read_frontmatter
@@ -314,6 +315,52 @@ def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: Clos
     )
 
 
+def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext) -> list[str]:
+    """One finding per untrustworthy entry in `GATE-NN-CRITERIA.md`, or none.
+
+    Three shapes make an entry untrustworthy: a `kind:` missing or outside
+    `criteria_state.ORACLE_KINDS`; a `state:` missing or outside
+    `criteria_state.CRITERION_STATES`; or an entry whose oracle has no
+    knowable scope (`kind: broad`) reading `state: pass` with an `attempt:`
+    that is not the current attempt — a broad oracle's green can never be
+    carried forward from a prior attempt (PLAN.md § *Scope decision*). Each
+    is its own finding so one bad entry never masks another, and an entry
+    contributes at most one finding — the first problem found. Returns an
+    empty list when the artifact does not exist yet; a close that has not
+    started recording state is not this requirement's concern.
+    """
+    if ctx.gate_num is None:
+        return []
+    path = ctx.feature_dir / f"GATE-{ctx.gate_num:02d}-CRITERIA.md"
+    if not path.is_file():
+        return []
+    entries = criteria_state.parse_criteria_state(path.read_text())
+    current_attempt = str(ctx.wfm.get("attempts"))
+    findings: list[str] = []
+    for entry in entries:
+        if entry.kind is None:
+            findings.append(f"{entry.criterion_id}: missing kind:")
+            continue
+        if entry.kind not in criteria_state.ORACLE_KINDS:
+            findings.append(
+                f"{entry.criterion_id}: kind {entry.kind!r} not one of "
+                f"{sorted(criteria_state.ORACLE_KINDS)}"
+            )
+            continue
+        if entry.state not in criteria_state.CRITERION_STATES:
+            findings.append(
+                f"{entry.criterion_id}: state {entry.state!r} not one of "
+                f"{sorted(criteria_state.CRITERION_STATES)}"
+            )
+            continue
+        if entry.kind == "broad" and entry.state == "pass" and entry.attempt != current_attempt:
+            findings.append(
+                f"{entry.criterion_id}: broad entry reads state: pass but "
+                f"attempt {entry.attempt!r} != current attempt {current_attempt!r}"
+            )
+    return findings
+
+
 _CHECKS = {
     "assert_retrospective_exists": _check_retrospective_exists,
     "assert_learnings_appended_or_noop": _check_learnings_appended_or_noop,
@@ -327,6 +374,7 @@ _CHECKS = {
     "assert_next_gate_drafted_or_terminal": _check_next_gate_drafted_or_terminal,
     "assert_hedged_followup_kinds_classified": _check_hedged_followup_kinds_classified,
     "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
+    "check_criteria_state_well_formed": check_criteria_state_well_formed,
 }
 
 
@@ -425,6 +473,12 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
             # No pre-squash requirement currently carries this condition
             # (close-g is post-pass); nothing to evaluate here.
             continue
+        elif req.applies_when == "criteria_artifact_present":
+            if ctx.gate_num is None:
+                continue
+            artifact_path = ctx.feature_dir / f"GATE-{ctx.gate_num:02d}-CRITERIA.md"
+            if not artifact_path.is_file():
+                continue
 
         checker = _CHECKS.get(req.enforced_by)
         if checker is None:
@@ -439,6 +493,10 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
 
         result = checker(req, ctx)
         if result is None:
+            continue
+        if isinstance(result, list):
+            for reason in result:
+                findings.append(_format_finding(req, reason))
             continue
         ok, reason = result
         if not ok:

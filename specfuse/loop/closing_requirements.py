@@ -179,8 +179,9 @@ class Requirement:
     """One closing-artifact requirement, as data.
 
     ``applies_when`` names the condition under which the requirement fires:
-    ``always``, ``verdict_met``, ``verdict_hedged``, ``failures_present``, or
-    ``autoclose_debt_marker``. ``phase`` is ``pre-squash`` (checked by
+    ``always``, ``verdict_met``, ``verdict_hedged``, ``failures_present``,
+    ``autoclose_debt_marker``, or ``criteria_artifact_present`` (the gate's
+    ``GATE-NN-CRITERIA.md`` exists). ``phase`` is ``pre-squash`` (checked by
     ``assert_closing_deliverables`` right after the WU's own squash) or
     ``post-pass`` (checked by ``verify_post_pass_invariants`` after the
     gate-boundary state flips run).
@@ -299,6 +300,18 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             file=RETROSPECTIVE_FILENAME,
             enforced_by="assert_changelog_entry_for_contract_changes",
         ),
+        Requirement(
+            id="close-l", wu_type="close", phase="pre-squash",
+            description=(
+                "Every entry in GATE-NN-CRITERIA.md carries a kind: in "
+                "criteria_state.ORACLE_KINDS and a state: in "
+                "criteria_state.CRITERION_STATES, and every entry whose kind "
+                "has no knowable scope and whose state reads pass carries an "
+                "attempt: equal to the current attempt"
+            ),
+            applies_when="criteria_artifact_present",
+            enforced_by="check_criteria_state_well_formed",
+        ),
     ],
     "close-intermediate": [
         Requirement(
@@ -342,6 +355,18 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             file=LEARNINGS_PATH,
             enforced_by="assert_learnings_staged_under_auto",
+        ),
+        Requirement(
+            id="close-intermediate-f", wu_type="close-intermediate", phase="pre-squash",
+            description=(
+                "Every entry in GATE-NN-CRITERIA.md carries a kind: in "
+                "criteria_state.ORACLE_KINDS and a state: in "
+                "criteria_state.CRITERION_STATES, and every entry whose kind "
+                "has no knowable scope and whose state reads pass carries an "
+                "attempt: equal to the current attempt"
+            ),
+            applies_when="criteria_artifact_present",
+            enforced_by="check_criteria_state_well_formed",
         ),
     ],
     "plan-next": [
