@@ -2,6 +2,10 @@
 gate: 2
 status: open        # open | awaiting_review | passed
 cost_budget_usd: 17.50
+baseline:
+  sha: 9eb7110f652331e18a253446680b619e3e3dae07
+  probed_at: 2026-08-07T12:02:28.588377+00:00
+  failing: []
 ---
 
 # Gate 2 — the hazard is prevented, and the two-invocation hold has a name
