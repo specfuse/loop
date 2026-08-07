@@ -84,3 +84,40 @@ class TestCriteriaArtifactSurvivesAttemptReset(unittest.TestCase):
                 "an unrelated file created after the snapshot must still be "
                 "cleaned — the carve-out must not widen beyond the artifact",
             )
+
+    def test_events_jsonl_carve_out_is_intact(self):
+        """T05 criterion 6: the pre-existing `events.jsonl` carve-out still holds.
+
+        T05 widened `_clean_attempt_untracked` to spare a second filename, so the
+        carve-out it was widened alongside needs its own assertion — otherwise a
+        later edit could drop the `events_path` branch with this module green.
+
+        `events.jsonl` is created AFTER the snapshot on purpose: a file already in
+        `untracked_before` is spared for a different reason, and asserting on that
+        would pass whether or not the carve-out exists.
+        """
+        with _git_repo_no_sign() as root:
+            events_path = root / "events.jsonl"
+            untracked_before = loop.untracked_paths()
+
+            events_path.write_text('{"event_type":"attempt_outcome"}\n')
+
+            leftover = root / "scratch-notes.txt"
+            leftover.write_text("agent leftover\n")
+
+            loop._clean_attempt_untracked(untracked_before, events_path)
+
+            self.assertTrue(
+                events_path.is_file(),
+                "events.jsonl must survive the attempt-reset cleanup — the "
+                "carve-out predates T05 and T05 must not have broken it",
+            )
+            self.assertIn(
+                "attempt_outcome", events_path.read_text(),
+                "events.jsonl must survive with its contents intact, not be "
+                "truncated or recreated empty",
+            )
+            self.assertFalse(
+                leftover.exists(),
+                "the events.jsonl carve-out must not spare unrelated files",
+            )
