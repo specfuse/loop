@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0075/T04
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.00
 oracle_env: macos_local
@@ -23,6 +23,13 @@ gate_set: code
 docstring already claims — "the driver's own importable surface" — by excluding paths
 that cannot be cached in `sys.modules`, so that T06 can build a process halt on it
 without halting a run over a documentation or schema edit.
+
+**Incremental edit to an existing file.** `specfuse/loop/driver_edit.py` appears in
+this unit's `produces:` even though `T01` created it: this WU narrows the predicate
+**in place**, replacing the bare prefix match with an importable-surface test and
+adding `is_driver_module_path`. The path is declared rather than dropped because the
+unit does modify that file, and `PLAN.md`'s single-detector constraint requires the
+narrowing land here rather than in a second module.
 
 **Context.** This is `FEAT-2026-0075/T04`, gate 2's first unit. `T01` built
 `driver_edit.py` with `DRIVER_MODULE_PREFIXES = ("specfuse/loop/",)` and two bare
