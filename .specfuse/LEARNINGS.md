@@ -3496,3 +3496,58 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Where the enforcing change is out of scope, the honest gate output is "unverified in
   situ, predicted as follows" with a falsifiable prediction the next run confirms for
   free — not a claim carried on seam tests that were never composed.
+
+- [FEAT-2026-0075/G2-CLOSE/a-control-closes-the-loop-a-diagnostic-cannot-close-its-own] **A
+  control that fires without anyone remembering it does close the loop a promoted rule
+  leaves open — but it cannot cover the gate that builds it, so the last manual
+  execution of the rule is always the one that ships the control. Plan for that
+  occurrence instead of hoping it will not happen.** This is the answer to the question
+  `[FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]`
+  posed, and it carries the negative half. **The positive half.** Replaying five
+  recorded occurrences of the same hazard — a work unit editing the driver, then the
+  same process dispatching more units that execute the pre-edit modules — through the
+  shipped squash-diff halt, all five stop at the *first* driver-editing unit, several
+  dispatches ahead of the close where the money was actually lost ($5.33, then $3.66 in
+  a spinning escalation, then $9.32). A sweep of 90 gates shows the control silent on
+  the 48 that never edit the driver: it costs one re-run of a command the operator
+  already ran, and only on gates that would otherwise produce a false verification.
+  Detection had been shipped one gate earlier, was correct, and prevented none of them.
+  **The negative half, which is the part worth keeping.** The gate that shipped the
+  control still required the manual restart, because the halt is not live in the
+  process that writes it — and the first attempt at that gate's own close *did* skip
+  the restart, burning $9.32 across three attempts that produced nothing but a
+  per-criterion state file. Every control of this shape has an irreducible last manual
+  occurrence: the one on its own gate. Rules. (a) When planning the gate that ships a
+  self-enforcing control, budget for the hazard firing one final time **on that gate**
+  and write the recovery into the plan (re-arm, restart, one extra close) rather than
+  writing "REQUIRED, operator action" in bold and treating the bold as mitigation —
+  that phrasing has now failed twice in this repository with the rule promoted both
+  times. (b) A close's precondition check is worth having anyway: it converts a silent
+  wrong answer into an honest blocked one, and the blocked answer is what forced the
+  restart that made the terminal close truthful. It raises the odds of a correct
+  observation not at all — only the odds of an honest one. (c) Do not size the
+  shipping gate's budget from the pre-control gate's actuals; the wiring unit at the
+  dispatch seam came in at 3.2x its estimate, and the close ran twice.
+
+- [FEAT-2026-0075/G2-CLOSE/a-control-retires-the-diagnostic-that-reported-it] **Shipping
+  a control that prevents a hazard usually makes the diagnostic that reported it
+  unreachable, and nothing tells you — the tests still pass, because they assert the
+  diagnostic's behaviour and not its reachability.** Gate 1 shipped a gate-completion
+  summary that named every driver-editing unit in a gate plus the units dispatched
+  after them, and emitted an event carrying the same. Gate 2 shipped a halt that stops
+  the run at the first such unit. The summary's input list is accumulated **per
+  process**; once the halt is live, the gate always finishes under a *fresh* process
+  whose list is empty, so the summary prints nothing and the event is never emitted.
+  Both are now reachable only when the gate's *final* unit edits the driver, or on a
+  driver too old to carry the halt. Every test of the summary still passes — they drive
+  it with a non-empty list. Rules. (a) When a gate makes an earlier gate's hazard
+  impossible, explicitly ask what the earlier gate's *reporting* path now sees, and put
+  the answer in the retrospective; it is a question no acceptance criterion asks,
+  because each gate's criteria only look forward. (b) State-accumulated-in-a-process is
+  the smell: any list built during a run and read at the end of it is silently emptied
+  by anything that makes the run restart. Rehydrating from the durable log
+  (`events.jsonl`) at read time costs little and survives the restart the control now
+  mandates. (c) A superseded diagnostic is not automatically a defect — the halt's own
+  event is strictly more informative than the summary — but leaving it undeclared means
+  the next reader finds shipped, tested, dead code and cannot tell whether it is
+  intentional.

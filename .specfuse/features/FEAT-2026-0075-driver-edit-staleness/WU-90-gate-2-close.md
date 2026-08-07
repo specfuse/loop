@@ -1,15 +1,21 @@
 ---
 id: FEAT-2026-0075/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met_locally
 oracle_env: macos_local
-duration_seconds: 1565.498
-cost_usd: 9.317808
-input_tokens: 139
-output_tokens: 94062
+duration_seconds: 1016.006
+cost_usd: 8.222645
+input_tokens: 7140
+output_tokens: 76984
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.9.3
+started_at: 2026-08-07T15:55:02.079683+00:00
 ---
 
 # Close gate 2 — terminal close for FEAT-2026-0075
