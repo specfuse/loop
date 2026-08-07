@@ -1,7 +1,7 @@
 ---
 gate: 2
-status: awaiting_review
-cost_budget_usd: 17.50
+status: open
+cost_budget_usd: 31.00
 baseline:
   sha: 23bb6423fd0ff2a802d77ec23d4b1e87b5eec02d
   probed_at: 2026-08-07T14:23:30.284159+00:00
@@ -153,6 +153,40 @@ second, independent argument: an arm-time refusal must key on author-supplied
   (`G2-CLOSE`, $5.00). `G2-CLOSE` carries the §5 `close` floor of $5.00. Implementation
   estimates are calibrated down from gate 1's actuals, where T01/T02/T03 came in at
   $1.18/$1.44/$2.78 against $2.50/$3.50/$3.00 planned.
+
+## Budget re-baseline — operator decision, 2026-08-07
+
+`cost_budget_usd` was raised **$17.50 → $31.00** by operator decision after the brake
+fired. Recorded here rather than edited quietly, because a budget silently raised
+whenever it fires is a decorative budget.
+
+**What fired.** The brake halted before `G2-CLOSE`'s dispatch with
+`spent $21.3764 >= budget $17.5000`. It halted correctly, no work unit was dispatched,
+and nothing was spent on the halted run.
+
+**Why the overrun happened**, since the number matters more than the delta:
+
+- `T06` came in at **$7.90 against $2.50** (3.2×). It was the gate's hardest unit —
+  the halt wiring at the dispatch seam — and its estimate was the one `GATE-02-REVIEW.md`
+  flagged as least certain.
+- `G2-CLOSE`'s first dispatch burned **$9.32 across three attempts and produced nothing**:
+  no retrospective section, no verdict, no lessons, its only `files_touched` being
+  `GATE-02-CRITERIA.md`. It was dispatched into a process that predated `T04`–`T06`, so
+  `T06`'s halt could not stop it — this feature's own subject, occurrence five, exactly
+  as `GATE-02-REVIEW.md` § *The one thing gate 2 cannot fix* predicted.
+
+Neither overrun is evidence the remaining work is mis-estimated. The gate's three
+substantive units are `done` and green; what remains is the close.
+
+**The new figure is $21.38 already spent plus $9.62 of headroom** — more than the $8.68
+FEAT-2026-0056's comparable terminal close cost, and matching the $9.32 this close burned
+on its failed run. It is not a re-forecast of the remaining work; it is the sunk cost
+plus one close.
+
+**For `G2-CLOSE`'s cost analysis:** reconcile against **both** figures. The $17.50 is
+what the gate was planned to cost and the honest baseline for the variance; the $31.00 is
+what it was permitted to cost after this decision. Reporting only the second would hide
+the overrun the brake exists to surface.
 
 ## Reflection notes
 
