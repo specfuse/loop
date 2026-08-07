@@ -42,11 +42,12 @@
 ### T05#6
 
 - **criterion:** `_clean_attempt_untracked` still never unlinks `events_path` — the existing
-- **oracle:** grep -n 'assert.*events' tests/test_loop_criteria_survival.py  (0 matches — the module holds one test and it never asserts on events_path)
+- **oracle:** python3 -m unittest tests.test_loop_criteria_survival  (2 tests, OK — `test_events_jsonl_carve_out_is_intact` creates events.jsonl after the untracked snapshot and asserts it survives with contents intact)
 - **kind:** `narrow`
-- **state:** `fail`
-- **proved_at_sha:** `f25e790`
+- **state:** `pass`
+- **proved_at_sha:** `04fbc80`
 - **attempt:** `1`
+- **provenance:** Flipped `fail` → `pass` post-close by an operator-directed session on 2026-08-06, not by the close WU. `G2-CLOSE` recorded `fail` correctly: at sha `f25e790` the behaviour held but no assertion existed, and repairing it was outside that unit's boundary. The hedged-verdict follow-up record in `RETROSPECTIVE.md` names the exact re-run condition — *"a work unit adds an assertion … and `python3 -m unittest tests.test_loop_criteria_survival` then reports at least 2 tests, OK. At that point `T05#6` flips to `state: pass` and this entry is discharged."* That condition was met at `04fbc80`, and the flip follows the record's own stated rule rather than a reader's inference. The assertion was mutation-verified: replacing `keep = events_path.resolve()` with `keep = None` in `_clean_attempt_untracked` fails this test and only this test.
 
 ### T05#7
 
