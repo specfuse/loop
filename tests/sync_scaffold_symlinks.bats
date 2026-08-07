@@ -49,6 +49,7 @@ setup() {
   printf 'closedisc\n'   > "$TESTDIR/.specfuse/rules/close-discipline.md"
   printf 'diagnose\n'    > "$TESTDIR/.specfuse/rules/design-for-diagnosis.md"
   printf 'never\n'       > "$TESTDIR/.specfuse/rules/never-touch.md"
+  printf 'opesc\n'       > "$TESTDIR/.specfuse/rules/operator-escalation.md"
   printf 'plandisc\n'    > "$TESTDIR/.specfuse/rules/planning-discipline.md"
   printf 'localreadme\n' > "$TESTDIR/.specfuse/rules-local/README.md"
   printf 'result\n'      > "$TESTDIR/.specfuse/rules/result-contract.md"
