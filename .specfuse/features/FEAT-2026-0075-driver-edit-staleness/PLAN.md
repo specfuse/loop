@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0075-driver-edit-staleness
 roadmap_goal: Make the driver-staleness hazard visible while it can still be acted on, and then impossible to arm into, rather than rediscovered after the money is spent.
 autonomy_default: review
 status: active
-planned_cost_usd: 24.50
+planned_cost_usd: 32.00
 ---
 
 # Plan: Driver-editing work units cannot take effect in the process that dispatches them
@@ -77,13 +77,22 @@ Gate 1 is warn-only and flips no severity, so this section's question does not a
 for it. Nothing in gate 1 blocks, refuses, or fails a gate; it prints and records.
 There is no "zero issues" predicate to satisfy.
 
-Gate 2 raises a refusal and will need the full §2 answer, written by `G1-PLAN`
-when it drafts that gate against gate 1's observed warn output. The question it must
-answer: *what does the arm-time refusal report on a gate that is already correctly
-ordered?* If the answer is anything but zero, the refusal fires on correct plans and
-must be redesigned before arming. Gate 1's summary output is deliberately the evidence
-that answers it — which is the reason the two shapes are split across two gates rather
-than built together.
+Gate 2 raises a blocking control and needs the full §2 answer. **`G1-PLAN` wrote it —
+see `GATE-02.md` § *Escalation-predicate satisfiability*, and `GATE-02-REVIEW.md` for
+the argument.** The short form: the question was *what does the arm-time refusal report
+on a gate that is already correctly ordered?*, and a sweep of all 57 feature folders /
+90 gates answered **41 of 41** — every gate in the methodology ends with a close, so a
+driver-editing unit is always ahead of a close in its own gate and no compliant plan
+exists to write. The arm-time scoping was therefore unsatisfiable and was re-drafted, not
+softened. The shipped control is a squash-diff halt whose §2 answer is **zero**: 49 of
+90 gates contain no driver-module edit and are never interrupted.
+
+Gate 1's output was expected to be the evidence for this. It was not, and the reason is
+itself the finding: gate 1's warning, summary and event fired **zero** times, because
+the process that dispatched its close predated the entire gate (`RETROSPECTIVE.md` §1
+and §2). The §2 answer above is therefore derived from a sweep over declared plan
+surfaces rather than from observed warn output, and `GATE-02.md`'s arming discipline
+carries the §4 requirement to re-run that sweep against the shipped code before arming.
 
 ## Scope decision: what this feature builds, and what it deliberately does not
 
@@ -165,12 +174,31 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      - id: FEAT-2026-0075/T04
+        file: WU-04-narrow-driver-module-surface.md
+        depends_on: [FEAT-2026-0075/T01]
+      - id: FEAT-2026-0075/T05
+        file: WU-05-sanctioned-restart-hold.md
+        depends_on: [FEAT-2026-0075/T02]
+      - id: FEAT-2026-0075/T06
+        file: WU-06-halt-before-dispatching-into-a-stale-process.md
+        depends_on:
+          - FEAT-2026-0075/T04
+          - FEAT-2026-0075/T05
+      # --- OPERATOR STEP between T06 and the close: restart the driver. ---
+      # Same step gate 1 carried, for the same reason, and gate 2 is the last
+      # gate that has to do it by hand: T06's halt is not live in the process
+      # that dispatches T06. Not a work unit — there is nothing in the graph
+      # schema that represents an operator action. Enforced by G2-CLOSE's
+      # criterion 1, which blocks if the dispatching process predates T06's
+      # started_at. See GATE-02.md § Arming discipline.
       # --- closing sequence: 1-WU close (terminal gate) ---
-      # Scaffolded now so lint reads gate 1 as non-terminal.
-      # G1-PLAN fills in gate 2's substantive WUs above this entry.
       - id: FEAT-2026-0075/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []   # G1-PLAN sets real depends_on when it drafts gate 2
+        depends_on:
+          - FEAT-2026-0075/T04
+          - FEAT-2026-0075/T05
+          - FEAT-2026-0075/T06
 ```
 
 ## Notes

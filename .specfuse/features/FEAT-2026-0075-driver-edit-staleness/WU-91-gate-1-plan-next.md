@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0075/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.9.3
+started_at: 2026-08-07T04:53:47.330395+00:00
+duration_seconds: 860.743
+cost_usd: 5.82051
+input_tokens: 84
+output_tokens: 63207
 ---
 
 # Draft gate 2 — the arm-time refusal and the sanctioned hold
