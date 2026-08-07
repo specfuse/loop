@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0075/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 provenance: "PLAN.md § Notes — 'The sanctioned hold is gate 2's, and it is a hard dependency of the refusal': `draft` is rejected by the arm check for the entire gate (`loop.py:5760-5770`, `return 2`) and `blocked_human` reads as a failure in `/attention`. `[FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]` rule (c) — 'prefer a precondition the process can enforce on itself to one a human must satisfy between two dispatches' — is what sets the shape: the hold is a halt the process performs on itself, not a status a human must set and later clear. `G1-PLAN` re-scoped it from 'a new WU status' to 'a named halt' after finding that a halt leaves every WU in `pending` and the gate in `open`, so no consumer needs teaching a new vocabulary."
@@ -15,6 +15,12 @@ generated_surfaces: []
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-07T12:24:19.815013+00:00
+duration_seconds: 938.882
+cost_usd: 2.894009
+input_tokens: 78
+output_tokens: 27241
 ---
 
 # Give the two-invocation split a sanctioned halt the driver performs on itself

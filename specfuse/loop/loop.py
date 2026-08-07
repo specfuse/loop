@@ -1952,6 +1952,59 @@ def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
     return gate_spent_usd(plan, gate, feature_dir) >= budget
 
 
+# Sanctioned name for the two-invocation-split halt (FEAT-2026-0075/T05).
+# Not a WU status and not a gate status — the halt flips neither, so no
+# vocabulary change is needed in lint_plan.py's VALID_STATUS or any of the
+# per-type tables. `2` is already taken by the unarmed-drafts check above;
+# a shared exit code would make the two halts indistinguishable to any
+# script reading the process's exit status.
+HALT_REASON_DRIVER_RESTART = "driver_restart_required"
+EXIT_DRIVER_RESTART_REQUIRED = 3
+
+
+def _halt_for_driver_restart(
+    gate_number: int,
+    feature_id: str,
+    events_path: Path,
+    wu_id: str,
+    driver_paths: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> int:
+    """Run-loop brake: the sanctioned halt a driver performs on itself when a
+    squash it just made edits the driver's own importable surface and the
+    gate still has units left to dispatch (FEAT-2026-0075/T05).
+
+    Sibling of `_should_halt_for_budget` at the same `for wu in pending`
+    seam — this unit builds the mechanism, `T06` builds the predicate that
+    decides when to call it. Deliberately flips NO gate status and NO WU
+    status: the run is suspended, not concluded, so a fresh process must see
+    the same `open` gate and the same `pending` units `ready()` would have
+    handed to this one. Durability is via the existing `commit_bookkeeping`
+    path (same as the budget brake), so the event survives even if the
+    operator does not restart immediately.
+    """
+    message = format_driver_restart_halt(
+        wu_id, driver_paths, remaining_wu_ids, resume_command)
+    flush_events(events_path, [build_event(
+        "driver_staleness_detected", feature_id, {
+            "gate": gate_number,
+            "wu_id": wu_id,
+            "driver_paths": driver_paths,
+            "halted": True,
+            "reason": HALT_REASON_DRIVER_RESTART,
+            "remaining_wu_ids": remaining_wu_ids,
+            "resume_command": resume_command,
+        })])
+    commit_bookkeeping(
+        [events_path],
+        f"chore(loop): gate {gate_number} halted for driver restart "
+        f"({wu_id})\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return EXIT_DRIVER_RESTART_REQUIRED
+
+
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
     """Run-loop predicate: sibling of `_should_halt_for_budget`, evaluated
     AFTER a work unit's outcome resolves rather than before the next dispatch.
@@ -2215,6 +2268,35 @@ def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
             f"any of these can be trusted as a verification of the change."
         )
     return "\n".join(lines)
+
+
+def format_driver_restart_halt(
+    wu_id: str, driver_paths: list, remaining_wu_ids: list, resume_command: str,
+) -> str:
+    """Render the sanctioned driver-restart halt message, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T05) — the same empty-input
+    contract as `format_driver_staleness_warning`.
+
+    Unlike the T02/T03 formatters, which only print, this message accompanies
+    a run that actually stopped: it names the offending unit and its edited
+    paths, states plainly that this process cannot execute what was just
+    written, lists every work unit left `pending` in the gate, and gives the
+    exact command the operator runs to resume — omitting it would send the
+    reader back to the source to reconstruct it by hand.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    return (
+        f"DRIVER RESTART REQUIRED: {wu_id} edited the driver itself "
+        f"({paths}). This process cached the pre-edit versions of those "
+        f"modules at import time and cannot execute the edited modules, so "
+        f"it has halted rather than dispatch into a process that cannot "
+        f"observe its own change. Work unit(s) left pending in this gate: "
+        f"{remaining}. Start a fresh driver process and resume with:\n"
+        f"  {resume_command}"
+    )
 
 
 class SquashCommitError(RuntimeError):
