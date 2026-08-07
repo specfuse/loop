@@ -23,20 +23,36 @@ from __future__ import annotations
 import subprocess
 
 DRIVER_MODULE_PREFIXES = ("specfuse/loop/",)
+DRIVER_DATA_PREFIXES = ("specfuse/loop/data/",)
+
+
+def is_driver_module_path(path):
+    """Return True if `path` is on the driver's importable surface.
+
+    A path counts only if it starts with a driver module prefix, ends in
+    `.py`, and does not start with a driver data prefix — data files are
+    never cached in `sys.modules`, so editing them costs a running loop
+    nothing.
+    """
+    return (
+        path.startswith(DRIVER_MODULE_PREFIXES)
+        and path.endswith(".py")
+        and not path.startswith(DRIVER_DATA_PREFIXES)
+    )
 
 
 def diff_edits_driver(paths):
-    """Return True if any path in `paths` falls under a driver module prefix."""
+    """Return True if any path in `paths` falls on the driver module surface."""
     for path in paths:
-        if path.startswith(DRIVER_MODULE_PREFIXES):
+        if is_driver_module_path(path):
             return True
     return False
 
 
 def driver_paths_in(paths):
-    """Return only the paths in `paths` that fall under a driver module prefix,
+    """Return only the paths in `paths` that fall on the driver module surface,
     in input order."""
-    return [path for path in paths if path.startswith(DRIVER_MODULE_PREFIXES)]
+    return [path for path in paths if is_driver_module_path(path)]
 
 
 def changed_paths_for_commit(sha, repo_root):

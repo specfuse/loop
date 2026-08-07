@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0075/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 provenance: "RETROSPECTIVE.md gate 1 §4, the finding the close was forbidden from repairing: `T03`'s own `files_touched` included `specfuse/loop/data/schemas/driver-event.schema.json`, which the `specfuse/loop/` prefix flags as a driver-module edit even though a JSON data file is read from disk at runtime and never enters `sys.modules`. The close states plainly that gate 1 is warn-only so the false positive costs only noise, and that gate 2 must narrow the predicate before building anything blocking on it. This WU is that narrowing, and it is scheduled first in gate 2 because T06 turns the same predicate into a process halt."
@@ -15,6 +15,12 @@ generated_surfaces: []
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-07T12:06:59.829998+00:00
+duration_seconds: 1039.719
+cost_usd: 1.260218
+input_tokens: 60
+output_tokens: 13439
 ---
 
 # Narrow driver-staleness detection to the importable surface
