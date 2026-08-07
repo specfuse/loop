@@ -88,7 +88,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
-| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | planned | — | [→ detail](#feat-2026-0075) |
+| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | active | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ detail](#feat-2026-0075) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -955,7 +955,7 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 
 **Benefits.** The most expensive class of work unit stops paying a tax nobody budgeted for: two close cycles were lost to this in a single feature, and closes are already the costliest attempt type in the portfolio. A hazard that currently depends on an operator remembering it becomes a property of the system. And the sanctioned hold removes the last hand-improvised step in a driver-editing feature, so a run that must span two invocations says so in its plan instead of being discovered mid-gate.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
