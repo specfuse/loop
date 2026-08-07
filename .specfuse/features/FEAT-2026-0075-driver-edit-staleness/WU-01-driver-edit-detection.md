@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0075/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces_driver_helper:
@@ -13,6 +13,15 @@ produces:
   - specfuse/loop/driver_edit.py
   - tests/test_driver_edit_detection.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-07T03:54:47.489903+00:00
+duration_seconds: 812.855
+cost_usd: 1.175409
+input_tokens: 64
+output_tokens: 9804
 ---
 
 # Detect a driver-editing diff from a commit's changed paths
