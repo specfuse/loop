@@ -71,7 +71,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | active | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ detail](#feat-2026-0056) |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
@@ -869,17 +869,6 @@ machine-checkable contract rather than prose.
 **Benefits.** A feature blocked on externally-caused debt can proceed without anyone weakening a gate: the debt is held constant, tracked in an issue, and visible in the gate review, while every newly-introduced failure still fails. Designed against real baseline records produced by 0051 rather than speculatively, and sequenced after it so the oracle-semantics change lands behind a shipped, proven brake.
 
 **Status: planned.**
-
-<a id="feat-2026-0056"></a>
-## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
-
-**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
-
-**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
-
-**Benefits.** This repository's `tests` gate (`python3 -m unittest discover -s tests -v -b`) is a `broad` oracle with no diff awareness, so it re-runs in full on every close attempt — the design does not reduce that cost. What it saves is the per-criterion agent reasoning, the regeneration, and the scenario matrix that a re-dispatched close otherwise redoes from scratch on criteria already proven green. A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices that portion of the ceremony.
-
-**Status: active.**
 
 <a id="feat-2026-0058"></a>
 ## FEAT-2026-0058 — Feature decision registry + override lint

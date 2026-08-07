@@ -1247,3 +1247,93 @@ implementation units came in 44–51% under plan while every closing unit came i
 Three closing units is not a portfolio, and `PLAN.md` already opens with the
 corpus-level version of this claim. Recorded in § *Cost analysis* as a signal for the
 next plan rather than promoted as a rule.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator's reason, verbatim:** *"The next feature will exercise the worklist on
+repeat closes; accepting now"*
+
+**Recorded:** 2026-08-07T01:15:49Z, via `/accept-hedged-close`.
+
+**Computed ceiling at acceptance:** `rework exists` — one entry carried
+`externally-verifiable-later`. See the note on entry 2 below: that entry's named
+re-run condition had already been met by the time of acceptance, so the computed
+ceiling reflects the record as the close wrote it rather than the state of the
+tree at acceptance. No entry was rewritten to change the computed value.
+
+**These follow-ups remain OPEN.** Accepting the hedge ships the feature with them
+outstanding; it does not resolve, discharge, or close any of them, except where
+the kind itself makes acceptance the discharge (entry 1). They are carried forward
+here verbatim from § *Hedged-verdict follow-up record* above.
+
+### Carried forward — 1. Human acknowledgment of the consumer-visible contract-change list
+
+**kind:** `acceptance-discharged`
+
+**Criterion, verbatim:** *"Enumerate every addition, removal, or rename across both
+gates, block on explicit human acknowledgment, and append each item to
+`CHANGELOG.md`'s `Unreleased` section carrying `FEAT-2026-0056`."*
+
+**Status at acceptance.** The enumeration (ten items, both gates) and the changelog
+append were complete before acceptance. The acknowledgment is discharged BY this
+acceptance — that is what `acceptance-discharged` means. The full list was quoted to
+the operator in full before the reason was given, with the two items flagged by the
+close as needing a real decision rather than a nod: **item 1**, the new blocking
+closing-lint finding, whose narrowing by `T06` means a close may now leave a
+criterion unannotated and still lint clean — so the lint enforces "everything you
+claimed is well-formed", not "everything was verified"; and **item 9**, the permanent
+driver-wide `_clean_attempt_untracked` carve-out, which applies to every feature in
+every downstream project after upgrade, not only to features using this artifact.
+
+### Carried forward — 2. `T05` criterion 6, the `events.jsonl` carve-out assertion
+
+**kind:** `externally-verifiable-later`
+
+**Criterion, verbatim:** *"`_clean_attempt_untracked` still never unlinks
+`events_path` — the existing carve-out is intact, asserted in the same test module."*
+
+**Re-run condition named by the close, verbatim:** *"A work unit adds an assertion to
+`tests/test_loop_criteria_survival.py` that creates `events_path` before the
+`_clean_attempt_untracked` call and asserts it still exists after … and
+`python3 -m unittest tests.test_loop_criteria_survival` then reports at least 2
+tests, OK. At that point `T05#6` flips to `state: pass` and this entry is
+discharged."*
+
+**Status at acceptance — this condition was MET post-close, before acceptance.**
+`test_events_jsonl_carve_out_is_intact` was added at `04fbc80`; the module reports 2
+tests, OK. The assertion was mutation-verified: replacing `keep =
+events_path.resolve()` with `keep = None` in `_clean_attempt_untracked` fails that
+test and only that test. `GATE-02-CRITERIA.md`'s `T05#6` was flipped `fail` → `pass`
+at `3ebb913` with a provenance line recording that the flip was made post-close by an
+operator-directed session rather than by the close WU, per `close-discipline.md` §5.
+The entry is retained verbatim above rather than deleted, because the close wrote it
+correctly for the tree it saw.
+
+### Carried forward — 3. The red-before-green observation for `T05 c1`, `T06 c1`, `T07 c1`, `T08 c1`
+
+**kind:** `inherent`
+
+**Criterion, in substance (identical across all four, quoting `T07 c1`):**
+*"`tests/test_criteria_worklist.py::test_broad_pass_never_carries_forward` exists and
+**fails on HEAD before this WU's edits**. Record the failing output in the RESULT
+block before editing production code."*
+
+**Re-run condition named by the close, verbatim:** *"None from within a close."* The
+observation is only ever available to the producing unit's own attempt, whose RESULT
+block recorded it, and to the driver's produces-vs-diff guard. A close can verify the
+recording exists; it can never re-derive the observation. These are the four entries
+left pristine in `GATE-02-CRITERIA.md` — annotating them to green the lint would be
+the inference `close-discipline.md` §5 forbids.
+
+**No `routed-finding` entries**, so no tracking surface was collected for any entry.
+
+### What the operator's reason commits to, and where it gets checked
+
+The reason names the next feature as the place the worklist gets exercised on repeat
+closes. That is the feature's central unmeasured claim: `RETROSPECTIVE.md`
+§ *The close-cost delta, honestly* records 0 of 44 criteria and 0 oracle invocations
+skipped on this run, because a first attempt has an empty carry-forward set by
+construction, and states that the saving remains **unmeasured, not disproven**. This
+acceptance ships that measurement forward rather than staging it here.

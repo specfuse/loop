@@ -5,7 +5,7 @@ slug: per-criterion-dod-state
 branch: feat/FEAT-2026-0056-per-criterion-dod-state
 roadmap_goal: Each close attempt records per-criterion pass/fail state, and a re-dispatched close re-verifies only failed and newly-added criteria plus the oracles whose scope cannot be bounded.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 41.00   # re-derived by G1-PLAN once gate 2 had work units; see GATE-02-REVIEW.md
 ---
 

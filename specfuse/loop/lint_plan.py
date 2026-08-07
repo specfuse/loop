@@ -35,6 +35,7 @@ from pathlib import Path
 from . import _miniyaml
 from . import _wu_sections
 from .closing_requirements import gate_review_filename
+from .criteria_state import CRITERIA_FILENAME_RE
 from .loop import VERDICT_VALUES
 
 FM = re.compile(r"^---\s*$")
@@ -978,7 +979,10 @@ def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     is correct, not drift — see the reasons recorded there.
 
     GATE-NN-REVIEW.md artifacts carry no `status` frontmatter and are not
-    gate files, so they're skipped by name.
+    gate files, so they're skipped by name. GATE-NN-CRITERIA.md (FEAT-2026-0056)
+    is skipped for the same reason and matched through `CRITERIA_FILENAME_RE`
+    rather than a fresh literal — that pattern is the artifact basename's one
+    home, and this is its fifth reader.
     """
     if plan_fm.get("status") != "done":
         return []
@@ -987,6 +991,8 @@ def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     errs: list[str] = []
     for gate_path in sorted(feature_dir.glob("GATE-*.md")):
         if gate_path.stem.endswith("-REVIEW"):
+            continue
+        if CRITERIA_FILENAME_RE.fullmatch(gate_path.name):
             continue
         gfm, _ = read_frontmatter(gate_path)
         gstatus = gfm.get("status")
