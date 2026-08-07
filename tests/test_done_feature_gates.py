@@ -88,6 +88,26 @@ class TestDoneFeatureGates(unittest.TestCase):
             f"REVIEW artifact should never be treated as a gate file; errs={errs}",
         )
 
+    def test_criteria_artifact_is_ignored(self):
+        """FEAT-2026-0056's GATE-NN-CRITERIA.md is not a gate file.
+
+        It matches the `GATE-*.md` glob and carries no `status` frontmatter, so
+        before this skip every feature reaching `status: done` with a criteria
+        artifact on disk failed the lint. FEAT-2026-0056 was the first, and it
+        failed on its own artifact the moment its terminal flips fired.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_feature(Path(tmp), "done", "passed")
+            (feat / "GATE-01-CRITERIA.md").write_text(
+                "### T01#1\n\n- **criterion:** does the thing\n"
+                "- **state:** `unverified`\n"
+            )
+            errs = lint_plan.lint(feat)
+        self.assertFalse(
+            any("GATE-01-CRITERIA.md" in e for e in errs),
+            f"CRITERIA artifact should never be treated as a gate file; errs={errs}",
+        )
+
     def test_excluded_feature_is_not_reported(self):
         errs = lint_plan.check_done_feature_gates(
             FEATURES_DIR / "FEAT-2026-0001-health-endpoint", {"status": "done"}

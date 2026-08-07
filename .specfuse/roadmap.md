@@ -71,7 +71,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
@@ -867,17 +867,6 @@ machine-checkable contract rather than prose.
 **Goal.** Three additions on top of 0051's recorded baseline. First, the **baseline-delta ratchet**: during a gate, a WU fails only on failures beyond the recorded baseline set, so pre-existing debt stops blocking while anything a WU newly introduces still fails normally — the same shape as the coverage floor, and deliberately chosen over a per-gate mute, which would also hide a genuine vulnerability a WU legitimately introduces. Second, the **waiver**: an operator-set flag that activates the ratchet for a gate, survives driver resume, and is visible in the gate review — turning 0051's halt into a decision point rather than a dead end. Third, **tracking-issue emission**: the escalation carries a fully-formed issue body plus the `gh issue create` command, auto-creating the issue only when `gh auth status` passes and printing the command for the operator otherwise, so a waived baseline is always tracked rather than silently accepted.
 
 **Benefits.** A feature blocked on externally-caused debt can proceed without anyone weakening a gate: the debt is held constant, tracked in an issue, and visible in the gate review, while every newly-introduced failure still fails. Designed against real baseline records produced by 0051 rather than speculatively, and sequenced after it so the oracle-semantics change lands behind a shipped, proven brake.
-
-**Status: planned.**
-
-<a id="feat-2026-0056"></a>
-## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
-
-**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
-
-**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
-
-**Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
 
 **Status: planned.**
 

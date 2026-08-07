@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0056"></a>
+## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
+
+**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
+
+**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
+
+**Benefits.** This repository's `tests` gate (`python3 -m unittest discover -s tests -v -b`) is a `broad` oracle with no diff awareness, so it re-runs in full on every close attempt — the design does not reduce that cost. What it saves is the per-criterion agent reasoning, the regeneration, and the scenario matrix that a re-dispatched close otherwise redoes from scratch on criteria already proven green. A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices that portion of the ceremony.
+
+**Status: done.** Terminal close ran with verdict `met_locally`; the operator accepted the hedge via `/accept-hedged-close` on 2026-08-07, carrying three follow-ups forward — the contract-change acknowledgment (discharged by the acceptance itself), the `events.jsonl` assertion (discharged post-close at `04fbc80`, `T05#6` flipped to `pass`), and the red-before-green observation (`inherent`, never upgradeable). **The cost saving is built and wired end-to-end but remains unmeasured:** the terminal close was a first attempt, whose carry-forward set is empty by construction, so it skipped 0 of 44 criteria. The operator's accepted reason records that the next feature exercises the worklist on repeat closes, which is where the claim actually gets tested.
+
 <a id="feat-2026-0057"></a>
 ## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
 

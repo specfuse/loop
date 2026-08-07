@@ -37,6 +37,7 @@ loop = load_loop()
 
 from specfuse.loop.closing_requirements import CLOSING_REQUIREMENTS  # noqa: E402
 from specfuse.loop import closing_requirements as creq  # noqa: E402
+from specfuse.loop import lint_closing  # noqa: E402
 
 
 class TestRegistryShape(unittest.TestCase):
@@ -67,11 +68,18 @@ class TestRegistryShape(unittest.TestCase):
                 )
 
     def test_every_requirement_names_a_real_guard_function(self):
+        # Most requirements are enforced both post-squash (a `loop.py`
+        # driver guard) and pre-squash (a `lint_closing.py` checker of the
+        # same name). `criteria_artifact_present` requirements are lint-only
+        # — FEAT-2026-0056/T03 deliberately does not wire a driver-side
+        # `assert_*` for them (see WU-03's Do-not-touch on `loop.py`) — so
+        # their guard function lives in `lint_closing` instead.
         for req in creq.all_requirements():
             self.assertTrue(
-                hasattr(loop, req.enforced_by),
+                hasattr(loop, req.enforced_by) or hasattr(lint_closing, req.enforced_by),
                 f"registry requirement {req.id} names enforced_by="
-                f"{req.enforced_by!r}, which does not exist in loop.py",
+                f"{req.enforced_by!r}, which exists in neither loop.py nor "
+                f"lint_closing.py",
             )
 
     def test_every_wu_type_has_entries(self):

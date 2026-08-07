@@ -3376,3 +3376,86 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   is already paying a sequencing tax to prove one unit, that is the cheapest moment
   to also strengthen that unit's own test, because a second sequencing round costs
   the same as the first and the round you are in is already sunk.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/survival-needs-the-whole-path-set] **When a
+  work unit's job is to make state survive a retry, enumerate every path that destroys
+  that state and test against each — the path the plan names is the one the author
+  already thought about, and therefore rarely the one that kills you.** Here the plan
+  named `fold_cumulative_on_rearm` and the unit tested it correctly against the real
+  function; the property was also unfalsifiable, because the fold rewrites work-unit
+  frontmatter and the artifact is a separate file, so no possible fold could have
+  touched it. The path that actually deletes the artifact is the per-attempt reset:
+  the untracked-file snapshot is taken once per work unit *before* the attempt loop,
+  the artifact is created *inside* each attempt, so a failing attempt's cleanup sees
+  it as "appeared since the snapshot" and unlinks it — and it stays untracked until a
+  passing attempt commits it, meaning the state is wiped on exactly the multi-attempt
+  runs it exists to serve. `events.jsonl` survives only because it has an explicit
+  hand-written carve-out in that cleanup. Rules. (a) Write the destroyer list before
+  the test list: for a file, that is at minimum the hard reset, the untracked clean,
+  the regeneration, and any fold; for a field, every writer of its container. (b) Be
+  suspicious of a survival test that passes on the first attempt with no scaffolding —
+  ask what would have to change for it to fail, and if the answer is "nothing
+  reachable", it is a tautology and the real path is untested. (c) An artifact is only
+  as durable as its most recent commit; anything created at dispatch and read across
+  attempts is untracked for its whole useful life.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/console-script-is-not-the-tree] **A console
+  script installed into the environment and the source checkout you are editing are two
+  different programs — any sweep, probe, or corpus check must name which one it ran, or
+  it is evidence about neither.** A gate-arming baseline and a work unit's
+  "reports zero findings across every existing feature" criterion both invoked the
+  project's installed CLI entry point, which resolves the package from `site-packages`
+  at whatever version was last pip-installed — in this case an older release that did
+  not contain the requirement being measured. Both reported the expected zero, and both
+  would have reported it had the work unit shipped nothing at all. The repo's own
+  script shims path-insert the repo root and do resolve from source, so the correct
+  command existed and was one character-class away from the one used. Rules. (a) In a
+  repo that both ships a CLI and dogfoods it, prefer the from-source invocation in
+  every acceptance criterion, and say in the criterion which one it is. (b) A
+  "zero findings over corpus C" criterion needs a positive control: run the check
+  against one input you know should fire, and paste that too — a sweep that cannot
+  distinguish "correctly silent" from "not running" has measured nothing. This is the
+  same shape as [FEAT-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
+  run, here it was run against the wrong binary.
+
+- [FEAT-2026-0056/G2-CLOSE/evidence-clause-needs-its-own-oracle] **When an acceptance
+  criterion names both a property and the place that must assert it — "X holds, asserted
+  in <module>" — the oracle that runs <module> cannot detect that the assertion is
+  missing, because a module with no assertion about X passes whether or not X holds. The
+  evidence clause needs an oracle of its own.** Here a unit was required to keep an
+  existing carve-out intact "asserted in the same test module"; the carve-out was intact,
+  the module was green, and the module contained one test that constructed the relevant
+  path, passed it to the function under test, never created the file and never asserted
+  on its survival. Every oracle the unit declared reported pass, and so did the driver's
+  produces-vs-diff guard, because the source really was edited. Only the close's own
+  re-run caught it, and only because it read the test rather than running it. Rules.
+  (a) Write two-clause criteria as two criteria, each with its own oracle — the property
+  gets a behavioural probe, the evidence clause gets a countable one
+  (`grep -c 'def test_'`, an assertion count, a coverage delta on the specific branch).
+  (b) Treat "still works / still intact / unchanged" criteria as the high-risk class:
+  they are satisfied by the absence of a regression, and absence is what a missing test
+  also looks like. (c) A close re-running a producing unit's oracle should ask what the
+  oracle would report if the deliverable were absent — if the answer is "the same
+  thing", the oracle is measuring nothing.
+
+- [FEAT-2026-0056/G2-CLOSE/a-cache-cannot-prove-itself-on-attempt-one] **A feature whose
+  value is that a second run is cheaper than the first cannot be demonstrated by its own
+  terminal close, because that close is a first run: its carried-forward set is empty by
+  construction, not by defect. Plan the gate to measure wiring, and hand the saving to a
+  falsifiable prediction instead.** Recorded state, memoized results, incremental
+  regeneration, warm caches and skip policies all share this shape — the mechanism reads
+  state a *prior attempt* wrote, and on attempt 1 no prior attempt exists, so every
+  correct implementation and every broken one produce the identical empty result. Here
+  the close's own dispatch was the designed experiment; it received the section, the
+  section was correct, and it carried 0 of 44 criteria forward, because the artifact is
+  seeded with exactly the fields the carry-forward predicate requires to be absent. Rules.
+  (a) Do not write an acceptance criterion asserting a non-empty cache hit in a close
+  that will run as attempt 1 — it is unsatisfiable, and a unit that must report "empty"
+  to be honest reads as a failure to everyone who skims it. Say in the criterion that an
+  empty result is a legitimate answer, and why. (b) Verify the mechanism on synthetic
+  state instead: drive the partition and the renderer over hand-built entries covering
+  every branch, which *is* checkable at attempt 1. (c) Close with the prediction rather
+  than the measurement — record the exact counts the next attempt's prompt must print
+  ("37 carried forward, 7 re-verify, 3 oracle groups"). That is a cheap, dated, falsifiable
+  claim, and it converts an unmeasurable close into one that a later run either confirms
+  or refutes for free.
