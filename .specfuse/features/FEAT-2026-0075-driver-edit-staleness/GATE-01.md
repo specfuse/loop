@@ -2,6 +2,10 @@
 gate: 1
 status: open        # open | awaiting_review | passed
 cost_budget_usd: 25.50
+baseline:
+  sha: f8945b128e9fee12516300ef39dccf7b88661f41
+  probed_at: 2026-08-07T02:50:38.480017+00:00
+  failing: []
 ---
 
 # Gate 1 — the staleness hazard is visible while it can still be acted on
