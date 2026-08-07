@@ -5957,6 +5957,32 @@ def run(
                               f"Halted before {wu.wu_id}.")
                         return 1
 
+                    # Driver-restart halt (FEAT-2026-0075/T06): sibling of the
+                    # budget brake above, same seam. A prior squash in this
+                    # pass touched the driver's own importable surface (the
+                    # squash-site warning just above recorded it into
+                    # `driver_edits`). This process's `sys.modules` still
+                    # holds the pre-edit code, so dispatching `wu` next would
+                    # execute stale modules — halt instead of dispatching
+                    # into a process that cannot observe its own change. Not
+                    # reached when driver_edits is empty (the common case:
+                    # 49 of 90 gates repo-wide never edit the driver) or on
+                    # the gate's final unit (nothing left in `pending` after
+                    # it, so this check is never reached for it at all).
+                    if driver_edits:
+                        _edit_wu_id, _edit_paths = driver_edits[-1]
+                        _remaining_ids = [
+                            w.wu_id for w in pending[pending.index(wu):]]
+                        return _halt_for_driver_restart(
+                            gate_number=gate.number,
+                            feature_id=feature_id,
+                            events_path=events_path,
+                            wu_id=_edit_wu_id,
+                            driver_paths=_edit_paths,
+                            remaining_wu_ids=_remaining_ids,
+                            resume_command=f"specfuse-loop --feature {feature_id}",
+                        )
+
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 # Summary line: the WU's title, so the log says WHAT is being

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0075/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 provenance: "`[FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]` rule (a) names the control verbatim: 'the driver refusing to dispatch a close whose gate contains a work unit that edited the driver after this process started'. RETROSPECTIVE.md gate 1 is the evidence that nothing weaker works — the restart was in bold as REQUIRED, the rule was promoted and quoted, the close carried a blocking criterion, and the restart still did not happen. GATE-02.md's draft-time proposal put this control at arm time keyed on `produces:` declarations; `G1-PLAN` moved it to the squash-diff seam after a 90-gate sweep showed the arm-time scoping was unsatisfiable (41 of 41 driver-editing gates would be refused, 0 compliant gates exist) and after PLAN.md's own scope decision — 'detection keys on the unit's actual squash diff, never on its declarations' — ruled out building a blocking check on author-supplied fields."
@@ -15,6 +15,12 @@ generated_surfaces: []
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-07T12:39:59.025188+00:00
+duration_seconds: 1504.84
+cost_usd: 7.90437
+input_tokens: 341
+output_tokens: 73367
 ---
 
 # Halt the run rather than dispatch the next unit into a stale process

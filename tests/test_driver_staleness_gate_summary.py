@@ -117,13 +117,26 @@ class TestDriverStalenessGateSummarySeam(unittest.TestCase):
 
     def test_summary_names_units_dispatched_after(self):
         """T00 precedes the driver edit and must NOT be named as affected;
-        T01 edits the driver; T02 and T03 are dispatched after it and must
-        both be named as having executed the pre-edit module."""
+        T01 edits the driver and is the gate's LAST unit.
+
+        Post-FEAT-2026-0075/T06, a driver edit with more units still pending
+        halts the run at the `for wu in pending` brake before any of them
+        dispatch (see `tests/test_driver_restart_halt_wiring.py`) — so a live
+        process can never again reach gate completion with units dispatched
+        *after* a driver edit in the same pass. This scenario — the driver
+        edit as the gate's final unit, with nothing left to halt in front of
+        — is the one case where `T02`'s summary still fires from a live gate
+        completion, and `dispatched_after` is correctly empty here. The
+        formatter's own multi-entry rendering (edits + a non-empty
+        `dispatched_after`) remains covered directly by
+        `TestFormatDriverStalenessSummaryUnit.test_names_editor_paths_and_dispatched_after`
+        above, which does not go through `loop.run()`.
+        """
         with integration_workspace() as root:
             os.chdir(root)
             fdir = _write_chained_feature(
                 root, "FEAT-2026-9201", "gate-summary",
-                "feat/gate-summary", ["T00", "T01", "T02", "T03"])
+                "feat/gate-summary", ["T00", "T01"])
 
             def fake_dispatch(wu, fn, ct=True):
                 short = wu.wu_id.split("/")[-1]
@@ -144,7 +157,9 @@ class TestDriverStalenessGateSummarySeam(unittest.TestCase):
 
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                loop.run(None, dry_run=False)
+                rc = loop.run(None, dry_run=False)
+
+            self.assertNotEqual(rc, loop.EXIT_DRIVER_RESTART_REQUIRED)
 
             output = buf.getvalue()
             self.assertIn("STALE DRIVER PROCESS (gate summary):", output)
@@ -154,8 +169,6 @@ class TestDriverStalenessGateSummarySeam(unittest.TestCase):
 
             self.assertIn("FEAT-2026-9201/T01", summary_block)
             self.assertIn("specfuse/loop/loop.py", summary_block)
-            self.assertIn("FEAT-2026-9201/T02", summary_block)
-            self.assertIn("FEAT-2026-9201/T03", summary_block)
             # T00 dispatched BEFORE the driver edit — must not read as affected.
             self.assertNotIn("FEAT-2026-9201/T00", summary_block)
 
@@ -168,10 +181,7 @@ class TestDriverStalenessGateSummarySeam(unittest.TestCase):
             self.assertEqual(edit_ids, ["FEAT-2026-9201/T01"])
             self.assertIn("specfuse/loop/loop.py",
                           payload["edits"][0]["driver_paths"])
-            self.assertEqual(
-                payload["dispatched_after"],
-                ["FEAT-2026-9201/T02", "FEAT-2026-9201/T03"],
-            )
+            self.assertEqual(payload["dispatched_after"], [])
 
     def test_no_driver_edit_no_summary_no_event(self):
         """A gate with no driver-editing unit produces no summary and no
