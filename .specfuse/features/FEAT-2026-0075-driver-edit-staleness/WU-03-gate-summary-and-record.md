@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0075/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces_driver_helper:
@@ -10,6 +10,15 @@ produces_driver_helper:
 produces:
   - tests/test_driver_staleness_gate_summary.py
 generated_surfaces: []
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-07T04:21:20.975561+00:00
+duration_seconds: 1071.227
+cost_usd: 2.779493
+input_tokens: 2352
+output_tokens: 24799
 ---
 
 # Summarize driver staleness at gate completion and record it as an event

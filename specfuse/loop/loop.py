@@ -2187,6 +2187,36 @@ def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
     )
 
 
+def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
+    """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
+
+    `edits` is `[(wu_id, driver_paths), ...]` for units that edited the
+    driver in this gate, in dispatch order. `dispatched_after` is the IDs of
+    units this same process dispatched after the earliest of those edits —
+    each executed the pre-edit module, per
+    `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b). This is
+    the gate-end counterpart to `format_driver_staleness_warning` (T02) — it
+    does not replace the immediate warning, it is what a close reads instead
+    of reconstructing the fact from `ps` output and `started_at` timestamps.
+    Returns "" when `edits` is empty so a gate with no driver-editing unit
+    stays silent.
+    """
+    if not edits:
+        return ""
+    lines = ["STALE DRIVER PROCESS (gate summary):"]
+    for wu_id, paths in edits:
+        lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
+    if dispatched_after:
+        affected = ", ".join(dispatched_after)
+        lines.append(
+            f"  Dispatched after the edit above in this same process: "
+            f"{affected} — each executed the pre-edit module(s), not what "
+            f"the edit(s) wrote. A fresh driver process is required before "
+            f"any of these can be trusted as a verification of the change."
+        )
+    return "\n".join(lines)
+
+
 class SquashCommitError(RuntimeError):
     """Raised when squash_commit's `git commit` is rejected (non-zero exit).
 
@@ -5755,6 +5785,13 @@ def run(
                 wfm, _ = read_frontmatter(wu_path)
                 if wfm.get("status") == DONE:
                     done_ids.add(ref["id"])
+        # Dispatch-order tracking for the gate-completion staleness summary
+        # (FEAT-2026-0075/T03): the order this run actually dispatched units
+        # in, never re-derived from PLAN.md's dependency graph — intent is
+        # not history. Units already DONE before this run started (populated
+        # above) are not "dispatched" by this process and are excluded.
+        dispatch_order: list[str] = []
+        driver_edits: list[tuple[str, list[str]]] = []
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
@@ -5877,6 +5914,7 @@ def run(
                         # duplicate bookkeeping commit are produced (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif wu.type == "close-intermediate" and _override_active:
                     flush_events(events_path, [build_event(
@@ -5914,6 +5952,7 @@ def run(
                         # so ready() filters this WU on the next pass (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif (wu.type == "close" and gate is gates[-1]
                         and _override_active and wu.verdict is None):
@@ -6249,6 +6288,11 @@ def run(
                                 wu.wu_id, _driver_paths)
                             if _warning:
                                 print(_warning)
+                                # Recorded for the gate-completion summary
+                                # (FEAT-2026-0075/T03) — the immediate print
+                                # above and this recording are independent;
+                                # neither replaces the other.
+                                driver_edits.append((wu.wu_id, _driver_paths))
                         # Smoke-import runner (FEAT-2026-0008/T03): after a
                         # successful verify() AND squash, run each
                         # `python3 -c "from X import Y"` line declared in the WU
@@ -6565,6 +6609,7 @@ def run(
                             "planned_cost_usd": _planned,
                         }))
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         # Post-dispatch budget breach check (#T03): the
                         # pre-dispatch brake above only ever sees spend
                         # BEFORE the next WU it would halt in front of, so a
@@ -6768,12 +6813,35 @@ def run(
             print(f"\n(dry run) Gate {gate.number} would complete and await review.")
             return 0
 
+        # Driver staleness gate summary (FEAT-2026-0075/T03): names which
+        # units in THIS gate edited the driver and which units this same
+        # process dispatched afterward, so a close reads the fact instead of
+        # reconstructing it from `ps` output and `started_at` timestamps
+        # (`[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b)).
+        # Independent of T02's immediate warning at the squash site — this is
+        # the gate-end half, printed before the gate flips to awaiting_review.
+        staleness_gate_events: list = []
+        if driver_edits:
+            _first_edit_idx = dispatch_order.index(driver_edits[0][0])
+            _dispatched_after = dispatch_order[_first_edit_idx + 1:]
+            _staleness_summary = format_driver_staleness_summary(
+                driver_edits, _dispatched_after)
+            if _staleness_summary:
+                print(f"\n{_staleness_summary}")
+                staleness_gate_events.append(build_event(
+                    "driver_staleness_detected", feature_id, {
+                        "gate": gate.number,
+                        "edits": [{"wu_id": wu_id, "driver_paths": paths}
+                                  for wu_id, paths in driver_edits],
+                        "dispatched_after": _dispatched_after,
+                    }))
+
         backend.set_gate(gate, "awaiting_review")
         # on_gate_passed fires here: WUs all done, gate now awaiting human review
         backend.on_gate_passed(feature_id, gate.number)
         arm_event = build_arm_predicate_event(feature_dir, feature_id, gate.number)
         gate_events = [build_event("gate_reached", feature_id, {"gate": gate.number}),
-                       arm_event]
+                       arm_event, *staleness_gate_events]
 
         # Live arm (FEAT-2026-0053/T06): `auto` + a clean predicate verdict
         # carries the draft->pending / gate awaiting_review->passed writes into
