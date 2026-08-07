@@ -3459,3 +3459,40 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   ("37 carried forward, 7 re-verify, 3 oracle groups"). That is a cheap, dated, falsifiable
   claim, and it converts an unmeasurable close into one that a later run either confirms
   or refutes for free.
+
+- [FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control] **A
+  hazard whose only mitigation is a written instruction that a human must remember to
+  execute is unmitigated. Promoting the rule, citing it verbatim in the gate, and
+  building the tooling that detects the hazard all leave the failure rate unchanged,
+  because none of them is the thing that has to happen at the moment it has to
+  happen.** The evidence is the fourth occurrence, and it landed on the close of the
+  feature written to fix the first three. `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]`
+  was already in this file. Its gate file quoted it, named the two features it had
+  already cost money (a $5.33 close, then three attempts and $3.66 in a
+  `spinning_detected` escalation), set the restart in bold as REQUIRED operator
+  action, and armed the close's criterion 1 to detect a missed restart. The restart
+  still did not happen: the process that dispatched the close was the same process
+  that had probed the gate's baseline ninety minutes before the first work unit ran,
+  identifiable because the gate's `baseline.probed_at` matched its start time to the
+  second. Every producing unit was green, all 31 acceptance criteria passed a fresh
+  re-run, and the feature's own detection code — a warning, a gate summary, and a new
+  event type — executed exactly zero times, because the process running the gate had
+  cached the pre-edit modules at import. The lesson is not "restart the driver"; that
+  rule existed and was consumed. It is that **detection and instruction are not
+  controls, and a close's criterion that merely *checks* a precondition converts a
+  silent wrong answer into an honest blocked one without raising the odds the
+  precondition is ever met.** Rules. (a) When a hazard has recurred with the rule
+  already promoted, stop writing rule text — the next artifact must be a control that
+  fires without anyone remembering it: the driver refusing to dispatch a close whose
+  gate contains a work unit that edited the driver after this process started, or
+  re-execing itself. Warn-only detection is a diagnostic, and the third recurrence is
+  the evidence that diagnostics were never the gap. (b) Do not let a gate's own design
+  depend on the operator action the gate exists to make unnecessary. A feature that
+  requires a manual restart in order to observe the code that automates away the
+  manual restart cannot demonstrate itself; plan the observation on a *separate*
+  feature's run, or on a subprocess the gate spawns itself, and say in the gate that
+  the in-situ observation is expected to be unavailable. (c) Prefer a precondition the
+  process can enforce on itself to one a human must satisfy between two dispatches.
+  Where the enforcing change is out of scope, the honest gate output is "unverified in
+  situ, predicted as follows" with a falsifiable prediction the next run confirms for
+  free — not a claim carried on seam tests that were never composed.
