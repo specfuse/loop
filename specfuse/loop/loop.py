@@ -100,6 +100,7 @@ from .gate_eval import (
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .cost import wu_lifetime_cost_usd
+from .driver_edit import changed_paths_for_commit, driver_paths_in
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -2160,6 +2161,30 @@ def persist_attempt_notes(
         p.write_text(evidence)
         paths.append(p)
     return paths
+
+
+def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
+    """Render the driver-editing staleness warning for `wu_id`, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T02).
+
+    Python caches `specfuse.loop.loop` in `sys.modules` at first import, so a
+    work unit that edits the driver changes nothing for anything this same
+    process dispatches next — including a close armed to verify it. The
+    message names the offending unit and every path it touched, and states
+    the required remedy explicitly rather than leaving the reader to infer it.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    return (
+        f"STALE DRIVER PROCESS: {wu_id} edited the driver itself ({paths}). "
+        f"This process cached the pre-edit versions of those modules at "
+        f"import time, so every work unit dispatched next in this process — "
+        f"including any close — will execute the OLD code, not what {wu_id} "
+        f"just wrote. A fresh driver process is required before any close "
+        f"can verify this change: stop this driver now and start a new one "
+        f"before dispatching the next work unit."
+    )
 
 
 class SquashCommitError(RuntimeError):
@@ -6210,6 +6235,20 @@ def run(
                             print(f"   SQUASH COMMIT REJECTED attempt "
                                   f"{attempt}/{MAX_ATTEMPTS}")
                             continue
+                        # Driver-editing staleness warning (FEAT-2026-0075/T02):
+                        # the squash just landed, so its diff is ground truth for
+                        # what this WU changed. If it touched the driver's own
+                        # importable surface, this process's sys.modules still
+                        # holds the pre-edit code — print the hazard NOW, while
+                        # the operator can still restart before the next
+                        # dispatch, rather than only at gate completion.
+                        if sha is not None:
+                            _changed = changed_paths_for_commit(sha, REPO_ROOT)
+                            _driver_paths = driver_paths_in(_changed)
+                            _warning = format_driver_staleness_warning(
+                                wu.wu_id, _driver_paths)
+                            if _warning:
+                                print(_warning)
                         # Smoke-import runner (FEAT-2026-0008/T03): after a
                         # successful verify() AND squash, run each
                         # `python3 -c "from X import Y"` line declared in the WU
