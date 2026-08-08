@@ -25,7 +25,7 @@ deprecation_banner() {
 ────────────────────────────────────────────────────────────────────────────
 NOTE: init.sh is the legacy install path (v1.0) and will be removed in v1.1.
 The forward path:
-  • Driver:  pip install specfuse-loop      (run `specfuse-loop` instead of
+  • Driver:  pip install specfuse-loop      (run `specfuse run` instead of
              python .specfuse/scripts/loop.py)
   • CLI:     pip install specfuse           (`specfuse upgrade` / `specfuse init`)
   • Skills:  /plugin marketplace add specfuse/specfuse

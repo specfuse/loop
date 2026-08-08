@@ -10,7 +10,7 @@ what is still missing.
 ## The two shipped surfaces
 
 **Local.** An operator, or a cron entry on a machine they control, runs
-`specfuse-monitor run`. This is the recommended starting point — the
+`specfuse monitor run`. This is the recommended starting point — the
 schema's own `monitoring.yml.example` advises starting every component at
 `runner: local` before loosening any dial. No extra installation is needed
 beyond the `specfuse-loop` package; the CLI reads `.specfuse/monitoring.yml`
@@ -46,7 +46,7 @@ than inheriting the default write-all token.
 
 ## The dial routes, and skips are reported, not silent
 
-`specfuse-monitor run` takes a `--runner` flag naming which surface this
+`specfuse monitor run` takes a `--runner` flag naming which surface this
 invocation *is* (defaulting to `local`). It enumerates only the components
 whose `runner` matches that flag; every other component is named in the run
 summary along with the surface it belongs to, so a skipped component is
@@ -59,7 +59,7 @@ nothing.
 
 `in-cluster` is a valid schema value today, but no runner surface
 implements it in this feature. A component dialed to `runner: in-cluster`
-is reported by `specfuse-monitor run` as unhandled by design — naming
+is reported by `specfuse monitor run` as unhandled by design — naming
 **FEAT-2026-0043**, which owns that surface — and is neither dropped
 silently nor treated as an error. Do not dial a component to `in-cluster`
 expecting it to be monitored until that feature ships.

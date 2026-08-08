@@ -78,7 +78,7 @@ If no gate is in `awaiting_review`, the skill stops with a hint
 
 ### 3. Per-draft accept / revise / reject
 
-Run `specfuse-lint <feature-dir>` before walking the drafts; its WARN/ERROR
+Run `specfuse lint <feature-dir>` before walking the drafts; its WARN/ERROR
 findings (produces-path satisfiability, Do-not-touch boundary collisions,
 etc.) are review input for the accept/revise/reject decision below, not a
 separate gate to pass silently.

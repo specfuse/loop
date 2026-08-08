@@ -125,7 +125,7 @@ disagree, the WU's stated verification is fiction.
 > re-run; and a WU burning each of three attempts on a full suite the
 > iteration didn't need.
 
-For `close` / `close-intermediate` WUs specifically, name `specfuse-lint
+For `close` / `close-intermediate` WUs specifically, name `specfuse lint
 --closing` as a verification step (must exit 0 before the WU reports
 `complete`), not the individual guard names it checks — the registry lives in
 `specfuse/loop/closing_requirements.py` and the skeleton is pre-created at
@@ -465,10 +465,10 @@ the zero-deliverable and partial-bundle hollow-pass shapes that body-level
   `no_deliverable_files` and blocks, regardless of whether it declared
   `produces:`.
 - Don't hand-copy path-semantics folklore into a WU body — the arm-time
-  verification is `specfuse-lint`'s `check_produces_satisfiability` (WARN on
+  verification is `specfuse lint`'s `check_produces_satisfiability` (WARN on
   a produces path already delivered by a `done` WU) and `check_produces_boundary`
   (ERROR on a produces path that collides with the WU's own Do-not-touch
-  section). Run `specfuse-lint <feature-dir>` before arming; its findings are
+  section). Run `specfuse lint <feature-dir>` before arming; its findings are
   the review input, not a comment you write yourself.
 
 > *Prevents:* the zero-deliverable and partial-bundle hollow passes

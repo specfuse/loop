@@ -254,8 +254,7 @@ class TestUpgradeClaudeRefreshedIdempotent(unittest.TestCase):
             (self.target / ".claude" / "settings.json").read_text(encoding="utf-8")
         )
         allow = data["permissions"]["allow"]
-        self.assertIn("Bash(specfuse-loop:*)", allow)
-        self.assertIn("Bash(specfuse-lint:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
     def test_gitignore_runtime_lines_present_after_upgrade(self):
         upgrade_specfuse(self.target)

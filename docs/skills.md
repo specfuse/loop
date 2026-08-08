@@ -23,7 +23,7 @@ A feature moves through these phases. The skill for each phase is named.
 ```
 roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1 detailed
                                                             │
-                                                   specfuse-loop
+                                                   specfuse run
                                                             │
                                    ┌────────────────────────┴───────────────┐
                                    ▼                                         ▼
@@ -74,14 +74,14 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
 
 ### 3. Run — the driver (not a skill)
 
-`specfuse-loop` (the pip-installed driver) walks the active gate, dispatches each
+`specfuse run` (the pip-installed driver) walks the active gate, dispatches each
 WU as a fresh session, verifies, and commits. It is a command, not a skill. It
 either auto-closes a clean gate or halts at the gate boundary for review.
 
 It also owns every terminal flip (gate → `passed`, roadmap row → `done`, PLAN.md →
 `done`, auto-archive) — no skill writes those surfaces. When a verdict is upgraded
 *after* its close WU is already `done`, re-fire them with
-`specfuse-loop --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
+`specfuse run --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
 verdict from disk and flips only if it now permits, printing why when it does not.
 Safe to run on an already-`done` or still-hedged feature — it writes nothing.
 

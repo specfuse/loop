@@ -9,7 +9,7 @@
 # MERGE AND EXECUTION SEMANTICS LAND IN FEAT-2026-0040. This file, like
 # monitoring.yml.example, is a shape declaration only: valid, inspectable, and
 # machine-checkable standing alone. It does not itself merge into
-# monitoring.yml or invoke anything — that is `specfuse-monitor run`'s job,
+# monitoring.yml or invoke anything — that is `specfuse monitor run`'s job,
 # a CLI FEAT-2026-0040 ships.
 #
 # SAME SCHEMA AS monitoring.yml.example, unchanged — validated by

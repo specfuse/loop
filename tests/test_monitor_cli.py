@@ -1,6 +1,6 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""Tests for `specfuse.monitor.cli` — the `specfuse-monitor run` CLI
+"""Tests for `specfuse.monitor.cli` — the `specfuse monitor run` CLI
 (FEAT-2026-0040/T10)."""
 
 from __future__ import annotations

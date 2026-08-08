@@ -132,7 +132,7 @@ defect gates later.
 **Close obligations** (REQUIRED only for `close` / `close-intermediate` WUs; omit
 otherwise — see `.specfuse/rules/close-discipline.md`).
 
-> Run `specfuse-lint --closing` and confirm it exits 0 before this WU reports
+> Run `specfuse lint --closing` and confirm it exits 0 before this WU reports
 > `complete` — see `.specfuse/rules/close-discipline.md` §4.
 
 The close's acceptance criteria must cover:
@@ -145,7 +145,7 @@ The close's acceptance criteria must cover:
    unmet criterion — criterion, why unverifiable here, exact re-run condition
    that upgrades it to `met`, and a `kind:` (one of `acceptance-discharged`,
    `externally-verifiable-later`, `routed-finding`, `inherent`) written as
-   `- **kind:** \`<value>\``. `specfuse-lint --closing` refuses a hedged close
+   `- **kind:** \`<value>\``. `specfuse lint --closing` refuses a hedged close
    whose record has an entry with no `kind:` or an unrecognised one.
 3. **Consumer-visible contract changes** (§3): enumerate every addition /
    removal / rename across the feature's producing WUs and block on human

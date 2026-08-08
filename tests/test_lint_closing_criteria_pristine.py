@@ -2,7 +2,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""`specfuse-lint --closing`'s pristine-entry skip — FEAT-2026-0056/T06.
+"""`specfuse lint --closing`'s pristine-entry skip — FEAT-2026-0056/T06.
 
 A pristine entry — `state: unverified`, no `kind:`, no `oracle:`, byte for
 byte what `_precreate_criteria_state_stub` seeds — must not be a finding.

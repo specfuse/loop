@@ -3,7 +3,7 @@
   "name": "specfuse",
   "displayName": "Specfuse",
   "version": "0.7.1",
-  "description": "Gate-cycle methodology skills: pick / draft / arm / diagnose / wrap features, author and verify work units. Pairs with the specfuse-loop driver (pip install specfuse-loop).",
+  "description": "Gate-cycle methodology skills: pick / draft / arm / diagnose / wrap features, author and verify work units. Pairs with the specfuse-loop driver, run as `specfuse run` (pipx install specfuse).",
   "author": {
     "name": "Specfuse contributors"
   },

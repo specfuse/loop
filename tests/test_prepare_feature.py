@@ -174,7 +174,7 @@ class TestPrepareFeature(unittest.TestCase):
             with self.assertRaises(SystemExit) as cm, redirect_stderr(err):
                 loop.require_feature_folder_committed(rel, _feat_fm(), _FEAT_ID)
             msg = str(cm.exception)
-            self.assertIn("specfuse-loop --prepare", msg)
+            self.assertIn("specfuse run --prepare", msg)
             self.assertIn(f"git checkout -b {_BRANCH}", msg)
 
     def test_guard_message_omits_checkout_when_on_feature_branch(self):
@@ -189,7 +189,7 @@ class TestPrepareFeature(unittest.TestCase):
             with self.assertRaises(SystemExit) as cm:
                 loop.require_feature_folder_committed(rel, _feat_fm(), _FEAT_ID)
             msg = str(cm.exception)
-            self.assertIn("specfuse-loop --prepare", msg)
+            self.assertIn("specfuse run --prepare", msg)
             self.assertNotIn("git checkout -b", msg)
 
 

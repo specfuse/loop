@@ -23,7 +23,7 @@ Two jobs:
 
 Exit 0 = clean, 1 = problems (printed).
 
-Usage:  specfuse-lint .specfuse/features/FEAT-XXXX-slug
+Usage:  specfuse lint .specfuse/features/FEAT-XXXX-slug
 """
 
 from __future__ import annotations
@@ -758,7 +758,7 @@ def check_produces_shape(feature_dir: Path, gates: list) -> list[str]:
     driver refuses this outright, but only after a full `claude -p` session.
     Since the agent cannot edit its own frontmatter, every retry is
     byte-identical -- a real feature paid $6.42 and 20.6 minutes across three
-    of them before `spinning_detected` fired, while `specfuse-lint` reported
+    of them before `spinning_detected` fired, while `specfuse lint` reported
     `OK - structurally valid` throughout (#593).
 
     Every input is static, so this belongs in the pre-dispatch checklist. The
