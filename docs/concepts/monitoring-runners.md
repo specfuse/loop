@@ -12,10 +12,11 @@ what is still missing.
 **Local.** An operator, or a cron entry on a machine they control, runs
 `specfuse monitor run`. This is the recommended starting point — the
 schema's own `monitoring.yml.example` advises starting every component at
-`runner: local` before loosening any dial. No extra installation is needed
-beyond the `specfuse-loop` package; the CLI reads `.specfuse/monitoring.yml`
-from the current working directory the same way on this surface as any
-other.
+`runner: local` before loosening any dial. Nothing extra to install — the
+`specfuse` suite already carries it (`pipx install specfuse`, which
+hard-depends on the `specfuse-loop` distribution this CLI ships in). The CLI
+reads `.specfuse/monitoring.yml` from the current working directory the same
+way on this surface as any other.
 
 **GitHub Actions.** A shipped, scheduled workflow template runs the same
 cycle in CI. It lives at
@@ -25,9 +26,12 @@ itself (this repository is a CLI tool with no deployable components and
 will never carry a real `monitoring.yml`; see `verification.yml`). To use
 it in a consumer project:
 
-1. Copy `specfuse-monitor.yml` from the installed `specfuse-loop` package
-   (or from this repository's `specfuse/loop/data/workflows/`) into that
-   project's own `.github/workflows/`.
+1. Copy `specfuse-monitor.yml` into that project's own `.github/workflows/`.
+   You already have it if `specfuse` is installed — it ships inside the
+   `specfuse_loop` package data, so
+   `python -c "import specfuse.loop, pathlib; print(pathlib.Path(specfuse.loop.__file__).parent / 'data/workflows/specfuse-monitor.yml')"`
+   prints its path. It is also readable from this repository's
+   `specfuse/loop/data/workflows/`.
 2. Add the secrets it references — one per credential-bearing environment
    variable named in that project's `.specfuse/monitoring.yml` (`api_key`,
    `connection_string`, etc.), plus a token with permission to file issues
