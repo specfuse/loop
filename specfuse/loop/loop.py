@@ -100,6 +100,7 @@ from .gate_eval import (
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .cost import wu_lifetime_cost_usd
+from .driver_edit import changed_paths_for_commit, driver_paths_in
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
@@ -1951,6 +1952,59 @@ def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
     return gate_spent_usd(plan, gate, feature_dir) >= budget
 
 
+# Sanctioned name for the two-invocation-split halt (FEAT-2026-0075/T05).
+# Not a WU status and not a gate status — the halt flips neither, so no
+# vocabulary change is needed in lint_plan.py's VALID_STATUS or any of the
+# per-type tables. `2` is already taken by the unarmed-drafts check above;
+# a shared exit code would make the two halts indistinguishable to any
+# script reading the process's exit status.
+HALT_REASON_DRIVER_RESTART = "driver_restart_required"
+EXIT_DRIVER_RESTART_REQUIRED = 3
+
+
+def _halt_for_driver_restart(
+    gate_number: int,
+    feature_id: str,
+    events_path: Path,
+    wu_id: str,
+    driver_paths: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> int:
+    """Run-loop brake: the sanctioned halt a driver performs on itself when a
+    squash it just made edits the driver's own importable surface and the
+    gate still has units left to dispatch (FEAT-2026-0075/T05).
+
+    Sibling of `_should_halt_for_budget` at the same `for wu in pending`
+    seam — this unit builds the mechanism, `T06` builds the predicate that
+    decides when to call it. Deliberately flips NO gate status and NO WU
+    status: the run is suspended, not concluded, so a fresh process must see
+    the same `open` gate and the same `pending` units `ready()` would have
+    handed to this one. Durability is via the existing `commit_bookkeeping`
+    path (same as the budget brake), so the event survives even if the
+    operator does not restart immediately.
+    """
+    message = format_driver_restart_halt(
+        wu_id, driver_paths, remaining_wu_ids, resume_command)
+    flush_events(events_path, [build_event(
+        "driver_staleness_detected", feature_id, {
+            "gate": gate_number,
+            "wu_id": wu_id,
+            "driver_paths": driver_paths,
+            "halted": True,
+            "reason": HALT_REASON_DRIVER_RESTART,
+            "remaining_wu_ids": remaining_wu_ids,
+            "resume_command": resume_command,
+        })])
+    commit_bookkeeping(
+        [events_path],
+        f"chore(loop): gate {gate_number} halted for driver restart "
+        f"({wu_id})\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return EXIT_DRIVER_RESTART_REQUIRED
+
+
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
     """Run-loop predicate: sibling of `_should_halt_for_budget`, evaluated
     AFTER a work unit's outcome resolves rather than before the next dispatch.
@@ -2160,6 +2214,89 @@ def persist_attempt_notes(
         p.write_text(evidence)
         paths.append(p)
     return paths
+
+
+def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
+    """Render the driver-editing staleness warning for `wu_id`, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T02).
+
+    Python caches `specfuse.loop.loop` in `sys.modules` at first import, so a
+    work unit that edits the driver changes nothing for anything this same
+    process dispatches next — including a close armed to verify it. The
+    message names the offending unit and every path it touched, and states
+    the required remedy explicitly rather than leaving the reader to infer it.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    return (
+        f"STALE DRIVER PROCESS: {wu_id} edited the driver itself ({paths}). "
+        f"This process cached the pre-edit versions of those modules at "
+        f"import time, so every work unit dispatched next in this process — "
+        f"including any close — will execute the OLD code, not what {wu_id} "
+        f"just wrote. A fresh driver process is required before any close "
+        f"can verify this change: stop this driver now and start a new one "
+        f"before dispatching the next work unit."
+    )
+
+
+def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
+    """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
+
+    `edits` is `[(wu_id, driver_paths), ...]` for units that edited the
+    driver in this gate, in dispatch order. `dispatched_after` is the IDs of
+    units this same process dispatched after the earliest of those edits —
+    each executed the pre-edit module, per
+    `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b). This is
+    the gate-end counterpart to `format_driver_staleness_warning` (T02) — it
+    does not replace the immediate warning, it is what a close reads instead
+    of reconstructing the fact from `ps` output and `started_at` timestamps.
+    Returns "" when `edits` is empty so a gate with no driver-editing unit
+    stays silent.
+    """
+    if not edits:
+        return ""
+    lines = ["STALE DRIVER PROCESS (gate summary):"]
+    for wu_id, paths in edits:
+        lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
+    if dispatched_after:
+        affected = ", ".join(dispatched_after)
+        lines.append(
+            f"  Dispatched after the edit above in this same process: "
+            f"{affected} — each executed the pre-edit module(s), not what "
+            f"the edit(s) wrote. A fresh driver process is required before "
+            f"any of these can be trusted as a verification of the change."
+        )
+    return "\n".join(lines)
+
+
+def format_driver_restart_halt(
+    wu_id: str, driver_paths: list, remaining_wu_ids: list, resume_command: str,
+) -> str:
+    """Render the sanctioned driver-restart halt message, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T05) — the same empty-input
+    contract as `format_driver_staleness_warning`.
+
+    Unlike the T02/T03 formatters, which only print, this message accompanies
+    a run that actually stopped: it names the offending unit and its edited
+    paths, states plainly that this process cannot execute what was just
+    written, lists every work unit left `pending` in the gate, and gives the
+    exact command the operator runs to resume — omitting it would send the
+    reader back to the source to reconstruct it by hand.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    return (
+        f"DRIVER RESTART REQUIRED: {wu_id} edited the driver itself "
+        f"({paths}). This process cached the pre-edit versions of those "
+        f"modules at import time and cannot execute the edited modules, so "
+        f"it has halted rather than dispatch into a process that cannot "
+        f"observe its own change. Work unit(s) left pending in this gate: "
+        f"{remaining}. Start a fresh driver process and resume with:\n"
+        f"  {resume_command}"
+    )
 
 
 class SquashCommitError(RuntimeError):
@@ -5730,6 +5867,13 @@ def run(
                 wfm, _ = read_frontmatter(wu_path)
                 if wfm.get("status") == DONE:
                     done_ids.add(ref["id"])
+        # Dispatch-order tracking for the gate-completion staleness summary
+        # (FEAT-2026-0075/T03): the order this run actually dispatched units
+        # in, never re-derived from PLAN.md's dependency graph — intent is
+        # not history. Units already DONE before this run started (populated
+        # above) are not "dispatched" by this process and are excluded.
+        dispatch_order: list[str] = []
+        driver_edits: list[tuple[str, list[str]]] = []
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
@@ -5813,6 +5957,32 @@ def run(
                               f"Halted before {wu.wu_id}.")
                         return 1
 
+                    # Driver-restart halt (FEAT-2026-0075/T06): sibling of the
+                    # budget brake above, same seam. A prior squash in this
+                    # pass touched the driver's own importable surface (the
+                    # squash-site warning just above recorded it into
+                    # `driver_edits`). This process's `sys.modules` still
+                    # holds the pre-edit code, so dispatching `wu` next would
+                    # execute stale modules — halt instead of dispatching
+                    # into a process that cannot observe its own change. Not
+                    # reached when driver_edits is empty (the common case:
+                    # 49 of 90 gates repo-wide never edit the driver) or on
+                    # the gate's final unit (nothing left in `pending` after
+                    # it, so this check is never reached for it at all).
+                    if driver_edits:
+                        _edit_wu_id, _edit_paths = driver_edits[-1]
+                        _remaining_ids = [
+                            w.wu_id for w in pending[pending.index(wu):]]
+                        return _halt_for_driver_restart(
+                            gate_number=gate.number,
+                            feature_id=feature_id,
+                            events_path=events_path,
+                            wu_id=_edit_wu_id,
+                            driver_paths=_edit_paths,
+                            remaining_wu_ids=_remaining_ids,
+                            resume_command=f"specfuse-loop --feature {feature_id}",
+                        )
+
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 # Summary line: the WU's title, so the log says WHAT is being
@@ -5852,6 +6022,7 @@ def run(
                         # duplicate bookkeeping commit are produced (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif wu.type == "close-intermediate" and _override_active:
                     flush_events(events_path, [build_event(
@@ -5889,6 +6060,7 @@ def run(
                         # so ready() filters this WU on the next pass (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif (wu.type == "close" and gate is gates[-1]
                         and _override_active and wu.verdict is None):
@@ -6210,6 +6382,25 @@ def run(
                             print(f"   SQUASH COMMIT REJECTED attempt "
                                   f"{attempt}/{MAX_ATTEMPTS}")
                             continue
+                        # Driver-editing staleness warning (FEAT-2026-0075/T02):
+                        # the squash just landed, so its diff is ground truth for
+                        # what this WU changed. If it touched the driver's own
+                        # importable surface, this process's sys.modules still
+                        # holds the pre-edit code — print the hazard NOW, while
+                        # the operator can still restart before the next
+                        # dispatch, rather than only at gate completion.
+                        if sha is not None:
+                            _changed = changed_paths_for_commit(sha, REPO_ROOT)
+                            _driver_paths = driver_paths_in(_changed)
+                            _warning = format_driver_staleness_warning(
+                                wu.wu_id, _driver_paths)
+                            if _warning:
+                                print(_warning)
+                                # Recorded for the gate-completion summary
+                                # (FEAT-2026-0075/T03) — the immediate print
+                                # above and this recording are independent;
+                                # neither replaces the other.
+                                driver_edits.append((wu.wu_id, _driver_paths))
                         # Smoke-import runner (FEAT-2026-0008/T03): after a
                         # successful verify() AND squash, run each
                         # `python3 -c "from X import Y"` line declared in the WU
@@ -6526,6 +6717,7 @@ def run(
                             "planned_cost_usd": _planned,
                         }))
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         # Post-dispatch budget breach check (#T03): the
                         # pre-dispatch brake above only ever sees spend
                         # BEFORE the next WU it would halt in front of, so a
@@ -6729,12 +6921,35 @@ def run(
             print(f"\n(dry run) Gate {gate.number} would complete and await review.")
             return 0
 
+        # Driver staleness gate summary (FEAT-2026-0075/T03): names which
+        # units in THIS gate edited the driver and which units this same
+        # process dispatched afterward, so a close reads the fact instead of
+        # reconstructing it from `ps` output and `started_at` timestamps
+        # (`[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b)).
+        # Independent of T02's immediate warning at the squash site — this is
+        # the gate-end half, printed before the gate flips to awaiting_review.
+        staleness_gate_events: list = []
+        if driver_edits:
+            _first_edit_idx = dispatch_order.index(driver_edits[0][0])
+            _dispatched_after = dispatch_order[_first_edit_idx + 1:]
+            _staleness_summary = format_driver_staleness_summary(
+                driver_edits, _dispatched_after)
+            if _staleness_summary:
+                print(f"\n{_staleness_summary}")
+                staleness_gate_events.append(build_event(
+                    "driver_staleness_detected", feature_id, {
+                        "gate": gate.number,
+                        "edits": [{"wu_id": wu_id, "driver_paths": paths}
+                                  for wu_id, paths in driver_edits],
+                        "dispatched_after": _dispatched_after,
+                    }))
+
         backend.set_gate(gate, "awaiting_review")
         # on_gate_passed fires here: WUs all done, gate now awaiting human review
         backend.on_gate_passed(feature_id, gate.number)
         arm_event = build_arm_predicate_event(feature_dir, feature_id, gate.number)
         gate_events = [build_event("gate_reached", feature_id, {"gate": gate.number}),
-                       arm_event]
+                       arm_event, *staleness_gate_events]
 
         # Live arm (FEAT-2026-0053/T06): `auto` + a clean predicate verdict
         # carries the draft->pending / gate awaiting_review->passed writes into
