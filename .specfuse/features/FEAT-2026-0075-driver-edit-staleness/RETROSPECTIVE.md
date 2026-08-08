@@ -795,3 +795,127 @@ events to the cent, so no money is hidden — but **the frontmatter's `attempts`
 undercounts a re-armed unit and `events.jsonl` does not.** For attempt counting the log
 is authoritative; for cost either surface works. This is the row
 `GATE-02-REVIEW.md` § *Deferred with a home* asked this close to check, answered.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator's reason, verbatim:** *"The next feature touching the driver will allow us to
+test it"*
+
+**Recorded:** 2026-08-08T11:20:42Z, via `/accept-hedged-close`.
+
+**Computed ceiling at acceptance:** `rework exists` — entry 2 carries
+`externally-verifiable-later`, naming the next driver-editing gate under a `T06`-carrying
+driver as the condition. The operator's reason answers that condition directly: the
+acceptance ships the measurement forward rather than staging it here.
+
+**No mid-flight re-baseline.** The roadmap row's `**Why.**` / `**Goal.**` /
+`**Benefits.**` paragraphs are unchanged since `1439a67` (the scaffold commit) — the
+only commit on this branch touching `.specfuse/roadmap.md`. The operator accepted the
+business case they approved at `/pick-feature` time.
+
+**These follow-ups remain OPEN.** Accepting the hedge ships the feature with them
+outstanding; it does not resolve, discharge, or close any of them, except where the kind
+itself makes acceptance the discharge (entry 1). Carried forward verbatim from
+§ *Hedged-verdict follow-up record* above.
+
+### Carried forward — 1. Human acknowledgment of the consumer-visible contract-change list
+
+**kind:** `acceptance-discharged`
+
+**Criterion, verbatim:** *"**Consumer-visible contract changes (§3).** Enumerate every
+addition, removal, or rename across both gates, block on explicit human acknowledgment,
+and append each item to `CHANGELOG.md`'s `Unreleased` carrying `FEAT-2026-0075`."*
+
+**Status at acceptance.** Discharged BY this acceptance — that is what
+`acceptance-discharged` means. The enumeration and the `CHANGELOG.md` appends were
+complete before acceptance (§6). The full list was quoted to the operator before the
+reason was given, with **item 8 — the breaking mid-gate halt and exit code `3`** —
+called out as the item needing a real decision rather than a nod: after upgrade, a
+driver in any downstream project can stop a run partway through a gate. The operator
+confirmed having read all four entries.
+
+### Carried forward — 2. Gate 1's central claim, observed in a live repository dispatch
+
+**kind:** `externally-verifiable-later`
+
+**Criterion, verbatim:** *"**Gate 1's deferred-verification list is closed out.**
+`RETROSPECTIVE.md` §5 lists four rows deferred to 'the first gate completion under a
+driver started after `cbc3b23`' — `T02#4`, `T03#5`, `T03#7`, and gate 1's own composite
+criterion 2."*
+
+**Re-run condition named by the close, verbatim:** *"the next driver-editing gate in any
+project running on a driver that carries `T06`. Its halt writes a
+`driver_staleness_detected` event with `halted: true` into that feature's `events.jsonl`
+— a durable artifact, unlike a printed line — and that event is the observation gate 1
+could never make. For `T03`'s summary specifically: a gate whose **final** work unit
+edits `specfuse/loop/*.py`."*
+
+**Status at acceptance: OPEN, and this is the feature's headline open item.**
+`driver_staleness_detected` has fired **zero** times across the entire repository. The
+mechanism is built, tested at the seam, and unexecuted. The operator's reason routes the
+measurement to the next driver-touching feature. Note the asymmetry that makes this
+acceptable: gate 1's observation was ephemeral (stdout, no log survived), while the
+condition above produces a **durable event**, so the next occurrence records itself
+rather than needing someone to be watching.
+
+### Carried forward — 3. `T03`'s gate summary is dead on the happy path
+
+**kind:** `routed-finding`
+
+**Criterion, verbatim:** *"`T03#5` — summary emitted at gate completion, before the gate
+flips to `awaiting_review`" and "`T03#7` — `driver_staleness_detected` appended to the
+feature's `events.jsonl`"*
+
+**Why it is unmet, verbatim:** *"`driver_edits` is per-process, so a gate that restarts
+as this feature now requires reaches completion with an empty list. The criterion is not
+failing; the code path is unreachable in the case the feature makes correct."*
+
+**Re-run condition named by the close, verbatim:** *"a decision, then a feature. Either
+accept that the halt's event supersedes the summary and retire `T03`'s gate-completion
+path, or make `driver_edits` per-gate by rehydrating it from the gate's `events.jsonl` at
+completion so a restarted process still reports what the gate did. Neither belongs in a
+close."*
+
+**Tracking surface: NOT NAMED at acceptance.** The operator acknowledged the entry and
+did not answer the tracking prompt, which `/accept-hedged-close` treats as non-blocking.
+Recorded as unanswered rather than assigned a home this record would be inventing. **This
+finding is currently untracked outside this retrospective**, and the decision it needs —
+retire the path, or rehydrate `driver_edits` per-gate — is an operator call that no other
+surface holds.
+
+### Carried forward — 4. Follow-ups `GATE-02-REVIEW.md` deliberately did not build
+
+**kind:** `routed-finding`
+
+**Criterion, verbatim:** *"the five rows of `GATE-02-REVIEW.md` § *Deferred with a home*
+— (1) `/attention` and `gate-status` rendering a halted run as 'awaiting driver restart —
+re-run `<cmd>`'; (2) an advisory arm-time class reporting 'this gate will halt mid-way,
+budget for two invocations'; (3) driver re-exec instead of halt-and-resume; (4)
+`specfuse-lint` on `PATH` resolving to a stale installed wheel; (5) `events.jsonl` losing
+a re-armed closing cycle."*
+
+**Status per row at acceptance, from the close's own record.** Row (5) answered here —
+the divergence did not recur. **Row (4) recurred and was worked around rather than
+fixed**: this session's first oracle batch resolved `specfuse.loop.loop` to the installed
+wheel and produced **14 spurious red results** before the run was repeated from the repo
+root. Rows (1)–(3) remain unbuilt, each rejected with reasoning at plan time.
+
+**Tracking surface: NOT NAMED at acceptance**, same as entry 3 and recorded the same way.
+Each row's named home in `GATE-02-REVIEW.md` § *Deferred with a home* remains the
+pointer, but no roadmap row or issue was created. **Row (4) is the one that has now cost
+real time twice** — it is the same failure family as this feature's own subject, an
+installed artifact diverging from the source a session believes it is running, and
+nothing owns it.
+
+### What this acceptance does and does not settle
+
+Settled: the feature ships. Its nine work units are done, its contract changes are
+enumerated and acknowledged, and its cost is reconciled ($45.55 actual against $32.00
+planned, with gate 2's budget re-baselined $17.50 → $31.00 by operator decision and
+recorded in `GATE-02.md` § *Budget re-baseline*).
+
+Not settled, and worth stating so a later reader does not infer otherwise: the feature's
+benefit has never been observed. Entry 2 is the open measurement; entries 3 and 4 are
+untracked findings that will evaporate if nobody gives them a home.

@@ -5,7 +5,7 @@ slug: driver-edit-staleness
 branch: feat/FEAT-2026-0075-driver-edit-staleness
 roadmap_goal: Make the driver-staleness hazard visible while it can still be acted on, and then impossible to arm into, rather than rediscovered after the money is spent.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 32.00
 ---
 

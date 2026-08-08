@@ -88,7 +88,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
-| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | active | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ detail](#feat-2026-0075) |
+| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -945,17 +945,6 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 **Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
 
 **Status: planned.**
-
-<a id="feat-2026-0075"></a>
-## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
-
-**Why.** Python caches modules in `sys.modules` at first import, so a work unit that edits the driver cannot change behaviour for any work unit the same driver process dispatches afterwards — including the close that judges it. This is not hypothetical and it is not cheap. FEAT-2026-0057 paid for it twice in one gate. Its T04 wired a pre-dispatch call site into `loop.py` at 13:58 UTC; the driver process had imported `loop.py` at 13:30, so the close dispatched one second later ran the pre-T04 function, received nothing, and could not make the observation that would have cleared its follow-up — a $5.33 close that closed `met_locally` for want of a restart. The second occurrence is one layer down: `execute_unit_attempt` imports `prerun_capture` at call time but calls it for **every** work unit, so the first dispatch of any process caches it. That round was deliberately split into two driver invocations to dodge the hazard, and the sequencing cost was paid for nothing because the fix it protected turned out to be defective for an unrelated reason. The methodology has no name for this and no guard against it; both times it was diagnosed after the money was spent. It is the self-hosting form of the harness-migration hazard `.specfuse/LEARNINGS.md` already warns about, and it will keep taxing every driver-editing feature until something detects or prevents it. Tracked as issue #757.
-
-**Goal.** Make the hazard visible or impossible rather than rediscovered. The design is genuinely open and should be settled in gate 1 rather than assumed here; at least three shapes are viable and they are not mutually exclusive. **Detect and warn** — at gate completion, if any work unit in the gate declared `produces:` naming a file under `specfuse/loop/`, print that later units in the same run executed against the pre-edit modules and that a fresh process is required before any close can verify the change; cheapest, and it converts a silent tax into a visible one. **Isolate the dispatch** — run each work-unit attempt in a subprocess so every attempt re-imports; strongest guarantee, largest blast radius, and it interacts with the driver's tree-reset and event-buffer bookkeeping in ways that need real design. **Refuse at arm time** — detect a driver-editing unit scheduled ahead of a close in the same gate and refuse to arm, forcing the two-invocation split the operator currently has to know to perform by hand. Whichever is chosen, the feature should also give the two-invocation pattern a sanctioned name: holding a close at `status: draft` does **not** work (the arm check rejects an entire gate containing any draft unit), and `blocked_human` is the only usable hold today, which reads as a failure in `/attention` and every other consumer.
-
-**Benefits.** The most expensive class of work unit stops paying a tax nobody budgeted for: two close cycles were lost to this in a single feature, and closes are already the costliest attempt type in the portfolio. A hazard that currently depends on an operator remembering it becomes a property of the system. And the sanctioned hold removes the last hand-improvised step in a driver-editing feature, so a run that must span two invocations says so in its plan instead of being discovered mid-gate.
-
-**Status: active.**
 
 ## Notes
 

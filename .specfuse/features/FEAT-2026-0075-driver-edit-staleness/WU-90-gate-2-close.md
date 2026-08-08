@@ -5,7 +5,7 @@ status: done
 attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
-verdict: met_locally
+verdict: met
 oracle_env: macos_local
 duration_seconds: 1016.006
 cost_usd: 8.222645
