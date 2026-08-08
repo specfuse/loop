@@ -263,7 +263,7 @@ For gate 1 only:
   Surface whichever set applies for confirmation rather than per-section
   discussion.
 
-  **Rely on the pre-created skeleton and `specfuse-lint --closing`, not a
+  **Rely on the pre-created skeleton and `specfuse lint --closing`, not a
   restated list of section headings.** Every `close` / `close-intermediate`
   WU gets its required sections (`## Cost analysis`, `## What the loop did
   NOT verify`, etc.) scaffolded at dispatch time — see
@@ -273,7 +273,7 @@ For gate 1 only:
   `planned_cost_usd` and events.jsonl; the deferred-verification list with
   criterion/reason/where-it-actually-gets-checked for each entry, or
   `(nothing — every acceptance criterion was verified in-loop)` if empty),
-  and close with: "`specfuse-lint --closing` exits 0 before this WU reports
+  and close with: "`specfuse lint --closing` exits 0 before this WU reports
   `complete`." Don't restate guard names or heading literals here — that
   copy drifts from the registry; the lint is the check.
 

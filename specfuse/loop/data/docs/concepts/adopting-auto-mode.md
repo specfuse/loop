@@ -44,7 +44,7 @@ Additive, present whether or not any feature in the project uses `auto`:
   (`close-e` / `close-intermediate-e`, `closing_requirements.py`), fired when
   a closing WU under `autonomy_default: auto` touches `.specfuse/LEARNINGS.md`
   directly instead of staging to `LEARNINGS-pending.md`. Changes
-  `specfuse-lint --closing` output accordingly. Inert outside `auto`, but the
+  `specfuse lint --closing` output accordingly. Inert outside `auto`, but the
   requirement registry is a published surface every project's lint now
   carries.
 

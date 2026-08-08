@@ -8,7 +8,7 @@
 `close-discipline.md` says a close carrying any §1–§3 obligation is
 **load-bearing**, and the plan author must set `auto_close_disabled: true` so
 `evaluate_auto_close` cannot optimize it away (#189). Nothing enforced that but
-a human remembering: `specfuse-lint` reported `OK — structurally valid` on a
+a human remembering: `specfuse lint` reported `OK — structurally valid` on a
 folder whose close was silently skipped — twice, including on a conformance
 pass whose entire purpose was close-discipline debt.
 

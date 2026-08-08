@@ -3,7 +3,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""`specfuse-lint --closing` — the closing contract, checkable in-session.
+"""`specfuse lint --closing` — the closing contract, checkable in-session.
 
 Reads `specfuse.loop.closing_requirements.CLOSING_REQUIREMENTS` (T01) and
 evaluates a feature's currently-in-progress closing WU (`close`,

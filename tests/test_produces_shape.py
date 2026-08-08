@@ -8,7 +8,7 @@
 directory. The verdict is right; the timing was not. It ran after a full
 `claude -p` session, three times, for a fact that is a `Path.is_dir()` call on
 static frontmatter: $6.42 and 20.6 minutes observed on a real feature, with
-`specfuse-lint` reporting `OK — structurally valid` throughout.
+`specfuse lint` reporting `OK — structurally valid` throughout.
 
 Two surfaces, one contract:
   - `lint_plan` must ERROR at draft/arm/conformance time, before the loop runs;

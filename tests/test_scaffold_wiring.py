@@ -44,8 +44,7 @@ class TestWiringCore(unittest.TestCase):
                 (target / ".claude" / "settings.json").read_text(encoding="utf-8")
             )
             allow = data["permissions"]["allow"]
-            self.assertEqual(allow.count("Bash(specfuse-loop:*)"), 1)
-            self.assertEqual(allow.count("Bash(specfuse-lint:*)"), 1)
+            self.assertEqual(allow.count("Bash(specfuse:*)"), 1)
 
     def test_wiring_writes_all_surfaces(self):
         """AC2, AC4, AC5: all surfaces written with correct content; no symlinks."""
@@ -77,8 +76,7 @@ class TestWiringCore(unittest.TestCase):
 
             # Bash allowlist (pip-native commands, AC2)
             allow = data["permissions"]["allow"]
-            self.assertIn("Bash(specfuse-loop:*)", allow)
-            self.assertIn("Bash(specfuse-lint:*)", allow)
+            self.assertIn("Bash(specfuse:*)", allow)
 
             # Marketplace identifier (AC4)
             self.assertIn("specfuse", data["extraKnownMarketplaces"])
@@ -168,9 +166,33 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         wire_claude(self.target)
         data = json.loads(settings.read_text(encoding="utf-8"))
         self.assertEqual(data["theme"], "dark")
-        self.assertIn("Bash(specfuse-loop:*)", data["permissions"]["allow"])
+        self.assertIn("Bash(specfuse:*)", data["permissions"]["allow"])
 
     def test_existing_settings_json_allow_entries_not_duplicated(self):
+        from specfuse.loop.scaffold import wire_claude
+
+        claude_dir = self.target / ".claude"
+        claude_dir.mkdir(parents=True)
+        settings = claude_dir / "settings.json"
+        settings.write_text(
+            json.dumps(
+                {"permissions": {"allow": ["Bash(specfuse:*)"]}}
+            ),
+            encoding="utf-8",
+        )
+        wire_claude(self.target)
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        allow = data["permissions"]["allow"]
+        self.assertEqual(allow.count("Bash(specfuse:*)"), 1)
+
+    def test_existing_settings_json_legacy_flat_allow_entries_preserved(self):
+        """A repo wired before the subcommand migration keeps its old entries.
+
+        `Bash(specfuse-loop:*)` / `Bash(specfuse-lint:*)` still authorise the
+        deprecated flat aliases, which keep working until 1.0.0. The merge is
+        additive, so upgrading such a repo gains `Bash(specfuse:*)` without
+        revoking anything it already had.
+        """
         from specfuse.loop.scaffold import wire_claude
 
         claude_dir = self.target / ".claude"
@@ -183,10 +205,10 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
             encoding="utf-8",
         )
         wire_claude(self.target)
-        data = json.loads(settings.read_text(encoding="utf-8"))
-        allow = data["permissions"]["allow"]
-        self.assertEqual(allow.count("Bash(specfuse-loop:*)"), 1)
-        self.assertEqual(allow.count("Bash(specfuse-lint:*)"), 1)
+        allow = json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(specfuse-loop:*)", allow)
+        self.assertIn("Bash(specfuse-lint:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
     def test_existing_settings_json_user_allow_entries_preserved(self):
         from specfuse.loop.scaffold import wire_claude
@@ -202,7 +224,7 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         data = json.loads(settings.read_text(encoding="utf-8"))
         allow = data["permissions"]["allow"]
         self.assertIn("Bash(npm:*)", allow)
-        self.assertIn("Bash(specfuse-loop:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
 
 class TestWiringNewFiles(unittest.TestCase):

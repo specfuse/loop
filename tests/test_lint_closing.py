@@ -2,7 +2,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""`specfuse-lint --closing` — FEAT-2026-0054/T02.
+"""`specfuse lint --closing` — FEAT-2026-0054/T02.
 
 Fixtures cover: a fully-ready close (exit 0), each guard class from T01's
 equivalence fixtures (exit 1, correct guard named), and a plan-next case

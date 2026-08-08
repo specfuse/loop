@@ -1468,8 +1468,8 @@ def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> st
     lines = [
         "",
         "Easiest — let the loop create the branch and commit for you:",
-        "    specfuse-loop --prepare        # …then run",
-        "    specfuse-loop --prepare-only   # …then stop, so you can review first",
+        "    specfuse run --prepare        # …then run",
+        "    specfuse run --prepare-only   # …then stop, so you can review first",
         "",
         "Or do it manually:",
     ]
@@ -5316,7 +5316,7 @@ def produces_shape_error(path: str) -> "str | None":
     session output can be checked by every surface that has the frontmatter:
     ``lint_plan`` at draft/arm/conformance time, and the driver before it
     spends a token (#593). A real feature paid $6.42 across three byte-identical
-    refusals for a ``Path.is_dir()`` call, with ``specfuse-lint`` reporting
+    refusals for a ``Path.is_dir()`` call, with ``specfuse lint`` reporting
     ``OK - structurally valid`` the whole time.
 
     The three surfaces must read identically, so all render this one string.
@@ -5505,7 +5505,7 @@ def assert_terminal_flips_fired(
             f"roadmap_row_not_done: row for {feature_id} not found in "
             f"{roadmap_path}. /draft-feature writes this row but leaves it "
             f"uncommitted; if it was dropped before dispatch, restore it and "
-            f"re-commit. `specfuse-loop --prepare` folds the row into the "
+            f"re-commit. `specfuse run --prepare` folds the row into the "
             f"scaffold commit — dispatch through it so the row survives the "
             f"per-attempt reset.",
         )
@@ -5794,7 +5794,7 @@ def run(
                 return 1
         if prepare_only:
             print("Prepared: feature is on its branch and committed. "
-                  "Re-run `specfuse-loop` to start the gate.")
+                  "Re-run `specfuse run` to start the gate.")
             return 0
         # Pre-flight guards — both run BEFORE ensure_feature_branch so the
         # refusal happens before any branch mutation, and both protect against
@@ -5980,7 +5980,7 @@ def run(
                             wu_id=_edit_wu_id,
                             driver_paths=_edit_paths,
                             remaining_wu_ids=_remaining_ids,
-                            resume_command=f"specfuse-loop --feature {feature_id}",
+                            resume_command=f"specfuse run --feature {feature_id}",
                         )
 
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
@@ -7063,7 +7063,7 @@ def run(
                 f"flip accepted WUs to `pending`,\n"
                 f"                          mark this gate `passed`. "
                 f"Reads {review.name} for planner findings.\n"
-                f"  - Resume               specfuse-loop"
+                f"  - Resume               specfuse run"
             )
         return 0
     except BookkeepingCommitError as exc:
@@ -7361,7 +7361,7 @@ def main() -> int:
     ap.add_argument("--prepare-only", action="store_true",
                     help="Like --prepare (create branch + commit the folder) but "
                     "STOP afterwards without dispatching — review the commit, then "
-                    "re-run `specfuse-loop` to start.")
+                    "re-run `specfuse run` to start.")
     ap.add_argument("--no-baseline-probe", action="store_true",
                     help="Skip the pre-flight baseline gate probe entirely — "
                     "dispatch proceeds exactly as it did before the probe existed. "

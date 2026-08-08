@@ -1,6 +1,6 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""``specfuse-monitor run`` — one polling cycle, end to end
+"""``specfuse monitor run`` — one polling cycle, end to end
 (FEAT-2026-0040/T10).
 
 Reads ``.specfuse/monitoring.yml``, enumerates every check and target,
@@ -541,7 +541,7 @@ def run_cycle(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="specfuse-monitor")
+    parser = argparse.ArgumentParser(prog="specfuse monitor")
     subparsers = parser.add_subparsers(dest="command")
     run_parser = subparsers.add_parser("run", help="run one polling cycle")
     run_parser.add_argument("--component", default=None, help="restrict the run to one component")
@@ -576,7 +576,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             repo=repo,
         )
     except MonitorCliError as exc:
-        print(f"specfuse-monitor: {exc}", file=sys.stderr)
+        print(f"specfuse monitor: {exc}", file=sys.stderr)
         return 1
 
 

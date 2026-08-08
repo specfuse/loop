@@ -240,9 +240,13 @@ _RULES_SENTINEL = "@.specfuse/rules/result-contract.md"
 
 _GITIGNORE_SENTINEL = ".specfuse/.loop.lock"
 
+# One entry covers the whole suite: every component command is now a `specfuse`
+# subcommand (`specfuse run`, `specfuse lint`, `specfuse monitor`, …). The merge
+# below is additive, so a repo wired before this carries its legacy
+# `Bash(specfuse-loop:*)` / `Bash(specfuse-lint:*)` entries forward untouched —
+# they still authorise the deprecated flat aliases, which work until 1.0.0.
 _ALLOW_ENTRIES: list[str] = [
-    "Bash(specfuse-loop:*)",
-    "Bash(specfuse-lint:*)",
+    "Bash(specfuse:*)",
 ]
 
 _MARKETPLACE_KEY = "specfuse"

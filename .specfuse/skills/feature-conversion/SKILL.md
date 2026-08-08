@@ -157,7 +157,7 @@ Once the user has accepted (or skipped) every proposal:
 ## Closing-contract migration
 
 Already-drafted features need no conversion for the closing-skeleton /
-`specfuse-lint --closing` machinery (`.specfuse/rules/close-discipline.md`
+`specfuse lint --closing` machinery (`.specfuse/rules/close-discipline.md`
 §4): the skeleton applies at dispatch time regardless of when the WU body was
 authored, and old bodies that restate guard strings inline are inert, not a
 lint failure. Do not propose edits to strip that prose — it's advisory

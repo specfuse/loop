@@ -80,7 +80,7 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
     LabelSpec(
         name=issues.FINDING_LABEL,
         colour="b60205",
-        description="A failure artifact reported by specfuse-monitor",
+        description="A failure artifact reported by specfuse monitor",
         consumer="monitor/issues.py",
     ),
     # Registered ahead of its consumer (gate 2, FEAT-2026-0042) on purpose:

@@ -2,7 +2,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""`specfuse-lint --closing`'s GATE-NN-CRITERIA.md well-formedness check —
+"""`specfuse lint --closing`'s GATE-NN-CRITERIA.md well-formedness check —
 FEAT-2026-0056/T03.
 
 `close-l` / `close-intermediate-f` fire only when the gate's criteria

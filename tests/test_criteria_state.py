@@ -20,7 +20,7 @@ from specfuse.loop.criteria_state import (
 FIXTURE = """\
 ### T03#2
 
-- **criterion:** `specfuse-lint --closing` exits 0 on a legacy close with no artifact
+- **criterion:** `specfuse lint --closing` exits 0 on a legacy close with no artifact
 - **oracle:** `python3 -m unittest tests.test_lint_closing_criteria -v`
 - **kind:** `narrow`
 - **state:** `pass`

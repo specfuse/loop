@@ -180,8 +180,7 @@ class TestInitFullLayout(unittest.TestCase):
     def test_settings_allowlist(self):
         data = json.loads((self.claude / "settings.json").read_text(encoding="utf-8"))
         allow = data["permissions"]["allow"]
-        self.assertIn("Bash(specfuse-loop:*)", allow)
-        self.assertIn("Bash(specfuse-lint:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
     def test_settings_marketplace(self):
         data = json.loads((self.claude / "settings.json").read_text(encoding="utf-8"))

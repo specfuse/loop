@@ -35,13 +35,13 @@ class TestVerificationSeed(unittest.TestCase):
         self.assertEqual(
             offenders, [],
             f"gate commands must not call .specfuse/scripts/* (absent under pip); "
-            f"use specfuse-lint / specfuse-loop. Offenders: {offenders}",
+            f"use the `specfuse` subcommands. Offenders: {offenders}",
         )
 
     def test_plan_lint_uses_console_script(self):
         text = (DATA / "verification.yml.example").read_text(encoding="utf-8")
-        self.assertIn("specfuse-lint", text,
-                      "the plan-next lint gate should call `specfuse-lint`")
+        self.assertIn("specfuse lint", text,
+                      "the plan-next lint gate should call `specfuse lint`")
 
 
 class TestRoadmapSeed(unittest.TestCase):

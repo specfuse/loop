@@ -355,7 +355,7 @@ in step 2 stays fixed.
 
 ## Worked example
 
-See the "Dogfood: deriving against `specfuse-loop` itself" section in the
+See the "Dogfood: deriving against the `specfuse-loop` repo itself" section in the
 commit that introduced this skill — that walk-through demonstrates the
 output format on a real Python repo with a CI workflow and a `tests/`
 directory, and shows where the skill defers to questions versus where it
