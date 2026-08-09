@@ -342,8 +342,7 @@ in step 2 stays fixed.
 ## What this skill does *not* do
 
 - It does not run any of the commands it proposes. It is an authoring aid,
-  not a smoke test. Once the file is accepted, the user runs `loop.py
-  --dry-run` (which uses the file but doesn't execute the gates) and then
+  not a smoke test. Once the file is accepted, the user runs `specfuse run --dry-run` (which uses the file but doesn't execute the gates) and then
   the first real feature exercises the gates for real.
 - It does not modify the driver's own modules (`specfuse.loop.loop`,
   `specfuse.loop.lint_plan`) or the

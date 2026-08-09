@@ -190,9 +190,15 @@ not invent one.
    leave the order of LEARNINGS untouched, so a diff shows exactly what curation
    changed.
 
-End with the RESULT block from
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` once the operator has walked every cluster and the accepted
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` once the operator has walked every cluster and the accepted
 writes landed. `status: blocked` only if `LEARNINGS.md` cannot be parsed into
 entries (malformed structure the operator must fix first).
 

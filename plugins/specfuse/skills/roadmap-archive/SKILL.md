@@ -16,7 +16,7 @@ with a back-link, and shrinks the hot roadmap file.
   still has an inline detail section (batch mode with confirmation)
 - When the user says "archive feature X", "move X to the archive",
   "clean up the roadmap", or "the roadmap is too long, archive the done features"
-- **Note:** As of FEAT-2026-0010 Gate 2, `loop.py` automatically archives a
+- **Note:** As of FEAT-2026-0010 Gate 2, the driver automatically archives a
   feature's detail section when it flips `PLAN.md` status to `complete`. Manual
   invocation of this skill remains valid for back-filling older features or
   correcting a failed auto-archive.

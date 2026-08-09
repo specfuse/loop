@@ -148,9 +148,15 @@ Tell the user the exact command to resume:
 Mention: if you want to confirm before dispatching, run with
 `--dry-run` first.
 
-End with the RESULT block per
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means every draft was decided and the gate was
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means every draft was decided and the gate was
 marked passed (or the user accepted that some drafts stay at
 `draft` and the gate stays `awaiting_review`).
 

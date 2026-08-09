@@ -196,4 +196,4 @@ If K > 0, list the feature IDs that were flipped.
 ## Version
 
 **v0.1** (FEAT-2026-0018/T09). Initial release — read-only survey, opt-in
-`auto_close_disabled` flip, predicate=v1 backtest via `gate_eval.py backtest`.
+`auto_close_disabled` flip, predicate=v1 backtest via `python3 -m specfuse.loop.gate_eval backtest`.

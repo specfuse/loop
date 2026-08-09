@@ -214,7 +214,7 @@ or a gate failure that requires operator decision.
 - **Does not modify LEARNINGS.md.** Unless the fix surfaces a durable
   rule that would change future bug fixes or feature authoring, the
   commit message + PR body carry the full audit.
-- **Does not run the loop driver.** No `loop.py` invocation.
+- **Does not run the loop driver.** No `specfuse run` invocation.
 - **Does not close the GitHub issue manually.** The `closes #<#>`
   reference in the merge commit auto-closes the issue. If the issue
   needs manual closure (e.g. user wants to keep it open for tracking

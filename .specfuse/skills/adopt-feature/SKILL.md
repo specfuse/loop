@@ -134,9 +134,15 @@ where `<folder>` is the path printed in step 6.
 
 ---
 
-End with the RESULT block defined in
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the human picked, `adopt_feature.py` ran without error, the
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the human picked, `adopt_feature.py` ran without error, the
 folder path printed, and the next-command line printed. `status: blocked` if
 `adopt_feature.py` exited non-zero, `gh` is unauthenticated, or the active-feature
 warning was not overridden.
@@ -152,7 +158,7 @@ warning was not overridden.
 - **Does not refine the seeded WU-01.** `adopt_feature.py` seeds `WU-01` with the raw
   issue body; refinement is `/draft-feature` or the gate 1 grind.
 - **Does not loop or auto-dispatch.** After printing the next command, the skill exits.
-  The human runs `loop.py` when ready.
+  The human runs `specfuse run` when ready.
 
 ## Version
 

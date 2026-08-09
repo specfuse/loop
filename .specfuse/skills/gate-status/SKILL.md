@@ -263,10 +263,17 @@ Report the ready WUs (those whose `depends_on` are all done and
 status is `pending`). Tell the user the gate would continue if they
 re-ran the loop.
 
-### 6. End with the RESULT block
+### 6. Emit the RESULT block only for a non-interactive run
 
-Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the report was produced and shown.
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
+[`../../rules/result-contract.md`](../../rules/result-contract.md).
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the report was produced and shown.
 `status: blocked` is reserved for the case where the canonical files
 themselves are missing or corrupt enough that the report can't be
 assembled (e.g. no `PLAN.md`, no `events.jsonl` for a feature whose

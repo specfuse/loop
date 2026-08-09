@@ -266,8 +266,15 @@ operator.
 
 ### 6. RESULT
 
-Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the acceptance record was written, the close WU's
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
+[`../../rules/result-contract.md`](../../rules/result-contract.md).
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the acceptance record was written, the close WU's
 verdict was updated to `met`, and `--recheck-verdict` ran and reported
 `fired: true`. `status: blocked` is reserved for a refusal in step 1 (`met`,
 `not_met`, or close WU not `done`) or an operator unavailable to supply the

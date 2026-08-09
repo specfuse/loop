@@ -142,9 +142,15 @@ If `yes`: apply every edit. Report the count of files written.
 - If no planned features remain: suggest `/draft-feature` to add
   one, or just say the roadmap is empty.
 
-End with the RESULT block per
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the user confirmed and every planned write
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the user confirmed and every planned write
 applied. `status: blocked` is used only if a planned write could not
 be applied (e.g. the roadmap row isn't in the expected format) —
 write whatever did apply, then stop and report.
