@@ -123,6 +123,91 @@ def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:
         return []
 
 
+def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = False) -> list:
+    """Record each decision in `decisions` against its GitHub issue.
+
+    Each decision is a mapping carrying at least `number`, `body` (the
+    issue's current body, for the idempotency check and marker append) and
+    `category`, plus optional `confidence` (defaults to `"high"`).
+
+    Marker first, label best-effort -- see `PLAN.md`'s "how a triaged issue
+    is marked" section. The marker write is the idempotency key: a decision
+    for an issue whose body already carries a marker performs no write at
+    all. A label write that fails is recorded in the returned report and
+    never raised, per `[FEAT-2026-0042/G2/registered-is-not-provisioned]`.
+
+    With `auto=True`, a decision whose confidence is not `"high"` is
+    recorded as the `question` category (still marked, still routed to
+    `needs-human`) instead of being applied as proposed. With `auto=False`
+    every decision is applied as given -- see this WU's flag-scope table.
+
+    Raises `ValueError` if any decision names a category outside
+    `CATEGORIES`, before any write for that decision happens.
+    """
+    results = []
+    for decision in decisions:
+        category = decision["category"]
+        if category not in CATEGORIES:
+            raise ValueError(f"not a triage category: {category!r}")
+
+        number = decision["number"]
+        body = decision.get("body") or ""
+        confidence = decision.get("confidence", "high")
+
+        if parse_marker(body) is not None:
+            results.append({
+                "number": number,
+                "skipped": True,
+                "marker_written": False,
+                "label_written": False,
+            })
+            continue
+
+        applied_category = category
+        if auto and confidence != "high":
+            applied_category = "question"
+
+        row = {
+            "number": number,
+            "category": applied_category,
+            "confidence": confidence,
+            "route": route_for(applied_category),
+            "skipped": False,
+        }
+
+        new_body = f"{body}\n\n{render_marker(applied_category, confidence)}" if body else render_marker(applied_category, confidence)
+        try:
+            runner(
+                ["gh", "issue", "edit", str(number), "--repo", repo, "--body", new_body],
+                check=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - recorded, not raised
+            row["marker_written"] = False
+            row["marker_error"] = str(exc)
+            row["label_written"] = False
+            results.append(row)
+            continue
+        row["marker_written"] = True
+
+        try:
+            runner(
+                [
+                    "gh", "issue", "edit", str(number),
+                    "--repo", repo,
+                    "--add-label", label_for(applied_category),
+                ],
+                check=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - label failure never raises
+            row["label_written"] = False
+            row["label_error"] = str(exc)
+        else:
+            row["label_written"] = True
+
+        results.append(row)
+    return results
+
+
 def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT) -> list:
     """Return open issues whose body carries no triage marker.
 

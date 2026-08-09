@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0045/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces:
   - specfuse/loop/triage.py
   - tests/test_triage_apply.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-09T22:14:07.834638+00:00
+duration_seconds: 728.047
+cost_usd: 1.002454
+input_tokens: 2928
+output_tokens: 9304
 ---
 
 # The write path and the `auto` dial: marker first, label best-effort
