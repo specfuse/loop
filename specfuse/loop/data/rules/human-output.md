@@ -59,7 +59,8 @@ enums are storage, not vocabulary. Say what they mean:
 
 Keep the words the methodology is *made of* — feature, gate, work unit, arm,
 close, roadmap. Those are the domain; explain them once where a first-time reader
-meets them, then use them plainly. When a raw field genuinely is the most precise
+meets them, then use them plainly. `.specfuse/docs/glossary.md` defines them for
+a reader who wants one, so point there rather than re-explaining inline. When a raw field genuinely is the most precise
 thing to show — a verbatim error, an exact status being written — show it and gloss
 it once: `awaiting_review` (waiting for your review).
 

@@ -5,6 +5,9 @@ Start here:
 - [`getting-started.md`](getting-started.md) — from `specfuse init` to a delivered
   feature, then how to operate a running loop (diagnose halts, arm gates, unblock
   WUs). Read this first.
+- [`glossary.md`](glossary.md) — the words Specfuse uses (feature, gate, work
+  unit, arm, close, the statuses and verdicts you'll see), in the order you meet
+  them. One or two sentences each; read it if a term in the output is unfamiliar.
 - [`skills.md`](skills.md) — the Claude Code skills catalog, ordered by lifecycle
   phase (pick → draft → arm → diagnose → wrap).
 - [`methodology.md`](methodology.md) — the canonical definition of the gate cycle:
@@ -12,7 +15,8 @@ Start here:
   verification-as-oracle, auto-close, plan-next, LEARNINGS, and autonomy. Shared
   vocabulary between the loop and the orchestrator. Reference-grade.
 
-`getting-started.md`, `skills.md`, `methodology.md`, and `concepts/` are also
+`getting-started.md`, `glossary.md`, `skills.md`, `methodology.md`, and
+`concepts/` are also
 shipped into target repos by `specfuse init`/`upgrade` (under `.specfuse/docs/`),
 so an initialized project is self-documenting.
 

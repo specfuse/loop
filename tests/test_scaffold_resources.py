@@ -40,6 +40,7 @@ _EXPECTED_RELPATHS = {
     "schemas/events/spec_validated.schema.json",
     "schemas/events/spec_issue_resolved.schema.json",
     "schemas/events/spec_issue_routed.schema.json",
+    "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",

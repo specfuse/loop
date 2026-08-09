@@ -48,6 +48,7 @@ TRACKED = {
 
 # Docs manifest — canonical source is repo docs/, not .specfuse/.
 DOCS_TRACKED = {
+    "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",
