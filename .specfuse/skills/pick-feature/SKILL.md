@@ -72,7 +72,7 @@ roadmap, this skill is solving nothing — just start it.
   (`planned` / `active` / `blocked` / `deferred` / `done` / `abandoned`) and
   one-line goal are the primary input.
 - **Durable lessons, sliced, not the whole file.** Run
-  `python3 .specfuse/scripts/learnings_query.py "<query>" --top 15`
+  `python3 -m specfuse.loop.learnings_query "<query>" --top 15`
   rather than reading `.specfuse/LEARNINGS.md` whole. Because this
   skill ranks 2-3 candidate features, not one, there is no single
   feature query — build `<query>` as the **concatenated one-line

@@ -2,7 +2,7 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""Tests for .specfuse/scripts/learnings_query.py (FEAT-2026-0025/T01).
+"""Tests for specfuse.loop.learnings_query (FEAT-2026-0025/T01).
 
 `parse_entries` splits LEARNINGS.md's `- [tag] text` bullets (which may wrap
 across lines) into entries, excluding header/Format/heading prose. `rank`
@@ -14,7 +14,7 @@ of the `specfuse` package.
 
 from __future__ import annotations
 
-import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -22,22 +22,8 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS_DIR = REPO_ROOT / ".specfuse" / "scripts"
-LEARNINGS_QUERY_PATH = SCRIPTS_DIR / "learnings_query.py"
 
-
-def _load(name: str):
-    if str(SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-    path = SCRIPTS_DIR / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-lq = _load("learnings_query")
+from specfuse.loop import learnings_query as lq  # noqa: E402
 
 
 class TestRank(unittest.TestCase):
@@ -166,13 +152,68 @@ class TestShouldLoadWhole(unittest.TestCase):
         self.assertFalse(lq.should_load_whole(entries, threshold=40))
 
 
+class TestDefaultPathResolvesAgainstCwd(unittest.TestCase):
+    """The packaging blocker this module had to clear (#1076).
+
+    The default was `Path(__file__).parent.parent / "LEARNINGS.md"`, which
+    worked only because the module lived in `.specfuse/scripts/`. Inside the
+    installed package that resolves into site-packages, so every consumer
+    project would query a file that is not theirs -- or, more likely, get a
+    "cannot read" error naming a path they have never seen.
+    """
+
+    def test_default_is_relative_to_the_working_directory(self):
+        self.assertEqual(
+            lq.default_learnings_path(), Path(".specfuse/LEARNINGS.md")
+        )
+
+    def test_default_does_not_point_inside_the_package(self):
+        resolved = str(lq.default_learnings_path().resolve())
+        package_dir = str(Path(lq.__file__).resolve().parent)
+        self.assertFalse(
+            resolved.startswith(package_dir),
+            f"default LEARNINGS path resolves inside the package: {resolved}",
+        )
+
+    def test_cli_reads_the_project_learnings_of_the_cwd(self):
+        """Run from a temp project, it must read THAT project's file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            specfuse = project / ".specfuse"
+            specfuse.mkdir()
+            (specfuse / "LEARNINGS.md").write_text(
+                _small_fixture(5), encoding="utf-8"
+            )
+            result = subprocess.run(
+                [sys.executable, "-m", "specfuse.loop.learnings_query", "routers"],
+                capture_output=True, text=True, check=False, cwd=str(project),
+                env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(lq.LOAD_WHOLE_SENTINEL, result.stdout)
+
+    def test_cli_names_the_projects_own_path_when_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [sys.executable, "-m", "specfuse.loop.learnings_query", "anything"],
+                capture_output=True, text=True, check=False, cwd=tmp,
+                env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn(".specfuse/LEARNINGS.md", result.stderr)
+
+
 class TestCli(unittest.TestCase):
-    def _run_cli(self, *args: str) -> subprocess.CompletedProcess:
+    """Exercised through `-m`, which is how the skills invoke it (#1076)."""
+
+    def _run_cli(self, *args: str, cwd: str | None = None) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(LEARNINGS_QUERY_PATH), *args],
+            [sys.executable, "-m", "specfuse.loop.learnings_query", *args],
             capture_output=True,
             text=True,
             check=False,
+            cwd=cwd,
+            env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
         )
 
     def test_cli_below_threshold_signals_load_whole(self):

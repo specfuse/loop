@@ -77,7 +77,7 @@ Before any proposal, read what shapes good plans in *this* project:
   this step, so build a short query from what's already in hand: the
   one-line feature idea the user gave you, the provisional slug, and any
   surface names the idea already mentions. Run
-  `python3 .specfuse/scripts/learnings_query.py "<query>" --top 8` and read
+  `python3 -m specfuse.loop.learnings_query "<query>" --top 8` and read
   only the returned bullets — durable rules from past gates that would
   change how this feature is planned or sized. If the CLI prints the
   sentinel line `LEARNINGS-LOAD-WHOLE` (small/early-stage repos, too few
