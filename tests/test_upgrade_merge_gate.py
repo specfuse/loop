@@ -2,40 +2,26 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""Tests for .specfuse/scripts/upgrade_merge_gate.py (FEAT-2026-0029/T01).
+"""Tests for specfuse.loop.upgrade_merge_gate (FEAT-2026-0029/T01).
 
-`decide` turns (CI status, per-feature lint_plan.py results) into a merge/halt
+`decide` turns (CI status, per-feature lint results) into a merge/halt
 verdict; `collect_reports` produces those per-feature results by shelling out
-to lint_plan.py once per `.specfuse/features/*/` folder. Loaded by file path,
-matching the pattern other `.specfuse/scripts` helpers use in this test suite
-(see test_leak_scan_content.py) since this module is not part of the
-`specfuse` package.
+to the plan linter once per `.specfuse/features/*/` folder.
+
+Imported from the package, not loaded by file path: `/scaffold-upgrade` calls
+`collect_reports` and `decide` as functions against a *target* project, where
+`.specfuse/scripts/` does not exist (#1076).
 """
 
 from __future__ import annotations
 
-import importlib.util
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from specfuse.loop import upgrade_merge_gate as umg
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SCRIPTS_DIR = REPO_ROOT / ".specfuse" / "scripts"
-
-
-def _load(name: str):
-    if str(SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(SCRIPTS_DIR))
-    path = SCRIPTS_DIR / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[name] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-umg = _load("upgrade_merge_gate")
 
 _VALID_FM = """\
 ---

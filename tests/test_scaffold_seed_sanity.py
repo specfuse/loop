@@ -66,16 +66,6 @@ class TestSkillsNameRunnableCommands(unittest.TestCase):
     )
     _FORBIDDEN = re.compile(r"\.specfuse/scripts/[A-Za-z_-]+\.py")
 
-    # Known-unpackaged helpers, exempted deliberately and visibly rather than
-    # by loosening the pattern. `learnings_query.py` and `upgrade_merge_gate.py`
-    # exist ONLY as repo-local dogfood scripts: no console script, no module
-    # under `specfuse/loop/`, and `init_specfuse` does not seed them. So the
-    # skills naming them are broken for a scaffolded project exactly as the
-    # `loop.py` references were — but unlike those, there is no packaged
-    # command to point at yet, and inventing one is a public-API decision, not
-    # a docs fix. Tracked in #1076; delete an entry here when its helper ships.
-    _KNOWN_UNPACKAGED = ("learnings_query.py", "upgrade_merge_gate.py")
-
     def test_skill_dirs_resolve(self):
         """Vacuity guard: a moved skills tree would otherwise assert nothing."""
         for d in self._SKILL_DIRS:
@@ -90,8 +80,7 @@ class TestSkillsNameRunnableCommands(unittest.TestCase):
                 for lineno, line in enumerate(
                     skill.read_text(encoding="utf-8").splitlines(), start=1
                 ):
-                    hit = self._FORBIDDEN.search(line)
-                    if hit and not hit.group(0).endswith(self._KNOWN_UNPACKAGED):
+                    if self._FORBIDDEN.search(line):
                         rel = skill.relative_to(REPO_ROOT)
                         offenders.append(f"{rel}:{lineno}: {line.strip()}")
         self.assertEqual(

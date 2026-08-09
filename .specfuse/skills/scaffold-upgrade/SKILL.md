@@ -12,8 +12,8 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 Wraps `specfuse upgrade [--dry-run] <target>` in the git choreography a human
 would otherwise repeat by hand: branch, run the upgrade, commit, push, open a
-PR, watch CI, then decide merge-vs-halt via the merge-safety gate helper from
-`.specfuse/scripts/upgrade_merge_gate.py`. Modeled on
+PR, watch CI, then decide merge-vs-halt via the merge-safety gate helper in
+`specfuse.loop.upgrade_merge_gate`. Modeled on
 [`../wrap-feature/SKILL.md`](../wrap-feature/SKILL.md) — same single-confirm
 posture on outward-facing steps, same graceful degradation when `gh` is
 absent.
@@ -104,8 +104,8 @@ any hold:
 
 ### (h) Merge-safety gate
 
-- Call `.specfuse/scripts/upgrade_merge_gate.py`:
-  - `collect_reports(<target>)` — runs `lint_plan.py`'s structural-conformance
+- Import `specfuse.loop.upgrade_merge_gate` and call:
+  - `collect_reports(<target>)` — runs the plan linter's structural-conformance
     check once per feature folder under `<target>/.specfuse/features/`,
     returning `[{"feature": ..., "ok": ..., "detail": ...}, ...]`.
   - `decide(ci_all_green, reports)` — returns `(verdict, reason)` where
