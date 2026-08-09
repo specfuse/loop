@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 23.00
+baseline:
+  sha: c62ee5ac0261121709d90c19fe4c8829db80799c
+  probed_at: 2026-08-09T21:46:31.563443+00:00
+  failing: []
 ---
 
 # Gate 1 — inbound issues get a category, a route, and a durable record
