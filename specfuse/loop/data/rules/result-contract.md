@@ -16,6 +16,26 @@ The agent's RESULT is **advisory**. The driver runs verification itself (see
 what decides done. Report honestly: claiming `complete` on work that fails the gates
 wastes an attempt and teaches the next session nothing.
 
+## Who reads it — emit it only when something does
+
+This block is a **machine interface**, not a report. Emit it when a program is on
+the other end:
+
+- a work-unit session the driver dispatched — always;
+- a skill invoked **non-interactively**, headless from a calling program that
+  parses the outcome (`fix-bug` under `autofix_invoke` is the live example).
+
+Do **not** emit it on an interactive run. A human who typed `/pick-feature` or
+`/gate-status` has no parser; the block lands as a fenced slab of `status:`,
+`acceptance_criteria:` and `evidence:` they have to scroll past, which is the
+verbosity [`human-output.md`](human-output.md) exists to prevent. Report to them
+per that rule instead. Emitting nothing costs nothing here — no driver is waiting
+on it, and the absence of a block is only a failed attempt when a driver
+dispatched the session.
+
+When in doubt about which you are in, look at who invoked you: a slash command
+typed by a person is interactive; a `claude -p` dispatch is not.
+
 ## The four-step discipline
 
 This contract is the loop-surface expression of the neutral

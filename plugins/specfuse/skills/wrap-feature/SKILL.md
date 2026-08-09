@@ -47,7 +47,7 @@ plan and stop" mode.
   `/gate-status` (if a WU is blocked) or wait for the close ceremony.
   If `abandoned`: stop, this skill is the wrong path. If `active` and
   the gate is `awaiting_review` with closing-sequence WUs pending,
-  point at re-running `loop.py` (drafted closing WUs need dispatch
+  point at re-running `specfuse run` (drafted closing WUs need dispatch
   before wrap).
 - **Read-only on RETROSPECTIVE / LEARNINGS / roadmap content.** The
   close ceremony OWNS those edits. This skill only confirms they

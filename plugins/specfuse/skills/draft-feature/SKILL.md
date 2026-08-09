@@ -342,9 +342,15 @@ When the user has accepted the structure:
 - Optionally run `specfuse run --dry-run` to
   confirm the loop loads the feature cleanly.
 
-End with the RESULT block defined in
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the user accepted, files are written, and
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the user accepted, files are written, and
 lint passes. If the user abandoned partway, emit `status: blocked`
 with what was decided so far in `blocked_reason`.
 

@@ -165,8 +165,15 @@ cleanup, never a required conversion.
 
 ## Closing rule
 
-End with the RESULT block defined in
-`.specfuse/rules/result-contract.md`. `status: complete` means "I
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
+`.specfuse/rules/result-contract.md`.
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means "I
 walked every lint error and the user decided on each." If the user
 abandoned the conversion partway, emit `status: blocked` with the
 remaining error list as `blocked_reason`.
