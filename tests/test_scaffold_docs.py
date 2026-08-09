@@ -11,6 +11,7 @@ from specfuse.loop.scaffold import init_specfuse, read_scaffold, upgrade_specfus
 _DOCS_RELPATHS = [
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/ralph-lineage.md",
+    "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",

@@ -64,6 +64,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "docs/concepts/autonomy-stop-classes.md",
     "docs/concepts/adopting-auto-mode.md",
     "docs/concepts/ralph-lineage.md",
+    "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",
