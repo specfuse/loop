@@ -1,14 +1,18 @@
 ---
 id: FEAT-2026-0045/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 produces:
   - plugins/specfuse/skills/triage-issues/SKILL.md
   - .specfuse/skills/triage-issues/SKILL.md
   - tests/test_triage_skill_contract.py
 oracle_env: macos_local
+duration_seconds: 1507.895
+cost_usd: 2.38633
+input_tokens: 6262
+output_tokens: 22081
 ---
 
 # The `/triage-issues` skill: judgment over the mechanism
