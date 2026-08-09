@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0045/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - specfuse/loop/triage.py
@@ -10,6 +10,15 @@ produces:
   - specfuse/monitor/issues.py
   - tests/test_triage.py
 oracle_env: macos_local
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.9.3
+started_at: 2026-08-09T21:51:06.616751+00:00
+duration_seconds: 1381.029
+cost_usd: 2.412055
+input_tokens: 2157
+output_tokens: 23824
 ---
 
 # The triage mechanism: vocabulary, marker, and the untriaged scan

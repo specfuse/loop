@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from specfuse.loop import escalation, gh_features
+from specfuse.loop import escalation, gh_features, triage
 from specfuse.monitor import autofix_state, issues
 from specfuse.loop.labels import LABEL_REGISTRY
 
@@ -15,16 +15,17 @@ _COLOUR_RE = re.compile(r"^[0-9a-f]{6}$")
 
 
 class TestLabelRegistry(unittest.TestCase):
-    def test_registry_has_exactly_nine_entries(self):
+    def test_registry_has_exactly_thirteen_entries(self):
         # Seven at FEAT-2026-0071; the eighth is the harvester's finding label,
         # added by #300 after `gh issue create` rejected it on a fresh repository.
         # The ninth is FEAT-2026-0042/T02's autofix-failed label, registered
-        # ahead of gate 2, its consumer, for the same reason.
+        # ahead of gate 2, its consumer, for the same reason. The tenth through
+        # thirteenth are FEAT-2026-0045/T01's category->label projection.
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 9)
+        self.assertEqual(len(LABEL_REGISTRY), 13)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -46,6 +47,12 @@ class TestLabelRegistry(unittest.TestCase):
             | {gh_features.FEATURE_LABEL}
             | {issues.FINDING_LABEL}
             | {autofix_state.AUTOFIX_FAILED_LABEL}
+            | {
+                triage.BUG_LABEL,
+                triage.FEATURE_LABEL,
+                triage.DUPLICATE_LABEL,
+                triage.WONTFIX_LABEL,
+            }
         )
         actual = {entry.name for entry in LABEL_REGISTRY}
         self.assertEqual(actual, expected)

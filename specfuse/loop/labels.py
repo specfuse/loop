@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from specfuse.loop import escalation, gh_features
+from specfuse.loop import escalation, gh_features, triage
 from specfuse.monitor import autofix_state, issues
 
 
@@ -91,6 +91,33 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="5319e7",
         description="auto-fix attempted, failed",
         consumer="monitor/autofix_state.py",
+    ),
+    # FEAT-2026-0045/T01: the category->label projection of the triage
+    # marker. `question` reuses the existing `triage-question` entry above
+    # rather than minting a second label -- see triage.py's module docstring.
+    LabelSpec(
+        name=triage.BUG_LABEL,
+        colour="ededed",
+        description="An inbound issue triaged as a bug",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.FEATURE_LABEL,
+        colour="006b75",
+        description="An inbound issue triaged as a feature request",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.DUPLICATE_LABEL,
+        colour="f9d0c4",
+        description="An inbound issue triaged as a duplicate",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.WONTFIX_LABEL,
+        colour="bfdadc",
+        description="An inbound issue triaged as won't-fix",
+        consumer="loop/triage.py",
     ),
 )
 
