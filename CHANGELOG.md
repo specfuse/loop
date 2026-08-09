@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.10.0+umbrella.0.10.0] - 2026-08-09
+
 ### Breaking
 
 - **`specfuse-lint --closing` gains a new blocking finding, `close-l` (terminal closes) / `close-intermediate-f` (intermediate ones).** A close whose gate carries a `GATE-NN-CRITERIA.md` now fails the closing lint once per untrustworthy entry: a `kind:` missing or outside `criteria_state.ORACLE_KINDS`, a `state:` missing or outside `criteria_state.CRITERION_STATES`, or an entry whose oracle has no knowable scope (`kind: broad`) reading `state: pass` with an `attempt:` that is not the current one — a broad oracle's green can never be carried forward. A `narrow` entry's `pass` from a prior attempt is deliberately not a finding; that carry-forward is the point. The requirement is declared in `closing_requirements.py` and gated on `applies_when: criteria_artifact_present`, so a feature with no artifact lints exactly as it did before — but the driver now seeds that artifact on every close dispatch, so the gate opens as soon as a driver carrying this change is running, and from that point a close session must record a `kind:` and a `state:` for every acceptance criterion in its gate or its closing lint is red. Nothing in this change fills those entries in; that is the close session's own work (FEAT-2026-0056)
