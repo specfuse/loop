@@ -1,11 +1,21 @@
 ---
 id: FEAT-2026-0045/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.9.3
+started_at: 2026-08-09T22:51:24.271926+00:00
+verdict: met_locally
+duration_seconds: 1084.647
+cost_usd: 5.229417
+input_tokens: 110
+output_tokens: 36688
 ---
 
 # Close gate 1 and the feature — retrospective, lessons, docs, terminal verdict

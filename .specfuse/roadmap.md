@@ -796,6 +796,21 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
 
+**Inherited handoff — one dial is already waiting for this file
+(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](#feat-2026-0045) shipped triage's `auto`
+dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
+auto=False)`, reading no configuration of any kind — deliberately, because
+`agent-policy.yml` is this feature's core deliverable and did not exist, and building a
+minimal reader there would have taken this feature's scope and left it shipping against a
+partial schema someone else authored. **This feature must wire its policy file to that
+parameter.** The parameter exists, is tested at both settings, and its semantics are
+fixed: under `auto=True` a decision whose confidence is not `high` is recorded as the
+`question` category and routed to `needs-human`, **still marked**, never skipped. Supply
+the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
+`autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
+`monitoring.yml`, and inbound issues are not components. See that feature's
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
+
 **Status: planned.**
 
 <a id="feat-2026-0045"></a>
@@ -828,6 +843,32 @@ a marker.
 session: triage against live GitHub (the `gh`-in-sandbox constraint), and "an agent
 following the skill's prose reproduces the module's routing on an unseen issue" — the
 skill test binds prose to constants and proves drift-freedom, not correctness.
+
+**Delivered** (gate 1, terminal — see
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md)).
+`specfuse/loop/triage.py`: the closed `CATEGORIES` / `CONFIDENCES` tuples, the total
+category→route map behind `route_for`, the category→label projection behind `label_for`,
+the `render_marker` / `parse_marker` pair over
+`<!-- specfuse:triage category=… confidence=… -->`, `list_untriaged` filtering
+client-side on the marker's absence over an injected runner (a harvester issue is returned
+flagged `already_structured`, not excluded), and `apply_triage(..., auto=False)` writing
+marker-first, projecting the label best-effort, idempotent on an already-marked body, and
+recording a failed label write rather than raising. Four new `LabelSpec` entries importing
+their names from `triage.py`; one new public predicate `has_finding_marker` in
+`specfuse/monitor/issues.py` so the marker literal has one home. `/triage-issues` ships
+canonical at `plugins/specfuse/skills/triage-issues/SKILL.md`, vendored byte-identically
+and discovery-symlinked, with a drift test binding its documented vocabulary and routes to
+the module's constants — which proves prose has not drifted from code, and deliberately
+does not claim the skill classifies correctly.
+
+**Verdict `met_locally`, as predicted — three open follow-ups.** Triage against a live
+GitHub repository is `externally-verifiable-later` (an operator run post-merge upgrades
+it); "an agent following the prose reproduces the routing" is `inherent` (no in-repo
+oracle can ever assert it, so `met` is unreachable through it); the consumer-visible
+contract list awaits human acknowledgment. `duplicate` shipped judgment-only, with no
+detection mechanism, by decision. Terminal flips are withheld on a hedged verdict —
+`PLAN.md`, the gate, and this row stay un-flipped until an operator accepts through
+`/accept-hedged-close`. The driver owns that flip; it is not hand-edited.
 
 **Status: active.**
 
