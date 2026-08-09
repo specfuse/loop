@@ -60,7 +60,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
-| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
+| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | active | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ detail](#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
@@ -807,7 +807,29 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
 
-**Status: planned.**
+**Shape (drafted 2026-08-09).** Single gate, 3 substantive WUs + terminal close, $18.00
+planned. The seam is **module = mechanism, agent = judgment**: `specfuse/loop/triage.py`
+owns the closed category vocabulary, the category→route map, the marker pair, and the
+untriaged scan; `/triage-issues` owns classifying free text. Three decisions were settled
+at draft time — a triaged issue carries **both** an authoritative body marker
+(`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
+projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
+argument** at the headless entry point rather than a config surface, because
+[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+`duplicate` ships judgment-only with no detection mechanism.
+
+**Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
+closing duplicates — that is [FEAT-2026-0048](#feat-2026-0048) for bugs and the operator
+otherwise); `.specfuse/agent-policy.yml` in any form; refactoring the five existing
+`gh issue list` call sites into a shared client; re-triaging an issue that already carries
+a marker.
+
+**Expected verdict `met_locally`.** Two surfaces are unreachable from inside a dispatched
+session: triage against live GitHub (the `gh`-in-sandbox constraint), and "an agent
+following the skill's prose reproduces the module's routing on an unseen issue" — the
+skill test binds prose to constants and proves drift-freedom, not correctness.
+
+**Status: active.**
 
 <a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
