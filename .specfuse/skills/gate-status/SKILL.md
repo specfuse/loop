@@ -277,9 +277,8 @@ WUs have non-pending statuses).
 - **Does not write or commit anything.** Read-only.
 - **Does not insert hygiene WUs, edit WU bodies, or flip statuses.**
   Recommends — the user (or `/draft-feature` / their editor) acts.
-- **Does not re-run the loop.** That's `python3
-  .specfuse/scripts/loop.py`; the skill names it in the recommended
-  action when relevant.
+- **Does not re-run the loop.** That's `specfuse run`; the skill names it
+  in the recommended action when relevant.
 - **Does not diagnose codebase bugs.** It reads what the agent and
   the verify-output said and quotes them; it doesn't go investigate
   whether the bug the agent named is actually a bug.

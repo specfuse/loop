@@ -99,7 +99,7 @@ For each `active` and `done` feature, build a one-paragraph report. Run the
 predicate read-only via:
 
 ```bash
-python3 .specfuse/scripts/gate_eval.py backtest <feature_id>
+python3 -m specfuse.loop.gate_eval backtest <feature_id>
 ```
 
 Capture the per-gate auto verdict (`auto: True/False`, `reasons: [...]`). If

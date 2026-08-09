@@ -45,6 +45,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "rules/security-boundaries.md",
     "rules/verification-discipline.md",
     "rules/operator-escalation.md",
+    "rules/human-output.md",
     "schemas/event.schema.json",
     "schemas/driver-event.schema.json",
     "schemas/events/initiative_created.schema.json",
@@ -138,6 +139,7 @@ class TestInitFullLayout(unittest.TestCase):
             "rules/security-boundaries.md",
             "rules/verification-discipline.md",
             "rules/operator-escalation.md",
+            "rules/human-output.md",
         ):
             self.assertTrue((self.sf / rel).exists(), f"{rel} not written")
             self.assertEqual(

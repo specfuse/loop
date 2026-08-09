@@ -336,11 +336,10 @@ When the user has accepted the structure:
   requires. A row without a detail section forces the driver to synthesize a
   stub at archive time (it no longer halts, since FEAT-2026-0022, but the stub
   carries no real record). Write the real section now.
-- Run `python3 .specfuse/scripts/lint_plan.py
-  .specfuse/features/<new-folder>`. Report PASS or the errors. If it
+- Run `specfuse lint .specfuse/features/<new-folder>`. Report PASS or the errors. If it
   fails, point at the `/feature-conversion` skill to walk the diff
   before the user re-runs.
-- Optionally run `python3 .specfuse/scripts/loop.py --dry-run` to
+- Optionally run `specfuse run --dry-run` to
   confirm the loop loads the feature cleanly.
 
 End with the RESULT block defined in

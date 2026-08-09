@@ -45,7 +45,7 @@ WUs and stop" mode.
 
 ## When to invoke
 
-When `python3 .specfuse/scripts/loop.py` printed:
+When `specfuse run` printed:
 
 ```
 Gate N halted: M work unit(s) need human attention.
@@ -237,9 +237,9 @@ After per-WU decisions, look at each gate that had a re-armed WU:
 
 ### 5. Print the resume command
 
-- One active feature: `python3 .specfuse/scripts/loop.py`
-- Multiple active features: `python3 .specfuse/scripts/loop.py
-  --feature FEAT-YYYY-NNNN-<slug>` (name the chosen feature).
+- One active feature: `specfuse run`
+- Multiple active features: `specfuse run --feature FEAT-YYYY-NNNN-<slug>`
+  (name the chosen feature).
 
 Mention: `--dry-run` confirms the ready-set before dispatch.
 

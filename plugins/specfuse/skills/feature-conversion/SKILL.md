@@ -44,7 +44,7 @@ suspect has drifted, even without running `--upgrade` — the skill's
 discovery surface is `lint_plan.py`'s output, which you can read any
 time with:
 
-    python .specfuse/scripts/lint_plan.py .specfuse/features/<feature-folder>
+    specfuse lint .specfuse/features/<feature-folder>
 
 ## Method
 
@@ -63,9 +63,9 @@ Before reading the failing feature, ground in the current scaffold:
 
 ### 2. Run the linter, capture every error verbatim
 
-    python .specfuse/scripts/lint_plan.py <feature-folder>
+    specfuse lint <feature-folder>
 
-`lint_plan.py` is the source of truth for what passes. **Every proposed
+`specfuse lint` is the source of truth for what passes. **Every proposed
 edit must trace to a specific error in this output**, named by the
 linter. Do not propose edits the linter is silent about — adding fields
 the templates document but the linter doesn't require is a quiet way to
@@ -128,7 +128,7 @@ the edit should look like. Then propose-and-confirm normally.
 
 Once the user has accepted (or skipped) every proposal:
 
-  - Re-run `python .specfuse/scripts/lint_plan.py <feature-folder>`.
+  - Re-run `specfuse lint <feature-folder>`.
   - Report the new state: either "PASS" or the remaining errors.
   - For remaining errors (skipped or unresolved), report them so the
     user knows the feature still needs attention.

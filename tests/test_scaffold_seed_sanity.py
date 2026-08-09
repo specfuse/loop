@@ -44,6 +44,65 @@ class TestVerificationSeed(unittest.TestCase):
                       "the plan-next lint gate should call `specfuse lint`")
 
 
+class TestSkillsNameRunnableCommands(unittest.TestCase):
+    """A skill must not tell the user to run a path that does not exist.
+
+    `.specfuse/scripts/` is a dogfood shim directory in THIS repo's checkout;
+    `init_specfuse` never writes it, so in a scaffolded project the path is
+    absent. Skills nevertheless printed `python3 .specfuse/scripts/loop.py` as
+    the next command — the same defect `test_gate_commands_reference_no_missing_scripts`
+    already guards for `verification.yml`, on a surface that guard never
+    covered. Every command a skill hands the user must be one they can paste:
+    a `specfuse` subcommand, or `python3 -m specfuse.loop.<module>` for the
+    helpers that have no console script.
+
+    Checked on both copies — the vendored one is what a scaffolded project
+    actually reads.
+    """
+
+    _SKILL_DIRS = (
+        REPO_ROOT / "plugins" / "specfuse" / "skills",
+        REPO_ROOT / ".specfuse" / "skills",
+    )
+    _FORBIDDEN = re.compile(r"\.specfuse/scripts/[A-Za-z_-]+\.py")
+
+    # Known-unpackaged helpers, exempted deliberately and visibly rather than
+    # by loosening the pattern. `learnings_query.py` and `upgrade_merge_gate.py`
+    # exist ONLY as repo-local dogfood scripts: no console script, no module
+    # under `specfuse/loop/`, and `init_specfuse` does not seed them. So the
+    # skills naming them are broken for a scaffolded project exactly as the
+    # `loop.py` references were — but unlike those, there is no packaged
+    # command to point at yet, and inventing one is a public-API decision, not
+    # a docs fix. Tracked in #1076; delete an entry here when its helper ships.
+    _KNOWN_UNPACKAGED = ("learnings_query.py", "upgrade_merge_gate.py")
+
+    def test_skill_dirs_resolve(self):
+        """Vacuity guard: a moved skills tree would otherwise assert nothing."""
+        for d in self._SKILL_DIRS:
+            with self.subTest(path=str(d)):
+                self.assertTrue(d.is_dir(), f"{d} is not a directory")
+                self.assertTrue(any(d.glob("*/SKILL.md")), f"no SKILL.md under {d}")
+
+    def test_no_skill_references_a_scripts_path(self):
+        offenders: list[str] = []
+        for d in self._SKILL_DIRS:
+            for skill in sorted(d.glob("*/SKILL.md")):
+                for lineno, line in enumerate(
+                    skill.read_text(encoding="utf-8").splitlines(), start=1
+                ):
+                    hit = self._FORBIDDEN.search(line)
+                    if hit and not hit.group(0).endswith(self._KNOWN_UNPACKAGED):
+                        rel = skill.relative_to(REPO_ROOT)
+                        offenders.append(f"{rel}:{lineno}: {line.strip()}")
+        self.assertEqual(
+            offenders, [],
+            "skills reference `.specfuse/scripts/*.py`, which is absent in a "
+            "scaffolded project; use a `specfuse` subcommand or "
+            "`python3 -m specfuse.loop.<module>`. Offenders:\n  "
+            + "\n  ".join(offenders),
+        )
+
+
 class TestRoadmapSeed(unittest.TestCase):
 
     def _table_header(self) -> str:

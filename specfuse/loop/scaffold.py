@@ -231,6 +231,7 @@ _RULES_BLOCK = (
     "@.specfuse/rules/security-boundaries.md\n"
     "@.specfuse/rules/verification-discipline.md\n"
     "@.specfuse/rules/operator-escalation.md\n"
+    "@.specfuse/rules/human-output.md\n"
     "<!-- Project-authored rules live in .specfuse/rules-local/ (never touched\n"
     "     by `specfuse upgrade`). Add one @.specfuse/rules-local/<rule>.md line\n"
     "     per rule below. See .specfuse/rules-local/README.md. -->\n"
@@ -290,6 +291,44 @@ def _write_changelog(target_path: Path) -> None:
     changelog.write_bytes(read_scaffold("CHANGELOG.seed.md"))
 
 
+def _rule_import_lines() -> list[str]:
+    """The `@.specfuse/rules/<rule>.md` lines `_RULES_BLOCK` declares, in order."""
+    return [
+        ln for ln in _RULES_BLOCK.splitlines()
+        if ln.startswith("@.specfuse/rules/")
+    ]
+
+
+def _backfill_rule_imports(existing: str) -> str:
+    """Add rule imports the scaffold has gained since this file was written.
+
+    A project wired before a rule existed keeps the sentinel, so the early
+    return below leaves it on the old set — the new rule ships into
+    `.specfuse/rules/` and is never loaded, which is the one failure mode a
+    binding rule cannot survive. Insert only what is missing, directly after
+    the last rule import already present, so the block stays contiguous and
+    anything the project added below it (rules-local imports, its own prose)
+    keeps its position. Idempotent: a file already carrying every line is
+    returned unchanged.
+    """
+    lines = existing.splitlines(keepends=True)
+    present = {ln.strip() for ln in lines}
+    missing = [ln for ln in _rule_import_lines() if ln not in present]
+    if not missing:
+        return existing
+
+    last = max(
+        (i for i, ln in enumerate(lines) if ln.strip().startswith("@.specfuse/rules/")),
+        default=None,
+    )
+    if last is None:  # sentinel matched inside prose, not as an import line
+        return existing
+    if not lines[last].endswith("\n"):
+        lines[last] += "\n"
+    lines[last + 1:last + 1] = [ln + "\n" for ln in missing]
+    return "".join(lines)
+
+
 def _write_claude_md(target_path: Path) -> None:
     claude_dir = target_path / ".claude"
     claude_dir.mkdir(parents=True, exist_ok=True)
@@ -297,6 +336,9 @@ def _write_claude_md(target_path: Path) -> None:
     if claude_md.exists():
         existing = claude_md.read_text(encoding="utf-8")
         if _RULES_SENTINEL in existing:
+            updated = _backfill_rule_imports(existing)
+            if updated != existing:
+                claude_md.write_text(updated, encoding="utf-8")
             return
         if not existing.endswith("\n"):
             existing += "\n"
