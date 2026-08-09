@@ -12,6 +12,34 @@ or any skill that asks before writing.
 The audience is someone **deciding**, not someone executing. They may not have
 been following. Lead with the shape of the problem; put the evidence after.
 
+Language and length are governed by [`human-output.md`](human-output.md); this
+rule governs what an escalation must *contain*.
+
+## How much to write
+
+The six parts below are the required **content**, not a required length. Deliver
+them as a decision brief a reader can act on without scrolling:
+
+- **Always in full:** what this is about (2), what decision is needed (3), the
+  options named with their one-line trade-off (5), and the recommendation (6).
+- **One line each, expanded on request:** the state so far (1) and why it did not
+  close automatically (4). One sentence each is usually enough to make the
+  decision; the cost table, the guard name, and the attempt history are evidence.
+- **Held back until asked:** per-work-unit narration, event excerpts, full cost
+  reconciliation, artifact paths beyond the one or two worth opening.
+
+Close with a single line naming what you are holding, so the reader knows the
+depth exists and can ask for exactly the part they want:
+
+```
+More on request: the attempt history, the full cost breakdown, the retrospective.
+```
+
+Compressing is not the same as omitting. Every part still has to be *answered* —
+a decision brief that drops the trade-offs or the recommendation has not become
+concise, it has become useless. When a part genuinely has nothing to report, say
+so in that line rather than dropping it silently.
+
 ## The six parts, in this order
 
 1. **What has been done so far.** The state, not the narrative. What landed, what
@@ -37,7 +65,10 @@ the decision is not the whole question. The operator also needs to know whether
 the work *achieved what it was funded to achieve*, and that is a separate
 question from whether the tasks passed.
 
-Lead with this briefing. The six parts follow inside part 6.
+Lead with this briefing. The six parts follow inside part 6. Points 1–5 are a
+paragraph at most each — the operator is reading to judge whether the spend
+bought what it was meant to buy, and that judgement rarely needs more. The same
+"more on request" line closes the briefing.
 
 1. **Why we picked this.** The business problem, in the terms that justified the
    spend — the cost, the risk, the recurring pain. Take it from the roadmap

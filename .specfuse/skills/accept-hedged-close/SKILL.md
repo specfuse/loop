@@ -54,8 +54,8 @@ close WU's hedged-verdict follow-up record, that shipping now with the
 follow-ups carried forward (not discharged) is the right call.
 
 If the verdict is already `met`: stop. Nothing to accept — the flips should
-already have fired, or run `python3 .specfuse/scripts/loop.py --recheck-verdict
-FEATURE_ID` directly; this skill has no role.
+already have fired, or run `specfuse run --recheck-verdict FEATURE_ID`
+directly; this skill has no role.
 
 ## Method
 
@@ -251,7 +251,7 @@ only by what runs next.
 Then run:
 
 ```
-python3 .specfuse/scripts/loop.py --recheck-verdict FEATURE_ID
+specfuse run --recheck-verdict FEATURE_ID
 ```
 
 This is `specfuse/loop/loop.py`'s `recheck_terminal_verdict` entry point

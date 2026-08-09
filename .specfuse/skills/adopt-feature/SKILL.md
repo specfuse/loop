@@ -62,7 +62,7 @@ Only proceed to step 3 on explicit user override.
 
 ### 3. Enumerate candidates
 
-Call `list_features('<repo>')` from `.specfuse/scripts/gh_features.py`
+Call `list_features('<repo>')` from `specfuse.loop.gh_features`
 programmatically (preferred — returns the full candidate dict including `title`,
 `initiative`, `number`, and `body`):
 
@@ -75,7 +75,7 @@ candidates = list_features('<repo>')
 Alternatively run:
 
 ```
-python3 .specfuse/scripts/gh_features.py <repo>
+python3 -m specfuse.loop.gh_features <repo>
 ```
 
 Issues whose titles lack a parseable `[<id>]` tag are skipped by the script with a
@@ -113,7 +113,7 @@ picked candidate's GitHub issue `number` for step 6.
 Run:
 
 ```
-python3 .specfuse/scripts/adopt_feature.py <repo> <issue-number>
+python3 -m specfuse.loop.adopt_feature <repo> <issue-number>
 ```
 
 where `<issue-number>` is the GitHub issue `number` from the picked candidate row
@@ -127,7 +127,7 @@ print stderr verbatim and stop without further writes.
 
 ```
 Run /draft-feature on the new folder to refine gate 1, or
-python3 .specfuse/scripts/loop.py --feature <folder> to dispatch as-seeded.
+specfuse run --feature <folder> to dispatch as-seeded.
 ```
 
 where `<folder>` is the path printed in step 6.

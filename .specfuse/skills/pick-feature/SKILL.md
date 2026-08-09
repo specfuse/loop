@@ -176,10 +176,9 @@ When the user picks a candidate by number (or by ID):
 - **Print the next command:**
   - If no feature folder exists for the pick: `Run /draft-feature
     to author the feature folder.`
-  - If a folder exists with gate 1's WUs detailed: `Run python3
-    .specfuse/scripts/lint_plan.py .specfuse/features/<folder> &&
-    python3 .specfuse/scripts/loop.py --dry-run to verify, then
-    python3 .specfuse/scripts/loop.py to start dispatching.`
+  - If a folder exists with gate 1's WUs detailed: `Run specfuse run to
+    start dispatching.` (Mention `specfuse lint .specfuse/features/<folder>`
+    and `specfuse run --dry-run` only if the user asks how to check first.)
   - If a folder exists but gate 1 isn't detailed: `Run /draft-feature
     to fill in gate 1's WUs.`
 - **If another feature is `active`,** the skill flipped the pick to

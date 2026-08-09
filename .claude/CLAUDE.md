@@ -11,3 +11,4 @@ discovery picks them up.
 @.specfuse/rules/security-boundaries.md
 @.specfuse/rules/verification-discipline.md
 @.specfuse/rules/operator-escalation.md
+@.specfuse/rules/human-output.md

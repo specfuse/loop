@@ -43,7 +43,7 @@ degraded "list drafts and stop" mode.
 
 ## When to invoke
 
-When `./scripts/smoke-test.sh` or `python3 .specfuse/scripts/loop.py`
+When `./scripts/smoke-test.sh` or `specfuse run`
 just printed that a gate is complete and the next gate has been drafted,
 or any time a gate file sits at `status: awaiting_review` and the next
 gate has drafts pending review.
@@ -141,9 +141,9 @@ passed. Tell the user which drafts remain and stop.
 
 Tell the user the exact command to resume:
 
-- One active feature: `python3 .specfuse/scripts/loop.py`
-- Multiple active features: `python3 .specfuse/scripts/loop.py
-  --feature FEAT-YYYY-NNNN-<slug>` (name the chosen feature).
+- One active feature: `specfuse run`
+- Multiple active features: `specfuse run --feature FEAT-YYYY-NNNN-<slug>`
+  (name the chosen feature).
 
 Mention: if you want to confirm before dispatching, run with
 `--dry-run` first.

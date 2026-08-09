@@ -143,6 +143,36 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         self.assertIn("@.specfuse/rules/result-contract.md", text)
 
     def test_existing_claude_md_no_duplicate_when_sentinel_present(self):
+        """The sentinel suppresses re-appending the block, not the backfill.
+
+        A project whose CLAUDE.md predates a rule must still gain that rule's
+        import — otherwise the scaffold ships a binding rule the project never
+        loads. So the guarantee here is *no duplication and no clobbering*:
+        the user's own content survives, the block is not appended a second
+        time, and every import appears exactly once.
+        """
+        from specfuse.loop.scaffold import _RULES_BLOCK, wire_claude
+
+        claude_dir = self.target / ".claude"
+        claude_dir.mkdir(parents=True)
+        claude_md = claude_dir / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project\n@.specfuse/rules/result-contract.md\n", encoding="utf-8"
+        )
+        wire_claude(self.target)
+        after = claude_md.read_text(encoding="utf-8")
+
+        self.assertIn("# Project", after)
+        self.assertNotIn(
+            "## Specfuse binding rules", after,
+            "the block header was appended even though the sentinel was present",
+        )
+        for line in _RULES_BLOCK.splitlines():
+            if line.startswith("@.specfuse/rules/"):
+                with self.subTest(rule=line):
+                    self.assertEqual(after.count(line), 1)
+
+    def test_existing_claude_md_wiring_is_idempotent(self):
         from specfuse.loop.scaffold import wire_claude
 
         claude_dir = self.target / ".claude"
@@ -151,10 +181,10 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         claude_md.write_text(
             "# Project\n@.specfuse/rules/result-contract.md\n", encoding="utf-8"
         )
-        original = claude_md.read_text(encoding="utf-8")
         wire_claude(self.target)
-        after = claude_md.read_text(encoding="utf-8")
-        self.assertEqual(original, after)
+        once = claude_md.read_text(encoding="utf-8")
+        wire_claude(self.target)
+        self.assertEqual(once, claude_md.read_text(encoding="utf-8"))
 
     def test_existing_settings_json_user_keys_preserved(self):
         from specfuse.loop.scaffold import wire_claude
