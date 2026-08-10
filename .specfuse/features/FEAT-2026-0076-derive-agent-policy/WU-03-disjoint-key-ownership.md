@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0076/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - plugins/specfuse/skills/groom-backlog/SKILL.md
   - tests/test_agent_policy_key_ownership.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T15:15:15.068244+00:00
+duration_seconds: 1187.617
+cost_usd: 2.544881
+input_tokens: 100
+output_tokens: 25203
 ---
 
 # Write the disjoint-key boundary into both skills

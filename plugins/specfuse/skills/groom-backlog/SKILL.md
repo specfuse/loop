@@ -144,6 +144,13 @@ channel was available.
 - **Writes only one file.** The only file this skill ever writes is
   `.specfuse/agent-policy.yml`, and only its `queue:` key — `rules:`,
   `budgets:`, and `escalation:` are read but never rewritten by this skill.
+- **Key ownership is disjoint: one writer per key block, not per file.**
+  This skill owns `queue` in `.specfuse/agent-policy.yml`. It must never
+  write `rules`, `budgets`, or `escalation` — those key blocks belong to
+  `derive-agent-policy` alone. (The older phrasing, "one writer per config
+  file," no longer holds: this skill and `derive-agent-policy` both write
+  `.specfuse/agent-policy.yml`, so the invariant that stays true is per key
+  block, not per file.)
 - **Does not compute a score.** The queue is an operator-authored order, not
   a ranking formula's output — a scoring formula is FEAT-2026-0011's and is
   blocked on ADR-0002. If grooming a queue seems to require a computed score

@@ -108,9 +108,14 @@ from a guess.** No silent invention.
   around it). A non-empty finding list means the draft is wrong, not the
   validator — the validator is gate 1's shipped oracle, never loosened to fit
   a draft.
-- **`queue:` is out of scope entirely.** `/groom-backlog` owns the feature
-  queue; this skill never reads or proposes it. If asked to touch `queue:`,
-  say so and stop rather than reaching into `/groom-backlog`'s surface.
+- **Key ownership is disjoint: one writer per key block, not per file.**
+  This skill owns `rules`, `budgets`, and `escalation` in
+  `.specfuse/agent-policy.yml`. It must never write `queue` — that key
+  belongs to `/groom-backlog` alone. (The older phrasing, "one writer per
+  config file," no longer holds: `/groom-backlog` and this skill both write
+  `.specfuse/agent-policy.yml`, so the invariant that stays true is per key
+  block, not per file.) If asked to touch `queue:`, say so and stop rather
+  than reaching into `/groom-backlog`'s surface.
 
 ## The method (in strict order)
 
@@ -299,7 +304,8 @@ dial — that text comes from them.
   authoring aid; the operator merges the accepted draft themselves, one block
   at a time.
 - It does not compute or propose `queue:` — that is `/groom-backlog`'s surface
-  entirely; this skill never reads or writes it.
+  entirely; this skill never reads or writes it. It owns `rules`, `budgets`,
+  and `escalation`; `queue` is the one key block it must never write.
 - It does not re-implement `propose_policy_defaults`'s heuristics. It calls the
   function once and reads its `{value, evidence}` output.
 - It does not extend `.specfuse/agent-policy.yml`'s schema. If drafting reveals
