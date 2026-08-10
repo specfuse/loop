@@ -173,6 +173,62 @@ DISPATCHABLE = {"pending", "ready"}
 DONE = "done"
 
 
+def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
+    """The operator-facing message for a terminal gate whose PLAN.md is not `done`.
+
+    Three states look identical from `PLAN.md` alone, and reporting them the same
+    way is #1416:
+
+    - **the verdict permits the flips** but they did not fire — a genuine defect,
+      and what the original message was written for.
+    - **the verdict is a recognised hedge** (`met_locally` / `partially_met`) —
+      the flips were withheld *because* the close said so. That is the
+      verdict-coupling rule working, and telling the operator to hand-flip
+      `PLAN.md` is advice to violate the contract `fire_terminal_flips` just
+      enforced.
+    - **no usable verdict** — absent, empty, `not_met`, or unrecognised. NOT a
+      deliberate hedge: a close that recorded no verdict did not finish its job,
+      and softening that into the reassuring message would hide it.
+
+    Both the flip predicate and the hedged set are imported rather than
+    re-derived, so this message can never disagree with the gate that produced
+    the state it describes.
+    """
+    header = (
+        f"\nGate {gate_number} complete (retro, lessons, docs, plan-next); "
+    )
+    if verdict_permits_terminal_flips(verdict):
+        return (
+            header + "terminal gate but PLAN.md not yet `done`.\n"
+            "Inconsistency: the close recorded a verdict that permits the "
+            "terminal flips, but PLAN.md is not `done`. Inspect "
+            "RETROSPECTIVE.md / events.jsonl. Likely fix: manually flip PLAN.md "
+            "`status: active -> done`, then `/wrap-feature`."
+        )
+    if verdict in HEDGED_VERDICT_VALUES:
+        return (
+            header + "terminal gate, PLAN.md deliberately left `active`.\n"
+            f"The close recorded verdict `{verdict}`, which does not permit the "
+            "terminal flips, so the gate, the roadmap row and PLAN.md were all "
+            "left un-flipped on purpose. This is the verdict-coupling rule "
+            "working, not a defect — do NOT hand-flip PLAN.md.\n"
+            f"Next: read the `## {HEDGED_RECORD_HEADING}` in RETROSPECTIVE.md "
+            "for what is unmet and what would upgrade it, then either discharge "
+            "those follow-ups or accept the hedge deliberately with "
+            "`/accept-hedged-close`, which records your reason and fires the "
+            "flips through their one owner."
+        )
+    shown = verdict if verdict else "none recorded"
+    return (
+        header + "terminal gate but PLAN.md not yet `done`.\n"
+        f"Inconsistency: the close recorded verdict `{shown}`, which is neither "
+        "a pass nor a recognised hedge, so the terminal flips were withheld and "
+        "there is no follow-up record to accept. A close that records no usable "
+        "verdict has not finished its job. Inspect RETROSPECTIVE.md / "
+        "events.jsonl before flipping anything by hand."
+    )
+
+
 def verdict_permits_terminal_flips(verdict: str | None) -> bool:
     """Return True iff verdict == 'met'; False for every other value including None."""
     return verdict == "met"
@@ -7129,14 +7185,19 @@ def run(
                 "git push, gh pr create."
             )
         elif is_terminal_gate:
-            print(f"\nGate {gate.number} complete (retro, lessons, docs, "
-                  f"plan-next); terminal gate but PLAN.md not yet `done`.")
-            print(
-                "Inconsistency: terminal gate closed without close ceremony "
-                "flipping PLAN.md to `done`. Inspect RETROSPECTIVE.md / "
-                "events.jsonl. Likely fix: manually flip PLAN.md `status: "
-                "active -> done`, then `/wrap-feature`."
-            )
+            # Verdict-aware (#1416): a hedged verdict means the flips were
+            # withheld deliberately, and the old message told the operator to
+            # undo that by hand.
+            close_verdict = None
+            for ref in gate.refs:
+                ref_file = feature_dir / ref["file"]
+                if not ref_file.is_file():
+                    continue
+                ref_fm, _ = read_frontmatter(ref_file)
+                if ref_fm.get("type") == "close":
+                    close_verdict = ref_fm.get("verdict") or None
+                    break
+            print(terminal_gate_message(gate.number, close_verdict))
         else:
             print(f"\nGate {gate.number} complete (retro, lessons, docs, "
                   f"plan-next).")
