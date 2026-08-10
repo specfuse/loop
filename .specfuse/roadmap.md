@@ -90,6 +90,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 | FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
 | FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | active | — | [→ detail](#feat-2026-0076) |
+| FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -910,6 +911,39 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 **Benefits.** The file's premise becomes true — the agent stops guessing intent because the operator was actually asked. Closes the compounding gap that issues #1417, #1418 and the FEAT-2026-0047 acceptance all point at. And it completes the derive-* trio, so a project bootstrapping Specfuse has one interview per config surface, each with a single writer.
 
 **Status: active.**
+
+<a id="feat-2026-0077"></a>
+## FEAT-2026-0077 — Provenance-recorded policy values: know who chose a value, not just what it is
+
+**Why.** [FEAT-2026-0076](#feat-2026-0076)'s review mode has to answer "did anyone actually
+choose this value, or is it the shipped default nobody looked at?" It answers by **comparing
+against the shipped baseline**, which is cheap, needs no schema change, and is deliberately
+lossy in one direction: an operator who *deliberately* chooses a value equal to the shipped
+one is indistinguishable from one who never chose. That was the right trade at the time and
+the reason is recorded honestly in that feature's `GATE-02-REVIEW.md` — but the reasoning
+carries its own expiry, stated there as the strongest argument against itself: gate 1 found
+this repository's file had *no operator intent in it to protect yet*, so comparison was
+chosen partly because the hard case did not exist in the sample rather than because it
+handles it. On a repository where someone has genuinely tuned their budgets, the lossy
+direction stops being harmless.
+
+**Goal.** Record provenance when a policy value is written, so review can distinguish
+"operator chose this" from "this is the shipped default" without inference. The shape is a
+schema change to `.specfuse/agent-policy.yml` — deliberately out of FEAT-2026-0076's scope
+boundary, which is why this is a separate feature rather than a widening of that one. It
+must also answer what happens to files written before provenance existed, since every
+consumer project's file is one: an absent provenance record has to degrade to the
+comparison heuristic rather than to a wrong answer.
+
+**Benefits.** Review stops hedging on the one question it exists to answer. The caveat
+FEAT-2026-0076 attaches to every baseline-match ("this may never have been decided") becomes
+unnecessary where a provenance record exists. And the ordering is deliberate — a cheap
+mechanism shipped first and replaced by the accurate one costs a migration; the reverse
+ordering costs a schema migration before anyone knows whether the precision is worth it.
+
+**Status: planned.** Filed at FEAT-2026-0076's gate-2 arming review by operator decision
+(open question 2). Not urgent: it becomes worth building when a real repository's policy file
+carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 ## Notes
 

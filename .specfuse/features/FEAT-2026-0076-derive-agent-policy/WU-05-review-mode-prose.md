@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0076/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.50
 oracle_env: macos_local
@@ -89,18 +89,28 @@ Binding rules apply by reference: `result-contract.md`, `never-touch.md`,
    a claim**, in words a test can find, and states the asymmetry: differing from
    the baseline reliably means someone chose it; matching it does not reliably
    mean nobody did.
-6. The prose keeps review mode's corrections on the same **staged per-block
+6. **The readout distinguishes a measured proposal from a converted one**, using
+   T04's per-key classification, and names the assumption behind a converted one
+   at the point the operator reads the number — not only in a source comment.
+   `rules.bugs.test_paths` is the only measured value of the four. A test asserts
+   the prose carries the distinction and does not present all four alike.
+
+   Operator decision at the gate-2 arming review. The point is narrow: the
+   operator should be able to disagree with the *assumption* separately from the
+   *number*, and cannot if the readout renders both kinds identically.
+
+7. The prose keeps review mode's corrections on the same **staged per-block
    accept** contract gate 1 established — `rules`, then `budgets`, then
    `escalation`, three separate accept/edit/reject decisions, never one blanket
    yes. A test asserts the review-mode section names all three blocks.
-7. `PROMPT.md` gains the matching review-mode instructions, so an operator who
+8. `PROMPT.md` gains the matching review-mode instructions, so an operator who
    pipes the prompt gets the review half and not only the bootstrap half. A test
    asserts `PROMPT.md` names `review_agent_policy`.
-8. `python3 -m unittest tests.test_derive_agent_policy_review_mode tests.test_derive_agent_policy_skill tests.test_skills_vendored_in_sync tests.test_skill_discovery_links -v`
+9. `python3 -m unittest tests.test_derive_agent_policy_review_mode tests.test_derive_agent_policy_skill tests.test_skills_vendored_in_sync tests.test_skill_discovery_links -v`
    exits zero after this WU's edits — `test_derive_agent_policy_skill` must pass
    **unmodified**, which is the proof this WU added the review half without
    breaking the bootstrap half's contract.
-9. `scripts/sync-scaffold.sh` has been run and both vendored copies
+10. `scripts/sync-scaffold.sh` has been run and both vendored copies
    (`SKILL.md`, `PROMPT.md`) are byte-identical to their canonical originals.
 
 **Do not touch.** `specfuse/loop/policy_review.py` and

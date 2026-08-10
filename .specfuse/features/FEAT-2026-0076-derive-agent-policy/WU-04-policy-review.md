@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0076/T04
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.50
 oracle_env: macos_local
@@ -92,27 +92,40 @@ Binding rules apply by reference: `result-contract.md`, `never-touch.md`,
    the baseline is indistinguishable from a value never chosen. A test asserts
    the caveat is present on that class and absent on the differs-from class, so
    a downstream reader cannot pick up the hint without the disclaimer attached.
-6. A test asserts the three absences are distinguishable from one another: a key
+6. **Each entry records how its proposal was obtained** — one of `measured`
+   (read directly from repo state) or `converted` (computed through a disclosed
+   assumption). Of the four in-scope keys, `rules.bugs.test_paths` is the only
+   `measured` one; `max_tokens_per_run` converts cost at an assumed tokens-per-
+   dollar rate, and `max_items_per_day` applies a volume heuristic to a total
+   with no per-day breakdown behind it. A test asserts the classification per
+   key, and asserts a `converted` entry carries the assumption in its evidence.
+
+   Operator decision at the gate-2 arming review: a converted proposal must not
+   be presented as though it were measured. A 2.3x delta resting on an assumed
+   rate invites a correction the evidence does not actually support, and the
+   distinction has to live in the returned data or T05's readout cannot show it.
+
+7. A test asserts the three absences are distinguishable from one another: a key
    absent from the policy file, a key present in the file for which
    `propose_policy_defaults` returns no proposal, and a key whose baseline is
    unreadable each produce a **different** observable result — no two collapse
    to the same value.
-7. When `.specfuse/agent-policy.yml.example` is absent or unparseable, every key
+8. When `.specfuse/agent-policy.yml.example` is absent or unparseable, every key
    whose baseline would have come from it is classified baseline-unavailable
    rather than compared against a guess, and a test constructs that fixture
    directly.
-8. `review_agent_policy` never reads, returns, or reports the `queue` key, and a
+9. `review_agent_policy` never reads, returns, or reports the `queue` key, and a
    test asserts `queue` appears nowhere in the returned structure even when the
    fixture policy file carries a populated `queue:`.
-9. The function returns a **per-key readout only** — it never returns or writes a
+10. The function returns a **per-key readout only** — it never returns or writes a
    whole-file document. A test asserts the return value contains no rendering of
    the input file, which is what makes clobbering structurally impossible in the
    reference implementation rather than merely discouraged in prose.
-10. `review_agent_policy` performs **no network call of its own**; `max_open_prs`
+11. `review_agent_policy` performs **no network call of its own**; `max_open_prs`
     evidence reaches it only through the injected `runner`, exactly as
     `propose_policy_defaults` takes it. A test passes a runner that raises and
     asserts the call still returns a readout.
-11. `python3 -m unittest tests.test_policy_review -v` exits zero after this WU's
+12. `python3 -m unittest tests.test_policy_review -v` exits zero after this WU's
     edits, and `python3 -m unittest tests.test_policy_proposals -v` still exits
     zero **unmodified** — this WU composes T01's module and must not change it.
 
