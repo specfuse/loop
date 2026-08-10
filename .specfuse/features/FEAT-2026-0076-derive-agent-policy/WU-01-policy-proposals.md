@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0076/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/policy_proposals.py
   - tests/test_policy_proposals.py
 produces_driver_helper: propose_policy_defaults
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T14:28:34.578334+00:00
+duration_seconds: 825.259
+cost_usd: 1.959089
+input_tokens: 95
+output_tokens: 30438
 ---
 
 # Propose agent-policy values from repository evidence
