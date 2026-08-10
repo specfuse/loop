@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0076/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
@@ -10,6 +10,13 @@ produces:
   - tests/test_policy_review.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T16:09:36.452012+00:00
+duration_seconds: 370.744
+cost_usd: 1.001152
+input_tokens: 846
+output_tokens: 14847
 ---
 
 # Read an existing policy file and classify each value against the shipped baseline
