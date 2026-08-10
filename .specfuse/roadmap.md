@@ -89,6 +89,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 | FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
+| FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | active | — | [→ detail](#feat-2026-0076) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -898,6 +899,17 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 **Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
 
 **Status: planned.**
+
+<a id="feat-2026-0076"></a>
+## FEAT-2026-0076 — Policy-interview skill: derive-agent-policy
+
+**Why.** `.specfuse/agent-policy.yml` shipped with [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) as the operator's declared policy — the file the agent reads *instead of guessing intent*. Every value in it is currently a default an agent chose: `wip_limit`, `gate_review`, the three budgets, `sla_hours`, and since [FEAT-2026-0047](roadmap-archive.md#feat-2026-0047) and issue #1418 also `provider`, `webhook_env`, `silence_hours`, and `test_paths`. `/groom-backlog` covers only the `queue:` key; `/triage-issues` merely reads one dial. Nothing has ever asked the operator for the rest, and the un-interviewed surface grows with each feature that adds a dial. Issue #1418 showed the cost of a wrong value: the bug lane's test-evidence guardrail failed closed and silently, reading as "the dial is on and nothing qualifies" rather than as a misconfiguration.
+
+**Goal.** A `derive-agent-policy` skill, sibling to `derive-verification` and `derive-monitoring` and sharing their posture — evidence first, ask only what the repo cannot answer, draft and never auto-write, staged per-block accepts. It covers the blocks `/groom-backlog` does not: `rules`, `budgets`, `escalation`. Several values are derivable as *proposals* rather than questions — `max_tokens_per_run` and `max_items_per_day` have real history in `events.jsonl`, `max_open_prs` is readable from the repo, and `test_paths` is answered by the directory tree plus `verification.yml`'s gate commands. One constraint is load-bearing: the webhook prompt must collect an environment-variable **name** and never a pasted URL, or it hand-feeds the credential `validate_agent_policy` was built to refuse.
+
+**Benefits.** The file's premise becomes true — the agent stops guessing intent because the operator was actually asked. Closes the compounding gap that issues #1417, #1418 and the FEAT-2026-0047 acceptance all point at. And it completes the derive-* trio, so a project bootstrapping Specfuse has one interview per config surface, each with a single writer.
+
+**Status: active.**
 
 ## Notes
 
