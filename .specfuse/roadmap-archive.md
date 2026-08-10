@@ -43,6 +43,57 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0044"></a>
+## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
+
+**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
+
+**Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
+
+**Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
+
+**Inherited handoff — one dial is already waiting for this file
+(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
+dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
+auto=False)`, reading no configuration of any kind — deliberately, because
+`agent-policy.yml` is this feature's core deliverable and did not exist, and building a
+minimal reader there would have taken this feature's scope and left it shipping against a
+partial schema someone else authored. **This feature must wire its policy file to that
+parameter.** The parameter exists, is tested at both settings, and its semantics are
+fixed: under `auto=True` a decision whose confidence is not `high` is recorded as the
+`question` category and routed to `needs-human`, **still marked**, never skipped. Supply
+the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
+`autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
+`monitoring.yml`, and inbound issues are not components. See that feature's
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
+
+**What shipped (gate 1, four work units).** `.specfuse/agent-policy.yml` and its
+example, with a structural validator
+`specfuse.loop.agent_policy.validate_agent_policy(path=None) -> list[str]` and a
+new `agent-policy-example-lint` CI gate that runs it against both the example
+and this repo's live policy file. A reader API — `load_policy(path=None) -> dict`,
+which raises rather than returning defaults when the file is absent, and
+`resolve_triage_auto(path=None) -> bool`. A new public
+`lint_roadmap.roadmap_statuses(repo_root=None) -> dict` behind the queue check.
+The `/triage-issues` skill now obtains `apply_triage`'s `auto` argument from
+`rules.triage.auto` instead of prompting the operator each run; the default is
+unchanged (`False` when the file or the key is absent). And `/groom-backlog`,
+a propose-and-confirm skill that writes only `.specfuse/agent-policy.yml`, only
+on explicit accept, with no `--auto` mode.
+
+**Queue-drift severity, as delivered.** The three-way split matters to anyone
+adopting the gate, and it is not the two-way rule the Goal paragraph above
+originally sketched. A queue entry naming a FEAT-ID with **no row in
+`roadmap.md`** is an `ERROR: ` and fails the gate — unresolvable without a
+human. An entry whose feature has gone **`done` or `abandoned`** is a `WARN: `
+that prints and does **not** fail — normal backlog evolution, which
+`/groom-backlog` proposes cleaning up. `planned`, `active`, `blocked` and
+`deferred` are all silent; `deferred` is included deliberately, as a legitimate
+parked slot in the status legend. A uniformly fatal check would turn the gate
+red on a correct tree the first time any queued feature completed.
+
+**Status: done.**
+
 <a id="feat-2026-0045"></a>
 ## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
 
