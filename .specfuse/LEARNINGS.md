@@ -3606,3 +3606,87 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   than only in the prose, where it is read once. (c) The guard is doing its job: the
   alternative to a failed attempt here is a WU reporting `done` on a path that does not
   exist, which is strictly worse and much harder to find later.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test] **When "produce
+  nothing" is a designed first-class outcome, at least one test must distinguish
+  absence-because-there-was-no-evidence from absence-because-the-lookup-failed.** A test
+  that only asserts a key is missing passes identically for both, and the second is a
+  defect wearing the first's clothes. Worked example: a proposer whose whole premise is
+  "propose only what the repository can answer, never a guess" resolved its input path
+  after building a scratch directory from it, so for any relative root the evidence walk
+  found nothing and every budget proposal was silently withheld — reported as "this
+  repository has no history" when the truth was "the code could not see the history."
+  Twelve acceptance criteria passed. Rule: pair every absence assertion with a presence
+  assertion over the SAME code path differing only in the data (same path shape, history
+  vs no history), so the test fails when the mechanism breaks rather than only when the
+  policy changes. The general form: an assertion that something is missing is only
+  evidence when you have separately shown the same call CAN find it.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/fixtures-that-share-an-incidental-property]
+  **A fixture set that unanimously shares a property nobody chose cannot fail on that
+  property — enumerate what your fixtures have in common before trusting their green.**
+  Every fixture in the case above built its repository under `tempfile.TemporaryDirectory()`
+  and passed the resulting ABSOLUTE path in; not one exercised a relative path, a `./`, or
+  a `../`, because absolute-tempdir is what the idiom hands you, not a decision anyone
+  made. The defect lived exactly in the gap. Rules. (a) At authoring time, list the
+  properties every fixture shares (path shape, encoding, ordering, size, clock) and ask
+  which of them the code under test actually reads — those are your missing cases. (b)
+  Argument-shape variation is cheap and belongs beside data variation: if a parameter
+  accepts `str | Path | None`, absolute and relative, at least one fixture should be each.
+  (c) A hygiene WU that fixes this costs a fraction of a rewrite — here $0.77, 11% of the
+  gate's implementation spend — but only if review catches it before the next WU builds
+  prose on top of the wrong behaviour.
+
+- [FEAT-2026-0076/G2-CLOSE/a-precedence-computed-summary-field-collapses-combinations]
+  **A single summary field computed by precedence over N conditions cannot distinguish the
+  cases where two of those conditions hold at once — so a criterion demanding "these
+  outcomes must be distinguishable" is met by the whole returned entry, never by the
+  summary field alone.** Worked example: a review function classified each key as
+  `matches_baseline` / `differs_from_baseline` / `absent_from_file` /
+  `baseline_unavailable`, checking baseline-availability first. A key that was *both*
+  absent from the file *and* had an unreadable baseline reported `baseline_unavailable`,
+  identical to a key that was present with an unreadable baseline; the two are only
+  separable by reading the entry's `current.present` field. Every test passed, because
+  each test constructed one condition at a time. Rules. (a) When a design says "N
+  distinguishable states", enumerate the 2^N *combinations* and ask which ones the
+  ranking silently merges — the ones the fixtures never build together are the ones
+  nobody checked. (b) Publish the precedence in the consumer-visible contract, since a
+  downstream renderer showing only the summary field will collapse what the data kept
+  apart. (c) This is the combination-shaped sibling of
+  `[FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test]`: that one is
+  about one absence with two causes, this one about two absences with one label.
+
+- [FEAT-2026-0076/G2-CLOSE/read-files-touched-before-trusting-failure-signature]
+  **A failed attempt's `failure_signature` tells you which oracle went red, not whether
+  the work unit did its work — read `files_touched` against the WU's `produces:` list
+  first.** Worked example: an attempt was dispatched to write skill prose plus a
+  structural test, touched only the test file, and was recorded with a `failure_class:
+  tests` and a signature naming a test in an unrelated module (an event-schema pattern
+  assertion). Reading the signature first sends the next session hunting a schema
+  regression; reading `files_touched` first shows an attempt that wrote its red test and
+  stopped, whose own oracle could not have been green. Rules. (a) `files_touched` ∩
+  `produces:` = ∅ means the attempt never produced its deliverable, and that is the
+  diagnosis regardless of what the signature says. (b) A signature stored alongside the
+  driver's own `NO VERDICT FOUND … may be unrelated to the failure` note is a tail
+  artifact, not a finding — re-run the gate before treating it as one. (c) A close that
+  cannot reproduce a recorded failure should say the root cause is not established
+  rather than supply a plausible one; an invented cause in a retrospective outlives the
+  event it explains.
+
+- [FEAT-2026-0076/G2-CLOSE/the-maturity-discount-applies-to-implementation-only]
+  **Implementation WUs whose plan-time existing-mechanism search returns "found and
+  reused" land at roughly half their estimate — and closing WUs do not get that discount,
+  so applying it uniformly underfunds the close.** Two gates of data on one feature:
+  implementation spent $11.86 of $23.00 (52%) across seven units, holding at ~50% even in
+  gate 2, whose estimates had *already* been cut on gate 1's evidence. The closing units
+  went the other way: the one close that ran a full fresh oracle sweep overran by +62.3%
+  ($7.30 against $4.50), and the closing subtotal came in +11.5%. Rules. (a) Discount an
+  implementation estimate when the existing-mechanism table says reuse or copy; leave it
+  alone when the unit's work is neither (the one gate-1 unit that went over, +27.2%, was
+  the only one writing a new invariant into two surfaces). (b) Never discount a close on
+  implementation evidence — a close re-runs every oracle, and its cost tracks the size of
+  the gate set, not the maturity of the parts. (c) A close reporting its own gate's cost
+  analysis is reporting from inside its own unstamped spend, so the closing overrun is
+  structurally invisible to it; the *next* gate's close is the first surface that can see
+  it, which is an argument for a terminal close reconciling every gate rather than only
+  its own.

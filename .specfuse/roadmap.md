@@ -89,6 +89,8 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
 | FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
+| FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | done | — | [→ archive](roadmap-archive.md#feat-2026-0076) |
+| FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -796,7 +798,6 @@ machine-checkable contract rather than prose.
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-
 **Status: planned.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Needs `/draft-feature` before it can be dispatched.
 
 <a id="feat-2026-0050"></a>
@@ -898,6 +899,39 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 **Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
 
 **Status: planned.**
+
+<a id="feat-2026-0077"></a>
+## FEAT-2026-0077 — Provenance-recorded policy values: know who chose a value, not just what it is
+
+**Why.** [FEAT-2026-0076](roadmap-archive.md#feat-2026-0076)'s review mode has to answer "did anyone actually
+choose this value, or is it the shipped default nobody looked at?" It answers by **comparing
+against the shipped baseline**, which is cheap, needs no schema change, and is deliberately
+lossy in one direction: an operator who *deliberately* chooses a value equal to the shipped
+one is indistinguishable from one who never chose. That was the right trade at the time and
+the reason is recorded honestly in that feature's `GATE-02-REVIEW.md` — but the reasoning
+carries its own expiry, stated there as the strongest argument against itself: gate 1 found
+this repository's file had *no operator intent in it to protect yet*, so comparison was
+chosen partly because the hard case did not exist in the sample rather than because it
+handles it. On a repository where someone has genuinely tuned their budgets, the lossy
+direction stops being harmless.
+
+**Goal.** Record provenance when a policy value is written, so review can distinguish
+"operator chose this" from "this is the shipped default" without inference. The shape is a
+schema change to `.specfuse/agent-policy.yml` — deliberately out of FEAT-2026-0076's scope
+boundary, which is why this is a separate feature rather than a widening of that one. It
+must also answer what happens to files written before provenance existed, since every
+consumer project's file is one: an absent provenance record has to degrade to the
+comparison heuristic rather than to a wrong answer.
+
+**Benefits.** Review stops hedging on the one question it exists to answer. The caveat
+FEAT-2026-0076 attaches to every baseline-match ("this may never have been decided") becomes
+unnecessary where a provenance record exists. And the ordering is deliberate — a cheap
+mechanism shipped first and replaced by the accurate one costs a migration; the reverse
+ordering costs a schema migration before anyone knows whether the precision is worth it.
+
+**Status: planned.** Filed at FEAT-2026-0076's gate-2 arming review by operator decision
+(open question 2). Not urgent: it becomes worth building when a real repository's policy file
+carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 ## Notes
 
