@@ -64,7 +64,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
-| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
+| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | planned | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
@@ -796,9 +796,8 @@ machine-checkable contract rather than prose.
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-**Blocked by.** [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](roadmap-archive.md#feat-2026-0047) — outbound notification; [FEAT-2026-0048](roadmap-archive.md#feat-2026-0048) — the autonomous bug lane
 
-**Status: blocked.**
+**Status: planned.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Needs `/draft-feature` before it can be dispatched.
 
 <a id="feat-2026-0050"></a>
 ## FEAT-2026-0050 — Async feature-drafting interview via question issues

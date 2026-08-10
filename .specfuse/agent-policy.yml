@@ -14,8 +14,6 @@ version: 1
 
 # Operator's stated sequence as of 2026-08-09.
 queue:
-  - FEAT-2026-0048
-  - FEAT-2026-0047
   - FEAT-2026-0049
 
 rules:
