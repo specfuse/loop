@@ -3679,6 +3679,54 @@ def _parse_roadmap_row(roadmap_text: str, feature_id: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 
 
+_BARE_FEAT_REF_RE = re.compile(r'\]\(#(feat-\d{4}-\d{4})\)')
+_STATUS_MARKER_RE = re.compile(r'\*\*Status:[^*]*\*\*')
+
+
+def _reconcile_moved_section(
+    section_text: str,
+    *,
+    feat_id_lower: str,
+    row_status: str,
+    roadmap_text: str,
+) -> str:
+    """Fix a detail section's own links and status marker for life in the archive.
+
+    The archiver used to move a section VERBATIM, which broke two things at once
+    (#1169 and #1038 — one cause, one pass):
+
+    - **Outbound links.** A bare `](#feat-…)` resolves only while both ends sit in
+      the same file. Once the section is in `roadmap-archive.md`, a reference to a
+      feature still inline in `roadmap.md` dangles. Rewritten to `roadmap.md#…`.
+      Deliberately NOT rewritten: a reference to the feature's own anchor (it
+      travels to the archive with the section) or to an already-archived feature
+      (both ends land in the archive). Those still resolve bare, and qualifying
+      them would be wrong.
+    - **Status marker.** The row is authoritative — that is `lint_roadmap`'s own
+      rule — so a section archived against a `done` row must not keep saying
+      `active`. Any prose after the marker is preserved, which is the contract
+      `lint_roadmap`'s error message already states. Observed three times before
+      this fix: FEAT-2026-0056, FEAT-2026-0075, FEAT-2026-0045.
+    """
+    def _requalify(m):
+        target = m.group(1)
+        if target == feat_id_lower:
+            return m.group(0)  # own anchor travels with the section
+        if f'<a id="{target}"></a>' in roadmap_text or re.search(
+            r'^## ' + re.escape(target.upper()) + r'\b', roadmap_text, re.MULTILINE | re.IGNORECASE
+        ):
+            return f'](roadmap.md#{target})'
+        return m.group(0)  # already archived — bare anchor still resolves
+
+    section_text = _BARE_FEAT_REF_RE.sub(_requalify, section_text)
+
+    if row_status:
+        section_text = _STATUS_MARKER_RE.sub(
+            f'**Status: {row_status}.**', section_text, count=1
+        )
+    return section_text
+
+
 def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     """Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver.
 
@@ -3768,6 +3816,17 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     archive_text = archive_path.read_text()
     if marker not in archive_text:
         return "refused: archive marker absent"
+
+    # Reconcile the section for its new home BEFORE it is written (#1169, #1038).
+    # `roadmap_text` here still holds every other feature's inline section, which
+    # is exactly what decides whether an outbound reference needs qualifying.
+    section_text = _reconcile_moved_section(
+        section_text,
+        feat_id_lower=feat_id_lower,
+        row_status=status,
+        roadmap_text=roadmap_text,
+    )
+
     marker_end = archive_text.index(marker) + len(marker)
     new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
     archive_path.write_text(new_archive)
@@ -3793,6 +3852,18 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     # archive. Strip the now-orphaned anchor line; Step 3 already re-emitted the
     # canonical anchor in roadmap-archive.md, so the link target travels with it.
     roadmap_text = roadmap_text.replace(f"{anchor}\n", "")
+
+    # Inbound half of #1169: every OTHER section's bare `](#feat-this-one)` link
+    # pointed at an anchor that has just left this file. Those references live in
+    # unrelated features' prose — most often a `**Blocked by.**` block — so a
+    # clean close would otherwise redden the gate on rows this feature never
+    # wrote, and the breakage would land on whoever ran the gate next rather than
+    # on the run that caused it. Scoped to THIS feature's anchor: other bare
+    # refs are none of this archive's business.
+    roadmap_text = roadmap_text.replace(
+        f"](#{feat_id_lower})", f"](roadmap-archive.md#{feat_id_lower})"
+    )
+
     roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
