@@ -17,6 +17,7 @@ from unittest import mock
 from specfuse.loop.agent_policy import (
     AUTOMERGE_VALUES,
     GATE_REVIEW_VALUES,
+    PROVIDER_VALUES,
     SEVERITY_VALUES,
     main,
     validate_agent_policy,
@@ -42,7 +43,8 @@ budgets:
   max_open_prs: 3
   max_items_per_day: 10
 escalation:
-  webhook: ""
+  webhook_env: ""
+  provider: none
   assignee: ""
   quiet_hours: ""
   sla_hours: 24
@@ -113,8 +115,8 @@ class TestValidateAgentPolicy(unittest.TestCase):
         "escalation": "".join(
             line + "\n" for line in VALID_CONFIG.splitlines()
             if line not in (
-                "escalation:", '  webhook: ""', '  assignee: ""',
-                '  quiet_hours: ""', "  sla_hours: 24",
+                "escalation:", '  webhook_env: ""', "  provider: none",
+                '  assignee: ""', '  quiet_hours: ""', "  sla_hours: 24",
             )
         ),
     }
@@ -232,6 +234,48 @@ class TestValidateAgentPolicy(unittest.TestCase):
         )
         findings = validate_agent_policy(_write(config))
         self.assertTrue(any("overrides" in f and "sometimes" in f for f in findings))
+
+    def test_webhook_env_url_shaped_is_error(self):
+        config = VALID_CONFIG.replace(
+            'webhook_env: ""', 'webhook_env: "https://discord.com/api/webhooks/x/y"'
+        )
+        findings = validate_agent_policy(_write(config))
+        self.assertTrue(
+            any("webhook_env" in f and f.startswith("ERROR: ") for f in findings)
+        )
+
+    def test_webhook_env_name_shaped_is_valid(self):
+        config = VALID_CONFIG.replace(
+            'webhook_env: ""', "webhook_env: SPECFUSE_NOTIFY_WEBHOOK"
+        )
+        self.assertEqual(validate_agent_policy(_write(config)), [])
+
+    def test_webhook_env_empty_is_valid(self):
+        self.assertEqual(validate_agent_policy(_write(VALID_CONFIG)), [])
+
+    def test_old_webhook_key_is_error(self):
+        config = VALID_CONFIG.replace('webhook_env: ""', 'webhook: ""')
+        findings = validate_agent_policy(_write(config))
+        self.assertTrue(
+            any(
+                "webhook" in f and "unknown" in f and f.startswith("ERROR: ")
+                for f in findings
+            )
+        )
+
+    def test_provider_enum_rejects_bad_value(self):
+        config = VALID_CONFIG.replace("provider: none", "provider: pagerduty")
+        findings = validate_agent_policy(_write(config))
+        self.assertTrue(
+            any(f.startswith("ERROR: ") and "provider" in f for f in findings)
+        )
+        self.assertEqual(
+            PROVIDER_VALUES, frozenset({"discord", "slack", "teams", "none"})
+        )
+
+    def test_provider_absent_is_valid(self):
+        config = VALID_CONFIG.replace("  provider: none\n", "")
+        self.assertEqual(validate_agent_policy(_write(config)), [])
 
     def test_main_prints_findings_and_returns_nonzero_on_error(self):
         config = VALID_CONFIG.replace("version: 1", "version: 2")

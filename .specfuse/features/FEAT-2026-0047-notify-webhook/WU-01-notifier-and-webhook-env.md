@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0047/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/notify.py
   - tests/test_notify.py
 produces_driver_helper: post_notification, resolve_webhook_url
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T06:56:07.279637+00:00
+duration_seconds: 871.357
+cost_usd: 1.812547
+input_tokens: 6087
+output_tokens: 22848
 ---
 
 # The notifier, its payload adapters, and the `webhook_env` security correction

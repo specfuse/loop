@@ -5,7 +5,7 @@ slug: notify-webhook
 branch: feat/FEAT-2026-0047-notify-webhook
 roadmap_goal: Make escalations push instead of waiting to be pulled — a one-liner and a link to whatever channel the operator configured — and make agent silence itself alarmed, so a stalled or dead agent announces rather than simply stopping.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 20.00
 ---
 

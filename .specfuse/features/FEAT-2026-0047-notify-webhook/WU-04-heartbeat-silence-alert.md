@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0047/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -10,6 +10,15 @@ produces:
   - tests/test_heartbeat.py
   - plugins/specfuse/skills/attention/SKILL.md
 produces_driver_helper: last_run_at, silence_check
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T08:25:52.471724+00:00
+duration_seconds: 763.263
+cost_usd: 1.268404
+input_tokens: 71
+output_tokens: 12587
 ---
 
 # Alarm the silence — derive the last run from repo state and flag staleness

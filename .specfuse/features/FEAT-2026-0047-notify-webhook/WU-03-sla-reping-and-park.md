@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0047/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/notify_sla.py
   - tests/test_notify_sla.py
 produces_driver_helper: sla_sweep, PARKED_LABEL
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T07:56:01.777855+00:00
+duration_seconds: 1482.221
+cost_usd: 2.469086
+input_tokens: 5667
+output_tokens: 27647
 ---
 
 # Re-ping an unanswered escalation exactly once, then park it

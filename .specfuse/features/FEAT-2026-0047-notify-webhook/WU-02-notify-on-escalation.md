@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0047/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/notify_escalation.py
   - tests/test_notify_escalation.py
 produces_driver_helper: notify_new_escalation
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T07:25:51.033742+00:00
+duration_seconds: 616.604
+cost_usd: 0.706789
+input_tokens: 31
+output_tokens: 7826
 ---
 
 # Post a one-liner and a link when a needs-human issue is filed
