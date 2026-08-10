@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 27.00
+baseline:
+  sha: 4a2d75a3e45b78c565cbf05e01c93e1b6f1c06aa
+  probed_at: 2026-08-10T14:23:54.494086+00:00
+  failing: []
 ---
 
 # Gate 1 — a greenfield repository can be interviewed into a valid policy file
