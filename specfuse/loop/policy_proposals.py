@@ -66,7 +66,7 @@ def propose_policy_defaults(
     carries no evidence to answer it; this function never fills a gap with
     the shipped default dressed as a proposal.
     """
-    root = Path(repo_root) if repo_root is not None else Path.cwd()
+    root = (Path(repo_root) if repo_root is not None else Path.cwd()).resolve()
     proposals: dict = {}
 
     stats = _collect_local_events(root)

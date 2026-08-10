@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0076/T01H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/policy_proposals.py
   - tests/test_policy_proposals.py
 provenance: "Operator review between T01 and T02 found propose_policy_defaults silently withholding budget proposals for any relative repo_root; T02 is about to describe this algorithm in prose."
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T14:49:53.628261+00:00
+duration_seconds: 761.32
+cost_usd: 0.770011
+input_tokens: 3572
+output_tokens: 7853
 ---
 
 # Withheld-for-no-evidence must mean no evidence, not an unresolved path

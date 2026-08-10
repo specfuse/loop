@@ -15,12 +15,16 @@ worse than an absent one."
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 from pathlib import Path
 from types import SimpleNamespace
 
+from specfuse.loop import policy_proposals
+from specfuse.loop import events_stats
 from specfuse.loop.agent_policy import validate_agent_policy
 from specfuse.loop.policy_proposals import propose_policy_defaults
 
@@ -299,6 +303,129 @@ class TestProposeDefaults(unittest.TestCase):
             result = propose_policy_defaults(root)
 
             self.assertNotIn("max_open_prs", result)
+
+
+class TestRelativeRepoRoot(unittest.TestCase):
+    """FEAT-2026-0076/T01H: a relative `repo_root` must not silently withhold
+    proposals a repository's own history can answer."""
+
+    def test_relative_and_absolute_agree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp).resolve()
+            root = workspace / "the-repo"
+            _write_events(root, "FEAT-2026-0001-x", [
+                _ev("FEAT-2026-0001/T01", 1.0, "passed", 2.00),
+                _ev("FEAT-2026-0001/T02", 2.0, "passed", 3.00),
+            ])
+
+            absolute_result = propose_policy_defaults(root)
+
+            cwd = os.getcwd()
+            os.chdir(workspace)
+            try:
+                relative_result = propose_policy_defaults(Path("the-repo"))
+                dotdot_result = propose_policy_defaults(
+                    Path("the-repo") / "." / ".." / "the-repo"
+                )
+            finally:
+                os.chdir(cwd)
+
+            self.assertEqual(absolute_result, relative_result)
+            self.assertEqual(absolute_result, dotdot_result)
+            self.assertIn("max_tokens_per_run", relative_result)
+            self.assertIn("max_items_per_day", relative_result)
+
+    def test_sibling_repository_scoping_preserved(self):
+        real_collect = events_stats.collect
+        seen_roots = []
+
+        def spying_collect(roots):
+            seen_roots.append([Path(r).resolve() for r in roots])
+            return real_collect(roots)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp).resolve()
+            root = workspace / "the-repo"
+            sibling = workspace / "sibling-repo"
+            _write_events(root, "FEAT-2026-0001-x", [
+                _ev("FEAT-2026-0001/T01", 1.0, "passed", 2.00),
+            ])
+            _write_events(sibling, "FEAT-2026-9999-x", [
+                _ev("FEAT-2026-9999/T01", 1.0, "passed", 999.00),
+            ])
+
+            cwd = os.getcwd()
+            os.chdir(workspace)
+            try:
+                with unittest.mock.patch.object(
+                    policy_proposals.events_stats, "collect", spying_collect
+                ):
+                    policy_proposals.propose_policy_defaults(Path("the-repo"))
+            finally:
+                os.chdir(cwd)
+
+            self.assertTrue(seen_roots)
+            for call_roots in seen_roots:
+                for scoped_root in call_roots:
+                    self.assertNotEqual(scoped_root, workspace)
+                    self.assertNotEqual(scoped_root, root.parent)
+                    self.assertFalse((scoped_root / "sibling-repo").exists())
+
+    def test_relative_path_with_history_yields_budget_proposals(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp).resolve()
+            root = workspace / "has-history"
+            _write_events(root, "FEAT-2026-0001-x", [
+                _ev("FEAT-2026-0001/T01", 1.0, "passed", 2.00),
+            ])
+
+            cwd = os.getcwd()
+            os.chdir(workspace)
+            try:
+                result = propose_policy_defaults(Path("has-history"))
+            finally:
+                os.chdir(cwd)
+
+            self.assertIn("max_tokens_per_run", result)
+            self.assertIn("max_items_per_day", result)
+
+    def test_withholding_tracks_data_not_path_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp).resolve()
+            with_history = workspace / "with-history"
+            without_history = workspace / "without-history"
+            _write_events(with_history, "FEAT-2026-0001-x", [
+                _ev("FEAT-2026-0001/T01", 1.0, "passed", 2.00),
+            ])
+            (without_history / ".specfuse" / "features").mkdir(parents=True)
+
+            cwd = os.getcwd()
+            os.chdir(workspace)
+            try:
+                with_result = propose_policy_defaults(Path("with-history"))
+                without_result = propose_policy_defaults(Path("without-history"))
+            finally:
+                os.chdir(cwd)
+
+            self.assertIn("max_tokens_per_run", with_result)
+            self.assertNotIn("max_tokens_per_run", without_result)
+            self.assertNotIn("max_items_per_day", without_result)
+
+    def test_max_tokens_evidence_discloses_conversion_assumption(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _write_events(root, "FEAT-2026-0001-x", [
+                _ev("FEAT-2026-0001/T01", 1.0, "passed", 2.00),
+            ])
+
+            result = propose_policy_defaults(root)
+
+            evidence = result["max_tokens_per_run"]["evidence"]
+            self.assertIn(f"{policy_proposals._ASSUMED_TOKENS_PER_USD:,}", evidence)
+            self.assertIn("tokens/$", evidence)
+
+    def test_assumed_tokens_per_usd_unchanged(self):
+        self.assertEqual(policy_proposals._ASSUMED_TOKENS_PER_USD, 200_000)
 
 
 def _yaml_list(items, indent):
