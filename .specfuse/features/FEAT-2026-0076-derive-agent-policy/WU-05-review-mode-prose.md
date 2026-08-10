@@ -1,14 +1,18 @@
 ---
 id: FEAT-2026-0076/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
   - tests/test_derive_agent_policy_review_mode.py
 model: sonnet
 effort: medium
+duration_seconds: 1481.788
+cost_usd: 2.977602
+input_tokens: 3009
+output_tokens: 24876
 ---
 
 # Add the review half to the skill's prose

@@ -173,3 +173,37 @@ End your turn with the RESULT block defined in
 `.specfuse/rules/result-contract.md`. `status: complete` means "I produced a
 staged, three-block draft plus report and showed it to the operator" —
 verification is the operator reading and accepting it, not a command exit.
+
+## Review mode — when `.specfuse/agent-policy.yml` already exists
+
+Before running the bootstrap method above, check whether
+`.specfuse/agent-policy.yml` already exists in the target repo.
+
+- **Absent** → run the bootstrap method above (Steps 1-3).
+- **Exists** → run review mode instead: call `review_agent_policy(repo_root)`
+  from `specfuse/loop/policy_review.py`. It returns a per-key readout for the
+  same four in-scope fields — `budgets.max_tokens_per_run`,
+  `budgets.max_items_per_day`, `budgets.max_open_prs`,
+  `rules.bugs.test_paths` — each carrying `current` (the live value),
+  `proposal` (what `propose_policy_defaults` returns today), `baseline` (the
+  shipped default), and `classification` (`matches_baseline`,
+  `differs_from_baseline`, `absent_from_file`, or `baseline_unavailable`).
+
+Present all four parts of the readout for every key, not just the
+classification. State plainly that `matches_baseline` is a **hint, not a
+claim** — the value may never have been chosen, but a deliberate pick equal
+to the baseline looks identical from this comparison alone — while
+`differs_from_baseline` reliably means someone touched it.
+
+`rules.bugs.test_paths` is `measured` — straight from repo evidence. The
+three `budgets` keys are `converted` — derived through an assumption about
+turning raw evidence into a budget number. Name that assumption alongside
+each converted value so the operator can disagree with the assumption
+separately from the number; do not present all four keys alike.
+
+Stage corrections the same way the bootstrap draft stages blocks — `rules`,
+then `budgets`, then `escalation` (escalation falls back to the bootstrap
+Step 2 ask, since `review_agent_policy` does not cover it) — three separate
+accept/edit/reject decisions, never a blanket yes. Never merge a correction
+into `.specfuse/agent-policy.yml` without the operator's explicit per-block
+accept.

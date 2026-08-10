@@ -284,6 +284,104 @@ rather than draft it.
   finding list is empty.
 ```
 
+## Review mode — an existing `.specfuse/agent-policy.yml`
+
+**Entry condition.** This skill is one skill with two entry conditions, not two
+skills — the questions in Step 2 above are the same questions; only the
+starting state differs. Before doing anything else, check whether
+`.specfuse/agent-policy.yml` **exists** in the target repo:
+
+- **Absent** (or unreadable) → run the bootstrap interview documented above:
+  Step 1 evidence gathering, Step 2 the batched ask, Step 3 the staged draft.
+  This is gate 1's shipped path.
+- **Exists** → run review mode, described below. An existing file is read and
+  corrected, never clobbered on the strength of a proposal alone.
+
+Review mode calls `review_agent_policy(repo_root)` from
+`specfuse/loop/policy_review.py`. It reads the live
+`.specfuse/agent-policy.yml`, composes `propose_policy_defaults` for the
+evidence-backed half, and returns a per-key readout for the same four in-scope
+fields Step 1 above proposes from evidence: `budgets.max_tokens_per_run`,
+`budgets.max_items_per_day`, `budgets.max_open_prs`, and
+`rules.bugs.test_paths`. Do not re-derive this comparison by hand — call the
+function once and present its output.
+
+### The readout, per key
+
+For each of the four keys, `review_agent_policy` returns an entry carrying:
+
+- **`current`** — the value read from the live file (or its absence).
+- **`proposal`** — what `propose_policy_defaults` returns for this key today
+  (value plus evidence string), or unavailable.
+- **`baseline`** — the shipped default: `agent_policy.DEFAULT_TEST_PATHS` for
+  `rules.bugs.test_paths`, `.specfuse/agent-policy.yml.example`'s literal
+  value for the three `budgets` keys.
+- **`classification`** — the provenance verdict: `matches_baseline`,
+  `differs_from_baseline`, `absent_from_file`, or `baseline_unavailable`.
+
+Present all four parts for every key — current, proposal, baseline, and
+classification — not just the current value and a verdict. An operator who
+sees only the classification cannot tell *why* a key was flagged.
+
+### Provenance is a hint, not a claim
+
+A `matches_baseline` classification is a **hint, not a claim**, and the
+readout must say so in those words. A value equal to the shipped baseline
+**may never have been** deliberately chosen — but an operator who deliberately
+picked that exact value looks identical from this comparison alone; the two
+are not distinguishable from the file. Never present a `matches_baseline`
+entry as "this was never decided."
+
+The asymmetry runs the other way too, and the readout must state it: a value
+that **differs** from the shipped baseline reliably means someone touched it.
+That direction is not lossy. Present `differs_from_baseline` with more
+confidence than `matches_baseline` — the former is evidence of a decision, the
+latter only a possibility of one.
+
+### Measured vs. converted proposals are not the same and must not read alike
+
+T04's `proposal.kind` field distinguishes two kinds of evidence-backed number,
+and the readout must carry the distinction at the point the operator reads
+it — not only in a source comment:
+
+- **`measured`** — `rules.bugs.test_paths` is the only measured value of the
+  four. It comes straight from repo evidence (`gate_commands.iter_code_gates`
+  scanning actual test-path usage) with no interpretive step in between.
+- **`converted`** — `budgets.max_tokens_per_run`, `budgets.max_items_per_day`,
+  and `budgets.max_open_prs` are converted: `propose_policy_defaults` derives
+  them from raw evidence (`events_stats.collect` aggregates, `gh pr list`
+  counts) through an assumption about how to turn that evidence into a budget
+  number. Name the assumption behind each converted value in the readout
+  itself, alongside the number — an operator reading only the number cannot
+  tell it rests on an assumption they might disagree with, separately from
+  disagreeing with the number.
+
+Do not present all four keys alike. An operator must be able to disagree with
+a converted value's *assumption* independently of disagreeing with its
+*number*; a readout that renders `measured` and `converted` identically takes
+that away.
+
+### Output — the same staged per-block accept, applied to corrections
+
+Review mode's corrections use the same staged per-block accept contract the
+bootstrap draft uses in Step 3 above — never one blanket yes. Present
+corrections to `rules`, then `budgets`, then `escalation`, as three separate
+accept/edit/reject decisions, in that order, even though review mode is
+correcting an existing file rather than drafting a fresh one:
+
+1. **`rules`** — `rules.bugs.test_paths`'s readout (current, proposal,
+   baseline, classification, `measured`).
+2. **`budgets`** — `max_tokens_per_run`, `max_items_per_day`, `max_open_prs`
+   readouts (current, proposal, baseline, classification, each `converted`
+   with its assumption named).
+3. **`escalation`** — out of `review_agent_policy`'s scope (it reads only the
+   four in-scope keys above); if the operator wants `escalation` reviewed too,
+   fall back to the bootstrap Step 2 ask for that block, staged the same way.
+
+Never merge a correction into `.specfuse/agent-policy.yml` without the
+operator's explicit per-block accept — the same rule the bootstrap draft
+follows.
+
 ## Escalation framing (binding — `.specfuse/rules/operator-escalation.md`)
 
 Whenever this skill halts for a human decision — a `webhook_env` answer that
