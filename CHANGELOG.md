@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.11.0+umbrella.0.11.0] - 2026-08-10
+
 ### Breaking
 
 - **`escalation.webhook` is renamed to `escalation.webhook_env` in `.specfuse/agent-policy.yml`, and its value is now an environment-variable NAME rather than a URL.** An incoming-webhook URL is a bearer credential — anyone holding it can post to the channel — and `agent-policy.yml` is a committed file; `lint_monitoring`'s credential-key pattern (`key|token|secret|password|credential|connection_string`) does not match `webhook`, so nothing previously stopped an operator pasting a live Discord URL into git. **The old spelling is now an `ERROR: unknown 'escalation.webhook' key`** — rejected, not warned about and not silently accepted — so a policy carrying it fails the `agent-policy-example-lint` gate. The new key's value is validated against `^[A-Za-z_][A-Za-z0-9_]*$`, the same structural shape `monitoring.yml` already uses for credentials, so **a literal `https://…` value is an `ERROR: ` finding**; an empty string remains valid and means "no webhook configured", which is the only configuration this repository itself ships. A project that copied `escalation.webhook` from the FEAT-2026-0044 example must rename the key and move the URL into the environment — one line, and **the URL must not be committed**. No compatibility shim ships and none is planned: the old spelling is the unsafe one, and nothing had consumed the key yet, since FEAT-2026-0044 shipped the field and FEAT-2026-0047 is its first and only reader (FEAT-2026-0047)
