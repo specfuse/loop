@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from specfuse.loop import escalation, gh_features, notify_sla, triage
+from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 from specfuse.loop.labels import LABEL_REGISTRY
 
@@ -21,12 +21,17 @@ class TestLabelRegistry(unittest.TestCase):
         # The ninth is FEAT-2026-0042/T02's autofix-failed label, registered
         # ahead of gate 2, its consumer, for the same reason. The tenth through
         # thirteenth are FEAT-2026-0045/T01's category->label projection. The
-        # fourteenth is FEAT-2026-0047/T03's parked-escalation label.
+        # fourteenth is FEAT-2026-0047/T03's parked-escalation label. The
+        # fifteenth through twenty-first are the bug lane's declining-reason
+        # labels, registered by the #1420 fix — the lane emitted them as raw
+        # REASON_* constants that this registry never declared, so
+        # provision_labels created none of them and every declining path
+        # failed against a real repository.
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 14)
+        self.assertEqual(len(LABEL_REGISTRY), 21)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -55,6 +60,7 @@ class TestLabelRegistry(unittest.TestCase):
                 triage.WONTFIX_LABEL,
             }
             | {notify_sla.PARKED_LABEL}
+            | set(bug_lane.DECLINE_LABELS.values())
         )
         actual = {entry.name for entry in LABEL_REGISTRY}
         self.assertEqual(actual, expected)

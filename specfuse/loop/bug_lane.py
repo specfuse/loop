@@ -40,6 +40,26 @@ REASON_DAILY_CAP_REACHED = "daily_cap_reached"
 REASON_ELIGIBLE = "eligible"
 REASON_UNREADABLE_INPUT = "unreadable_input"
 
+# Public label names for the declining reasons (#1420). The REASON_* values above
+# are internal identifiers and must not double as labels: they are snake_case
+# where the registry is kebab/prefixed, and — the defect this fixes — nothing
+# created them, so `gh pr edit --add-label <reason>` failed on every declining
+# path in every repository. Every name here has a LABEL_SPEC in
+# `loop/labels.py`, so `provision_labels` creates it on init/upgrade;
+# `tests/test_bug_lane_labels_registered.py` asserts that both ways.
+#
+# REASON_ELIGIBLE is deliberately absent: it is not a decline and is never
+# labelled.
+DECLINE_LABELS = {
+    REASON_NO_TEST_EVIDENCE: "bug-lane:no-test-evidence",
+    REASON_CI_NOT_GREEN: "bug-lane:ci-not-green",
+    REASON_DIFF_TOO_LARGE: "bug-lane:diff-too-large",
+    REASON_JUDGE_PATH_TOUCHED: "bug-lane:judge-path-touched",
+    REASON_UNTRACEABLE: "bug-lane:untraceable-provenance",
+    REASON_DAILY_CAP_REACHED: "bug-lane:daily-cap-reached",
+    REASON_UNREADABLE_INPUT: "bug-lane:unreadable-input",
+}
+
 PROVENANCE_KINDS = ("triaged_issue", "diagnosed_finding")
 
 _TESTS_PREFIX = "tests/"

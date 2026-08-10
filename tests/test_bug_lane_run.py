@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from specfuse.loop.bug_lane import (
+    DECLINE_LABELS,
     REASON_CI_NOT_GREEN,
     REASON_DAILY_CAP_REACHED,
     REASON_DIFF_TOO_LARGE,
@@ -330,7 +331,12 @@ class TestRunBugLane(unittest.TestCase):
 
         label_calls = runner.calls_matching(["gh", "pr", "edit"])
         self.assertEqual(len(label_calls), 1)
-        self.assertIn(REASON_CI_NOT_GREEN, label_calls[0])
+        # The PUBLIC label name, not the raw reason constant (#1420). Asserting
+        # the constant here is what let the defect ship: the lane labelled with
+        # a name provision_labels never creates, so this call failed against a
+        # real repository while the stubbed test stayed green.
+        self.assertIn(DECLINE_LABELS[REASON_CI_NOT_GREEN], label_calls[0])
+        self.assertNotIn(REASON_CI_NOT_GREEN, label_calls[0])
 
         close_calls = [c for c in runner.calls if "close" in c]
         self.assertEqual(close_calls, [])
