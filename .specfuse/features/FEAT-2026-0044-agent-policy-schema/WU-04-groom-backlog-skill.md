@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0044/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
   - plugins/specfuse/skills/groom-backlog/SKILL.md
   - tests/test_groom_backlog_skill.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T03:52:23.366925+00:00
+duration_seconds: 385.41
+cost_usd: 0.784942
+input_tokens: 1212
+output_tokens: 9300
 ---
 
 # Ship the `/groom-backlog` skill
