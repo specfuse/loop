@@ -94,9 +94,12 @@ class TestPersistAttemptNotes(unittest.TestCase):
             paths = loop.persist_attempt_notes(work, "FEAT-2026-0016/T03", notes)
             self.assertEqual(len(paths), 2)
             self.assertTrue((work / "FEAT-2026-0016_T03" / "attempt-1.md").exists())
+            # Trailing newline added by #1412: an unterminated last line counts
+            # 0 under `wc -l`, which is how a 43-byte note came to be reported
+            # as a 0-byte file. Content is otherwise carried verbatim.
             self.assertEqual(
                 (work / "FEAT-2026-0016_T03" / "attempt-2.md").read_text(),
-                "second failure")
+                "second failure\n")
 
     def test_wu_id_slashes_flattened(self):
         with tempfile.TemporaryDirectory() as tmp:
