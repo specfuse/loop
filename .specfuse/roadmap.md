@@ -59,11 +59,11 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
-| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
+| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | active | `.specfuse/features/FEAT-2026-0044-agent-policy-schema/` | [→ detail](#feat-2026-0044) |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
-| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | planned | — | [→ detail](#feat-2026-0048) |
+| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | planned | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ detail](#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
@@ -811,7 +811,7 @@ the value; do not redesign the semantics, and do not re-litigate where the dial 
 `monitoring.yml`, and inbound issues are not components. See that feature's
 [RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
@@ -832,6 +832,14 @@ the value; do not redesign the semantics, and do not re-litigate where the dial 
 **Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
+
+**Drafted 2026-08-09, ahead of its turn.** The feature folder exists and lints
+clean, drafted solo without an operator interview and **before
+[FEAT-2026-0044](#feat-2026-0044) shipped the schema it builds on** — both on
+operator instruction. Its `PLAN.md` records seven assumed decisions for veto at
+PR review, and its `T01` verifies the shipped schema against the assumed one and
+escalates on divergence rather than adapting silently. Dispatch only after 0044
+merges.
 
 **Status: planned.** Unblocked 2026-08-10: both named blockers cleared —
 [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) (machine-readable triage intake) and
