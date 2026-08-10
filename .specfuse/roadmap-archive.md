@@ -60,11 +60,11 @@ at draft time — a triaged issue carries **both** an authoritative body marker
 (`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
 projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
 argument** at the headless entry point rather than a config surface, because
-[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+[FEAT-2026-0044](roadmap.md#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
 `duplicate` ships judgment-only with no detection mechanism.
 
 **Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
-closing duplicates — that is [FEAT-2026-0048](#feat-2026-0048) for bugs and the operator
+closing duplicates — that is [FEAT-2026-0048](roadmap.md#feat-2026-0048) for bugs and the operator
 otherwise); `.specfuse/agent-policy.yml` in any form; refactoring the five existing
 `gh issue list` call sites into a shared client; re-triaging an issue that already carries
 a marker.
@@ -100,7 +100,10 @@ detection mechanism, by decision. Terminal flips are withheld on a hedged verdic
 `PLAN.md`, the gate, and this row stay un-flipped until an operator accepts through
 `/accept-hedged-close`. The driver owns that flip; it is not hand-edited.
 
-**Status: active.**
+**Status: done.** Accepted 2026-08-10 via `/accept-hedged-close`; the driver fired the
+terminal flips through `--recheck-verdict`. D1 was discharged by a live triage run against
+this repository's own issues before the acceptance; D2 (`inherent`) and D3 are carried
+forward in `RETROSPECTIVE.md`.
 
 <a id="feat-2026-0075"></a>
 ## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them

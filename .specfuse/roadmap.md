@@ -797,7 +797,7 @@ machine-checkable contract rather than prose.
 **Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
 
 **Inherited handoff — one dial is already waiting for this file
-(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](#feat-2026-0045) shipped triage's `auto`
+(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
 dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
 auto=False)`, reading no configuration of any kind — deliberately, because
 `agent-policy.yml` is this feature's core deliverable and did not exist, and building a
@@ -833,7 +833,7 @@ the value; do not redesign the semantics, and do not re-litigate where the dial 
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
 
-**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
+**Blocked by.** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
 
 **Status: blocked.**
 
