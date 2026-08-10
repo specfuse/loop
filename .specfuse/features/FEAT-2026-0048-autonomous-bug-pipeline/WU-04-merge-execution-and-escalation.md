@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0048/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/bug_lane_run.py
   - tests/test_bug_lane_run.py
 produces_driver_helper: run_bug_lane, pr_ci_conclusion
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T05:56:04.808638+00:00
+duration_seconds: 1174.629
+cost_usd: 3.597465
+input_tokens: 102
+output_tokens: 43432
 ---
 
 # Run the lane end to end: fix → PR → guarded merge, with escalation on refusal

@@ -26,8 +26,7 @@ EXAMPLE_PATH = Path(__file__).resolve().parents[1] / ".specfuse" / "agent-policy
 
 VALID_CONFIG = """\
 version: 1
-queue:
-  - FEAT-2026-0048
+queue: []
 rules:
   bugs:
     preempt: true
@@ -102,7 +101,7 @@ class TestValidateAgentPolicy(unittest.TestCase):
 
     _CONFIGS_MISSING_KEY = {
         "version": VALID_CONFIG.replace("version: 1\n", ""),
-        "queue": VALID_CONFIG.replace("queue:\n  - FEAT-2026-0048\n", ""),
+        "queue": VALID_CONFIG.replace("queue: []\n", ""),
         "rules": VALID_CONFIG.replace(_RULES_BLOCK, ""),
         "budgets": "".join(
             line + "\n" for line in VALID_CONFIG.splitlines()
@@ -142,19 +141,22 @@ class TestValidateAgentPolicy(unittest.TestCase):
 
     def test_queue_entry_bad_shape(self):
         config = VALID_CONFIG.replace(
-            "queue:\n  - FEAT-2026-0048\n", "queue:\n  - not-a-feat-id\n"
+            "queue: []\n", "queue:\n  - not-a-feat-id\n"
         )
         findings = validate_agent_policy(_write(config))
         self.assertTrue(any("not-a-feat-id" in f for f in findings))
 
     def test_queue_duplicate_entry(self):
+        # FEAT-2026-0002 is permanently `done`, so its roadmap status cannot drift.
+        # A WARN for the done status is expected and irrelevant here; the
+        # assertion below looks only for the duplicate ERROR.
         config = VALID_CONFIG.replace(
-            "queue:\n  - FEAT-2026-0048\n",
-            "queue:\n  - FEAT-2026-0048\n  - FEAT-2026-0048\n",
+            "queue: []\n",
+            "queue:\n  - FEAT-2026-0002\n  - FEAT-2026-0002\n",
         )
         findings = validate_agent_policy(_write(config))
         self.assertTrue(
-            any("duplicate" in f and "FEAT-2026-0048" in f for f in findings)
+            any("duplicate" in f and "FEAT-2026-0002" in f for f in findings)
         )
 
     def test_severity_enum_rejects_bad_value(self):

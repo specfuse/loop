@@ -1,0 +1,184 @@
+# Copyright 2026 Specfuse Contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+"""The bug-lane merge-eligibility predicate (FEAT-2026-0048/T02): may this
+bug-lane PR auto-merge?
+
+Mirrors `specfuse/monitor/autofix.py`'s shape: module-level `REASON_*`
+constants, a frozen decision dataclass, an injected state-reader `Protocol`
+so the predicate performs no I/O. Its docstring promise carries over
+unchanged: any failure to evaluate an input returns "do not merge".
+
+Fail closed. This is the whole design. A guardrail that raises on malformed
+input is a guardrail that malformed input walks straight through. Every
+unreadable, missing, wrong-typed, or ambiguous input yields `eligible=False`
+with a reason -- never an exception, never a default-permit.
+
+Six guardrails, all required, all and-ed: test-first evidence (structural
+only -- this module does not judge whether a test is a *good* test, per
+FEAT-2026-0053's rule that model-authored signals may only veto, never
+approve); CI green; a diff-size cap; no `arm_eval.JUDGE_PATHS` touched;
+traced to a triaged issue or diagnosed finding; and a rolling-24h merge cap
+whose storage T03 owns.
+
+This module performs no merge. Execution is T04's, deliberately kept out of
+this predicate's reach.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Mapping, Protocol, Sequence
+
+from specfuse.loop.arm_eval import JUDGE_PATHS
+
+REASON_NO_TEST_EVIDENCE = "no_test_evidence"
+REASON_CI_NOT_GREEN = "ci_not_green"
+REASON_DIFF_TOO_LARGE = "diff_too_large"
+REASON_JUDGE_PATH_TOUCHED = "judge_path_touched"
+REASON_UNTRACEABLE = "untraceable_provenance"
+REASON_DAILY_CAP_REACHED = "daily_cap_reached"
+REASON_ELIGIBLE = "eligible"
+REASON_UNREADABLE_INPUT = "unreadable_input"
+
+PROVENANCE_KINDS = ("triaged_issue", "diagnosed_finding")
+
+_TESTS_PREFIX = "tests/"
+
+
+class MergeCapStateReader(Protocol):
+    """Read-only view over rolling-24h merge-cap state (T03 owns where it
+    lives). Injected so this module stays testable with no disk and no
+    network."""
+
+    def merges_last_24h(self) -> int: ...
+
+
+@dataclass(frozen=True)
+class MergeDecision:
+    """The predicate's output: eligibility plus the guardrail that produced
+    the verdict."""
+
+    eligible: bool
+    reason: str
+
+
+def _decline(reason: str) -> MergeDecision:
+    return MergeDecision(eligible=False, reason=reason)
+
+
+def evaluate_merge_guardrails(
+    *,
+    changed_files: Any,
+    ci_conclusion: Any,
+    diff_lines: Any,
+    max_diff_lines: Any,
+    provenance: Any,
+    max_merges_per_day: Any,
+    state_reader: MergeCapStateReader,
+) -> MergeDecision:
+    """Decide whether a bug-lane PR may auto-merge.
+
+    `changed_files` is the PR's changed-file path list; `ci_conclusion` is
+    the CI run's terminal conclusion string; `diff_lines` is the PR's total
+    changed-line count; `max_diff_lines` / `max_merges_per_day` come from
+    `agent_policy.bug_lane_limits()` (resolved by the caller -- this module
+    reads no config file); `provenance` names the triaging source; and
+    `state_reader` answers the rolling-24h merge-count question T03 owns the
+    storage for. Any failure to evaluate an input returns
+    `eligible=False`.
+    """
+    changed = _validate_changed_files(changed_files)
+    if changed is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+
+    if not _has_test_evidence(changed):
+        return _decline(REASON_NO_TEST_EVIDENCE)
+
+    if ci_conclusion != "success":
+        return _decline(REASON_CI_NOT_GREEN)
+
+    max_diff = _validate_positive_int(max_diff_lines)
+    if max_diff is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+    diff_count = _validate_nonnegative_int(diff_lines)
+    if diff_count is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+    if diff_count > max_diff:
+        return _decline(REASON_DIFF_TOO_LARGE)
+
+    if _touches_judge_path(changed):
+        return _decline(REASON_JUDGE_PATH_TOUCHED)
+
+    if not _is_traceable(provenance):
+        return _decline(REASON_UNTRACEABLE)
+
+    max_merges = _validate_positive_int(max_merges_per_day)
+    if max_merges is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+
+    try:
+        merge_count = state_reader.merges_last_24h()
+    except Exception:  # noqa: BLE001
+        return _decline(REASON_UNREADABLE_INPUT)
+    if not isinstance(merge_count, int) or isinstance(merge_count, bool):
+        return _decline(REASON_UNREADABLE_INPUT)
+    if merge_count >= max_merges:
+        return _decline(REASON_DAILY_CAP_REACHED)
+
+    return MergeDecision(eligible=True, reason=REASON_ELIGIBLE)
+
+
+def _validate_changed_files(changed_files: Any) -> list[str] | None:
+    if changed_files is None or isinstance(changed_files, (str, bytes)):
+        return None
+    if not isinstance(changed_files, Sequence):
+        return None
+    result: list[str] = []
+    for entry in changed_files:
+        if not isinstance(entry, str):
+            return None
+        result.append(entry)
+    return result
+
+
+def _has_test_evidence(changed: list[str]) -> bool:
+    return any(path.startswith(_TESTS_PREFIX) for path in changed)
+
+
+def _touches_judge_path(changed: list[str]) -> bool:
+    for path in changed:
+        for judge_path in JUDGE_PATHS:
+            if judge_path.endswith("/"):
+                if path.startswith(judge_path):
+                    return True
+            elif path == judge_path:
+                return True
+    return False
+
+
+def _is_traceable(provenance: Any) -> bool:
+    if not isinstance(provenance, Mapping):
+        return False
+    kind = provenance.get("kind")
+    ref = provenance.get("ref")
+    if kind not in PROVENANCE_KINDS:
+        return False
+    if not isinstance(ref, str) or not ref.strip():
+        return False
+    return True
+
+
+def _validate_positive_int(value: Any) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def _validate_nonnegative_int(value: Any) -> int | None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        return None
+    if value < 0:
+        return None
+    return value

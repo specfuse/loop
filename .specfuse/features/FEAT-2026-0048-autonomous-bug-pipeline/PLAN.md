@@ -5,7 +5,7 @@ slug: autonomous-bug-pipeline
 branch: feat/FEAT-2026-0048-autonomous-bug-pipeline
 roadmap_goal: Run the full bug lane headlessly — triaged bug issue or diagnosed finding to headless fix-bug to PR, and on CI green merge behind a default-off dial that opens the gate without ever removing the guardrails.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 21.00
 ---
 
