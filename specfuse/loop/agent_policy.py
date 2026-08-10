@@ -76,6 +76,11 @@ _DEFAULT_PATH = Path(".specfuse/agent-policy.yml")
 
 DEFAULT_MAX_DIFF_LINES = 150
 DEFAULT_MAX_MERGES_PER_DAY = 3
+# Path prefixes the bug lane accepts as test evidence (#1418). A tuple, so the
+# default cannot be mutated by a caller. `tests/` alone was hardcoded in
+# bug_lane until it made the guardrail unsatisfiable — and therefore the whole
+# lane inert — on any repository laying tests out differently.
+DEFAULT_TEST_PATHS = ("tests/",)
 
 
 def load_policy(path: str | Path | None = None) -> dict:
@@ -144,6 +149,7 @@ def bug_lane_limits(path: str | Path | None = None) -> dict:
     limits = {
         "max_diff_lines": DEFAULT_MAX_DIFF_LINES,
         "max_merges_per_day": DEFAULT_MAX_MERGES_PER_DAY,
+        "test_paths": list(DEFAULT_TEST_PATHS),
     }
 
     try:
@@ -163,6 +169,16 @@ def bug_lane_limits(path: str | Path | None = None) -> dict:
     max_merges_per_day = bugs.get("max_merges_per_day")
     if isinstance(max_merges_per_day, int) and not isinstance(max_merges_per_day, bool):
         limits["max_merges_per_day"] = max_merges_per_day
+
+    # A declared list of non-empty strings replaces the default outright rather
+    # than extending it: an operator naming their layout means "these are my test
+    # paths", not "these as well as tests/". A malformed value leaves the default
+    # in place, so a typo cannot silently widen or disable the guardrail.
+    test_paths = bugs.get("test_paths")
+    if isinstance(test_paths, list) and test_paths and all(
+        isinstance(entry, str) and entry.strip() for entry in test_paths
+    ):
+        limits["test_paths"] = list(test_paths)
 
     return limits
 
@@ -330,6 +346,23 @@ def _check_rules_bugs(bugs: object) -> list[str]:
             findings.append(
                 f"ERROR: 'rules.bugs.max_merges_per_day' must be an int > 0 "
                 f"(got {max_merges_per_day!r})"
+            )
+
+    # Validated rather than silently ignored (#1418). `bug_lane_limits` falls back
+    # to the default on a malformed value, so without this an operator's declared
+    # layout would be dropped with no signal — the same silent-inertness the
+    # hardcoded prefix caused. An empty list is rejected too: it would refuse
+    # every merge, which is a misconfiguration and not a way to disable the check.
+    if "test_paths" in bugs:
+        test_paths = bugs["test_paths"]
+        if (
+            not isinstance(test_paths, list)
+            or not test_paths
+            or not all(isinstance(e, str) and e.strip() for e in test_paths)
+        ):
+            findings.append(
+                f"ERROR: 'rules.bugs.test_paths' must be a non-empty list of "
+                f"non-empty path prefixes (got {test_paths!r})"
             )
 
     return findings

@@ -224,7 +224,8 @@ class TestBugLaneLimits(unittest.TestCase):
             missing = Path(tmp) / "agent-policy.yml"
             self.assertEqual(
                 bug_lane_limits(missing),
-                {"max_diff_lines": 150, "max_merges_per_day": 3},
+                {"max_diff_lines": 150, "max_merges_per_day": 3,
+                 "test_paths": ["tests/"]},
             )
 
     def test_defaults_when_keys_absent(self) -> None:
@@ -233,7 +234,8 @@ class TestBugLaneLimits(unittest.TestCase):
             p.write_text(VALID_CONFIG_AUTOMERGE_OFF)
             self.assertEqual(
                 bug_lane_limits(p),
-                {"max_diff_lines": 150, "max_merges_per_day": 3},
+                {"max_diff_lines": 150, "max_merges_per_day": 3,
+                 "test_paths": ["tests/"]},
             )
 
     def test_explicit_values_used(self) -> None:
@@ -242,7 +244,8 @@ class TestBugLaneLimits(unittest.TestCase):
             p.write_text(_config_with_limits(max_diff_lines=75, max_merges_per_day=5))
             self.assertEqual(
                 bug_lane_limits(p),
-                {"max_diff_lines": 75, "max_merges_per_day": 5},
+                {"max_diff_lines": 75, "max_merges_per_day": 5,
+                 "test_paths": ["tests/"]},
             )
 
 
