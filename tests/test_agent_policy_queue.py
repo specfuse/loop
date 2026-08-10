@@ -36,7 +36,7 @@ _TAIL_BLOCK = (
     "  max_open_prs: 3\n"
     "  max_items_per_day: 10\n"
     "escalation:\n"
-    '  webhook: ""\n'
+    '  webhook_env: ""\n'
     '  assignee: ""\n'
     '  quiet_hours: ""\n'
     "  sla_hours: 24\n"

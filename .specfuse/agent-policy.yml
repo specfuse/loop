@@ -35,7 +35,9 @@ budgets:
   max_items_per_day: 10
 
 escalation:
-  webhook: ""                  # FEAT-2026-0047 has not shipped
+  webhook_env: ""               # env-var NAME holding the webhook URL, not the URL itself
+  provider: none                # discord | slack | teams | none
   assignee: ""
   quiet_hours: ""
   sla_hours: 24
+  silence_hours: 24

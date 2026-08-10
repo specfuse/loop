@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from specfuse.loop import escalation, gh_features, triage
+from specfuse.loop import escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 
 
@@ -118,6 +118,12 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="bfdadc",
         description="An inbound issue triaged as won't-fix",
         consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=notify_sla.PARKED_LABEL,
+        colour="c2e0c6",
+        description="An unanswered escalation was re-pinged once and is now parked",
+        consumer="loop/notify_sla.py",
     ),
 )
 

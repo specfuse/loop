@@ -45,6 +45,7 @@ __all__ = (
     "SEVERITY_VALUES",
     "AUTOMERGE_VALUES",
     "GATE_REVIEW_VALUES",
+    "PROVIDER_VALUES",
 )
 
 _DONE_OR_ABANDONED = frozenset({"done", "abandoned"})
@@ -52,13 +53,24 @@ _DONE_OR_ABANDONED = frozenset({"done", "abandoned"})
 SEVERITY_VALUES = frozenset({"low", "medium", "high", "critical"})
 AUTOMERGE_VALUES = frozenset({"off", "on"})
 GATE_REVIEW_VALUES = frozenset({"human", "auto"})
+PROVIDER_VALUES = frozenset({"discord", "slack", "teams", "none"})
 
 REQUIRED_TOP_LEVEL_FIELDS = ("version", "queue", "rules", "budgets", "escalation")
 
 _FEAT_ID_RE = re.compile(r"^FEAT-\d{4}-\d{4}$")
 
 _REQUIRED_BUDGET_FIELDS = ("max_tokens_per_run", "max_open_prs", "max_items_per_day")
-_REQUIRED_ESCALATION_FIELDS = ("webhook", "assignee", "quiet_hours", "sla_hours")
+_REQUIRED_ESCALATION_FIELDS = ("webhook_env", "assignee", "quiet_hours", "sla_hours")
+_ESCALATION_KNOWN_KEYS = frozenset(_REQUIRED_ESCALATION_FIELDS) | {
+    "provider",
+    "silence_hours",
+}
+
+# An environment-variable-NAME reference, not a secret value — same shape
+# check and same rationale as lint_monitoring._ENV_VAR_NAME_RE: structural
+# only, not a secret detector (that is leak-scan's job). A pasted webhook
+# URL trips it on `:`, `/`, and `.`.
+_ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 _DEFAULT_PATH = Path(".specfuse/agent-policy.yml")
 
@@ -398,7 +410,12 @@ def _check_escalation(escalation: object) -> list[str]:
         return ["ERROR: 'escalation' must be a mapping"]
 
     findings: list[str] = []
-    for field in ("webhook", "assignee", "quiet_hours"):
+
+    unknown = set(escalation) - _ESCALATION_KNOWN_KEYS
+    for key in sorted(unknown):
+        findings.append(f"ERROR: unknown 'escalation.{key}' key")
+
+    for field in ("webhook_env", "assignee", "quiet_hours"):
         if field not in escalation:
             findings.append(f"ERROR: missing 'escalation.{field}' key")
             continue
@@ -406,6 +423,25 @@ def _check_escalation(escalation: object) -> list[str]:
             findings.append(
                 f"ERROR: 'escalation.{field}' must be a string "
                 f"(got {escalation[field]!r})"
+            )
+
+    webhook_env = escalation.get("webhook_env")
+    if (
+        isinstance(webhook_env, str)
+        and webhook_env
+        and not _ENV_VAR_NAME_RE.match(webhook_env)
+    ):
+        findings.append(
+            f"ERROR: 'escalation.webhook_env' must be an "
+            f"environment-variable NAME, not a value (got {webhook_env!r})"
+        )
+
+    if "provider" in escalation:
+        provider = escalation["provider"]
+        if provider not in PROVIDER_VALUES:
+            findings.append(
+                f"ERROR: 'escalation.provider' has unknown value "
+                f"{provider!r} — must be one of {sorted(PROVIDER_VALUES)}"
             )
 
     if "sla_hours" not in escalation:
@@ -416,6 +452,18 @@ def _check_escalation(escalation: object) -> list[str]:
             findings.append(
                 f"ERROR: 'escalation.sla_hours' must be an int > 0 "
                 f"(got {sla_hours!r})"
+            )
+
+    if "silence_hours" in escalation:
+        silence_hours = escalation["silence_hours"]
+        if (
+            not isinstance(silence_hours, int)
+            or isinstance(silence_hours, bool)
+            or silence_hours <= 0
+        ):
+            findings.append(
+                f"ERROR: 'escalation.silence_hours' must be an int > 0 "
+                f"(got {silence_hours!r})"
             )
     return findings
 

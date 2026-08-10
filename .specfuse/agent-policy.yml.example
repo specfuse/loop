@@ -45,7 +45,9 @@ budgets:
   max_items_per_day: 10          # int > 0
 
 escalation:
-  webhook: ""                    # str, may be empty
-  assignee: ""                   # str, may be empty
-  quiet_hours: ""                # str, may be empty; "HH:MM-HH:MM" when set
-  sla_hours: 24                  # int > 0
+  webhook_env: ""                 # env-var NAME holding the webhook URL (not the URL itself); may be empty
+  provider: none                  # discord | slack | teams | none
+  assignee: ""                    # str, may be empty
+  quiet_hours: ""                 # str, may be empty; "HH:MM-HH:MM" when set
+  sla_hours: 24                   # int > 0
+  silence_hours: 24               # OPTIONAL int > 0 — no run within this window flags stale; defaults to 24

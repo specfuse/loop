@@ -1,12 +1,22 @@
 ---
 id: FEAT-2026-0047/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
 oracle_env: macos_local
 oracles: [oracles]
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.10.0
+started_at: 2026-08-10T09:22:20.187908+00:00
+duration_seconds: 1476.636
+cost_usd: 19.877361
+input_tokens: 273
+output_tokens: 97698
 ---
 
 # Close FEAT-2026-0047 — terminal gate

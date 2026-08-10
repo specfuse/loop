@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The notifier, its payload adapters, and the `webhook_env` security correction",
+          "id": "FEAT-2026-0047/T01",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Post a one-liner and a link when a needs-human issue is filed",
+          "id": "FEAT-2026-0047/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Re-ping an unanswered escalation exactly once, then park it",
+          "id": "FEAT-2026-0047/T03",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Alarm the silence \u2014 derive the last run from repo state and flag staleness",
+          "id": "FEAT-2026-0047/T04",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close FEAT-2026-0047 \u2014 terminal gate",
+          "id": "FEAT-2026-0047/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

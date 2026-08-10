@@ -53,7 +53,7 @@ budgets:
   max_open_prs: 1
   max_items_per_day: 1
 escalation:
-  webhook: x
+  webhook_env: x
   assignee: x
   quiet_hours: x
   sla_hours: 1

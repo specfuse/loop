@@ -1,7 +1,17 @@
 ---
 gate: 1
-status: open
+status: passed
 cost_budget_usd: 24.50
+baseline:
+  sha: e0ec4972e3e9ccd87f578bf51c7341233e273a19
+  probed_at: 2026-08-10T08:52:14.435059+00:00
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: test_real_feature_corpus_has_no_close_l_or_close_intermediate_f_findings
+    - gate: coverage
+      failure_class: coverage
+      failure_signature: $ coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90
 ---
 
 # Gate 1 — escalations reach the operator's channel, and agent silence alarms itself

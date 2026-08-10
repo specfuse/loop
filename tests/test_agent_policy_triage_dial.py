@@ -31,7 +31,7 @@ budgets:
   max_open_prs: 3
   max_items_per_day: 10
 escalation:
-  webhook: ""
+  webhook_env: ""
   assignee: ""
   quiet_hours: ""
   sla_hours: 24
@@ -53,7 +53,7 @@ budgets:
   max_open_prs: 3
   max_items_per_day: 10
 escalation:
-  webhook: ""
+  webhook_env: ""
   assignee: ""
   quiet_hours: ""
   sla_hours: 24
@@ -77,7 +77,7 @@ budgets:
   max_open_prs: 3
   max_items_per_day: 10
 escalation:
-  webhook: ""
+  webhook_env: ""
   assignee: ""
   quiet_hours: ""
   sla_hours: 24
