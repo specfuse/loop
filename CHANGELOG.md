@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`specfuse run` now refuses to start when a dispatched session could not create its own session directory.** A run launched from a sandboxed shell whose deny-list covers `~/.claude/session-env` dispatched anyway: the parent process has a working shell, so nothing looked wrong, but every `claude -p` session it spawned failed with `EPERM ... mkdir '.../session-env/<session-id>'` and started with a **dead Bash tool** for the whole attempt. The agent could still use Write, so `files_touched` came back non-empty and the failure read as ordinary work-unit trouble — blame landing on the work unit rather than the environment. Observed cost before this guard: **$7.85 across two attempts**, the second of which correctly diagnosed the EPERM itself and reported `blocked`. `require_session_env_writable` now probes the root with a create-and-remove before any dispatch, in the same preflight block as the existing feature-folder guards, and refuses with the path and the likely cause named. An absent root is **created**, not refused — a first-ever run has no session-env directory, and treating that as failure would halt every clean machine (#1414)
+
 ## [0.11.0+umbrella.0.11.0] - 2026-08-10
 
 ### Breaking
