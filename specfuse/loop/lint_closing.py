@@ -19,6 +19,7 @@ registry the post-squash guards in `loop.py` import from.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -117,11 +118,27 @@ def _check_retrospective_exists(req: creq.Requirement, ctx: ClosingContext):
 def _check_learnings_appended_or_noop(req: creq.Requirement, ctx: ClosingContext):
     if _git_diff_added_lines(ctx.repo_root, creq.LEARNINGS_PATH):
         return True, ""
+    # Under `autonomy_default: auto` the append above is what close-i
+    # forbids, so the feature-local staging file carries the same evidence.
+    # The mirror has to agree with the driver guard here or lint keeps
+    # telling an auto session to write the no-op phrase it just earned the
+    # right not to write (#1419).
+    staged_rel: str | None = None
+    if creq.learnings_staging_is_required(ctx.plan_fm.get("autonomy_default")):
+        staged_rel = os.path.relpath(
+            ctx.feature_dir / creq.LEARNINGS_PENDING_FILENAME, ctx.repo_root,
+        )
+        if _git_diff_added_lines(ctx.repo_root, staged_rel):
+            return True, ""
     retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
     if retro.exists() and creq.NOTHING_GENERALIZES_PHRASE in retro.read_text().lower():
         return True, ""
+    accepted = (
+        creq.LEARNINGS_PATH if staged_rel is None
+        else f"{creq.LEARNINGS_PATH} or {staged_rel}"
+    )
     return False, (
-        f"no {creq.LEARNINGS_PATH} additions in the working tree and no "
+        f"no {accepted} additions in the working tree and no "
         f"'{creq.NOTHING_GENERALIZES_PHRASE}' note in {creq.RETROSPECTIVE_FILENAME}"
     )
 

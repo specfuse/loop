@@ -90,6 +90,7 @@ from .closing_requirements import (
     find_consumer_visible_section,
     gate_review_filename,
     gate_section_heading_re,
+    learnings_staging_is_required,
 )
 from .gate_eval import (
     evaluate_auto_close,
@@ -4920,26 +4921,61 @@ def assert_retrospective_exists(
     return True, ""
 
 
-def assert_learnings_appended_or_noop(
-    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
-) -> tuple[bool, str]:
-    """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
+def _squash_added_lines(rel_path: str, head_before: str) -> bool:
+    """True if *rel_path* gained ≥1 added line between *head_before* and HEAD."""
     proc = subprocess.run(
-        ["git", "diff", head_before, "HEAD", "--", LEARNINGS_PATH],
+        ["git", "diff", head_before, "HEAD", "--", rel_path],
         capture_output=True, text=True, check=False,
     )
-    added = any(
+    return any(
         ln.startswith("+") and not ln.startswith("+++")
         for ln in proc.stdout.splitlines()
     )
-    if added:
+
+
+def _feature_autonomy_default(feature_dir: Path) -> str | None:
+    """`autonomy_default` from PLAN.md, or None when there is no PLAN.md.
+
+    Deliberately not `load_graph`, which exits the process when PLAN.md
+    carries no graph block — the closing guards must stay callable against a
+    bare feature dir.
+    """
+    plan = feature_dir / "PLAN.md"
+    if not plan.exists():
+        return None
+    fm, _ = read_frontmatter(plan)
+    return fm.get("autonomy_default")
+
+
+def assert_learnings_appended_or_noop(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-b) A generalizable lesson was recorded, or RETRO says 'nothing generalizes'.
+
+    "Recorded" means ≥1 added line in `LEARNINGS_PATH` — except under
+    `autonomy_default: auto`, where `assert_learnings_staged_under_auto`
+    (close-i) forbids exactly that and routes the lesson to the feature-local
+    `LEARNINGS_PENDING_FILENAME` instead. Accepting the staging file as the
+    same evidence is what keeps the two guards from contradicting: before
+    this, an `auto` close could satisfy close-b only by asserting that
+    nothing generalized while a populated staging file sat beside it (#1419).
+    """
+    if _squash_added_lines(LEARNINGS_PATH, head_before):
         return True, ""
+    staged_rel: str | None = None
+    if learnings_staging_is_required(_feature_autonomy_default(feature_dir)):
+        staged_rel = os.path.relpath(
+            feature_dir / LEARNINGS_PENDING_FILENAME, repo_root,
+        )
+        if _squash_added_lines(staged_rel, head_before):
+            return True, ""
     retro = feature_dir / RETROSPECTIVE_FILENAME
     if retro.exists() and NOTHING_GENERALIZES_PHRASE in retro.read_text().lower():
         return True, ""
+    accepted = LEARNINGS_PATH if staged_rel is None else f"{LEARNINGS_PATH} or {staged_rel}"
     return (
         False,
-        f"assert_learnings_appended_or_noop: no {LEARNINGS_PATH} additions in squash "
+        f"assert_learnings_appended_or_noop: no {accepted} additions in squash "
         f"and no '{NOTHING_GENERALIZES_PHRASE}' note in {RETROSPECTIVE_FILENAME}",
     )
 
@@ -5822,7 +5858,7 @@ def assert_learnings_staged_under_auto(
     between `head_before` and `HEAD` does not touch `LEARNINGS_PATH`.
     """
     feat_fm, _ = load_graph(feature_dir)
-    if feat_fm.get("autonomy_default") != "auto":
+    if not learnings_staging_is_required(feat_fm.get("autonomy_default")):
         return True, ""
     proc = subprocess.run(
         ["git", "diff", "--name-only", head_before, "HEAD"],
