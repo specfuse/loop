@@ -37,6 +37,7 @@ from .lint_roadmap import roadmap_statuses
 
 __all__ = (
     "load_policy",
+    "resolve_triage_auto",
     "validate_agent_policy",
     "main",
     "SEVERITY_VALUES",
@@ -71,6 +72,28 @@ def load_policy(path: str | Path | None = None) -> dict:
     if not p.is_file():
         raise FileNotFoundError(f"{p}: agent-policy file does not exist")
     return _miniyaml.parse(p.read_text())
+
+
+def resolve_triage_auto(path: str | Path | None = None) -> bool:
+    """Resolve `rules.triage.auto` for `apply_triage`'s `auto` argument.
+
+    Returns `False` (the safe default, matching `apply_triage`'s own
+    default) when the policy file is absent or the key is absent. Returns
+    `True` only when the key is exactly boolean `true` -- no truthy-string
+    coercion.
+    """
+    try:
+        policy = load_policy(path)
+    except FileNotFoundError:
+        return False
+
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    if not isinstance(rules, dict):
+        return False
+    triage = rules.get("triage")
+    if not isinstance(triage, dict):
+        return False
+    return triage.get("auto") is True
 
 
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:

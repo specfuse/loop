@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0044/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - plugins/specfuse/skills/triage-issues/SKILL.md
   - tests/test_agent_policy_triage_dial.py
 produces_driver_helper: resolve_triage_auto
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T03:34:46.055482+00:00
+duration_seconds: 778.676
+cost_usd: 0.949437
+input_tokens: 48
+output_tokens: 7451
 ---
 
 # Supply `apply_triage`'s `auto` from the policy file
