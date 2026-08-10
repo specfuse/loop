@@ -2319,9 +2319,81 @@ def persist_attempt_notes(
     for atmpt, evidence in attempt_notes:
         p = work_dir / wu_key / f"attempt-{atmpt}.md"
         p.parent.mkdir(parents=True, exist_ok=True)
+        # Terminate the last line. A note without one counts 0 under `wc -l`,
+        # which is how #1412 came to be reported as a 0-byte file when it
+        # actually carried 43 bytes. Empty evidence still writes empty: a
+        # newline-only file would signal that evidence exists when none does.
+        if evidence and not evidence.endswith("\n"):
+            evidence += "\n"
         p.write_text(evidence)
         paths.append(p)
     return paths
+
+
+def format_deliverable_missing_note(
+    wu: "WorkUnit", summary: str, touched: list, attempt: int,
+) -> str:
+    """Compose the attempt note for a deliverable-presence refusal (#1412).
+
+    The presence gate fires BEFORE verification, so there is no verify output
+    to write — which is why this branch used to buffer only
+    ``assert_declared_deliverables``' one-line summary. That single line is
+    the same string the retry prompt already prints, so the artifact set said
+    nothing the next attempt did not already know: not which of several
+    declared paths landed, not what the attempt actually wrote instead. A
+    real run spent $3.88 over three attempts, each reaching the same wall,
+    with none of that recorded.
+
+    Renders what IS knowable at the refusal: every declared ``produces:``
+    entry marked present or absent as measured on disk, and the paths the
+    attempt's squash actually touched (``git diff`` against ``head_before``,
+    measured before the reset). An empty touched list is stated explicitly —
+    "the agent wrote nothing" is evidence, and the reported run's third
+    attempt was exactly that.
+
+    The issue also asked for ``git status --porcelain``. At this point the
+    attempt's work is already squashed, so the working tree is clean and the
+    porcelain output would be empty; *touched* is the meaningful equivalent
+    and is what this renders instead.
+    """
+    lines = [
+        f"# Deliverable-presence refusal — attempt {attempt}",
+        "",
+        f"`{wu.wu_id}` was refused by `assert_declared_deliverables`:",
+        "",
+        f"    {summary}",
+        "",
+        "## Declared `produces:` vs what is on disk",
+        "",
+    ]
+    if not wu.produces:
+        lines.append("(none declared)")
+    for raw in wu.produces or []:
+        path = str(raw)
+        p = Path(path)
+        if produces_is_glob(path):
+            matches = [
+                m for m in glob.glob(path)
+                if Path(m).is_file() and Path(m).stat().st_size > 0
+            ]
+            state = (
+                f"PRESENT — {len(matches)} non-empty match(es)" if matches
+                else "ABSENT — glob matched no existing non-empty file"
+            )
+        elif not p.exists():
+            state = "ABSENT — no such file"
+        elif p.stat().st_size == 0:
+            state = "ABSENT — exists but is empty (0 bytes)"
+        else:
+            state = f"PRESENT — {p.stat().st_size} bytes"
+        lines.append(f"- `{path}` — {state}")
+    lines += ["", "## Files this attempt touched", ""]
+    if touched:
+        lines += [f"- `{t}`" for t in touched]
+    else:
+        lines.append("(none — the attempt's squash changed no tracked file)")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
@@ -6747,6 +6819,14 @@ def run(
                         # every current WU is unchanged.
                         deliv_ok, deliv_summary = assert_declared_deliverables(wu)
                         if not deliv_ok:
+                            # Composed BEFORE the reset. The reset rolls the
+                            # squash back, so afterwards every declared path
+                            # reads ABSENT and the note would lose the one
+                            # distinction it exists to record — which of the
+                            # declared deliverables the attempt did land (#1412).
+                            _deliv_note = format_deliverable_missing_note(
+                                wu, deliv_summary, _refusal_touched, attempt,
+                            )
                             reset_preserving_events(head_before, events_path,
                                                     untracked_before=untracked_before)
                             missing = deliv_summary.split(": ", 1)[-1]
@@ -6761,7 +6841,7 @@ def run(
                             ))
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
-                            attempt_notes.append((attempt, deliv_summary))
+                            attempt_notes.append((attempt, _deliv_note))
                             failure_note = deliv_summary
                             print(
                                 f"   DELIVERABLE MISSING attempt "
