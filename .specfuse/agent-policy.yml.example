@@ -16,14 +16,21 @@ version: 1                      # int, must equal 1
 # Feature work-queue order, by FEAT-ID. May be empty — an empty queue is a
 # valid, meaningful declaration: "agent works bugs only and asks for
 # priorities" when nothing here is ready to pick up.
-queue:
-  - FEAT-2026-0048
+# Ordered FEAT-IDs, highest priority first. Empty is valid and meaningful:
+# the agent works bugs only and asks for priorities. Entries are validated
+# against .specfuse/roadmap.md — an unknown ID is an ERROR, and one whose
+# feature has since gone done/abandoned is a WARN for /groom-backlog to clear.
+#   queue:
+#     - FEAT-2026-0123
+queue: []
 
 rules:
   bugs:
     preempt: true                # bool — bugs jump the feature queue when true
     min_severity: low            # low | medium | high | critical
     automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
+    max_diff_lines: 150          # OPTIONAL int > 0 — merge-eligibility size cap; defaults to 150
+    max_merges_per_day: 3        # OPTIONAL int > 0 — rolling 24h auto-merge cap; defaults to 3
   features:
     gate_review: human           # human | auto
     wip_limit: 1                 # int >= 1

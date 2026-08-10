@@ -1,7 +1,11 @@
 ---
 gate: 1
-status: open
+status: passed
 cost_budget_usd: 26.00
+baseline:
+  sha: bb0a56ac7e7024982ec759ce267c922d62130a8b
+  probed_at: 2026-08-10T06:22:16.139385+00:00
+  failing: []
 ---
 
 # Gate 1 — the bug lane runs end to end, and nothing merges unless every guardrail says so

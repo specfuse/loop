@@ -38,6 +38,8 @@ from .lint_roadmap import roadmap_statuses
 __all__ = (
     "load_policy",
     "resolve_triage_auto",
+    "resolve_bug_automerge",
+    "bug_lane_limits",
     "validate_agent_policy",
     "main",
     "SEVERITY_VALUES",
@@ -59,6 +61,9 @@ _REQUIRED_BUDGET_FIELDS = ("max_tokens_per_run", "max_open_prs", "max_items_per_
 _REQUIRED_ESCALATION_FIELDS = ("webhook", "assignee", "quiet_hours", "sla_hours")
 
 _DEFAULT_PATH = Path(".specfuse/agent-policy.yml")
+
+DEFAULT_MAX_DIFF_LINES = 150
+DEFAULT_MAX_MERGES_PER_DAY = 3
 
 
 def load_policy(path: str | Path | None = None) -> dict:
@@ -94,6 +99,60 @@ def resolve_triage_auto(path: str | Path | None = None) -> bool:
     if not isinstance(triage, dict):
         return False
     return triage.get("auto") is True
+
+
+def resolve_bug_automerge(path: str | Path | None = None) -> bool:
+    """Resolve `rules.bugs.automerge` for the bug-lane merge guardrails.
+
+    Returns `False` (the safe default) when the policy file is absent, the
+    key is absent, or the value is anything other than the exact string
+    `"on"` -- including the boolean `True`, which is not the declared
+    spelling (the schema's `AUTOMERGE_VALUES` are `"off"` / `"on"` strings).
+    """
+    try:
+        policy = load_policy(path)
+    except FileNotFoundError:
+        return False
+
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    if not isinstance(rules, dict):
+        return False
+    bugs = rules.get("bugs")
+    if not isinstance(bugs, dict):
+        return False
+    return bugs.get("automerge") == "on"
+
+
+def bug_lane_limits(path: str | Path | None = None) -> dict:
+    """Resolve `rules.bugs.max_diff_lines` / `max_merges_per_day`.
+
+    Returns the documented defaults (150, 3) when the policy file is absent
+    or either key is absent.
+    """
+    limits = {
+        "max_diff_lines": DEFAULT_MAX_DIFF_LINES,
+        "max_merges_per_day": DEFAULT_MAX_MERGES_PER_DAY,
+    }
+
+    try:
+        policy = load_policy(path)
+    except FileNotFoundError:
+        return limits
+
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    if not isinstance(bugs, dict):
+        return limits
+
+    max_diff_lines = bugs.get("max_diff_lines")
+    if isinstance(max_diff_lines, int) and not isinstance(max_diff_lines, bool):
+        limits["max_diff_lines"] = max_diff_lines
+
+    max_merges_per_day = bugs.get("max_merges_per_day")
+    if isinstance(max_merges_per_day, int) and not isinstance(max_merges_per_day, bool):
+        limits["max_merges_per_day"] = max_merges_per_day
+
+    return limits
 
 
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:
@@ -236,6 +295,31 @@ def _check_rules_bugs(bugs: object) -> list[str]:
             f"ERROR: 'rules.bugs.automerge' has unknown value {automerge!r} "
             f"— must be one of {sorted(AUTOMERGE_VALUES)}"
         )
+
+    if "max_diff_lines" in bugs:
+        max_diff_lines = bugs["max_diff_lines"]
+        if (
+            not isinstance(max_diff_lines, int)
+            or isinstance(max_diff_lines, bool)
+            or max_diff_lines <= 0
+        ):
+            findings.append(
+                f"ERROR: 'rules.bugs.max_diff_lines' must be an int > 0 "
+                f"(got {max_diff_lines!r})"
+            )
+
+    if "max_merges_per_day" in bugs:
+        max_merges_per_day = bugs["max_merges_per_day"]
+        if (
+            not isinstance(max_merges_per_day, int)
+            or isinstance(max_merges_per_day, bool)
+            or max_merges_per_day <= 0
+        ):
+            findings.append(
+                f"ERROR: 'rules.bugs.max_merges_per_day' must be an int > 0 "
+                f"(got {max_merges_per_day!r})"
+            )
+
     return findings
 
 

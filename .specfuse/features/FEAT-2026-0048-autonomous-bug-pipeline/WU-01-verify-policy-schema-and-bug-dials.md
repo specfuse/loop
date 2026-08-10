@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0048/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - tests/test_bug_lane_policy_contract.py
 produces_driver_helper: resolve_bug_automerge, bug_lane_limits
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T04:54:50.101122+00:00
+duration_seconds: 312.051
+cost_usd: 0.805799
+input_tokens: 30
+output_tokens: 9457
 ---
 
 # Verify the shipped policy schema against this plan's assumptions, then add the bug-lane dials

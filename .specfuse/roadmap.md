@@ -62,8 +62,8 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | done | `.specfuse/features/FEAT-2026-0044-agent-policy-schema/` | [→ archive](roadmap-archive.md#feat-2026-0044) |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
-| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
-| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | planned | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ detail](#feat-2026-0048) |
+| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ detail](#feat-2026-0047) |
+| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
@@ -798,27 +798,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0048"></a>
-## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
-
-**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
-
-**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
-
-**Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
-
-**Drafted 2026-08-09, ahead of its turn.** The feature folder exists and lints
-clean, drafted solo without an operator interview and **before
-[FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) shipped the schema it builds on** — both on
-operator instruction. Its `PLAN.md` records seven assumed decisions for veto at
-PR review, and its `T01` verifies the shipped schema against the assumed one and
-escalates on divergence rather than adapting silently. Dispatch only after 0044
-merges.
-
-**Status: planned.** Unblocked 2026-08-10: both named blockers cleared —
-[FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) (machine-readable triage intake) and
-[FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) (escalation contract) are both `done`.
-
 <a id="feat-2026-0049"></a>
 ## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
 
@@ -828,7 +807,7 @@ merges.
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-**Blocked by.** [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
+**Blocked by.** [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](roadmap-archive.md#feat-2026-0048) — the autonomous bug lane
 
 **Status: blocked.**
 

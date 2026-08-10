@@ -107,30 +107,30 @@ class TestQueueAgainstRoadmap(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_planned_active_blocked_deferred_produce_no_finding(self):
-        # FEAT-2026-0048 planned, FEAT-2026-0011 blocked, per the live roadmap.
-        for feat_id, status in (
-            ("FEAT-2026-0048", "planned"),
-            ("FEAT-2026-0011", "blocked"),
-        ):
+        # Every ID is looked up from the live roadmap by status rather than
+        # hardcoded. Pinning an ID pins its status at authoring time, and the
+        # status is exactly what changes: this test asserted FEAT-2026-0048 was
+        # `planned` and went red the morning that feature reached `done` — on a
+        # correct tree, which is the failure `planning-discipline.md` §2 exists
+        # to prevent and which the WARN/ERROR split was designed to avoid.
+        statuses = roadmap_statuses(REPO_ROOT)
+
+        checked = 0
+        for status in ("planned", "active", "blocked", "deferred"):
+            feat_id = next(
+                (fid for fid, st in statuses.items() if st == status), None
+            )
+            if feat_id is None:
+                continue  # no feature currently in that state — nothing to assert
             with self.subTest(feat_id=feat_id, status=status):
                 path = _write(_config_with_queue(feat_id))
                 findings = validate_agent_policy(path)
                 self.assertEqual(findings, [], findings)
+            checked += 1
 
-        statuses = roadmap_statuses(REPO_ROOT)
-        active_id = next(
-            (fid for fid, st in statuses.items() if st == "active"), None
-        )
-        if active_id is not None:
-            path = _write(_config_with_queue(active_id))
-            self.assertEqual(validate_agent_policy(path), [])
-
-        deferred_id = next(
-            (fid for fid, st in statuses.items() if st == "deferred"), None
-        )
-        if deferred_id is not None:
-            path = _write(_config_with_queue(deferred_id))
-            self.assertEqual(validate_agent_policy(path), [])
+        # Guard against the whole loop silently asserting nothing if the roadmap
+        # ever holds none of the four non-terminal statuses.
+        self.assertGreater(checked, 0, "no non-terminal roadmap status to check")
 
     def test_skipped_without_roadmap(self):
         with tempfile.TemporaryDirectory() as tmp:

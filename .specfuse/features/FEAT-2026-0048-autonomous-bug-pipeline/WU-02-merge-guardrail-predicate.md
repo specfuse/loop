@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0048/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/bug_lane.py
   - tests/test_bug_lane_guardrails.py
 produces_driver_helper: evaluate_merge_guardrails
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T05:03:44.606906+00:00
+duration_seconds: 642.74
+cost_usd: 1.038923
+input_tokens: 46
+output_tokens: 12688
 ---
 
 # The merge-eligibility predicate — pure, fail-closed, six hardcoded guardrails

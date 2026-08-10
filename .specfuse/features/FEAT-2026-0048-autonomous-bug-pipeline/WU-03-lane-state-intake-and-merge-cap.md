@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0048/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/bug_lane_state.py
   - tests/test_bug_lane_state.py
 produces_driver_helper: GitHubMergeCapState, triaged_bug_intake
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T05:26:54.419304+00:00
+duration_seconds: 713.602
+cost_usd: 0.827689
+input_tokens: 9123
+output_tokens: 11616
 ---
 
 # GitHub-resident lane state — the durable merge cap and the triaged-bug intake

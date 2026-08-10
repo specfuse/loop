@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Verify the shipped policy schema against this plan's assumptions, then add the bug-lane dials",
+          "id": "FEAT-2026-0048/T01",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "The merge-eligibility predicate \u2014 pure, fail-closed, six hardcoded guardrails",
+          "id": "FEAT-2026-0048/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "GitHub-resident lane state \u2014 the durable merge cap and the triaged-bug intake",
+          "id": "FEAT-2026-0048/T03",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Run the lane end to end: fix \u2192 PR \u2192 guarded merge, with escalation on refusal",
+          "id": "FEAT-2026-0048/T04",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close FEAT-2026-0048 \u2014 terminal gate",
+          "id": "FEAT-2026-0048/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
