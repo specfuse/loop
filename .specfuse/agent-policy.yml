@@ -1,0 +1,41 @@
+# .specfuse/agent-policy.yml
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# This repo's own operator priorities, per FEAT-2026-0044/T02: feature-work
+# queue order, gate-review and triage dials, budgets, and escalation contact
+# points. Validated structurally by `specfuse/loop/agent_policy.py`
+# (`validate_agent_policy`) and, since T02, cross-checked against
+# `.specfuse/roadmap.md` — queue entries with no roadmap row are an ERROR,
+# entries whose roadmap status has gone `done`/`abandoned` are a WARN.
+
+version: 1
+
+# Operator's stated sequence as of 2026-08-09.
+queue:
+  - FEAT-2026-0048
+  - FEAT-2026-0047
+  - FEAT-2026-0049
+
+rules:
+  bugs:
+    preempt: true
+    min_severity: low
+    automerge: "off"           # FEAT-2026-0048 owns enforcement; not built yet
+  features:
+    gate_review: human
+    wip_limit: 1
+  triage:
+    auto: false                # T03 wires this; false preserves today's behavior
+
+budgets:
+  max_tokens_per_run: 2000000
+  max_open_prs: 3
+  max_items_per_day: 10
+
+escalation:
+  webhook: ""                  # FEAT-2026-0047 has not shipped
+  assignee: ""
+  quiet_hours: ""
+  sla_hours: 24

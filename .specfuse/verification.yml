@@ -51,10 +51,10 @@ code:
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
   - name: agent-policy-example-lint
-    # FEAT-2026-0044/T01: validate_agent_policy over the shipped example, not
-    # this repo's live policy — `.specfuse/agent-policy.yml` does not exist
-    # until T02 creates it.
-    command: "python3 .specfuse/scripts/lint_agent_policy.py .specfuse/agent-policy.yml.example"
+    # FEAT-2026-0044/T02: validate_agent_policy over both the shipped example
+    # and this repo's live policy, now that `.specfuse/agent-policy.yml`
+    # exists (T02 created it).
+    command: "python3 .specfuse/scripts/lint_agent_policy.py .specfuse/agent-policy.yml.example && python3 .specfuse/scripts/lint_agent_policy.py .specfuse/agent-policy.yml"
 
   - name: event-type-gate
     # FEAT-2026-0073/T02: validate_event.py over every .specfuse/features/*/

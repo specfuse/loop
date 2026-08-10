@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0044/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
   - .specfuse/agent-policy.yml
   - tests/test_agent_policy_queue.py
 produces_driver_helper: load_policy, roadmap_statuses
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T03:17:45.359082+00:00
+duration_seconds: 663.041
+cost_usd: 1.593053
+input_tokens: 90
+output_tokens: 13929
 ---
 
 # Add the policy reader and validate queue entries against the roadmap

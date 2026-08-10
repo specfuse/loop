@@ -33,14 +33,18 @@ import re
 from pathlib import Path
 
 from . import _miniyaml
+from .lint_roadmap import roadmap_statuses
 
 __all__ = (
+    "load_policy",
     "validate_agent_policy",
     "main",
     "SEVERITY_VALUES",
     "AUTOMERGE_VALUES",
     "GATE_REVIEW_VALUES",
 )
+
+_DONE_OR_ABANDONED = frozenset({"done", "abandoned"})
 
 SEVERITY_VALUES = frozenset({"low", "medium", "high", "critical"})
 AUTOMERGE_VALUES = frozenset({"off", "on"})
@@ -54,6 +58,19 @@ _REQUIRED_BUDGET_FIELDS = ("max_tokens_per_run", "max_open_prs", "max_items_per_
 _REQUIRED_ESCALATION_FIELDS = ("webhook", "assignee", "quiet_hours", "sla_hours")
 
 _DEFAULT_PATH = Path(".specfuse/agent-policy.yml")
+
+
+def load_policy(path: str | Path | None = None) -> dict:
+    """Load and parse *path* (default ``.specfuse/agent-policy.yml``).
+
+    Raises ``FileNotFoundError`` when the path is absent — a missing policy
+    file and an empty queue are different declared states, and a caller must
+    be able to tell them apart rather than receive silently-defaulted output.
+    """
+    p = Path(path) if path is not None else _DEFAULT_PATH
+    if not p.is_file():
+        raise FileNotFoundError(f"{p}: agent-policy file does not exist")
+    return _miniyaml.parse(p.read_text())
 
 
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:
@@ -95,6 +112,37 @@ def validate_agent_policy(path: str | Path | None = None) -> list[str]:
     if "escalation" in parsed:
         findings.extend(_check_escalation(parsed["escalation"]))
 
+    if "queue" in parsed and isinstance(parsed["queue"], list):
+        findings.extend(_check_queue_against_roadmap(parsed["queue"]))
+
+    return findings
+
+
+def _check_queue_against_roadmap(queue: list) -> list[str]:
+    """Cross-check queue entries against roadmap.md's FEAT-ID status.
+
+    ERROR when a queue entry has no roadmap row at all (unresolvable, a
+    human must fix it). WARN when its status is done/abandoned (normal
+    backlog evolution; /groom-backlog proposes removal). No finding for
+    planned/active/blocked/deferred — deferred is a legitimate parked slot,
+    per the roadmap's own status legend. Skipped without error when
+    roadmap.md is absent, so a policy file may exist before a roadmap does.
+    """
+    statuses = roadmap_statuses()
+    if not statuses:
+        return []
+
+    findings: list[str] = []
+    for entry in queue:
+        if not isinstance(entry, str) or not _FEAT_ID_RE.match(entry):
+            continue
+        status = statuses.get(entry)
+        if status is None:
+            findings.append(f"ERROR: queue: {entry!r} has no row in roadmap.md")
+        elif status in _DONE_OR_ABANDONED:
+            findings.append(
+                f"WARN: queue: {entry!r} is roadmap status {status!r}"
+            )
     return findings
 
 
