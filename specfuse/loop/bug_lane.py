@@ -62,6 +62,9 @@ DECLINE_LABELS = {
 
 PROVENANCE_KINDS = ("triaged_issue", "diagnosed_finding")
 
+# Retained as the fallback only; the accepted paths now arrive as a parameter
+# (#1418) so a consumer project can declare its own layout. Kept module-level
+# so the historical default has one name.
 _TESTS_PREFIX = "tests/"
 
 
@@ -94,6 +97,10 @@ def evaluate_merge_guardrails(
     max_diff_lines: Any,
     provenance: Any,
     max_merges_per_day: Any,
+    # Defaults to the historical `tests/` so an omitting caller behaves exactly
+    # as before #1418. An explicitly malformed value still fails closed —
+    # omission means "use the default", not "skip the guardrail".
+    test_paths: Any = (_TESTS_PREFIX,),
     state_reader: MergeCapStateReader,
 ) -> MergeDecision:
     """Decide whether a bug-lane PR may auto-merge.
@@ -111,7 +118,7 @@ def evaluate_merge_guardrails(
     if changed is None:
         return _decline(REASON_UNREADABLE_INPUT)
 
-    if not _has_test_evidence(changed):
+    if not _has_test_evidence(changed, test_paths):
         return _decline(REASON_NO_TEST_EVIDENCE)
 
     if ci_conclusion != "success":
@@ -161,8 +168,27 @@ def _validate_changed_files(changed_files: Any) -> list[str] | None:
     return result
 
 
-def _has_test_evidence(changed: list[str]) -> bool:
-    return any(path.startswith(_TESTS_PREFIX) for path in changed)
+def _has_test_evidence(changed: list[str], test_paths: Any) -> bool:
+    """True when the diff touches a declared test path.
+
+    Structural only — it never judges whether the test is a *good* test. A
+    semantic judgement here would be a model-authored approval, and
+    FEAT-2026-0053's principle permits models to veto, never to approve.
+
+    Fails closed: an unreadable, empty, or non-list `test_paths` returns False,
+    so a malformed declaration refuses the merge rather than waving it through.
+    An empty list is deliberately not read as "no evidence needed".
+    """
+    if not isinstance(test_paths, (list, tuple)) or not test_paths:
+        return False
+    prefixes = [p for p in test_paths if isinstance(p, str) and p]
+    if not prefixes:
+        return False
+    return any(
+        path.startswith(prefix)
+        for path in changed
+        for prefix in prefixes
+    )
 
 
 def _touches_judge_path(changed: list[str]) -> bool:

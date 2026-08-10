@@ -31,6 +31,15 @@ rules:
     automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
     max_diff_lines: 150          # OPTIONAL int > 0 — merge-eligibility size cap; defaults to 150
     max_merges_per_day: 3        # OPTIONAL int > 0 — rolling 24h auto-merge cap; defaults to 3
+    # Path prefixes accepted as test-first evidence by the bug lane's merge
+    # guardrail. Optional; defaults to [tests/]. A declared list REPLACES the
+    # default rather than extending it. Declare your project's real layout —
+    # e.g. [spec/], [src/__tests__/], or the package dirs holding *_test.go —
+    # or the guardrail can never be satisfied and the lane silently never
+    # merges. The check is structural (does the diff touch one of these?), never
+    # a judgement about test quality.
+    # test_paths:
+    #   - tests/
   features:
     gate_review: human           # human | auto
     wip_limit: 1                 # int >= 1

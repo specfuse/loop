@@ -324,6 +324,7 @@ def run_bug_lane(
         max_diff_lines=limits["max_diff_lines"],
         provenance=provenance,
         max_merges_per_day=limits["max_merges_per_day"],
+        test_paths=limits["test_paths"],
         state_reader=state_reader,
     )
     dial = resolve_bug_automerge(policy_path)
