@@ -3606,3 +3606,33 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   than only in the prose, where it is read once. (c) The guard is doing its job: the
   alternative to a failed attempt here is a WU reporting `done` on a path that does not
   exist, which is strictly worse and much harder to find later.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test] **When "produce
+  nothing" is a designed first-class outcome, at least one test must distinguish
+  absence-because-there-was-no-evidence from absence-because-the-lookup-failed.** A test
+  that only asserts a key is missing passes identically for both, and the second is a
+  defect wearing the first's clothes. Worked example: a proposer whose whole premise is
+  "propose only what the repository can answer, never a guess" resolved its input path
+  after building a scratch directory from it, so for any relative root the evidence walk
+  found nothing and every budget proposal was silently withheld — reported as "this
+  repository has no history" when the truth was "the code could not see the history."
+  Twelve acceptance criteria passed. Rule: pair every absence assertion with a presence
+  assertion over the SAME code path differing only in the data (same path shape, history
+  vs no history), so the test fails when the mechanism breaks rather than only when the
+  policy changes. The general form: an assertion that something is missing is only
+  evidence when you have separately shown the same call CAN find it.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/fixtures-that-share-an-incidental-property]
+  **A fixture set that unanimously shares a property nobody chose cannot fail on that
+  property — enumerate what your fixtures have in common before trusting their green.**
+  Every fixture in the case above built its repository under `tempfile.TemporaryDirectory()`
+  and passed the resulting ABSOLUTE path in; not one exercised a relative path, a `./`, or
+  a `../`, because absolute-tempdir is what the idiom hands you, not a decision anyone
+  made. The defect lived exactly in the gap. Rules. (a) At authoring time, list the
+  properties every fixture shares (path shape, encoding, ordering, size, clock) and ask
+  which of them the code under test actually reads — those are your missing cases. (b)
+  Argument-shape variation is cheap and belongs beside data variation: if a parameter
+  accepts `str | Path | None`, absolute and relative, at least one fixture should be each.
+  (c) A hygiene WU that fixes this costs a fraction of a rewrite — here $0.77, 11% of the
+  gate's implementation spend — but only if review catches it before the next WU builds
+  prose on top of the wrong behaviour.

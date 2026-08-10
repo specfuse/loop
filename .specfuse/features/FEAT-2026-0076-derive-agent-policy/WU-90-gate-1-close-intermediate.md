@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0076/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 auto_close_disabled: true
 oracle_env: macos_local
 oracles: [oracles]
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.10.0
+started_at: 2026-08-10T15:35:02.957711+00:00
+duration_seconds: 872.917
+cost_usd: 7.302612
+input_tokens: 144
+output_tokens: 45809
 ---
 
 # Close gate 1 — bootstrap half
