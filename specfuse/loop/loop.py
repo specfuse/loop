@@ -1536,6 +1536,57 @@ def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> st
     return "\n".join(lines)
 
 
+def _session_env_root() -> "Path":
+    """Where a dispatched `claude -p` session creates its own session directory.
+
+    Isolated so the preflight can probe the real location rather than a guess,
+    and so a test can point it somewhere harmless.
+    """
+    return Path(os.path.expanduser("~")) / ".claude" / "session-env"
+
+
+def require_session_env_writable(root: "Path | None" = None) -> None:
+    """Hard-stop if a dispatched session could not create its session dir (#1414).
+
+    A `specfuse run` launched from a sandboxed shell whose deny-list covers
+    `~/.claude/session-env` dispatches happily — the PARENT process has a working
+    shell. Every `claude -p` session it spawns then fails on
+
+        EPERM: operation not permitted, mkdir '.../session-env/<session-id>'
+
+    and that session's Bash tool is dead for the entire attempt. Nothing in the
+    driver's output suggests an environment problem, and the agent can still use
+    Write, so `files_touched` comes back non-empty and the run reads as ordinary
+    work-unit trouble. Observed cost before this guard: **$7.85 across two
+    attempts**, the second of which correctly diagnosed the EPERM itself and
+    reported `blocked` — a good outcome for $7.20 that a `mkdir` could have
+    produced for free.
+
+    The probe is a create-and-remove of a throwaway subdirectory. An absent root
+    is created rather than refused: a first-ever run has no session-env
+    directory, and refusing there would halt every clean machine.
+    """
+    root = root if root is not None else _session_env_root()
+    probe = root / ".specfuse-preflight-probe"
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        probe.mkdir(exist_ok=True)
+    except OSError as exc:
+        sys.exit(
+            f"loop.py: cannot create a directory under '{root}' ({exc.strerror}). "
+            f"Every dispatched `claude -p` session creates its session directory "
+            f"there, so each one would start with a dead Bash tool and burn a full "
+            f"attempt before failing — the parent shell working is not evidence "
+            f"that the children will. This is usually a sandbox deny-list covering "
+            f"the path: re-run outside the sandbox, or allow writes to '{root}'.\n"
+        )
+    finally:
+        try:
+            probe.rmdir()
+        except OSError:
+            pass
+
+
 def require_feature_folder_committed(
     feature_dir: "Path", feat_fm: dict, feature_id: str,
 ) -> None:
@@ -5942,6 +5993,10 @@ def run(
         #         deleted by the reset (and crash the next frontmatter write).
         #   #74 — uncommitted arm-gate / WU-revision edits (armed statuses, AC
         #         revisions) would be silently discarded by the reset.
+        #   #1414 — a sandboxed launch leaves every dispatched session's Bash
+        #         tool dead; the parent shell working proves nothing about the
+        #         children, and the run burns full attempts before failing.
+        require_session_env_writable()
         require_feature_folder_committed(feature_dir, feat_fm, feature_id)
         require_feature_folder_unmodified(feature_dir, feat_fm, feature_id)
         ensure_feature_branch(feat_fm, feature_dir)
