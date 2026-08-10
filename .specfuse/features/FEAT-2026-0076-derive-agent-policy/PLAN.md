@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0076-derive-agent-policy
 roadmap_goal: Make agent-policy.yml's premise true — the agent stops guessing the operator's intent because a skill actually asks, proposing from repo evidence what the repo can answer and asking only what it cannot.
 autonomy_default: review
 status: active
-planned_cost_usd: 29.00
+planned_cost_usd: 38.50
 ---
 
 # Plan: Policy-interview skill — derive-agent-policy
@@ -178,12 +178,32 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Drafted by G1-PLAN against what gate 1 actually learned. Ships
-      # `status: draft` (unarmed); the operator arms it at the gate-1 review.
+      # Drafted by G1-PLAN against what gate 1 actually learned. All four ship
+      # `status: draft` (unarmed); the operator arms them at the gate-1 review
+      # after reading GATE-02-REVIEW.md. The provenance mechanism these units
+      # assume — comparison against the shipped baseline, no schema change — is
+      # decided in that artifact, reasoned from gate 1's derivability count.
+      - id: FEAT-2026-0076/T04
+        file: WU-04-policy-review.md
+        depends_on: []
+      - id: FEAT-2026-0076/T05
+        file: WU-05-review-mode-prose.md
+        depends_on: [FEAT-2026-0076/T04]
+      - id: FEAT-2026-0076/T06
+        file: WU-06-non-clobber-invariant.md
+        depends_on: [FEAT-2026-0076/T05]
       - id: FEAT-2026-0076/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0076/T04
+          - FEAT-2026-0076/T05
+          - FEAT-2026-0076/T06
 ```
+
+Gate 2 repeats gate 1's dependency shape for the same reasons. T05 depends on
+T04 because the skill's prose must describe an algorithm that exists — the
+constraint `[FEAT-2026-0069/G2-CLOSE]` records and gate 1 honoured between T01
+and T02. T06 depends on T05 because it fences the prose T05 writes.
 
 T02 depends on T01 because the skill's prose must describe an algorithm that
 exists. T03 depends on T02 because it edits the file T02 creates.
@@ -200,15 +220,36 @@ Left to `G1-PLAN` on operator decision. Gate 1 will report how many values are
 even derivable, which is the input that should decide it — deciding now would be
 guessing ahead of the evidence.
 
+**Answered by `G1-PLAN`, 2026-08-10 — see `GATE-02-REVIEW.md` § *The provenance
+question*.** Gate 1 reported **3 of 4 derivable unaided, 4 of 4 with a `gh`
+runner**, and the recommendation follows that count: **comparison, widened to the
+shipped baseline** — `agent_policy.DEFAULT_*` where a constant exists,
+`.specfuse/agent-policy.yml.example` where one does not, because gate 1 also
+found that none of the three `budgets` keys has a `DEFAULT_*` constant at all.
+**No schema change is taken, so the scope boundary above stands unwidened**; the
+provenance-recording shape is recommended as a successor feature, not folded in.
+The recommendation is the operator's to accept at the arming review.
+
 ## Notes
 
-- **`planned_cost_usd` is $27.00, the sum of the work units that actually
-  exist** — gate 1's five plus gate 2's close placeholder. Gate 2's
-  substantive units are drafted by `G1-PLAN`, which raises this figure and
-  sets `GATE-02.md`'s budget at the same time. The drafting estimate for the
-  whole feature was ~$37; that number is a forecast, not a plan, and is
-  deliberately not recorded in frontmatter where lint would compare it
-  against undrafted work.
+- **`planned_cost_usd` is $38.50, the sum of the work units that actually
+  exist.** The figure has moved twice, and both moves are recorded rather than
+  overwritten. At drafting it was $27.00 — gate 1's five units plus gate 2's
+  close placeholder. T01H was inserted mid-gate at operator review and added
+  $2.00, taking it to **$29.00**; gate 1's close caught that this prose still
+  said $27.00 and reported the staleness rather than editing it, since `PLAN.md`
+  prose was not that close's to rewrite. `G1-PLAN` then drafted gate 2's three
+  substantive units (T04 $3.50, T05 $3.50, T06 $2.50 — **$9.50**), taking the
+  feature to **$38.50** and setting `GATE-02.md`'s `cost_budget_usd` to $19.50
+  at the same time (gate 2's four units, $14.50, plus one re-attempt of its
+  largest, $5.00 — `planning-discipline.md` §5 corollary).
+
+  The drafting forecast for the whole feature was ~$37; that number was a
+  forecast, not a plan, and was deliberately not recorded in frontmatter where
+  lint would compare it against undrafted work. It is now superseded by the
+  drafted sum above and is close to it — which is worth one line in gate 2's
+  cost analysis, given gate 1's implementation spend came in at ~40% of
+  estimate.
 
 - **Skills are canonical in `plugins/specfuse/skills/`** and vendored into
   `.specfuse/skills/` by `scripts/sync-scaffold.sh`, which also creates the

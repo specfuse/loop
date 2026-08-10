@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0076/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.10.0
+started_at: 2026-08-10T15:49:36.050964+00:00
+duration_seconds: 626.171
+cost_usd: 4.408823
+input_tokens: 4967
+output_tokens: 44340
 ---
 
 # Draft gate 2 — the review half
