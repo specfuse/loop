@@ -1,12 +1,13 @@
 ---
 id: FEAT-2026-0044/G1-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
 oracles: recent-commits
+duration_seconds: 0.0
 ---
 
 # Close FEAT-2026-0044 — terminal gate
