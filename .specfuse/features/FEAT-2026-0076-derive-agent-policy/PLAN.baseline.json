@@ -1,0 +1,50 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Propose agent-policy values from repository evidence",
+          "id": "FEAT-2026-0076/T01",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Ship the `derive-agent-policy` skill",
+          "id": "FEAT-2026-0076/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Write the disjoint-key boundary into both skills",
+          "id": "FEAT-2026-0076/T03",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 bootstrap half",
+          "id": "FEAT-2026-0076/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the review half",
+          "id": "FEAT-2026-0076/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Close FEAT-2026-0076 \u2014 terminal gate",
+          "id": "FEAT-2026-0076/G2-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
