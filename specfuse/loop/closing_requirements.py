@@ -33,6 +33,25 @@ ROADMAP_PATH = ".specfuse/roadmap.md"
 DOCS_PREFIX = "docs/"
 NOTHING_GENERALIZES_PHRASE = "nothing generalizes"
 
+#: The `autonomy_default` value under which `close-i` / `close-intermediate-e`
+#: forbid a closing WU from touching `LEARNINGS_PATH` directly.
+AUTO_AUTONOMY = "auto"
+
+
+def learnings_staging_is_required(autonomy_default: str | None) -> bool:
+    """True when a closing WU's lessons belong in `LEARNINGS_PENDING_FILENAME`.
+
+    `close-i` / `close-intermediate-e` forbid appending to `LEARNINGS_PATH`
+    under `auto`, so the feature-local staging file is where a generalizable
+    lesson lands. `close-b` / `close-intermediate-b` read the same predicate,
+    which is what keeps the two requirements from contradicting: without it,
+    `auto` closes off the append route and leaves the
+    `NOTHING_GENERALIZES_PHRASE` note as the only way to satisfy `close-b` —
+    forcing a close whose lessons *do* generalize to write a sentence saying
+    they do not (#1419).
+    """
+    return autonomy_default == AUTO_AUTONOMY
+
 COST_ANALYSIS_HEADING = "Cost analysis"
 COST_ANALYSIS_HEADING_RE = re.compile(
     r"^##+ " + re.escape(COST_ANALYSIS_HEADING), re.MULTILINE | re.IGNORECASE,
@@ -212,7 +231,9 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
         Requirement(
             id="close-b", wu_type="close", phase="pre-squash",
             description=(
-                "LEARNINGS.md gains >=1 line in the squash, or RETROSPECTIVE.md "
+                "LEARNINGS.md gains >=1 line in the squash — or, under "
+                f"autonomy_default={AUTO_AUTONOMY} where close-i forbids that, "
+                f"{LEARNINGS_PENDING_FILENAME} does — or RETROSPECTIVE.md "
                 f"says '{NOTHING_GENERALIZES_PHRASE}'"
             ),
             file=LEARNINGS_PATH,
@@ -323,8 +344,10 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
         Requirement(
             id="close-intermediate-b", wu_type="close-intermediate", phase="pre-squash",
             description=(
-                "LEARNINGS.md gains >=1 line in the squash, or RETROSPECTIVE.md "
-                f"says '{NOTHING_GENERALIZES_PHRASE}'"
+                "LEARNINGS.md gains >=1 line in the squash — or, under "
+                f"autonomy_default={AUTO_AUTONOMY} where close-intermediate-e "
+                f"forbids that, {LEARNINGS_PENDING_FILENAME} does — or "
+                f"RETROSPECTIVE.md says '{NOTHING_GENERALIZES_PHRASE}'"
             ),
             file=LEARNINGS_PATH,
             enforced_by="assert_learnings_appended_or_noop",
