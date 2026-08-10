@@ -1,0 +1,44 @@
+# .specfuse/agent-policy.yml.example
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# Declares the operator's priorities for what the loop works on next: bug vs.
+# feature preemption, gate-review automation, budgets, and where to escalate.
+# Copy this file to `.specfuse/agent-policy.yml` and edit it for your own
+# priorities to opt in.
+#
+# This file is validated structurally by `specfuse/loop/agent_policy.py`
+# (`validate_agent_policy`).
+
+version: 1                      # int, must equal 1
+
+# Feature work-queue order, by FEAT-ID. May be empty — an empty queue is a
+# valid, meaningful declaration: "agent works bugs only and asks for
+# priorities" when nothing here is ready to pick up.
+queue:
+  - FEAT-2026-0048
+
+rules:
+  bugs:
+    preempt: true                # bool — bugs jump the feature queue when true
+    min_severity: low            # low | medium | high | critical
+    automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
+  features:
+    gate_review: human           # human | auto
+    wip_limit: 1                 # int >= 1
+    # overrides:                 # OPTIONAL map of FEAT-ID -> human|auto,
+    #   FEAT-2026-0048: auto     # overriding gate_review per feature
+  triage:
+    auto: false                  # bool — wired to apply_triage(..., auto=)
+
+budgets:
+  max_tokens_per_run: 2000000    # int > 0
+  max_open_prs: 3                # int > 0
+  max_items_per_day: 10          # int > 0
+
+escalation:
+  webhook: ""                    # str, may be empty
+  assignee: ""                   # str, may be empty
+  quiet_hours: ""                # str, may be empty; "HH:MM-HH:MM" when set
+  sla_hours: 24                  # int > 0

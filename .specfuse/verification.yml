@@ -50,6 +50,12 @@ code:
     # scan on the staged diff; this gate is the can't-bypass backstop.
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
+  - name: agent-policy-example-lint
+    # FEAT-2026-0044/T01: validate_agent_policy over the shipped example, not
+    # this repo's live policy — `.specfuse/agent-policy.yml` does not exist
+    # until T02 creates it.
+    command: "python3 .specfuse/scripts/lint_agent_policy.py .specfuse/agent-policy.yml.example"
+
   - name: event-type-gate
     # FEAT-2026-0073/T02: validate_event.py over every .specfuse/features/*/
     # events.jsonl, over the full envelope. Originally scoped to event_type

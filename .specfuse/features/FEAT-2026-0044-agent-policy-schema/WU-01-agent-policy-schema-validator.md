@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0044/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
@@ -10,6 +10,15 @@ produces:
   - .specfuse/agent-policy.yml.example
   - tests/test_agent_policy_schema.py
 produces_driver_helper: validate_agent_policy
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T03:01:38.255102+00:00
+duration_seconds: 623.635
+cost_usd: 1.227266
+input_tokens: 2
+output_tokens: 30
 ---
 
 # Ship the agent-policy.yml schema, its example, and a structural validator
