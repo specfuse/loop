@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0076-derive-agent-policy
 roadmap_goal: Make agent-policy.yml's premise true — the agent stops guessing the operator's intent because a skill actually asks, proposing from repo evidence what the repo can answer and asking only what it cannot.
 autonomy_default: review
 status: active
-planned_cost_usd: 27.00
+planned_cost_usd: 29.00
 ---
 
 # Plan: Policy-interview skill — derive-agent-policy
@@ -147,9 +147,20 @@ gates:
       - id: FEAT-2026-0076/T01
         file: WU-01-policy-proposals.md
         depends_on: []
+      # Hygiene WU inserted at operator review between T01 and T02: T01 silently
+      # withheld both budget proposals for any relative `repo_root`, because the
+      # scratch symlink scoping `events_stats.collect` to this repo alone was
+      # built from an unresolved path. A withheld proposal is supposed to mean
+      # "no evidence exists"; it meant "the code could not see the evidence",
+      # which is the outcome this feature exists to prevent. Every T01 fixture
+      # used an absolute tempdir, so all twelve criteria passed. Inserted before
+      # T02 so the skill's prose does not describe an under-proposing algorithm.
+      - id: FEAT-2026-0076/T01H
+        file: WU-01H-relative-repo-root.md
+        depends_on: [FEAT-2026-0076/T01]
       - id: FEAT-2026-0076/T02
         file: WU-02-derive-agent-policy-skill.md
-        depends_on: [FEAT-2026-0076/T01]
+        depends_on: [FEAT-2026-0076/T01H]
       - id: FEAT-2026-0076/T03
         file: WU-03-disjoint-key-ownership.md
         depends_on: [FEAT-2026-0076/T02]
@@ -157,6 +168,7 @@ gates:
         file: WU-90-gate-1-close-intermediate.md
         depends_on:
           - FEAT-2026-0076/T01
+          - FEAT-2026-0076/T01H
           - FEAT-2026-0076/T02
           - FEAT-2026-0076/T03
       - id: FEAT-2026-0076/G1-PLAN
