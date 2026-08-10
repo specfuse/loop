@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0076/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces:
   - plugins/specfuse/skills/derive-agent-policy/SKILL.md
   - plugins/specfuse/skills/derive-agent-policy/PROMPT.md
   - tests/test_derive_agent_policy_skill.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.10.0
+started_at: 2026-08-10T15:07:05.710507+00:00
+duration_seconds: 489.065
+cost_usd: 1.903363
+input_tokens: 78
+output_tokens: 19671
 ---
 
 # Ship the `derive-agent-policy` skill
