@@ -1,12 +1,12 @@
 ---
 id: FEAT-2026-0044/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
-oracles: recent-commits
+oracles: [oracles]
 duration_seconds: 0.0
 ---
 

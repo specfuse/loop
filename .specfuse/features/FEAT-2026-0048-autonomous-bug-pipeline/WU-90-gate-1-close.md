@@ -6,7 +6,7 @@ attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
-oracles: recent-commits
+oracles: [oracles]
 ---
 
 # Close FEAT-2026-0048 — terminal gate
