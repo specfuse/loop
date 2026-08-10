@@ -150,6 +150,67 @@ class TestInboundRefs(_Harness):
         self.assertIn("[FEAT-2026-8888](#feat-2026-8888)", roadmap_after)
 
 
+class TestInboundRefsFromArchive(_Harness):
+    """The third inbound direction (#1425).
+
+    #1182 reconciled two directions: outbound links inside the moved section, and
+    inbound bare `](#feat-this-one)` links elsewhere in `roadmap.md`. It did not
+    cover inbound links held by sections ALREADY in the archive, which use the
+    qualified `](roadmap.md#feat-this-one)` form. Those are correct while the
+    target is inline and dangle the moment it moves — and the archive is where
+    every previously-closed feature's prose lives, so the population only grows.
+
+    Observed five times in one morning archiving FEAT-2026-0044, 0047 and 0048,
+    each one hand-fixed after CI went red on a tree nobody edited.
+    """
+
+    _ARCHIVE_WITH_INBOUND_REF = textwrap.dedent("""\
+        ---
+        project: test
+        ---
+
+        # Archived feature details
+
+        This file holds the detail sections for features whose status has reached
+        `done` or `abandoned`.
+
+        <!-- Archived sections appended below -->
+
+        <a id="feat-2026-7777"></a>
+        ## FEAT-2026-7777 — An already-archived feature
+
+        Outbound notification is [FEAT-2026-9999](roadmap.md#feat-2026-9999).
+        Unrelated: [FEAT-2026-8888](roadmap.md#feat-2026-8888).
+        """)
+
+    def test_qualified_inbound_ref_in_the_archive_is_made_bare(self):
+        _result, _roadmap_after, archive = self._run(
+            _roadmap("Target body."), archive_text=self._ARCHIVE_WITH_INBOUND_REF
+        )
+        self.assertIn("[FEAT-2026-9999](#feat-2026-9999)", archive)
+        self.assertNotIn("[FEAT-2026-9999](roadmap.md#feat-2026-9999)", archive)
+
+    def test_other_features_qualified_refs_are_untouched(self):
+        # Scoped to THIS feature's anchor, mirroring the roadmap-side inbound
+        # rewrite. FEAT-2026-8888 is still inline, so its qualified ref is
+        # correct and must survive.
+        _result, _roadmap_after, archive = self._run(
+            _roadmap("Target body."), archive_text=self._ARCHIVE_WITH_INBOUND_REF
+        )
+        self.assertIn("[FEAT-2026-8888](roadmap.md#feat-2026-8888)", archive)
+
+    def test_the_link_graph_is_clean_after_archiving(self):
+        # The end-to-end property the gate actually asserts: no ref anywhere in
+        # the archive still points at roadmap.md for an anchor the archive owns.
+        _result, _roadmap_after, archive = self._run(
+            _roadmap("Target body."), archive_text=self._ARCHIVE_WITH_INBOUND_REF
+        )
+        owned = {"feat-2026-9999", "feat-2026-7777"}
+        for slug in owned:
+            with self.subTest(anchor=slug):
+                self.assertNotIn(f"](roadmap.md#{slug})", archive)
+
+
 class TestStatusMarker(_Harness):
     """The stale **Status:** marker (#1038)."""
 
