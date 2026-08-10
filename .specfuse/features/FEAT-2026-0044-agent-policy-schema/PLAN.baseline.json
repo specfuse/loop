@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Ship the agent-policy.yml schema, its example, and a structural validator",
+          "id": "FEAT-2026-0044/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Add the policy reader and validate queue entries against the roadmap",
+          "id": "FEAT-2026-0044/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Supply `apply_triage`'s `auto` from the policy file",
+          "id": "FEAT-2026-0044/T03",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Ship the `/groom-backlog` skill",
+          "id": "FEAT-2026-0044/T04",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close FEAT-2026-0044 \u2014 terminal gate",
+          "id": "FEAT-2026-0044/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
