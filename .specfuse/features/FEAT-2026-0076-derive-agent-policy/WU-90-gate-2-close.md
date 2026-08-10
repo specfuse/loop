@@ -1,12 +1,22 @@
 ---
 id: FEAT-2026-0076/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+verdict: met_locally
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
 oracles: [oracles]
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.10.0
+started_at: 2026-08-10T16:52:49.451088+00:00
+duration_seconds: 1081.033
+cost_usd: 11.136132
+input_tokens: 3772
+output_tokens: 66925
 ---
 
 # Close FEAT-2026-0076 — terminal gate
