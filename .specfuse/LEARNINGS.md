@@ -3551,3 +3551,58 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   event is strictly more informative than the summary — but leaving it undeclared means
   the next reader finds shipped, tested, dead code and cannot tell whether it is
   intentional.
+
+- [FEAT-2026-0045/G1-CLOSE/declare-precedence-between-redundant-records] **When one fact
+  needs two records — a machine-readable one and a human-visible one — the cheap fix is
+  not to cut one, it is to declare which one WINS and make the other a projection of it.**
+  The standing objection to storing a fact twice is that the copies drift. The usual
+  response is to pick one surface and lose the other's benefit; the better response is
+  three declarations made at plan time, before any code: (a) which record is
+  authoritative, (b) that the other is a projection re-derived from it, never
+  independently authored, and (c) the WRITE ORDER, which follows from (a) rather than
+  being a style choice. Worked example: a triaged issue carries both an authoritative body
+  marker and a category label. The marker wins on disagreement, the label is a projection,
+  and the marker is written first — so a failed label write leaves an issue correctly
+  triaged and merely lacking a swatch, while the reverse order would have produced an
+  issue that is labelled and still scans as untriaged, i.e. triaged and not-triaged at
+  once. Re-labelling then becomes idempotent repair rather than a second source of truth.
+  Rules. (a) State precedence and write order in the plan, not in the implementation WU —
+  by implementation time it reads as an arbitrary detail and gets reordered. (b) The
+  projection's absence must be tolerable by construction: if losing it breaks the
+  consumer, it was never a projection. (c) Look for the pattern already in the codebase
+  before inventing it — this repository's `autofix_state.has_prior_attempt` had been
+  locating an issue by label and then re-checking the body marker client-side, precisely
+  so a coincidental label match never reads as a hit, which is this rule with the
+  reasoning left implicit.
+
+- [FEAT-2026-0045/G1-CLOSE/verb-check-table-earns-its-cost] **A roadmap row's verbs are
+  claims about mechanisms that may not exist; grep each one at plan time and put the
+  verdicts in a table.** The practice came from `[FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/
+  roadmap-row-verbs-are-claims]`; this is the measurement of whether it pays. On this
+  feature four verbs were checked ("queued for fix-bug", "recognizes harvester-created
+  issues", "labeled", "behind an `auto` dial") and **one of the four was backed by nothing
+  that exists** — the dial's config file was an unbuilt future feature. Catching it at
+  plan time produced a settled design decision (the dial ships as a function argument, and
+  the unbuilt feature wires its file to the parameter later); catching it at implementation
+  time would have produced a blocked WU and a re-attempt. One in four is a high enough hit
+  rate to justify the table's cost on any feature drafted from a roadmap row written more
+  than a few weeks earlier. **Recommendation for whoever next edits
+  `.specfuse/rules/planning-discipline.md`:** promote the verb-check table from a
+  remembered practice to a standard, named section of that rule alongside the existing
+  numbered checks, so it is performed by default rather than by whoever happens to recall
+  it. That edit is a rule change and is deliberately not made here.
+
+- [FEAT-2026-0045/G1-CLOSE/script-produced-paths-are-not-declarable-until-the-script-ran]
+  **A path that a helper script generates is not declarable in `files_changed` until you
+  have actually run that script in this attempt.** A WU authored a skill at its canonical
+  location, correctly declared the canonical path and the vendored copy, and also declared
+  the discovery symlink that the repo's sync script creates — without having run the sync
+  script. The driver's files-changed guard failed the attempt on an unchanged path, and
+  the re-attempt cost 23% of the feature's implementation spend on a deliverable that was
+  otherwise finished. Rules. (a) When a WU's `produces:` list mixes hand-authored files
+  with script-generated ones, run the generator BEFORE composing the RESULT block, not
+  after — the block is a claim about the tree as it stands. (b) A WU body that says "run
+  the sync script" should say it in the acceptance criteria, where it is checked, rather
+  than only in the prose, where it is read once. (c) The guard is doing its job: the
+  alternative to a failed attempt here is a WU reporting `done` on a path that does not
+  exist, which is strictly worse and much harder to find later.

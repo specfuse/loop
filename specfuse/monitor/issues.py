@@ -66,6 +66,20 @@ def _marker(fingerprint: str) -> str:
     return _MARKER_TEMPLATE.format(fingerprint=fingerprint)
 
 
+_MARKER_PREFIX = _MARKER_TEMPLATE.split("{fingerprint}")[0]
+
+
+def has_finding_marker(body: str) -> bool:
+    """True iff `body` carries a specfuse finding marker, any fingerprint.
+
+    Narrow public predicate over the private `_marker` convention this
+    module already owns, added for FEAT-2026-0045/T01 so a caller (e.g.
+    `specfuse.loop.triage.list_untriaged`) can recognise a harvester issue
+    without re-typing the marker literal.
+    """
+    return _MARKER_PREFIX in (body or "")
+
+
 class TruncatedListingError(RuntimeError):
     """Raised when a listing page is full and carries no fingerprint match.
 

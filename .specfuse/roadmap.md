@@ -60,7 +60,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
 | FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
-| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
+| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
@@ -796,16 +796,20 @@ machine-checkable contract rather than prose.
 
 **Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
 
-**Status: planned.**
-
-<a id="feat-2026-0045"></a>
-## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
-
-**Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
-
-**Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
-
-**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
+**Inherited handoff — one dial is already waiting for this file
+(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
+dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
+auto=False)`, reading no configuration of any kind — deliberately, because
+`agent-policy.yml` is this feature's core deliverable and did not exist, and building a
+minimal reader there would have taken this feature's scope and left it shipping against a
+partial schema someone else authored. **This feature must wire its policy file to that
+parameter.** The parameter exists, is tested at both settings, and its semantics are
+fixed: under `auto=True` a decision whose confidence is not `high` is recorded as the
+`question` category and routed to `needs-human`, **still marked**, never skipped. Supply
+the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
+`autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
+`monitoring.yml`, and inbound issues are not components. See that feature's
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
 
 **Status: planned.**
 
@@ -829,7 +833,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
 
-**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
+**Blocked by.** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
 
 **Status: blocked.**
 
