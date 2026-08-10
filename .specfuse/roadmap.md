@@ -59,11 +59,11 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
-| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
+| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | done | `.specfuse/features/FEAT-2026-0044-agent-policy-schema/` | [→ archive](roadmap-archive.md#feat-2026-0044) |
 | FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
-| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | planned | — | [→ detail](#feat-2026-0048) |
+| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | planned | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ detail](#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
@@ -787,32 +787,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0044"></a>
-## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
-
-**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
-
-**Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run — entries must exist and be `planned`/`active`/`blocked`; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
-
-**Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
-
-**Inherited handoff — one dial is already waiting for this file
-(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
-dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
-auto=False)`, reading no configuration of any kind — deliberately, because
-`agent-policy.yml` is this feature's core deliverable and did not exist, and building a
-minimal reader there would have taken this feature's scope and left it shipping against a
-partial schema someone else authored. **This feature must wire its policy file to that
-parameter.** The parameter exists, is tested at both settings, and its semantics are
-fixed: under `auto=True` a decision whose confidence is not `high` is recorded as the
-`question` category and routed to `needs-human`, **still marked**, never skipped. Supply
-the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
-`autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
-`monitoring.yml`, and inbound issues are not components. See that feature's
-[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
-
-**Status: planned.**
-
 <a id="feat-2026-0047"></a>
 ## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
 
@@ -833,6 +807,14 @@ the value; do not redesign the semantics, and do not re-litigate where the dial 
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
 
+**Drafted 2026-08-09, ahead of its turn.** The feature folder exists and lints
+clean, drafted solo without an operator interview and **before
+[FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) shipped the schema it builds on** — both on
+operator instruction. Its `PLAN.md` records seven assumed decisions for veto at
+PR review, and its `T01` verifies the shipped schema against the assumed one and
+escalates on divergence rather than adapting silently. Dispatch only after 0044
+merges.
+
 **Status: planned.** Unblocked 2026-08-10: both named blockers cleared —
 [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) (machine-readable triage intake) and
 [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) (escalation contract) are both `done`.
@@ -846,7 +828,7 @@ the value; do not redesign the semantics, and do not re-litigate where the dial 
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-**Blocked by.** [FEAT-2026-0044](#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
+**Blocked by.** [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
 
 **Status: blocked.**
 

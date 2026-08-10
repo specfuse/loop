@@ -58,11 +58,15 @@ same as every other category.
   `specfuse.loop.triage.apply_triage`, marker first, label best-effort. This
   skill does not hand-compose the marker string or call `gh issue edit`
   itself.
-- **`auto` stays off unless the operator asks for it.** `apply_triage`'s
-  `auto` parameter defaults to `False`. Only pass `auto=True` when the
-  operator explicitly asks for the auto dial; even then, `apply_triage`
-  itself downgrades any non-`high`-confidence decision to `question` before
-  writing — this skill does not need to re-implement that downgrade.
+- **`auto` is declared in `.specfuse/agent-policy.yml`, not asked for.**
+  Obtain `apply_triage`'s `auto` argument by calling
+  `specfuse.loop.agent_policy.resolve_triage_auto()` (dial lives at
+  `rules.triage.auto`; resolves to `False` when the policy file is absent or
+  the key is absent) and pass its result straight through — do not prompt
+  the operator for it per run. Under `auto=True`, `apply_triage` itself
+  downgrades any non-`high`-confidence decision to `question` and routes it
+  to `needs-human` — still marked, never skipped — this skill does not
+  re-implement that downgrade.
 
 ## When to invoke
 
@@ -101,7 +105,8 @@ For each row, in order:
 
 Batch the accepted decisions (or record them one at a time — either is
 correct) and call `specfuse.loop.triage.apply_triage(runner, repo, decisions,
-auto=...)`. Report each row's `marker_written` / `label_written` outcome; a
+auto=specfuse.loop.agent_policy.resolve_triage_auto())`. Report each row's
+`marker_written` / `label_written` outcome; a
 failed label write is cosmetic (per `PLAN.md`'s "registered is not
 provisioned" note) and does not mean the issue is still untriaged.
 
