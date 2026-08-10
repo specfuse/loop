@@ -890,3 +890,89 @@ exists: `met` is reachable, and the operator has a real choice between
 accepting the hedge now and running the two named conditions first. Neither is
 `inherent` and neither is `routed-finding` — nothing here is unknowable or
 owned elsewhere.
+
+## Hedged verdict accepted
+
+- **Accepted verdict:** `met_locally`
+- **Operator reason (verbatim):** "accepting since both re-run conditions have been verified and future feedback will come from using it for real"
+- **Recorded:** 2026-08-10T17:26:22+00:00
+
+The verdict ceiling at acceptance time was **rework exists** — both entries are
+`externally-verifiable-later`. Unlike a hedge accepted with its rework
+outstanding, **both named re-run conditions were executed before acceptance**:
+
+- **Entry 1** — `/derive-agent-policy` was run against this repository's own
+  `.specfuse/agent-policy.yml`. Review mode was entered on the existing-file
+  condition, `review_agent_policy` was called once rather than re-derived, all
+  four parts were presented per key, `measured` was distinguished from
+  `converted` with each assumption named, three staged per-block accepts were
+  taken, and no unowned key (`queue`, `version`, `rules.triage`) was written.
+  The run's one accepted change was `rules.bugs.test_paths: ['tests/']`;
+  `budgets` and `escalation` were accepted unchanged. `validate_agent_policy`
+  exits 0 against the result.
+
+  **Honest limit on this evidence, recorded rather than smoothed over:** the
+  agent that executed the prose is the one that authored it earlier the same
+  day. Following remembered intent rather than the written text cannot be ruled
+  out. A cold session against an unseen repository remains stronger evidence
+  than this run provides, and the entry below is carried forward partly for
+  that reason.
+
+- **Entry 2** — `git diff 7d3b0b3 HEAD -- tests/test_agent_policy_key_ownership.py`
+  reports **71 insertions, 0 deletions**. Purely additive: one class appended,
+  no line inside `TestKeyOwnership` altered, exactly as T06#6 claimed.
+
+Both entries are still carried forward **verbatim and open** below. Accepting a
+hedge records what shipped with known-open items; it does not mark them done.
+
+### Follow-ups carried forward, verbatim and open
+
+### The agent-executes-prose oracle (`PLAN.md` § *The oracle problem*)
+
+- **criterion, verbatim:** *an agent following `derive-agent-policy`'s prose,
+  run against a repository whose policy file it has not seen, proposes the
+  values `propose_policy_defaults` computes.*
+- **why it is unverifiable in this environment:** the loop's oracles are
+  `unittest` runs and structural asserts over prose. Every test this feature
+  ships either exercises the algorithm or asserts on the text; none composes
+  them by having an agent execute the skill against an unseen tree, and a
+  work-unit session cannot dispatch an agent to do so. A passing fixture and an
+  agent-executed skill are different oracles — `[FEAT-2026-0069/G2-CLOSE]`.
+- **re-run condition that would upgrade this to `met`:** one operator
+  invocation of `/derive-agent-policy` against **this repository's own
+  `.specfuse/agent-policy.yml`**, comparing what the agent proposes against
+  `review_agent_policy`'s readout for the same four keys (recorded in § *`review_agent_policy`
+  re-run fresh…* above as R1/R2, so the comparison target already exists). That
+  run is also the first real use of review mode and the review the operator
+  wants, so the deferral and the first real use are one action.
+- **kind:** `externally-verifiable-later`
+
+### The byte-level half of T06#6's "passes unmodified"
+
+- **criterion, verbatim (T06#6):** *`tests/test_agent_policy_key_ownership.py`'s
+  existing T03-era test methods are present and pass **unmodified**; this WU
+  adds a class, it does not rewrite the suite.*
+- **why it is unverifiable in this environment:** "unmodified" is a claim about
+  a diff, and a close WU runs no `git` command (`result-contract.md` rule 1,
+  `never-touch.md` §3). T06 legitimately edited this file, so — unlike T05#9
+  and T04#12, whose paths appear in no gate-2 attempt's `files_touched` at all —
+  the driver's per-attempt record cannot separate an appended class from a
+  rewritten suite. This close verified everything short of the diff: all 32
+  methods green in a scoped fresh run, and the T03-era method-name set asserted
+  *exactly* equal to its original six names by
+  `test_t03_methods_present_and_pass_unmodified`, which fails on any addition or
+  removal. Method **bodies** are not compared.
+- **re-run condition that would upgrade this to `met`:** a reviewer outside a
+  close session runs `git diff <T03's commit> HEAD --
+  tests/test_agent_policy_key_ownership.py` and observes the change is purely
+  additive — one new class appended, no line inside `TestKeyOwnership` altered.
+  That is one command and it belongs in the PR review, where the diff is already
+  on screen.
+- **kind:** `externally-verifiable-later`
+
+**Verdict ceiling.** Both entries are `externally-verifiable-later`, so rework
+exists: `met` is reachable, and the operator has a real choice between
+accepting the hedge now and running the two named conditions first. Neither is
+`inherent` and neither is `routed-finding` — nothing here is unknowable or
+owned elsewhere.
+

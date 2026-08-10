@@ -3,7 +3,7 @@ id: FEAT-2026-0076/G2-CLOSE
 type: close
 status: done
 attempts: 1
-verdict: met_locally
+verdict: met
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local

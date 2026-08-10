@@ -5,7 +5,7 @@ slug: derive-agent-policy
 branch: feat/FEAT-2026-0076-derive-agent-policy
 roadmap_goal: Make agent-policy.yml's premise true — the agent stops guessing the operator's intent because a skill actually asks, proposing from repo evidence what the repo can answer and asking only what it cannot.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 38.50
 ---
 

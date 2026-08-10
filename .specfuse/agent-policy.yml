@@ -21,6 +21,8 @@ rules:
     preempt: true
     min_severity: low
     automerge: "off"           # FEAT-2026-0048 owns enforcement; not built yet
+    test_paths:                 # accepted at the FEAT-2026-0076 review: measured from
+      - tests/                  # the tree and verification.yml gate commands, which agree
   features:
     gate_review: human
     wip_limit: 1
