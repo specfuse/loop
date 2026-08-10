@@ -5531,6 +5531,36 @@ def assert_implementation_touched_files(
     )
 
 
+#: The metacharacters that make a `produces:` entry a glob rather than a
+#: literal path. `[` is deliberately NOT here: every file-based routing
+#: convention (Next.js App Router, Remix, SvelteKit) spells a dynamic segment
+#: as a literal `[id]` directory, so a bracket with no accompanying wildcard
+#: is far more likely to be that than an intentional character class (#1181).
+GLOB_METACHARACTERS = "*?"
+
+
+def produces_is_glob(path: str) -> bool:
+    """True when *path* should be matched as a glob rather than a literal.
+
+    One rule, so `assert_declared_deliverables`' presence check and
+    `assert_produces_in_diff`'s cross-check classify an entry identically —
+    the unified literal/glob contract (FEAT-2026-0055/T03) claims they do,
+    and for a bracketed path they did not: `glob.glob` read `[id]` as a
+    character class and returned nothing however the file was spelled on
+    disk, while the diff check's literal-equality branch matched it fine. A
+    WU declaring such a path was refused every attempt with a byte-identical
+    error and spun to `spinning_detected` (#1181).
+
+    A wildcard anywhere in the entry still means the whole entry is a
+    pattern, so `src/[abc]*.ts` keeps its character-class meaning — an author
+    who wants a class writes one alongside a wildcard. The residual case is
+    an entry mixing a *literal* bracket segment with a wildcard elsewhere
+    (`src/app/[id]/*.ts`); that is still read as a class and is not fixed
+    here.
+    """
+    return any(ch in path for ch in GLOB_METACHARACTERS)
+
+
 def produces_shape_error(path: str) -> "str | None":
     """Return why *path* is an invalid ``produces:`` entry, or None if it is fine.
 
@@ -5586,10 +5616,11 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     absence opt-out (loop.py:994). Otherwise every declared entry must satisfy
     one of two forms:
 
-    - **Literal path** (no ``fnmatch`` metacharacter — none of ``* ? [``):
-      must exist and be non-empty (``test -s`` semantics). Unchanged from the
-      original presence gate.
-    - **Glob** (contains an ``fnmatch`` metacharacter): at least one existing,
+    - **Literal path** (no glob metacharacter — see ``produces_is_glob``,
+      which reads ``*`` and ``?`` but deliberately not ``[``): must exist and
+      be non-empty (``test -s`` semantics). Unchanged from the original
+      presence gate.
+    - **Glob** (contains a glob metacharacter): at least one existing,
       non-empty file must match, via ``glob.glob`` (same pattern syntax
       ``assert_produces_in_diff`` matches against the squash diff with
       ``fnmatch.fnmatch``, so a pattern that satisfies one satisfies the other).
@@ -5613,7 +5644,7 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
         shape_err = produces_shape_error(path)
         if shape_err:
             return False, shape_err
-        if any(ch in path for ch in "*?["):
+        if produces_is_glob(path):
             matches = [
                 m for m in glob.glob(path)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
