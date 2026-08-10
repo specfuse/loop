@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 23.00
+baseline:
+  sha: 16896db7d7160f47402feacdbe20270e986076df
+  probed_at: 2026-08-10T02:55:42.205222+00:00
+  failing: []
 ---
 
 # Gate 1 — the operator's priorities have one auditable file, and one waiting dial reads it
