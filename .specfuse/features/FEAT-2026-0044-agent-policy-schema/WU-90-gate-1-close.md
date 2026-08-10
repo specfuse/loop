@@ -12,7 +12,7 @@ model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.10.0
-started_at: 2026-08-10T04:04:20.856694+00:00
+started_at: 2026-08-10T04:19:24.425330+00:00
 ---
 
 # Close FEAT-2026-0044 — terminal gate
