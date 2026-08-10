@@ -43,6 +43,65 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0045"></a>
+## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
+
+**Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
+
+**Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
+
+**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
+
+**Shape (drafted 2026-08-09).** Single gate, 3 substantive WUs + terminal close, $18.00
+planned. The seam is **module = mechanism, agent = judgment**: `specfuse/loop/triage.py`
+owns the closed category vocabulary, the category→route map, the marker pair, and the
+untriaged scan; `/triage-issues` owns classifying free text. Three decisions were settled
+at draft time — a triaged issue carries **both** an authoritative body marker
+(`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
+projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
+argument** at the headless entry point rather than a config surface, because
+[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+`duplicate` ships judgment-only with no detection mechanism.
+
+**Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
+closing duplicates — that is [FEAT-2026-0048](#feat-2026-0048) for bugs and the operator
+otherwise); `.specfuse/agent-policy.yml` in any form; refactoring the five existing
+`gh issue list` call sites into a shared client; re-triaging an issue that already carries
+a marker.
+
+**Expected verdict `met_locally`.** Two surfaces are unreachable from inside a dispatched
+session: triage against live GitHub (the `gh`-in-sandbox constraint), and "an agent
+following the skill's prose reproduces the module's routing on an unseen issue" — the
+skill test binds prose to constants and proves drift-freedom, not correctness.
+
+**Delivered** (gate 1, terminal — see
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md)).
+`specfuse/loop/triage.py`: the closed `CATEGORIES` / `CONFIDENCES` tuples, the total
+category→route map behind `route_for`, the category→label projection behind `label_for`,
+the `render_marker` / `parse_marker` pair over
+`<!-- specfuse:triage category=… confidence=… -->`, `list_untriaged` filtering
+client-side on the marker's absence over an injected runner (a harvester issue is returned
+flagged `already_structured`, not excluded), and `apply_triage(..., auto=False)` writing
+marker-first, projecting the label best-effort, idempotent on an already-marked body, and
+recording a failed label write rather than raising. Four new `LabelSpec` entries importing
+their names from `triage.py`; one new public predicate `has_finding_marker` in
+`specfuse/monitor/issues.py` so the marker literal has one home. `/triage-issues` ships
+canonical at `plugins/specfuse/skills/triage-issues/SKILL.md`, vendored byte-identically
+and discovery-symlinked, with a drift test binding its documented vocabulary and routes to
+the module's constants — which proves prose has not drifted from code, and deliberately
+does not claim the skill classifies correctly.
+
+**Verdict `met_locally`, as predicted — three open follow-ups.** Triage against a live
+GitHub repository is `externally-verifiable-later` (an operator run post-merge upgrades
+it); "an agent following the prose reproduces the routing" is `inherent` (no in-repo
+oracle can ever assert it, so `met` is unreachable through it); the consumer-visible
+contract list awaits human acknowledgment. `duplicate` shipped judgment-only, with no
+detection mechanism, by decision. Terminal flips are withheld on a hedged verdict —
+`PLAN.md`, the gate, and this row stay un-flipped until an operator accepts through
+`/accept-hedged-close`. The driver owns that flip; it is not hand-edited.
+
+**Status: active.**
+
 <a id="feat-2026-0075"></a>
 ## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
 

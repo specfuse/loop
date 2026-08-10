@@ -402,3 +402,75 @@ Both candidates the WU named were assessed; both were promoted, with the second 
 - Next: `/accept-hedged-close FEAT-2026-0045` (acknowledging the contract list discharges
   D3 at the same time), then `/wrap-feature`, then D1's live-repository run — and only
   after that, the FEAT-2026-0048 roadmap edit named above.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Recorded:** 2026-08-10T00:31:13Z
+
+**Operator's reason, verbatim:** "accepting since D2 can never close"
+
+**Operator's acknowledgment of the consumer-visible contract-change list, verbatim:**
+"marker format is fine"
+
+The operator confirmed they read all three follow-up entries as quoted before accepting.
+
+**Computed ceiling at acceptance:** `rework exists`, from
+`verdict_ceiling_for_kinds({externally-verifiable-later, inherent, acceptance-discharged})`
+— named by D1.
+
+### Standing follow-ups, carried forward
+
+Accepting this hedge ships the feature with these open. It does not discharge them. They
+are reproduced exactly as the hedged-verdict follow-up record above states them; no entry
+is dropped, paraphrased, or marked done.
+
+**D1 — Triage against a live GitHub repository — OPEN.** `kind: externally-verifiable-later`.
+Carried forward as written.
+
+> **Evidence note, recorded alongside D1 rather than inside it.** D1's named re-run
+> condition was executed in the operator's own shell on 2026-08-10, before this
+> acceptance and ahead of the sequence the closing state above anticipated. What ran:
+> `list_untriaged` against this repository returned 25 untriaged rows; three were accepted
+> across three categories (#796 `bug`, #298 `feature`, #248 `question`); all three bodies
+> carried a parseable marker afterwards (`('bug','high')`, `('feature','high')`,
+> `('question','high')`); a second scan returned 22 and re-proposed none of them; and
+> re-applying the same decisions returned `skipped=True` with no second write. The label
+> half split usefully: `triage-question` was already provisioned so #248's label wrote,
+> while `triage:bug` and `triage:feature` were registered but not yet created, so those
+> two writes failed, were recorded in the report, and did **not** raise — the live
+> confirmation of this feature's "registered is not provisioned" decision, which no
+> fixture could have produced. `provision_labels` was then run (created all four
+> `triage:*` labels, zero failures).
+>
+> **This note does not close D1.** The entry stays OPEN because this skill does not
+> discharge follow-ups, and because the run surfaced a defect that qualifies the result
+> (below). Whoever revisits D1 should read this note and the defect together.
+
+**D2 — An agent following the skill's prose reproduces the module's routing — OPEN.**
+`kind: inherent`. Carried forward as written. No re-run condition exists; `met` is
+unreachable through this entry by any in-repo work. This is the entry the operator's
+acceptance reason names.
+
+**D3 — Human acknowledgment of the consumer-visible contract-change list — OPEN.**
+`kind: acceptance-discharged`. Carried forward as written. The operator's acknowledgment
+recorded above is this entry's discharge condition; it is left OPEN in this record because
+this skill does not mark entries discharged.
+
+### Defect found by D1's run, filed rather than folded in
+
+`apply_triage`'s idempotency check keys on the **marker alone**, so an issue whose marker
+wrote but whose label write failed is skipped on every later run and can never have its
+label projected — even after the label is created. Confirmed live: after `provision_labels`
+created `triage:bug` and `triage:feature`, re-applying #796 and #298 returned
+`skipped=True, label_written=False` and both issues remained unlabelled.
+
+`PLAN.md` justified the marker-first order by calling a missing label "cosmetic and
+**repairable**", and `WU-02` restated it as "merely lacks a swatch". The ordering decision
+is still correct; the word "repairable" was unearned, because no code path repairs it.
+
+Filed as **https://github.com/specfuse/loop/issues/1163** with the full evidence trail and
+two candidate fix shapes. The two affected issues were hand-repaired
+(`gh issue edit --add-label`) so the repository ends in the intended state; that repair is
+outside `apply_triage` and is not a fix.

@@ -11,7 +11,7 @@ effort: high
 gate_set: plannext
 driver_version: 0.9.3
 started_at: 2026-08-09T22:51:24.271926+00:00
-verdict: met_locally
+verdict: met
 duration_seconds: 1084.647
 cost_usd: 5.229417
 input_tokens: 110

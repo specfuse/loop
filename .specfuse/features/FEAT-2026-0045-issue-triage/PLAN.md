@@ -5,7 +5,7 @@ slug: issue-triage
 branch: feat/FEAT-2026-0045-issue-triage
 roadmap_goal: Give every inbound GitHub issue exactly one lane — categorized, routed, and recorded in an authoritative body marker projected to a human-visible label — through a mechanism module that FEAT-2026-0048 can import and a thin interactive skill that owns the judgment.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 18.00
 ---
 
