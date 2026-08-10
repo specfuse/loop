@@ -111,7 +111,7 @@ at draft time — a triaged issue carries **both** an authoritative body marker
 (`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
 projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
 argument** at the headless entry point rather than a config surface, because
-[FEAT-2026-0044](roadmap.md#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
 `duplicate` ships judgment-only with no detection mechanism.
 
 **Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
