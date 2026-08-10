@@ -33,7 +33,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from specfuse.loop.agent_policy import bug_lane_limits, resolve_bug_automerge
-from specfuse.loop.bug_lane import REASON_ELIGIBLE, evaluate_merge_guardrails
+from specfuse.loop.bug_lane import (
+    DECLINE_LABELS,
+    REASON_ELIGIBLE,
+    evaluate_merge_guardrails,
+)
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.escalation import emit_escalation
 from specfuse.loop.triage import parse_marker
@@ -333,9 +337,14 @@ def run_bug_lane(
         return BugLaneResult(outcome=OUTCOME_MERGED, reason=decision.reason, pr_number=pr_number)
 
     if decision.reason != REASON_ELIGIBLE:
-        runner(
-            ["gh", "pr", "edit", str(pr_number), "--repo", repo, "--add-label", decision.reason],
-            check=True,
-        )
+        # The public label name, never the raw reason constant (#1420): the
+        # constant is an internal identifier that provision_labels does not
+        # create, so labelling with it failed on every declining path.
+        label = DECLINE_LABELS.get(decision.reason)
+        if label is not None:
+            runner(
+                ["gh", "pr", "edit", str(pr_number), "--repo", repo, "--add-label", label],
+                check=True,
+            )
 
     return BugLaneResult(outcome=OUTCOME_DECLINED, reason=decision.reason, pr_number=pr_number)

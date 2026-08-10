@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from specfuse.loop import escalation, gh_features, notify_sla, triage
+from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 
 
@@ -124,6 +124,51 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="c2e0c6",
         description="An unanswered escalation was re-pinged once and is now parked",
         consumer="loop/notify_sla.py",
+    ),
+    # Bug-lane declining reasons (#1420). Every name here is a value in
+    # `bug_lane.DECLINE_LABELS`; the lane cannot emit a label this registry does
+    # not declare, and tests/test_bug_lane_labels_registered.py asserts it.
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_NO_TEST_EVIDENCE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: the diff adds no test file",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_CI_NOT_GREEN],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: CI did not conclude success",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_DIFF_TOO_LARGE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: diff exceeds rules.bugs.max_diff_lines",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_JUDGE_PATH_TOUCHED],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: the diff touches a never-auto-merge path",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_UNTRACEABLE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: not traced to a triaged issue or diagnosed finding",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_DAILY_CAP_REACHED],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: rolling 24h merge cap reached",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_UNREADABLE_INPUT],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: a guardrail input could not be read",
+        consumer="loop/bug_lane_run.py",
     ),
 )
 
