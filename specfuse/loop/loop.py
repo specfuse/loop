@@ -3827,6 +3827,18 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
         roadmap_text=roadmap_text,
     )
 
+    # Third inbound direction (#1425). #1169 rewrote inbound refs living in
+    # `roadmap.md`; sections ALREADY in this archive hold the *qualified*
+    # `](roadmap.md#feat-this-one)` form, correct while the target was inline and
+    # dangling the moment it moves here. Both ends now live in this file, so the
+    # bare form is right — the same rule `_reconcile_moved_section` already
+    # applies outbound for an already-archived target. Scoped to THIS feature's
+    # anchor: every other qualified ref still points at a live inline section and
+    # is none of this archive's business.
+    archive_text = archive_text.replace(
+        f"](roadmap.md#{feat_id_lower})", f"](#{feat_id_lower})"
+    )
+
     marker_end = archive_text.index(marker) + len(marker)
     new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
     archive_path.write_text(new_archive)
