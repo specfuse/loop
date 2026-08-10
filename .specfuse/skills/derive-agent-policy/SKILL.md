@@ -382,6 +382,32 @@ Never merge a correction into `.specfuse/agent-policy.yml` without the
 operator's explicit per-block accept — the same rule the bootstrap draft
 follows.
 
+### Review mode must never write what it does not own, and must never drop what it does
+
+Review mode reads the whole existing file, so it has every unowned key in
+hand — that is exactly the shape that tempts a skill into re-emitting a
+"corrected" document instead of a per-key correction. Two properties hold
+here, and both are non-negotiable:
+
+**Non-ownership.** Review mode must never write `queue` — that block belongs
+to `/groom-backlog` alone, same as in the bootstrap path above. It must also
+never write `version` or `rules.triage`: neither is in this skill's asked-or-
+proposed set (Step 2 and the readout above cover exactly `rules.bugs`,
+`rules.features`, `budgets`, and `escalation`), and `rules.triage` is already
+marked "not in this skill's scope to ask" in the 3a example block. Reviewing
+the file does not expand what this skill is allowed to touch.
+
+**Non-clobbering.** A corrected block this skill proposes for a key it does
+own must preserve every key the existing file already carries in that block.
+Dropping one is not a correction — it is a deletion wearing a correction's
+clothes. Concretely: if the live file's `budgets` block carries
+`max_tokens_per_run`, `max_items_per_day`, and `max_open_prs`, and the
+proposed correction returns only two of the three, that is a deletion of the
+third key, not a fix to the other two — never present it as though it were.
+The same holds for `rules` and `escalation`: a proposed block returns every
+key the file already had in that block, correcting values, never removing
+keys silently.
+
 ## Escalation framing (binding — `.specfuse/rules/operator-escalation.md`)
 
 Whenever this skill halts for a human decision — a `webhook_env` answer that

@@ -111,5 +111,76 @@ class TestKeyOwnership(unittest.TestCase):
             )
 
 
+def _review_mode_section(body: str) -> str:
+    match = re.search(
+        r"## Review mode.*?(?=\n## Escalation framing)", body, re.DOTALL
+    )
+    assert match, "expected a 'Review mode' section preceding 'Escalation framing'"
+    return match.group(0)
+
+
+class TestReviewModePreservation(unittest.TestCase):
+    """FEAT-2026-0076/T06: review mode reads the whole file, so it must state
+    (and this suite must keep testable) that it never writes an unowned key
+    and never drops a key from a block it corrects."""
+
+    def test_review_mode_states_non_clobbering(self):
+        section = _review_mode_section(_body(_DERIVE_AGENT_POLICY))
+        self.assertTrue(
+            re.search(r"preserve[s]?\s+every key", section, re.IGNORECASE)
+            or re.search(r"never\s+drop[s]?\s+a key", section, re.IGNORECASE),
+            "review mode section must state it preserves every key it does "
+            "not own and never drops a key the existing file already carries",
+        )
+
+    def test_review_mode_names_non_clobbering_consequence(self):
+        section = _review_mode_section(_body(_DERIVE_AGENT_POLICY))
+        self.assertTrue(
+            re.search(r"budgets", section, re.IGNORECASE)
+            and re.search(r"delet", section, re.IGNORECASE),
+            "review mode section must name a concrete consequence — a "
+            "`budgets` correction returning fewer keys than the file "
+            "carries is a deletion — not just a vague 'preserve intent'",
+        )
+
+    def test_review_mode_must_never_write_set_covers_every_unowned_key_block(self):
+        section = _review_mode_section(_body(_DERIVE_AGENT_POLICY))
+        derive_owns = _OWNS["derive-agent-policy"]
+        not_owned = _ALL_KEY_BLOCKS - derive_owns
+        for key in not_owned:
+            self.assertIn(
+                f"`{key}`",
+                section,
+                f"review mode section must state it must never write {key} "
+                "— an unowned top-level key block with no review-mode "
+                "statement is the intended alarm",
+            )
+        for name in ("version", "rules.triage"):
+            self.assertIn(
+                f"`{name}`",
+                section,
+                f"review mode section must also disclaim {name}, which is "
+                "unowned by this skill though not a top-level key block",
+            )
+
+    def test_t03_methods_present_and_pass_unmodified(self):
+        suite_methods = {
+            name
+            for name in dir(TestKeyOwnership)
+            if name.startswith("test_")
+        }
+        self.assertEqual(
+            suite_methods,
+            {
+                "test_groom_backlog_disclaims_the_other_blocks",
+                "test_derive_agent_policy_disclaims_queue",
+                "test_each_skill_names_every_key_block_it_owns",
+                "test_each_skill_names_every_key_block_it_must_not_write",
+                "test_ownership_sets_are_disjoint_and_exhaustive",
+                "test_both_skills_state_the_one_writer_per_key_block_invariant",
+            },
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
