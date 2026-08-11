@@ -2,7 +2,7 @@
 id: FEAT-2026-0049/T14
 type: implementation
 status: pending
-attempts: 0
+attempts: 1
 planned_cost_usd: 6.50
 produces:
   - specfuse/agent/providers/feature.py
@@ -10,6 +10,8 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T06:50:06.849881+00:00
 ---
 
 # T14 — the feature provider: advance the queue top, escalate, switch
