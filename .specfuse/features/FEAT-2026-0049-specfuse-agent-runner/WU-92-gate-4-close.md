@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0049/G4-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 re_arm_count: 1
 planned_cost_usd: 5.00
 # AC6 writes CHANGELOG.md — a surface outside this feature's folder, which makes
@@ -12,26 +12,49 @@ planned_cost_usd: 5.00
 # auto-closed at attempts: 0 and left 57 criteria unreconciled between them.
 # See close-discipline.md, #293.
 auto_close_disabled: true
-# The feature's terminal verdict (AC4). `met_locally` and not `met`: every
-# acceptance criterion of all fourteen substantive work units is met and was
-# re-verified this session, but no `specfuse-agent run` has ever executed
-# against live repository state, so the funded outcome is unproven — see
-# RETROSPECTIVE.md § "The headline: this feature has never been run" and AC7's
-# escalation trigger, which says `met` is a claim the evidence does not support.
-# Not `partially_met`: no criterion is unmet at the level it was written.
-# The `## Hedged-verdict follow-up record` carries four groups; one is
-# `externally-verifiable-later`, so the ceiling reads "rework exists" — one
-# bounded live run would upgrade it.
+# The feature's terminal verdict (AC4), DECIDED AFRESH on the re-arm attempt and
+# not inherited: the value below is unchanged from attempt 1, and that is a
+# judgement made this session on this session's evidence.
+#
+# What changed since attempt 1: commit 21fdb40 fixed #1746, and a read-only probe
+# run in this session drove the whole selection path against live repository
+# state — gather_snapshot over this repo's real issues/PRs/policy/63 feature
+# folders, advertise() on all six providers (0/10/1/8/0/0), then _select_next,
+# which chose BugsProvider correctly under `rules.bugs.preempt: true`.
+#
+# Why still `met_locally` and not `met`: the probe stopped at the selection
+# boundary. No item was executed, no driver was invoked, nothing was committed.
+# `execute`, every halt classification and every escalation path remain proven
+# only against fixtures and an injected runner, so the funded outcome — an agent
+# that ADVANCES features unattended — is still unproven. AC7's escalation trigger
+# says `met` alongside "no `specfuse-agent run` has ever executed against live
+# state" is the combination to stop at; it still applies.
+#
+# Why not `partially_met`: no criterion is unmet at the level it was written; all
+# 22 gate-4 criteria pass, and the one defect the feature shipped (#1746) was
+# found and fixed on the branch rather than left standing.
+#
+# The `## Hedged-verdict follow-up record` carries four groups; Group D remains
+# `externally-verifiable-later` with its re-run condition sharpened (the trial
+# repo must also have no higher-ranked bug work, or the run never reaches the
+# feature provider), so the ceiling still reads "rework exists" — one bounded
+# live run would upgrade it.
 verdict: met_locally
 model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.11.0
-started_at: 2026-08-11T11:06:43.041163+00:00
-duration_seconds: 857.861
-cost_usd: 9.831181
-input_tokens: 152
-output_tokens: 54242
+started_at: 2026-08-11T12:32:19.656241+00:00
+duration_seconds: 818.214
+cost_usd: 10.767693
+input_tokens: 209
+output_tokens: 51275
+cumulative_cost_usd: 9.831181
+cumulative_duration_seconds: 857.861
+cumulative_input_tokens: 152
+cumulative_output_tokens: 54242
+cumulative_attempts: 0
+folded_through_re_arm: 1
 ---
 
 # G4-CLOSE — the terminal close

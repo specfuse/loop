@@ -142,3 +142,34 @@ this file is where those lessons go instead.
   Rule: when a guard passes, ask what input it actually saw. A guard whose
   filter silently drops the majority of its domain reads as coverage while
   asserting nothing, which is the same failure shape as an ungated test suite.
+
+- [FEAT-2026-0049/G4-CLOSE] **A test suite that injects a fixture value for a
+  parameter with a shipped default never exercises the default — and the default
+  is the invocation your users actually type.** All 54 of gate 4's tests passed
+  `features_root=<a Path under a temp dir>`. `FeatureProvider`'s no-argument
+  fallback is the *string* `".specfuse/features"`, and the reader called
+  `.is_dir()` on it, so the bare `specfuse-agent run` raised `AttributeError`
+  before selecting anything — and because `_select_next` calls every provider's
+  `advertise` un-guarded, one provider's type error ended the whole run
+  (#1746). The fixture was not wrong; it was *uniform*. Rule: for any parameter
+  that has a default the shipped entry point relies on, one test must supply
+  **nothing** and drive the entry point's own construction path. A
+  fixture-injecting variant of that test re-hides the bug, which is why the
+  regression module states in its docstring that it exercises the default
+  deliberately. Corollary for reviewers: `grep` the test file for the parameter
+  name; if every occurrence is an assignment, the default is untested.
+
+- [FEAT-2026-0049/G4-CLOSE] **A close's evidence is "as of a commit", and
+  nothing in the artifact records which commit — so a re-arm re-reads a
+  retrospective that silently describes a different tree.** This close ran
+  twice. The first pass re-ran every oracle honestly and recorded the results;
+  one commit later those results described a tree that no longer existed, and
+  `--recheck-verdict` re-reads the verdict field rather than re-verifying
+  anything, so nothing in the machinery would have noticed. Two sub-rules, both
+  paid for here. (a) A close that re-runs oracles should say which tree state it
+  ran against, so a later reader can tell staleness from disagreement. (b) A
+  live probe that calls a module's *leaf functions* is not evidence about the
+  *entry path* that calls them: the first pass probed five readers and a
+  constructor against live state, looked thorough, and was blind to a crash
+  sitting between the constructor and the first method call. Probe the path the
+  shipped entry point takes, or say explicitly that you probed the leaves.
