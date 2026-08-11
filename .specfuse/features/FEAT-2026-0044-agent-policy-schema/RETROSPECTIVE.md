@@ -562,3 +562,86 @@ rather than an unmet criterion.
 **No predecessor auto-close debt.** This feature has one gate and no
 `<!-- specfuse:autoclose-debt -->` marker anywhere in its folder; nothing
 auto-closed here and there is no deferred close to reconcile.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator's reason (verbatim):** the two git checks are answered at PR review
+
+**Recorded:** 2026-08-10T22:59:49Z
+
+**Computed verdict ceiling at acceptance:** `rework exists` — two of the three
+entries below are `externally-verifiable-later`, so a re-run in an environment
+permitted to use git would settle D2 and D3. The operator was shown both re-run
+conditions verbatim and accepted now rather than waiting for them.
+
+**Accepting is not discharging.** Every follow-up below remains exactly as open
+as it was before this record was written. None is marked resolved, none is
+dropped, and none is paraphrased — they are carried forward verbatim from
+[Hedged-verdict follow-up record](#hedged-verdict-follow-up-record) so the
+standing list survives in a reviewable trail instead of a silent hand-edit.
+
+No entry carries `kind: routed-finding`, so no tracking surface was collected —
+`acceptance-discharged` is discharged by this acceptance itself, and both
+`externally-verifiable-later` entries carry their own re-run condition, which is
+their tracking surface.
+
+### Follow-ups carried forward, verbatim
+
+### D1 — Human acknowledgment of the consumer-visible contract-change list
+
+- **Criterion, verbatim** (`close-discipline.md` §3): "The close enumerates
+  every consumer-visible addition, removal, or rename the feature makes across
+  ALL its producing WUs — API surface, generated models, published schemas, CLI
+  flags, whatever contract consumers depend on — and **blocks on explicit human
+  acknowledgment of the list**."
+- **Why unverifiable here:** the enumeration exists and is complete (four items,
+  above, and in `CHANGELOG.md`'s `Unreleased`), but an agent cannot supply the
+  acknowledgment it is collecting. `operator-escalation.md` names writing the
+  human's own justification for them as a failure the rule exists to prevent.
+- **Re-run condition that would upgrade this:** the operator reads the four
+  items at this feature's PR and acknowledges them — which for this feature is
+  the same read that discharges the solo-drafting veto checkpoint, so it is one
+  review, not two.
+- **kind:** `acceptance-discharged`
+
+### D2 — `specfuse/loop/triage.py` is unmodified by T03
+
+- **Criterion, verbatim** (T03 acceptance criterion 8): "`specfuse/loop/triage.py`
+  is **unmodified** by this WU — `git diff --stat` shows no change to it, and
+  the existing `tests/test_triage_apply.py` passes untouched."
+- **Why unverifiable here:** the criterion names `git diff --stat` as its
+  oracle, and a work-unit session runs no `git` at all (`result-contract.md`
+  rule 1, `never-touch.md` §3). The pre-dispatch `diff-stat` oracle capture is
+  truncated to a byte budget and does not enumerate all 33 changed paths, so it
+  cannot answer the question either. **The second half of the criterion was
+  verified:** `python3 -m unittest tests.test_triage_apply` ran clean in this
+  session (7 tests, OK), which is the behavioural proof that `apply_triage`'s
+  semantics survived; only the diff-shaped half is open.
+- **Re-run condition that would upgrade this:**
+  `git diff --stat main -- specfuse/loop/triage.py` returning empty output, run
+  by anyone with git access — the PR's own file list answers it at review.
+- **kind:** `externally-verifiable-later`
+
+### D3 — The red half of the four red-test-first criteria
+
+- **Criterion, verbatim** (T01#1, and identically T02#1, T03#1, T04#1): "…exists
+  and **fails on HEAD before this WU runs** (the module and the test file do not
+  yet exist, which counts as red)."
+- **Why unverifiable here:** the assertion is about a tree state that no longer
+  exists. Re-running the named test today proves the *green* half and can never
+  prove the red half, because the code the test needs is now present. Reaching
+  the red state requires checking out each WU's parent commit, which is a `git`
+  operation this session may not perform. All four named tests exist and pass —
+  `tests.test_agent_policy_schema` (23 tests),
+  `tests.test_agent_policy_queue` (10), `tests.test_agent_policy_triage_dial`
+  (4), `tests.test_groom_backlog_skill` (10), all exit 0 — so the entries are
+  recorded `pass` in `GATE-01-CRITERIA.md` on the strength of the half that is
+  assertable.
+- **Re-run condition that would upgrade this:** check out each work unit's
+  parent commit and run the named test nodeid, expecting a failure — e.g.
+  `git checkout <parent-of-T01-squash> && python3 -m unittest
+  tests.test_agent_policy_schema.TestValidateAgentPolicy.test_shipped_example_validates_clean`.
+  Cheap, but it needs git.
+- **kind:** `externally-verifiable-later`

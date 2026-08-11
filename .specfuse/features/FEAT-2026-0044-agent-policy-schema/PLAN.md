@@ -5,7 +5,7 @@ slug: agent-policy-schema
 branch: feat/FEAT-2026-0044-agent-policy-schema
 roadmap_goal: Give the operator's priorities one auditable, versioned surface — an ordered queue, class rules, budgets, and escalation config the agent reads instead of guessing — plus the periodic ritual that keeps it fed as the backlog evolves.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 19.00
 ---
 
