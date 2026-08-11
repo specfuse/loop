@@ -3204,23 +3204,36 @@ def resolve_bash() -> str | None:
 
 
 # Lines a reader needs in a gate's FAIL report: test-runner verdicts, coverage
-# totals, and the first line of a traceback. Matched against a stripped line.
+# totals, and the first line of a traceback. Searched within a stripped line
+# (not anchored to its start): Maven prefixes every line with a
+# `[INFO]`/`[ERROR]`/`[WARNING]` reactor tag, and surefire's own per-test
+# failure marker trails the test name and elapsed time rather than leading
+# the line, so an anchored match would miss both (#1413).
 _VERDICT_RE = re.compile(
-    r"^(?:"
-    r"OK\b"                                  # unittest pass
-    r"|FAILED\b"                             # unittest fail
-    r"|Ran \d+ tests?\b"                     # unittest count
-    r"|ERROR:|FAIL:"                         # unittest per-test headers
-    r"|AssertionError\b"
-    r"|Traceback \(most recent call last\)"
-    r"|\d+ (?:passed|failed|error)"          # pytest summary
-    r"|TOTAL\s+\d"                           # coverage total
+    r"(?:"
+    r"\bOK\b"                                # unittest pass
+    r"|\bFAILED\b"                           # unittest fail
+    r"|\bRan \d+ tests?\b"                   # unittest count
+    r"|\bERROR:|\bFAIL:"                     # unittest per-test headers
+    r"|\bAssertionError\b"
+    r"|\bTraceback \(most recent call last\)"
+    r"|\b\d+ (?:passed|failed|error)"        # pytest summary
+    r"|\bTOTAL\s+\d"                         # coverage total
     # ruff (#723). Its summary is the verdict for this repo's own `lint` gate,
     # the second entry in the `code` set. Without these two the selector pinned
     # nothing on a lint failure, appended _NO_VERDICT_NOTE, and fell back to the
     # positional tail FEAT-2026-0068 exists to prevent.
-    r"|Found \d+ errors?\b"                  # ruff failure summary
-    r"|All checks passed!"                   # ruff clean summary
+    r"|\bFound \d+ errors?\b"                # ruff failure summary
+    r"|\bAll checks passed!"                 # ruff clean summary
+    # Maven surefire (#1413). The actionable content — the run summary and
+    # the per-test failure marker naming the failing class — sits well above
+    # the final `[ERROR] Failed to execute goal ...` block, which names no
+    # test at all, and Maven prefixes every line with a reactor tag
+    # (`[INFO]`/`[ERROR]`/`[WARNING]`) that an anchored match would trip on.
+    # Without these two, every surefire failure pins nothing and degrades to
+    # that content-free tail.
+    r"|\bTests run: \d+, Failures: \d+"      # surefire run summary
+    r"|<<< (?:FAILURE|ERROR)!"               # surefire per-test failure marker
     r")"
 )
 
@@ -3255,7 +3268,7 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     tail = lines[-window:] if window > 0 else []
     head = lines[: len(lines) - len(tail)]
 
-    pinned = [ln for ln in head if _VERDICT_RE.match(ln.strip())]
+    pinned = [ln for ln in head if _VERDICT_RE.search(ln.strip())]
     if pinned:
         # Cap the pinned block so a suite emitting hundreds of `FAIL:` headers
         # cannot itself flood the report it exists to make readable.
@@ -3264,7 +3277,7 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
         marker = [f"... ({elided} line(s) elided) ..."] if elided > 0 else []
         return pinned + marker + tail
 
-    if any(_VERDICT_RE.match(ln.strip()) for ln in tail):
+    if any(_VERDICT_RE.search(ln.strip()) for ln in tail):
         return tail
     return tail + [_NO_VERDICT_NOTE]
 
