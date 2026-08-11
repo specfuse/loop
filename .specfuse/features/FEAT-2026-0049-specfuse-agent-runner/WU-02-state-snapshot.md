@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0049/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces:
   - specfuse/agent/__init__.py
   - specfuse/agent/state.py
   - tests/test_agent_state.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T00:39:33.373467+00:00
+duration_seconds: 760.9
+cost_usd: 1.771038
+input_tokens: 56
+output_tokens: 19535
 ---
 
 # T02 — the repo-state snapshot, and the first reader of `queue:`

@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0049/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - specfuse/agent/budget.py
   - tests/test_agent_budget.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T00:52:14.481601+00:00
+duration_seconds: 719.973
+cost_usd: 1.277438
+input_tokens: 58
+output_tokens: 12814
 ---
 
 # T03 — caps and the kill switch

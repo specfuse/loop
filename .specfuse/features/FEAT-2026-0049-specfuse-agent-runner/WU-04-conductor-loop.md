@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0049/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.50
 produces:
   - specfuse/agent/run.py
   - tests/test_agent_run.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T01:04:14.666306+00:00
+duration_seconds: 1050.307
+cost_usd: 1.990814
+input_tokens: 86
+output_tokens: 26458
 ---
 
 # T04 — the conductor loop and the `specfuse-agent` entry point

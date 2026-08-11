@@ -77,13 +77,36 @@ class TestEmitEscalation(unittest.TestCase):
         present = [label for label in CATEGORY_LABELS if label in create_call]
         self.assertEqual(len(present), 1)
 
-    def test_no_existing_issue_create_call_has_configured_assignee(self):
+    def test_no_existing_issue_create_call_omits_assignee_by_default(self):
+        """Rewritten for #1762. This test previously asserted that the create
+        call carried `DEFAULT_ASSIGNEE`, which was the literal
+        `specfuse-operator` — a username assignable on no repository. That
+        assertion passed for the whole life of the bug and is precisely why it
+        reached a live run, where `gh issue create` exited 1 on that flag and
+        the escalation was silently never filed.
+
+        The contract now: with nothing configured, no `--assignee` is sent at
+        all. An unassigned needs-human issue beats an unfiled one.
+        """
         runner = _StubRunner([_search_result([]), _create_result()])
 
         emit_escalation(_CORRELATION_ID, runner=runner, **_sample_kwargs())
 
         create_call = runner.calls[-1]
-        self.assertIn(DEFAULT_ASSIGNEE, create_call)
+        self.assertEqual(DEFAULT_ASSIGNEE, "")
+        self.assertNotIn("--assignee", create_call)
+        self.assertNotIn("specfuse-operator", create_call)
+
+    def test_configured_assignee_is_sent(self):
+        runner = _StubRunner([_search_result([]), _create_result()])
+
+        emit_escalation(
+            _CORRELATION_ID, runner=runner, assignee="clabonte", **_sample_kwargs()
+        )
+
+        create_call = runner.calls[-1]
+        self.assertIn("--assignee", create_call)
+        self.assertIn("clabonte", create_call)
 
     def test_second_emit_for_same_correlation_id_creates_nothing(self):
         marker = f"<!-- specfuse:escalation id={_CORRELATION_ID} -->"

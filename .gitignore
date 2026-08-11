@@ -27,6 +27,7 @@ skills-lock.json
 # (these are illustrative; the canonical patterns also live in the scaffold)
 .specfuse/**/work/
 .specfuse/.loop.lock
+.specfuse/.agent.lock
 *.tmp
 
 # Leak-scan denylist — operator-supplied literal org names; never committed

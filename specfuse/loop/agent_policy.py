@@ -118,6 +118,34 @@ def resolve_triage_auto(path: str | Path | None = None) -> bool:
     return triage.get("auto") is True
 
 
+def resolve_escalation_assignee(path: str | Path | None = None) -> str:
+    """Resolve `escalation.assignee` for `escalation.emit_escalation` (#1762).
+
+    Returns `""` -- meaning "file the issue unassigned" -- when the policy
+    file is absent, the key is absent, or the value is not a string. Empty is
+    the safe default here in a way a username never is: `emit_escalation`
+    previously defaulted to the literal `specfuse-operator`, which is
+    assignable on no repository, so `gh issue create` exited 1 on that flag
+    and every escalation was lost while the caller reported success.
+
+    The key was validated by `validate_agent_policy` and read by nothing
+    before this, so an operator who wrote `assignee: ""` was overridden by a
+    placeholder they never chose.
+    """
+    try:
+        policy = load_policy(path)
+    except FileNotFoundError:
+        return ""
+
+    escalation = policy.get("escalation") if isinstance(policy, dict) else None
+    if not isinstance(escalation, dict):
+        return ""
+    assignee = escalation.get("assignee")
+    if not isinstance(assignee, str):
+        return ""
+    return assignee.strip()
+
+
 def resolve_bug_automerge(path: str | Path | None = None) -> bool:
     """Resolve `rules.bugs.automerge` for the bug-lane merge guardrails.
 

@@ -75,6 +75,7 @@ specfuse-lint = "specfuse.loop.lint_plan:main"
 specfuse-monitor-lint = "specfuse.loop.lint_monitoring:main"
 specfuse-monitor = "specfuse.monitor.cli:main"
 specfuse-stats = "specfuse.loop.events_stats:main"
+specfuse-agent = "specfuse.agent.run:main"
 
 [tool.setuptools.packages.find]
 # Ship ONLY the specfuse namespace package. Without this scope, setuptools'

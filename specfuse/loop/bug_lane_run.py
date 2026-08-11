@@ -32,7 +32,11 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
-from specfuse.loop.agent_policy import bug_lane_limits, resolve_bug_automerge
+from specfuse.loop.agent_policy import (
+    bug_lane_limits,
+    resolve_bug_automerge,
+    resolve_escalation_assignee,
+)
 from specfuse.loop.bug_lane import (
     DECLINE_LABELS,
     REASON_ELIGIBLE,
@@ -232,12 +236,14 @@ def _issue_provenance(runner: Callable, repo: str, issue_number: int) -> Optiona
 
 
 def _escalate_fix_bug_outcome(
-    runner: Callable, repo: str, issue_number: int, outcome: str
+    runner: Callable, repo: str, issue_number: int, outcome: str,
+    policy_path: Any = None,
 ) -> None:
     emit_escalation(
         CORRELATION_ID,
         category="blocked-wu",
         repo=repo,
+        assignee=resolve_escalation_assignee(policy_path),
         done_so_far=(
             f"Headless `/fix-bug` ran against issue #{issue_number} and "
             f"stopped without opening a mergeable PR."
@@ -304,7 +310,7 @@ def run_bug_lane(
     outcome = classify_outcome(getattr(invocation, "stdout", "") or "")
 
     if outcome in _ESCALATING_OUTCOMES:
-        _escalate_fix_bug_outcome(runner, repo, issue_number, outcome)
+        _escalate_fix_bug_outcome(runner, repo, issue_number, outcome, policy_path)
         return BugLaneResult(outcome=outcome, reason=None, pr_number=None)
 
     pr_number = _find_pr_for_issue(runner, repo, issue_number)

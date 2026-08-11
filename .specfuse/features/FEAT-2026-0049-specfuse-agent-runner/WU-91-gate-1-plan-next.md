@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0049/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.11.0
+started_at: 2026-08-11T01:21:45.370376+00:00
+duration_seconds: 927.985
+cost_usd: 7.236406
+input_tokens: 6415
+output_tokens: 67713
 ---
 
 # G1-PLAN — draft gate 2 and write its review
