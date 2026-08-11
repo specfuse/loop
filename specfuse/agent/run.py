@@ -398,14 +398,17 @@ def default_providers(
     here; T07/T08 add theirs the same way."""
     from specfuse.agent.providers.answers import AnsweredEscalationProvider
     from specfuse.agent.providers.bugs import BugsProvider
+    from specfuse.agent.providers.findings_autofix import FindingsAutofixProvider
     from specfuse.agent.providers.findings_diagnose import FindingsDiagnoseProvider
     from specfuse.agent.providers.triage import TriageProvider
 
     if repo is None:
         return ()
     findings_diagnose_kwargs = {}
+    findings_autofix_kwargs = {}
     if monitoring_config_path is not None:
         findings_diagnose_kwargs["monitoring_config_path"] = monitoring_config_path
+        findings_autofix_kwargs["monitoring_config_path"] = monitoring_config_path
     return (
         AnsweredEscalationProvider(
             repo=repo,
@@ -426,6 +429,12 @@ def default_providers(
             runner=runner,
             policy_path=policy_path,
             **findings_diagnose_kwargs,
+        ),
+        FindingsAutofixProvider(
+            repo=repo,
+            runner=runner,
+            policy_path=policy_path,
+            **findings_autofix_kwargs,
         ),
     )
 

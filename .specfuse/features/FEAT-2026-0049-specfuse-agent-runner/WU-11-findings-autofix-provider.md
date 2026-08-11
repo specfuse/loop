@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0049/T11
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.50
 produces:
   - specfuse/agent/providers/findings_autofix.py
   - tests/test_agent_provider_findings_autofix.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T04:36:20.217627+00:00
+duration_seconds: 907.334
+cost_usd: 1.764265
+input_tokens: 2531
+output_tokens: 19077
 ---
 
 # T11 — the findings-autofix provider
