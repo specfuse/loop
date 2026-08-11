@@ -1,8 +1,9 @@
 ---
 id: FEAT-2026-0049/G4-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
+re_arm_count: 1
 planned_cost_usd: 5.00
 # AC6 writes CHANGELOG.md — a surface outside this feature's folder, which makes
 # this close load-bearing. Without this flag `evaluate_auto_close` may skip the
@@ -34,6 +35,54 @@ output_tokens: 54242
 ---
 
 # G4-CLOSE — the terminal close
+
+## Re-arm context — READ THIS FIRST (re_arm_count: 1)
+
+**This close has already run once and passed**, issuing `verdict: met_locally`.
+It is being re-armed by the operator, not retried after a failure. Its previous
+output is committed (`db6b394`) and is in the tree right now: six
+`RETROSPECTIVE.md` sections (`## Gate 4 — the agent advances features`,
+`## Cost analysis`, `## Consumer-visible contract changes`,
+`## Hedged-verdict follow-up record`, `## Lessons promoted (gate 4)`,
+`## What the loop did NOT verify`), a populated `GATE-04-CRITERIA.md`, and three
+`CHANGELOG.md` `Unreleased` entries.
+
+**Update those in place. Do not append a second copy of any of them.** A
+duplicate `## What the loop did NOT verify` is actively harmful:
+`assert_autoclose_debt_reconciled` reads only the LAST such section.
+
+**Why the re-arm.** The previous close's criterion 1 re-ran the oracles fresh
+and recorded them honestly — but the tree has moved since. Commit `21fdb40`
+fixes issue #1746: `read_feature_summaries` now normalises `features_root`, so a
+bare `specfuse-agent run` no longer dies with
+`AttributeError: 'str' object has no attribute 'is_dir'`. The previous close's
+evidence therefore describes a tree one commit behind, and `--recheck-verdict`
+only re-reads the verdict field rather than re-verifying anything.
+
+**What is genuinely new evidence, and must reach the retrospective:**
+
+1. **The bare-invocation path was broken and is now fixed.** Before `21fdb40`,
+   `FeatureProvider.advertise` raised from inside `_select_next`, which has no
+   per-provider guard, so the exception ended the whole run — taking the healthy
+   bug, triage and findings providers with it.
+2. **The feature HAS now been exercised against live repository state**, which
+   the previous close's headline said had never happened. A read-only probe
+   built a real snapshot of this repository, and all six providers advertised:
+   answered-escalations 0, bugs 10, features 1, triage 8, findings-diagnose 0,
+   findings-autofix 0 — and `_select_next` chose `BugsProvider`, correct under
+   `rules.bugs.preempt: true`. **No item was executed**, so this is selection
+   evidence only. State it as exactly that: the headline moves from "never run"
+   to "selection proven against live state, execution still unproven" — do not
+   overstate it into a full live run.
+3. **Group D's re-run condition is still open.** It names one real
+   `specfuse-agent run`; a read-only probe is not that. Carry the group forward.
+
+**Re-issue the verdict; do not inherit it.** `verdict: met_locally` is still in
+this file's frontmatter from the previous pass. Decide it afresh on the evidence
+above and write it deliberately — if it stays `met_locally`, that must be a
+judgement made this session, not a leftover.
+
+Everything below this section is the original WU and is unchanged.
 
 **Context.** `FEAT-2026-0049/G4-CLOSE`. Gate 4 is the feature's terminal gate, so
 its closing sequence is a single `close` work unit collapsing retrospective,
