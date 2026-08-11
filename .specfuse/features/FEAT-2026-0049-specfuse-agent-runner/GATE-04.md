@@ -2,6 +2,10 @@
 gate: 4
 status: open
 cost_budget_usd: 29.50
+baseline:
+  sha: da9f27a778d34938216ba7b9eb1d4203435134b2
+  probed_at: 2026-08-11T05:55:56.923810+00:00
+  failing: []
 ---
 
 # Gate 4 — the agent advances features
