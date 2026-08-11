@@ -5,7 +5,7 @@ slug: specfuse-agent-runner
 branch: feat/FEAT-2026-0049-specfuse-agent-runner
 roadmap_goal: One operator-launched command drives the whole lifecycle of a specfuse-configured repo — findings, triage, bugs, prioritized feature advancement — as a thin conductor over the existing loop driver and skills, escalating what it cannot handle, for exactly as long and as expensively as the operator allows.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 123.00
 ---
 

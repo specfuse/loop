@@ -1126,3 +1126,143 @@ carry them as `kind: inherent`. Done.
    deferral that survives a re-arm unchanged is still a deferral, and the
    re-arm's extra evidence touched neither.
 
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator's reason (verbatim):** the live run proved it end to end. Issues found during the live run will be addressed (via the autonomous agent) after
+
+**Recorded:** 2026-08-11T14:50:22Z
+
+**Computed verdict ceiling at acceptance:** `rework exists` — Groups A and D are
+`externally-verifiable-later`, Groups B and C are `inherent`. The operator was
+shown the ceiling and both re-run conditions before accepting.
+
+**What changed between this close and this acceptance.** Groups A and D named one
+real `specfuse-agent run` as their upgrade condition. That run has since happened:
+29.8 minutes against this live repository, selecting `bug-1413` under
+`rules.bugs.preempt`, invoking headless `/fix-bug`, and producing PR #1784 — a
+test-first fix that passed CI, was reviewed, and merged, closing issue #1413. The
+feature's central claim is therefore demonstrated end to end, which is the basis
+the operator names in their reason above.
+
+**Why the verdict is nonetheless still `met_locally` and not `met`.** That same
+run reported `items completed: 0`. Two defects it surfaced stop the lane short of
+completing an item, and both are open at acceptance:
+
+- **#1785** — 8 of `LABEL_REGISTRY`'s 21 labels are unprovisioned on this
+  repository, and a failed label write is fatal in the bug lane while being
+  best-effort in `apply_triage`. This is what discarded the 30 minutes of work.
+- **#1786** — the lane reads CI the instant it opens the PR, so
+  `rules.bugs.automerge` cannot fire and a green PR was labelled `ci-not-green`.
+
+A third, **#1762** (`emit_escalation` hard-coding an unassignable user), was found
+by the first live run and is fixed on this branch — but has **not** been exercised
+live, because the bug lane runs from `main` and the fix has not merged there yet.
+
+**Accepting is not discharging.** Every follow-up below remains exactly as open as
+it was. None is marked resolved, none dropped, none paraphrased — carried forward
+verbatim from [Hedged-verdict follow-up record](#hedged-verdict-follow-up-record).
+Groups B and C are `inherent`: they require `git`, which a close session cannot
+run by contract, so **no future close will ever discharge them** and no re-run is
+worth waiting for.
+
+No entry carries `kind: routed-finding`, so no tracking surface was collected.
+
+### Follow-ups carried forward, verbatim
+
+### Group A — gate 3's ten criteria met only against fixtures
+
+Enumerated individually with their live conditions in § "Gate 3 — the criteria
+met only against fixtures" above, which this entry carries forward verbatim
+rather than restating: T09#5 (`component_for_finding`), T09#5
+(`load_monitoring_config`), T09#6 (`--monitoring-config`'s default path), T10#2,
+T10#5, T10#6, T11#2, T11#5, T11#6, and the diagnose→autofix handoff within one
+run. Ten criteria.
+
+- **why unverifiable here:** this repository has no `.specfuse/monitoring.yml`
+  and never will — `.specfuse/verification.yml`'s `monitoring-example-lint`
+  gate records that it is a CLI tool with no deployable components — so no
+  harvester run has ever happened and no `monitoring-finding` issue has ever
+  existed here. Inventing one would be a fixture masquerading as a live
+  surface.
+- **re-run condition:** one `specfuse monitor run` followed by one
+  `specfuse-agent run` in a repository with a real `monitoring.yml` and at
+  least two findings, one with `diagnose: auto` and one with `diagnose:
+  manual`. The single cheapest partial upgrade, available in this repo today
+  and not done: a fixture-level test registering both findings providers and
+  asserting the iteration-4 visibility of a diagnosis posted at iteration 3.
+- **kind:** `externally-verifiable-later`
+
+### Group B — the fourteen red-before-green halves
+
+T01#1, T02#1, T03#1, T04#1, T05#1, T06#1, T07#1, T08#1, T09#1, T10#1, T11#1,
+T12#1, T13#1, T14#1. Gate 4 inherits the same criterion shape gates 1–3 used,
+so the eleven gate-3's close named are now fourteen.
+
+- **the criterion, verbatim (T12#1's, representative of all fourteen):**
+  "`tests/test_agent_queue_read.py::TestQueueWorkability::test_queue_entry_without_a_feature_folder_needs_drafting`
+  exists and **fails on HEAD before this WU runs** (the file does not yet
+  exist)."
+- **why unverifiable here:** the green-after half re-runs in milliseconds and
+  did, this session, for all fourteen. The red-before half asserts a tree state
+  that no longer exists and would need `git` to reconstruct; a closing session
+  runs no `git` command by contract.
+- **re-run condition:** none. No future close can discharge this either, for
+  the same structural reason. It was true when each producing session ran and
+  the driver's produces-vs-diff guard covered it at squash time; this close
+  will not mark it verified on a substitute.
+- **kind:** `inherent`
+
+### Group C — the four no-file-under-`specfuse/loop/`-was-edited diff claims
+
+T06#2, T07#2, T10#2, T11#2.
+
+- **the criterion, verbatim (T06#2's shape):** "No file under `specfuse/loop/`
+  (or `specfuse/monitor/`) is edited."
+- **why unverifiable here:** it is a diff claim, and diffs need `git`.
+- **re-run condition:** none, in a close session, by construction. Not
+  unverified in the loop as a whole — the driver's produces-vs-diff guard and
+  each WU's `Do not touch` boundary cover it at squash time — but this close
+  cannot be the one to assert it.
+- **kind:** `inherent`
+
+### Group D — gate 4's own criteria, met against fixtures and an injected runner
+
+**Still open, and carried forward at the re-arm.** The re-arm's read-only probe
+is not this group's re-run condition, which names one real `specfuse-agent run`.
+A probe that stops before `execute()` cannot discharge criteria about what
+`execute()` does.
+
+All 22 entries in `GATE-04-CRITERIA.md`, less the live-state subset recorded in
+§ "What this close proved against live state" — which the re-arm *enlarged*:
+beyond T12's readers and classifier, the whole selection path (`gather_snapshot`
+→ six `advertise()` calls → `_select_next`) has now run against this
+repository's real issues, PRs, policy file and 63 real feature folders. The
+remainder — every halt classification in T13, every row of T14's halt→outcome
+table, and every escalation path — was met against fixture feature folders under
+a temporary directory and a runner that returns canned exit codes, stdout and
+stderr.
+
+- **why unverifiable here:** deliberately, and as a safety property rather than
+  a limitation. A test that dispatched the real driver against a real feature
+  in this repository would run the loop inside the loop, and this repository's
+  own `queue:` top is this very feature. `GATE-04.md` § "What this gate
+  deliberately does not prove" records the decision; T13's and T14's escalation
+  triggers forbid working around it.
+- **re-run condition (sharpened by the probe, and the sharpening matters):** one
+  `specfuse-agent run` against a repository whose `queue:` top is a feature
+  other than this one — under `--max-items 1` and a `--max-minutes` cap, which
+  is what makes the trial cheap and bounded. **Add one condition the previous
+  pass could not have known to add:** the trial repository must have **no
+  higher-ranked bug work**, or `rules.bugs.preempt` must be `false`. The probe
+  showed `_select_next` choosing `BugsProvider` over `FeatureProvider` on this
+  repository's real state — correct behaviour, and it means a `--max-items 1`
+  run here would spend its single item on a bug and exercise none of this
+  group's criteria. A run that never reaches the feature provider is not the
+  re-run condition however faithfully it is executed. With that condition met,
+  one run exercises the console script, the lock, the caps, the snapshot, the
+  ranking, the subprocess invocation, at least one halt classification and its
+  escalation path, all at once.
+- **kind:** `externally-verifiable-later`

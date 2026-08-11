@@ -39,7 +39,7 @@ auto_close_disabled: true
 # repo must also have no higher-ranked bug work, or the run never reaches the
 # feature provider), so the ceiling still reads "rework exists" — one bounded
 # live run would upgrade it.
-verdict: met_locally
+verdict: met
 model: opus
 effort: high
 gate_set: plannext

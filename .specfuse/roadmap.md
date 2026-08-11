@@ -64,7 +64,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
-| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | active | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ detail](#feat-2026-0049) |
+| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
@@ -789,21 +789,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0049"></a>
-## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
-
-**Why.** The capstone: a script that drives the whole lifecycle of a specfuse-configured repo — monitoring findings, issue triage, bug fixing, prioritized feature advancement — as a thin conductor over the existing loop driver and skills (none of which it modifies), escalating whatever it cannot handle. The operator controls when and how long it runs, and therefore what it costs.
-
-**Goal.** `specfuse-agent run` — operator-launched, run-to-drain: acquire a lock file (PID + heartbeat timestamp, stale-lock detection, exactly one agent per repo); loop — read repo state (issues, PRs, roadmap, agent-policy.yml, feature folders: the entire agent memory, per the derivable-from-GH-or-safely-losable principle — no agent database), pick the highest-value action under policy (bugs preempt per rules; queue top for features; parse answered needs-human issues first), execute via the existing skill/driver surfaces, reconcile — until the queue is drained or a cap hits (`--max-minutes`, `--max-tokens`, `--max-items`). Feature execution respects gate checkpoints: driver halts `awaiting_review` → escalate per contract and switch to the next workable item (pause = stop and pick different work; feature folders already persist all state). Blocked items park with an escalation; drafting-needed queue tops escalate (drafting stays human in v1). Kill switch: a PAUSE marker checked each iteration. Cron or event triggers later invoke the same script unchanged.
-
-**Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
-
-**Shape.** Three gates. Gate 1 builds the conductor's stopping properties — its own `.specfuse/.agent.lock` (separate from the driver's, which `loop.run()` takes itself), item-boundary caps, PAUSE marker, one repo-state snapshot carrying the first real reader of `queue:` — and drains an empty provider registry. Gate 2 adds the four cheap action classes over already-shipped composition (`run_bug_lane`, `apply_triage`, `diagnose_cli`, `run_autofix`). Gate 3 adds feature advancement, invoking the driver as a subprocess and switching away on an `awaiting_review` halt. New code lives in a new `specfuse/agent/` package, deliberately outside `driver_edit`'s `specfuse/loop/` halt prefix.
-
-**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
-
-**Status: active.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
-
 <a id="feat-2026-0050"></a>
 ## FEAT-2026-0050 — Async feature-drafting interview via question issues
 
@@ -813,7 +798,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
 
-**Blocked by.** [FEAT-2026-0049](#feat-2026-0049) — an agent capability; the runner and its escalation loop must exist
+**Blocked by.** [FEAT-2026-0049](roadmap-archive.md#feat-2026-0049) — an agent capability; the runner and its escalation loop must exist
 
 **Status: blocked.**
 
