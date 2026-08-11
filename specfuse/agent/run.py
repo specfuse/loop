@@ -59,6 +59,8 @@ KIND_BUG = "bug"
 KIND_FEATURE = "feature"
 KIND_TRIAGE = "triage"
 KIND_ESCALATION_ANSWER = "escalation-answer"
+KIND_FINDING_DIAGNOSE = "finding-diagnose"
+KIND_FINDING_AUTOFIX = "finding-autofix"
 
 
 class AgentLockHeldError(RuntimeError):
@@ -220,7 +222,7 @@ def _select_next(
     for provider, item in candidates:
         if item.kind == KIND_ESCALATION_ANSWER:
             ranked.append(((-1, 0), provider, item))
-        elif item.kind == KIND_BUG:
+        elif item.kind == KIND_BUG or item.kind == KIND_FINDING_AUTOFIX:
             tier = 0 if bugs_preempt else 2
             ranked.append(((tier, 0), provider, item))
         elif item.kind == KIND_FEATURE:
@@ -231,8 +233,10 @@ def _select_next(
                 unresolved.append(
                     (provider, item, f"queue_key {item.queue_key!r} is not in policy queue:")
                 )
-        elif item.kind == KIND_TRIAGE:
+        elif item.kind == KIND_FINDING_DIAGNOSE:
             ranked.append(((3, 0), provider, item))
+        elif item.kind == KIND_TRIAGE:
+            ranked.append(((3, 1), provider, item))
         else:
             unresolved.append((provider, item, f"unknown item kind {item.kind!r}"))
 
@@ -384,6 +388,7 @@ def default_providers(
     runner: Callable = _default_runner,
     policy_path: Optional[str] = None,
     features_root: Optional[Path] = None,
+    monitoring_config_path: Optional[str] = None,
 ) -> Sequence[ActionProvider]:
     """The registry each gate-2 provider WU (T06-T08) appends itself to.
 
@@ -423,6 +428,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--repo", default=None, help="GitHub repo, OWNER/NAME")
     parser.add_argument("--policy", default=None, help="path to agent-policy.yml")
     parser.add_argument("--features-root", default=None, help="path to .specfuse/features")
+    parser.add_argument(
+        "--monitoring-config",
+        default=".specfuse/monitoring.yml",
+        help="path to monitoring.yml (default: .specfuse/monitoring.yml)",
+    )
     parser.add_argument("--max-minutes", type=float, default=None)
     parser.add_argument("--max-tokens", type=int, default=None)
     parser.add_argument("--max-items", type=int, default=None)
@@ -446,6 +456,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 repo=args.repo,
                 policy_path=args.policy,
                 features_root=features_root,
+                monitoring_config_path=args.monitoring_config,
             ),
         )
     except AgentLockHeldError as exc:

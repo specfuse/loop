@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0049/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.50
 produces:
   - specfuse/agent/monitoring_read.py
   - tests/test_agent_findings_seam.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T04:14:31.200783+00:00
+duration_seconds: 632.181
+cost_usd: 1.415455
+input_tokens: 76
+output_tokens: 13667
 ---
 
 # T09 — the findings seam: two kinds, their ranking, and the monitoring reader
