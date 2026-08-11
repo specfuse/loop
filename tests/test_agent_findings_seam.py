@@ -284,7 +284,7 @@ class TestMonitoringConfigFlag(unittest.TestCase):
             features_root=None,
             monitoring_config_path=".specfuse/monitoring.yml",
         )
-        self.assertEqual(len(providers), 5)
+        self.assertEqual(len(providers), 6)
 
 
 if __name__ == "__main__":

@@ -398,6 +398,7 @@ def default_providers(
     here; T07/T08 add theirs the same way."""
     from specfuse.agent.providers.answers import AnsweredEscalationProvider
     from specfuse.agent.providers.bugs import BugsProvider
+    from specfuse.agent.providers.feature import FeatureProvider
     from specfuse.agent.providers.findings_autofix import FindingsAutofixProvider
     from specfuse.agent.providers.findings_diagnose import FindingsDiagnoseProvider
     from specfuse.agent.providers.triage import TriageProvider
@@ -418,6 +419,12 @@ def default_providers(
             repo=repo,
             runner=runner,
             policy_path=policy_path,
+        ),
+        FeatureProvider(
+            repo=repo,
+            runner=runner,
+            policy_path=policy_path,
+            features_root=features_root,
         ),
         TriageProvider(
             repo=repo,

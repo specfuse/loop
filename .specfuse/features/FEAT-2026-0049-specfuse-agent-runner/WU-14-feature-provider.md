@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0049/T14
 type: implementation
-status: pending
+status: done
 attempts: 1
 planned_cost_usd: 6.50
 produces:
@@ -11,7 +11,11 @@ model: sonnet
 effort: medium
 gate_set: code
 driver_version: 0.11.0
-started_at: 2026-08-11T06:50:06.849881+00:00
+started_at: 2026-08-11T07:11:24.684354+00:00
+duration_seconds: 785.992
+cost_usd: 2.179865
+input_tokens: 1780
+output_tokens: 28985
 ---
 
 # T14 — the feature provider: advance the queue top, escalate, switch
