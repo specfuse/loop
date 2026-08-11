@@ -71,6 +71,9 @@ OUTCOME_DECLINED = "declined"
 _ESCALATING_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
 
 _CI_UNKNOWN = "unknown"
+#: Checks exist but have not concluded yet -- internal to this module; never
+#: reaches `evaluate_merge_guardrails`, which sees only a conclusion or unknown.
+_CI_PENDING = "__pending__"
 
 _REASON_PR_NOT_FOUND = "pr_not_found"
 
@@ -93,15 +96,17 @@ class BugLaneResult:
     pr_number: Optional[int]
 
 
-def pr_ci_conclusion(runner: Callable, repo: str, pr_number: int) -> str:
-    """Read `pr_number`'s CI conclusion via `gh pr checks`.
+#: How long to wait for a freshly-opened PR's checks to reach a conclusion,
+#: and how often to re-read while waiting (#1786). The lane reads CI moments
+#: after `/fix-bug` opens the PR, so a pending conclusion is the GUARANTEED
+#: first observation, not an exceptional one.
+CI_WAIT_SECONDS = 600
+CI_POLL_SECONDS = 15
 
-    Returns a bare conclusion string (e.g. `"success"`, `"failure"`) on a
-    clean, unanimous read. Returns `_CI_UNKNOWN` -- never raises -- when the
-    command fails, the output cannot be parsed, or the conclusion is missing
-    or malformed. `evaluate_merge_guardrails` declines on anything but a
-    literal `"success"`, so an unreadable conclusion fails closed.
-    """
+
+def _read_ci_conclusion_once(runner: Callable, repo: str, pr_number: int) -> str:
+    """One `gh pr checks` read. `_CI_PENDING` when a check has no conclusion
+    yet; `_CI_UNKNOWN` when the read itself cannot be trusted."""
     try:
         result = runner(
             ["gh", "pr", "checks", str(pr_number), "--repo", repo, "--json", "conclusion"],
@@ -126,14 +131,61 @@ def pr_ci_conclusion(runner: Callable, repo: str, pr_number: int) -> str:
         if not isinstance(row, dict):
             return _CI_UNKNOWN
         conclusion = row.get("conclusion")
-        if not isinstance(conclusion, str) or not conclusion:
+        if not isinstance(conclusion, str):
             return _CI_UNKNOWN
+        if not conclusion:
+            # Queued or in progress -- distinct from unreadable. This is the
+            # distinction the single-read version could not draw, and drawing
+            # it is the whole fix: "CI has not finished" is not a verdict.
+            return _CI_PENDING
         conclusions.add(conclusion)
 
     if len(conclusions) != 1:
         return _CI_UNKNOWN
 
     return conclusions.pop()
+
+
+def pr_ci_conclusion(
+    runner: Callable,
+    repo: str,
+    pr_number: int,
+    *,
+    sleep: Callable = time.sleep,
+    clock: Callable = time.monotonic,
+    deadline_seconds: float = CI_WAIT_SECONDS,
+    poll_seconds: float = CI_POLL_SECONDS,
+) -> str:
+    """Wait for `pr_number`'s CI to reach a conclusion, then return it.
+
+    Returns a bare conclusion string (e.g. `"success"`, `"failure"`) once every
+    check has one. Returns `_CI_UNKNOWN` -- never raises -- when the command
+    fails, the output cannot be parsed, the conclusions disagree, or the
+    checks are still pending when *deadline_seconds* expires.
+    `evaluate_merge_guardrails` declines on anything but a literal `"success"`,
+    so an unreadable conclusion still fails closed.
+
+    Polls rather than reading once (#1786). `run_bug_lane` calls this moments
+    after `/fix-bug` opens the PR, when checks are queued by definition, so the
+    single read returned `_CI_UNKNOWN` every time: `rules.bugs.automerge` could
+    never fire, and a green PR was labelled `bug-lane:ci-not-green`. A settled
+    PR still costs exactly one call -- the wait is paid only when there is
+    something to wait for.
+
+    A pending-at-deadline result is deliberately reported as `_CI_UNKNOWN`
+    rather than a new reason. A distinct reason would need a distinct
+    guardrail label, and those are already the subject of #1785 (8 of 21
+    registry labels unprovisioned, and a failed label write fatal here); adding
+    a ninth would widen that failure rather than narrow this one.
+    """
+    started = clock()
+    while True:
+        conclusion = _read_ci_conclusion_once(runner, repo, pr_number)
+        if conclusion != _CI_PENDING:
+            return conclusion
+        if clock() - started >= deadline_seconds:
+            return _CI_UNKNOWN
+        sleep(poll_seconds)
 
 
 def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Optional[int]:
