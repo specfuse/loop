@@ -52,3 +52,61 @@ before the feature's terminal verdict — auto-close cannot enumerate them.
   - deferred: The run summary names: items attempted, items completed, the stop reason from
   - deferred: With one or more test-double providers registered, the loop selects, executes
   - deferred: The loop performs no git mutation of its own. It invokes; it does not commit,
+
+## Gate 2 — auto-closed (predicate=v1)
+
+On-plan intermediate close; full close-intermediate ceremony
+skipped per `evaluate_auto_close`. `plan-next` WU dispatched
+to draft gate 3.
+
+- feature_id: FEAT-2026-0049
+- predicate_version: v1
+- gate_total_cost: $6.66
+- gate_budget: $45.50
+- reasons: [] (auto=True)
+
+## What the loop did NOT verify (gate 2)
+
+This gate auto-closed on-plan; the full close-intermediate ceremony did
+not run, so the per-criterion deferred-verification list was **not**
+enumerated. Any acceptance criterion whose verification is deferred
+(loop-sandbox limit, cross-repo coordination, real-system access) is
+unrecorded here. Gate 3's close MUST reconcile these
+before the feature's terminal verdict — auto-close cannot enumerate them.
+
+<!-- specfuse:autoclose-debt gate=2 wus=T05,T06,T07,T08 criteria=30 predicate=v1 -->
+
+- **FEAT-2026-0049/T05** (`WU-05-provider-seam.md`)
+  - deferred: `tests/test_agent_seam.py::TestKindVocabulary::test_triage_item_is_selected_not_escalated`
+  - deferred: `specfuse/agent/run.py` exposes `KIND_TRIAGE` and `KIND_ESCALATION_ANSWER`,
+  - deferred: The same test passes after this WU's edits.
+  - deferred: **Gate 1's ranking is unchanged.** With only bug- and feature-kind items
+  - deferred: `ActionOutcome` carries a spend field defaulting to zero, and `run_agent`
+  - deferred: `RunSummary` and the printed run summary name total reported spend alongside
+  - deferred: `specfuse/agent/run.py` exposes `default_providers(...)` returning the
+  - deferred: **An escalated outcome can reach the human inbox, not only stdout.**
+  - deferred: **An escalation with no payload is reported as summary-only, in words.** When
+- **FEAT-2026-0049/T06** (`WU-06-bugs-provider.md`)
+  - deferred: `tests/test_agent_provider_bugs.py::TestBugsProvider::test_declined_outcome_escalates_without_second_issue`
+  - deferred: `specfuse/agent/providers/bugs.py` implements T05's protocol over
+  - deferred: The same test passes after this WU's edits.
+  - deferred: `advertise` returns one `kind="bug"` item per open snapshot issue whose triage
+  - deferred: `execute` maps `merged` to a completed outcome and `declined` / `refused` /
+  - deferred: **No second escalation.** For `refused` / `could_not_proceed` the lane has
+  - deferred: The provider is registered in `default_providers()` and the provider performs
+- **FEAT-2026-0049/T07** (`WU-07-triage-provider.md`)
+  - deferred: `tests/test_agent_provider_triage.py::TestTriageProvider::test_low_confidence_under_auto_becomes_question`
+  - deferred: `specfuse/agent/providers/triage.py` implements T05's protocol over
+  - deferred: The same test passes after this WU's edits.
+  - deferred: The provider passes `auto=snapshot.triage_auto` to `apply_triage` and contains
+  - deferred: A classifier result naming a category outside `triage.CATEGORIES` never
+  - deferred: A row `list_untriaged` flags `already_structured` (a harvester finding) is not
+  - deferred: The provider is registered in `default_providers()`, advertises
+- **FEAT-2026-0049/T08** (`WU-08-answered-escalations.md`)
+  - deferred: `tests/test_agent_provider_answers.py::TestAnsweredEscalations::test_numbered_reply_is_parsed_and_acknowledged`
+  - deferred: `specfuse/agent/providers/answers.py` implements T05's protocol, advertising
+  - deferred: The same test passes after this WU's edits.
+  - deferred: The label name, the marker pattern, and the numbered-answers shape are read
+  - deferred: An acknowledged answer produces exactly one `gh issue comment` naming the
+  - deferred: An issue whose comments match no numbered option is left untouched — no
+  - deferred: The provider is registered in `default_providers()` and performs no git
