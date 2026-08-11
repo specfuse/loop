@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0049/G3-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 # Set at the /arm-gate checkpoint by the agent, under the operator's standing
 # authorization of 2026-08-10 — NOT reviewed by the operator.
@@ -13,6 +13,15 @@ planned_cost_usd: 4.50
 # predecessor marker is named. Forcing this close to run is what stops the
 # compounding. Reverse this line to restore auto-close for gate 3.
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.11.0
+started_at: 2026-08-11T04:51:27.890016+00:00
+duration_seconds: 701.061
+cost_usd: 7.016129
+input_tokens: 3453
+output_tokens: 50370
 ---
 
 # G3-CLOSE-INTERMEDIATE — gate 3 retrospective, lessons, docs
