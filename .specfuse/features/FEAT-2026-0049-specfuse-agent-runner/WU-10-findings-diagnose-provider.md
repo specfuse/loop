@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0049/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 7.50
 produces:
   - specfuse/agent/providers/findings_diagnose.py
   - specfuse/agent/diagnose_invoke.py
   - tests/test_agent_provider_findings_diagnose.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T04:25:03.612229+00:00
+duration_seconds: 676.261
+cost_usd: 1.762713
+input_tokens: 915
+output_tokens: 19294
 ---
 
 # T10 — the findings-diagnose provider
