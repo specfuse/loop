@@ -1,0 +1,60 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 the agent's own lock",
+          "id": "FEAT-2026-0049/T01",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 the repo-state snapshot, and the first reader of `queue:`",
+          "id": "FEAT-2026-0049/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 caps and the kill switch",
+          "id": "FEAT-2026-0049/T03",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 the conductor loop and the `specfuse-agent` entry point",
+          "id": "FEAT-2026-0049/T04",
+          "planned_cost_usd": 6.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE-INTERMEDIATE \u2014 gate 1 retrospective, lessons, docs",
+          "id": "FEAT-2026-0049/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "G1-PLAN \u2014 draft gate 2 and write its review",
+          "id": "FEAT-2026-0049/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": []
+    },
+    {
+      "gate": 3,
+      "work_units": [
+        {
+          "goal": "G3-CLOSE \u2014 terminal close (placeholder)",
+          "id": "FEAT-2026-0049/G3-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
