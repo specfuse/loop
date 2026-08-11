@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0049-specfuse-agent-runner
 roadmap_goal: One operator-launched command drives the whole lifecycle of a specfuse-configured repo — findings, triage, bugs, prioritized feature advancement — as a thin conductor over the existing loop driver and skills, escalating what it cannot handle, for exactly as long and as expensively as the operator allows.
 autonomy_default: auto
 status: active
-planned_cost_usd: 34.50
+planned_cost_usd: 72.00
 ---
 
 # Plan: specfuse-agent runner
@@ -139,9 +139,12 @@ and asserts no "zero issues" close predicate. It consumes existing predicates
 ```yaml
 # Closing shape (FEAT-2026-0015):
 #   Gates 1 and 2 are non-terminal: close-intermediate + plan-next.
-#   Gate 3 is terminal: single close, scaffolded here as a draft placeholder so
-#   lint reads gate 1 as non-terminal. G2-PLAN fills in gate 3's substantive WUs
-#   above that entry when gate 2 completes.
+#   The last gate is terminal: single close, scaffolded here as a draft
+#   placeholder so lint reads the earlier gates as non-terminal.
+#   G2-PLAN inserts the findings gate ahead of the features gate (the sizing
+#   decision below), which moves this terminal close to gate 4, and then drafts
+#   the substantive WUs above that entry. Until it runs, the entry below is the
+#   features gate at its original number, untouched.
 gates:
   - gate: 1
     file: GATE-01.md
@@ -167,7 +170,26 @@ gates:
         depends_on: [FEAT-2026-0049/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []
+    work_units:
+      - id: FEAT-2026-0049/T05
+        file: WU-05-provider-seam.md
+        depends_on: []
+      - id: FEAT-2026-0049/T06
+        file: WU-06-bugs-provider.md
+        depends_on: [FEAT-2026-0049/T05]
+      - id: FEAT-2026-0049/T07
+        file: WU-07-triage-provider.md
+        depends_on: [FEAT-2026-0049/T05]
+      - id: FEAT-2026-0049/T08
+        file: WU-08-answered-escalations.md
+        depends_on: [FEAT-2026-0049/T05]
+      # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
+      - id: FEAT-2026-0049/G2-CLOSE-INTERMEDIATE
+        file: WU-93-gate-2-close-intermediate.md
+        depends_on: [FEAT-2026-0049/T05, FEAT-2026-0049/T06, FEAT-2026-0049/T07, FEAT-2026-0049/T08]
+      - id: FEAT-2026-0049/G2-PLAN
+        file: WU-94-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0049/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
@@ -179,12 +201,18 @@ gates:
 
 ## A note on `planned_cost_usd`
 
-`34.50` is the sum of the **drafted** work units — gate 1's six plus gate 3's
-terminal `close` placeholder. It is not an estimate of the whole feature, which
-lands nearer $90 across three gates. Gates 2 and 3 have no work units yet, so
-there is nothing honest to add for them; `G1-PLAN` and `G2-PLAN` raise this
-figure as they draft. Keeping it equal to the real sum is what lets the 10%
-drift lint stay meaningful instead of being permanently red.
+`72.00` is the sum of the **drafted** work units: gate 1's six ($34.50 at draft
+time, unchanged), gate 2's six ($37.50, drafted by `G1-PLAN` on 2026-08-11), and
+gate 3's terminal `close` placeholder. It is not an estimate of the whole
+feature — the findings gate and the features gate have no work units yet, so
+there is nothing honest to add for them, and `G2-PLAN` raises this figure as it
+drafts them. Keeping it equal to the real sum is what lets the 10% drift lint
+stay meaningful instead of being permanently red.
+
+For calibration when the next estimate is made: gate 1 planned $29.50 of
+substantive work and spent **$5.95** against a $36.00 budget. Gate 2's estimates
+carry that same conservatism forward deliberately — the padding is for a known
+guard-contract defect (`planning-discipline.md` §5), not a prediction.
 
 ## Gate map
 
@@ -195,22 +223,40 @@ providers, and prints a run summary. Deliberately has no action class: the loop'
 stopping properties are the thing most expensive to get wrong and cheapest to
 test in isolation.
 
-**Gate 2 — the agent drains bugs, triage, and findings.** Four providers over
-already-shipped composition: bugs (`run_bug_lane`), triage (`apply_triage`,
-honouring `rules.triage.auto`), findings-diagnose (`diagnose_cli`), and
-findings-autofix (`run_autofix`). Plus parsing answered needs-human issues, which
-is an action class in its own right rather than a selection detail.
+**Gate 2 — the agent drains bugs, triage, and answered escalations.** Three
+providers over already-shipped composition — bugs (`run_bug_lane`), triage
+(`apply_triage`, honouring `rules.triage.auto`), and answered needs-human issues,
+which is an action class in its own right rather than a selection detail — plus
+the seam they all need: the selector's kind vocabulary, the provider registry, and
+the spend ledger that makes `--max-tokens` enforce a real number.
 
-**Gate 3 — the agent advances features.** The feature provider reads the queue
+**The findings classes moved out of this gate** — see the sizing decision below.
+
+**The findings gate — the agent diagnoses and autofixes findings.** Two providers:
+findings-diagnose (`diagnose_cli`, which renders a body but neither produces the
+analysis nor posts it, so the provider supplies both halves) and findings-autofix
+(`run_autofix`). Drafted by `G2-PLAN`, inserted ahead of the features gate.
+
+**The features gate — the agent advances features.** The feature provider reads the queue
 top, invokes `specfuse run` **as a subprocess** — never in-process, per D1 and
 the live hazards in #757 and #1040 — classifies the driver's halt, escalates on
 `awaiting_review`, and switches to the next workable item. Blocked items park
 with an escalation; a drafting-needed top escalates per the scope boundary.
 
-**Known sizing risk, recorded rather than resolved.** Gate 2 is the largest gate
-and may prove oversized once `G1-PLAN` drafts it against real code. The natural
-split is findings into their own gate, making this a four-gate feature. That
-decision belongs to `plan-next` with evidence, not to this draft with a guess.
+**Sizing risk — resolved by `G1-PLAN`, 2026-08-11: split.** Drafting gate 2
+against the shipped conductor grew it from five sketched items to seven real work
+units, and showed that the two findings classes are the ones that cannot be
+exercised against this repository at all. Findings therefore become their own
+gate, ahead of the features gate; the evidence is in `GATE-02-REVIEW.md` §
+"The sizing decision". Gate 2 as drafted here is the remainder: the provider seam
+plus bugs, triage, and answered escalations.
+
+**The insertion is not yet made.** Placing a findings gate ahead of the features
+gate moves the terminal close from gate 3 to gate 4, and gate 3's work units were
+outside `G1-PLAN`'s boundary. The gate-3 entry below is therefore still the
+features gate with its terminal close placeholder, unchanged. `G2-PLAN`
+(`WU-94`) owns the restructure as its first acceptance criterion; until then the
+gate map above reads three gates and the plan of record is four.
 
 ## Notes
 
