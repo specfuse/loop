@@ -234,11 +234,21 @@ def _feature_summary(feature_dir: Path) -> FeatureSummary:
     )
 
 
-def read_feature_summaries(features_root: Path) -> tuple:
+def read_feature_summaries(features_root: "Path | str") -> tuple:
     """Return `(features, errors)`. A feature folder whose `PLAN.md` cannot
     be parsed lands in `errors` keyed by directory name, never silently
     dropped and never allowed to abort the walk of the other folders —
-    the same non-shrinking-denominator discipline `arm_sweep.py` uses."""
+    the same non-shrinking-denominator discipline `arm_sweep.py` uses.
+
+    *features_root* is normalised here rather than at each call site (#1746).
+    `FeatureProvider`'s no-argument fallback is the string
+    `".specfuse/features"`, so requiring a `Path` made a bare
+    `specfuse-agent run` — the invocation with no `--features-root` — raise
+    `AttributeError` from inside `_select_next`, which is not wrapped in a
+    per-provider guard and therefore ended the whole run. One normalisation
+    point, at the boundary that actually touches the filesystem.
+    """
+    features_root = Path(features_root)
     if not features_root.is_dir():
         return (), {}
     features = []
