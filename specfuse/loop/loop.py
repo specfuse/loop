@@ -2373,7 +2373,10 @@ def format_deliverable_missing_note(
         p = Path(path)
         if produces_is_glob(path):
             matches = [
-                m for m in glob.glob(path)
+                # recursive=True or `**` collapses to a single `*`, matches one
+                # level, yields directories, and the is_file() filter drops them
+                # all -- a WU that produced everything is refused (#1744).
+                m for m in glob.glob(path, recursive=True)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
             ]
             state = (
@@ -5731,7 +5734,10 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
             return False, shape_err
         if produces_is_glob(path):
             matches = [
-                m for m in glob.glob(path)
+                # recursive=True or `**` collapses to a single `*`, matches one
+                # level, yields directories, and the is_file() filter drops them
+                # all -- a WU that produced everything is refused (#1744).
+                m for m in glob.glob(path, recursive=True)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
             ]
             if not matches:
