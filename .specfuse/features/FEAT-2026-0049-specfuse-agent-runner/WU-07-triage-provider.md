@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0049/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 7.00
 produces:
   - specfuse/agent/providers/triage.py
   - specfuse/agent/triage_invoke.py
   - tests/test_agent_provider_triage.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T03:25:10.865186+00:00
+duration_seconds: 892.693
+cost_usd: 1.674008
+input_tokens: 3684
+output_tokens: 19007
 ---
 
 # T07 — the triage provider

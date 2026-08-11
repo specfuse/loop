@@ -392,11 +392,17 @@ def default_providers(
     going through this function. T06 is the first provider to append itself
     here; T07/T08 add theirs the same way."""
     from specfuse.agent.providers.bugs import BugsProvider
+    from specfuse.agent.providers.triage import TriageProvider
 
     if repo is None:
         return ()
     return (
         BugsProvider(
+            repo=repo,
+            runner=runner,
+            policy_path=policy_path,
+        ),
+        TriageProvider(
             repo=repo,
             runner=runner,
             policy_path=policy_path,

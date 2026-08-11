@@ -207,7 +207,7 @@ class TestBugsProvider(unittest.TestCase):
     def test_default_providers_registers_bugs_provider(self):
         providers = default_providers(repo="o/r")
 
-        self.assertEqual([type(p).__name__ for p in providers], ["BugsProvider"])
+        self.assertIn("BugsProvider", [type(p).__name__ for p in providers])
 
     def test_execute_passes_injected_runner_through_without_git_mutation(self):
         calls = []
