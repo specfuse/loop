@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 45.50
+baseline:
+  sha: 0eb27d88b253fdf08a4c40f376da65afe91ce5d9
+  probed_at: 2026-08-11T02:49:59.414446+00:00
+  failing: []
 ---
 
 # Gate 2 — the agent drains bugs, triage, and answered escalations
