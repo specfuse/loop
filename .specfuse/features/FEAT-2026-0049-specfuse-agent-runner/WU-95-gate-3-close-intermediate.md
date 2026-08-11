@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0049/G3-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 4.50
+# Set at the /arm-gate checkpoint by the agent, under the operator's standing
+# authorization of 2026-08-10 — NOT reviewed by the operator.
+# Gates 1 and 2 both auto-closed on-plan, each writing an autoclose-debt marker
+# (27 and 30 criteria) and each skipping its own reconciliation criterion in the
+# process. A third repetition would push ~87 unreconciled criteria onto the
+# terminal close, which assert_autoclose_debt_reconciled refuses unless every
+# predecessor marker is named. Forcing this close to run is what stops the
+# compounding. Reverse this line to restore auto-close for gate 3.
+auto_close_disabled: true
 ---
 
 # G3-CLOSE-INTERMEDIATE — gate 3 retrospective, lessons, docs

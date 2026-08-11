@@ -6,6 +6,32 @@ open_questions:
 
 # Gate 3 review — drafted by `G2-PLAN`, 2026-08-11
 
+## Open questions — decided by the AGENT, not the operator (2026-08-11T04:09:30Z)
+
+**The operator was asleep.** They gave standing authorization on 2026-08-10 to
+arm gate 3 unattended, after being told explicitly that any operator-owned
+question would be decided by the agent and marked as such. These are those
+decisions. **Neither has been reviewed by the operator.** Both align with the
+drafted criteria, so no criterion text changed — reversing either means editing
+the WU, not just this note.
+
+- **OQ-1 — confirmed as drafted: findings-autofix ranks at the bug tier and
+  honours `rules.bugs.preempt`.** Reasoning: `run_autofix` invokes headless
+  `/fix-bug`; a monitoring autofix *is* a bug fix, so the bugs dial governing it
+  is coherent rather than accidental. The alternative mints a new
+  `agent-policy.yml` key, which is a schema change plus validator work — a plan
+  change, disproportionate to the distinction it draws. **Accepted consequence:**
+  an operator who set `preempt: true` for bugs alone now also lets a monitoring
+  autofix jump the feature queue. If that is not wanted, T09 criterion 4 is the
+  place to change it.
+- **OQ-2 — confirmed as drafted: T10 honours the `diagnose:` dial and skips
+  components not set to `auto`.** Verified the review's claim: `diagnose:` is a
+  required, enum-validated component field (`lint_monitoring.py:192`) that no
+  shipped code reads. Honouring it makes a declared-but-inert surface real, which
+  is this feature's whole premise — read policy, do not guess intent. Ignoring it
+  would make a validated dial meaningless and would spend money diagnosing
+  findings for components whose operator chose `manual`.
+
 The operator's pre-arm review for gate 3 of `FEAT-2026-0049-specfuse-agent-runner`.
 Flip each gate-3 WU from `status: draft` → `pending` only after answering the two
 open questions above and checking the Cross-surface contracts table below.

@@ -35,10 +35,23 @@ actually built rather than against this draft's guess.
 1. `RETROSPECTIVE.md` carries a `## Cost analysis` section reconciling every
    gate's actual spend against its `cost_budget_usd`, read from `events.jsonl`
    and WU frontmatter rather than estimated.
-2. `RETROSPECTIVE.md` carries a `## What the loop did NOT verify` section naming
-   every auto-close debt marker left by an earlier gate, plus each acceptance
-   criterion not verified in-loop with the reason and where it actually gets
-   checked — or the explicit
+2. `RETROSPECTIVE.md` carries a `## What the loop did NOT verify` section that
+   **names gate 1 and gate 2 explicitly** — both auto-closed on-plan and both
+   left a `specfuse:autoclose-debt` marker in `RETROSPECTIVE.md` (**gate 1: 27
+   criteria; gate 2: 30 criteria**) — plus any further marker a later gate
+   leaves. `assert_autoclose_debt_reconciled` searches this section for each
+   gate number and refuses the pass after dispatch if one is unnamed, so the
+   numbers belong here literally, not as "every earlier gate".
+
+   For each marker, state per criterion whether it has since been verified and
+   by what, or that it remains unverified. **A criterion still unverified is a
+   legitimate outcome; recording it as verified without a run is not.** Note
+   that gate 1's and gate 2's own reconciliation criteria never executed — both
+   close-intermediate WUs were skipped by the auto-close that created their
+   debt — so this WU is the first place either is actually discharged.
+
+   Then each acceptance criterion not verified in-loop, with the reason and
+   where it actually gets checked — or the explicit
    `(nothing — every acceptance criterion was verified in-loop)` line.
 3. The feature's terminal `verdict` is written to this unit's frontmatter and is
    one of `met` / `met_locally` / `partially_met` / `not_met`. On a hedged
