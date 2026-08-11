@@ -44,6 +44,7 @@ from specfuse.loop.bug_lane import (
 )
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.escalation import emit_escalation
+from specfuse.loop.labels import provision_labels
 from specfuse.loop.triage import parse_marker
 from specfuse.monitor.autofix_invoke import build_invocation, classify_outcome
 
@@ -56,6 +57,7 @@ __all__ = (
     "OUTCOME_DECLINED",
     "run_bug_lane",
     "pr_ci_conclusion",
+    "add_guardrail_label",
 )
 
 # This WU's own correlation ID, used verbatim so `emit_escalation`'s
@@ -94,6 +96,13 @@ class BugLaneResult:
     outcome: str
     reason: Optional[str]
     pr_number: Optional[int]
+    #: Whether the declining reason reached the PR as a label (#1785).
+    #: Defaults True so existing callers and their tests are unaffected; only
+    #: a declining path that tried and failed sets it False. The lane no
+    #: longer dies on that failure -- `reason` above is the verdict, and the
+    #: label is a projection of it, so losing the projection must not lose
+    #: the item. Mirrors `apply_triage`'s `label_written` row exactly.
+    label_written: bool = True
 
 
 #: How long to wait for a freshly-opened PR's checks to reach a conclusion,
@@ -172,11 +181,13 @@ def pr_ci_conclusion(
     PR still costs exactly one call -- the wait is paid only when there is
     something to wait for.
 
-    A pending-at-deadline result is deliberately reported as `_CI_UNKNOWN`
-    rather than a new reason. A distinct reason would need a distinct
-    guardrail label, and those are already the subject of #1785 (8 of 21
-    registry labels unprovisioned, and a failed label write fatal here); adding
-    a ninth would widen that failure rather than narrow this one.
+    A pending-at-deadline result is still reported as `_CI_UNKNOWN` rather
+    than a distinct reason. When this landed, the argument was that a new
+    reason needs a new label and an unprovisioned label was fatal here --
+    #1785 has since fixed that half, so the objection is now only that a
+    ninth guardrail label is a contract change owing its own issue, not that
+    it would break the lane. Splitting the pending case out is safe whenever
+    someone wants it.
     """
     started = clock()
     while True:
@@ -186,6 +197,57 @@ def pr_ci_conclusion(
         if clock() - started >= deadline_seconds:
             return _CI_UNKNOWN
         sleep(poll_seconds)
+
+
+def add_guardrail_label(
+    runner: Callable,
+    repo: str,
+    pr_number: int,
+    label: str,
+    *,
+    target: Any = _DEFAULT_WORKING_DIR,
+) -> bool:
+    """Label *pr_number* with the lane's declining reason. Never raises (#1785).
+
+    Returns True when the label landed, False when it did not.
+
+    This used to run with ``check=True``. A label that is registered in
+    ``LABEL_REGISTRY`` but never created on the repository therefore raised
+    ``CalledProcessError`` out of the lane, and on a live run that discarded
+    29.8 minutes of correct work -- a test-first fix and a mergeable PR --
+    replacing the guardrail verdict with an exception repr. Eight of the
+    registry's twenty-one labels were absent; the registry was complete and
+    nothing had ever provisioned them.
+
+    ``apply_triage`` already treats this exact condition as best-effort,
+    recording ``label_written: False`` and continuing. Two consumers of one
+    registry must not disagree about whether a missing label is survivable,
+    so the lane now matches it: **the reason is the verdict, and the label is
+    only a projection of it.** Losing the projection must not lose the item.
+
+    On failure the label is provisioned on demand -- ``provision_labels`` is
+    idempotent and captures its own failure modes rather than raising -- and
+    the write retried exactly once. A label that already exists costs one
+    call and no provisioning, so the happy path is unchanged.
+    """
+    argv = ["gh", "pr", "edit", str(pr_number), "--repo", repo, "--add-label", label]
+
+    def _attempt() -> bool:
+        try:
+            result = runner(argv, check=False)
+        except Exception:  # noqa: BLE001 - a raising runner must not kill the item
+            return False
+        return getattr(result, "returncode", 1) == 0
+
+    if _attempt():
+        return True
+
+    try:
+        provision_labels(target, runner=runner)
+    except Exception:  # noqa: BLE001 - best-effort by contract; never fatal here
+        return False
+
+    return _attempt()
 
 
 def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Optional[int]:
@@ -395,15 +457,20 @@ def run_bug_lane(
         record_merge(runner, repo, pr_number, at=time.time() if now is None else now)
         return BugLaneResult(outcome=OUTCOME_MERGED, reason=decision.reason, pr_number=pr_number)
 
+    label_written = True
     if decision.reason != REASON_ELIGIBLE:
         # The public label name, never the raw reason constant (#1420): the
         # constant is an internal identifier that provision_labels does not
         # create, so labelling with it failed on every declining path.
         label = DECLINE_LABELS.get(decision.reason)
         if label is not None:
-            runner(
-                ["gh", "pr", "edit", str(pr_number), "--repo", repo, "--add-label", label],
-                check=True,
+            label_written = add_guardrail_label(
+                runner, repo, pr_number, label, target=working_dir,
             )
 
-    return BugLaneResult(outcome=OUTCOME_DECLINED, reason=decision.reason, pr_number=pr_number)
+    return BugLaneResult(
+        outcome=OUTCOME_DECLINED,
+        reason=decision.reason,
+        pr_number=pr_number,
+        label_written=label_written,
+    )
