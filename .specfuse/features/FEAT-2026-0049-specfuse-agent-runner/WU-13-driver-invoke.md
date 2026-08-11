@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0049/T13
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 produces:
   - specfuse/agent/driver_invoke.py
@@ -10,6 +10,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T06:21:52.832062+00:00
+duration_seconds: 734.653
+cost_usd: 1.569455
+input_tokens: 76
+output_tokens: 23438
 ---
 
 # T13 — `specfuse run` as a subprocess, and the closed set of halt classes
