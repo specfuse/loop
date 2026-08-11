@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0049/G3-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.11.0
+started_at: 2026-08-11T05:03:09.132845+00:00
+duration_seconds: 1155.799
+cost_usd: 11.773772
+input_tokens: 168
+output_tokens: 79252
 ---
 
 # G3-PLAN — draft gate 4 and write its review
