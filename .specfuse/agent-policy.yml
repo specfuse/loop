@@ -37,7 +37,7 @@ budgets:
 escalation:
   webhook_env: ""               # env-var NAME holding the webhook URL, not the URL itself
   provider: none                # discord | slack | teams | none
-  assignee: ""
+  assignee: "clabonte"       # verified assignable: gh api repos/specfuse/loop/assignees/clabonte
   quiet_hours: ""
   sla_hours: 24
   silence_hours: 24

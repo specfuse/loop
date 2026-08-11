@@ -346,6 +346,7 @@ def run_agent(
                         why_not_auto=outcome.escalation.why_not_auto,
                         options=outcome.escalation.options,
                         recommendation=outcome.escalation.recommendation,
+                        assignee=agent_policy.resolve_escalation_assignee(policy_path),
                         runner=runner,
                     )
                     reason = f"{reason} (filed as issue {issue_id})" if reason else f"filed as issue {issue_id}"

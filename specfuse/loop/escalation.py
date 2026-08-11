@@ -16,7 +16,11 @@ from typing import Callable, Optional
 
 NEEDS_HUMAN_LABEL = "needs-human"
 
-DEFAULT_ASSIGNEE = "specfuse-operator"
+#: Empty by default (#1762). A username that is valid on no repository is
+#: not a safe default -- it failed every `gh issue create` on every repo
+#: that had not happened to create that user. Callers pass the operator's
+#: own `escalation.assignee` from agent-policy.yml; empty means unassigned.
+DEFAULT_ASSIGNEE = ""
 
 CATEGORY_LABELS = frozenset(
     {
@@ -221,16 +225,23 @@ def emit_escalation(
         recommendation=recommendation,
     )
 
-    result = runner(
-        [
-            "gh", "issue", "create",
-            "--repo", repo,
-            "--title", f"[{correlation_id}] {issue_summary}",
-            "--body", body,
-            "--label", NEEDS_HUMAN_LABEL,
-            "--label", category,
-            "--assignee", assignee,
-        ],
-        check=True,
-    )
+    argv = [
+        "gh", "issue", "create",
+        "--repo", repo,
+        "--title", f"[{correlation_id}] {issue_summary}",
+        "--body", body,
+        "--label", NEEDS_HUMAN_LABEL,
+        "--label", category,
+    ]
+    # Assign only when an assignee is actually configured (#1762). The old
+    # default was the literal `specfuse-operator`, a placeholder assignable on
+    # no repository, so `gh issue create` exited 1 on that flag and the whole
+    # escalation was lost -- the caller recorded "escalated" and the human
+    # inbox stayed empty. An unassigned needs-human issue is strictly better
+    # than an unfiled one. An empty value must OMIT the flag rather than pass
+    # `--assignee ""`, which fails the same way.
+    if assignee and assignee.strip():
+        argv += ["--assignee", assignee.strip()]
+
+    result = runner(argv, check=True)
     return _extract_issue_number(result.stdout)
