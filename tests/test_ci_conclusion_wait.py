@@ -4,6 +4,10 @@
 #
 """The bug lane waits for a terminal CI conclusion — issue #1786.
 
+FIXTURES CORRECTED under #1826: these originally emitted a `conclusion`
+field that `gh pr checks` has never had, so they agreed with the code and
+both disagreed with reality. They now emit gh's real `bucket` shape.
+
 `pr_ci_conclusion` issued exactly one `gh pr checks` and was called moments
 after `/fix-bug` opened the PR (`bug_lane_run.py:310` then `:315`). A PR seconds
 old always has queued or in-progress checks, so the read was `unknown`, the
@@ -28,10 +32,20 @@ from types import SimpleNamespace
 from specfuse.loop.bug_lane_run import pr_ci_conclusion
 
 
+#: Maps this module's shorthand onto the REAL `gh pr checks` row shape.
+#: These fixtures originally emitted `{"conclusion": ...}`, a field `gh pr
+#: checks` does not have — the assumption that hid #1826 for the whole life of
+#: the bug. `bucket` is what gh actually returns.
+_BUCKET_FOR = {"": "pending", "SUCCESS": "pass", "FAILURE": "fail"}
+
+
 def _rows(*conclusions):
     return SimpleNamespace(
         returncode=0,
-        stdout=json.dumps([{"conclusion": c} for c in conclusions]),
+        stdout=json.dumps([
+            {"bucket": _BUCKET_FOR.get(c, c.lower()), "name": f"c{i}", "state": c or "PENDING"}
+            for i, c in enumerate(conclusions)
+        ]),
         stderr="",
     )
 
@@ -142,8 +156,11 @@ class TestFailClosedContractPreserved(unittest.TestCase):
             "unknown",
         )
 
-    def test_mixed_terminal_conclusions_is_unknown(self):
-        self.assertEqual(self._once(_rows("SUCCESS", "FAILURE")), "unknown")
+    def test_mixed_terminal_conclusions_is_not_success(self):
+        """Corrected with #1826: a pass alongside a fail is a legible FAILING
+        verdict, not an unreadable one. It was only `unknown` while the
+        conclusion field this asserted on did not exist."""
+        self.assertNotEqual(self._once(_rows("SUCCESS", "FAILURE")), "success")
 
     def test_raising_runner_is_unknown(self):
         class _Boom:

@@ -101,7 +101,10 @@ class _StubRunner:
             issue_body if issue_body is not None
             else "<!-- specfuse:triage category=bug confidence=high -->\nRepro steps."
         )
-        self._checks = checks if checks is not None else [{"conclusion": "success"}]
+        # gh pr checks returns `bucket`, never `conclusion` (#1826). These
+        # stubs invented the latter, which is how a field that exists in no
+        # gh version survived from the lane shipping until a live run.
+        self._checks = checks if checks is not None else [{"bucket": "pass"}]
         self._checks_returncode = checks_returncode
         self._merged_prs = merged_prs if merged_prs is not None else []
         self._existing_escalation_issue = existing_escalation_issue
@@ -148,14 +151,14 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_dial_off_never_merges(self):
         runner = _StubRunner()
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_OFF))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
 
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
 
     def test_dial_off_all_guardrails_satisfied_still_no_merge(self):
         runner = _StubRunner()
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_OFF))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
 
         self.assertEqual(result.reason, REASON_ELIGIBLE)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -164,14 +167,14 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_dial_on_no_test_evidence_never_merges(self):
         runner = _StubRunner(pr_files=[{"path": "specfuse/loop/thing.py", "additions": 5, "deletions": 0}])
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.reason, REASON_NO_TEST_EVIDENCE)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
 
     def test_dial_on_ci_not_green_never_merges(self):
-        runner = _StubRunner(checks=[{"conclusion": "failure"}])
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        runner = _StubRunner(checks=[{"bucket": "fail"}])
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.reason, REASON_CI_NOT_GREEN)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -179,7 +182,7 @@ class TestRunBugLane(unittest.TestCase):
     def test_dial_on_diff_too_large_never_merges(self):
         big_files = [{"path": "tests/test_thing.py", "additions": 1000, "deletions": 0}]
         runner = _StubRunner(pr_files=big_files)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.reason, REASON_DIFF_TOO_LARGE)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -189,7 +192,7 @@ class TestRunBugLane(unittest.TestCase):
             {"path": "tests/test_thing.py", "additions": 10, "deletions": 0},
             {"path": ".specfuse/verification.yml", "additions": 1, "deletions": 0},
         ])
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.reason, REASON_JUDGE_PATH_TOUCHED)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -198,13 +201,13 @@ class TestRunBugLane(unittest.TestCase):
         # PR is found (its body still cites the issue) but the issue itself
         # carries no `bug`-category triage marker -- untraceable.
         runner = _StubRunner(issue_body="No triage marker on this issue.")
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.reason, REASON_UNTRACEABLE)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
 
     def test_pr_ci_conclusion_mixed_conclusions_is_non_success(self):
-        runner = _StubRunner(checks=[{"conclusion": "success"}, {"conclusion": "failure"}])
+        runner = _StubRunner(checks=[{"bucket": "pass"}, {"bucket": "fail"}])
         conclusion = pr_ci_conclusion(runner, _REPO, _PR_NUMBER)
         self.assertNotEqual(conclusion, "success")
 
@@ -214,8 +217,15 @@ class TestRunBugLane(unittest.TestCase):
         self.assertNotEqual(conclusion, "success")
 
     def test_pr_ci_conclusion_empty_rows(self):
+        """An empty row list is PENDING as of #1826 -- a brand-new PR has no
+        checks registered yet -- so this now waits rather than answering at
+        once. `deadline_seconds=0` keeps the assertion (still not success)
+        while making the wait instant; without it this test sleeps for the
+        real ten-minute default."""
         runner = _StubRunner(checks=[])
-        conclusion = pr_ci_conclusion(runner, _REPO, _PR_NUMBER)
+        conclusion = pr_ci_conclusion(
+            runner, _REPO, _PR_NUMBER, deadline_seconds=0,
+        )
         self.assertNotEqual(conclusion, "success")
 
     def test_find_pr_for_issue_command_failure_declines(self):
@@ -225,7 +235,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
 
@@ -236,7 +246,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
 
@@ -247,7 +257,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
         # No changed files at all -> fails the test-evidence guardrail.
         self.assertEqual(result.reason, REASON_NO_TEST_EVIDENCE)
 
@@ -258,7 +268,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
         self.assertEqual(result.reason, REASON_UNTRACEABLE)
 
     def test_dial_on_daily_cap_reached_never_merges(self):
@@ -277,7 +287,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON), now=1_700_000_010.0)
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON), now=1_700_000_010.0)
 
         self.assertEqual(result.reason, REASON_DAILY_CAP_REACHED)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -297,8 +307,13 @@ class TestRunBugLane(unittest.TestCase):
     # -- Criterion 6: pr_ci_conclusion never raises, non-success on bad input -
 
     def test_pr_ci_conclusion_missing(self):
+        """Same as above: empty rows are pending, and a non-zero exit no longer
+        short-circuits the read (#1826 -- `gh pr checks` exits non-zero when
+        checks FAIL, so the exit code alone cannot mean unreadable)."""
         runner = _StubRunner(checks=[], checks_returncode=1)
-        conclusion = pr_ci_conclusion(runner, _REPO, _PR_NUMBER)
+        conclusion = pr_ci_conclusion(
+            runner, _REPO, _PR_NUMBER, deadline_seconds=0,
+        )
         self.assertNotEqual(conclusion, "success")
 
     def test_pr_ci_conclusion_malformed(self):
@@ -320,14 +335,14 @@ class TestRunBugLane(unittest.TestCase):
         self.assertNotEqual(conclusion, "success")
 
     def test_pr_ci_conclusion_success(self):
-        runner = _StubRunner(checks=[{"conclusion": "success"}, {"conclusion": "success"}])
+        runner = _StubRunner(checks=[{"bucket": "pass"}, {"bucket": "pass"}])
         self.assertEqual(pr_ci_conclusion(runner, _REPO, _PR_NUMBER), "success")
 
     # -- Criterion 7: declining path labels + leaves PR open -----------------
 
     def test_declining_path_labels_reason_and_never_closes_or_reinvokes(self):
-        runner = _StubRunner(checks=[{"conclusion": "failure"}])
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        runner = _StubRunner(checks=[{"bucket": "fail"}])
+        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         label_calls = runner.calls_matching(["gh", "pr", "edit"])
         self.assertEqual(len(label_calls), 1)
@@ -348,7 +363,7 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_refused_escalates_at_dial_on(self):
         runner = _StubRunner(fix_bug_stdout="refused")
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.outcome, OUTCOME_REFUSED)
         create_calls = runner.calls_matching(["gh", "issue", "create"])
@@ -357,7 +372,7 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_refused_escalates_at_dial_off(self):
         runner = _StubRunner(fix_bug_stdout="refused")
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_OFF))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
 
         self.assertEqual(result.outcome, OUTCOME_REFUSED)
         create_calls = runner.calls_matching(["gh", "issue", "create"])
@@ -366,21 +381,21 @@ class TestRunBugLane(unittest.TestCase):
     def test_could_not_proceed_escalates_at_both_dials(self):
         for policy in (_AGENT_POLICY_ON, _AGENT_POLICY_OFF):
             runner = _StubRunner(fix_bug_stdout="could_not_proceed")
-            result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(policy))
+            result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(policy))
 
             self.assertEqual(result.outcome, OUTCOME_COULD_NOT_PROCEED)
             self.assertEqual(len(runner.calls_matching(["gh", "issue", "create"])), 1)
 
     def test_escalation_idempotent_across_repeated_runs(self):
         runner = _StubRunner(fix_bug_stdout="refused", existing_escalation_issue=123)
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         create_calls = runner.calls_matching(["gh", "issue", "create"])
         self.assertEqual(create_calls, [])
 
     def test_refused_never_merges_or_finds_pr(self):
         runner = _StubRunner(fix_bug_stdout="refused")
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(runner.calls_matching(["gh", "pr", "list"]), [])
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
@@ -389,7 +404,7 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_successful_merge_records_exactly_once(self):
         runner = _StubRunner()
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON), now=1.0)
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON), now=1.0)
 
         self.assertEqual(result.outcome, OUTCOME_MERGED)
         merge_calls = runner.calls_matching(["gh", "pr", "merge"])
@@ -407,8 +422,8 @@ class TestRunBugLane(unittest.TestCase):
         self.assertTrue(view_calls_for_record)
 
     def test_record_merge_not_called_on_declining_path(self):
-        runner = _StubRunner(checks=[{"conclusion": "failure"}])
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        runner = _StubRunner(checks=[{"bucket": "fail"}])
+        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         edit_calls = runner.calls_matching(["gh", "pr", "edit"])
         for call in edit_calls:
@@ -416,7 +431,7 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_record_merge_not_called_when_dial_off(self):
         runner = _StubRunner()
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_OFF))
+        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
 
         edit_calls = runner.calls_matching(["gh", "pr", "edit"])
         for call in edit_calls:
@@ -426,7 +441,7 @@ class TestRunBugLane(unittest.TestCase):
 
     def test_happy_path_merges_with_injected_runner_no_network(self):
         runner = _StubRunner()
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON), now=5.0)
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON), now=5.0)
 
         self.assertEqual(result.outcome, OUTCOME_MERGED)
         self.assertEqual(result.pr_number, _PR_NUMBER)
@@ -440,7 +455,7 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
 
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
