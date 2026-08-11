@@ -6,6 +6,26 @@ open_questions:
 
 # Gate 2 review — drafted by `G1-PLAN`, 2026-08-11
 
+## Open questions — resolved at arming (2026-08-11T02:48:30Z)
+
+Both were answered by the operator at the `/arm-gate` checkpoint before any
+gate-2 WU was flipped to `pending`. Recorded here because T08's escalation
+trigger reads this file: it instructs the session to stop if OQ-2 is still
+unanswered at dispatch.
+
+- **OQ-1 — confirmed as drafted.** `G2-PLAN` (WU-94) owns the gate renumbering.
+  Operator's words: *"confirm OQ-1, WU-94 owns the renumbering"*. PLAN.md's map
+  reads three gates and the plan of record is four until WU-94 performs the
+  insertion.
+- **OQ-2 — the label stays.** Operator's words: *"keep the label until the
+  option is executed"*. `needs-human` is **not** removed on acknowledgment.
+  T08's criterion 5 was revised at arming to match; criterion 6's
+  "`PARKED_LABEL` is never removed" is unchanged. Consequence the operator
+  accepted: since nothing in gate 2 executes a chosen option, answered
+  escalations retain `needs-human` indefinitely and the inbox grows until a
+  later gate can act. An inbox that overstates outstanding work was preferred
+  to one that silently drops it.
+
 The operator's pre-arm review for gate 2 of `FEAT-2026-0049-specfuse-agent-runner`.
 Flip each gate-2 WU from `status: draft` → `pending` only after working the two
 open questions above and the Cross-surface contracts table below.

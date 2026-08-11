@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0049/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
-planned_cost_usd: 8.00
+planned_cost_usd: 10.00
 produces:
   - specfuse/agent/run.py
   - specfuse/agent/providers/__init__.py
@@ -77,6 +77,21 @@ change — say so and stop rather than inventing a new `agent-policy.yml` key he
    default stays `()` so tests keep injecting doubles. The registry returns `()`
    in this unit — the seam ships here, the providers ship in T06–T08 — and
    `specfuse/agent/providers/__init__.py` is created as its future home.
+8. **An escalated outcome can reach the human inbox, not only stdout.**
+   `ActionOutcome` gains an optional structured escalation payload carrying the
+   six parts `specfuse.loop.escalation.emit_escalation` requires
+   (`done_so_far`, `issue_summary`, `decision_needed`, `why_not_auto`,
+   `options`, `recommendation`), and `run_agent` calls `emit_escalation` —
+   imported and used unmodified, with the injected runner passed through — for
+   every escalated outcome that supplies one. `emit_escalation` is idempotent on
+   `correlation_id`, so a re-run of the same item files no duplicate; a test
+   asserts that by invoking twice.
+9. **An escalation with no payload is reported as summary-only, in words.** When
+   an escalated outcome supplies no payload, no issue is filed and the run
+   summary says so for that item — `escalated (summary only, no issue filed)` or
+   equivalent — so "escalated" never silently means "printed to a terminal
+   nobody was watching". A test asserts both halves: no `gh issue create` reaches
+   the runner, and the summary line names the item as unfiled.
 
 **A note on `produces:`.** `specfuse/agent/run.py` is listed there even though
 T04 already delivered it, so `specfuse lint` emits a
@@ -86,8 +101,13 @@ their tiers in `_select_next`, the spend field on `ActionOutcome` and its call t
 `record_tokens`, `default_providers()`, and the summary line), and dropping the
 path would leave this unit's main deliverable outside the driver's presence gate.
 
-**Do not touch.** `specfuse/loop/` and `specfuse/monitor/` entirely — this unit
-consumes neither. `specfuse/agent/state.py` and `specfuse/agent/budget.py`: T02's
+**Do not touch.** `specfuse/monitor/` entirely. `specfuse/loop/` is **read and
+imported, never edited** — criterion 8 imports `emit_escalation` from
+`specfuse/loop/escalation.py` and calls it unmodified; changing anything under
+`specfuse/loop/` is out of bounds and is an escalation, not a fix. Note that a
+squash touching `specfuse/loop/` would also halt the driver for a restart, which
+is a second reason the import must stay an import.
+`specfuse/agent/state.py` and `specfuse/agent/budget.py`: T02's
 snapshot and T03's budget are consumed, not edited; `record_tokens` already
 exists with the right shape, so wiring it needs no change to `budget.py`. Do not
 weaken, rewrite, or delete any existing test in `tests/test_agent_run.py`,
@@ -99,7 +119,8 @@ git; this session edits files only and runs no `git` command.
 **Verification.** The `code` gate set from `.specfuse/verification.yml`. Plus §9
 symbol checks:
 `python3 -c "from specfuse.agent.run import KIND_TRIAGE, KIND_ESCALATION_ANSWER, default_providers; print(default_providers)"`
-and `python3 -c "import specfuse.agent.providers"`.
+and `python3 -c "import specfuse.agent.providers"`. Plus, for criterion 8:
+`python3 -c "import specfuse.agent.run as r, inspect; assert 'emit_escalation' in inspect.getsource(r); print('wired')"`.
 
 **Escalation triggers.** If preserving gate 1's ordering (criterion 4) turns out
 to require editing `budget.py` or `state.py`, stop and say which one and why —
@@ -110,3 +131,12 @@ the key and stop: policy schema changes are a plan change, not a WU detail. If
 if the only honest number is one the provider does not have — say so and stop
 rather than inventing an estimate; a fabricated token count is worse than an
 inert cap, because it makes the cap look real.
+
+For criterion 8 specifically: **do not compose the six escalation parts inside
+`run_agent`.** `validate_escalation_body` requires two numbered options, and a
+loop that has only an item ID and a reason string cannot produce two real ones —
+it would be inventing choices nobody identified, which is the same failure as
+authoring the operator's own justification. The payload comes from the provider
+that knows the situation, or no issue is filed and criterion 9's summary-only
+path reports that honestly. If wiring `emit_escalation` appears to require the
+loop to author any of the six parts, stop and say which part and why.

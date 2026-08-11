@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0049/G2-PLAN
 type: plan-next
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 ---

@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0049/T08
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 6.50
 produces:
@@ -35,11 +35,14 @@ contract to parse against, all of it in `specfuse/loop/escalation.py`:
 **Scope: this unit records an answer; it does not execute the chosen option.**
 What option *N* means is free text written by whichever unit raised the
 escalation, so executing it is not a general capability the agent can have. The
-provider parses the choice, leaves a durable acknowledgment, and takes the issue
-out of the human inbox — see the open question in `GATE-02-REVIEW.md` on whether
-dropping it from the inbox before anyone acts on the answer is the contract the
-operator wants. If the answer is unanswerable-in-place, the issue is left exactly
-as it was.
+provider parses the choice and leaves a durable acknowledgment — and **leaves the
+issue in the human inbox**. `GATE-02-REVIEW.md`'s OQ-2 was resolved at the
+`/arm-gate` checkpoint in favour of the label staying until the chosen option is
+executed: an inbox that overstates outstanding work is safer than one that drops
+an answered-but-unacted item silently. Since no gate-2 provider executes an
+option, that means answered escalations accumulate `needs-human` until a later
+gate can act — a consequence the operator accepted explicitly. If the answer is
+unanswerable-in-place, the issue is left exactly as it was.
 
 **The snapshot does not carry comments.** `state._read_issues` requests
 `number,title,labels,body` only. This provider reads comments itself through the
@@ -63,9 +66,16 @@ surface change and is out of bounds here.
    module contains no literal copy of the marker string, the label string, or the
    `Reply with a number` heading (§8).
 5. An acknowledged answer produces exactly one `gh issue comment` naming the
-   parsed option and the correlation ID, followed by removal of
-   `NEEDS_HUMAN_LABEL`. The write is idempotent: a second pass over an issue that
-   already carries the acknowledgment writes nothing at all. Two tests.
+   parsed option and the correlation ID. **`NEEDS_HUMAN_LABEL` is NOT removed** —
+   the label stays until the chosen option is actually executed, which no gate-2
+   provider does. A test asserts the injected runner receives no
+   `gh issue edit --remove-label needs-human` for an acknowledged issue. The
+   write is idempotent: a second pass over an issue that already carries the
+   acknowledgment writes nothing at all. Three tests.
+
+   *Operator's decision at the `/arm-gate` checkpoint, resolving
+   `GATE-02-REVIEW.md`'s OQ-2 — see that file's "Open questions — resolved at
+   arming" section for their words and the consequence they accepted.*
 6. An issue whose comments match no numbered option is left untouched — no
    comment, no label change — and is not advertised twice in the same run.
    `PARKED_LABEL` is never removed by this provider.
