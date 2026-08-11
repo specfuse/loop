@@ -132,9 +132,16 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
 
     Marker first, label best-effort -- see `PLAN.md`'s "how a triaged issue
     is marked" section. The marker write is the idempotency key: a decision
-    for an issue whose body already carries a marker performs no write at
-    all. A label write that fails is recorded in the returned report and
-    never raised, per `[FEAT-2026-0042/G2/registered-is-not-provisioned]`.
+    for an issue whose body already carries a marker never rewrites the
+    marker. But a marker with no matching label on the issue (the label
+    write failed on an earlier pass, e.g. because the label did not exist
+    yet) is not fully idempotent -- it is missing its projection, so this
+    retries only the label write. `decision["labels"]` (as returned by
+    `gh issue list --json ...,labels`, i.e. a list of `{"name": ...}`
+    mappings) is what `labels` is checked against; a decision with no
+    `labels` key is treated as having none, so a repair is attempted. A
+    label write that fails is recorded in the returned report and never
+    raised, per `[FEAT-2026-0042/G2/registered-is-not-provisioned]`.
 
     With `auto=True`, a decision whose confidence is not `"high"` is
     recorded as the `question` category (still marked, still routed to
@@ -154,13 +161,35 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         body = decision.get("body") or ""
         confidence = decision.get("confidence", "high")
 
-        if parse_marker(body) is not None:
-            results.append({
+        marker = parse_marker(body)
+        if marker is not None:
+            marked_category, _marked_confidence = marker
+            target_label = label_for(marked_category) if marked_category in CATEGORIES else None
+            existing_labels = {
+                label.get("name") for label in decision.get("labels") or []
+            }
+            row = {
                 "number": number,
                 "skipped": True,
                 "marker_written": False,
                 "label_written": False,
-            })
+            }
+            if target_label is not None and target_label not in existing_labels:
+                try:
+                    runner(
+                        [
+                            "gh", "issue", "edit", str(number),
+                            "--repo", repo,
+                            "--add-label", target_label,
+                        ],
+                        check=True,
+                    )
+                except Exception as exc:  # noqa: BLE001 - label failure never raises
+                    row["label_written"] = False
+                    row["label_error"] = str(exc)
+                else:
+                    row["label_written"] = True
+            results.append(row)
             continue
 
         applied_category = category
