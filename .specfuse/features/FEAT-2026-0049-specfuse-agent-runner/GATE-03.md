@@ -2,6 +2,10 @@
 gate: 3
 status: open
 cost_budget_usd: 38.50
+baseline:
+  sha: b5b72d3a827bd7f31b2efc628e1706445dfea752
+  probed_at: 2026-08-11T04:10:24.117876+00:00
+  failing: []
 ---
 
 # Gate 3 — the agent diagnoses and autofixes findings
