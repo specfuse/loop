@@ -68,6 +68,45 @@ class TestLabelFailureTolerated(unittest.TestCase):
         self.assertFalse(results[0]["label_written"])
 
 
+class TestMarkedButUnlabelledIsRepaired(unittest.TestCase):
+    """Issue #1163: a marker-written/label-failed issue must become
+    labelled once the label exists, not stay permanently skipped."""
+
+    def test_marked_issue_missing_label_retries_label_only(self):
+        runner = _StubRunner()
+        marked_body = "Body text.\n\n<!-- specfuse:triage category=bug confidence=high -->"
+        decisions = [{
+            "number": 796,
+            "body": marked_body,
+            "category": "bug",
+            "confidence": "high",
+            "labels": [{"name": "bug"}],
+        }]
+
+        results = apply_triage(runner, _REPO, decisions)
+
+        self.assertTrue(results[0]["skipped"])
+        self.assertTrue(results[0]["label_written"])
+        self.assertTrue(any("--add-label" in c for c in runner.calls))
+        self.assertFalse(any("--body" in c for c in runner.calls))
+
+    def test_marked_issue_with_label_already_present_does_nothing(self):
+        runner = _StubRunner()
+        marked_body = "Body text.\n\n<!-- specfuse:triage category=bug confidence=high -->"
+        decisions = [{
+            "number": 248,
+            "body": marked_body,
+            "category": "bug",
+            "confidence": "high",
+            "labels": [{"name": "triage:bug"}],
+        }]
+
+        results = apply_triage(runner, _REPO, decisions)
+
+        self.assertTrue(results[0]["skipped"])
+        self.assertFalse(runner.calls)
+
+
 class TestIdempotency(unittest.TestCase):
     def test_second_call_over_marked_issue_performs_no_write(self):
         runner = _StubRunner()
@@ -80,7 +119,13 @@ class TestIdempotency(unittest.TestCase):
         self.assertIsNotNone(parse_marker(marked_body))
 
         runner2 = _StubRunner()
-        decisions2 = [{"number": 3, "body": marked_body, "category": "duplicate", "confidence": "high"}]
+        decisions2 = [{
+            "number": 3,
+            "body": marked_body,
+            "category": "duplicate",
+            "confidence": "high",
+            "labels": [{"name": label_for("duplicate")}],
+        }]
         apply_triage(runner2, _REPO, decisions2)
         self.assertEqual(len(runner2.calls), 0)
 
