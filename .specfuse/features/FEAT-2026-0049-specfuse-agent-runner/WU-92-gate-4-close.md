@@ -2,7 +2,7 @@
 id: FEAT-2026-0049/G4-CLOSE
 type: close
 status: pending
-attempts: 0
+attempts: 1
 planned_cost_usd: 5.00
 # AC6 writes CHANGELOG.md — a surface outside this feature's folder, which makes
 # this close load-bearing. Without this flag `evaluate_auto_close` may skip the
