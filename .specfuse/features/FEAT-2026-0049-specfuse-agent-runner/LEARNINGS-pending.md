@@ -93,3 +93,52 @@ this file is where those lessons go instead.
   "needs a live run", ask what fraction of it a test double could reach today.
   Deferring the whole claim when only part of it is genuinely environment-bound
   is how a testable gap gets filed as an untestable one.
+
+- [FEAT-2026-0049/G4-CLOSE] **A "every work unit passed first attempt" claim in
+  a planning artifact must be recomputed from `events.jsonl` at each close, not
+  copied forward from the previous gate's prose.** Three artifacts on this
+  feature — `PLAN.md` § "A note on `planned_cost_usd`", `GATE-03-REVIEW.md`, and
+  `GATE-04-REVIEW.md` § "On the estimates" — say "eleven substantive work units,
+  every one a first-attempt pass." T06 failed its first attempt
+  (`attempt_outcome`, `failure_class: tests`, $0.70) and its own frontmatter
+  reads `attempts: 2`. The claim was not decorative: it was the evidence for a
+  cost-estimating decision ("eleven observations is a distribution, not an
+  outlier"). It survived two gates because each `plan-next` quoted the previous
+  one instead of re-reading the event log, which is the cheapest possible check
+  — one pass over a file the session already has open. Rule: any claim of the
+  form "N units, all clean" in a gate review or PLAN note is derived data;
+  derive it, and cite the file you derived it from.
+
+- [FEAT-2026-0049/G4-CLOSE] **On a feature whose closing units run `opus`/`high`
+  and whose implementation units run `sonnet`/`medium`, the closing units are
+  the cost model — and `planning-discipline.md` §5 sizes the padding off the
+  wrong end.** Fourteen substantive units planned $86.50 and spent $22.03 (25.5%
+  of plan). The four closing units that actually ran planned $22.50 and spent
+  $34.30 — **61% of the feature's entire spend** — every one over its estimate,
+  by +21%, +38%, +56% and +96%. §5 sizes a gate's headroom off its *largest
+  substantive* estimate and explicitly declines to budget for a closing retry,
+  on the grounds that a closing retry is a defect to diagnose. That reasoning
+  holds for a *retry*; it does not cover a first attempt that is simply twice
+  its estimate because it runs a bigger model over four gates of accumulated
+  context. Nothing went wrong here — the substantive underrun absorbed it and
+  budget was never binding — but the estimates were wrong in the one place the
+  padding rule does not look. Rule: estimate a closing WU from the *volume of
+  prior gates it must reconcile* and its model tier, not from a flat floor, and
+  expect a terminal close to cost more than any implementation unit in the
+  feature.
+
+- [FEAT-2026-0049/G4-CLOSE] **A gate-scoped guard that resolves a gate number
+  from the correlation ID can only see closing work units — check what a guard
+  can observe before trusting its green.** `assert_failure_class_breakdown_when_
+  failures_present` (`close-f`) is scoped by gate, and the scoping runs through
+  `_gate_number_from_wu_id`, which matches `^G(\d+)-` on the ID's last segment.
+  A substantive ID (`FEAT-2026-0049/T06`) has no such prefix, yields `None`, and
+  is filtered out of every gate-scoped summary. So the guard that exists to make
+  a close account for failed attempts is structurally blind to the failures of
+  the units that do the work, and can only ever fire on a closing WU's own
+  stumble — which issue #145 then deliberately excludes. Observed here: the
+  gate-scoped call returns "(no non-passing attempts in scope)" for all four
+  gates while the unscoped call over the same file returns a populated table.
+  Rule: when a guard passes, ask what input it actually saw. A guard whose
+  filter silently drops the majority of its domain reads as coverage while
+  asserting nothing, which is the same failure shape as an ungated test suite.

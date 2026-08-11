@@ -379,3 +379,510 @@ produced are staged in `LEARNINGS-pending.md` in this feature folder for a human
 to promote at PR review. That is the mechanism working, not an absence of
 lessons.
 
+## Gate 4 — the agent advances features
+
+Three substantive work units, three first-attempt passes, no re-arms, no
+driver-refused attempts. The terminal gate, and the one where the thing being
+driven is the same machinery doing the driving.
+
+### The headline: this feature has never been run
+
+**No `specfuse-agent run` has executed against live repository state at any
+point in gates 1, 2, 3 or 4.** Every behaviour this feature ships is proven by
+test against injected runners and fixture feature folders. The command exists,
+it is installed as a console script, its six providers register, and its whole
+selection-and-stopping machinery is covered by 3046 passing tests — and nobody
+has ever typed it and watched what happened.
+
+**This is "not proven", not "disproven".** Nothing observed in four gates
+suggests the runner is broken. No test has failed for a reason that implicates
+live behaviour, no design assumption has been contradicted, and the one live
+surface a close *can* reach without dispatching anything was reached in this
+session and behaved exactly as its tests said it would (see § "What this close
+proved against live state"). The distinction matters because the two readings
+lead to opposite next actions: "disproven" would mean fix something, and
+"not proven" means run it once, under caps, and read the result.
+
+Two standing findings belong in the same headline, because both are properties
+of the shipped code rather than of the test environment:
+
+1. **`reconcile` was called by six providers across four gates and did nothing
+   every time.** Every implementation is `return None` —
+   `providers/answers.py:219`, `bugs.py:128`, `triage.py:173`,
+   `findings_diagnose.py:180`, `findings_autofix.py:225`, `feature.py:334`.
+   The call site is real (`run.py:332`, executed for every item), so this is
+   not "untested"; it is "tested, called, and empty." Gate 2's review named the
+   feature provider as the verb's last chance to earn its place. It did not
+   take it, and that was a decision recorded in advance
+   (`GATE-04-REVIEW.md` § "The `reconcile` verdict"), not an oversight. A
+   future feature should either delete the verb or name the case that needs it;
+   after four gates the honest reading of the protocol is "two verbs and a hook
+   nobody has needed."
+2. **`--max-tokens` is wired end to end and every provider still reports
+   `spend=0`.** `ActionOutcome.spend` defaults to `0` (`run.py:125`) and
+   `budget.record_tokens(outcome.spend)` runs on every item (`run.py:333`), so
+   the ledger is live and the number flowing through it is always zero — no
+   provider anywhere assigns `spend`. The cap therefore cannot fire on real
+   work. Gate 4 adds the most expensive spender of the six: `advance_feature`
+   launches a full driver run. Unlike the earlier five it has a plausible spend
+   source — the driver writes cost into WU frontmatter via `write_cost_to_wu` —
+   but reading it was never drafted, and reporting a measured zero when nothing
+   was measured is exactly what T11's escalation trigger refused to do.
+
+### What actually happened
+
+- **T12 — the workability classifier.** `specfuse/agent/queue_read.py` with
+  five disposition constants, `classify_queue_entry` in a stated precedence
+  order (`UNREADABLE` first, because an unparseable folder is
+  indistinguishable from an absent one by `feature_id` alone), `select_workable`
+  with `DONE` entries consuming no `wip_limit` slot, and the two
+  `rules.features` readers. Promoted `state._read_features` to
+  `read_feature_summaries` with the old name retained as an alias. Nineteen
+  tests.
+- **T13 — the subprocess seam.** `specfuse/agent/driver_invoke.py`:
+  `build_invocation`, six halt classes, `advance_feature`. The subprocess
+  invariant is now mechanical rather than remembered — a structural test
+  asserts the module's source contains neither `loop.run` nor
+  `specfuse.loop.loop`. Sixteen tests.
+- **T14 — the feature provider.** `specfuse/agent/providers/feature.py` over
+  T12 and T13, registered in `default_providers()`. Nineteen tests, including
+  one per row of the halt→outcome table. The two escalation categories
+  `escalation.py` declared and nothing had ever used — `drafting-needed` and
+  `gate-review` — got their first consumer.
+
+`default_providers(repo='owner/repo')` now returns six providers, verified
+directly in this session: `AnsweredEscalationProvider`, `BugsProvider`,
+`FeatureProvider`, `TriageProvider`, `FindingsDiagnoseProvider`,
+`FindingsAutofixProvider`.
+
+### Oracles re-run fresh in this session
+
+Per `close-discipline.md` §1 — run here, exit codes read directly, nothing
+inherited from a producing WU's self-report.
+
+| Command | Result |
+|---|---|
+| `bash scripts/smoke-test.sh` (the full `code` gate set, all 16 gates derived from `.specfuse/verification.yml`) | **exit 0** — `smoke test: OK` |
+| ↳ `tests` gate: `python3 -m unittest discover -s tests -v -b` | **3046 tests, OK (skipped=1)**, 116.5s |
+| ↳ `lint` gate: `ruff check specfuse .specfuse/scripts tests scripts` | `All checks passed!` |
+| ↳ `security` gate: `bandit -r specfuse .specfuse/scripts -ll` | `No issues identified.` (0 medium, 0 high) |
+| ↳ `coverage` gate: `coverage run --source=specfuse … && coverage report --fail-under=90` | `TOTAL 10288 676 93%` — above the 90% floor |
+| ↳ the remaining 12 gates (leak-scan, event-type, roadmap-link, arm-sweep, monitoring-example-lint, and the six `bats` suites) | all green; `roadmap-link-gate` printed 3 non-failing WARNs |
+| `python3 -m unittest tests.test_agent_queue_read -b` | **exit 0**, 19 tests, OK |
+| `python3 -m unittest tests.test_agent_driver_invoke -b` | **exit 0**, 16 tests, OK |
+| `python3 -m unittest tests.test_agent_provider_feature -b` | **exit 0**, 19 tests, OK |
+
+The three gate-4 modules together: **54 tests, OK**. The full-suite run is the
+feature-level re-run and is **not** carried forward to any future close attempt.
+
+Every one of `GATE-04-CRITERIA.md`'s 22 entries was additionally re-run under
+its own scoped oracle this attempt, all `state: pass`. All 22 are `kind: narrow`
+— a scoped nodeid, a symbol-existence import, or a structural assert. **No
+gate-4 criterion carries a `broad` oracle**, which is a statement about this
+gate rather than an omission: no acceptance criterion here names the full suite
+as its proof. The full suite still ran, as the feature-level oracle above; it
+just is not what any single criterion rests on.
+
+### What this close proved against live state
+
+Small, but real, and worth separating from the fixtures. T12's readers were
+pointed at this repository's own files in this session — not at a fixture:
+
+```
+resolve_wip_limit('.specfuse/agent-policy.yml')                 -> 1
+resolve_gate_review('.specfuse/agent-policy.yml', 'FEAT-2026-0049') -> 'human'
+read_feature_summaries(Path('.specfuse/features'))              -> 63 summaries, 0 unreadable
+classify_queue_entry('FEAT-2026-0049', …)                       -> workable
+select_workable(['FEAT-2026-0049'], …, wip_limit=1)             -> (('FEAT-2026-0049',), ())
+```
+
+So `rules.features.wip_limit` and `rules.features.gate_review` — validated by
+`agent_policy.py` since FEAT-2026-0044 and read by no shipped code until T12 —
+have now been read from an operator-authored policy file, and the classifier has
+been run over 63 real feature folders rather than fixtures. This is read-only:
+no `gh` call, no write, no driver invocation. It is also the exact hazard
+`GATE-04-REVIEW.md` § "Risks to weigh before arming" named — the live queue top
+is this feature — observed rather than argued: a real `specfuse-agent run` here
+would classify `FEAT-2026-0049` as workable and invoke the driver on the feature
+it is being built inside.
+
+### Findings this gate produced
+
+None is a defect in gate 4's shipped behaviour. Two are corrections to the
+record, one is a driver defect this close can see and is forbidden to fix.
+
+1. **"Every substantive work unit was a first-attempt pass" is false, and it is
+   written in three places.** `PLAN.md` § "A note on `planned_cost_usd`",
+   `GATE-04-REVIEW.md` § "On the estimates", and `GATE-03-REVIEW.md` all say
+   eleven substantive units, every one a first-attempt pass. **T06 failed its
+   first attempt** — `events.jsonl` records `attempt: 1, outcome: failed,
+   failure_class: tests, cost_usd: 0.703116`, then `attempt: 2, outcome:
+   passed`; `WU-06-bugs-provider.md` frontmatter reads `attempts: 2`. Fourteen
+   substantive units, thirteen first-attempt passes, one re-arm. The claim was
+   used as evidence for a cost-estimating decision ("eleven observations is a
+   distribution, not an outlier"), so it is not cosmetic — though the
+   correction does not change the decision, since thirteen of fourteen is still
+   a distribution. Not fixed here: those are gate 1–3 planning artifacts and a
+   close records rather than revises.
+2. **The failure-class breakdown guard cannot see a substantive work unit's
+   failure.** `summarize_attempt_failure_classes(feature_dir, gate_n, …)`
+   resolves an event's gate through `_gate_number_from_wu_id`
+   (`loop.py:4976`), which matches `^G(\d+)-` on the ID's last segment. A
+   substantive ID (`FEAT-2026-0049/T06`) has no such prefix, so it returns
+   `None` and the event is filtered out of **every** gate-scoped summary.
+   Observed directly: the gate-scoped call returns `(no non-passing attempts in
+   scope)` for gates 1, 2, 3 and 4, while the unscoped call over the same file
+   returns a table with one row — `tests | 1 |
+   test_default_providers_returns_empty_registry`. So `close-f`
+   (`assert_failure_class_breakdown_when_failures_present`), which is gate-
+   scoped, can only ever fire on a *closing* WU's own failed attempt. A
+   substantive WU's failure is structurally invisible to it. **This is a driver
+   defect, not a gate-4 defect, and this close does not fix it** — a closing
+   unit records; the fix is a bug with its own branch. The breakdown below is
+   therefore written from the unscoped read, which is the true one.
+3. **T06's one failure was on the test gate 3's close later flagged as
+   misnamed.** Its `failure_signature` is
+   `test_default_providers_returns_empty_registry` — the same test gate 3's
+   retrospective finding 4 recorded as "green for a different reason than it
+   was written for". The two observations are one story: a test asserting an
+   emptiness invariant that later WUs deliberately superseded cost one failed
+   attempt ($0.70) while it was being superseded, and then went on reading as
+   coverage afterwards. The lesson gate 3 staged about superseded criteria has
+   a price attached to it after all.
+
+## Cost analysis
+
+Every figure read from `events.jsonl` `attempt_outcome` / `task_completed`
+payloads and from WU frontmatter — none estimated. No row was missing: the
+escalation trigger about `events.jsonl` rows lost between a squash and the next
+bookkeeping commit (#1024) did **not** fire, and every substantive work unit in
+all four gates has both its `task_started` and its
+`attempt_outcome`/`task_completed` rows present.
+
+| Gate | Planned (sum of WU `planned_cost_usd`) | Actual | `cost_budget_usd` | Actual as % of budget |
+|---|---|---|---|---|
+| 1 | $29.50 | **$13.19** | $36.00 | 36.6% |
+| 2 | $39.50 | **$14.94** | $45.50 | 32.8% |
+| 3 | $31.00 | **$23.73** | $38.50 | 61.6% |
+| 4 | $23.00 | **$4.47** | $29.50 | 15.2% |
+| **feature** | **$123.00** | **$56.33** | **$149.50** | **37.7%** |
+
+Gate 4's actual excludes this closing session: the driver writes a closing WU's
+`attempt_outcome` row after the session ends, so that row is not yet written —
+not lost. At its $5.00 plan the gate would land near $9.47 against $29.50.
+
+### The distribution that matters, per work unit
+
+| WU | ID | attempts | planned | actual | duration | outcome |
+|---|---|---|---|---|---|---|
+| `WU-12-queue-workability.md` | T12 | 1 | $5.50 | **$0.72** | 334s | passed |
+| `WU-13-driver-invoke.md` | T13 | 1 | $6.00 | **$1.57** | 735s | passed |
+| `WU-14-feature-provider.md` | T14 | 1 | $6.50 | **$2.18** | 786s | passed |
+| **gate-4 substantive** | | **3** | **$18.00** | **$4.47** | **1855s (31 min)** | |
+
+Across all four gates: **fourteen substantive work units planned $86.50 and
+spent $22.03 — 25.5% of plan.** Every one ran `model: sonnet` / `effort:
+medium`; thirteen passed first attempt, T06 took two.
+
+**The closing units are where the money went, and that is the one real cost
+finding of this feature.** Seven closing units were planned at $36.50. Two
+(gate 1's and gate 2's close-intermediates) auto-closed at `attempts: 0` and
+cost **$0.00**. One is this session. The four that actually ran cost
+**$34.30 — 60.9% of the feature's entire $56.33 spend** — and every one of them
+overran its estimate, in the opposite direction to every substantive unit:
+
+| Closing WU | planned | actual | delta |
+|---|---|---|---|
+| `G1-PLAN` | $6.00 | $7.24 | **+21%** |
+| `G2-PLAN` | $6.00 | $8.28 | **+38%** |
+| `G3-CLOSE-INTERMEDIATE` | $4.50 | $7.02 | **+56%** |
+| `G3-PLAN` | $6.00 | $11.77 | **+96%** |
+
+All four ran `model: opus` / `effort: high`; all fourteen substantive units ran
+`sonnet` / `medium`. That is most of the explanation, and it is a deliberate
+setting rather than a surprise — but it means the feature's cost model is
+inverted from the one the estimates assume. `planning-discipline.md` §5 sizes a
+gate's padding off *the largest substantive estimate* and treats a closing-WU
+retry as a defect to diagnose rather than a cost to budget for. On this feature
+the substantive units came in at a quarter of plan while the closing units came
+in at up to double, and the padding was never drawn on because the substantive
+underrun absorbed it. Budget was never the binding constraint here — but if it
+ever becomes one, the estimates are wrong at the closing units, not at the
+implementation units.
+
+Gate 3's $23.73 stands out for the same reason and no other: it is the only
+gate whose close was forced to run *and* whose `plan-next` had four gates of
+accumulated context to reconcile.
+
+### Failure-class breakdown
+
+Read unscoped across all four gates, for the reason recorded in finding 2
+above: the gate-scoped read is structurally blind to a substantive work unit's
+failure, and gate-scoped it would print `(no non-passing attempts in scope)`
+for every gate — which would be true of what it can see and false of what
+happened.
+
+| failure_class | non-passed attempts | dominant signature |
+|---------------|---------------------|--------------------|
+| tests | 1 | test_default_providers_returns_empty_registry |
+| **total** | **1** | — |
+
+One non-passing attempt in 21 work units across four gates: T06, attempt 1,
+$0.70, recovered on attempt 2. No `blocked` outcome, no `spinning_detected`, no
+driver-refused attempt, and no re-arm requiring a human anywhere in the feature.
+
+## Consumer-visible contract changes
+
+Enumerated per `close-discipline.md` §3. This is **not** an `n/a` close — the
+feature adds a new command and changes what an existing one does. Each item is
+appended to `CHANGELOG.md`'s `Unreleased` section under this feature's ID.
+
+1. **`specfuse-agent`, a new console script** —
+   `specfuse-agent = "specfuse.agent.run:main"` in `pyproject.toml`
+   `[project.scripts]`, taking the shipped entry points from five to six. It is
+   the operator-launched conductor: it takes `.specfuse/.agent.lock` (its own,
+   distinct from the driver's `.specfuse/.loop.lock`), reads repo state, and
+   runs select→execute→reconcile to drain.
+2. **Seven new CLI flags on that command**, all optional with safe defaults:
+   `--repo` (OWNER/NAME), `--policy` (path to `agent-policy.yml`),
+   `--features-root` (path to `.specfuse/features`), `--monitoring-config`
+   (defaults to `.specfuse/monitoring.yml`), and the three caps `--max-minutes`,
+   `--max-tokens`, `--max-items`, each defaulting to `None` meaning unbounded.
+   Two things about the caps a consumer will otherwise assume wrongly: they are
+   checked **at item boundaries only**, so a cap can overshoot by the duration
+   of one running item and never interrupts work in progress (D3); and
+   `--max-items` counts **advertised items, which for a feature means gates,
+   not features** — one feature advancing four gates consumes four items, so
+   `--max-items 3` yields one feature, not three.
+3. **`--max-tokens` is enforceable in principle and inert in practice.** The
+   ledger is wired end to end, and every provider reports `spend=0`, so the cap
+   cannot currently fire on real work. Stated here rather than in the
+   retrospective alone because a consumer reading the flag list would otherwise
+   expect it to bound cost.
+4. **A behaviour change to `default_providers()` — an unattended
+   `specfuse-agent run` now dispatches the loop driver.** This is a change to
+   what an existing command does, not an addition, and it is the largest
+   blast-radius change the feature makes. Before gate 4, the command could file
+   bug PRs, triage issues, answer escalations, post diagnoses and fire
+   autofixes. After it, the same command reads `queue:` from
+   `.specfuse/agent-policy.yml` and invokes `specfuse run` on the top workable
+   feature — which commits. There is **no opt-in flag**: the provider is
+   registered like the other five. That was decided as OQ-3 in
+   `GATE-04-REVIEW.md` on the grounds that the approved roadmap goal funds
+   exactly this behaviour, and it was decided **by the agent, overnight, with
+   the operator asleep**, under a standing authorization to arm unattended. The
+   review recommends the operator review this one decision specifically before
+   merge, and this close repeats that recommendation.
+5. **Two previously inert policy dials become load-bearing.**
+   `rules.features.wip_limit` (int ≥ 1, default 1) now caps how many distinct
+   features one run advances, in `queue:` order, with already-`done` entries
+   consuming no slot. `rules.features.gate_review` (`human` | `auto`, default
+   `human`, with a per-feature `overrides` map) now decides what an
+   `awaiting_review` halt does: `human` files a `gate-review` needs-human
+   issue, `auto` records the halt in the run summary and files nothing. Both
+   have been validated by `agent_policy.py` since FEAT-2026-0044 and read by no
+   shipped code until now — so an operator who set them expecting no effect
+   will now get one. Absent keys and malformed values resolve to the
+   conservative defaults rather than raising.
+6. **Two escalation categories reach GitHub for the first time.**
+   `drafting-needed` and `gate-review` have been declared in
+   `escalation.py`'s `CATEGORY_LABELS` and used by nothing; the feature
+   provider is their first consumer, so repositories will begin seeing
+   needs-human issues carrying those labels. No category was minted and the
+   registry is unchanged.
+
+## Hedged-verdict follow-up record
+
+The terminal verdict is `met_locally`. Every acceptance criterion of all
+fourteen substantive work units is met and re-verified; what is unproven is the
+feature-level claim that the command does its job when actually run. Per
+`close-discipline.md` §2, one entry per criterion below, each with the condition
+that would upgrade it.
+
+Three groups, and their `kind`s were decided by the closes that met them rather
+than re-decided here. Because at least one entry is
+`externally-verifiable-later`, `verdict_ceiling_for_kinds` reads **rework
+exists**: a real re-run condition is nameable, so the operator has a genuine
+choice between accepting the hedge now and waiting for one live run.
+
+### Group A — gate 3's ten criteria met only against fixtures
+
+Enumerated individually with their live conditions in § "Gate 3 — the criteria
+met only against fixtures" above, which this entry carries forward verbatim
+rather than restating: T09#5 (`component_for_finding`), T09#5
+(`load_monitoring_config`), T09#6 (`--monitoring-config`'s default path), T10#2,
+T10#5, T10#6, T11#2, T11#5, T11#6, and the diagnose→autofix handoff within one
+run. Ten criteria.
+
+- **why unverifiable here:** this repository has no `.specfuse/monitoring.yml`
+  and never will — `.specfuse/verification.yml`'s `monitoring-example-lint`
+  gate records that it is a CLI tool with no deployable components — so no
+  harvester run has ever happened and no `monitoring-finding` issue has ever
+  existed here. Inventing one would be a fixture masquerading as a live
+  surface.
+- **re-run condition:** one `specfuse monitor run` followed by one
+  `specfuse-agent run` in a repository with a real `monitoring.yml` and at
+  least two findings, one with `diagnose: auto` and one with `diagnose:
+  manual`. The single cheapest partial upgrade, available in this repo today
+  and not done: a fixture-level test registering both findings providers and
+  asserting the iteration-4 visibility of a diagnosis posted at iteration 3.
+- **kind:** `externally-verifiable-later`
+
+### Group B — the fourteen red-before-green halves
+
+T01#1, T02#1, T03#1, T04#1, T05#1, T06#1, T07#1, T08#1, T09#1, T10#1, T11#1,
+T12#1, T13#1, T14#1. Gate 4 inherits the same criterion shape gates 1–3 used,
+so the eleven gate-3's close named are now fourteen.
+
+- **the criterion, verbatim (T12#1's, representative of all fourteen):**
+  "`tests/test_agent_queue_read.py::TestQueueWorkability::test_queue_entry_without_a_feature_folder_needs_drafting`
+  exists and **fails on HEAD before this WU runs** (the file does not yet
+  exist)."
+- **why unverifiable here:** the green-after half re-runs in milliseconds and
+  did, this session, for all fourteen. The red-before half asserts a tree state
+  that no longer exists and would need `git` to reconstruct; a closing session
+  runs no `git` command by contract.
+- **re-run condition:** none. No future close can discharge this either, for
+  the same structural reason. It was true when each producing session ran and
+  the driver's produces-vs-diff guard covered it at squash time; this close
+  will not mark it verified on a substitute.
+- **kind:** `inherent`
+
+### Group C — the four no-file-under-`specfuse/loop/`-was-edited diff claims
+
+T06#2, T07#2, T10#2, T11#2.
+
+- **the criterion, verbatim (T06#2's shape):** "No file under `specfuse/loop/`
+  (or `specfuse/monitor/`) is edited."
+- **why unverifiable here:** it is a diff claim, and diffs need `git`.
+- **re-run condition:** none, in a close session, by construction. Not
+  unverified in the loop as a whole — the driver's produces-vs-diff guard and
+  each WU's `Do not touch` boundary cover it at squash time — but this close
+  cannot be the one to assert it.
+- **kind:** `inherent`
+
+### Group D — gate 4's own criteria, met against fixtures and an injected runner
+
+All 22 entries in `GATE-04-CRITERIA.md`, less the live-state subset recorded in
+§ "What this close proved against live state" (T12's readers and classifier,
+which this session ran against this repository's real `agent-policy.yml` and its
+63 real feature folders). The remainder — every halt classification in T13, and
+every row of T14's halt→outcome table — was met against fixture feature folders
+under a temporary directory and a runner that returns canned exit codes,
+stdout and stderr.
+
+- **why unverifiable here:** deliberately, and as a safety property rather than
+  a limitation. A test that dispatched the real driver against a real feature
+  in this repository would run the loop inside the loop, and this repository's
+  own `queue:` top is this very feature. `GATE-04.md` § "What this gate
+  deliberately does not prove" records the decision; T13's and T14's escalation
+  triggers forbid working around it.
+- **re-run condition:** one `specfuse-agent run` against a repository whose
+  `queue:` top is a feature other than this one — under `--max-items 1` and a
+  `--max-minutes` cap, which is what makes the trial cheap and bounded. That
+  single run would exercise the console script, the lock, the caps, the
+  snapshot, the ranking, the subprocess invocation, at least one halt
+  classification and its escalation path, all at once.
+- **kind:** `externally-verifiable-later`
+
+## Lessons promoted (gate 4)
+
+Same mechanism as gate 3's, unchanged: under `autonomy_default: auto` a closing
+WU whose diff touches `.specfuse/LEARNINGS.md` fails
+`assert_learnings_staged_under_auto`, so this gate's lessons are appended to
+`LEARNINGS-pending.md` in this feature folder for a human to promote at PR
+review. Gate 3's four are left in place and three more are appended — the file
+now holds seven. This is staging, not "nothing generalizes": the lessons below
+do generalize, and the staging file is where the mechanism puts them.
+
+## What the loop did NOT verify
+
+**This section supersedes gate 3's.** The guard reads only the last
+`What the loop did NOT verify` heading in this file, so from the moment this one
+is written it is the record — which is why every earlier gate's deferrals are
+carried into it here rather than left behind in a section that is no longer
+read. Named explicitly and by number: **gate 1**, **gate 2**, **gate 3**, and
+**gate 4**.
+
+### gate 1 — auto-close debt, reconciled
+
+`<!-- specfuse:autoclose-debt gate=1 wus=T01,T02,T03,T04 criteria=27 -->` is
+still open as a marker and stays that way: it records that gate 1 auto-closed,
+which remains true, and deleting it would erase history rather than discharge
+it. **All 27 criteria are reconciled, and were reconciled by gate 3's close**
+against a fresh full-suite run; that per-WU table — oracle re-run and result for
+T01#1–#6, T02#1–#6, T03#1–#7 and T04#1–#8, 27 rows, all `pass` — is in §
+"Gate 1's auto-close debt — reconciled" above and is carried forward here with
+its evidence rather than redone. This close re-ran the same four modules as part
+of the full suite (3046 tests, OK) and observed no regression in any of them.
+
+One qualification, carried not created: T01#1, T02#1, T03#1 and T04#1 are
+reconciled on their green-after half only. Their red-before-green half is Group
+B above, `kind: inherent`.
+
+### gate 2 — auto-close debt, reconciled
+
+`<!-- specfuse:autoclose-debt gate=2 wus=T05,T06,T07,T08 criteria=30 -->` —
+same disposition, same reason, marker likewise left standing. **All 30 criteria
+are reconciled**, by gate 3's close, in the per-WU table in § "Gate 2's
+auto-close debt — reconciled" above: T05#1–#9, T06#1–#7, T07#1–#7, T08#1–#7, all
+`pass`. Carried forward with its evidence.
+
+Two qualifications, both carried:
+
+- T05#7's emptiness half is recorded `pass, superseded` — the test is green
+  because `default_providers()` returns `()` on the `repo=None` path, not
+  because the registry is empty. It returns **six** providers when given a
+  `repo`, verified again this session. Not a defect; a test whose name asserts
+  more than its body does.
+- T06#1, T07#1, T08#1 are reconciled on their green half only (Group B);
+  T06#2 and T07#2 are Group C, `kind: inherent`.
+
+### gate 3 — no marker, and still named
+
+Gate 3 left no `specfuse:autoclose-debt` marker: its close ran rather than
+auto-closing. It is named here anyway because its own deferral section stopped
+being the record the moment this one was written, which that close said in
+writing. Its ten fixture-only criteria are Group A above,
+`kind: externally-verifiable-later`, each with the live condition it already
+named; T09#1, T10#1 and T11#1 are Group B and T10#2, T11#2 are Group C. Criteria
+T09#2–#4, T09#7, T10#3, T10#4, T10#7, T11#3, T11#4 and T11#7 were met against
+the real code paths and are **not** deferred.
+
+Gate 3's own instruction to this close was to stop deferring Groups B and C and
+carry them as `kind: inherent`. Done.
+
+### gate 4 — its own deferrals
+
+1. **Every gate-4 criterion less T12's live-state subset was met against
+   fixtures and an injected runner** — Group D above,
+   `kind: externally-verifiable-later`. Twenty-two criteria, all `pass`, none
+   of them evidence that the command works when run.
+2. **`reconcile` has never done anything, across six providers and four
+   gates.** Verified, not assumed: all six return `None`, and the call site
+   executes. Recorded as a finding for a future feature to act on, not as
+   something this close can discharge.
+3. **`spend` is zero everywhere, so `--max-tokens` has never bounded
+   anything.** Same posture: the wiring is verified, the number is structurally
+   zero, and no live run exists to measure the real one.
+4. **The snapshot is not a snapshot, and this close says so plainly rather than
+   deferring it again.** `run_agent` gathers one `AgentSnapshot` before the
+   loop and passes that same value to `advertise()` on every iteration, but
+   four of six providers now re-read live state inside `advertise` — and the
+   feature provider is the first that must, because its own `execute` is what
+   changed the state it re-reads. The name describes an intent the code no
+   longer has. Fixing it means changing T02's gate-1 surface, which is out of
+   this feature's bounds.
+5. **No live-state evidence exists for any halt class.** `classify_halt`'s six
+   classes were derived from the driver's shipped source and proven against
+   fixture feature folders; no real `specfuse run` halt has ever been passed
+   through them. If a seventh halt shape exists in practice, nothing here would
+   have found it.
+6. **The two things this close observed but must not fix**: the
+   first-attempt-pass claim contradicted by T06's `events.jsonl` rows, and the
+   gate-scoped failure-class summary that is structurally blind to substantive
+   work units (`_gate_number_from_wu_id` returns `None` for a `TNN` ID). The
+   first is stale prose in gate 1–3 planning artifacts; the second is a driver
+   defect that needs a bug with its own branch. Both are findings above, and
+   both are carried by the verdict rather than repaired here.
+

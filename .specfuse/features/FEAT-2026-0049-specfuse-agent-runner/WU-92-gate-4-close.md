@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0049/G4-CLOSE
 type: close
-status: pending
+status: done
 attempts: 1
 planned_cost_usd: 5.00
 # AC6 writes CHANGELOG.md — a surface outside this feature's folder, which makes
@@ -11,6 +11,26 @@ planned_cost_usd: 5.00
 # auto-closed at attempts: 0 and left 57 criteria unreconciled between them.
 # See close-discipline.md, #293.
 auto_close_disabled: true
+# The feature's terminal verdict (AC4). `met_locally` and not `met`: every
+# acceptance criterion of all fourteen substantive work units is met and was
+# re-verified this session, but no `specfuse-agent run` has ever executed
+# against live repository state, so the funded outcome is unproven — see
+# RETROSPECTIVE.md § "The headline: this feature has never been run" and AC7's
+# escalation trigger, which says `met` is a claim the evidence does not support.
+# Not `partially_met`: no criterion is unmet at the level it was written.
+# The `## Hedged-verdict follow-up record` carries four groups; one is
+# `externally-verifiable-later`, so the ceiling reads "rework exists" — one
+# bounded live run would upgrade it.
+verdict: met_locally
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.11.0
+started_at: 2026-08-11T11:06:43.041163+00:00
+duration_seconds: 857.861
+cost_usd: 9.831181
+input_tokens: 152
+output_tokens: 54242
 ---
 
 # G4-CLOSE — the terminal close
