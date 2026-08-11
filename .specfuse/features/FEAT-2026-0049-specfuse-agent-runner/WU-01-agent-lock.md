@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0049/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/loop/_filelock.py
   - tests/test_agent_lock.py
 produces_driver_helper:
   - acquire_agent_lock
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T00:17:21.577512+00:00
+duration_seconds: 666.539
+cost_usd: 0.912573
+input_tokens: 800
+output_tokens: 6098
 ---
 
 # T01 — the agent's own lock

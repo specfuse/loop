@@ -17,15 +17,15 @@ import sys
 from pathlib import Path
 
 
-def acquire_tree_lock(specfuse_dir: Path):
-    """Open .specfuse/.loop.lock and acquire a non-blocking exclusive lock.
+def acquire_tree_lock(specfuse_dir: Path, lock_name: str = ".loop.lock"):
+    """Open .specfuse/<lock_name> and acquire a non-blocking exclusive lock.
 
     Returns the open file object; caller keeps it alive for the process
     lifetime — the OS auto-releases on fd/handle close or process death
     (SIGKILL included), so no stale-lock cleanup is ever needed.
     Raises BlockingIOError if another process already holds the lock.
     """
-    lock_path = specfuse_dir / ".loop.lock"
+    lock_path = specfuse_dir / lock_name
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = lock_path.open("w")
     try:
@@ -42,3 +42,14 @@ def acquire_tree_lock(specfuse_dir: Path):
         fd.close()
         raise
     return fd
+
+
+def acquire_agent_lock(specfuse_dir: Path):
+    """Open .specfuse/.agent.lock and acquire a non-blocking exclusive lock.
+
+    Independent of `acquire_tree_lock`'s `.loop.lock` — same mechanics, a
+    second lock file, so an agent holding it does not block the driver's own
+    lock. Same release contract: caller keeps the returned file object alive
+    for the process lifetime; the OS releases on fd close or process death.
+    """
+    return acquire_tree_lock(specfuse_dir, lock_name=".agent.lock")
