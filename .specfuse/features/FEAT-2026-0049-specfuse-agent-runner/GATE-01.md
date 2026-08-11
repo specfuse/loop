@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 36.00
+baseline:
+  sha: 83faca7e12fe6daa408b449c54b9af8fe0edb6c3
+  probed_at: 2026-08-11T00:12:20.449955+00:00
+  failing: []
 ---
 
 # Gate 1 — the conductor drains an empty queue
