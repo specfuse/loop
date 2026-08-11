@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0049/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.50
 produces:
   - specfuse/agent/providers/answers.py
   - tests/test_agent_provider_answers.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T03:40:03.853026+00:00
+duration_seconds: 802.802
+cost_usd: 1.543806
+input_tokens: 1004
+output_tokens: 20222
 ---
 
 # T08 — the answered-escalation provider

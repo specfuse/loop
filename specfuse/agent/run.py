@@ -391,12 +391,17 @@ def default_providers(
     default stays `()` too, so tests keep injecting doubles rather than
     going through this function. T06 is the first provider to append itself
     here; T07/T08 add theirs the same way."""
+    from specfuse.agent.providers.answers import AnsweredEscalationProvider
     from specfuse.agent.providers.bugs import BugsProvider
     from specfuse.agent.providers.triage import TriageProvider
 
     if repo is None:
         return ()
     return (
+        AnsweredEscalationProvider(
+            repo=repo,
+            runner=runner,
+        ),
         BugsProvider(
             repo=repo,
             runner=runner,
