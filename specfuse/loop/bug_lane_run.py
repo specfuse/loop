@@ -113,46 +113,74 @@ CI_WAIT_SECONDS = 600
 CI_POLL_SECONDS = 15
 
 
+#: The `--json` fields this module reads. `gh pr checks` has NO `conclusion`
+#: field (#1826) -- asking for one exits 1 with `Unknown JSON field`, which is
+#: why CI was unreadable on every PR since the lane shipped and
+#: `rules.bugs.automerge` could never fire. Verbatim from `gh pr checks --json`:
+#: bucket, completedAt, description, event, link, name, startedAt, state,
+#: workflow. `tests/test_pr_checks_json_field.py` compares this list against
+#: the installed binary, which is the check that was missing.
+CI_JSON_FIELDS = "bucket,name,state"
+
+#: `bucket` is gh's own normalisation across check providers. A skipped check
+#: is not a failure: a required check that did not need to run must not block a
+#: merge forever.
+_BUCKETS_OK = frozenset({"pass", "skipping"})
+_BUCKET_PENDING = "pending"
+
+_CI_FAILING = "fail"
+
+
 def _read_ci_conclusion_once(runner: Callable, repo: str, pr_number: int) -> str:
-    """One `gh pr checks` read. `_CI_PENDING` when a check has no conclusion
-    yet; `_CI_UNKNOWN` when the read itself cannot be trusted."""
+    """One `gh pr checks` read, mapped through `bucket`.
+
+    `_CI_PENDING` when any check is queued or running, or when no check is
+    registered yet; `_CI_UNKNOWN` when the output cannot be parsed at all.
+    """
     try:
         result = runner(
-            ["gh", "pr", "checks", str(pr_number), "--repo", repo, "--json", "conclusion"],
+            ["gh", "pr", "checks", str(pr_number), "--repo", repo,
+             "--json", CI_JSON_FIELDS],
             check=False,
         )
     except Exception:  # noqa: BLE001 - a raising runner still fails closed
         return _CI_UNKNOWN
 
-    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+    # Deliberately NOT gated on returncode. `gh pr checks` exits non-zero when
+    # checks are FAILING (1) or partly skipped (8), not only when the
+    # invocation is bad -- so exit code alone cannot distinguish "CI is red"
+    # from "the command broke". The output is the authority; the exit code is
+    # only a fallback when there is no parseable output.
+    stdout = getattr(result, "stdout", None)
+    if not stdout:
         return _CI_UNKNOWN
 
     try:
-        rows = json.loads(result.stdout)
+        rows = json.loads(stdout)
     except ValueError:
         return _CI_UNKNOWN
 
-    if not isinstance(rows, list) or not rows:
+    if not isinstance(rows, list):
         return _CI_UNKNOWN
+    if not rows:
+        # No check registered yet -- the first state of a brand-new PR, which
+        # is pending rather than unreadable. Bounded by the caller's deadline.
+        return _CI_PENDING
 
-    conclusions = set()
+    buckets = set()
     for row in rows:
         if not isinstance(row, dict):
             return _CI_UNKNOWN
-        conclusion = row.get("conclusion")
-        if not isinstance(conclusion, str):
+        bucket = row.get("bucket")
+        if not isinstance(bucket, str) or not bucket:
             return _CI_UNKNOWN
-        if not conclusion:
-            # Queued or in progress -- distinct from unreadable. This is the
-            # distinction the single-read version could not draw, and drawing
-            # it is the whole fix: "CI has not finished" is not a verdict.
-            return _CI_PENDING
-        conclusions.add(conclusion)
+        buckets.add(bucket.lower())
 
-    if len(conclusions) != 1:
-        return _CI_UNKNOWN
-
-    return conclusions.pop()
+    if _BUCKET_PENDING in buckets:
+        return _CI_PENDING
+    if buckets <= _BUCKETS_OK:
+        return "success"
+    return _CI_FAILING
 
 
 def pr_ci_conclusion(
@@ -409,6 +437,9 @@ def run_bug_lane(
     working_dir: str = _DEFAULT_WORKING_DIR,
     policy_path: Any = None,
     now: Optional[float] = None,
+    ci_sleep: Callable = time.sleep,
+    ci_clock: Callable = time.monotonic,
+    ci_deadline_seconds: float = CI_WAIT_SECONDS,
 ) -> BugLaneResult:
     """Run the bug lane for one issue: fix, PR, guarded merge.
 
@@ -432,7 +463,10 @@ def run_bug_lane(
         return BugLaneResult(outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND, pr_number=None)
 
     changed_files, diff_lines = _pr_changed_files_and_diff_lines(runner, repo, pr_number)
-    ci_conclusion = pr_ci_conclusion(runner, repo, pr_number)
+    ci_conclusion = pr_ci_conclusion(
+        runner, repo, pr_number,
+        sleep=ci_sleep, clock=ci_clock, deadline_seconds=ci_deadline_seconds,
+    )
     limits = bug_lane_limits(policy_path)
     provenance = _issue_provenance(runner, repo, issue_number)
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)

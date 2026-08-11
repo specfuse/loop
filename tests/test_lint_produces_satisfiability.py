@@ -48,7 +48,14 @@ Test context.
 """
 
 
-def _wu_text(wid: str, wu_type: str, status: str, produces=None, extra: str = "") -> str:
+def _wu_text(
+    wid: str,
+    wu_type: str,
+    status: str,
+    produces=None,
+    produces_incremental=None,
+    extra: str = "",
+) -> str:
     lines = ["---", f"id: {wid}", f"type: {wu_type}", f"status: {status}"]
     if produces is not None:
         if isinstance(produces, list):
@@ -57,6 +64,13 @@ def _wu_text(wid: str, wu_type: str, status: str, produces=None, extra: str = ""
                 lines.append(f"  - {p}")
         else:
             lines.append(f"produces: {produces}")
+    if produces_incremental is not None:
+        if isinstance(produces_incremental, list):
+            lines.append("produces_incremental:")
+            for p in produces_incremental:
+                lines.append(f"  - {p}")
+        else:
+            lines.append(f"produces_incremental: {produces_incremental}")
     if extra:
         lines.append(extra)
     lines.append("---")
@@ -81,7 +95,11 @@ def _build_feature(tmp_path: Path, wus: list[dict]) -> Path:
     )
     for w in wus:
         (feat / w["file"]).write_text(
-            _wu_text(w["id"], w["type"], w["status"], produces=w.get("produces"))
+            _wu_text(
+                w["id"], w["type"], w["status"],
+                produces=w.get("produces"),
+                produces_incremental=w.get("produces_incremental"),
+            )
         )
     return feat
 
@@ -116,7 +134,7 @@ class TestProducesSatisfiability(unittest.TestCase):
         self.assertIn("FEAT-2026-0099/T04", out)
         self.assertIn("FEAT-2026-0099/T03", out)
         self.assertIn("src/widget.py", out)
-        self.assertIn("Drop the path, or state the incremental edit", out)
+        self.assertIn("Drop the path, declare it under produces_incremental:", out)
 
     def test_incremental_edit_chain_still_warns(self):
         """0066 T03->T05 shape: a later WU incrementally edits a path an
@@ -180,6 +198,28 @@ class TestProducesSatisfiability(unittest.TestCase):
                     "id": "FEAT-2026-0099/T02", "file": "WU-02.md",
                     "type": "implementation", "status": "draft",
                     "produces": "src/shared.py",
+                },
+            ])
+            out = _lint_stdout(feat)
+        self.assertNotIn("already delivered it", out)
+
+    def test_no_warn_when_declared_produces_incremental(self):
+        """#1041: a WU that declares the overlapping path under
+        produces_incremental: is making a real, observable claim that this is
+        an in-place edit to an existing file — the WARN is suppressed instead
+        of sending the author toward an unobservable body-prose fix."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_feature(Path(tmp), [
+                {
+                    "id": "FEAT-2026-0099/T01", "file": "WU-01.md",
+                    "type": "implementation", "status": "done",
+                    "produces": "src/shared.py",
+                },
+                {
+                    "id": "FEAT-2026-0099/T04", "file": "WU-04.md",
+                    "type": "implementation", "status": "pending",
+                    "produces": "src/shared.py",
+                    "produces_incremental": "src/shared.py",
                 },
             ])
             out = _lint_stdout(feat)
