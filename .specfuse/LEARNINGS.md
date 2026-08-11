@@ -3690,3 +3690,46 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   structurally invisible to it; the *next* gate's close is the first surface that can see
   it, which is an argument for a terminal close reconciling every gate rather than only
   its own.
+
+- [meta/agent-live-runs/a-stub-that-agrees-with-the-code-proves-nothing]
+  **Three defects shipped green through a full gate set because a test stub encoded the
+  same wrong assumption the production code did — the stub agreed with the code, and
+  neither was ever compared to the real tool.** All three were found by running the
+  thing for real, not by testing it. (1) `emit_escalation` defaulted its assignee to the
+  literal `specfuse-operator`, a username assignable on no repository, and
+  `test_escalation_emit.py` asserted `DEFAULT_ASSIGNEE in create_call` — an assertion
+  that passed for the whole life of the bug because it pinned the placeholder rather
+  than any property anyone wanted. Every escalation failed to file while the run
+  reported success (#1762). (2) `pr_ci_conclusion` asked `gh pr checks` for a `--json
+  conclusion` field that exists in no version of `gh`; the command exited 1 every time,
+  so CI was unreadable on every PR since the bug lane shipped and `rules.bugs.automerge`
+  could never fire. Its tests injected `[{"conclusion": "SUCCESS"}]` (#1826). (3) The
+  fix for (2)'s *symptom* — polling, on the theory that CI was read too early — passed
+  its own tests for the same reason and could not have helped, because it polled a
+  command that failed on argument parsing (#1786). Rules. (a) When a module's contract
+  is *what an external tool returns*, at least one test must compare the assumption
+  against the real tool — assert the requested `--json` field names against the
+  binary's own advertised list, `skipTest` where the binary is absent. `gh pr checks
+  --json` with no value prints its field list and costs nothing. (b) Capture the real
+  output before writing the parser, and paste it into the test module's docstring; a
+  fixture built from memory of an API is the defect, not the test of it. (c) A
+  placeholder that is valid nowhere is not a safe default — prefer empty and omit the
+  flag, so a missing configuration degrades to "unassigned" rather than "the whole
+  command fails". (d) When a fix addresses a symptom rather than a reproduced cause,
+  say so in the commit; (3) above looked like a clean fix with green tests and was
+  treating the wrong defect, and only a live run distinguished them.
+
+- [meta/agent-live-runs/an-outward-failure-that-reports-success-is-the-worst-shape]
+  **Every one of those three defects turned a non-zero `gh` exit into a lost
+  operator-facing record while the run's own summary read as success.** The bug lane
+  fixed a bug, opened a mergeable PR, then died labelling it — `items completed: 0`,
+  29.8 minutes discarded, and the escalation carried a `CalledProcessError` repr instead
+  of the guardrail verdict, so the operator learned a command failed and never learned
+  *why the lane declined to merge* (#1785). Rules. (a) A projection of a verdict — a
+  label, an assignee, a comment — must never be able to destroy the verdict it projects;
+  record `label_written: False` and continue, as `apply_triage` already did. (b) Two
+  consumers of one registry must not disagree about whether a missing entry is
+  survivable; that disagreement, not the missing label, was the defect. (c) `registered
+  is not provisioned` is a real state — provision on demand at the point of use and
+  retry once, rather than assuming an install-time step ran.
+
