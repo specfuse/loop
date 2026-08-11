@@ -1,12 +1,16 @@
 ---
 id: FEAT-2026-0049/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.50
 produces:
   - specfuse/agent/providers/bugs.py
   - tests/test_agent_provider_bugs.py
+duration_seconds: 1091.65
+cost_usd: 1.899535
+input_tokens: 76
+output_tokens: 27184
 ---
 
 # T06 — the bugs provider

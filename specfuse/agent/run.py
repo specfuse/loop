@@ -387,10 +387,21 @@ def default_providers(
 ) -> Sequence[ActionProvider]:
     """The registry each gate-2 provider WU (T06-T08) appends itself to.
 
-    Returns `()` in this unit — the seam ships here, the providers ship
-    later. `run_agent`'s own `providers=` default stays `()` too, so tests
-    keep injecting doubles rather than going through this function."""
-    return ()
+    Returns `()` when `repo` is not given -- `run_agent`'s own `providers=`
+    default stays `()` too, so tests keep injecting doubles rather than
+    going through this function. T06 is the first provider to append itself
+    here; T07/T08 add theirs the same way."""
+    from specfuse.agent.providers.bugs import BugsProvider
+
+    if repo is None:
+        return ()
+    return (
+        BugsProvider(
+            repo=repo,
+            runner=runner,
+            policy_path=policy_path,
+        ),
+    )
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
