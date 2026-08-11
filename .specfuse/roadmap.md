@@ -64,7 +64,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
-| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | planned | — | — |
+| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | active | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ detail](#feat-2026-0049) |
 | FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
@@ -798,7 +798,11 @@ machine-checkable contract rather than prose.
 
 **Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
 
-**Status: planned.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Needs `/draft-feature` before it can be dispatched.
+**Shape.** Three gates. Gate 1 builds the conductor's stopping properties — its own `.specfuse/.agent.lock` (separate from the driver's, which `loop.run()` takes itself), item-boundary caps, PAUSE marker, one repo-state snapshot carrying the first real reader of `queue:` — and drains an empty provider registry. Gate 2 adds the four cheap action classes over already-shipped composition (`run_bug_lane`, `apply_triage`, `diagnose_cli`, `run_autofix`). Gate 3 adds feature advancement, invoking the driver as a subprocess and switching away on an `awaiting_review` halt. New code lives in a new `specfuse/agent/` package, deliberately outside `driver_edit`'s `specfuse/loop/` halt prefix.
+
+**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
+
+**Status: active.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
 
 <a id="feat-2026-0050"></a>
 ## FEAT-2026-0050 — Async feature-drafting interview via question issues
