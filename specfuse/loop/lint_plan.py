@@ -559,14 +559,10 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
     same feature — a glob is compared literally, not expanded (expansion
     semantics belong to the presence gate, not this lint). Parallel drafts
     sharing a surface are fine (the earlier WU must be `done`), and a WU's own
-    file / `events.jsonl` never count as a clash. A path also listed in the
-    WU's `produces_incremental:` frontmatter is a declared in-place edit to an
-    existing file and is exempt — the WARN's "state the incremental edit"
-    resolution has to be something the check can actually observe, and prose
-    in the body isn't. WARN-only; never appends to the errors list. See
-    FEAT-2026-0055/T01, FEAT-2026-0066/T04, #1041.
+    file / `events.jsonl` never count as a clash. WARN-only; never appends to
+    the errors list. See FEAT-2026-0055/T01, FEAT-2026-0066/T04.
     """
-    records = []  # (wid, wfile, status, produces_entries, incremental_entries)
+    records = []  # (wid, wfile, status, produces_entries)
     for gate in gates:
         for entry in gate.get("work_units") or []:
             wid, wfile = entry.get("id"), entry.get("file")
@@ -586,31 +582,20 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
                 if not p_s or p_s in _PRODUCES_EXEMPT_PATHS or p_s == wfile:
                     continue
                 cleaned.add(p_s)
-            if not cleaned:
-                continue
-            incremental_raw = wfm.get("produces_incremental")
-            if incremental_raw:
-                incremental_entries = (
-                    incremental_raw if isinstance(incremental_raw, list) else [incremental_raw]
-                )
-            else:
-                incremental_entries = []
-            incremental = {str(p).strip() for p in incremental_entries if str(p).strip()}
-            records.append((wid, wfile, wfm.get("status", ""), cleaned, incremental))
+            if cleaned:
+                records.append((wid, wfile, wfm.get("status", ""), cleaned))
 
     done_paths: dict = {}  # path -> (wid, wfile), first done WU declaring it
-    for wid, wfile, status, entries, _incremental in records:
+    for wid, wfile, status, entries in records:
         if status != "done":
             continue
         for p in entries:
             done_paths.setdefault(p, (wid, wfile))
 
-    for wid, wfile, status, entries, incremental in records:
+    for wid, wfile, status, entries in records:
         if status not in _PRODUCES_DISPATCHABLE_STATUSES:
             continue
         for p in entries:
-            if p in incremental:
-                continue
             match = done_paths.get(p)
             if match is None or match[0] == wid:
                 continue
@@ -618,9 +603,8 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
             print(
                 f"WARN: {wfile}: {wid} declares produces path {p!r}, but "
                 f"done WU {done_wid} ({done_wfile}) already delivered it. "
-                f"Drop the path, declare it under produces_incremental: to "
-                f"mark it as an in-place edit, or state the incremental edit "
-                f"this WU makes to it in the body."
+                f"Drop the path, or state the incremental edit this WU makes "
+                f"to it in the body."
             )
 
 
