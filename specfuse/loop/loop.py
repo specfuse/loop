@@ -2376,7 +2376,7 @@ def format_deliverable_missing_note(
                 # recursive=True or `**` collapses to a single `*`, matches one
                 # level, yields directories, and the is_file() filter drops them
                 # all -- a WU that produced everything is refused (#1744).
-                m for m in glob.glob(path, recursive=True)
+                m for m in glob.glob(produces_glob_pattern(path), recursive=True)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
             ]
             state = (
@@ -5649,6 +5649,30 @@ def produces_is_glob(path: str) -> bool:
     return any(ch in path for ch in GLOB_METACHARACTERS)
 
 
+def produces_glob_pattern(path: str) -> str:
+    """Escape `[...]` segments that carry no wildcard of their own (#1589).
+
+    #1181 made a bare bracketed path literal, but an entry mixing a literal
+    bracket segment with a wildcard ELSEWHERE is still a pattern, so `[id]`
+    recovers its character-class meaning and matches nothing:
+    `glob.glob('src/app/[id]/*.ts')` is `[]` even with both files present, and
+    `fnmatch` fails the same way — so unlike #1181, BOTH halves of the unified
+    contract missed it.
+
+    Escaping is per SEGMENT, not whole-pattern: a class written in the same
+    segment as a wildcard (`src/[abc]*.ts`) is left alone, which preserves the
+    escape hatch #1181 deliberately kept for an author who wants a real class.
+    Segments with no bracket, and paths with no bracket at all, come back
+    unchanged.
+    """
+    return "/".join(
+        glob.escape(seg)
+        if "[" in seg and not any(ch in seg for ch in GLOB_METACHARACTERS)
+        else seg
+        for seg in path.split("/")
+    )
+
+
 def produces_shape_error(path: str) -> "str | None":
     """Return why *path* is an invalid ``produces:`` entry, or None if it is fine.
 
@@ -5737,7 +5761,7 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
                 # recursive=True or `**` collapses to a single `*`, matches one
                 # level, yields directories, and the is_file() filter drops them
                 # all -- a WU that produced everything is refused (#1744).
-                m for m in glob.glob(path, recursive=True)
+                m for m in glob.glob(produces_glob_pattern(path), recursive=True)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
             ]
             if not matches:
@@ -5782,7 +5806,11 @@ def assert_produces_in_diff(
     for raw in wu.produces:
         entry = str(raw)
         probe = entry.removeprefix("./")
-        if not any(t == probe or fnmatch.fnmatch(t, probe) for t in touched_norm):
+        # Escaped so a literal `[id]` segment beside a wildcard matches here
+        # too -- this half failed for the same reason the presence gate did
+        # (#1589). Literal equality is still tried first.
+        pattern = produces_glob_pattern(probe)
+        if not any(t == probe or fnmatch.fnmatch(t, pattern) for t in touched_norm):
             unmatched.append(entry)
     if unmatched:
         return False, (
