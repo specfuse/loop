@@ -7,6 +7,46 @@ open_questions:
 
 # Gate 4 review — drafted by `G3-PLAN`, 2026-08-11
 
+## Open questions — decided by the AGENT, not the operator (2026-08-11T05:55:32Z)
+
+**The operator was asleep.** Standing authorization of 2026-08-10 to arm gate 3
+unattended, given after being told any operator-owned question would be decided
+by the agent and marked as such. Gate 4 was armed under the same authorization
+and the same caveat. **None of these has been reviewed by the operator.**
+
+- **OQ-1 — confirmed as drafted.** `rules.features.wip_limit` caps how many
+  distinct features one run advances, in `queue:` order, with already-done
+  entries consuming no slot. Verified the claim: the key is validated at
+  `agent_policy.py:383` and read by nothing. The deciding argument against the
+  alternative reading (count open feature PRs) is that `budgets.max_open_prs`
+  already exists and already counts exactly that — making `wip_limit` a second
+  name for it would leave the repo with two keys for one quantity.
+- **OQ-2 — confirmed as drafted.** `rules.features.gate_review: human` escalates
+  an awaiting-review halt as a `gate-review` needs-human issue; `auto` records
+  the halt in the run summary and files nothing. Verified: the dial is validated
+  at `agent_policy.py:376` and read by nothing (every other `gate_review` hit in
+  the tree is `gate_review_filename`, an unrelated helper). Reasoning: the agent
+  cannot arm a gate — arming is `/arm-gate`'s job and requires judgment. If
+  `auto` escalated too, the dial would be inert, which is the outcome to avoid
+  when the whole feature exists to make declared policy real.
+- **OQ-3 — confirmed as drafted, and this is the one to review first.** After
+  T14, a bare `specfuse-agent run` dispatches the loop driver against the
+  `queue:` top unattended, with **no opt-in flag**. This is the largest
+  blast-radius change the feature makes.
+
+  Reasoning for confirming rather than adding a flag: the roadmap goal funds
+  exactly this — *"operator-launched, run-to-drain … pick the highest-value
+  action under policy (bugs preempt per rules; queue top for features)"* — so
+  requiring a flag would contradict the approved goal, not merely narrow it. The
+  blast radius is bounded by machinery already built and tested: the agent lock,
+  the item-boundary caps, and the PAUSE marker.
+
+  **The agent nonetheless recommends the operator review this specific decision
+  before merge.** It is the one call made overnight where the safe option
+  (opt-in) and the funded option (as drafted) diverge, and it was resolved toward
+  the funded one. Reversing it means adding a CLI flag and a consumer-visible
+  surface — T14's criterion 7.
+
 The operator's pre-arm review for the terminal gate of
 `FEAT-2026-0049-specfuse-agent-runner`. Flip each gate-4 WU from `status: draft`
 → `pending` only after answering the three open questions above and checking the

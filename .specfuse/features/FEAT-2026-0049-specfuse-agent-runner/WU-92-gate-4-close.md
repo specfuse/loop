@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0049/G4-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 # AC6 writes CHANGELOG.md — a surface outside this feature's folder, which makes
