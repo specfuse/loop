@@ -63,3 +63,12 @@ Before flipping this gate's WUs to `pending`:
   `open_questions:` list. Under `autonomy_default: auto` that parks the feature
   until it is answered — deliberately: both entries are decisions the operator
   owns, not work the planner deferred.
+
+## Auto-close note
+
+**PASSED — auto-closed** (`evaluate_auto_close`, predicate=v1). The close ceremony **did not run**.
+
+- gate_total_cost: $6.66 of $45.50
+- reasons: [] (auto=True)
+
+The per-criterion deferred-verification list was **not** enumerated. Before treating this gate as fully verified, read `RETROSPECTIVE.md` § "What the loop did NOT verify" and the `specfuse:autoclose-debt` marker it carries.

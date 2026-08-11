@@ -1,5 +1,5 @@
 ---
-id: FEAT-2026-0049/G3-CLOSE
+id: FEAT-2026-0049/G4-CLOSE
 type: close
 status: draft
 attempts: 0
@@ -11,19 +11,23 @@ planned_cost_usd: 5.00
 auto_close_disabled: true
 ---
 
-# G3-CLOSE — terminal close (placeholder)
+# G4-CLOSE — terminal close (placeholder)
 
-**Context.** Gate 3 is the feature's terminal gate, so its closing sequence is a
+**Context.** Gate 4 is the feature's terminal gate, so its closing sequence is a
 single `close` work unit collapsing retrospective, lessons, docs, and the
 feature's terminal verdict into one session.
+
+**Renumbered from `G3-CLOSE` by `G2-PLAN` (2026-08-11)**, when the findings gate
+was inserted ahead of the features gate. Only the gate number this unit names
+changed; every acceptance criterion below is as `G1-PLAN` drafted it.
 
 This file is scaffolded at draft time for one structural reason: the linter
 treats the last non-empty gate as terminal, so without an entry here gate 1 would
 be misread as terminal and its `close-intermediate` → `plan-next` sequence
-rejected. It stays `status: draft` — unarmed — until gate 3 is really drafted.
+rejected. It stays `status: draft` — unarmed — until gate 4 is really drafted.
 
-`G2-PLAN` drafts gate 3's substantive work units above this entry, sets this
-unit's real `depends_on`, and sharpens the criteria below against what gate 3
+`G3-PLAN` drafts gate 4's substantive work units above this entry, sets this
+unit's real `depends_on`, and sharpens the criteria below against what gate 4
 actually built rather than against this draft's guess.
 
 **Acceptance criteria.**
