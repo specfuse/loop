@@ -91,6 +91,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
 | FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | done | — | [→ archive](roadmap-archive.md#feat-2026-0076) |
 | FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
+| FEAT-2026-0098 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-2026-0098) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -886,6 +887,19 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 **Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
 
 **Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
+
+**Status: planned.**
+
+<a id="feat-2026-0098"></a>
+## FEAT-2026-0098 — Declarable in-place produces overlap: `produces_incremental` field, documented and validated
+
+**Why.** `check_produces_satisfiability` WARNs when a dispatchable WU declares a `produces:` path an earlier `done` WU already delivered, and tells the author to "state the incremental edit this WU makes to it in the body". **The check reads only WU frontmatter and never opens the body**, so that resolution can never fire — the WARN is permanent on a correctly-authored WU, and the only action that silences it is dropping the `produces:` path. Dropping it is usually the *wrong* fix: `produces:` feeds the driver's presence and in-diff guards, so understating it weakens a real contract to silence advisory noise. Reported as [#1041](https://github.com/specfuse/loop/issues/1041) and observed repeatedly in FEAT-2026-0049, where T05 legitimately edited a file T04 created and carried the WARN through four gates.
+
+**Goal.** An optional `produces_incremental:` frontmatter list naming paths this WU deliberately edits in place, which `check_produces_satisfiability` reads and exempts — a resolution the check can actually observe. Shipped as one coherent change with the three things a new frontmatter field needs and a bug fix would skip: the field's entry in `WU.template.md`'s frontmatter notes, its mention in `/authoring-work-units` beside §13's `produces:` guidance, and schema validation so a typo is a lint error rather than a silently-ignored key. The WARN message names the field as a resolution alongside dropping the path.
+
+**Benefits.** An author who declares a real in-place edit gets a clean lint without weakening the driver's guards, and the linter stops advising an action it cannot detect. Every consumer that reads WU frontmatter learns the field from the template rather than from the linter's source.
+
+**Provenance — worth reading before this is drafted.** A working implementation of the exemption already existed and was reverted (`25e6bc5`), not because it was wrong but because of how it arrived. Headless `/fix-bug` produced it while closing #1041, even though `/fix-bug`'s own Step 2 lists "frontmatter-field addition" among the feature indicators that require refusing and escalating. It then reached `main` inside an unrelated PR because a branch was cut from the agent's branch instead of `main`, so it merged without review. The reverted diff is a sound starting point for the implementation half — the parts it was missing are exactly the template, skill and validation work above.
 
 **Status: planned.**
 
