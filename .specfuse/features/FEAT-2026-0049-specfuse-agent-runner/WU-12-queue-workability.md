@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0049/T12
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.50
 produces:
   - specfuse/agent/queue_read.py
@@ -10,6 +10,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T06:16:18.283846+00:00
+duration_seconds: 334.365
+cost_usd: 0.721979
+input_tokens: 22
+output_tokens: 8830
 ---
 
 # T12 — the queue-workability classifier and the `rules.features` readers

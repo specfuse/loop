@@ -234,7 +234,7 @@ def _feature_summary(feature_dir: Path) -> FeatureSummary:
     )
 
 
-def _read_features(features_root: Path) -> tuple:
+def read_feature_summaries(features_root: Path) -> tuple:
     """Return `(features, errors)`. A feature folder whose `PLAN.md` cannot
     be parsed lands in `errors` keyed by directory name, never silently
     dropped and never allowed to abort the walk of the other folders —
@@ -251,6 +251,9 @@ def _read_features(features_root: Path) -> tuple:
         except Exception as exc:  # noqa: BLE001 - a malformed folder is a ledger entry
             errors[feature_dir.name] = f"{type(exc).__name__}: {exc}"
     return tuple(features), errors
+
+
+_read_features = read_feature_summaries
 
 
 def gather_snapshot(
