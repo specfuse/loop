@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0049/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 10.00
 produces:
   - specfuse/agent/run.py
   - specfuse/agent/providers/__init__.py
   - tests/test_agent_seam.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-11T02:54:18.895499+00:00
+duration_seconds: 759.407
+cost_usd: 1.547464
+input_tokens: 1856
+output_tokens: 18128
 ---
 
 # T05 — the loop is provider-ready: kind vocabulary, registry, spend ledger

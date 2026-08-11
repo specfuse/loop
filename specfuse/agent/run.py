@@ -47,6 +47,7 @@ from specfuse.agent.budget import (
 from specfuse.agent.state import AgentSnapshot, gather_snapshot
 from specfuse.loop import agent_policy
 from specfuse.loop._filelock import acquire_agent_lock
+from specfuse.loop.escalation import emit_escalation
 
 DEFAULT_SPECFUSE_DIR = Path(".specfuse")
 DEFAULT_AGENT_LOCK_NAME = ".agent.lock"
@@ -56,6 +57,8 @@ STATUS_ESCALATED = "escalated"
 
 KIND_BUG = "bug"
 KIND_FEATURE = "feature"
+KIND_TRIAGE = "triage"
+KIND_ESCALATION_ANSWER = "escalation-answer"
 
 
 class AgentLockHeldError(RuntimeError):
@@ -90,11 +93,35 @@ class ActionItem:
 
 
 @dataclass(frozen=True)
+class EscalationPayload:
+    """The six parts `specfuse.loop.escalation.emit_escalation` requires,
+    supplied by a provider that knows the situation — the loop never
+    composes these itself (see the WU's note on `render_escalation_body`'s
+    two-option minimum)."""
+
+    done_so_far: str
+    issue_summary: str
+    decision_needed: str
+    why_not_auto: str
+    options: Sequence[tuple]
+    recommendation: str
+    category: str = "blocked-wu"
+
+
+@dataclass(frozen=True)
 class ActionOutcome:
-    """What a provider's `execute()` reports for one item."""
+    """What a provider's `execute()` reports for one item.
+
+    `spend` is whatever unit the provider counts as tokens; it defaults to
+    zero so a provider that reports nothing leaves the run's total spend at
+    zero. `escalation`, when set on a `STATUS_ESCALATED` outcome, is filed
+    as a needs-human issue via `emit_escalation`; left `None`, the item is
+    still recorded as escalated but no issue is filed (criterion 9)."""
 
     status: str
     detail: str = ""
+    spend: int = 0
+    escalation: Optional[EscalationPayload] = None
 
 
 class ActionProvider(Protocol):
@@ -134,6 +161,7 @@ class RunSummary:
     items_escalated: int
     stop_reason: str
     elapsed_minutes: float
+    tokens_spent: int = 0
     escalations: tuple = ()
 
 
@@ -190,7 +218,9 @@ def _select_next(
     ranked = []
     unresolved = []
     for provider, item in candidates:
-        if item.kind == KIND_BUG:
+        if item.kind == KIND_ESCALATION_ANSWER:
+            ranked.append(((-1, 0), provider, item))
+        elif item.kind == KIND_BUG:
             tier = 0 if bugs_preempt else 2
             ranked.append(((tier, 0), provider, item))
         elif item.kind == KIND_FEATURE:
@@ -201,6 +231,8 @@ def _select_next(
                 unresolved.append(
                     (provider, item, f"queue_key {item.queue_key!r} is not in policy queue:")
                 )
+        elif item.kind == KIND_TRIAGE:
+            ranked.append(((3, 0), provider, item))
         else:
             unresolved.append((provider, item, f"unknown item kind {item.kind!r}"))
 
@@ -294,10 +326,29 @@ def run_agent(
                 continue
 
             provider.reconcile(item, outcome)
+            budget.record_tokens(outcome.spend)
             if outcome.status == STATUS_COMPLETED:
                 items_completed += 1
             else:
-                escalations.append(Escalation(item_id=item.item_id, reason=outcome.detail))
+                reason = outcome.detail
+                if outcome.escalation is not None:
+                    issue_id = emit_escalation(
+                        item.item_id,
+                        category=outcome.escalation.category,
+                        repo=repo,
+                        done_so_far=outcome.escalation.done_so_far,
+                        issue_summary=outcome.escalation.issue_summary,
+                        decision_needed=outcome.escalation.decision_needed,
+                        why_not_auto=outcome.escalation.why_not_auto,
+                        options=outcome.escalation.options,
+                        recommendation=outcome.escalation.recommendation,
+                        runner=runner,
+                    )
+                    reason = f"{reason} (filed as issue {issue_id})" if reason else f"filed as issue {issue_id}"
+                else:
+                    suffix = "(summary only, no issue filed)"
+                    reason = f"{reason} {suffix}" if reason else f"escalated {suffix}"
+                escalations.append(Escalation(item_id=item.item_id, reason=reason))
 
         return RunSummary(
             items_attempted=budget.items_started,
@@ -305,6 +356,7 @@ def run_agent(
             items_escalated=len(escalations),
             stop_reason=stop_reason,
             elapsed_minutes=budget.elapsed_minutes,
+            tokens_spent=budget.tokens_spent,
             escalations=tuple(escalations),
         )
     finally:
@@ -319,10 +371,26 @@ def _format_summary(summary: RunSummary) -> str:
         f"  items escalated:  {summary.items_escalated}",
         f"  stop reason:      {summary.stop_reason}",
         f"  elapsed minutes:  {summary.elapsed_minutes:.2f}",
+        f"  tokens spent:     {summary.tokens_spent}",
     ]
     for escalation in summary.escalations:
         lines.append(f"    escalated: {escalation.item_id} — {escalation.reason}")
     return "\n".join(lines)
+
+
+def default_providers(
+    *,
+    repo: Optional[str] = None,
+    runner: Callable = _default_runner,
+    policy_path: Optional[str] = None,
+    features_root: Optional[Path] = None,
+) -> Sequence[ActionProvider]:
+    """The registry each gate-2 provider WU (T06-T08) appends itself to.
+
+    Returns `()` in this unit — the seam ships here, the providers ship
+    later. `run_agent`'s own `providers=` default stays `()` too, so tests
+    keep injecting doubles rather than going through this function."""
+    return ()
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -343,14 +411,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
 
+    features_root = Path(args.features_root) if args.features_root else None
     try:
         summary = run_agent(
             repo=args.repo,
             policy_path=args.policy,
-            features_root=Path(args.features_root) if args.features_root else None,
+            features_root=features_root,
             max_minutes=args.max_minutes,
             max_tokens=args.max_tokens,
             max_items=args.max_items,
+            providers=default_providers(
+                repo=args.repo,
+                policy_path=args.policy,
+                features_root=features_root,
+            ),
         )
     except AgentLockHeldError as exc:
         print(str(exc), file=sys.stderr)
