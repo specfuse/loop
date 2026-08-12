@@ -126,14 +126,31 @@ class ActionOutcome:
 
     `spend` is whatever unit the provider counts as tokens; it defaults to
     zero so a provider that reports nothing leaves the run's total spend at
-    zero. `escalation`, when set on a `STATUS_ESCALATED` outcome, is filed
-    as a needs-human issue via `emit_escalation`; left `None`, the item is
-    still recorded as escalated but no issue is filed (criterion 9)."""
+    zero. `escalation`, when set on a `STATUS_ESCALATED` outcome, is
+    recorded — on `target_issue` when the payload names one, otherwise as a
+    fresh needs-human issue via `emit_escalation`."""
 
     status: str
     detail: str = ""
     spend: int = 0
     escalation: Optional[EscalationPayload] = None
+    #: Why this escalation is deliberately recorded nowhere (#1970).
+    #:
+    #: An escalating outcome with neither a payload nor a waiver leaves no
+    #: trace at all: the run summary mentions it and the terminal scrolls.
+    #: Nine such paths shipped across three providers, every one of them by
+    #: omission rather than by decision.
+    #:
+    #: Not every escalation deserves a GitHub record, though. An item that
+    #: vanished from the snapshot between `advertise` and `execute` is a
+    #: benign race with nothing for a human to decide, and filing a
+    #: needs-human issue for it is noise rather than a trace. Such a path
+    #: sets this field to the reason instead, which `tests/
+    #: test_provider_escalation_traces.py` accepts in place of a payload —
+    #: so "we thought about it" is distinguishable from "we forgot", the
+    #: same shape as `NON_JUDGE_MODULES` and
+    #: `DEPENDENCY_MANIFEST_NAMED_UNCOVERED`.
+    escalation_waived: str = ""
 
 
 class ActionProvider(Protocol):
@@ -243,7 +260,10 @@ def _record_escalation(
         # whenever something further down had in fact filed one, and was
         # printed for exactly that case on four items of the first live run.
         # It is now reachable only when nothing recorded anything.
-        suffix = "(not recorded on GitHub — this run's console is the only trace)"
+        if outcome.escalation_waived:
+            suffix = f"(not recorded by design — {outcome.escalation_waived})"
+        else:
+            suffix = "(not recorded on GitHub — this run's console is the only trace)"
         return f"{reason} {suffix}" if reason else f"escalated {suffix}"
 
     assignee = agent_policy.resolve_escalation_assignee(policy_path)

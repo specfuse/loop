@@ -160,7 +160,7 @@ class TestFindingsAutofixProvider(unittest.TestCase):
         self.assertEqual(outcome.status, STATUS_COMPLETED)
         self.assertIsNone(outcome.escalation)
 
-    def test_fire_refused_escalates_with_no_second_label(self):
+    def test_fire_refused_escalates_with_payload_and_one_label(self):
         runner = FakeRunner(comments=[_diagnosis_comment()], session_stdout="refused")
         provider = FindingsAutofixProvider(repo=_REPO, runner=runner)
 
@@ -172,12 +172,18 @@ class TestFindingsAutofixProvider(unittest.TestCase):
             outcome = provider.execute(items[0])
 
         self.assertEqual(outcome.status, STATUS_ESCALATED)
-        self.assertIsNone(outcome.escalation)
+        # Carries a payload since #1970, recorded on the finding's own issue.
+        # It previously carried none, on the reasoning that AUTOFIX_FAILED_LABEL
+        # was already applied -- but a label says WHICH issues failed, never
+        # what was attempted or what the operator's options are, and nothing
+        # assigns it. The label still ships; both are asserted here.
+        self.assertIsNotNone(outcome.escalation)
+        self.assertEqual(outcome.escalation.target_issue, 12)
         label_calls = [c for c in runner.calls if c[:3] == ["gh", "issue", "edit"] and "--add-label" in c]
         self.assertEqual(len(label_calls), 1)
         self.assertIn(AUTOFIX_FAILED_LABEL, label_calls[0])
 
-    def test_fire_could_not_proceed_escalates_with_no_second_label(self):
+    def test_fire_could_not_proceed_escalates_with_payload_and_one_label(self):
         runner = FakeRunner(comments=[_diagnosis_comment()], session_stdout="could_not_proceed")
         provider = FindingsAutofixProvider(repo=_REPO, runner=runner)
 
@@ -189,7 +195,13 @@ class TestFindingsAutofixProvider(unittest.TestCase):
             outcome = provider.execute(items[0])
 
         self.assertEqual(outcome.status, STATUS_ESCALATED)
-        self.assertIsNone(outcome.escalation)
+        # Carries a payload since #1970, recorded on the finding's own issue.
+        # It previously carried none, on the reasoning that AUTOFIX_FAILED_LABEL
+        # was already applied -- but a label says WHICH issues failed, never
+        # what was attempted or what the operator's options are, and nothing
+        # assigns it. The label still ships; both are asserted here.
+        self.assertIsNotNone(outcome.escalation)
+        self.assertEqual(outcome.escalation.target_issue, 13)
         label_calls = [c for c in runner.calls if c[:3] == ["gh", "issue", "edit"] and "--add-label" in c]
         self.assertEqual(len(label_calls), 1)
 

@@ -46,6 +46,7 @@ from specfuse.agent.run import (
     STATUS_ESCALATED,
     ActionItem,
     ActionOutcome,
+    EscalationPayload,
     _default_runner,
 )
 from specfuse.agent.state import AgentSnapshot
@@ -80,6 +81,48 @@ def _already_diagnosed(comments: list) -> bool:
         except DiagnosisParseError:
             continue
     return False
+
+
+def _unparseable_diagnosis_payload(number: int, error: str) -> EscalationPayload:
+    return EscalationPayload(
+        target_issue=number,
+        done_so_far=(
+            f"The agent ran a headless diagnosis session against this finding. "
+            f"The session returned output that could not be parsed as a "
+            f"diagnosis: {error}"
+        ),
+        issue_summary=(
+            f"Finding #{number} could not be diagnosed automatically -- the "
+            f"session's output did not parse."
+        ),
+        decision_needed=(
+            "Whether a human should diagnose this finding by hand, or leave it "
+            "for a later run."
+        ),
+        why_not_auto=(
+            "A diagnosis is only useful if it carries the structured fields "
+            "downstream decisions read. Unparseable output has none of them, "
+            "so nothing can be recorded on the finding."
+        ),
+        options=[
+            (
+                "Diagnose by hand",
+                "unblocks the finding and records a usable root cause",
+                "costs a human's time",
+            ),
+            (
+                "Leave it for a later run",
+                "cheap; a transient session failure may not repeat",
+                "the finding stays undiagnosed and nothing routes it",
+            ),
+        ],
+        recommendation=(
+            "Read the session output before re-running -- output that does not "
+            "parse is usually a prompt or component-context problem that will "
+            "repeat, not a transient failure."
+        ),
+        category="blocked-wu",
+    )
 
 
 class FindingsDiagnoseProvider:
@@ -146,6 +189,10 @@ class FindingsDiagnoseProvider:
             return ActionOutcome(
                 status=STATUS_ESCALATED,
                 detail=f"issue #{number} is no longer available for diagnosis",
+                escalation_waived=(
+                    "the finding left the diagnosable set between the snapshot "
+                    "and this item; nothing for a human to decide"
+                ),
             )
 
         title = row["title"]
@@ -161,6 +208,7 @@ class FindingsDiagnoseProvider:
             return ActionOutcome(
                 status=STATUS_ESCALATED,
                 detail=f"issue #{number}: {exc}",
+                escalation=_unparseable_diagnosis_payload(number, str(exc)),
             )
 
         self._runner(
