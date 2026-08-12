@@ -3561,8 +3561,10 @@ def format_preexisting_gate_failure(
             )
         else:
             lines.append(
-                "Proof the feature's tree matches its integration branch "
-                "(so the failure predates this feature):"
+                "Proof the failing check(s)' input files are unchanged vs "
+                "the integration branch (so the failure predates this "
+                "feature; the diff below is the feature's own plan/scaffold "
+                "files, not code the failing check(s) read):"
             )
         lines.append(diffstat)
     else:
