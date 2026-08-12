@@ -109,9 +109,28 @@ min 0000   max 9301   next FEAT-2026-9302   ~9200 reported gaps
 ```
 
 `FEAT-2026-9301` is an illustration inside `FEAT-2026-0064`'s retrospective;
-`0098`, `0099` and `0000` are likewise examples elsewhere. Sources (a), (b) and
-(d) are safe to count because their patterns are **positional** — a table row, a
-`feature_id:` frontmatter field, an issue/PR reference — rather than free prose.
+`0098`, `0099` and `0000` are likewise examples elsewhere. Sources (a) and (b)
+are safe to count unconditionally because their patterns are **positional** — a
+table row, a `feature_id:` frontmatter field — rather than free prose.
+
+Source (d) is *not* positional in the same sense: it matches `FEAT-<YYYY>-`
+anywhere in an issue/PR title or body, so a body that **quotes** an ID — a bug
+report reproducing this exact contamination (#1872), a paste of `tests/`
+fixture content, a cross-repo citation — is indistinguishable from a genuine
+reservation by pattern alone. Treat a source-(d) hit the same way as source
+(c) whenever its ordinal is implausible: if it exceeds the max already
+established by sources (a) and (b) by more than **500**, it is a contaminant,
+not a reservation — exclude it from the max/gap computation, keep it for the
+collision check, and print:
+
+```
+WARN: FEAT-<YYYY>-<NNNN> (GitHub issue/PR #<n>) excluded from the next-ID
+      max — <NNNN> is implausibly far past the local max of <MMMM>. Likely
+      a quoted example, not a reservation. Verify by hand if unsure.
+```
+
+This mirrors #771's treatment of source (c); #1872 is the same failure mode
+reaching the scan through a different source.
 
 A genuine reservation that exists **only** in a retrospective, with no roadmap
 row, no `PLAN.md`, and no GitHub issue, is caught by the collision check when an
@@ -154,8 +173,9 @@ different repo (cross-repo reservations) are out of scope for the automatic scan
 ### Computing the next ID
 
 1. Collect all `NNNN` ordinals for the current year from the **authoritative**
-   sources — (a), (b), and (d) when GitHub was reachable. Source (c) is
-   advisory and is excluded here; see its section above.
+   sources — (a), (b), and (d) when GitHub was reachable, subject to the
+   plausibility bound in source (d)'s section above. Source (c) is advisory
+   and is excluded here; see its section above.
 2. If none found: next ordinal is `0001`.
 3. Otherwise: next ordinal is `max(ordinals) + 1`.
 4. **Gap report — informational, NOT a stop.** Compute the missing ordinals
