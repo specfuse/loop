@@ -182,9 +182,9 @@ class TestShapePredicateInIsolation(unittest.TestCase):
 class TestJudgePathsTouched(unittest.TestCase):
     def test_names_every_matching_path_once(self):
         hits = judge_paths_touched(
-            ["specfuse/loop/a.py", "specfuse/loop/b.py", "tests/test_a.py"]
+            ["specfuse/loop/loop.py", "specfuse/loop/gate_eval.py", "tests/test_a.py"]
         )
-        self.assertEqual(hits, ["specfuse/loop/a.py", "specfuse/loop/b.py"])
+        self.assertEqual(hits, ["specfuse/loop/loop.py", "specfuse/loop/gate_eval.py"])
 
     def test_exact_file_entries_match_only_exactly(self):
         self.assertEqual(judge_paths_touched(["pyproject.toml"]), ["pyproject.toml"])
@@ -192,6 +192,10 @@ class TestJudgePathsTouched(unittest.TestCase):
 
     def test_no_judge_path_returns_empty(self):
         self.assertEqual(judge_paths_touched(["tests/test_a.py"]), [])
+
+    def test_a_loop_module_that_decides_nothing_is_not_a_judge_path(self):
+        """`specfuse/loop/` stopped being a blanket prefix (#1938)."""
+        self.assertEqual(judge_paths_touched(["specfuse/loop/notify.py"]), [])
 
 
 if __name__ == "__main__":
