@@ -305,7 +305,10 @@ def add_guardrail_label(
         return True
 
     try:
-        provision_labels(target, runner=runner)
+        # `repo=` is load-bearing (#2081): without it `provision_labels` calls
+        # the runner with `cwd=`, which this module's runner does not accept,
+        # so the whole on-demand path died on a TypeError it then swallowed.
+        provision_labels(target, runner=runner, repo=repo)
     except Exception:  # noqa: BLE001 - best-effort by contract; never fatal here
         return False
 

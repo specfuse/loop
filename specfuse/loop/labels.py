@@ -193,8 +193,31 @@ def provision_labels(
     target: str | Path,
     *,
     runner: Optional[Callable] = None,
+    repo: Optional[str] = None,
 ) -> ProvisionReport:
     """Create every LABEL_REGISTRY label the repo at ``target`` is missing.
+
+    *repo* (``OWNER/NAME``) selects the repository with ``--repo`` instead of
+    inferring it from *target* as the working directory. **Pass it whenever
+    you inject a runner** (#2081).
+
+    This module's own default runner takes ``cwd``; every other runner in the
+    codebase is ``(argv, check)`` -- `agent.run`, `escalation`, `gh_backend`
+    all use that shape, and `labels` is the sole outlier. So injecting any of
+    them raised ``TypeError: got an unexpected keyword argument 'cwd'`` on the
+    very first ``gh`` call, which this function then caught into
+    ``ProvisionReport.reason`` and returned as ``skipped``.
+
+    That is not theoretical. `bug_lane_run.add_guardrail_label` has injected
+    the lane's runner since #1785 added on-demand provisioning, so **the
+    on-demand path has never once created a label** -- the seven
+    ``bug-lane:*`` entries were registered by FEAT-2026-0048 and no repository
+    has them, while every label `scaffold.py` provisions (it passes no runner,
+    so it gets the compatible default) exists.
+
+    With *repo* set, no ``cwd`` is passed and the runner is called as
+    ``runner(argv, check=False)``, which every caller in the codebase
+    satisfies.
 
     Best-effort and idempotent: lists existing labels first and creates only
     what is missing, never overwriting so an operator's edited colour or
@@ -205,11 +228,15 @@ def provision_labels(
     runner = runner if runner is not None else _default_runner
     report = ProvisionReport()
 
+    def _invoke(argv: list):
+        """Call *runner* with the contract its caller actually implements."""
+        if repo is not None:
+            return runner(argv + ["--repo", repo], check=False)
+        return runner(argv, cwd=target, check=False)
+
     try:
-        listed = runner(
-            ["gh", "label", "list", "--json", "name,color,description", "--limit", "1000"],
-            cwd=target,
-            check=False,
+        listed = _invoke(
+            ["gh", "label", "list", "--json", "name,color,description", "--limit", "1000"]
         )
     except FileNotFoundError:
         report.skipped = True
@@ -239,14 +266,12 @@ def provision_labels(
             report.already_present.append(spec.name)
             continue
         try:
-            created = runner(
+            created = _invoke(
                 [
                     "gh", "label", "create", spec.name,
                     "--color", spec.colour,
                     "--description", spec.description,
-                ],
-                cwd=target,
-                check=False,
+                ]
             )
         except Exception:  # noqa: BLE001 - keep provisioning remaining labels
             report.failed.append(spec.name)

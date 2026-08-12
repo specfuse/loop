@@ -240,8 +240,25 @@ def _declined_payload(
     pr_number: Optional[int],
     reason: str,
     evidence: Sequence[str] = (),
+    label_written: bool = True,
 ) -> EscalationPayload:
     ref = _pr_ref(pr_number)
+    # The declining reason is also written to the PR as a label, which is the
+    # only thing making declined PRs findable (`gh pr list --label
+    # bug-lane:<reason>`). That write can fail, and until #2081 the failure
+    # was computed, returned as `label_written=False`, and read by nobody --
+    # so a filter that silently returns nothing looked like "no PR was ever
+    # declined for this reason". Say it where the decline is read.
+    label_note = (
+        ""
+        if label_written
+        else (
+            " The declining reason could NOT be written to the PR as a label, "
+            "so this PR will not appear under `gh pr list --label "
+            "bug-lane:...`. The verdict above is the record; the label is only "
+            "a projection of it."
+        )
+    )
     return EscalationPayload(
         target_issue=issue_number,
         done_so_far=(
@@ -250,7 +267,7 @@ def _declined_payload(
         ),
         issue_summary=(
             f"{ref} fixes this issue but was declined by the merge "
-            f"guardrails -- `{reason}`.{_evidence_block(evidence)}"
+            f"guardrails -- `{reason}`.{_evidence_block(evidence)}{label_note}"
         ),
         decision_needed=f"Whether a human should review and merge {ref} by hand.",
         why_not_auto=(
@@ -350,7 +367,11 @@ class BugsProvider:
         else:
             assert result.outcome == OUTCOME_DECLINED
             escalation = _declined_payload(
-                issue_number, result.pr_number, detail, result.evidence
+                issue_number,
+                result.pr_number,
+                detail,
+                result.evidence,
+                label_written=result.label_written,
             )
 
         return ActionOutcome(status=STATUS_ESCALATED, detail=detail, escalation=escalation)
