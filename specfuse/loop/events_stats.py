@@ -251,6 +251,9 @@ def render(stats: dict, min_fires: int = 1) -> str:
 def main() -> int:
     import argparse
 
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
+
     parser = argparse.ArgumentParser(
         description="Aggregate cost and outcomes from events.jsonl. Read-only.",
         usage="events_stats.py [--roots DIR ...] [--json] [--min-fires N]",

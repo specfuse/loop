@@ -1558,6 +1558,9 @@ def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
 
 def main() -> int:
     import argparse
+
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
     parser = argparse.ArgumentParser(
         description="Specfuse plan linter.",
         usage="lint_plan.py <feature_dir> [--just-closed-gate N] [--closing]",

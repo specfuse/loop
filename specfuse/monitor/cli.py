@@ -558,6 +558,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command != "run":

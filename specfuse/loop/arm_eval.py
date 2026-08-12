@@ -133,6 +133,8 @@ NON_JUDGE_MODULES = {
     "__init__.py": "package marker; no logic",
     "_filelock.py": "advisory lock primitive; grants no verdict",
     "adopt_feature.py": "scaffolds a feature folder from a GitHub issue",
+    "build_provenance.py": "warns when the running build is not the working "
+        "tree's; prints a diagnostic and changes no verdict",
     "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
     "driver_edit.py": "applies operator edits to a feature folder",
     "escalation.py": "renders and files needs-human records after a halt",
