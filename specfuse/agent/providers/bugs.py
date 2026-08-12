@@ -79,6 +79,72 @@ def _evidence_block(evidence: Sequence[str]) -> str:
     return " " + " ".join(evidence)
 
 
+def _abandoned_work_payload(
+    issue_number: int, outcome: str, branch: str, commits: int
+) -> EscalationPayload:
+    """The stop left committed work behind. Say so, first and loudest.
+
+    `refused` / `could_not_proceed` is accurate for the step the session
+    reached and says nothing about what it finished before reaching it. Issue
+    #1859's session wrote a skill fix, a new test file and a CHANGELOG entry,
+    committed all of it, then stopped -- and the escalation offered "fix it by
+    hand", "promote to a feature" and "close the issue", none of which was
+    "push the branch that already exists". The work was invisible until
+    someone went looking by hand.
+    """
+    plural = "commit" if commits == 1 else "commits"
+    return EscalationPayload(
+        target_issue=issue_number,
+        done_so_far=(
+            f"Headless `/fix-bug` ran against this issue and reported "
+            f"`{outcome}` -- but it had already committed work first. Branch "
+            f"`{branch}` carries {commits} {plural} that no remote has. The "
+            f"most likely reading is that the fix itself completed and the "
+            f"push or the PR open is what failed."
+        ),
+        issue_summary=(
+            f"The bug lane stopped on this issue (`{outcome}`), leaving "
+            f"{commits} committed {plural} on the local branch `{branch}` "
+            f"that was never pushed."
+        ),
+        decision_needed=(
+            "Whether that branch is worth pushing and reviewing, or should be "
+            "discarded and the issue fixed another way."
+        ),
+        why_not_auto=(
+            "The lane merges only what reaches a pull request, and this work "
+            "never got that far. It is not lost -- it is on the branch named "
+            "above, on the machine that ran the agent, and nothing else "
+            "references it."
+        ),
+        options=[
+            (
+                f"Review `{branch}`, then push it and open a PR",
+                "recovers work that is already done and may be complete",
+                "needs a human to confirm the work is sound first",
+            ),
+            (
+                "Discard the branch and fix the issue by hand",
+                "right call if the committed work is wrong or half-finished",
+                "throws away whatever was already correct",
+            ),
+            (
+                "Leave the branch and re-run the lane later",
+                "cheap",
+                "the branch is local only, so a fresh clone or a wiped "
+                "machine loses it silently",
+            ),
+        ],
+        recommendation=(
+            f"Look at `{branch}` before deciding anything else. Run the "
+            f"project's gates against it -- if they pass, this is a push away "
+            f"from being a reviewable PR, and the outcome constant above is "
+            f"describing the push step rather than the fix."
+        ),
+        category="blocked-wu",
+    )
+
+
 def _fix_bug_stopped_payload(issue_number: int, outcome: str) -> EscalationPayload:
     return EscalationPayload(
         target_issue=issue_number,
@@ -271,7 +337,14 @@ class BugsProvider:
         detail = result.reason if result.reason is not None else result.outcome
 
         if result.outcome in _FIX_BUG_STOPPED_OUTCOMES:
-            escalation = _fix_bug_stopped_payload(issue_number, result.outcome)
+            if result.unpushed_work:
+                branch, commits = result.unpushed_work
+                escalation = _abandoned_work_payload(
+                    issue_number, result.outcome, branch, commits
+                )
+                detail = f"{detail} — {commits} committed on `{branch}`, unpushed"
+            else:
+                escalation = _fix_bug_stopped_payload(issue_number, result.outcome)
         elif result.outcome == OUTCOME_AUTOMERGE_OFF:
             escalation = _automerge_off_payload(issue_number, result.pr_number)
         else:
