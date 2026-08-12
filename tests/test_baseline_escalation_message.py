@@ -314,6 +314,27 @@ class TestResumedGateAttribution(unittest.TestCase):
             1, self._FAILING, {}, done_unit_ids=[])
         self.assertIn("before this feature touched any file", msg)
 
+    def test_fresh_gate_diffstat_header_does_not_overstate_a_matching_tree(self):
+        """Issue #240: a fresh gate almost always has a non-empty diffstat --
+        the feature's own plan/scaffold files -- so a header claiming "the
+        feature's tree matches its integration branch" is self-refuting the
+        moment the diffstat below it lists changed files."""
+        with integration_workspace() as root:
+            os.chdir(root)
+            subprocess.run(["git", "-C", str(root), "checkout", "-q",
+                            "-b", "feat/some-feature"], check=True)
+            (root / "PLAN.md").write_text("plan scaffold\n")
+            subprocess.run(["git", "-C", str(root), "add", "PLAN.md"], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m",
+                            "feat: scaffold plan"], check=True)
+            msg = loop.format_preexisting_gate_failure(1, self._FAILING, {})
+
+        self.assertNotIn(
+            "Proof the feature's tree matches its integration branch", msg,
+            "the diffstat below the header lists PLAN.md as changed -- "
+            "claiming the tree 'matches' the integration branch while "
+            "showing it doesn't is the contradiction issue #240 reports")
+
     def test_resumed_gate_never_calls_its_diff_proof_of_a_matching_tree(self):
         with integration_workspace() as root:
             os.chdir(root)
