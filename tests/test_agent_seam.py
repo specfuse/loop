@@ -250,14 +250,23 @@ class TestEscalationEmission(unittest.TestCase):
         self.assertEqual(gh_runner.create_calls, 1)  # unchanged: found, not re-created
         self.assertIn("filed as issue 42", summary2.escalations[0].reason)
 
-    def test_escalated_outcome_without_payload_is_summary_only(self):
+    def test_escalated_outcome_without_payload_says_nothing_was_recorded(self):
+        """No payload means no trace anywhere, and the line must say only that.
+
+        It used to read "(summary only, no issue filed)" -- an assertion about
+        GitHub that was false whenever something further down had filed one.
+        On the first live run it was printed for four items whose escalations
+        had in fact been filed (issues #1873, #1878, #1879, #1880).
+        """
         gh_runner = _EscalationGHRunner()
         provider = _escalating_provider("bug-2", None)
 
         summary = _run((provider,), runner=gh_runner)
 
         self.assertEqual(gh_runner.create_calls, 0)
-        self.assertIn("summary only, no issue filed", summary.escalations[0].reason)
+        reason = summary.escalations[0].reason
+        self.assertIn("not recorded on GitHub", reason)
+        self.assertNotIn("no issue filed", reason)
 
 
 if __name__ == "__main__":

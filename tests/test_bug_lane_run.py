@@ -21,6 +21,7 @@ from specfuse.loop.bug_lane import (
 )
 from specfuse.loop.bug_lane_run import (
     CORRELATION_ID,
+    OUTCOME_AUTOMERGE_OFF,
     OUTCOME_COULD_NOT_PROCEED,
     OUTCOME_DECLINED,
     OUTCOME_MERGED,
@@ -153,7 +154,12 @@ class TestRunBugLane(unittest.TestCase):
         runner = _StubRunner()
         result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
 
-        self.assertEqual(result.outcome, OUTCOME_DECLINED)
+        # `automerge_off`, NOT `declined`: every guardrail passed and the dial
+        # is the only thing in the way. Reporting this as a decline produced
+        # the self-contradicting escalation seen live on issue #296 --
+        # "declined by the merge guardrails -- `eligible`".
+        self.assertEqual(result.outcome, OUTCOME_AUTOMERGE_OFF)
+        self.assertEqual(result.reason, REASON_ELIGIBLE)
         self.assertEqual(runner.calls_matching(["gh", "pr", "merge"]), [])
 
     def test_dial_off_all_guardrails_satisfied_still_no_merge(self):
@@ -361,37 +367,29 @@ class TestRunBugLane(unittest.TestCase):
 
     # -- Criterion 8/9: refused / could_not_proceed escalate at both dials ---
 
-    def test_refused_escalates_at_dial_on(self):
-        runner = _StubRunner(fix_bug_stdout="refused")
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
+    def test_refused_reports_the_outcome_and_files_nothing(self):
+        """The lane records nothing for a human -- that belongs to the caller.
 
-        self.assertEqual(result.outcome, OUTCOME_REFUSED)
-        create_calls = runner.calls_matching(["gh", "issue", "create"])
-        self.assertEqual(len(create_calls), 1)
-        self.assertIn(CORRELATION_ID, " ".join(create_calls[0]))
+        It used to file its own tracking issue here. One halt then produced a
+        second issue the reader had to correlate back to the bug by hand, and
+        a halt that recurred produced another each run: issue #1183 was
+        refused on three runs and left three tracking issues.
+        """
+        for policy in (_AGENT_POLICY_ON, _AGENT_POLICY_OFF):
+            runner = _StubRunner(fix_bug_stdout="refused")
+            result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(policy))
 
-    def test_refused_escalates_at_dial_off(self):
-        runner = _StubRunner(fix_bug_stdout="refused")
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_OFF))
+            self.assertEqual(result.outcome, OUTCOME_REFUSED)
+            self.assertEqual(runner.calls_matching(["gh", "issue", "create"]), [])
+            self.assertEqual(runner.calls_matching(["gh", "issue", "comment"]), [])
 
-        self.assertEqual(result.outcome, OUTCOME_REFUSED)
-        create_calls = runner.calls_matching(["gh", "issue", "create"])
-        self.assertEqual(len(create_calls), 1)
-
-    def test_could_not_proceed_escalates_at_both_dials(self):
+    def test_could_not_proceed_reports_the_outcome_and_files_nothing(self):
         for policy in (_AGENT_POLICY_ON, _AGENT_POLICY_OFF):
             runner = _StubRunner(fix_bug_stdout="could_not_proceed")
             result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(policy))
 
             self.assertEqual(result.outcome, OUTCOME_COULD_NOT_PROCEED)
-            self.assertEqual(len(runner.calls_matching(["gh", "issue", "create"])), 1)
-
-    def test_escalation_idempotent_across_repeated_runs(self):
-        runner = _StubRunner(fix_bug_stdout="refused", existing_escalation_issue=123)
-        run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
-
-        create_calls = runner.calls_matching(["gh", "issue", "create"])
-        self.assertEqual(create_calls, [])
+            self.assertEqual(runner.calls_matching(["gh", "issue", "create"]), [])
 
     def test_refused_never_merges_or_finds_pr(self):
         runner = _StubRunner(fix_bug_stdout="refused")
