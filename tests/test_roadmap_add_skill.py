@@ -103,9 +103,49 @@ def scan_feat_ids(
 # reported ~9200 phantom gaps. See #771.
 _AUTHORITATIVE_SOURCES = frozenset({"a", "b", "d"})
 
+# Source (d) matches "FEAT-<YYYY>-<NNNN>" anywhere in an issue/PR title or
+# body -- free text, same as source (c) -- so a body that QUOTES a fixture ID
+# (a bug report reproducing this exact contamination, a paste of tests/
+# content, a cross-repo citation) is indistinguishable from a real
+# reservation by pattern alone. An ordinal that jumps this far past the
+# structurally-known max (sources a+b, which are positional and cannot be
+# contaminated by prose) is treated as a contaminant, not a reservation: it
+# is excluded from the max/gap computation but stays collision-visible. See
+# #1872 (previously #771 for source (c)).
+_PLAUSIBLE_GITHUB_MARGIN = 500
+
+
+def _structural_max(year: int, sources: dict) -> int | None:
+    """Max ordinal from sources (a) and (b) only -- immune to prose contamination."""
+    ordinals = [
+        int(fid.split("-")[2])
+        for fid, meta in sources.items()
+        if fid.startswith(f"FEAT-{year}-") and len(meta) > 2 and meta[2] in ("a", "b")
+    ]
+    return max(ordinals) if ordinals else None
+
+
+def implausible_github_reservations(year: int, sources: dict) -> list[str]:
+    """Source-(d) FEAT IDs excluded from the max as an implausible jump.
+
+    Surfaced so the skill can print a WARN naming the excluded ID and its
+    GitHub reference, rather than silently dropping it (#1872).
+    """
+    structural_max = _structural_max(year, sources)
+    if structural_max is None:
+        return []
+    out = []
+    for fid, meta in sources.items():
+        if not fid.startswith(f"FEAT-{year}-") or len(meta) <= 2 or meta[2] != "d":
+            continue
+        if int(fid.split("-")[2]) > structural_max + _PLAUSIBLE_GITHUB_MARGIN:
+            out.append(fid)
+    return sorted(out)
+
 
 def _year_ordinals(year: int, sources: dict, authoritative_only: bool = True) -> list[int]:
     year_str = str(year)
+    structural_max = _structural_max(year, sources) if authoritative_only else None
     out = []
     for fid, meta in sources.items():
         if not fid.startswith(f"FEAT-{year_str}-"):
@@ -113,7 +153,15 @@ def _year_ordinals(year: int, sources: dict, authoritative_only: bool = True) ->
         source = meta[2] if len(meta) > 2 else "a"
         if authoritative_only and source not in _AUTHORITATIVE_SOURCES:
             continue
-        out.append(int(fid.split("-")[2]))
+        ordinal = int(fid.split("-")[2])
+        if (
+            authoritative_only
+            and source == "d"
+            and structural_max is not None
+            and ordinal > structural_max + _PLAUSIBLE_GITHUB_MARGIN
+        ):
+            continue
+        out.append(ordinal)
     return sorted(out)
 
 
@@ -686,6 +734,47 @@ class TestNextFeatId(unittest.TestCase):
         # Reusing one of the exposed ordinals by hand is still refused.
         with self.assertRaises(ValueError):
             assert_requested_id_is_not_a_gap("FEAT-2026-0013", 2026, sources)
+
+    def test_github_body_quoting_a_fixture_id_does_not_explode_the_max(self):
+        """#1872: a GitHub issue body quoting a fixture-shaped FEAT ID (e.g. a
+        bug report reproducing test-fixture contamination, or an issue that
+        pastes a snippet from tests/) is not a reservation. Source (d)'s
+        title/body pattern match cannot tell the two apart, so an ordinal
+        that jumps far past the locally-known max must be excluded from the
+        max/gap computation -- same treatment #771 gave source (c).
+
+        On the real repo this pattern produced ``next id: FEAT-2026-9302``
+        against a true max of 0097.
+        """
+        gh = {
+            "FEAT-2026-9999": "GitHub issue #1872",
+            "FEAT-2026-7777": "GitHub issue #1872",
+            "FEAT-2026-9301": "GitHub issue #1872",
+        }
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
+        )
+        # local max (roadmap/plan/learnings) tops out at 0010
+        feat_id, ordinal = next_feat_id(2026, sources)
+        self.assertEqual(feat_id, "FEAT-2026-0011")
+        self.assertEqual(ordinal, 11)
+        # excluded, but still surfaced so the operator can see what was dropped
+        self.assertEqual(
+            implausible_github_reservations(2026, sources),
+            ["FEAT-2026-7777", "FEAT-2026-9301", "FEAT-2026-9999"],
+        )
+
+    def test_implausible_github_id_still_collides(self):
+        """Excluded from the max, but a real duplicate must still be caught --
+        the bound only protects the max/gap computation, never the collision
+        check (#1872, mirroring #771's treatment of source (c))."""
+        gh = {"FEAT-2026-9999": "GitHub issue #1872"}
+        sources = scan_feat_ids(
+            self.roadmap, self.features_dir, [self.learnings], github_reserved=gh
+        )
+        collides, filepath, _ = check_collision("FEAT-2026-9999", sources)
+        self.assertTrue(collides)
+        self.assertIn("1872", filepath)
 
 
 class TestCollisionRejection(unittest.TestCase):
