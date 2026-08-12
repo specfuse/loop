@@ -306,6 +306,8 @@ def _select_next(
     snapshot: AgentSnapshot,
     bugs_preempt: bool,
     handled_ids: set,
+    disabled: Optional[set] = None,
+    on_advertise_error: Optional[Callable[[object, Exception], None]] = None,
 ):
     """Return `("execute", provider, item)`, `("escalate", item, reason)`,
     or `("drained", None, None)`.
@@ -318,10 +320,35 @@ def _select_next(
     `kind`) is escalated rather than guessed — one per call, so the caller's
     loop re-evaluates after each escalation instead of guessing an order
     among several unresolvable items too.
+
+    **A provider that raises in `advertise()` loses itself, not the run.**
+    This loop was unguarded, so one raising provider ended the whole run and
+    took every healthy provider's work with it — observed as #1746, where
+    `FeatureProvider.advertise` raised `AttributeError` on the default
+    invocation and every shipped behaviour of the command became reachable
+    only by passing `--features-root` explicitly. That fix normalised the one
+    cause; the structural gap stayed, and there are six providers now.
+
+    A provider that raises is added to *disabled* and skipped for the rest of
+    the run, with *on_advertise_error* called once for it. Excluding it
+    rather than retrying each iteration is deliberate: `advertise` runs every
+    loop pass, so a permanently-broken provider would otherwise report on
+    every one, and a run whose log is mostly one repeated traceback is no
+    more readable than the crash it replaced.
     """
+    disabled = disabled if disabled is not None else set()
     candidates = []
     for provider in providers:
-        for item in provider.advertise(snapshot):
+        if id(provider) in disabled:
+            continue
+        try:
+            advertised = tuple(provider.advertise(snapshot))
+        except Exception as exc:  # noqa: BLE001 - one provider must not end the run
+            disabled.add(id(provider))
+            if on_advertise_error is not None:
+                on_advertise_error(provider, exc)
+            continue
+        for item in advertised:
             if item.item_id in handled_ids:
                 continue
             candidates.append((provider, item))
@@ -425,7 +452,18 @@ def run_agent(
         items_completed = 0
         escalations = []
         handled_ids = set()
+        disabled_providers: set = set()
         stop_reason = STOP_DRAINED
+
+        def _provider_failed_to_advertise(provider, exc) -> None:
+            """Record a provider dropping out — once, by name, in the summary."""
+            name = type(provider).__name__
+            reason = (
+                f"{type(exc).__name__}: {exc} — provider disabled for the rest "
+                f"of this run; its work is not being picked up"
+            )
+            escalations.append(Escalation(item_id=f"provider:{name}", reason=reason))
+            report(f"{name} failed to advertise — {reason}")
 
         while True:
             if budget.pause_requested():
@@ -435,7 +473,14 @@ def run_agent(
                 stop_reason = STOP_CAP
                 break
 
-            action, a, b = _select_next(providers, snapshot, bugs_preempt, handled_ids)
+            action, a, b = _select_next(
+                providers,
+                snapshot,
+                bugs_preempt,
+                handled_ids,
+                disabled=disabled_providers,
+                on_advertise_error=_provider_failed_to_advertise,
+            )
 
             if action == "drained":
                 stop_reason = STOP_DRAINED
@@ -472,7 +517,18 @@ def run_agent(
                 )
                 continue
 
-            provider.reconcile(item, outcome)
+            try:
+                provider.reconcile(item, outcome)
+            except Exception as exc:  # noqa: BLE001 - the outcome is already decided
+                # `reconcile` is post-hoc bookkeeping. The item ran, the
+                # outcome exists, and any escalation it carries still needs
+                # recording — losing all of that because a provider's
+                # bookkeeping raised would discard real work, so this is
+                # reported and stepped over rather than allowed to end the run.
+                report(
+                    f"{item.item_id}: reconcile raised — {type(exc).__name__}: {exc} "
+                    f"(the item's own outcome still stands)"
+                )
             budget.record_tokens(outcome.spend)
             if outcome.status == STATUS_COMPLETED:
                 items_completed += 1
