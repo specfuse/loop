@@ -62,6 +62,7 @@ def _make_repo(root: Path) -> None:
     subprocess.run(["git", "init", "-q", str(root)], check=True)
     _git(root, "config", "user.email", "test@example.com")
     _git(root, "config", "user.name", "Test")
+    _git(root, "config", "commit.gpgsign", "false")
     specfuse = root / ".specfuse"
     specfuse.mkdir()
     (specfuse / "VERSION").write_text("0.3.0\n", encoding="utf-8")
