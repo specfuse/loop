@@ -21,12 +21,17 @@ slot to be told that is not selection.
 alone:
 
     FIRE / completed              -> completed
-    FIRE / refused|could_not_proceed -> escalated, no escalation payload
-                                        (run_autofix already applied
-                                        AUTOFIX_FAILED_LABEL)
+    FIRE / refused|could_not_proceed -> escalated, with an escalation payload
+                                        recorded on the finding's own issue
     ROUTE_TO_HUMAN                -> escalated, with an escalation payload
     DECLINE                       -> completed (the predicate working, not
                                       a failure to report)
+
+The failing-FIRE path carried no payload until #1970, on the reasoning that
+`run_autofix` had already applied `AUTOFIX_FAILED_LABEL`. A label is a
+filter, not a record: it says which issues failed, never what was attempted,
+why it stopped, or what the operator's options are -- and nothing assigns it
+to anyone. The label still ships; the payload is what makes the halt readable.
 
 `ActionOutcome.detail` always carries `decide`'s own `reason` string. This
 provider performs no git mutation of its own -- it invokes through
@@ -91,6 +96,51 @@ def _known_components(monitoring_config: Any) -> set:
     if not isinstance(components, list):
         return set()
     return {entry.get("name") for entry in components if isinstance(entry, dict)}
+
+
+def _autofix_failed_payload(number: int, reason: str) -> EscalationPayload:
+    return EscalationPayload(
+        target_issue=number,
+        done_so_far=(
+            f"The autofix guardrails fired for this finding and the fix was "
+            f"attempted. It did not complete: {reason}"
+        ),
+        issue_summary=(
+            f"Finding #{number}'s autofix was attempted and did not complete "
+            f"-- `{reason}`."
+        ),
+        decision_needed=(
+            "Whether a human should fix this finding directly, or take it out "
+            "of the autofix lane."
+        ),
+        why_not_auto=(
+            "The guardrails judged this finding eligible to fix, so the "
+            "attempt was made; the attempt itself is what failed. Re-running "
+            "unchanged reaches the same guardrail verdict and the same attempt."
+        ),
+        options=[
+            (
+                "Fix the finding by hand",
+                "unblocks it directly, and the failed attempt narrows where to look",
+                "costs a human's time",
+            ),
+            (
+                "Take it out of the autofix lane",
+                "right call if this finding is not the shape autofix handles",
+                "the finding needs another route or it stays open",
+            ),
+            (
+                "Leave it and re-run later",
+                "cheap if the failure was environmental",
+                "a non-environmental failure repeats at the same cost",
+            ),
+        ],
+        recommendation=(
+            "Read the attempt's own output first -- an autofix that fires and "
+            "then fails is more often a scoping problem than a transient one."
+        ),
+        category="blocked-wu",
+    )
 
 
 class FindingsAutofixProvider:
@@ -159,6 +209,10 @@ class FindingsAutofixProvider:
             return ActionOutcome(
                 status=STATUS_ESCALATED,
                 detail=f"issue #{number} is no longer available for autofix",
+                escalation_waived=(
+                    "the finding left the autofixable set between the snapshot "
+                    "and this item; nothing for a human to decide"
+                ),
             )
 
         number = row["number"]
@@ -178,12 +232,13 @@ class FindingsAutofixProvider:
                 return ActionOutcome(
                     status=STATUS_ESCALATED,
                     detail=result.reason,
-                    escalation=None,
+                    escalation=_autofix_failed_payload(number, result.reason),
                 )
             return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason)
 
         if result.decision == ROUTE_TO_HUMAN:
             escalation = EscalationPayload(
+                target_issue=number,
                 done_so_far=(
                     f"Finding issue #{number} was diagnosed and evaluated by "
                     "the autofix predicate."
