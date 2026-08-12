@@ -66,6 +66,7 @@ __all__ = (
     "pr_ci_conclusion",
     "add_guardrail_label",
     "pr_closes_issue",
+    "unpushed_work_for_issue",
 )
 
 # This WU's own correlation ID. Retained as the lane's public identity (it is
@@ -130,6 +131,12 @@ class BugLaneResult:
     #: computed, which is the whole content of every escalation the first
     #: unattended run produced.
     evidence: tuple = ()
+    #: `(branch, commit_count)` when a stopped run left committed work behind
+    #: that no remote has. `None` when the stop really did leave nothing --
+    #: the two are not distinguishable from the outcome constant alone, and
+    #: telling them apart is the difference between "fix this by hand" and
+    #: "push the branch that already exists".
+    unpushed_work: Optional[tuple] = None
 
 
 #: How long to wait for a freshly-opened PR's checks to reach a conclusion,
@@ -435,6 +442,60 @@ def _issue_provenance(runner: Callable, repo: str, issue_number: int) -> Optiona
     return {"kind": "triaged_issue", "ref": str(issue_number)}
 
 
+#: Branch shape `/fix-bug` uses for an issue it is fixing.
+_WORK_BRANCH_GLOB = "fix/issue-{number}-*"
+
+
+def unpushed_work_for_issue(runner: Callable, issue_number: int) -> Optional[tuple]:
+    """Return `(branch, commit_count)` for committed-but-unpushed work, else None.
+
+    A `refused` / `could_not_proceed` outcome is not proof that nothing
+    happened. Observed live on issue #1859: the session did the whole job --
+    a skill fix, a new test file, a CHANGELOG entry, 143 insertions across 4
+    files -- committed it as "Closes #1859", and then stopped. Most likely it
+    failed at the push or the PR open; the outcome is accurate for the step it
+    reached and says nothing about the finished work sitting on disk.
+
+    The escalation the operator got offered three options -- fix by hand,
+    promote to a feature, close the issue -- and none of them was "push the
+    branch that already exists". Twenty minutes of green, tested work was
+    invisible until someone went looking for it by hand.
+
+    Read-only: `git branch --list` and `git log`, no mutation. `--not
+    --remotes` is the whole predicate -- commits reachable from the branch and
+    from no remote ref are exactly the ones nobody but this machine can see,
+    which is base-branch-agnostic and stays correct if the work was partially
+    pushed.
+    """
+    try:
+        listed = runner(
+            ["git", "branch", "--list",
+             _WORK_BRANCH_GLOB.format(number=issue_number),
+             "--format=%(refname:short)"],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a reporting aid must never break the lane
+        return None
+    if getattr(listed, "returncode", 1) != 0:
+        return None
+
+    for branch in (getattr(listed, "stdout", "") or "").split():
+        try:
+            log = runner(
+                ["git", "log", branch, "--not", "--remotes", "--format=%H"],
+                check=False,
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        if getattr(log, "returncode", 1) != 0:
+            continue
+        commits = [line for line in (getattr(log, "stdout", "") or "").split() if line]
+        if commits:
+            return (branch, len(commits))
+    return None
+
+
+
 def _evidence_for(
     reason: str, changed_files: list, diff_lines: int, limits: dict
 ) -> tuple:
@@ -524,7 +585,12 @@ def run_bug_lane(
         # a third and a fourth (issue #1183, three runs, three issues). The
         # caller records the halt on the bug's own issue instead, through the
         # single escalation owner in `specfuse.agent.run`.
-        return BugLaneResult(outcome=outcome, reason=None, pr_number=None)
+        return BugLaneResult(
+            outcome=outcome,
+            reason=None,
+            pr_number=None,
+            unpushed_work=unpushed_work_for_issue(runner, issue_number),
+        )
 
     pr_number = _find_pr_for_issue(runner, repo, issue_number)
     if pr_number is None:
