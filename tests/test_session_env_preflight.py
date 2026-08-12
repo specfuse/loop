@@ -100,6 +100,33 @@ class TestSessionEnvPreflight(unittest.TestCase):
             loop.require_session_env_writable()
             probe.assert_called_once()
 
+    def test_concurrent_calls_do_not_exit(self):
+        # #1951: the probe used a fixed name, so two overlapping calls raced —
+        # the loser's mkdir(exist_ok=True) re-checked is_dir() after the winner's
+        # finally-block rmdir() already removed it, and it re-raised FileExistsError
+        # as though the root itself were unwritable.
+        import threading
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            errors = []
+            barrier = threading.Barrier(8)
+
+            def worker():
+                barrier.wait()
+                try:
+                    loop.require_session_env_writable(root)
+                except SystemExit as exc:
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=worker) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            self.assertEqual(errors, [])
+
     def test_run_invokes_the_guard_before_dispatch(self):
         # A guard nothing calls is the defect unfixed. Assert it is wired into
         # the same preflight block as the other two.
