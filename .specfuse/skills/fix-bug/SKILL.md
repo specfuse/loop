@@ -148,6 +148,33 @@ Do NOT add `# nosec` / `# noqa` to suppress new findings unless the
 finding is a documented false positive and the suppression is
 narrowly scoped + commented.
 
+### 6.5. Diff self-check (before commit)
+
+Step 2's triage ran against the issue text, before the fix existed. A
+feature indicator can be invisible at triage and only become visible in
+the diff the fix actually produces — e.g. the fix turns out to need a
+new frontmatter field to carry state, which nothing in the issue text
+predicted. Re-checking here closes that gap.
+
+- After gates pass, re-apply Step 2's feature indicators to the diff
+  itself (`git diff main...HEAD` / `git diff --stat`), not to the
+  issue text triage already used.
+- Mechanically check for the one indicator that's greppable in a diff:
+  a new key added inside a YAML frontmatter block (`---` … `---`) that
+  did not exist on the pre-fix side, in any changed file. That is the
+  "frontmatter-field addition" indicator from Step 2 firing — treat it
+  as fired even though Step 2 itself didn't catch it.
+- Also re-read the diff against Step 2's other indicators (file count,
+  new abstractions/modules, other contract changes, irreversible state
+  migration) — these are harder to grep but still checkable by eye
+  against the actual changed files.
+- If any Step 2 indicator fires against the diff: STOP. Do not commit,
+  push, or open a PR. This is the same situation as "When to break the
+  rules" — a feature indicator surfacing mid-flow — handle it
+  identically: surface the scope creep, propose `/draft-feature`, leave
+  the branch in place as evidence.
+- If no indicator fires: proceed to Step 7.
+
 ### 7. Commit + push + PR
 
 - One commit, scoped to this fix. Message format:
@@ -200,11 +227,13 @@ narrowly scoped + commented.
 
 Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
 `status: complete` means: failing test was authored and verified to
-fail on unchanged code, fix landed, all gates pass, commit + push + PR
-opened, PR URL surfaced. `status: blocked` is reserved for: the
-issue isn't a bug (feature-scoped — `/draft-feature` instead), the
-repro can't be reduced to a failing test (insufficient information),
-or a gate failure that requires operator decision.
+fail on unchanged code, fix landed, all gates pass, the diff
+self-check (Step 6.5) found no Step 2 indicator against the actual
+diff, commit + push + PR opened, PR URL surfaced. `status: blocked` is
+reserved for: the issue isn't a bug (feature-scoped — `/draft-feature`
+instead), the repro can't be reduced to a failing test (insufficient
+information), a gate failure that requires operator decision, or the
+diff self-check found a Step 2 indicator against the actual diff.
 
 ## What this skill does NOT do
 
@@ -259,18 +288,21 @@ outcomes instead.
 ends in exactly one of these):
 
 - **`refused`** — the skill's existing refusal criteria (Step 2's feature
-  indicators, or the Step 2/"When to break the rules" mid-flow scope-creep
-  escalation) say this is not a bug-sized fix. The recorded reason names
-  which criterion fired.
+  indicators, the Step 6.5 diff self-check finding one of those same
+  indicators against the actual diff, or the Step 2/"When to break the
+  rules" mid-flow scope-creep escalation) say this is not a bug-sized fix.
+  The recorded reason names which criterion fired and, for Step 6.5, that
+  it fired against the diff rather than the issue text.
 - **`could_not_proceed`** — a precondition the workflow needs was missing:
   the issue has no clear repro (Step 1), the repro cannot be reduced to a
   falsifiable failing test (Step 4), a gate failure that would otherwise
   require an operator decision (Step 6/Step 9), or an operational
   precondition such as `gh auth status` failing (Step 7).
 - **`completed`** — the fix ran end-to-end: failing test authored and
-  verified red on unchanged code, fix applied, all gates green, one commit,
-  branch pushed, PR opened. Same definition of done as the interactive
-  `status: complete` in Step 9.
+  verified red on unchanged code, fix applied, all gates green, the Step
+  6.5 diff self-check found no Step 2 indicator against the actual diff,
+  one commit, branch pushed, PR opened. Same definition of done as the
+  interactive `status: complete` in Step 9.
 
 **The rule (binding, explicit — not implied by the method above).** A
 headless run never asks a question, never waits for input, and never
@@ -292,6 +324,7 @@ mapping stays honest as the method above evolves:
 | Step 2 — a feature indicator fires ("STOP, print... promote to a feature?") | refusal criterion | `refused` |
 | Step 4 — test can't be made to fail on unchanged code | precondition missing | `could_not_proceed` |
 | Step 6 — a gate failure needs an operator decision | precondition missing | `could_not_proceed` |
+| Step 6.5 — Diff self-check finds a Step 2 indicator against the actual diff | refusal criterion | `refused` |
 | Step 7 — `gh auth status` fails, `gh` unavailable | precondition missing | `could_not_proceed` |
 | "When to break the rules" — scope creep discovered mid-flow | refusal criterion | `refused` |
 | Step 9 RESULT `status: blocked` — issue isn't a bug (feature-scoped) | refusal criterion | `refused` |
