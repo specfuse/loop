@@ -243,7 +243,12 @@ class TestArmPredicate(unittest.TestCase):
             _wu(feature, "WU-05.md", "Do T05", [
                 "type: implementation", "status: pending",
                 "cost_usd: 0.0", "planned_cost_usd: 1.0",
-                "produces: [specfuse/loop/some_module.py]",
+                # A named decision module, not any path under the package.
+                # `JUDGE_PATHS` stopped covering `specfuse/loop/` wholesale
+                # (#1938): a WU producing a module that decides nothing no
+                # longer fires this class, and `some_module.py` -- which does
+                # not exist -- would now be one of those.
+                "produces: [specfuse/loop/gate_eval.py]",
                 "provenance: RETRO-1",
             ])
             decision = evaluate_arm_predicate(feature, 1)

@@ -178,7 +178,13 @@ class TestBugsProvider(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertFalse(any("issue" in call and "create" in call for call in calls))
 
-    def test_lane_filed_outcomes_carry_no_escalation_payload(self):
+    def test_fix_bug_stopped_outcomes_escalate_onto_the_bug_issue(self):
+        """The lane no longer files its own issue, so the provider must.
+
+        Every escalating outcome now carries a payload targeting the bug's
+        own issue -- an escalation about issue #N belongs on issue #N, not on
+        a new issue that says "issue #N's fix stopped".
+        """
         provider = BugsProvider(repo="o/r", runner=_recording_runner([]))
         item = ActionItem(item_id="bug-3", kind=KIND_BUG)
 
@@ -188,7 +194,9 @@ class TestBugsProvider(unittest.TestCase):
                 return_value=BugLaneResult(outcome=lane_outcome, reason=None, pr_number=None),
             ):
                 outcome = provider.execute(item)
-            self.assertIsNone(outcome.escalation)
+            self.assertIsNotNone(outcome.escalation)
+            self.assertEqual(outcome.escalation.target_issue, 3)
+            self.assertIn(lane_outcome, outcome.escalation.issue_summary)
 
     def test_reconcile_issues_no_gh_call(self):
         calls = []
