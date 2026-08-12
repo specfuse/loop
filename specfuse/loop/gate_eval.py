@@ -467,6 +467,13 @@ def main() -> None:
         default=None,
         help="Restrict evaluation to gate N",
     )
+    bt.add_argument(
+        "--repo",
+        type=str,
+        metavar="PATH",
+        default=None,
+        help="Target repo root containing .specfuse/ (default: current working directory)",
+    )
 
     args = parser.parse_args()
 
@@ -475,7 +482,7 @@ def main() -> None:
         sys.exit(0)
 
     # backtest subcommand
-    repo_root = Path(__file__).resolve().parent.parent.parent
+    repo_root = Path(args.repo).resolve() if args.repo else Path.cwd()
 
     try:
         feature_dir = _resolve_feature_dir(args.feature_id, repo_root)
