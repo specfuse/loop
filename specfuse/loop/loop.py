@@ -52,6 +52,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1568,7 +1569,7 @@ def require_session_env_writable(root: "Path | None" = None) -> None:
     directory, and refusing there would halt every clean machine.
     """
     root = root if root is not None else _session_env_root()
-    probe = root / ".specfuse-preflight-probe"
+    probe = root / f".specfuse-preflight-probe-{os.getpid()}-{threading.get_ident()}"
     try:
         root.mkdir(parents=True, exist_ok=True)
         probe.mkdir(exist_ok=True)

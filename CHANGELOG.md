@@ -75,6 +75,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 - **`tests/test_autosync_no_cwd_leak.py`'s `_make_repo` fixture no longer inherits the host's global `commit.gpgsign`.** `git init` does not isolate a repo from global config, and the fixture pinned only `user.email`/`user.name` — identity, not the ability to commit — so any host with signing enabled and an unreachable signing agent (this project's own command sandbox included) errored in `setUp` with `fatal: failed to write commit object`, producing a false `preexisting_gate_failure` halt before any work unit could dispatch. Flagged across three gates in FEAT-2026-0040 with no owning work unit. `_make_repo` now pins `commit.gpgsign false` alongside identity, so a commit it makes no longer depends on the host's signing configuration (#296)
 - `apply_triage`'s marker/label repair path could never fire because `list_untriaged` filtered out every marked issue, including one whose label write had failed (#1163)
 - `/learnings-curate` no longer proposes an apply-in-place promote onto a core-vendored rules file; it checks `.specfuse/.vendored.json` and flags core-vendored targets for upstream instead (#1859)
+- Fix a race in the session-env preflight probe where two concurrent `specfuse run` invocations could make the loser exit with a misleading sandbox-deny-list diagnosis (#1951)
 
 ## [0.11.0+umbrella.0.11.0] - 2026-08-10
 
