@@ -3,9 +3,7 @@ feature_id: FEAT-YYYY-NNNN
 title: <short feature title>
 slug: <feature-slug>
 branch: feat/FEAT-YYYY-NNNN-<feature-slug>
-roadmap_goal: <one line copied from the roadmap — the north star this feature serves;
-  plan-next anchors every drafted gate to this and flags if a retrospective implies
-  it should change>
+roadmap_goal: <one line copied from the roadmap — the north star this feature serves; plan-next anchors every drafted gate to this and flags if a retrospective implies it should change>
 autonomy_default: review        # auto | review | supervised
 status: active                  # active | blocked | deferred | done | abandoned
                                 # deferred = parked pending an external decision/dependency; resumable, non-dispatchable

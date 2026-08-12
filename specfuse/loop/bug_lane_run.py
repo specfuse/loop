@@ -31,6 +31,7 @@ failure -- leaves the PR open, optionally labelled with the declining reason.
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
@@ -64,6 +65,8 @@ __all__ = (
     "run_bug_lane",
     "pr_ci_conclusion",
     "add_guardrail_label",
+    "pr_closes_issue",
+    "unpushed_work_for_issue",
 )
 
 # This WU's own correlation ID. Retained as the lane's public identity (it is
@@ -96,6 +99,9 @@ _REASON_PR_NOT_FOUND = "pr_not_found"
 
 _DEFAULT_WORKING_DIR = "."
 
+#: How many open PRs to scan for the `closes #<n>` linkage.
+_PR_LIST_LIMIT = 100
+
 
 @dataclass(frozen=True)
 class BugLaneResult:
@@ -125,6 +131,12 @@ class BugLaneResult:
     #: computed, which is the whole content of every escalation the first
     #: unattended run produced.
     evidence: tuple = ()
+    #: `(branch, commit_count)` when a stopped run left committed work behind
+    #: that no remote has. `None` when the stop really did leave nothing --
+    #: the two are not distinguishable from the outcome constant alone, and
+    #: telling them apart is the difference between "fix this by hand" and
+    #: "push the branch that already exists".
+    unpushed_work: Optional[tuple] = None
 
 
 #: How long to wait for a freshly-opened PR's checks to reach a conclusion,
@@ -300,19 +312,51 @@ def add_guardrail_label(
     return _attempt()
 
 
+#: `/fix-bug` cites its issue as `closes #<n>` in the PR body by hard contract
+#: (SKILL.md Step 7). Matched with word boundaries on both sides: a bare
+#: `f"#{issue_number}"` substring test made `#198` match a PR closing `#1984`,
+#: which the search query happened to mask until the search itself was removed.
+_CLOSES_RE = r"\bcloses\s+#{number}\b"
+
+
+def pr_closes_issue(body: str, issue_number: int) -> bool:
+    """Whether *body* cites `closes #issue_number`, case-insensitively.
+
+    One predicate, shared with `specfuse.agent.providers.bugs`, so the lane's
+    "which PR fixes this issue" and selection's "does this issue already have
+    a PR" cannot disagree about what the linkage is.
+    """
+    return re.search(_CLOSES_RE.format(number=issue_number), body or "", re.IGNORECASE) is not None
+
+
 def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Optional[int]:
     """Find the open PR `/fix-bug` opened for `issue_number`.
 
-    `fix-bug`'s PR body cites `closes #<issue-number>` by hard contract
-    (SKILL.md Step 7) -- this searches open PRs for that marker rather than
-    inventing a second linkage mechanism.
+    **Deliberately does not use `gh pr list --search`.** That hits GitHub's
+    search index, which lags object creation by seconds to minutes, and this
+    function is called immediately after `/fix-bug` opens the PR. Observed
+    live: issue #1984's fix ran 17 minutes, opened PR #2016 with a correct
+    `Closes #1984` body, and the lane reported `pr_not_found` -- the same
+    search returned the PR minutes later. The result was 17 minutes of
+    correct work reported as failure and a PR left un-evaluated by every
+    guardrail.
+
+    Listing without `--search` reads the repository's pull requests directly
+    rather than an index built from them, so a PR opened one second ago is
+    visible. The `closes #<n>` match then happens client-side -- the same
+    shape `triage.list_untriaged` uses, which "filters `gh issue list`'s
+    output client-side rather than trusting a label listing".
+
+    Bounded by `_PR_LIST_LIMIT`: a repository with more open PRs than that
+    could still miss one. That is a far smaller window than the index lag it
+    replaces, and it fails the same way -- `pr_not_found`, no merge.
     """
     result = runner(
         [
             "gh", "pr", "list",
             "--repo", repo,
             "--state", "open",
-            "--search", f"closes #{issue_number} in:body",
+            "--limit", str(_PR_LIST_LIMIT),
             "--json", "number,body",
         ],
         check=False,
@@ -326,11 +370,10 @@ def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Option
     if not isinstance(rows, list):
         return None
 
-    marker = f"#{issue_number}"
     for row in rows:
         if not isinstance(row, dict):
             continue
-        if marker in (row.get("body") or ""):
+        if pr_closes_issue(row.get("body") or "", issue_number):
             number = row.get("number")
             if isinstance(number, int) and not isinstance(number, bool):
                 return number
@@ -397,6 +440,60 @@ def _issue_provenance(runner: Callable, repo: str, issue_number: int) -> Optiona
     if category != "bug":
         return None
     return {"kind": "triaged_issue", "ref": str(issue_number)}
+
+
+#: Branch shape `/fix-bug` uses for an issue it is fixing.
+_WORK_BRANCH_GLOB = "fix/issue-{number}-*"
+
+
+def unpushed_work_for_issue(runner: Callable, issue_number: int) -> Optional[tuple]:
+    """Return `(branch, commit_count)` for committed-but-unpushed work, else None.
+
+    A `refused` / `could_not_proceed` outcome is not proof that nothing
+    happened. Observed live on issue #1859: the session did the whole job --
+    a skill fix, a new test file, a CHANGELOG entry, 143 insertions across 4
+    files -- committed it as "Closes #1859", and then stopped. Most likely it
+    failed at the push or the PR open; the outcome is accurate for the step it
+    reached and says nothing about the finished work sitting on disk.
+
+    The escalation the operator got offered three options -- fix by hand,
+    promote to a feature, close the issue -- and none of them was "push the
+    branch that already exists". Twenty minutes of green, tested work was
+    invisible until someone went looking for it by hand.
+
+    Read-only: `git branch --list` and `git log`, no mutation. `--not
+    --remotes` is the whole predicate -- commits reachable from the branch and
+    from no remote ref are exactly the ones nobody but this machine can see,
+    which is base-branch-agnostic and stays correct if the work was partially
+    pushed.
+    """
+    try:
+        listed = runner(
+            ["git", "branch", "--list",
+             _WORK_BRANCH_GLOB.format(number=issue_number),
+             "--format=%(refname:short)"],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a reporting aid must never break the lane
+        return None
+    if getattr(listed, "returncode", 1) != 0:
+        return None
+
+    for branch in (getattr(listed, "stdout", "") or "").split():
+        try:
+            log = runner(
+                ["git", "log", branch, "--not", "--remotes", "--format=%H"],
+                check=False,
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        if getattr(log, "returncode", 1) != 0:
+            continue
+        commits = [line for line in (getattr(log, "stdout", "") or "").split() if line]
+        if commits:
+            return (branch, len(commits))
+    return None
+
 
 
 def _evidence_for(
@@ -488,7 +585,12 @@ def run_bug_lane(
         # a third and a fourth (issue #1183, three runs, three issues). The
         # caller records the halt on the bug's own issue instead, through the
         # single escalation owner in `specfuse.agent.run`.
-        return BugLaneResult(outcome=outcome, reason=None, pr_number=None)
+        return BugLaneResult(
+            outcome=outcome,
+            reason=None,
+            pr_number=None,
+            unpushed_work=unpushed_work_for_issue(runner, issue_number),
+        )
 
     pr_number = _find_pr_for_issue(runner, repo, issue_number)
     if pr_number is None:
