@@ -49,28 +49,47 @@ file under a judge-path surface — paths that would let a work unit edit its
 own verification.
 
 **Fires when:** a drafted WU's `produces:` list contains a path matching one
-of `JUDGE_PATHS`: `.specfuse/verification.yml`, `.specfuse/hooks/`,
-`.specfuse/rules/`, `.github/workflows/`, `specfuse/loop/`, or
-`pyproject.toml` (matched whole-file); or a WU declares
-`produces_driver_helper`.
+of `JUDGE_PATHS` — `.specfuse/verification.yml`, `.specfuse/hooks/`,
+`.specfuse/rules/`, `.github/workflows/`, or `pyproject.toml` (matched
+whole-file) — or a WU declares `produces_driver_helper`.
+
+`JUDGE_PATHS` also covers the driver's own decision modules and the package
+data that seeds a judge surface downstream, but **only in the repository that
+holds the driver source**; a project that installed Specfuse has no
+`specfuse/loop/` path, so those entries never match there. That set used to be
+the blanket prefix `specfuse/loop/`, which covered all 44 modules and every
+shipped document — so in the driver's own repository no gate shipping
+documentation could arm. It is now the named list in
+`arm_eval.JUDGE_MODULES` / `JUDGE_DATA_PREFIXES`, with every unlisted module
+and data entry carrying a written reason in `NON_JUDGE_MODULES` /
+`NON_JUDGE_DATA_ENTRIES`. Shipped documentation under
+`specfuse/loop/data/docs/` is the deliberate exclusion: no predicate reads it.
 
 **Veto channel:** no.
 
 **Clearing action:** normally, route the WU so it does not produce a path
 under these prefixes.
 
-**Added-at-arming v1 approximation (open question 2).** This class fires on
-*any* path under the `specfuse/loop/` prefix. Every documentation file in this
-repository is mirrored into `specfuse/loop/data/docs/` by the scaffold sync —
-which means, under `auto`, **no gate that ships a documentation file can arm**:
-the prefix test cannot distinguish package data (a mirrored doc) from driver
-source (a change to `arm_eval.py` itself). This is the same v1-approximation
-shape already documented for `pyproject.toml` above — a whole-surface match
-standing in for a diff the predicate does not have. It is the case the first
-`auto` feature to write docs will hit. The clearing action here is **the human
-arm, not a code change** — the operator reviews the drafted gate, confirms the
-documentation-only content is fine, and arms manually. Do not treat this as a
-bug to patch in `arm_eval.py`; it is an accepted v1 limit.
+**Resolved: the documentation-blocks-arming limit (open question 2).** This
+class used to fire on *any* path under the `specfuse/loop/` prefix. Every
+documentation file in this repository is mirrored into
+`specfuse/loop/data/docs/` by the scaffold sync, so under `auto` **no gate
+shipping a documentation file could arm** — the prefix test could not
+distinguish a mirrored doc from a change to `arm_eval.py` itself. FEAT-2026-0053
+shipped that as an accepted v1 limit whose clearing action was "the human arm,
+not a code change", and recorded that narrowing the prefix "needs a decision
+with evidence, not a one-line prefix edit".
+
+That decision has since been made and the limit is gone. The prefix is replaced
+by a named registry — `JUDGE_MODULES` for the driver modules a verdict reads,
+`JUDGE_DATA_PREFIXES` for the package data that seeds a judge surface
+downstream — with every unlisted module and data entry carrying a written
+reason in `NON_JUDGE_MODULES` / `NON_JUDGE_DATA_ENTRIES`, and a registry test
+that fails when a new file appears in neither. Shipped documentation is
+excluded on the evidence that no predicate reads it.
+
+The whole-surface approximation documented for `pyproject.toml` above still
+stands: it is matched whole-file, because this predicate has no diff.
 
 ### 3. `decision_class_paths`
 
@@ -235,7 +254,9 @@ per-project override yet. Tuning them is expected to graduate to
 | `BUDGET_PROJECTION_MULTIPLIER` | `2.0` | class 1, `budget_projection` |
 | `DRIFT_CAP_RATIO` | `0.5` | class 5, `drift_caps` |
 | `ADDED_GATE_CAP` | `1` | class 5, `drift_caps` |
-| `JUDGE_PATHS` | `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `specfuse/loop/`, `pyproject.toml` | class 2, `judge_editing` |
+| `JUDGE_PATHS` | `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `pyproject.toml`, plus `JUDGE_MODULES` and `JUDGE_DATA_PREFIXES` (driver-source repository only) | class 2, `judge_editing` |
+| `JUDGE_MODULES` | the 20 modules under `specfuse/loop/` a merge/arm/close verdict reads; every other module is registered in `NON_JUDGE_MODULES` with a reason | class 2, `judge_editing` |
+| `JUDGE_DATA_PREFIXES` | `specfuse/loop/data/` subtrees seeding a judge surface downstream: `rules/`, `rules-local/`, `schemas/`, `templates/`, `workflows/`, `verification.yml.example` | class 2, `judge_editing` |
 
 ## Reading an `arm_predicate_evaluated` event
 

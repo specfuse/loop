@@ -51,14 +51,142 @@ ADDED_GATE_CAP = 1
 # config sections from the rest of the file without a diff, so any produced
 # `pyproject.toml` fires both this class and decision_class_paths below. That
 # double-fire is an accepted v1 approximation, not a bug.
-JUDGE_PATHS = (
+#
+# These five are surfaces in ANY repository. The `specfuse/loop/` entries below
+# exist only in this one — a project vendoring the driver has no such path — so
+# they govern the self-hosting case exclusively.
+_UNIVERSAL_JUDGE_PATHS = (
     ".specfuse/verification.yml",
     ".specfuse/hooks/",
     ".specfuse/rules/",
     ".github/workflows/",
-    "specfuse/loop/",
     "pyproject.toml",
 )
+
+# The driver modules a merge, arm, or close decision actually reads (#1938).
+#
+# This replaces the blanket `specfuse/loop/` prefix. That prefix was correct in
+# intent and far too wide in reach: it covered all 44 modules of the package
+# plus every shipped document, so in the one repository where it applies —
+# this one — **no gate shipping documentation could arm and no bug fix under
+# `specfuse/loop/` could auto-merge**, whether or not it went anywhere near a
+# decision. FEAT-2026-0053's close recorded the first half as a structural
+# limit that made `auto` "currently unreachable for a large class of
+# features"; the first unattended agent run hit the second half, declining two
+# of eight items `judge_path_touched` for edits to modules that decide nothing.
+#
+# Membership rule, applied module by module below: a module is a judge if a
+# merge/arm/close verdict, or the evidence a verdict reads, can change because
+# of an edit to it. Reporting, notification, scaffolding and plumbing are not
+# judges — they act on a verdict already reached.
+#
+# **`NON_JUDGE_MODULES` is the other half of this list and is not optional.**
+# An allowlist silently stops protecting the moment someone adds a module and
+# forgets it, which is exactly the failure the blanket prefix could not have.
+# `tests/test_judge_path_registry.py` enumerates `specfuse/loop/*.py` and fails
+# when a module appears in neither tuple, so a new decision module cannot
+# escape by omission — it has to be classified, in writing, with a reason.
+JUDGE_MODULES = tuple(
+    f"specfuse/loop/{name}"
+    for name in (
+        # The predicates themselves.
+        "arm_eval.py",           # this module: the arm verdict
+        "arm_sweep.py",          # evaluates the arm predicate over a corpus
+        "arm_txn.py",            # performs the arm the verdict authorises
+        "gate_eval.py",          # the auto-close verdict
+        "bug_lane.py",           # the merge-guardrail verdict
+        "bug_lane_run.py",       # holds the single `gh pr merge` call site
+        "bug_lane_state.py",     # the rolling merge cap a guardrail reads
+        "upgrade_merge_gate.py",  # the scaffold-upgrade merge gate
+        # The dials, budgets and command sets a verdict is measured against.
+        "agent_policy.py",       # automerge dial, diff/merge caps, test paths
+        "cost.py",               # spend, read by budget_projection
+        "gate_commands.py",      # resolves which commands a gate must pass
+        # What a work unit or a close must satisfy.
+        "closing_requirements.py",
+        "criteria_state.py",
+        "lint_closing.py",
+        "lint_plan.py",
+        "plan_baseline.py",      # the baseline retroactive_edits compares to
+        # The driver: dispatch guards, halt classification, the produces gate,
+        # post-pass invariants. The largest judge surface in the package.
+        "loop.py",
+        "prerun.py",
+        "prerun_capture.py",
+        # Trail integrity: a verdict is only as good as the events proving it.
+        "validate_event.py",
+    )
+)
+
+# Every other module under `specfuse/loop/`, each with the reason it decides
+# nothing. Same shape, and the same obligation, as
+# `DEPENDENCY_MANIFEST_NAMED_UNCOVERED` below: a module whose honest answer is
+# "it does judge" belongs in `JUDGE_MODULES` instead.
+NON_JUDGE_MODULES = {
+    "__init__.py": "package marker; no logic",
+    "_filelock.py": "advisory lock primitive; grants no verdict",
+    "_miniyaml.py": "YAML parsing primitive used by judges and non-judges alike",
+    "_wu_sections.py": "work-unit section splitting; a reader, not a verdict",
+    "adopt_feature.py": "scaffolds a feature folder from a GitHub issue",
+    "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
+    "driver_edit.py": "applies operator edits to a feature folder",
+    "escalation.py": "renders and files needs-human records after a halt",
+    "events_stats.py": "aggregates the event trail for reporting",
+    "gh_backend.py": "GitHub side effects for a decision already taken",
+    "gh_features.py": "reads GitHub feature issues; supplies input, judges none",
+    "heartbeat.py": "liveness reporting",
+    "labels.py": "label registry and provisioning; a projection of a verdict",
+    "learnings_query.py": "reads LEARNINGS.md for planning context",
+    "lint_monitoring.py": "lints monitoring.yml, which no arm/close/merge "
+        "verdict reads",
+    "lint_roadmap.py": "lints roadmap.md, which no arm/close/merge verdict reads",
+    "notify.py": "delivery of a message about a decision already made",
+    "notify_escalation.py": "as notify.py",
+    "notify_sla.py": "as notify.py",
+    "policy_proposals.py": "drafts policy changes for a human to accept",
+    "policy_review.py": "presents proposals; the human decides",
+    "rearm_migration.py": "one-shot migration of re-arm history format",
+    "scaffold.py": "writes scaffold files into a target project",
+    "triage.py": "classifies inbound issues; sets no gate and merges nothing",
+}
+
+# Package data is what a target project receives, so a work unit editing a
+# shipped rule, schema, template or workflow is editing the *source of* a judge
+# surface in every downstream repository. Those subtrees stay covered.
+#
+# `data/docs/` is the deliberate exclusion: it is prose for humans, read by no
+# predicate. Mirroring every shipped document under `specfuse/loop/data/docs/`
+# is what made `judge_editing` fire on any gate that shipped documentation —
+# FEAT-2026-0053's own close watched it fire on three documentation work units
+# and recorded that narrowing "needs a decision with evidence, not a one-line
+# prefix edit". This is that decision: the evidence is that no consumer of
+# `data/docs/` exists in any predicate, enforced by the registry test.
+JUDGE_DATA_PREFIXES = tuple(
+    f"specfuse/loop/data/{name}"
+    for name in (
+        "rules/",
+        "rules-local/",
+        "schemas/",
+        "templates/",
+        "workflows/",
+        "verification.yml.example",
+    )
+)
+
+NON_JUDGE_DATA_ENTRIES = {
+    "docs": "documentation for humans; no predicate reads it",
+    "CHANGELOG.seed.md": "seed content for a new project's changelog",
+    "LEARNINGS.template.md": "seed content for a new project's learnings file",
+    "VERSION": "the scaffold version string",
+    "gitignore.snippet": "seed content for .gitignore",
+    "monitoring-secrets-checklist.md": "operator checklist prose",
+    "monitoring.overrides.yml.example": "seeds monitoring config, which no "
+        "arm/close/merge verdict reads",
+    "monitoring.yml.example": "as monitoring.overrides.yml.example",
+    "roadmap.template.md": "seed content for a new project's roadmap",
+}
+
+JUDGE_PATHS = _UNIVERSAL_JUDGE_PATHS + JUDGE_MODULES + JUDGE_DATA_PREFIXES
 
 # Dependency-manifest recognition surface (class 3). One stated table:
 # `fnmatch` patterns (exact basenames are just patterns with no special
