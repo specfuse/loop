@@ -65,7 +65,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
-| FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
+| FEAT-2026-0050 | Async feature-drafting interview via question issues | planned | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
@@ -799,9 +799,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
 
-**Blocked by.** [FEAT-2026-0049](roadmap-archive.md#feat-2026-0049) — an agent capability; the runner and its escalation loop must exist
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0052"></a>
 ## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
