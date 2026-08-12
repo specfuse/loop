@@ -47,6 +47,7 @@ from specfuse.agent.budget import (
 from specfuse.agent.state import AgentSnapshot, gather_snapshot
 from specfuse.loop import agent_policy
 from specfuse.loop._filelock import acquire_agent_lock
+from specfuse.loop.build_provenance import warn_if_out_of_tree
 from specfuse.loop.escalation import annotate_escalation, emit_escalation
 
 DEFAULT_SPECFUSE_DIR = Path(".specfuse")
@@ -589,6 +590,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    warn_if_out_of_tree()
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
 

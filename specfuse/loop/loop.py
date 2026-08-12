@@ -7737,6 +7737,9 @@ def _force_utf8_console() -> None:
 
 def main() -> int:
     _force_utf8_console()
+
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
     ap.add_argument("--feature", help="Feature dir name or bare FEAT-ID (e.g. "
                     "FEAT-2026-0039) under .specfuse/features/ "
