@@ -44,6 +44,7 @@ from specfuse.agent.budget import (
     STOP_PAUSE,
     RunBudget,
 )
+from specfuse.agent import worktree
 from specfuse.agent.state import AgentSnapshot, gather_snapshot
 from specfuse.loop import agent_policy
 from specfuse.loop._filelock import acquire_agent_lock
@@ -671,6 +672,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     features_root = Path(args.features_root) if args.features_root else None
+
+    # Bracket the run at the process boundary (#2055). Dispatched `/fix-bug`
+    # sessions create and check out branches, so a run that started on `main`
+    # ends wherever the last session left it -- silently. The conductor is not
+    # the right place to fix that: `run_agent`'s invariant is that no code path
+    # in it can commit, branch or merge, and a test enforces that its runner
+    # only ever issues `gh`. `main()` is what the operator invoked, so `main()`
+    # is what owes them their branch back.
+    started_on = worktree.current_branch()
+
     try:
         summary = run_agent(
             repo=args.repo,
@@ -689,6 +700,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except AgentLockHeldError as exc:
         print(str(exc), file=sys.stderr)
         return 1
+    finally:
+        # `finally`, not a trailing call: a run that raises part-way has still
+        # moved the tree, and that is exactly when the operator is least likely
+        # to think to check.
+        worktree.restore_branch(started_on, report=_default_reporter)
 
     print(_format_summary(summary))
     return 0
