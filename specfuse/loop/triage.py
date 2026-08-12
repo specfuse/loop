@@ -238,7 +238,8 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
 
 
 def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT) -> list:
-    """Return open issues whose body carries no triage marker.
+    """Return open issues with no triage marker, plus marked issues whose
+    projected label is missing.
 
     Filters `gh issue list`'s output client-side rather than trusting a
     label listing -- the marker is re-checked here directly, the same
@@ -247,14 +248,36 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
     (`has_finding_marker`) is still returned, flagged `already_structured`
     in its row so the caller can skip re-categorising it -- that is a flag,
     not an exclusion.
+
+    A marked issue is normally excluded -- marked means done, per
+    `PLAN.md`'s scope boundary. But `apply_triage`'s repair path
+    (`[FEAT-2026-0045/T01/marker-label-desync]`) can only fire on rows this
+    function hands it, so a marked issue whose projected label is missing
+    from its `labels` is still returned here, flagged `needs_repair` with
+    the marker's own `category`/`confidence` copied onto the row -- the
+    caller applies those straight to `apply_triage` without a
+    classification round, since the category is already decided.
     """
     issues = _list_open_issues(runner, repo, limit=limit)
     untriaged = []
     for issue in issues:
         body = issue.get("body") or ""
-        if parse_marker(body) is not None:
+        marker = parse_marker(body)
+        if marker is not None:
+            marked_category, marked_confidence = marker
+            target_label = label_for(marked_category) if marked_category in CATEGORIES else None
+            existing_labels = {label.get("name") for label in issue.get("labels") or []}
+            if target_label is None or target_label in existing_labels:
+                continue
+            row = dict(issue)
+            row["needs_repair"] = True
+            row["category"] = marked_category
+            row["confidence"] = marked_confidence
+            row["already_structured"] = has_finding_marker(body)
+            untriaged.append(row)
             continue
         row = dict(issue)
+        row["needs_repair"] = False
         row["already_structured"] = has_finding_marker(body)
         untriaged.append(row)
     return untriaged
