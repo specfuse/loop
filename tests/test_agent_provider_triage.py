@@ -49,13 +49,25 @@ def _snapshot(triage_auto: bool = False) -> AgentSnapshot:
     )
 
 
-def _row(number: int, title: str = "an issue", body: str = "body text", already_structured: bool = False):
+def _row(
+    number: int,
+    title: str = "an issue",
+    body: str = "body text",
+    already_structured: bool = False,
+    needs_repair: bool = False,
+    category: str = None,
+    confidence: str = "high",
+    labels: list = None,
+):
     return {
         "number": number,
         "title": title,
         "body": body,
-        "labels": [],
+        "labels": labels if labels is not None else [],
         "already_structured": already_structured,
+        "needs_repair": needs_repair,
+        "category": category,
+        "confidence": confidence,
     }
 
 
@@ -143,6 +155,47 @@ class TestTriageProvider(unittest.TestCase):
 
         edit_calls = [c for c in calls if c[:3] == ["gh", "issue", "edit"]]
         self.assertEqual(edit_calls, [])
+
+    def test_needs_repair_row_skips_classification_and_repairs_label(self):
+        calls = []
+        provider = TriageProvider(repo="o/r", runner=_recording_runner(calls))
+
+        marked_body = "<!-- specfuse:triage category=bug confidence=high -->\n\nSomething broke."
+        with patch(
+            "specfuse.agent.providers.triage.list_untriaged",
+            return_value=[_row(9, body=marked_body, needs_repair=True, category="bug")],
+        ):
+            items = provider.advertise(_snapshot())
+            outcome = provider.execute(items[0])
+
+        self.assertEqual(outcome.status, STATUS_COMPLETED)
+        self.assertIn("repaired", outcome.detail)
+
+        # no classification invocation and no marker (--body) rewrite --
+        # only the label add.
+        self.assertFalse(any("--body" in c for c in calls))
+        label_calls = [c for c in calls if c[:3] == ["gh", "issue", "edit"] and "--add-label" in c]
+        self.assertEqual(len(label_calls), 1)
+        self.assertEqual(label_calls[0][label_calls[0].index("--add-label") + 1], "triage:bug")
+
+    def test_needs_repair_row_escalates_when_label_write_fails(self):
+        def runner(argv, check: bool = False):
+            if "--add-label" in argv:
+                raise RuntimeError("label add failed")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        provider = TriageProvider(repo="o/r", runner=runner)
+
+        marked_body = "<!-- specfuse:triage category=bug confidence=high -->\n\nSomething broke."
+        with patch(
+            "specfuse.agent.providers.triage.list_untriaged",
+            return_value=[_row(10, body=marked_body, needs_repair=True, category="bug")],
+        ):
+            items = provider.advertise(_snapshot())
+            outcome = provider.execute(items[0])
+
+        self.assertEqual(outcome.status, STATUS_ESCALATED)
+        self.assertIn("label repair failed", outcome.detail)
 
     def test_default_providers_registers_triage_provider(self):
         providers = default_providers(repo="o/r")

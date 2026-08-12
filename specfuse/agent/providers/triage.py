@@ -12,6 +12,11 @@ judgment stops at the marker `triage_invoke.classify_result` hands back --
 this module validates the named category against `triage.CATEGORIES`
 before ever calling `apply_triage` (which would raise `ValueError` on an
 unknown category) and escalates instead of guessing when it is not one.
+A row flagged `needs_repair` (already marked, only its projected label is
+missing -- `[FEAT-2026-0045/T01/marker-label-desync]`) skips
+classification entirely: its `category`/`confidence` come straight from
+`list_untriaged`'s marker read, and `execute` hands them to `apply_triage`
+directly.
 `auto` is read once per `advertise()` call from
 `AgentSnapshot.triage_auto` and passed straight through to `apply_triage`;
 the low-confidence-under-auto downgrade to `question` is `apply_triage`'s
@@ -89,6 +94,31 @@ class TriageProvider:
 
         title = row.get("title", "")
         body = row.get("body") or ""
+
+        if row.get("needs_repair"):
+            decisions = [
+                {
+                    "number": number,
+                    "body": body,
+                    "category": row.get("category"),
+                    "confidence": row.get("confidence", "high"),
+                    "labels": row.get("labels") or [],
+                }
+            ]
+            results = apply_triage(self._runner, self._repo, decisions, auto=self._auto)
+            row_result = results[0]
+            if row_result.get("label_written"):
+                return ActionOutcome(
+                    status=STATUS_COMPLETED,
+                    detail=f"issue #{number} label repaired",
+                )
+            return ActionOutcome(
+                status=STATUS_ESCALATED,
+                detail=(
+                    f"issue #{number}: label repair failed -- "
+                    f"{row_result.get('label_error', 'unknown error')}"
+                ),
+            )
 
         argv, prompt = build_invocation(number, title, body, self._repo, self._working_dir)
         result = self._runner(argv + [prompt], check=False)

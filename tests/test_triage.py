@@ -41,11 +41,16 @@ def _list_result(issues_json):
 
 
 class TestUntriagedScan(unittest.TestCase):
-    def test_untriaged_excludes_marked_issue(self):
+    def test_untriaged_excludes_marked_and_labelled_issue(self):
         marked_body = render_marker("bug", "high") + "\n\nSomething broke."
         runner = _StubRunner([
             _list_result([
-                {"number": 1, "title": "marked", "body": marked_body, "labels": []},
+                {
+                    "number": 1,
+                    "title": "marked",
+                    "body": marked_body,
+                    "labels": [{"name": "triage:bug"}],
+                },
                 {"number": 2, "title": "unmarked", "body": "No marker here.", "labels": []},
             ])
         ])
@@ -54,6 +59,34 @@ class TestUntriagedScan(unittest.TestCase):
 
         numbers = {row["number"] for row in untriaged}
         self.assertEqual(numbers, {2})
+
+    def test_marked_but_unlabelled_issue_is_returned_flagged_needs_repair(self):
+        marked_body = render_marker("bug", "high") + "\n\nSomething broke."
+        runner = _StubRunner([
+            _list_result([
+                {"number": 1, "title": "marked", "body": marked_body, "labels": []},
+            ])
+        ])
+
+        untriaged = list_untriaged(runner, _REPO, limit=50)
+
+        self.assertEqual(len(untriaged), 1)
+        row = untriaged[0]
+        self.assertEqual(row["number"], 1)
+        self.assertTrue(row["needs_repair"])
+        self.assertEqual(row["category"], "bug")
+        self.assertEqual(row["confidence"], "high")
+
+    def test_unmarked_issue_is_flagged_not_needing_repair(self):
+        runner = _StubRunner([
+            _list_result([
+                {"number": 2, "title": "unmarked", "body": "No marker here.", "labels": []},
+            ])
+        ])
+
+        untriaged = list_untriaged(runner, _REPO, limit=50)
+
+        self.assertFalse(untriaged[0]["needs_repair"])
 
     def test_finding_marker_issue_is_returned_and_flagged(self):
         finding_body = _finding_marker("fp-1") + "\n\nA harvester finding."
