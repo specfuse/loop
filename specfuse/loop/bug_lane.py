@@ -89,6 +89,52 @@ def _decline(reason: str) -> MergeDecision:
     return MergeDecision(eligible=False, reason=reason)
 
 
+def evaluate_pr_shape_guardrails(
+    *,
+    changed_files: Any,
+    diff_lines: Any,
+    max_diff_lines: Any,
+    provenance: Any,
+    test_paths: Any = (_TESTS_PREFIX,),
+) -> MergeDecision:
+    """The guardrails decidable from the PR's shape alone -- no CI, no cap.
+
+    Extracted so a caller can learn that a PR can never merge *before* paying
+    for something expensive. `run_bug_lane` waits up to ten minutes for CI to
+    settle; a PR touching a judge path is unmergeable whatever CI says, so
+    that wait buys nothing. Observed live: two of eight items in one run
+    declined `judge_path_touched` after the full CI wait.
+
+    Returns `eligible=True` only in the sense that no shape guardrail
+    objected -- CI and the rolling merge cap are still unevaluated, so this
+    is never on its own an authorisation to merge. `evaluate_merge_guardrails`
+    remains the single predicate the merge decision reads.
+    """
+    changed = _validate_changed_files(changed_files)
+    if changed is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+
+    if not _has_test_evidence(changed, test_paths):
+        return _decline(REASON_NO_TEST_EVIDENCE)
+
+    max_diff = _validate_positive_int(max_diff_lines)
+    if max_diff is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+    diff_count = _validate_nonnegative_int(diff_lines)
+    if diff_count is None:
+        return _decline(REASON_UNREADABLE_INPUT)
+    if diff_count > max_diff:
+        return _decline(REASON_DIFF_TOO_LARGE)
+
+    if judge_paths_touched(changed):
+        return _decline(REASON_JUDGE_PATH_TOUCHED)
+
+    if not _is_traceable(provenance):
+        return _decline(REASON_UNTRACEABLE)
+
+    return MergeDecision(eligible=True, reason=REASON_ELIGIBLE)
+
+
 def evaluate_merge_guardrails(
     *,
     changed_files: Any,
@@ -114,6 +160,10 @@ def evaluate_merge_guardrails(
     storage for. Any failure to evaluate an input returns
     `eligible=False`.
     """
+    # The two checks that precede the CI read keep their own inline form, so
+    # the CI check stays exactly where it was in the sequence and no declining
+    # reason's precedence changes. Everything after CI is the shape predicate,
+    # which re-runs these two harmlessly.
     changed = _validate_changed_files(changed_files)
     if changed is None:
         return _decline(REASON_UNREADABLE_INPUT)
@@ -124,20 +174,15 @@ def evaluate_merge_guardrails(
     if ci_conclusion != "success":
         return _decline(REASON_CI_NOT_GREEN)
 
-    max_diff = _validate_positive_int(max_diff_lines)
-    if max_diff is None:
-        return _decline(REASON_UNREADABLE_INPUT)
-    diff_count = _validate_nonnegative_int(diff_lines)
-    if diff_count is None:
-        return _decline(REASON_UNREADABLE_INPUT)
-    if diff_count > max_diff:
-        return _decline(REASON_DIFF_TOO_LARGE)
-
-    if _touches_judge_path(changed):
-        return _decline(REASON_JUDGE_PATH_TOUCHED)
-
-    if not _is_traceable(provenance):
-        return _decline(REASON_UNTRACEABLE)
+    shape = evaluate_pr_shape_guardrails(
+        changed_files=changed_files,
+        diff_lines=diff_lines,
+        max_diff_lines=max_diff_lines,
+        provenance=provenance,
+        test_paths=test_paths,
+    )
+    if not shape.eligible:
+        return shape
 
     max_merges = _validate_positive_int(max_merges_per_day)
     if max_merges is None:
@@ -191,15 +236,25 @@ def _has_test_evidence(changed: list[str], test_paths: Any) -> bool:
     )
 
 
-def _touches_judge_path(changed: list[str]) -> bool:
+def judge_paths_touched(changed: Sequence[str]) -> list[str]:
+    """Return the changed paths that fall under `JUDGE_PATHS`, in order.
+
+    Public and path-naming rather than boolean (it used to be
+    `_touches_judge_path`) so an escalation can tell the reader *which* path
+    tripped the guardrail. `judge_path_touched` on its own sends the human
+    back to the diff to work out what the agent already knew.
+    """
+    hits: list[str] = []
     for path in changed:
         for judge_path in JUDGE_PATHS:
             if judge_path.endswith("/"):
                 if path.startswith(judge_path):
-                    return True
+                    hits.append(path)
+                    break
             elif path == judge_path:
-                return True
-    return False
+                hits.append(path)
+                break
+    return hits
 
 
 def _is_traceable(provenance: Any) -> bool:

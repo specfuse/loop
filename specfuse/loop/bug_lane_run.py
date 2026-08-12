@@ -13,7 +13,10 @@ exist yet:
   durable merge cap, T03's.
 - `specfuse.loop.agent_policy.resolve_bug_automerge` / `bug_lane_limits` --
   the dial and the limits it reads.
-- `specfuse.loop.escalation.emit_escalation` -- refusal/failure escalation.
+
+This module files no issue and posts no comment. Recording a halt for a human
+belongs to the caller, which knows the issue the halt is about; the lane
+returns a verdict and nothing else.
 
 `pr_ci_conclusion` is the one wrapper this WU builds: `gh pr checks` has no
 existing reader, and this predicate's fail-closed contract (T02's) requires a
@@ -35,15 +38,17 @@ from typing import Any, Callable, Optional
 from specfuse.loop.agent_policy import (
     bug_lane_limits,
     resolve_bug_automerge,
-    resolve_escalation_assignee,
 )
 from specfuse.loop.bug_lane import (
     DECLINE_LABELS,
-    REASON_ELIGIBLE,
+    REASON_DIFF_TOO_LARGE,
+    REASON_JUDGE_PATH_TOUCHED,
+    REASON_NO_TEST_EVIDENCE,
     evaluate_merge_guardrails,
+    evaluate_pr_shape_guardrails,
+    judge_paths_touched,
 )
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
-from specfuse.loop.escalation import emit_escalation
 from specfuse.loop.labels import provision_labels
 from specfuse.loop.triage import parse_marker
 from specfuse.monitor.autofix_invoke import build_invocation, classify_outcome
@@ -55,20 +60,30 @@ __all__ = (
     "OUTCOME_COULD_NOT_PROCEED",
     "OUTCOME_MERGED",
     "OUTCOME_DECLINED",
+    "OUTCOME_AUTOMERGE_OFF",
     "run_bug_lane",
     "pr_ci_conclusion",
     "add_guardrail_label",
 )
 
-# This WU's own correlation ID, used verbatim so `emit_escalation`'s
-# find-then-create idempotency dedupes repeated refusals into one tracking
-# issue rather than filing a duplicate per bug.
+# This WU's own correlation ID. Retained as the lane's public identity (it is
+# exported and referenced by consumers); it is no longer used to file an issue,
+# because the lane no longer files one.
 CORRELATION_ID = "FEAT-2026-0048/T04"
 
 OUTCOME_REFUSED = "refused"
 OUTCOME_COULD_NOT_PROCEED = "could_not_proceed"
 OUTCOME_MERGED = "merged"
 OUTCOME_DECLINED = "declined"
+
+#: Every guardrail passed and `rules.bugs.automerge` is `off`. Distinct from
+#: `OUTCOME_DECLINED` because nothing declined: the PR is mergeable and the
+#: operator has simply not armed the dial. Folding the two together produced
+#: the self-contradicting report observed live on issue #296 -- "declined by
+#: the merge guardrails -- `eligible`", under a "why it did not close
+#: automatically" section that read "the merge guardrails declined the PR",
+#: when the guardrails had passed and the dial was the only thing in the way.
+OUTCOME_AUTOMERGE_OFF = "automerge_off"
 
 _ESCALATING_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
 
@@ -103,6 +118,13 @@ class BugLaneResult:
     #: label is a projection of it, so losing the projection must not lose
     #: the item. Mirrors `apply_triage`'s `label_written` row exactly.
     label_written: bool = True
+    #: The measurements behind a declining `reason`, as ready-to-read
+    #: sentences -- which judge path was touched, how the diff compared to the
+    #: cap. Empty for outcomes carrying no measurement. A reason constant on
+    #: its own makes the human re-derive from the diff what the lane already
+    #: computed, which is the whole content of every escalation the first
+    #: unattended run produced.
+    evidence: tuple = ()
 
 
 #: How long to wait for a freshly-opened PR's checks to reach a conclusion,
@@ -377,55 +399,60 @@ def _issue_provenance(runner: Callable, repo: str, issue_number: int) -> Optiona
     return {"kind": "triaged_issue", "ref": str(issue_number)}
 
 
-def _escalate_fix_bug_outcome(
-    runner: Callable, repo: str, issue_number: int, outcome: str,
-    policy_path: Any = None,
-) -> None:
-    emit_escalation(
-        CORRELATION_ID,
-        category="blocked-wu",
-        repo=repo,
-        assignee=resolve_escalation_assignee(policy_path),
-        done_so_far=(
-            f"Headless `/fix-bug` ran against issue #{issue_number} and "
-            f"stopped without opening a mergeable PR."
-        ),
-        issue_summary=(
-            f"The bug lane could not fix issue #{issue_number} automatically "
-            f"-- `/fix-bug` reported `{outcome}`."
-        ),
-        decision_needed=(
-            "Whether a human should fix this bug directly, promote it to a "
-            "feature, or close it."
-        ),
-        why_not_auto=(
-            "`/fix-bug`'s own refusal or precondition check stopped the run "
-            "before a PR existed; the bug lane never reaches a guardrail or "
-            "merge decision on this path."
-        ),
-        options=[
-            (
-                "Fix it by hand",
-                "unblocks the issue directly",
-                "costs a human's time",
-            ),
-            (
-                "Promote to a feature via /draft-feature",
-                "right call if the fix turned out to be feature-scoped",
-                "slower than a bug fix would have been",
-            ),
-            (
-                "Leave it and re-run the bug lane later",
-                "cheap, no immediate cost",
-                "the same outcome likely repeats until something changes",
-            ),
-        ],
-        recommendation=(
-            "Read the issue and `/fix-bug`'s own reasoning first -- a "
-            "`refused` outcome usually means the fix is feature-scoped, "
-            "which points at promoting rather than forcing a bug-sized fix."
-        ),
-        runner=runner,
+def _evidence_for(
+    reason: str, changed_files: list, diff_lines: int, limits: dict
+) -> tuple:
+    """Render the measurement behind *reason* as sentences a human can read."""
+    if reason == REASON_JUDGE_PATH_TOUCHED:
+        hits = judge_paths_touched(changed_files)
+        if not hits:
+            return ()
+        shown = ", ".join(f"`{p}`" for p in hits[:5])
+        more = f" (and {len(hits) - 5} more)" if len(hits) > 5 else ""
+        return (
+            f"Judge paths touched: {shown}{more}. A judge path is one the "
+            f"merge decision itself depends on, so a fix that edits it "
+            f"cannot approve its own guardrail.",
+        )
+    if reason == REASON_DIFF_TOO_LARGE:
+        return (
+            f"Diff is {diff_lines} changed lines against a "
+            f"`rules.bugs.max_diff_lines` cap of {limits.get('max_diff_lines')}.",
+        )
+    if reason == REASON_NO_TEST_EVIDENCE:
+        paths = ", ".join(f"`{p}`" for p in limits.get("test_paths") or ())
+        return (
+            f"No changed file falls under the declared test paths"
+            f"{': ' + paths if paths else ''}.",
+        )
+    return ()
+
+
+def _declined(
+    runner: Callable,
+    repo: str,
+    pr_number: int,
+    reason: str,
+    working_dir: str,
+    *,
+    evidence: tuple = (),
+) -> BugLaneResult:
+    """Label the PR with *reason* (best-effort) and return the declined result."""
+    # The public label name, never the raw reason constant (#1420): the
+    # constant is an internal identifier that provision_labels does not
+    # create, so labelling with it failed on every declining path.
+    label_written = True
+    label = DECLINE_LABELS.get(reason)
+    if label is not None:
+        label_written = add_guardrail_label(
+            runner, repo, pr_number, label, target=working_dir,
+        )
+    return BugLaneResult(
+        outcome=OUTCOME_DECLINED,
+        reason=reason,
+        pr_number=pr_number,
+        label_written=label_written,
+        evidence=evidence,
     )
 
 
@@ -455,7 +482,12 @@ def run_bug_lane(
     outcome = classify_outcome(getattr(invocation, "stdout", "") or "")
 
     if outcome in _ESCALATING_OUTCOMES:
-        _escalate_fix_bug_outcome(runner, repo, issue_number, outcome, policy_path)
+        # The lane files nothing. It used to open its own tracking issue here,
+        # which meant one halt produced a second issue the human then had to
+        # correlate back to the bug by hand -- and a repeated refusal produced
+        # a third and a fourth (issue #1183, three runs, three issues). The
+        # caller records the halt on the bug's own issue instead, through the
+        # single escalation owner in `specfuse.agent.run`.
         return BugLaneResult(outcome=outcome, reason=None, pr_number=None)
 
     pr_number = _find_pr_for_issue(runner, repo, issue_number)
@@ -463,12 +495,33 @@ def run_bug_lane(
         return BugLaneResult(outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND, pr_number=None)
 
     changed_files, diff_lines = _pr_changed_files_and_diff_lines(runner, repo, pr_number)
+    limits = bug_lane_limits(policy_path)
+    provenance = _issue_provenance(runner, repo, issue_number)
+
+    # Shape first, CI second. Every guardrail below is decidable from the PR
+    # itself, and a PR they decline can never merge whatever CI reports -- so
+    # waiting up to `CI_WAIT_SECONDS` for a conclusion first bought nothing
+    # but ten minutes per item. Two of eight items in the first unattended
+    # run paid that wait to be declined `judge_path_touched`.
+    shape = evaluate_pr_shape_guardrails(
+        changed_files=changed_files,
+        diff_lines=diff_lines,
+        max_diff_lines=limits["max_diff_lines"],
+        provenance=provenance,
+        test_paths=limits["test_paths"],
+    )
+    if not shape.eligible:
+        return _declined(
+            runner, repo, pr_number, shape.reason, working_dir,
+            evidence=_evidence_for(
+                shape.reason, changed_files, diff_lines, limits,
+            ),
+        )
+
     ci_conclusion = pr_ci_conclusion(
         runner, repo, pr_number,
         sleep=ci_sleep, clock=ci_clock, deadline_seconds=ci_deadline_seconds,
     )
-    limits = bug_lane_limits(policy_path)
-    provenance = _issue_provenance(runner, repo, issue_number)
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)
 
     decision = evaluate_merge_guardrails(
@@ -491,20 +544,19 @@ def run_bug_lane(
         record_merge(runner, repo, pr_number, at=time.time() if now is None else now)
         return BugLaneResult(outcome=OUTCOME_MERGED, reason=decision.reason, pr_number=pr_number)
 
-    label_written = True
-    if decision.reason != REASON_ELIGIBLE:
-        # The public label name, never the raw reason constant (#1420): the
-        # constant is an internal identifier that provision_labels does not
-        # create, so labelling with it failed on every declining path.
-        label = DECLINE_LABELS.get(decision.reason)
-        if label is not None:
-            label_written = add_guardrail_label(
-                runner, repo, pr_number, label, target=working_dir,
-            )
+    if decision.eligible:
+        # Eligible but not merged: the dial is the only thing in the way, and
+        # saying so is the whole point of this branch. No label -- there is no
+        # declining reason to project, and `DECLINE_LABELS` deliberately has no
+        # entry for `REASON_ELIGIBLE`.
+        return BugLaneResult(
+            outcome=OUTCOME_AUTOMERGE_OFF, reason=decision.reason, pr_number=pr_number
+        )
 
-    return BugLaneResult(
-        outcome=OUTCOME_DECLINED,
-        reason=decision.reason,
-        pr_number=pr_number,
-        label_written=label_written,
+    # Reaching here means `decision.eligible` is False, so the reason is a real
+    # declining one and never `REASON_ELIGIBLE` -- the eligible-but-not-merged
+    # case returned above.
+    return _declined(
+        runner, repo, pr_number, decision.reason, working_dir,
+        evidence=_evidence_for(decision.reason, changed_files, diff_lines, limits),
     )
