@@ -115,6 +115,13 @@ JUDGE_MODULES = tuple(
         "prerun_capture.py",
         # Trail integrity: a verdict is only as good as the events proving it.
         "validate_event.py",
+        # Evidence pipes. None of these reaches a verdict itself, but each one
+        # is how a verdict READS its inputs, and the membership rule is about
+        # what can change a verdict, not about who signs it.
+        "_miniyaml.py",      # parses every frontmatter and agent-policy.yml
+        "_wu_sections.py",   # splits the WU body the closing guards read
+        "triage.py",         # `parse_marker` decides REASON_UNTRACEABLE
+        "rearm_migration.py",  # rewrites the cost fields budget_projection reads
     )
 )
 
@@ -125,8 +132,6 @@ JUDGE_MODULES = tuple(
 NON_JUDGE_MODULES = {
     "__init__.py": "package marker; no logic",
     "_filelock.py": "advisory lock primitive; grants no verdict",
-    "_miniyaml.py": "YAML parsing primitive used by judges and non-judges alike",
-    "_wu_sections.py": "work-unit section splitting; a reader, not a verdict",
     "adopt_feature.py": "scaffolds a feature folder from a GitHub issue",
     "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
     "driver_edit.py": "applies operator edits to a feature folder",
@@ -145,9 +150,7 @@ NON_JUDGE_MODULES = {
     "notify_sla.py": "as notify.py",
     "policy_proposals.py": "drafts policy changes for a human to accept",
     "policy_review.py": "presents proposals; the human decides",
-    "rearm_migration.py": "one-shot migration of re-arm history format",
     "scaffold.py": "writes scaffold files into a target project",
-    "triage.py": "classifies inbound issues; sets no gate and merges nothing",
 }
 
 # Package data is what a target project receives, so a work unit editing a

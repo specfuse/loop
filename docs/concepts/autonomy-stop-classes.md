@@ -255,7 +255,7 @@ per-project override yet. Tuning them is expected to graduate to
 | `DRIFT_CAP_RATIO` | `0.5` | class 5, `drift_caps` |
 | `ADDED_GATE_CAP` | `1` | class 5, `drift_caps` |
 | `JUDGE_PATHS` | `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `pyproject.toml`, plus `JUDGE_MODULES` and `JUDGE_DATA_PREFIXES` (driver-source repository only) | class 2, `judge_editing` |
-| `JUDGE_MODULES` | the 20 modules under `specfuse/loop/` a merge/arm/close verdict reads; every other module is registered in `NON_JUDGE_MODULES` with a reason | class 2, `judge_editing` |
+| `JUDGE_MODULES` | the 24 modules under `specfuse/loop/` a merge/arm/close verdict reads; every other module is registered in `NON_JUDGE_MODULES` with a reason | class 2, `judge_editing` |
 | `JUDGE_DATA_PREFIXES` | `specfuse/loop/data/` subtrees seeding a judge surface downstream: `rules/`, `rules-local/`, `schemas/`, `templates/`, `workflows/`, `verification.yml.example` | class 2, `judge_editing` |
 
 ## Reading an `arm_predicate_evaluated` event

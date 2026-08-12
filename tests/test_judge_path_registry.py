@@ -115,6 +115,24 @@ class TestEveryDataEntryIsClassified(unittest.TestCase):
 class TestTheDecisionModulesAreStillCovered(unittest.TestCase):
     """Spot checks with names, so a careless registry edit is loud."""
 
+    def test_evidence_pipes_are_judge_paths(self):
+        """A module a verdict READS THROUGH can change that verdict.
+
+        `triage.parse_marker` decides `REASON_UNTRACEABLE` in the merge
+        guardrails; `_miniyaml` parses every frontmatter and
+        `agent-policy.yml`, including the automerge dial; `rearm_migration`
+        rewrites the cost fields `budget_projection` measures. None of them
+        signs a verdict. Each can change one.
+        """
+        for module in (
+            "specfuse/loop/triage.py",
+            "specfuse/loop/_miniyaml.py",
+            "specfuse/loop/_wu_sections.py",
+            "specfuse/loop/rearm_migration.py",
+        ):
+            with self.subTest(module=module):
+                self.assertTrue(arm_eval._matches_judge_path(module))
+
     def test_the_predicates_are_judge_paths(self):
         for module in (
             "specfuse/loop/arm_eval.py",
@@ -133,12 +151,13 @@ class TestTheDecisionModulesAreStillCovered(unittest.TestCase):
 
         Issue #240's fix touched `specfuse/loop/loop.py` -- a real judge, and
         still declined. Issue #795's touched `specfuse/loop/gate_eval.py`, also
-        a real judge. But a fix to notification or triage code was blocked by
-        the same prefix while deciding nothing, and that class is now free.
+        a real judge. But a fix to notification, liveness, changelog or
+        escalation-rendering code was blocked by the same prefix while
+        deciding nothing, and that class is now free.
         """
         for module in (
             "specfuse/loop/notify.py",
-            "specfuse/loop/triage.py",
+            "specfuse/loop/heartbeat.py",
             "specfuse/loop/changelog.py",
             "specfuse/loop/escalation.py",
         ):
