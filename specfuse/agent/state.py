@@ -72,6 +72,12 @@ class PRSummary:
     number: int
     title: str
     labels: tuple
+    #: The PR body, carried so a provider can tell whether an item it is
+    #: about to work already has an open PR against it. `/fix-bug`'s hard
+    #: contract is a `closes #<issue>` line in the body, so the body is the
+    #: only place that linkage is readable from a listing. Defaults empty so
+    #: a caller constructing a `PRSummary` by hand is unaffected.
+    body: str = ""
 
 
 @dataclass(frozen=True)
@@ -173,7 +179,12 @@ def _to_pr_summary(raw: dict) -> PRSummary:
     labels = tuple(
         entry.get("name", "") for entry in (raw.get("labels") or []) if isinstance(entry, dict)
     )
-    return PRSummary(number=raw.get("number"), title=raw.get("title", ""), labels=labels)
+    return PRSummary(
+        number=raw.get("number"),
+        title=raw.get("title", ""),
+        labels=labels,
+        body=raw.get("body") or "",
+    )
 
 
 def _read_issues(runner: Callable, repo: str, *, limit: int) -> tuple:
@@ -205,7 +216,7 @@ def _read_prs(runner: Callable, repo: str, *, limit: int) -> tuple:
                 "--repo", repo,
                 "--state", "open",
                 "--limit", str(limit),
-                "--json", "number,title,labels",
+                "--json", "number,title,labels,body",
             ],
         )
     except _ReadFailure as exc:
