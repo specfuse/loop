@@ -12,7 +12,6 @@ consumed here unmodified.
 
 from __future__ import annotations
 
-import re
 from typing import Any, Callable, Optional, Sequence
 
 from specfuse.agent.run import (
@@ -31,6 +30,7 @@ from specfuse.loop.bug_lane_run import (
     OUTCOME_DECLINED,
     OUTCOME_MERGED,
     OUTCOME_REFUSED,
+    pr_closes_issue,
     run_bug_lane,
 )
 from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
@@ -51,18 +51,15 @@ _FIX_BUG_STOPPED_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
 #: "fix" its own "PR was declined by the merge guardrails" report.
 _HUMAN_OWNED_LABELS = frozenset({NEEDS_HUMAN_LABEL, "blocked-wu"})
 
-#: `/fix-bug` cites its issue as `closes #<n>` in the PR body by hard
-#: contract (SKILL.md Step 7); `bug_lane_run._find_pr_for_issue` already
-#: relies on exactly this. Matched case-insensitively against every open PR
-#: body so an issue whose fix is already open for review is not re-fixed.
-_CLOSES_RE_TEMPLATE = r"\bcloses\s+#{number}\b"
-
-
 def _has_open_pr(snapshot: AgentSnapshot, issue_number: int) -> bool:
-    pattern = re.compile(
-        _CLOSES_RE_TEMPLATE.format(number=issue_number), re.IGNORECASE
-    )
-    return any(pattern.search(pr.body or "") for pr in snapshot.prs)
+    """Whether an open PR already cites `closes #issue_number`.
+
+    Delegates to `bug_lane_run.pr_closes_issue` rather than carrying its own
+    regex: selection's "this issue already has a fix in review" and the
+    lane's "which PR fixes this issue" are the same question, and two copies
+    of the answer is how they drift.
+    """
+    return any(pr_closes_issue(pr.body or "", issue_number) for pr in snapshot.prs)
 
 
 def _pr_ref(pr_number: Optional[int]) -> str:
