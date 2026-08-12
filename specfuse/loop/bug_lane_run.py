@@ -52,7 +52,11 @@ from specfuse.loop.bug_lane import (
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.labels import provision_labels
 from specfuse.loop.triage import parse_marker
-from specfuse.monitor.autofix_invoke import build_invocation, classify_outcome
+from specfuse.monitor.autofix_invoke import (
+    build_invocation,
+    classify_outcome,
+    extract_stop_rationale,
+)
 
 __all__ = (
     "BugLaneResult",
@@ -131,6 +135,12 @@ class BugLaneResult:
     #: computed, which is the whole content of every escalation the first
     #: unattended run produced.
     evidence: tuple = ()
+    #: The session's own account of why it stopped, for `refused` /
+    #: `could_not_proceed`. `/fix-bug`'s contract promises one -- "the
+    #: recorded reason names which criterion fired" -- and `classify_outcome`
+    #: was throwing it away, so three refusals in one run were three
+    #: identical escalations saying only which word came back.
+    stop_rationale: str = ""
     #: `(branch, commit_count)` when a stopped run left committed work behind
     #: that no remote has. `None` when the stop really did leave nothing --
     #: the two are not distinguishable from the outcome constant alone, and
@@ -579,7 +589,8 @@ def run_bug_lane(
     """
     argv, prompt = build_invocation(issue_number, repo, working_dir)
     invocation = runner(argv + [prompt], check=False)
-    outcome = classify_outcome(getattr(invocation, "stdout", "") or "")
+    session_output = getattr(invocation, "stdout", "") or ""
+    outcome = classify_outcome(session_output)
 
     if outcome in _ESCALATING_OUTCOMES:
         # The lane files nothing. It used to open its own tracking issue here,
@@ -593,6 +604,7 @@ def run_bug_lane(
             reason=None,
             pr_number=None,
             unpushed_work=unpushed_work_for_issue(runner, issue_number),
+            stop_rationale=extract_stop_rationale(session_output),
         )
 
     pr_number = _find_pr_for_issue(runner, repo, issue_number)

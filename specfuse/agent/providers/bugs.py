@@ -80,7 +80,7 @@ def _evidence_block(evidence: Sequence[str]) -> str:
 
 
 def _abandoned_work_payload(
-    issue_number: int, outcome: str, branch: str, commits: int
+    issue_number: int, outcome: str, branch: str, commits: int, rationale: str = ""
 ) -> EscalationPayload:
     """The stop left committed work behind. Say so, first and loudest.
 
@@ -101,6 +101,7 @@ def _abandoned_work_payload(
             f"`{branch}` carries {commits} {plural} that no remote has. The "
             f"most likely reading is that the fix itself completed and the "
             f"push or the PR open is what failed."
+            f"{_rationale_block(rationale)}"
         ),
         issue_summary=(
             f"The bug lane stopped on this issue (`{outcome}`), leaving "
@@ -145,12 +146,26 @@ def _abandoned_work_payload(
     )
 
 
-def _fix_bug_stopped_payload(issue_number: int, outcome: str) -> EscalationPayload:
+def _rationale_block(rationale: str) -> str:
+    """The session's own words, quoted, or a statement that it gave none."""
+    if not rationale:
+        return (
+            "\n\nThe session recorded no reason for stopping. That is itself "
+            "worth noting -- `/fix-bug`'s contract says the recorded reason "
+            "names which criterion fired."
+        )
+    return f"\n\nIts own account of why:\n\n> {rationale}"
+
+
+def _fix_bug_stopped_payload(
+    issue_number: int, outcome: str, rationale: str = ""
+) -> EscalationPayload:
     return EscalationPayload(
         target_issue=issue_number,
         done_so_far=(
             f"Headless `/fix-bug` ran against this issue and stopped without "
             f"opening a mergeable PR -- it reported `{outcome}`."
+            f"{_rationale_block(rationale)}"
         ),
         issue_summary=(
             f"The bug lane could not fix this issue automatically -- "
@@ -357,11 +372,14 @@ class BugsProvider:
             if result.unpushed_work:
                 branch, commits = result.unpushed_work
                 escalation = _abandoned_work_payload(
-                    issue_number, result.outcome, branch, commits
+                    issue_number, result.outcome, branch, commits,
+                    result.stop_rationale,
                 )
                 detail = f"{detail} — {commits} committed on `{branch}`, unpushed"
             else:
-                escalation = _fix_bug_stopped_payload(issue_number, result.outcome)
+                escalation = _fix_bug_stopped_payload(
+                    issue_number, result.outcome, result.stop_rationale
+                )
         elif result.outcome == OUTCOME_AUTOMERGE_OFF:
             escalation = _automerge_off_payload(issue_number, result.pr_number)
         else:
