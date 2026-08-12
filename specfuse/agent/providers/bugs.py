@@ -12,6 +12,7 @@ consumed here unmodified.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Callable, Optional, Sequence
 
 from specfuse.agent.run import (
@@ -31,10 +32,32 @@ from specfuse.loop.bug_lane_run import (
     OUTCOME_REFUSED,
     run_bug_lane,
 )
+from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
 
 _ITEM_ID_PREFIX = "bug-"
 
 _LANE_FILED_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
+
+#: Labels that mean "a human already owns this issue". An issue carrying one
+#: is parked awaiting a decision, so re-running the lane against it can only
+#: repeat the outcome that parked it. Observed live: issue #1183 was refused
+#: on three separate runs, and every escalation the agent filed was itself
+#: triaged `bug` and became a candidate on the next run -- the lane trying to
+#: "fix" its own "PR was declined by the merge guardrails" report.
+_HUMAN_OWNED_LABELS = frozenset({NEEDS_HUMAN_LABEL, "blocked-wu"})
+
+#: `/fix-bug` cites its issue as `closes #<n>` in the PR body by hard
+#: contract (SKILL.md Step 7); `bug_lane_run._find_pr_for_issue` already
+#: relies on exactly this. Matched case-insensitively against every open PR
+#: body so an issue whose fix is already open for review is not re-fixed.
+_CLOSES_RE_TEMPLATE = r"\bcloses\s+#{number}\b"
+
+
+def _has_open_pr(snapshot: AgentSnapshot, issue_number: int) -> bool:
+    pattern = re.compile(
+        _CLOSES_RE_TEMPLATE.format(number=issue_number), re.IGNORECASE
+    )
+    return any(pattern.search(pr.body or "") for pr in snapshot.prs)
 
 
 class BugsProvider:
@@ -59,6 +82,10 @@ class BugsProvider:
         items = []
         for issue in snapshot.issues:
             if issue.triage_category != "bug":
+                continue
+            if _HUMAN_OWNED_LABELS.intersection(issue.labels or ()):
+                continue
+            if _has_open_pr(snapshot, issue.number):
                 continue
             items.append(
                 ActionItem(
