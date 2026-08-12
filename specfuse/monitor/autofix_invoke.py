@@ -64,3 +64,49 @@ def classify_outcome(result_text):
     if len(found) != 1:
         return "could_not_proceed"
     return found[0]
+
+
+#: How much of the session's own words to carry. Long enough for a paragraph
+#: of reasoning, short enough that an escalation stays readable.
+STOP_RATIONALE_LIMIT = 700
+
+
+def extract_stop_rationale(result_text: str, *, limit: int = STOP_RATIONALE_LIMIT) -> str:
+    """The session's own account of why it stopped, or `""`.
+
+    `classify_outcome` reduces an entire headless session to one of four
+    words and discards everything else -- including the reason. `/fix-bug`'s
+    contract is explicit that there is one to keep: *"The recorded reason
+    names which criterion fired."*
+
+    Losing it is not cosmetic. Three consecutive refusals in one run produced
+    three byte-identical escalations reading only "`/fix-bug` reported
+    `refused`", so nothing distinguished a correct refusal on
+    architectural work from a questionable one on a two-line prose fix, and
+    the operator could not tell which without redoing the analysis by hand.
+
+    Prefers an explicit `blocked_reason:` (the RESULT-block field
+    `result-contract.md` defines) and otherwise falls back to the output's
+    tail, which is where a session's closing explanation lands. Returns `""`
+    rather than guessing when there is nothing usable -- an empty rationale
+    is honest; an invented one is worse than none.
+    """
+    if not result_text or not result_text.strip():
+        return ""
+
+    lines = [line.rstrip() for line in result_text.strip().splitlines()]
+
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.lower().startswith("blocked_reason:"):
+            reason = stripped.split(":", 1)[1].strip()
+            # A wrapped value continues on the following indented lines.
+            for continuation in lines[index + 1:]:
+                if not continuation.strip() or not continuation.startswith((" ", "\t")):
+                    break
+                reason = f"{reason} {continuation.strip()}"
+            if reason:
+                return reason[:limit].strip()
+
+    tail = [line.strip() for line in lines if line.strip()][-6:]
+    return " ".join(tail)[:limit].strip()
