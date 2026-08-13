@@ -1,13 +1,46 @@
 ---
 gate: 1
-status: open        # open | awaiting_review | passed
-cost_budget_usd: 24.0
-# Sum of this gate's WU estimates ($16.00) plus one re-attempt of its largest WU
-# ($8.00, T01) — the defensive padding `.specfuse/rules/planning-discipline.md` §5
-# prescribes while first-attempt success runs 51–74%.
+status: passed
+cost_budget_usd: 50.0
+# Raised 2026-08-13 from $24.00 by operator decision, with the reason recorded
+# here so the number is not mysterious later.
+#
+# The original $24.00 was the correct estimate: this gate's WU estimates ($16.00)
+# plus one re-attempt of its largest WU ($8.00, T01), the defensive padding
+# `.specfuse/rules/planning-discipline.md` §5 prescribes. It was not wrong; it
+# was overrun.
+#
+# The overrun is $40.27 of failed G1-CLOSE attempts, all three refused on
+# `assert_learnings_appended_or_noop`.
+#
+# CORRECTED 2026-08-13, after the passing close did the forensics. The cause
+# recorded here originally — that criterion 5 named `.specfuse/LEARNINGS.md`,
+# the path `close-i` forbids under `auto` — was WRONG, and so was the claim that
+# no artifacts were produced. All three refused attempts (`22ff27c`, `bc27b30`,
+# `9292986`) committed a populated `LEARNINGS-pending.md` (+180/+85/+138 lines):
+# they took the staging route regardless of the criterion's wording.
+#
+# The real cause is a stale driver build. Every refusal names only
+# `.specfuse/LEARNINGS.md`, with no "or <staging file>" clause — a string only
+# pre-#1582 code emits (`git show 08a2210^:specfuse/loop/loop.py | grep -c
+# learnings_staging_is_required` → 0; current → 3). `08a2210` is an ancestor of
+# all three attempts, so the tree carried the fix while the code that ran did
+# not: the `build_provenance` / #1040 hazard, `specfuse run` resolving
+# `specfuse.loop` from an installed copy rather than the working tree.
+#
+# The criterion-5 edit (`589fd96`) was therefore unnecessary. It is kept because
+# naming the staging file is clearer than naming a forbidden path, not because
+# it fixed this. #2173 is corrected in place and re-scoped accordingly.
+#
+# `planning-discipline.md` §5 warns against raising a ceiling to absorb a retry,
+# because "a closing-WU retry is a defect to diagnose, not a cost to budget for".
+# That warning is honoured rather than waived: the defect WAS diagnosed and fixed,
+# and the remaining work is one bounded close at ~$5.00. $50.00 covers the sunk
+# $43.52 plus that close. It is not headroom for further retries — a second spin
+# here is a new defect and should halt again.
 baseline:
-  sha: 2718d6e5684fe48ef290e4e0837f856f017a1f1a
-  probed_at: 2026-08-13T00:33:08.127419+00:00
+  sha: 26e6c56e2abcad34f22d862b5c9ccb35adb23ecd
+  probed_at: 2026-08-13T12:24:03.449129+00:00
   failing: []
 ---
 

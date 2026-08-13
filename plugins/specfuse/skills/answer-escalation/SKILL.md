@@ -130,7 +130,14 @@ For every disposition except `skip`:
    `gh issue comment <number> --repo <repo> --body "<guidance>\n<!-- specfuse:operator-guidance id=<correlation_id> -->"`
 2. Only after that comment succeeds, remove `NEEDS_HUMAN_LABEL` (and, for
    `blocked-wu`, `blocked-wu` too) from the issue:
-   `gh issue edit <number> --repo <repo> --remove-label needs-human`
+   `gh issue edit <number> --repo <repo> --remove-label needs-human --remove-label blocked-wu`
+
+   **Both labels, not just `needs-human`.** `BugsProvider._HUMAN_OWNED_LABELS`
+   is `{needs-human, blocked-wu}` and skips an issue carrying *either*, so
+   releasing only the first leaves the issue answered and still parked — the
+   exact failure this skill exists to remove. Omit `--remove-label blocked-wu`
+   only when the issue does not carry it (`gh issue edit` errors on removing a
+   label that is absent).
 
 This order is deliberate (PLAN.md D3): the comment is the authoritative
 record, the label is a projection of it. A failed label release leaves an
@@ -151,7 +158,7 @@ $ gh issue comment 42 --repo example-org/example-repo --body \
   "Credentials rotated; re-run should succeed now.
 <!-- specfuse:operator-guidance id=FEAT-2026-0080/T01 -->"
 
-$ gh issue edit 42 --repo example-org/example-repo --remove-label needs-human
+$ gh issue edit 42 --repo example-org/example-repo --remove-label needs-human --remove-label blocked-wu
 ```
 
 ## What this skill is not
