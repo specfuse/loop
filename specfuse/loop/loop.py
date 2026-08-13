@@ -1820,34 +1820,57 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         # built on the current base?", which is what comparing its merge-base
         # against the base's tip answers. A rebased or freshly-created branch
         # passes; a branch forked from an older tip does not.
-        # True divergence means BOTH sides carry commits the other lacks --
-        # which is what the word in the error message has always claimed.
-        # A branch merely ahead (normal in-progress work, or a rebased one) or
-        # merely behind (created earlier, nothing done yet) is not divergent
-        # and must not be refused.
+        # A feature branch falls behind its base every time anything else
+        # merges. That is the normal life of a feature branch, not a fault --
+        # and refusing it made the driver unable to advance ANY in-flight
+        # feature after any merge, which for an unattended agent is a deadlock
+        # generator rather than a safety property.
+        #
+        # This guard's stated purpose is that a pre-existing branch "is
+        # surfaced rather than silently checked out" (#48). Surfaced, not
+        # refused. The hazard is silently reusing a branch from a DIFFERENT
+        # lineage; a branch the driver has been committing to, merely behind
+        # its base, is not that.
+        #
+        # So: bring it up to date the way a human would, and refuse only when
+        # that cannot be done automatically. `merge` rather than `rebase`
+        # deliberately -- the branch may already be pushed, and rewriting its
+        # history would force every consumer to recover from a force-push to
+        # fix a condition that is not their fault.
         counts = subprocess.run(
             ["git", "rev-list", "--left-right", "--count", f"{base}...{branch}"],
             capture_output=True, text=True, check=False,
         )
-        if counts.returncode != 0:
-            # Unreadable: fail open rather than block on a git that cannot
-            # answer. The checkout below surfaces any real problem itself.
-            is_ancestor = True
-        else:
+        behind = 0
+        if counts.returncode == 0:
             parts = counts.stdout.split()
-            behind, ahead = (int(parts[0]), int(parts[1])) if len(parts) == 2 else (0, 0)
-            is_ancestor = not (behind and ahead)
-        if not is_ancestor:
-            raise FeatureBranchError(
-                f"branch '{branch}' has diverged from '{base}' — it carries "
-                f"commits '{base}' does not, likely because it was created "
-                f"from a different starting point or '{base}' has since moved "
-                f"on. Bring it onto the current base:\n"
-                f"  git checkout {branch} && git rebase {base}\n"
-                f"(Carrying unmerged commits is normal and no longer refused; "
-                f"what is refused is a branch forked from an older '{base}'.)"
-            )
+            if len(parts) == 2:
+                behind = int(parts[0])
+
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
+
+        if behind:
+            merged = subprocess.run(
+                ["git", "merge", "--no-edit", base],
+                capture_output=True, text=True, check=False,
+            )
+            if merged.returncode != 0:
+                subprocess.run(
+                    ["git", "merge", "--abort"],
+                    capture_output=True, text=True, check=False,
+                )
+                raise FeatureBranchError(
+                    f"branch '{branch}' is {behind} commit(s) behind '{base}' and "
+                    f"cannot be brought up to date automatically -- merging "
+                    f"'{base}' into it conflicts. The merge was aborted and the "
+                    f"branch left exactly as it was. Resolve by hand:\n"
+                    f"  git checkout {branch} && git merge {base}\n"
+                    f"git's own report:\n{(merged.stdout + merged.stderr).strip()}"
+                )
+            print(
+                f"Brought '{branch}' up to date with '{base}' "
+                f"({behind} commit(s) behind)."
+            )
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
         # Create-from-base carries the working tree onto the new branch. Only

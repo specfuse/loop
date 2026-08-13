@@ -180,11 +180,19 @@ class TestTheOldCheckWasUnsatisfiable(unittest.TestCase):
         self.assertTrue(self.repo.accepted("feat/x"))
 
 
-class TestUnreadableGitFailsOpen(unittest.TestCase):
-    def test_the_message_no_longer_implies_unmerged_work_is_the_problem(self):
+class TestTheRefusalIsNowConflictOnly(unittest.TestCase):
+    def test_the_guard_refuses_only_a_conflicting_merge(self):
+        """Superseded by the auto-sync change (#2186).
+
+        An earlier revision refused on divergence and explained that unmerged
+        commits were acceptable. The driver now brings a behind branch up to
+        date instead, so the only remaining refusal is a merge that conflicts.
+        """
         src = (REPO_ROOT / "specfuse" / "loop" / "loop.py").read_text()
 
-        self.assertIn("Carrying unmerged commits is normal", src)
+        self.assertIn("cannot be brought up to date automatically", src)
+        self.assertIn("merge", src)
+        self.assertIn("--abort", src)
 
 
 if __name__ == "__main__":
