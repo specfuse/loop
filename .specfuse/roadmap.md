@@ -93,7 +93,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
 | FEAT-2026-0078 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-2026-0078) |
 | FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | planned | — | [→ detail](#feat-2026-0079) |
-| FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | active | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ detail](#feat-2026-0080) |
+| FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -946,21 +946,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Benefits.** One operation behaves one way regardless of which path an operator takes, so archiving by hand stops being able to reintroduce a defect the driver no longer has. Removes a drift surface rather than re-syncing it. And it settles a question that recurs whenever a skill and the driver implement the same thing — flagged once by `[FEAT-2026-0010/G1]` and never decided.
 
 **Status: planned.**
-
-<a id="feat-2026-0080"></a>
-## FEAT-2026-0080 — Operator-answered escalations: guidance that survives into the next agent run
-
-**Why.** `AnsweredEscalationProvider` parses the operator's chosen option off an escalation issue and posts an acknowledgment, but by its own docstring it "does not carry out the chosen option" and leaves `NEEDS_HUMAN_LABEL` in place "until whichever future provider executes the option removes it". That future provider does not exist: the only `--remove-label` calls in the tree are `state:ready` / `state:in-progress` in `gh_backend.py`, neither of which touches the human-owned labels. Meanwhile `BugsProvider.advertise` skips every issue carrying `needs-human` or `blocked-wu` (`_HUMAN_OWNED_LABELS`), so an answered escalation is acknowledged and then stays parked forever. Observed 2026-08-12: eight open `needs-human` issues, every one also `blocked-wu` — answering any of them changes nothing until a human edits its labels by hand. Worse, simply releasing the label would make the lane retry an *unchanged* problem and collect the same refusal, which is how several of those issues accumulated in the first place.
-
-**Goal.** One human-invoked skill, `/answer-escalation`, that reads a parked escalation, explains in plain English what stopped the agent, and offers four dispositions: hand off to the skill that owns the escalation's category, answer with guidance recorded as a marked issue comment, close as won't-fix, or skip. Every disposition except `skip` releases the `needs-human` / `blocked-wu` labels so the lane can act again; `skip` writes nothing at all. The skill triggers no fix and no retry — its product is guidance plus the unpark. Paired with it, `/fix-bug` is corrected to read the issue comments its Step 1 already claims to read, so that guidance reaches the retry rather than being written into a void. Agent-side autonomous execution of an answer is explicitly excluded, not deferred.
-
-**Benefits.** An operator check-in becomes "work the queue one issue at a time and leave a real answer" instead of hand-editing labels, and the next agent run starts better-informed rather than merely unblocked — the difference between repeating a refusal and resolving it. Formalizes a promotion path the operator already walks by hand: FEAT-2026-0079 was itself promoted from #1183 after the bug lane refused it three times. Also removes a permanent side effect nobody chose — because the label is never released today, `notify_sla` re-pings answered escalations forever.
-
-**What shipped (gate 1, terminal).** `/answer-escalation` exists in both the canonical and vendored skill trees, byte-identical, human-invoked only and refusing to run headless. It names all four dispositions, carries a routing entry for every value in `escalation.CATEGORY_LABELS`, documents the `<!-- specfuse:operator-guidance id=<correlation_id> -->` marker, fixes the write order at guidance-comment-first / label-release-second, makes `skip` inert, and states that it triggers no fix and no retry. `/fix-bug` Step 1 now names `gh issue view <issue-number> --comments`, so the guidance reaches the retry instead of being written into a void. **Agent-side autonomous execution of an answer was excluded, not deferred** — PLAN.md's D1 records this as a decision, not a remaining slice, and `AnsweredEscalationProvider` is untouched; a later reader should not log it as unfinished work from this feature.
-
-**What was not verified.** The skill's acceptance is structural — its tests assert on `SKILL.md` prose — so no live `gh` round-trip has ever run. Two verifications stand open: whether the guidance marker survives a real `gh issue comment` write and is found by a subsequent `gh issue view --comments`, and the `gate-review` routing branch, unexercisable while the repository has zero open `gate-review` escalations and zero `awaiting_review` gates. Both are recorded with their exact re-run conditions in the feature's `RETROSPECTIVE.md`, which closes `met_locally` on that basis.
-
-**Status: active.**
 
 ## Notes
 

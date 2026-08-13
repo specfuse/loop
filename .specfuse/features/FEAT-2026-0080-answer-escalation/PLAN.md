@@ -5,7 +5,7 @@ slug: answer-escalation
 branch: feat/FEAT-2026-0080-answer-escalation
 roadmap_goal: A human can work the needs-human queue one issue at a time, leave guidance the next agent run actually reads, and unpark the issue — without ever triggering a fix themselves.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 16.00
 ---
 
