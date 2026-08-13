@@ -12,9 +12,10 @@
 
 version: 1
 
-# Operator's stated sequence as of 2026-08-09.
+# Operator's stated sequence as of 2026-08-12.
+# FEAT-2026-0049 dropped: roadmap status `done`, which validate_agent_policy WARNed on.
 queue:
-  - FEAT-2026-0049
+  - FEAT-2026-0080
 
 rules:
   bugs:
