@@ -14,8 +14,8 @@
   "properties": {
     "original_issue_correlation_id": {
       "type": "string",
-      "description": "The task-level correlation ID from the triggering task that filed the spec issue (e.g. `FEAT-2026-0042/T09`). Links the routing event back to the original `spec_issue_raised` event and the downstream task that discovered the problem.",
-      "pattern": "^((FEAT-\\d{4}-\\d{4})|(INIT-\\d{4}-\\d{4}/F\\d{2}))/T\\d{2}$"
+      "description": "The task-level correlation ID from the triggering task that filed the spec issue (e.g. `FEAT-2026-0042/T09`). Links the routing event back to the original `spec_issue_raised` event and the downstream task that discovered the problem. The task-id segment accepts every documented work-unit shape: substantive TNN, hygiene TNNH[N...], and closing-sequence G<n>-<NAME> (RETRO, LESSONS, DOCS, PLAN, CLOSE-INTERMEDIATE, CLOSE). See .specfuse/rules/correlation-ids.md.",
+      "pattern": "^((FEAT-\\d{4}-\\d{4})|(INIT-\\d{4}-\\d{4}/F\\d{2}))/(T\\d{2}(H\\d*)?|G\\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE))$"
     },
     "target_project": {
       "type": "string",
