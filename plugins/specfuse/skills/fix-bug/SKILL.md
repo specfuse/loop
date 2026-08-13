@@ -62,7 +62,12 @@ clearly feature-scoped (multi-file refactor, new capability, redesign).
 
 ### 1. Fetch the issue
 
-- `gh issue view <issue-number>` (or accept the body if user pasted it).
+- `gh issue view <issue-number> --comments` (or accept the body if user
+  pasted it). Plain `gh issue view` truncates at the issue body and
+  drops comments — comments matter because a prior run on this same
+  issue may have hit a halt and been answered by an operator since;
+  reading them is the difference between repeating that refusal and
+  resolving it.
 - Read: title, labels, body, comments. Capture: symptom, repro steps,
   observed vs expected behavior, root-cause hypothesis (if author
   provided one), proposed fix shape (if author proposed one).

@@ -6,6 +6,10 @@ attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+duration_seconds: 3731.83
+cost_usd: 40.267894
+input_tokens: 7754
+output_tokens: 127731
 ---
 
 # Close gate 1 — retrospective, lessons, docs and terminal verdict
@@ -54,8 +58,14 @@ dispatch; fill it with substance rather than re-deriving its headings.
    its trigger phrases, the `<!-- specfuse:operator-guidance … -->` marker as a new
    public format, and the changed Step 1 command in `/fix-bug` — or writes exactly
    `n/a — no consumer-visible contract change` if that enumeration turns out empty.
-5. Generalizable lessons are promoted to `.specfuse/LEARNINGS.md`, or the close
-   states explicitly that nothing generalizes and why. A candidate worth weighing:
+5. Generalizable lessons are written to this feature's `LEARNINGS-pending.md`,
+   **not** to `.specfuse/LEARNINGS.md`. This feature is `autonomy_default: auto`,
+   and under `auto` the `close-i` invariant `assert_learnings_staged_under_auto`
+   refuses a squash that touches `.specfuse/LEARNINGS.md` — a human promotes from
+   the staging file later. An added line in `LEARNINGS-pending.md` satisfies
+   `close-b` (`assert_learnings_appended_or_noop`) on its own; the
+   "nothing generalizes" phrase is for a close that genuinely found no durable
+   rule, and must not be written to escape a refusal. A candidate worth weighing:
    whether "an instruction naming a command that cannot satisfy it" is a recurring
    defect shape worth a durable rule, given `/fix-bug` Step 1 held that form
    undetected.

@@ -5,6 +5,10 @@ cost_budget_usd: 24.0
 # Sum of this gate's WU estimates ($16.00) plus one re-attempt of its largest WU
 # ($8.00, T01) — the defensive padding `.specfuse/rules/planning-discipline.md` §5
 # prescribes while first-attempt success runs 51–74%.
+baseline:
+  sha: 2718d6e5684fe48ef290e4e0837f856f017a1f1a
+  probed_at: 2026-08-13T00:33:08.127419+00:00
+  failing: []
 ---
 
 # Gate 1 — an operator can answer a parked escalation, and the next agent run is better for it

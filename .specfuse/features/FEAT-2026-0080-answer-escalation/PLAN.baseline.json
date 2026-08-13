@@ -1,0 +1,27 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Add the `/answer-escalation` skill",
+          "id": "FEAT-2026-0080/T01",
+          "planned_cost_usd": 8.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Make `/fix-bug` read the issue comments it already claims to read",
+          "id": "FEAT-2026-0080/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs and terminal verdict",
+          "id": "FEAT-2026-0080/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
