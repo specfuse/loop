@@ -1,10 +1,28 @@
 ---
 gate: 1
-status: awaiting_review
-cost_budget_usd: 24.0
-# Sum of this gate's WU estimates ($16.00) plus one re-attempt of its largest WU
-# ($8.00, T01) — the defensive padding `.specfuse/rules/planning-discipline.md` §5
-# prescribes while first-attempt success runs 51–74%.
+status: open
+cost_budget_usd: 50.0
+# Raised 2026-08-13 from $24.00 by operator decision, with the reason recorded
+# here so the number is not mysterious later.
+#
+# The original $24.00 was the correct estimate: this gate's WU estimates ($16.00)
+# plus one re-attempt of its largest WU ($8.00, T01), the defensive padding
+# `.specfuse/rules/planning-discipline.md` §5 prescribes. It was not wrong; it
+# was overrun.
+#
+# The overrun is $40.27 of failed G1-CLOSE attempts, all three refused on
+# `assert_learnings_appended_or_noop`, caused by this WU's own criterion 5 naming
+# `.specfuse/LEARNINGS.md` as the lesson destination on an `autonomy_default: auto`
+# feature — the one path `close-i` forbids. Diagnosed and fixed (the criterion now
+# names `LEARNINGS-pending.md`); the authoring gap that allowed it is filed as
+# #2173.
+#
+# `planning-discipline.md` §5 warns against raising a ceiling to absorb a retry,
+# because "a closing-WU retry is a defect to diagnose, not a cost to budget for".
+# That warning is honoured rather than waived: the defect WAS diagnosed and fixed,
+# and the remaining work is one bounded close at ~$5.00. $50.00 covers the sunk
+# $43.52 plus that close. It is not headroom for further retries — a second spin
+# here is a new defect and should halt again.
 baseline:
   sha: 57fd796a758cf91daf7b827c91cc61f9b0308eca
   probed_at: 2026-08-13T12:15:20.630541+00:00
