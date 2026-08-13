@@ -49,7 +49,11 @@ from specfuse.agent.state import AgentSnapshot, gather_snapshot
 from specfuse.loop import agent_policy
 from specfuse.loop._filelock import acquire_agent_lock
 from specfuse.loop.build_provenance import warn_if_out_of_tree
-from specfuse.loop.escalation import annotate_escalation, emit_escalation
+from specfuse.loop.escalation import (
+    CREATED_NUMBER_UNKNOWN,
+    annotate_escalation,
+    emit_escalation,
+)
 
 DEFAULT_SPECFUSE_DIR = Path(".specfuse")
 DEFAULT_AGENT_LOCK_NAME = ".agent.lock"
@@ -298,7 +302,12 @@ def _record_escalation(
             assignee=assignee,
             runner=runner,
         )
-        suffix = f"(filed as issue {issue_id})"
+        if not issue_id:
+            suffix = "(escalation could NOT be filed — no GitHub record exists)"
+        elif issue_id == CREATED_NUMBER_UNKNOWN:
+            suffix = "(escalation filed, but its issue number could not be read)"
+        else:
+            suffix = f"(filed as issue {issue_id})"
     return f"{reason} {suffix}" if reason else suffix.strip("()")
 
 
@@ -538,13 +547,26 @@ def run_agent(
                     f"{outcome.detail or 'no detail'}"
                 )
             else:
-                reason = _record_escalation(
-                    item,
-                    outcome,
-                    repo=repo,
-                    runner=runner,
-                    policy_path=policy_path,
-                )
+                try:
+                    reason = _record_escalation(
+                        item,
+                        outcome,
+                        repo=repo,
+                        runner=runner,
+                        policy_path=policy_path,
+                    )
+                except Exception as exc:  # noqa: BLE001 - see below
+                    # Recording an escalation must never destroy the run it is
+                    # recording (#2170). A `gh issue create` rejected for an
+                    # over-long title raised `CalledProcessError` out of here,
+                    # out of `run_agent`, and out of the process -- so a
+                    # REPORTING failure killed a run that had already done its
+                    # work. The item is still escalated; only its GitHub trace
+                    # is lost, and the summary says so.
+                    reason = (
+                        f"{outcome.detail} (escalation could NOT be recorded — "
+                        f"{type(exc).__name__}: {exc})"
+                    ).strip()
                 escalations.append(Escalation(item_id=item.item_id, reason=reason))
                 report(
                     f"{item.item_id} escalated after {_took(clock, item_started)} — "

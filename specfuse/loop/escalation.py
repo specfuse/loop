@@ -16,6 +16,10 @@ from typing import Callable, Optional
 
 NEEDS_HUMAN_LABEL = "needs-human"
 
+#: `gh issue create` succeeded but printed no parseable issue number. Distinct
+#: from `""`, which means it did not succeed at all.
+CREATED_NUMBER_UNKNOWN = "created (number unknown)"
+
 #: Empty by default (#1762). A username that is valid on no repository is
 #: not a safe default -- it failed every `gh issue create` on every repo
 #: that had not happened to create that user. Callers pass the operator's
@@ -186,6 +190,38 @@ def _extract_issue_number(stdout: str) -> str:
     return stdout.strip()
 
 
+#: GitHub rejects an over-long issue title outright. 256 is the documented
+#: ceiling; this leaves room for the `[correlation-id] ` prefix.
+_TITLE_LIMIT = 180
+
+
+def issue_title(correlation_id: str, issue_summary: str) -> str:
+    """One short line, whatever the summary contains.
+
+    The title used to be `f"[{cid}] {issue_summary}"` verbatim. When a
+    provider's summary is a Python traceback -- which is exactly what the
+    feature provider produces for a driver crash -- that is a multi-line,
+    ~2000-character title, and `gh issue create` rejects it. Observed
+    2026-08-12: the rejection raised out of `emit_escalation` and killed the
+    entire agent run, so a *reporting* failure destroyed the run it was
+    trying to report on.
+
+    Takes the first non-empty line, collapses whitespace, and truncates. The
+    full text is untouched in the body, which is where detail belongs.
+    """
+    first = ""
+    for line in (issue_summary or "").splitlines():
+        if line.strip():
+            first = " ".join(line.split())
+            break
+    if not first:
+        first = "escalation"
+    title = f"[{correlation_id}] {first}"
+    if len(title) > _TITLE_LIMIT:
+        title = title[: _TITLE_LIMIT - 1].rstrip() + "…"
+    return title
+
+
 def emit_escalation(
     correlation_id: str,
     *,
@@ -228,7 +264,7 @@ def emit_escalation(
     argv = [
         "gh", "issue", "create",
         "--repo", repo,
-        "--title", f"[{correlation_id}] {issue_summary}",
+        "--title", issue_title(correlation_id, issue_summary),
         "--body", body,
         "--label", NEEDS_HUMAN_LABEL,
         "--label", category,
@@ -243,8 +279,23 @@ def emit_escalation(
     if assignee and assignee.strip():
         argv += ["--assignee", assignee.strip()]
 
-    result = runner(argv, check=True)
-    return _extract_issue_number(result.stdout)
+    # NOT check=True (#2170). A rejected `gh issue create` used to raise
+    # `CalledProcessError` out of this function, through the caller, and out
+    # of the whole run -- a reporting failure destroying the run it was
+    # reporting on. The escalation is best-effort like every other GitHub
+    # projection in this codebase; the caller decides what an unfiled one
+    # means.
+    try:
+        result = runner(argv, check=False)
+    except Exception:  # noqa: BLE001 - a raising runner must not end the run
+        return ""
+    if getattr(result, "returncode", 1) != 0:
+        return ""
+    number = _extract_issue_number(getattr(result, "stdout", "") or "")
+    # Created, but `gh` printed nothing we could parse a number from. That is
+    # not the same as "not created", and reporting it as such would send the
+    # operator looking for an issue that exists.
+    return number or CREATED_NUMBER_UNKNOWN
 
 
 def _issue_carries_marker(
