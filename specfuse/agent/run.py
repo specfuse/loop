@@ -590,6 +590,7 @@ def default_providers(
     policy_path: Optional[str] = None,
     features_root: Optional[Path] = None,
     monitoring_config_path: Optional[str] = None,
+    reporter: Optional[Callable[[str], None]] = None,
 ) -> Sequence[ActionProvider]:
     """The registry each gate-2 provider WU (T06-T08) appends itself to.
 
@@ -626,6 +627,10 @@ def default_providers(
             runner=runner,
             policy_path=policy_path,
             features_root=features_root,
+            # The one provider that runs a long child process, so the one that
+            # owes the operator its output while it runs rather than after.
+            stream_driver_output=True,
+            reporter=reporter if reporter is not None else _default_reporter,
         ),
         TriageProvider(
             repo=repo,

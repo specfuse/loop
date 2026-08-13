@@ -19,6 +19,7 @@ feature is out of scope for this provider (`PLAN.md` "Scope boundary") --
 
 from __future__ import annotations
 
+import time
 from typing import Any, Callable, Optional, Sequence
 
 from specfuse.agent import driver_invoke, queue_read, state
@@ -63,12 +64,23 @@ class FeatureProvider:
         runner: Callable = _default_runner,
         policy_path: Any = None,
         features_root: Any = None,
+        stream_driver_output: bool = False,
+        reporter: Optional[Callable[[str], None]] = None,
     ):
         self._repo = repo
         self._runner = runner
         self._policy_path = policy_path
         self._features_root = features_root if features_root is not None else ".specfuse/features"
         self._rows: dict = {}
+        #: Opt-in rather than default-on so every existing caller that injects
+        #: its own `runner` keeps using it. The tests here inject recording
+        #: runners whose `on_call` side effects are what drive their
+        #: assertions; a provider that quietly built its own runner instead
+        #: would make those side effects stop firing. `default_providers`
+        #: turns this on for the real invocation, where `runner` is only ever
+        #: the module default and streaming is what the operator wants.
+        self._stream_driver_output = stream_driver_output
+        self._reporter = reporter
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         features, errors = state.read_feature_summaries(self._features_root)
@@ -136,7 +148,9 @@ class FeatureProvider:
 
         if disposition == queue_read.DISPOSITION_WORKABLE:
             halt = driver_invoke.advance_feature(
-                self._runner, feature_id, features_root=self._features_root
+                self._driver_runner(feature_id),
+                feature_id,
+                features_root=self._features_root,
             )
             return self._map_halt(feature_id, halt)
 
@@ -201,6 +215,26 @@ class FeatureProvider:
             detail=f"{disposition}: {detail}",
             escalation=escalation,
         )
+
+    def _driver_runner(self, feature_id: str) -> Callable:
+        """The runner one `specfuse run` invocation gets.
+
+        The injected `runner` unless streaming was asked for -- see the
+        `_stream_driver_output` note in `__init__` for why the default is off.
+        A log path that cannot be resolved (no feature directory found) still
+        yields a teeing runner: streaming to the console is the half the
+        operator is watching, and the file is the durable extra.
+        """
+        if not self._stream_driver_output:
+            return self._runner
+
+        stamp = time.strftime("%Y%m%dT%H%M%S")
+        log_path = driver_invoke.driver_log_path(
+            self._features_root, feature_id, stamp=stamp
+        )
+        if self._reporter is not None and log_path is not None:
+            self._reporter(f"{feature_id}: driver output → {log_path}")
+        return driver_invoke.teeing_runner(log_path, reporter=self._reporter)
 
     def _map_halt(self, feature_id: str, halt) -> ActionOutcome:
         halt_class, detail = halt.halt_class, halt.detail
