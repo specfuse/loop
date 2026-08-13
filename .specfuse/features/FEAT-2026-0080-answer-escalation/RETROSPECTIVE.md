@@ -247,6 +247,44 @@ them alone would claim a live behaviour nothing observed.
 Both entries below are settled by a live round-trip this gate could not perform,
 not by anything left unbuilt.
 
+### ~~The guidance-comment marker has not survived a real `gh` round-trip~~ — DISCHARGED 2026-08-13
+
+**Discharged.** The re-run condition named below was executed exactly as
+written, unsandboxed, against issue
+[#2205](https://github.com/specfuse/loop/issues/2205) — a real open
+`needs-human` escalation whose stated cause (branch divergence) had already been
+resolved by #2204 and #2212, so the `answer` disposition was honest rather than
+contrived for the test.
+
+Evidence:
+
+- Guidance comment posted:
+  [`#2205 (comment)`](https://github.com/specfuse/loop/issues/2205#issuecomment-5280806085)
+- Labels released in the prescribed order (comment first, labels second):
+  `needs-human,blocked-wu,triage:bug` → `triage:bug`
+- `gh issue view 2205 --repo specfuse/loop --comments` returns the marker with
+  exactly one match, rendered verbatim:
+  `<!-- specfuse:operator-guidance id=feature-FEAT-2026-0080-g1 -->`
+- The machine-readable path an agent would actually use round-trips too:
+  `gh issue view 2205 --json comments --jq '...capture("operator-guidance id=(?<id>[^ ]+) -->")'`
+  yields `correlation_id=feature-FEAT-2026-0080-g1`
+
+The open question this entry existed for was whether GitHub would strip or
+mangle an HTML comment in a rendered body. It does not — the marker survives
+byte-intact and parses back cleanly.
+
+**One defect surfaced by running it**, which no structural test could have
+caught: `SKILL.md` step 5 instructs removing `needs-human` "(and, for
+`blocked-wu`, `blocked-wu` too)" but the example command one line below shows
+only `--remove-label needs-human`. An operator or agent copying the command —
+the likelier path — leaves `blocked-wu` in place, and
+`BugsProvider._HUMAN_OWNED_LABELS` still skips the issue, so it reads as
+answered while staying parked. That is the exact failure this feature exists to
+remove. Fixed on this branch; recorded here because it is the concrete return on
+discharging this follow-up rather than accepting it.
+
+The original entry follows unchanged, for the record.
+
 ### The guidance-comment marker has not survived a real `gh` round-trip
 
 - **criterion:** "whether the guidance-comment marker survives a real

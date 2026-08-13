@@ -11,11 +11,26 @@ cost_budget_usd: 50.0
 # was overrun.
 #
 # The overrun is $40.27 of failed G1-CLOSE attempts, all three refused on
-# `assert_learnings_appended_or_noop`, caused by this WU's own criterion 5 naming
-# `.specfuse/LEARNINGS.md` as the lesson destination on an `autonomy_default: auto`
-# feature — the one path `close-i` forbids. Diagnosed and fixed (the criterion now
-# names `LEARNINGS-pending.md`); the authoring gap that allowed it is filed as
-# #2173.
+# `assert_learnings_appended_or_noop`.
+#
+# CORRECTED 2026-08-13, after the passing close did the forensics. The cause
+# recorded here originally — that criterion 5 named `.specfuse/LEARNINGS.md`,
+# the path `close-i` forbids under `auto` — was WRONG, and so was the claim that
+# no artifacts were produced. All three refused attempts (`22ff27c`, `bc27b30`,
+# `9292986`) committed a populated `LEARNINGS-pending.md` (+180/+85/+138 lines):
+# they took the staging route regardless of the criterion's wording.
+#
+# The real cause is a stale driver build. Every refusal names only
+# `.specfuse/LEARNINGS.md`, with no "or <staging file>" clause — a string only
+# pre-#1582 code emits (`git show 08a2210^:specfuse/loop/loop.py | grep -c
+# learnings_staging_is_required` → 0; current → 3). `08a2210` is an ancestor of
+# all three attempts, so the tree carried the fix while the code that ran did
+# not: the `build_provenance` / #1040 hazard, `specfuse run` resolving
+# `specfuse.loop` from an installed copy rather than the working tree.
+#
+# The criterion-5 edit (`589fd96`) was therefore unnecessary. It is kept because
+# naming the staging file is clearer than naming a forbidden path, not because
+# it fixed this. #2173 is corrected in place and re-scoped accordingly.
 #
 # `planning-discipline.md` §5 warns against raising a ceiling to absorb a retry,
 # because "a closing-WU retry is a defect to diagnose, not a cost to budget for".
