@@ -74,6 +74,12 @@ class _Runner:
                 ),
                 stderr="",
             )
+        if argv[:3] == ["gh", "issue", "create"]:
+            # What `gh` really prints — the old fake returned "", which made
+            # an unparseable id read as a successful filing.
+            return SimpleNamespace(
+                returncode=0, stdout="https://github.com/o/r/issues/4242\n", stderr=""
+            )
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
     def matching(self, prefix):
