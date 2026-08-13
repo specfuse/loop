@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 50.0
 # Raised 2026-08-13 from $24.00 by operator decision, with the reason recorded
 # here so the number is not mysterious later.
