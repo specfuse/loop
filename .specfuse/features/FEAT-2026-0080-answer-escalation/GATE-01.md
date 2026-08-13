@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open        # open | awaiting_review | passed
+status: awaiting_review
 cost_budget_usd: 24.0
 # Sum of this gate's WU estimates ($16.00) plus one re-attempt of its largest WU
 # ($8.00, T01) — the defensive padding `.specfuse/rules/planning-discipline.md` §5
