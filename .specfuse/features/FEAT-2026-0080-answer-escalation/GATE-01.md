@@ -24,8 +24,8 @@ cost_budget_usd: 50.0
 # $43.52 plus that close. It is not headroom for further retries — a second spin
 # here is a new defect and should halt again.
 baseline:
-  sha: 57fd796a758cf91daf7b827c91cc61f9b0308eca
-  probed_at: 2026-08-13T12:15:20.630541+00:00
+  sha: 26e6c56e2abcad34f22d862b5c9ccb35adb23ecd
+  probed_at: 2026-08-13T12:24:03.449129+00:00
   failing: []
 ---
 
