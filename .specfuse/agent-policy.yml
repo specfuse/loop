@@ -12,10 +12,16 @@
 
 version: 1
 
-# Operator's stated sequence as of 2026-08-12.
-# FEAT-2026-0049 dropped: roadmap status `done`, which validate_agent_policy WARNed on.
+# Operator's stated sequence as of 2026-08-13.
+# FEAT-2026-0080 dropped: shipped and `done` (PR #2245), which validate_agent_policy
+# WARNed on. Only FEAT-2026-0079 is queued: it is the sole `planned` roadmap row with
+# a drafted folder and armed work units, so it is the only entry the feature lane can
+# actually advance. The other eight `planned` rows have no feature folder, and queuing
+# an undrafted entry produces a `drafting-needed` escalation rather than work -- that
+# list is uncapped by `wip_limit`, so it would spend the run's item budget on
+# escalations.
 queue:
-  - FEAT-2026-0080
+  - FEAT-2026-0079
 
 rules:
   bugs:
