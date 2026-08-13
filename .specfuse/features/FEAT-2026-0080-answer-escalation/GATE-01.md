@@ -6,8 +6,8 @@ cost_budget_usd: 24.0
 # ($8.00, T01) — the defensive padding `.specfuse/rules/planning-discipline.md` §5
 # prescribes while first-attempt success runs 51–74%.
 baseline:
-  sha: 2718d6e5684fe48ef290e4e0837f856f017a1f1a
-  probed_at: 2026-08-13T00:33:08.127419+00:00
+  sha: ee7c24962ee8bf6386c838a0b5d8c6331598b86b
+  probed_at: 2026-08-13T12:08:30.268485+00:00
   failing: []
 ---
 
