@@ -1796,20 +1796,56 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         capture_output=True, text=True, check=False,
     ).returncode == 0
     if exists:
-        # Surface a stale branch that diverged from the declared base instead
-        # of silently reusing it. `merge-base --is-ancestor B <base>` exits 0
-        # iff B is an ancestor of base (i.e. base already contains B — safe).
-        is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", branch, base],
+        # Surface a branch built on a STALE base, without refusing healthy
+        # in-progress work (#2186).
+        #
+        # This used to ask `merge-base --is-ancestor <branch> <base>`, which
+        # exits 0 only when the base already CONTAINS the branch -- true only
+        # once the feature is merged. Every feature branch carrying unmerged
+        # work failed it by construction, so the driver refused to resume any
+        # feature that had done anything.
+        #
+        # It was masked for a long time: `specfuse-agent` used to leave the
+        # working tree ON the feature branch, so the next run hit the
+        # `current == branch` early return above and never reached here.
+        # Restoring the operator's branch at run end (#2055) removed that
+        # accident and exposed the guard.
+        #
+        # Worse, the refusal told the operator to `git rebase <base>` -- which
+        # cannot satisfy an is-ancestor test in that direction. Rebasing makes
+        # the BRANCH contain the base; the test wanted the base to contain the
+        # branch. A branch rebased exactly as instructed was refused again.
+        #
+        # The question the guard actually wants to ask is "is this branch
+        # built on the current base?", which is what comparing its merge-base
+        # against the base's tip answers. A rebased or freshly-created branch
+        # passes; a branch forked from an older tip does not.
+        # True divergence means BOTH sides carry commits the other lacks --
+        # which is what the word in the error message has always claimed.
+        # A branch merely ahead (normal in-progress work, or a rebased one) or
+        # merely behind (created earlier, nothing done yet) is not divergent
+        # and must not be refused.
+        counts = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", f"{base}...{branch}"],
             capture_output=True, text=True, check=False,
-        ).returncode == 0
+        )
+        if counts.returncode != 0:
+            # Unreadable: fail open rather than block on a git that cannot
+            # answer. The checkout below surfaces any real problem itself.
+            is_ancestor = True
+        else:
+            parts = counts.stdout.split()
+            behind, ahead = (int(parts[0]), int(parts[1])) if len(parts) == 2 else (0, 0)
+            is_ancestor = not (behind and ahead)
         if not is_ancestor:
             raise FeatureBranchError(
                 f"branch '{branch}' has diverged from '{base}' — it carries "
                 f"commits '{base}' does not, likely because it was created "
                 f"from a different starting point or '{base}' has since moved "
-                f"on. The safe action is to bring it up to date with the base:\n"
-                f"  git checkout {branch} && git rebase {base}"
+                f"on. Bring it onto the current base:\n"
+                f"  git checkout {branch} && git rebase {base}\n"
+                f"(Carrying unmerged commits is normal and no longer refused; "
+                f"what is refused is a branch forked from an older '{base}'.)"
             )
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
