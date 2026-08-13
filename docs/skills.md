@@ -102,6 +102,19 @@ Safe to run on an already-`done` or still-hedged feature — it writes nothing.
   underlying cause (credentials, spec ambiguity, missing dep). Flips
   `blocked_human → pending`, resets attempts, re-opens the gate if needed, prints
   the resume command.
+- **`/answer-escalation`** — work the `needs-human` GitHub queue one issue at a
+  time. Reads one parked escalation, explains in plain English what stopped the
+  agent, and records one of four dispositions: **hand off** to the skill that
+  owns the escalation's category, **answer** with guidance recorded as a marked
+  issue comment, **close** as won't-fix, or **skip**. Every disposition except
+  `skip` releases the `needs-human` *and* `blocked-wu` labels — both, because
+  `BugsProvider` skips an issue carrying either, so releasing one leaves the
+  issue answered and still parked. Human-invoked only; it triggers no fix and no
+  retry. Its product is guidance the next agent run reads, carried in a comment
+  marked `<!-- specfuse:operator-guidance id=… -->` so a later reader can find it
+  mechanically. Write order is deliberate — comment first, labels second — so a
+  failed label release leaves an issue correctly answered and merely still
+  parked, never unparked with no guidance.
 - **`/abandon-feature`** — cleanly abandon the active feature when retry isn't
   worth it. Flips every non-terminal WU/gate/PLAN/roadmap surface to its
   abandoned state behind a single up-front confirmation.

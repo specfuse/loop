@@ -10,6 +10,11 @@ Start here:
   them. One or two sentences each; read it if a term in the output is unfamiliar.
 - [`skills.md`](skills.md) — the Claude Code skills catalog, ordered by lifecycle
   phase (pick → draft → arm → diagnose → wrap).
+- [`lifecycles.md`](lifecycles.md) — the five ways work moves through a project
+  (feature, bug, autonomous, escalation, maintenance), with diagrams, the skills
+  each uses, and the specific points where the loop stops and needs a human.
+  Read this when you know *what* the skills are and want to know *which
+  lifecycle you are in*.
 - [`methodology.md`](methodology.md) — the canonical definition of the gate cycle:
   unit hierarchy, ownership split, the five-section work-unit contract,
   verification-as-oracle, auto-close, plan-next, LEARNINGS, and autonomy. Shared
