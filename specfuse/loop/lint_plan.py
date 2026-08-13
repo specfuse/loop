@@ -86,17 +86,19 @@ VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
 # Two enforcement surfaces, one contract. This pattern governs PLAN.md graphs
-# and WU frontmatter. The event envelope enforces its own, narrower
-# `correlation_id` pattern (`data/schemas/event.schema.json`, vendored from the
-# methodology core and never edited here); the driver widens it via the
-# driver-local registry `data/schemas/driver-event.schema.json`, read by
-# `validate_event.load_validator` on a deep copy — the fall-through
+# and WU frontmatter. The event envelope enforces its own `correlation_id`
+# pattern (`data/schemas/event.schema.json`, vendored from the methodology core
+# and never edited here); since #1433 that envelope carries all three documented
+# work-unit shapes, so the two surfaces agree on their own. The driver-local
+# registry `data/schemas/driver-event.schema.json` — read by
+# `validate_event.load_validator` on a deep copy, the fall-through
 # FEAT-2026-0060 established for `event_type` and FEAT-2026-0073 extended to
-# correlation IDs.
+# correlation IDs — is now an inert safety net against an older schema root.
 #
-# ADDING A NEW `<NAME>` SEGMENT: update this pattern AND that registry's
-# `closing_names`, or IDs the linter accepts will be rejected by envelope
-# validation. This note lives here, at the change site, rather than in
+# ADDING A NEW `<NAME>` SEGMENT: it belongs in core's envelope. Update this
+# pattern AND that registry's `closing_names` in the same change, then get core
+# to adopt it — until it does, only the registry's widening makes envelope
+# validation accept what the linter already does. This note lives here, at the change site, rather than in
 # `rules/correlation-ids.md` — that file is vendored from core, so a loop-local
 # addition to it is reverted by the next `sync-scaffold.sh` run (#581).
 CORRELATION_ID_RE = re.compile(

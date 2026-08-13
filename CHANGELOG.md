@@ -26,6 +26,12 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.12.1+umbrella.0.12.1] - 2026-08-13
+
+### Fixed
+
+- **The vendored event schemas were three releases behind core, so a repo scaffolded by `specfuse init` carried two contradictory copies of the same contract.** `specfuse init` writes `.specfuse/schemas/` from this package and `.specfuse/methodology/schemas/` from the methodology core, and the two are meant to be byte-identical — the umbrella provisions the core copy only on that basis (`specfuse/methodology.py`). Core adopted the widened correlation-ID patterns in specfuse#135 and this repository never re-vendored, so the two disagreed on **which work-unit IDs are legal**: measured against the on-disk files, `.specfuse/schemas/event.schema.json` rejected `FEAT-2026-0001/T01H`, `/G1-CLOSE` and `INIT-2026-0001/F01/G1-CLOSE` while `.specfuse/methodology/schemas/event.schema.json` accepted all three — shapes `.specfuse/rules/correlation-ids.md`, sitting **byte-identical in both locations**, has documented as valid throughout. `scripts/sync-scaffold.sh` re-vendors the three drifted files (`event.schema.json`, `events/spec_issue_resolved.schema.json`, `events/spec_issue_routed.schema.json`); the other six vendored files were already in step. **The driver was never affected and no event log needs revalidating** — `validate_event` reads the package copy and widens it at load time from `driver-event.schema.json` (FEAT-2026-0073), so every documented shape has always validated through the driver. What was wrong was the contract every *other* reader sees: agents, skills, and humans reading `.specfuse/schemas/` directly got the narrow pattern. **The FEAT-2026-0073 widening is now inert against the packaged schemas** and is deliberately kept rather than deleted — `_widen_correlation_id_pattern` no longer recognises its own `(/T\d{2})?$` tail and returns the pattern unchanged, which is its documented graceful path, and `SPECFUSE_SCHEMA_ROOT` can still point at an older envelope. Three tests that asserted the envelope was narrow are inverted, not deleted: they now assert core carries the shapes, so a future narrowing of core is caught here rather than only downstream. **The duplication itself is not fixed** — nine files still land in two locations, four rules and five schemas, all byte-identical as of this release; retiring this repository's copies in favour of `.specfuse/methodology/` is tracked separately (#1433)
+
 ## [0.12.0+umbrella.0.12.0] - 2026-08-13
 
 ### Added

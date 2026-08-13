@@ -4,15 +4,28 @@
 #
 """Tests for the correlation_id driver-local override (FEAT-2026-0073).
 
-The vendored envelope schema (specfuse/loop/data/schemas/event.schema.json)
-constrains correlation_id to
-``^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?(/T\\d{2})?$`` — a substantive work unit
-and nothing else. `.specfuse/rules/correlation-ids.md` documents two further
-shapes: closing-sequence units (``G<n>-<NAME>``) and hygiene units
-(``T<NN>H[N...]``). This registers those shapes in the driver-local registry
+`.specfuse/rules/correlation-ids.md` documents three work-unit shapes:
+substantive (``T<NN>``), hygiene (``T<NN>H[N...]``) and closing-sequence
+(``G<n>-<NAME>``). The vendored envelope schema
+(specfuse/loop/data/schemas/event.schema.json) once carried only the first —
+``^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?(/T\\d{2})?$`` — so FEAT-2026-0073
+registered the other two in the driver-local registry
 (specfuse/loop/data/schemas/driver-event.schema.json's ``correlation_id`` key)
-and widens the pattern on a deep copy in validate_event.py's load_validator,
+and widened the pattern on a deep copy in validate_event.py's load_validator,
 the same fall-through mechanism FEAT-2026-0060 established for event_type.
+
+**The methodology core has since adopted all three shapes** (specfuse#135,
+re-vendored here in #1433), so the envelope now admits them natively and
+``_widen_correlation_id_pattern`` no longer recognises its own ``(/T\\d{2})?$``
+tail — the override is inert against the packaged schemas. It is deliberately
+kept rather than deleted: SPECFUSE_SCHEMA_ROOT can still point at an older
+envelope, and the mechanism is additive by construction, so an inert override
+costs nothing while a deleted one would have to be rebuilt the next time core
+and the loop's documented shapes diverge.
+
+What these tests therefore assert is the OUTCOME — every documented shape
+validates, malformed ones do not, and a missing registry degrades without
+raising — not which of the two layers supplies it.
 
 These tests exercise the REAL package schemas under specfuse/loop/data/schemas
 (no SPECFUSE_SCHEMA_ROOT override) — the point is to prove the packaged
@@ -90,8 +103,8 @@ def _correlation_errors(validator: ve.Draft202012Validator, correlation_id: str)
 
 
 class TestCorrelationIdOverride(_RealSchemaRootTestCase):
-    """Criteria 1-2: closing-sequence shapes are red on the vendored pattern
-    alone and green through the driver-local override."""
+    """Criteria 1-2: closing-sequence shapes validate, and — since core adopted
+    them (#1433) — already match the vendored pattern on their own."""
 
     CLOSING_IDS = [
         "FEAT-2026-0042/G1-CLOSE",
@@ -103,16 +116,26 @@ class TestCorrelationIdOverride(_RealSchemaRootTestCase):
         "FEAT-2026-0042/G10-CLOSE",
     ]
 
-    def test_closing_sequence_ids_are_rejected_by_the_vendored_pattern_alone(self) -> None:
+    def test_closing_sequence_ids_match_the_vendored_pattern_alone(self) -> None:
+        """Inverted at #1433, deliberately.
+
+        This asserted the opposite while core's envelope carried only ``T\\d{2}``:
+        the shapes had to be red there for the driver-local override to be doing
+        anything. Core adopted all three documented shapes (specfuse#135), so the
+        envelope is now the layer that admits them and the override is a no-op —
+        which is the end state FEAT-2026-0073 wanted and could not reach from
+        this repo. Asserting it keeps a future narrowing of core visible here
+        rather than only in the outcome tests below.
+        """
         with VENDORED_SCHEMA_PATH.open("r", encoding="utf-8") as f:
             vendored = json.load(f)
         pattern = re.compile(vendored["properties"]["correlation_id"]["pattern"])
         for correlation_id in self.CLOSING_IDS:
             with self.subTest(correlation_id=correlation_id):
-                self.assertIsNone(
+                self.assertIsNotNone(
                     pattern.match(correlation_id),
-                    f"{correlation_id} unexpectedly matches the vendored "
-                    "pattern alone; the override would then be a no-op",
+                    f"{correlation_id} no longer matches the vendored pattern — "
+                    "core narrowed the envelope, or the re-vendor regressed",
                 )
 
     def test_closing_sequence_ids_validate(self) -> None:
@@ -209,6 +232,14 @@ class TestMissingRegistryDegradesGracefully(_RealSchemaRootTestCase):
         self.assertIsNone(patterns)
 
     def test_missing_file_falls_back_to_vendored_pattern_only(self) -> None:
+        """With the registry gone, the vendored envelope alone is in force.
+
+        Before #1433 that meant closing-sequence IDs were rejected here, and this
+        asserted so. Core now carries every documented shape, so the fallback
+        validates them too — the property under test is that an unreadable
+        registry degrades to the envelope without raising, not what the envelope
+        happens to permit.
+        """
         with mock.patch.object(
             ve, "DRIVER_SCHEMA_PATH", Path("/nonexistent/driver-event.schema.json")
         ):
@@ -216,15 +247,20 @@ class TestMissingRegistryDegradesGracefully(_RealSchemaRootTestCase):
             ve._DRIVER_CORRELATION_PATTERNS_CACHE = ve._UNSET
             validator = ve.load_validator()
 
-            errors = _correlation_errors(validator, "FEAT-2026-0001/T01")
-            self.assertEqual(errors, [], f"vendored shape must still validate: {errors!r}")
+            for correlation_id in ("FEAT-2026-0001/T01",
+                                   "FEAT-2026-0001/T01H",
+                                   "FEAT-2026-0001/G1-CLOSE"):
+                with self.subTest(correlation_id=correlation_id):
+                    errors = _correlation_errors(validator, correlation_id)
+                    self.assertEqual(
+                        errors, [],
+                        f"the vendored envelope must admit {correlation_id} on "
+                        f"its own since #1433: {errors!r}")
 
-            closing_errors = _correlation_errors(validator, "FEAT-2026-0001/G1-CLOSE")
+            malformed = _correlation_errors(validator, "FEAT-2026-0042/G1-NOTAREAL")
             self.assertTrue(
-                closing_errors,
-                "closing-sequence shape must be rejected when the registry "
-                "is unreadable",
-            )
+                malformed,
+                "the envelope must still be a constraint without the registry")
 
     def test_unparseable_json_returns_none(self) -> None:
         import tempfile
