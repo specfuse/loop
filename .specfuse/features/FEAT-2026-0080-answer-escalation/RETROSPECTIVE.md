@@ -437,3 +437,72 @@ owns — `/attention` reads `awaiting_review` straight from the gate files, so t
 issue is a second record of the same fact. PLAN.md noted this as pre-existing
 and out of scope; it remains so. Noted again here only so the next reader does
 not rediscover it as new.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `met_locally`
+
+**Operator's reason (verbatim):** "This feature needs to be tested separately.
+Any issue found will be handled as bugs"
+
+**Recorded:** 2026-08-13T13:20:21Z
+
+**What the operator was shown before accepting.** The verdict ceiling computed
+by `closing_requirements.verdict_ceiling_for_kinds` over the kinds present was
+`rework exists`, because follow-up 1 (since discharged) and follow-up 2 are both
+`externally-verifiable-later`. Both remaining follow-ups below were quoted in
+full, along with the note that follow-up 3 is dischargeable by a human at PR
+review while follow-up 2 waits on an escalation that has to occur naturally.
+
+**What was treated as the acknowledgment, stated plainly for audit.** The
+operator did not write the words "I have read the follow-ups". They answered the
+quoted list with a disposition that addresses both entries directly — test this
+feature separately, file anything found as a bug — which is a substantive
+response to what the follow-ups are about (untested runtime routes), not a
+blanket yes to an unquoted list. Recording the distinction rather than claiming
+an acknowledgment that was not given.
+
+### Follow-ups carried forward — open, not discharged
+
+Accepting this hedge does not resolve these. They remain exactly as open as they
+were, carried forward verbatim from the hedged-verdict follow-up record above.
+
+**1. The guidance-comment marker has not survived a real `gh` round-trip** —
+`externally-verifiable-later`. **DISCHARGED 2026-08-13**, before this acceptance,
+by executing its re-run condition verbatim against issue #2205. Not carried
+forward. See the discharge record above for evidence.
+
+**2. The `gate-review` routing branch has never been exercised** —
+`externally-verifiable-later`.
+
+> **criterion:** "the `gate-review` routing branch, unexercisable while the
+> repository has zero open `gate-review` escalations and zero `awaiting_review`
+> gates" (PLAN.md § *Verification the loop cannot perform*; WU-90 acceptance
+> criterion 3, second bullet)
+>
+> **why unverifiable here:** the repository carries no open `gate-review`
+> escalation and no `awaiting_review` gate, so the route has no real input.
+>
+> **re-run that upgrades this to `met`:** requires a `gate-review` escalation to
+> occur naturally — on the loop's schedule rather than on demand.
+
+**3. `/answer-escalation` is absent from the `docs/skills.md` catalogue** —
+`routed-finding`.
+
+> **criterion:** "Documentation and the roadmap detail section reflect what was
+> actually built" (WU-90 acceptance criterion 7) — the documentation half, as it
+> applies to the operator-facing skills catalogue.
+>
+> **why unverifiable here:** unreachable within this WU's contract. `docs/skills.md`
+> is one of five docs in `test_scaffold_data_in_sync.DOCS_TRACKED` whose copy under
+> `specfuse/loop/data/docs/` must byte-match it, so editing the catalogue requires
+> writing under `specfuse/`, which WU-90's **Do not touch** list forbids outright.
+>
+> **re-run that upgrades this to `met`:** at PR review, add the entry to
+> `docs/skills.md` § *5. Diagnose* and copy it to
+> `specfuse/loop/data/docs/skills.md` in the same commit, then confirm
+> `python3 -m unittest tests.test_scaffold_data_in_sync` passes.
+>
+> **tracking surface (operator's answer, verbatim):** "Any issue found will be
+> handled as bugs" — i.e. tracked as a bug when raised. No issue exists for it at
+> the time of acceptance; this entry is the record that it is known and untracked.

@@ -2,7 +2,7 @@
 id: FEAT-2026-0080/G1-CLOSE
 type: close
 status: done
-verdict: met_locally
+verdict: met
 attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
