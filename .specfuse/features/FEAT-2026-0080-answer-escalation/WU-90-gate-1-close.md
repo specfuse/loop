@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0080/G1-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+duration_seconds: 3731.83
+cost_usd: 40.267894
+input_tokens: 7754
+output_tokens: 127731
 ---
 
 # Close gate 1 — retrospective, lessons, docs and terminal verdict
