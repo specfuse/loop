@@ -144,7 +144,21 @@ class TestEnsureFeatureBranch(unittest.TestCase):
 
     # AC 5 — a pre-existing branch that diverges from HEAD is surfaced, not
     # silently checked out.
-    def test_stale_divergent_branch_surfaced(self):
+    def test_divergent_branch_is_brought_up_to_date_not_refused(self):
+        """CONTRACT CHANGE (#2186). This test asserted a refusal.
+
+        The fixture below is the normal life of a feature branch: it has a
+        commit, and `main` moved on with an unrelated one. Refusing that made
+        the driver unable to advance ANY in-flight feature after any merge —
+        observed as four consecutive failed agent runs against FEAT-2026-0080,
+        where merging each fix put the branch one commit behind and re-armed
+        the refusal.
+
+        The guard's stated purpose (#48) is that such a branch "is SURFACED
+        rather than silently checked out". Bringing it up to date and saying
+        so on stdout satisfies that; refusing forever does not. A conflicting
+        merge is still refused — see test_feature_branch_auto_sync.py.
+        """
         with _repo() as root:
             # create feat/x and put a commit on it that main never sees
             _git(root, "checkout", "-q", "-b", "feat/x")
@@ -154,12 +168,15 @@ class TestEnsureFeatureBranch(unittest.TestCase):
             _commit_file(root, "only_on_main.txt", "1\n", "main-only commit")
 
             with _chdir(root):
-                with self.assertRaises(loop.FeatureBranchError) as ctx:
-                    loop.ensure_feature_branch({"branch": "feat/x"})
-                # not silently switched
+                loop.ensure_feature_branch({"branch": "feat/x"})
                 current = _git(root, "branch", "--show-current")
-            self.assertEqual(current, "main")
-            self.assertIn("diverge", str(ctx.exception).lower())
+                behind = _git(
+                    root, "rev-list", "--count", "feat/x..main",
+                )
+            self.assertEqual(current, "feat/x")
+            self.assertEqual(behind, "0", "main's commit must now be on the branch")
+            self.assertTrue((root / "only_on_branch.txt").exists(), "work preserved")
+            self.assertTrue((root / "only_on_main.txt").exists(), "base folded in")
 
     # AC 6 — clean path preserved: -B creates from HEAD when absent; no-op when
     # already on the branch.
