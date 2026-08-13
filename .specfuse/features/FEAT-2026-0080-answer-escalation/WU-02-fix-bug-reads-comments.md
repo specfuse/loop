@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0080/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
   - plugins/specfuse/skills/fix-bug/SKILL.md
   - .specfuse/skills/fix-bug/SKILL.md
   - tests/test_fix_bug_reads_comments.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.11.0
+started_at: 2026-08-13T01:00:33.282471+00:00
+duration_seconds: 563.988
+cost_usd: 0.575359
+input_tokens: 28
+output_tokens: 5121
 ---
 
 # Make `/fix-bug` read the issue comments it already claims to read
