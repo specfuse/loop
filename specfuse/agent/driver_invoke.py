@@ -31,6 +31,7 @@ file.
 from __future__ import annotations
 
 import json
+import subprocess
 from collections import namedtuple
 from pathlib import Path
 from typing import Callable, Optional
@@ -48,6 +49,8 @@ __all__ = (
     "build_invocation",
     "classify_halt",
     "advance_feature",
+    "driver_log_path",
+    "teeing_runner",
     "FeatureState",
     "HaltResult",
 )
@@ -206,6 +209,105 @@ def classify_halt(returncode: int, before: FeatureState, after: FeatureState,
             return HALT_AWAITING_REVIEW, {"gate": gate_num}
 
     return HALT_AWAITING_REVIEW, None
+
+
+def driver_log_path(features_root, feature_id: str, *, stamp: str) -> Optional[Path]:
+    """Where one `specfuse run` invocation's output is teed.
+
+    `<feature_dir>/work/driver-<stamp>.log`. The `work/` subdirectory is
+    already declared ephemeral and gitignored by `.specfuse/gitignore.snippet`
+    ("per-feature work/ scratch directories (large, ephemeral)"), so a log
+    written here needs no gitignore change and never shows up in `git status`
+    -- which matters because the driver commits the feature directory as it
+    goes and an unignored log would land in a work unit's squash commit.
+
+    Returns `None` when the feature directory cannot be located; the caller
+    falls back to a non-teeing runner rather than inventing a path outside the
+    feature it is advancing.
+    """
+    feature_dir = _find_feature_dir(features_root, feature_id)
+    if feature_dir is None:
+        return None
+    return feature_dir / "work" / f"driver-{stamp}.log"
+
+
+def teeing_runner(log_path: Optional[Path], reporter: Optional[Callable[[str], None]] = None):
+    """A `runner(argv, check=False)` that streams the driver's output instead
+    of swallowing it.
+
+    `specfuse run` prints a line per work unit as it dispatches, but
+    `agent/run.py:_default_runner` calls `subprocess.run(capture_output=True)`,
+    so every one of those lines is captured and then discarded -- `classify_halt`
+    reads `returncode` and, on `HALT_DRIVER_ERROR` only, a 20-line stderr tail.
+    An operator watching a `specfuse-agent` run therefore sees one line when an
+    item starts and the next when it ends, with nothing in between. Observed
+    2026-08-12: a single feature item ran 3h40m and its close work unit spun
+    three times on one guard; the only way to see that while it happened was
+    `ps` and reading work-unit frontmatter by hand.
+
+    This is the same defect `_default_reporter` already fixed one layer up --
+    its docstring records that "the first live run took 85 minutes and its first
+    output was the summary" -- left unapplied at the layer that does the slow
+    work. The two logs interleave by construction: `_default_reporter`'s format
+    was deliberately matched to "the driver's per-WU line (`loop.py:6368`) so one
+    operator reads both the same way".
+
+    **Not a change to `agent/run.py:_default_runner`**, deliberately. That
+    callable is the default for all six providers, so teeing there would stream
+    `gh ... list` JSON into the operator's terminal alongside driver output. Only
+    `advance_feature` runs a long child process, so only it gets a teeing runner.
+
+    stderr is merged into stdout so a single reader drains one pipe -- two pipes
+    would need threads or `selectors` to avoid a deadlock when either fills. The
+    merged text is returned as BOTH `stdout` and `stderr` on the result, because
+    `classify_halt`'s driver-error branch tails `stderr` and must keep seeing the
+    driver's error output; the merge widens that tail to include interleaved
+    stdout rather than narrowing it.
+
+    A log path that cannot be opened is reported once and then ignored -- a
+    progress aid must never be the reason a feature fails to advance.
+    """
+    def _run(argv: list, check: bool = False):
+        sink = None
+        if log_path is not None:
+            try:
+                log_path.parent.mkdir(parents=True, exist_ok=True)
+                sink = log_path.open("w", encoding="utf-8", errors="replace")
+            except OSError as exc:
+                if reporter is not None:
+                    reporter(f"driver log unavailable ({exc}) — streaming to console only")
+                sink = None
+
+        collected = []
+        try:
+            # `with` so the stdout pipe is closed even on an exception -- an
+            # unclosed pipe is a ResourceWarning, and this repository's test
+            # gate treats warnings as failures.
+            with subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ) as process:
+                for line in process.stdout:
+                    collected.append(line)
+                    if sink is not None:
+                        sink.write(line)
+                        sink.flush()
+                    if reporter is not None:
+                        reporter(f"  │ {line.rstrip()}")
+                returncode = process.wait()
+        finally:
+            if sink is not None:
+                sink.close()
+
+        merged = "".join(collected)
+        if check and returncode != 0:
+            raise subprocess.CalledProcessError(returncode, argv, output=merged)
+        return subprocess.CompletedProcess(argv, returncode, stdout=merged, stderr=merged)
+
+    return _run
 
 
 def advance_feature(runner: Callable, feature_id: str, *, features_root,
