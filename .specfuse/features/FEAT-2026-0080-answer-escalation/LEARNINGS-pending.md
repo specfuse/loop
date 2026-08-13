@@ -34,6 +34,19 @@ mode — this file is where those lessons go instead.
 
 ## Entries
 
+**All four entries below were PROMOTED to `.specfuse/LEARNINGS.md` on 2026-08-13**,
+after PR #2245 merged, each carrying the `[FEAT-2026-0080/G1/<slug>]` correlation ID
+that file's format requires. None were rejected or narrowed. They are left here
+verbatim rather than deleted, per this file's own step 3, so the staging record stays
+readable next to what came of it.
+
+Promoted as:
+
+- `[FEAT-2026-0080/G1/a-refusal-message-shorter-than-its-source-means-a-stale-build]`
+- `[FEAT-2026-0080/G1/an-instruction-naming-a-mechanism-that-cannot-satisfy-it]`
+- `[FEAT-2026-0080/G1/price-a-wu-against-its-declared-acceptance-not-its-runtime-surface]`
+- `[FEAT-2026-0080/G1/a-recovery-diagnosis-is-a-hypothesis-until-checked-against-the-reflog]`
+
 <!-- closing work units append below this line -->
 
 - [FEAT-2026-0080/G1] **When a guard refusal's message names fewer accepted paths
