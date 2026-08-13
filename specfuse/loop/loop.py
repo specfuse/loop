@@ -1796,22 +1796,81 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         capture_output=True, text=True, check=False,
     ).returncode == 0
     if exists:
-        # Surface a stale branch that diverged from the declared base instead
-        # of silently reusing it. `merge-base --is-ancestor B <base>` exits 0
-        # iff B is an ancestor of base (i.e. base already contains B — safe).
-        is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", branch, base],
+        # Surface a branch built on a STALE base, without refusing healthy
+        # in-progress work (#2186).
+        #
+        # This used to ask `merge-base --is-ancestor <branch> <base>`, which
+        # exits 0 only when the base already CONTAINS the branch -- true only
+        # once the feature is merged. Every feature branch carrying unmerged
+        # work failed it by construction, so the driver refused to resume any
+        # feature that had done anything.
+        #
+        # It was masked for a long time: `specfuse-agent` used to leave the
+        # working tree ON the feature branch, so the next run hit the
+        # `current == branch` early return above and never reached here.
+        # Restoring the operator's branch at run end (#2055) removed that
+        # accident and exposed the guard.
+        #
+        # Worse, the refusal told the operator to `git rebase <base>` -- which
+        # cannot satisfy an is-ancestor test in that direction. Rebasing makes
+        # the BRANCH contain the base; the test wanted the base to contain the
+        # branch. A branch rebased exactly as instructed was refused again.
+        #
+        # The question the guard actually wants to ask is "is this branch
+        # built on the current base?", which is what comparing its merge-base
+        # against the base's tip answers. A rebased or freshly-created branch
+        # passes; a branch forked from an older tip does not.
+        # A feature branch falls behind its base every time anything else
+        # merges. That is the normal life of a feature branch, not a fault --
+        # and refusing it made the driver unable to advance ANY in-flight
+        # feature after any merge, which for an unattended agent is a deadlock
+        # generator rather than a safety property.
+        #
+        # This guard's stated purpose is that a pre-existing branch "is
+        # surfaced rather than silently checked out" (#48). Surfaced, not
+        # refused. The hazard is silently reusing a branch from a DIFFERENT
+        # lineage; a branch the driver has been committing to, merely behind
+        # its base, is not that.
+        #
+        # So: bring it up to date the way a human would, and refuse only when
+        # that cannot be done automatically. `merge` rather than `rebase`
+        # deliberately -- the branch may already be pushed, and rewriting its
+        # history would force every consumer to recover from a force-push to
+        # fix a condition that is not their fault.
+        counts = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", f"{base}...{branch}"],
             capture_output=True, text=True, check=False,
-        ).returncode == 0
-        if not is_ancestor:
-            raise FeatureBranchError(
-                f"branch '{branch}' has diverged from '{base}' — it carries "
-                f"commits '{base}' does not, likely because it was created "
-                f"from a different starting point or '{base}' has since moved "
-                f"on. The safe action is to bring it up to date with the base:\n"
-                f"  git checkout {branch} && git rebase {base}"
-            )
+        )
+        behind = 0
+        if counts.returncode == 0:
+            parts = counts.stdout.split()
+            if len(parts) == 2:
+                behind = int(parts[0])
+
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
+
+        if behind:
+            merged = subprocess.run(
+                ["git", "merge", "--no-edit", base],
+                capture_output=True, text=True, check=False,
+            )
+            if merged.returncode != 0:
+                subprocess.run(
+                    ["git", "merge", "--abort"],
+                    capture_output=True, text=True, check=False,
+                )
+                raise FeatureBranchError(
+                    f"branch '{branch}' is {behind} commit(s) behind '{base}' and "
+                    f"cannot be brought up to date automatically -- merging "
+                    f"'{base}' into it conflicts. The merge was aborted and the "
+                    f"branch left exactly as it was. Resolve by hand:\n"
+                    f"  git checkout {branch} && git merge {base}\n"
+                    f"git's own report:\n{(merged.stdout + merged.stderr).strip()}"
+                )
+            print(
+                f"Brought '{branch}' up to date with '{base}' "
+                f"({behind} commit(s) behind)."
+            )
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
         # Create-from-base carries the working tree onto the new branch. Only
