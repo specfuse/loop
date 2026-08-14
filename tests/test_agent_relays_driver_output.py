@@ -154,7 +154,16 @@ class TestFeatureProviderStreamingIsOptIn(unittest.TestCase):
             provider.execute(items[0])
 
             self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0], driver_invoke.build_invocation("FEAT-A"))
+            # Against the command the provider resolved, not a hard-coded
+            # `specfuse run`: which build is dispatched now depends on whether
+            # the conductor is standing in a source checkout (#2186). What
+            # this test guards is that the *injected* runner received it.
+            self.assertEqual(
+                calls[0],
+                driver_invoke.build_invocation(
+                    "FEAT-A", command=provider._driver_command
+                ),
+            )
 
     def test_streaming_provider_does_not_call_the_injected_runner(self):
         with tempfile.TemporaryDirectory() as tmp:
