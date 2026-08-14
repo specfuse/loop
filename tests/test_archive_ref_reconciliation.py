@@ -234,6 +234,37 @@ class TestStatusMarker(_Harness):
         self.assertIn("Just body prose.", archive)
         self.assertNotIn("**Status:", archive)
 
+    def test_a_prose_mention_of_the_marker_is_not_the_marker(self):
+        """#2345: the pattern was unanchored, so `count=1` rewrote whichever
+        `**Status:...**` came first — including one quoted mid-sentence. A
+        section discussing the roadmap format is exactly where that happens.
+
+        Observed on FEAT-2026-0079, whose own detail prose quotes the marker
+        by name: the sentence became `its **Status: done.** marker` while the
+        real trailing marker kept saying `planned` against a `done` row, and
+        three `lint_roadmap` tests went red against the real tree."""
+        _result, _roadmap_text, archive = self._run(
+            _roadmap(
+                "**Why.** #1169 taught the driver to reconcile its "
+                "`**Status:**` marker.\n\n**Status: active.**"
+            )
+        )
+        # The quoted mention is prose about the format, not a status claim.
+        self.assertIn("its `**Status:**` marker", archive)
+        # The real marker — anchored at the start of its own line — is the one
+        # that had to move.
+        self.assertIn("\n**Status: done.**", archive)
+        self.assertNotIn("**Status: active.**", archive)
+
+    def test_only_the_first_standalone_marker_is_rewritten(self):
+        """`count=1` is still right once the pattern is anchored: a section
+        carries one status marker, and a second standalone one would be a
+        different defect than this pass owns."""
+        _result, _roadmap_text, archive = self._run(
+            _roadmap("**Status: active.**\n\nBody.\n\n**Status: active.**")
+        )
+        self.assertIn("**Status: done.**", archive)
+
     def test_abandoned_row_status_is_honoured_not_hardcoded_done(self):
         _result, _roadmap_text, archive = self._run(
             _roadmap("Body.\n\n**Status: active.**", status="abandoned")

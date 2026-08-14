@@ -3972,7 +3972,15 @@ def _parse_roadmap_row(roadmap_text: str, feature_id: str) -> dict | None:
 
 
 _BARE_FEAT_REF_RE = re.compile(r'\]\(#(feat-\d{4}-\d{4})\)')
-_STATUS_MARKER_RE = re.compile(r'\*\*Status:[^*]*\*\*')
+#: A section's status marker stands alone at the start of its own line. Kept
+#: deliberately in step with `lint_roadmap._SECTION_STATUS_RE`, which is what
+#: judges the result -- an archiver matching something the linter does not can
+#: only ever rewrite the wrong text. Unanchored, this matched a `**Status:**`
+#: quoted mid-sentence, and `count=1` then spent the one substitution on it:
+#: FEAT-2026-0079's prose became `its **Status: done.** marker` while its real
+#: marker kept saying `planned` against a `done` row (#2345). `[^*\n]` rather
+#: than `[^*]` so a marker can never swallow the blank line after it either.
+_STATUS_MARKER_RE = re.compile(r'^\*\*Status:[^*\n]*\*\*', re.MULTILINE)
 
 
 def _reconcile_moved_section(
