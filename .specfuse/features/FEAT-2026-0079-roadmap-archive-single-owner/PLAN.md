@@ -5,7 +5,7 @@ slug: roadmap-archive-single-owner
 branch: feat/FEAT-2026-0079-roadmap-archive-single-owner
 roadmap_goal: One operation behaves one way whether the driver or a human runs it — the roadmap-archive algorithm gets a single owner and the skill delegates to it.
 autonomy_default: review
-status: planned
+status: done
 planned_cost_usd: 14.00
 ---
 

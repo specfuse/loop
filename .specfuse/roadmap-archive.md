@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0079"></a>
+## FEAT-2026-0079 — One owner for the roadmap-archive algorithm (skill/driver de-duplication)
+
+**Why.** `auto_archive_feature` and the `/roadmap-archive` skill are two implementations of one algorithm — the driver's docstring says so outright ("Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver"). #1169 fixed the driver to reconcile a moved section's cross-references and its `**Status:**` marker; the skill was deliberately left alone to keep that PR inside bug scope, so the two now describe different behaviour for the same operation. The skill is the path a human takes, so an operator following its prose reproduces the pre-fix defect — on rows an unrelated feature owns, which is the part of #1169 that landed the failure on the wrong person. `[FEAT-2026-0010/G1]` records this exact pattern and closes by requiring the contract be stated explicitly; it also notes the two copies agreed only because the operation had no side effects on unrelated rows. Archiving now rewrites inbound links, so that condition no longer holds. Promoted from #1183 after the bug lane refused it three times: the resolution is a design choice spanning two vendored copies, not a bug-sized fix.
+
+**Goal.** Pick one owner deliberately and implement it across both the canonical plugin skill and its vendored `.specfuse/skills/` copy. Two candidates to weigh with evidence rather than by preference: restate the reconciliation rules in the skill's own prose — a third copy of the algorithm, but `/roadmap-archive` keeps working on a tree with no driver installed — or have the skill invoke the driver's function and stop describing the mechanics, which removes the drift surface entirely at the cost of that independence. #1183 is explicit that either resolution is acceptable and that choosing one deliberately is the point.
+
+**Benefits.** One operation behaves one way regardless of which path an operator takes, so archiving by hand stops being able to reintroduce a defect the driver no longer has. Removes a drift surface rather than re-syncing it. And it settles a question that recurs whenever a skill and the driver implement the same thing — flagged once by `[FEAT-2026-0010/G1]` and never decided.
+
+**Status: done.**
+
 <a id="feat-2026-0080"></a>
 ## FEAT-2026-0080 — Operator-answered escalations: guidance that survives into the next agent run
 

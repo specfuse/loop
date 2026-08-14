@@ -108,6 +108,7 @@ JUDGE_MODULES = tuple(
         "lint_closing.py",
         "lint_plan.py",
         "plan_baseline.py",      # the baseline retroactive_edits compares to
+        "roadmap_archive.py",    # CLI entry for auto_archive_feature; assert_terminal_flips_fired depends on it
         # The driver: dispatch guards, halt classification, the produces gate,
         # post-pass invariants. The largest judge surface in the package.
         "loop.py",

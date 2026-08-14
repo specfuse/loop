@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0079/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces_driver_helper:
   - specfuse.loop.roadmap_archive.main
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/roadmap_archive.py
   - .specfuse/scripts/roadmap_archive.py
   - tests/test_roadmap_archive_cli.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-14T13:13:51.716991+00:00
+duration_seconds: 635.285
+cost_usd: 0.89093
+input_tokens: 87
+output_tokens: 8753
 ---
 
 # T01 — Expose the archiver as a command line

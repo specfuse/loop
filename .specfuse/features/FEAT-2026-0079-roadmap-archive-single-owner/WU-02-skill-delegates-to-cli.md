@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0079/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - plugins/specfuse/skills/roadmap-archive/SKILL.md
   - .specfuse/skills/roadmap-archive/SKILL.md
   - tests/test_roadmap_archive_skill_delegates.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-14T15:09:31.496360+00:00
+duration_seconds: 971.393
+cost_usd: 1.837286
+input_tokens: 90
+output_tokens: 20639
 ---
 
 # T02 — The skill invokes the archiver instead of restating it

@@ -1,0 +1,27 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 Expose the archiver as a command line",
+          "id": "FEAT-2026-0079/T01",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 The skill invokes the archiver instead of restating it",
+          "id": "FEAT-2026-0079/T02",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 Terminal close for gate 1",
+          "id": "FEAT-2026-0079/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
