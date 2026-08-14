@@ -22,6 +22,7 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Optional, Sequence
 
+from specfuse.agent import driver_command as driver_command_module
 from specfuse.agent import driver_invoke, queue_read, state
 from specfuse.agent.run import (
     KIND_FEATURE,
@@ -57,6 +58,12 @@ class FeatureProvider:
     """`ActionProvider` over `queue:` entries, mediated by T12's classifier
     and T13's subprocess invocation."""
 
+    #: How many times one item may re-dispatch the driver after a restart
+    #: halt. Two covers the real shape -- a unit edits the driver, the fresh
+    #: process finishes the gate -- with one spare, and stops a unit that
+    #: re-edits on every attempt from consuming the run.
+    MAX_DRIVER_RESTARTS = 2
+
     def __init__(
         self,
         *,
@@ -66,6 +73,7 @@ class FeatureProvider:
         features_root: Any = None,
         stream_driver_output: bool = False,
         reporter: Optional[Callable[[str], None]] = None,
+        driver_command: Optional[Sequence[str]] = None,
     ):
         self._repo = repo
         self._runner = runner
@@ -81,6 +89,12 @@ class FeatureProvider:
         #: the module default and streaming is what the operator wants.
         self._stream_driver_output = stream_driver_output
         self._reporter = reporter
+        #: Resolved once per provider, not per dispatch: which build gets run
+        #: is a property of where the conductor is standing, and re-deciding
+        #: it mid-run could dispatch two different drivers in one run (#2186).
+        self._driver_command = driver_command_module.resolve_driver_command(
+            override=driver_command
+        )
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         features, errors = state.read_feature_summaries(self._features_root)
@@ -147,12 +161,7 @@ class FeatureProvider:
         feature_id = row["feature_id"]
 
         if disposition == queue_read.DISPOSITION_WORKABLE:
-            halt = driver_invoke.advance_feature(
-                self._driver_runner(feature_id),
-                feature_id,
-                features_root=self._features_root,
-            )
-            return self._map_halt(feature_id, halt)
+            return self._advance(feature_id)
 
         if disposition == queue_read.DISPOSITION_NEEDS_DRAFTING:
             escalation = EscalationPayload(
@@ -215,6 +224,108 @@ class FeatureProvider:
             detail=f"{disposition}: {detail}",
             escalation=escalation,
         )
+
+    def _advance(self, feature_id: str) -> ActionOutcome:
+        """Dispatch `specfuse run` for one feature, restarting the driver as
+        many as `MAX_DRIVER_RESTARTS` times.
+
+        A restart halt is not a failure and not a gate boundary: the driver
+        stopped because a work unit edited its own importable surface, and it
+        left every gate and WU status untouched precisely so a fresh process
+        picks up where it stopped. The next `advance_feature` *is* that fresh
+        process, so the conductor can answer this itself -- which is what it
+        failed to do when the halt arrived misclassified as
+        `awaiting_review: None`, costing an escalation, a filed issue, and a
+        triage item while the gate's remaining units stayed pending (#2321).
+
+        Bounded because "restart me" is only progress if something changed. A
+        unit that edits the driver on every attempt would otherwise spin here
+        for the whole run; past the cap it becomes a human's problem, named as
+        one.
+        """
+        restarts = 0
+        self._say(
+            f"{feature_id}: "
+            f"{driver_command_module.describe_command(self._driver_command)}"
+        )
+        while True:
+            halt = driver_invoke.advance_feature(
+                self._driver_runner(feature_id),
+                feature_id,
+                features_root=self._features_root,
+                command=self._driver_command,
+            )
+            if halt.halt_class != driver_invoke.HALT_DRIVER_RESTART:
+                return self._map_halt(feature_id, halt)
+
+            detail = halt.detail if isinstance(halt.detail, dict) else {}
+            if restarts >= self.MAX_DRIVER_RESTARTS:
+                return self._restart_exhausted(feature_id, detail, restarts)
+
+            restarts += 1
+            self._say(
+                f"{feature_id}: driver halted for restart after "
+                f"{detail.get('wu_id') or 'a work unit'} edited it "
+                f"({', '.join(detail.get('driver_paths') or []) or 'driver modules'}) "
+                f"— dispatching a fresh driver ({restarts}/{self.MAX_DRIVER_RESTARTS})"
+            )
+
+    def _restart_exhausted(self, feature_id: str, detail: dict, restarts: int) -> ActionOutcome:
+        """Escalate a feature that asked for a restart more times than the cap
+        allows -- the one case where re-dispatching has stopped being progress."""
+        wu_id = detail.get("wu_id") or "a work unit"
+        remaining = ", ".join(detail.get("remaining_wu_ids") or []) or "(none reported)"
+        paths = ", ".join(detail.get("driver_paths") or []) or "driver modules"
+        escalation = EscalationPayload(
+            done_so_far=(
+                f"specfuse run was dispatched for {feature_id} {restarts + 1} times; "
+                f"each run halted asking for a driver restart after {wu_id} edited "
+                f"{paths}. Work units still pending in the gate: {remaining}."
+            ),
+            issue_summary=(
+                f"{feature_id} has asked for a driver restart {restarts + 1} times in "
+                f"one run — {wu_id} keeps editing the driver's own importable surface."
+            ),
+            decision_needed=(
+                f"Whether {feature_id}'s gate can make progress, or whether {wu_id} "
+                f"needs to be split so it stops re-editing the driver every attempt."
+            ),
+            why_not_auto=(
+                "The agent restarts the driver on this halt, but a unit that "
+                "triggers it on every attempt is not making progress and would "
+                "otherwise spin for the rest of the run."
+            ),
+            options=[
+                (
+                    f"Run 'specfuse run --feature {feature_id}' by hand",
+                    "shows whether a fresh process gets further",
+                    "costs a human's time",
+                ),
+                (
+                    "Split the work unit so it stops editing the driver mid-gate",
+                    "removes the restart loop at its source",
+                    "requires re-authoring the unit",
+                ),
+                (
+                    "Leave it",
+                    "no immediate cost",
+                    "the gate stalls with work units pending",
+                ),
+            ],
+            recommendation=(
+                f"Run the driver by hand for {feature_id} and read what {wu_id} edits."
+            ),
+            category="blocked-wu",
+        )
+        return ActionOutcome(
+            status=STATUS_ESCALATED,
+            detail=f"driver restart loop: {wu_id} after {restarts + 1} dispatches",
+            escalation=escalation,
+        )
+
+    def _say(self, message: str) -> None:
+        if self._reporter is not None:
+            self._reporter(message)
 
     def _driver_runner(self, feature_id: str) -> Callable:
         """The runner one `specfuse run` invocation gets.

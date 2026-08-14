@@ -350,7 +350,13 @@ class TestFeatureProvider(unittest.TestCase):
         items = provider.advertise(_snapshot(("FEAT-A",)))
         provider.execute(items[0])
         self.assertEqual(len(runner.calls), 1)
-        self.assertEqual(runner.calls[0], ["specfuse", "run", "--feature", "FEAT-A"])
+        # One call, and it is the driver being advanced -- not `git`, not a
+        # mutating `gh`. The argv's leading command is no longer fixed: a
+        # conductor standing in a source checkout dispatches that source
+        # rather than whatever `specfuse` is on PATH (#2186).
+        self.assertEqual(runner.calls[0][-2:], ["--feature", "FEAT-A"])
+        self.assertNotIn("git", runner.calls[0])
+        self.assertNotIn("gh", runner.calls[0])
 
     def test_reconcile_is_a_noop(self):
         _write_feature(self.root, "FEAT-A", "active", {1: "open"})

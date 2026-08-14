@@ -2189,6 +2189,40 @@ def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> b
     return gate_spent_usd(plan, gate, feature_dir) >= budget
 
 
+def _report_post_dispatch_budget_breach_if_final(
+    plan: dict, gate: dict, feature_dir: Path, gate_number: int,
+    units: list, done_ids: set, wu, events_path: Path,
+) -> None:
+    """Call once a WU reaches ANY terminal outcome — `done` or
+    `blocked_human` alike (#2174) — so the report fires whether the gate's
+    last WU passes or spins out, not only on the all-`done` shape the
+    original guard assumed. `wu` need not be in `done_ids`: a WU is this
+    gate's last one to finish once every OTHER unit is already done.
+
+    Must be called AFTER the caller's own `flush_events(events_path,
+    wu_events)` for this WU's outcome — `gate_spent_usd` sums
+    `attempt_outcome` events from `events.jsonl` on disk, so calling this
+    before that flush undercounts by the finishing WU's own cost (#2174).
+    """
+    if not all(u.wu_id in done_ids or u.wu_id == wu.wu_id for u in units):
+        return
+    if not _should_report_budget_breach(plan, gate, feature_dir):
+        return
+    budget = gate_budget_usd(feature_dir / gate["file"])
+    spent = gate_spent_usd(plan, gate, feature_dir)
+    flush_events(events_path, [build_event(
+        "human_escalation", wu.wu_id.split("/")[0], {
+            "reason": "gate_budget_exceeded_post_dispatch",
+            "gate": gate_number,
+            "budget_usd": budget,
+            "spent_usd": round(spent, 6),
+            "final_wu_id": wu.wu_id,
+        })])
+    print(f"\nGate {gate_number} budget exceeded "
+          f"(post-dispatch): spent ${spent:.4f} "
+          f">= budget ${budget:.4f}. Reported after {wu.wu_id}.")
+
+
 class BookkeepingCommitError(RuntimeError):
     """Raised when commit_bookkeeping's `git commit` is rejected (non-zero exit).
 
@@ -7168,36 +7202,24 @@ def run(
                         }))
                         done_ids.add(wu.wu_id)
                         dispatch_order.append(wu.wu_id)
-                        # Post-dispatch budget breach check (#T03): the
+                        flush_events(events_path, wu_events)
+                        # Post-dispatch budget breach check (#T03, #2174): the
                         # pre-dispatch brake above only ever sees spend
                         # BEFORE the next WU it would halt in front of, so a
                         # gate's own final WU can breach budget with no
-                        # subsequent dispatch left to catch it. Evaluated only
-                        # once every WU in this gate is done — a gate with
-                        # more pending WUs already gets the pre-dispatch halt
-                        # on its next iteration, so this never double-reports
-                        # the same overrun.
-                        if all(u.wu_id in done_ids for u in units):
-                            _gate_dict = {"file": gate.file.name,
-                                          "work_units": gate.refs}
-                            if _should_report_budget_breach(
-                                    feat_fm, _gate_dict, feature_dir):
-                                _budget = gate_budget_usd(gate.file)
-                                _spent = gate_spent_usd(
-                                    feat_fm, _gate_dict, feature_dir)
-                                wu_events.append(build_event(
-                                    "human_escalation", feature_id, {
-                                        "reason": "gate_budget_exceeded_post_dispatch",
-                                        "gate": gate.number,
-                                        "budget_usd": _budget,
-                                        "spent_usd": round(_spent, 6),
-                                        "final_wu_id": wu.wu_id,
-                                    }))
-                                print(f"\nGate {gate.number} budget exceeded "
-                                      f"(post-dispatch): spent ${_spent:.4f} "
-                                      f">= budget ${_budget:.4f}. Reported "
-                                      f"after {wu.wu_id}.")
-                        flush_events(events_path, wu_events)
+                        # subsequent dispatch left to catch it. Evaluated
+                        # once every OTHER WU in this gate is done — a gate
+                        # with more pending WUs already gets the pre-dispatch
+                        # halt on its next iteration, so this never
+                        # double-reports the same overrun. Called AFTER the
+                        # flush above so this WU's own attempt_outcome/cost
+                        # is already on disk for gate_spent_usd to sum.
+                        _gate_dict = {"file": gate.file.name,
+                                      "work_units": gate.refs}
+                        _report_post_dispatch_budget_breach_if_final(
+                            feat_fm, _gate_dict, feature_dir, gate.number,
+                            units, done_ids, wu, events_path,
+                        )
                         print(f"   PASS — committed {sha}")
                         break
 
@@ -7310,6 +7332,18 @@ def run(
                                        _fs or "")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
+                        # Post-dispatch budget breach check (#2174): a
+                        # blocked_human terminal outcome ends this gate's
+                        # advancement just as surely as a `done` one, so the
+                        # gate's own final WU must be checked here too — not
+                        # only on the all-`done` shape (see
+                        # `_report_post_dispatch_budget_breach_if_final`).
+                        _gate_dict = {"file": gate.file.name,
+                                      "work_units": gate.refs}
+                        _report_post_dispatch_budget_breach_if_final(
+                            feat_fm, _gate_dict, feature_dir, gate.number,
+                            units, done_ids, wu, events_path,
+                        )
                         commit_bookkeeping(
                             [wu.file, events_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
@@ -7354,6 +7388,16 @@ def run(
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
+                    # Post-dispatch budget breach check (#2174): see the
+                    # spinning_signature_repeat block above — attempt
+                    # exhaustion is the other blocked_human terminal shape
+                    # the original all-`done` guard missed.
+                    _gate_dict = {"file": gate.file.name,
+                                  "work_units": gate.refs}
+                    _report_post_dispatch_budget_breach_if_final(
+                        feat_fm, _gate_dict, feature_dir, gate.number,
+                        units, done_ids, wu, events_path,
+                    )
                     commit_bookkeeping(
                         [wu.file, events_path, *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
