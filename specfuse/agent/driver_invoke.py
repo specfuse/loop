@@ -46,6 +46,7 @@ __all__ = (
     "HALT_BLOCKED",
     "HALT_FEATURE_DONE",
     "HALT_DRIVER_ERROR",
+    "HALT_DRIVER_RESTART",
     "build_invocation",
     "classify_halt",
     "advance_feature",
@@ -61,6 +62,16 @@ HALT_NOT_ARMED = "not_armed"
 HALT_BLOCKED = "blocked"
 HALT_FEATURE_DONE = "feature_done"
 HALT_DRIVER_ERROR = "driver_error"
+#: The driver halted itself because a work unit edited the driver's own
+#: importable surface. Not an error and not a review boundary: it is the
+#: driver asking for a fresh process, having deliberately flipped no gate and
+#: no WU status so that process resumes where this one stopped (#2321).
+HALT_DRIVER_RESTART = "driver_restart"
+
+#: Mirrors the driver's `EXIT_DRIVER_RESTART_REQUIRED`. Duplicated rather
+#: than imported: this module is structurally forbidden from importing the
+#: driver at all, which is what keeps `specfuse run` a subprocess.
+_EXIT_DRIVER_RESTART_REQUIRED = 3
 
 _DEFAULT_COMMAND = ("specfuse", "run")
 _STDERR_TAIL_LINES = 20
@@ -162,6 +173,23 @@ def _find_human_escalation(events: list) -> Optional[dict]:
     return None
 
 
+def _find_restart_detail(events: list) -> dict:
+    """The halting `driver_staleness_detected` row's payload, or `{}`.
+
+    Only a row the driver marked `halted` counts: the same event type is
+    emitted as a non-halting warning when a unit edits the driver but the
+    gate has nothing left to dispatch, and treating that one as a restart
+    would re-run a gate that already finished.
+    """
+    for event in reversed(events):
+        if event.get("event_type") != "driver_staleness_detected":
+            continue
+        payload = event.get("payload") or {}
+        if payload.get("halted"):
+            return dict(payload)
+    return {}
+
+
 def _tail(text: str, *, lines: int = _STDERR_TAIL_LINES) -> str:
     parts = text.splitlines()
     return "\n".join(parts[-lines:]).strip()
@@ -176,6 +204,12 @@ def classify_halt(returncode: int, before: FeatureState, after: FeatureState,
     if returncode == 2:
         return HALT_NOT_ARMED, None
 
+    if returncode == _EXIT_DRIVER_RESTART_REQUIRED:
+        # The exit code is the contract; the event only enriches it. A run
+        # whose `driver_staleness_detected` row cannot be re-read is still a
+        # restart, and must not fall back into the success path below.
+        return HALT_DRIVER_RESTART, _find_restart_detail(new_events)
+
     if returncode == 1:
         escalation = _find_human_escalation(new_events)
         if escalation is not None:
@@ -186,6 +220,14 @@ def classify_halt(returncode: int, before: FeatureState, after: FeatureState,
             }
             return HALT_BLOCKED, detail
         return HALT_DRIVER_ERROR, _tail(stderr or "")
+
+    if returncode != 0:
+        # Every code this function does not recognise used to reach the
+        # success block below, where a run that flipped no gate came out as a
+        # clean `awaiting_review` -- a failure reported as a review boundary
+        # (#2321). An unknown non-zero code is an error; a code that later
+        # earns a class of its own gets a branch above this one.
+        return HALT_DRIVER_ERROR, _tail(stderr or "") or f"driver exited {returncode}"
 
     # returncode == 0
     if after.plan_status == "done":
