@@ -178,8 +178,13 @@ among lanes that already exist and keeps selecting until the work drains or your
 budget does.
 
 ```
-specfuse-agent --repo OWNER/NAME [--max-items N] [--max-minutes M]
+specfuse-agent [--repo OWNER/NAME] [--max-items N] [--max-minutes M]
 ```
+
+`--repo` is optional from inside a checkout: it defaults to whatever
+`gh repo view` resolves, falling back to the `origin` remote. A run that can
+determine no repo exits non-zero rather than draining, because a conductor
+with no repo has nothing to select from (#2271).
 
 ```mermaid
 flowchart TD
