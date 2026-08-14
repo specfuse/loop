@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 19.00
+baseline:
+  sha: 36a1dd488befdad783b1a9dbcb4d639dfa3d7f30
+  probed_at: 2026-08-14T13:09:57.619398+00:00
+  failing: []
 ---
 
 # Gate 1 — the skill invokes the archiver instead of describing it
