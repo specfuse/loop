@@ -187,9 +187,18 @@ def _to_pr_summary(raw: dict) -> PRSummary:
     )
 
 
+#: What every repo-scoped section reports when there is no repo to scope it
+#: to (#2271). Passing the `None` through built `gh issue list --repo None`,
+#: which `subprocess` rejected with "expected str, bytes or os.PathLike
+#: object, not NoneType" -- a message naming neither `--repo` nor `gh`.
+_NO_REPO = "no repo given — pass --repo OWNER/NAME (nothing was queried)"
+
+
 def _read_issues(runner: Callable, repo: str, *, limit: int) -> tuple:
     """Return `(issues, error)`. `issues` is `()` and `error` is set when the
     listing call fails; never a partial list read as complete."""
+    if not repo:
+        return (), _NO_REPO
     try:
         raw = _run_json_list(
             runner,
@@ -208,6 +217,8 @@ def _read_issues(runner: Callable, repo: str, *, limit: int) -> tuple:
 
 def _read_prs(runner: Callable, repo: str, *, limit: int) -> tuple:
     """Return `(prs, error)`, same contract as `_read_issues`."""
+    if not repo:
+        return (), _NO_REPO
     try:
         raw = _run_json_list(
             runner,

@@ -45,6 +45,7 @@ from specfuse.agent.budget import (
     RunBudget,
 )
 from specfuse.agent import worktree
+from specfuse.agent.repo_detect import detect_repo
 from specfuse.agent.state import AgentSnapshot, gather_snapshot
 from specfuse.loop import agent_policy
 from specfuse.loop._filelock import acquire_agent_lock
@@ -679,7 +680,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         prog="specfuse-agent",
         description="Run the specfuse-agent conductor loop.",
     )
-    parser.add_argument("--repo", default=None, help="GitHub repo, OWNER/NAME")
+    parser.add_argument(
+        "--repo",
+        default=None,
+        help="GitHub repo, OWNER/NAME (default: detected from the checkout)",
+    )
     parser.add_argument("--policy", default=None, help="path to agent-policy.yml")
     parser.add_argument("--features-root", default=None, help="path to .specfuse/features")
     parser.add_argument(
@@ -700,6 +705,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     features_root = Path(args.features_root) if args.features_root else None
 
+    # No repo, no run (#2271). `default_providers` returns `()` on a `None`
+    # repo, so continuing here would drain in 0.00 minutes and exit 0 -- a
+    # summary indistinguishable from "there was genuinely nothing to do",
+    # printed by a run that never asked. Failing before the lock is taken
+    # keeps that distinction where the operator can act on it.
+    repo = args.repo or detect_repo()
+    if not repo:
+        print(
+            "specfuse-agent: could not work out which GitHub repo to run "
+            "against, and a run without one does nothing. Pass --repo "
+            "OWNER/NAME, or run from a checkout whose 'origin' remote is on "
+            "github.com (gh repo view must succeed).",
+            file=sys.stderr,
+        )
+        return 2
+
     # Bracket the run at the process boundary (#2055). Dispatched `/fix-bug`
     # sessions create and check out branches, so a run that started on `main`
     # ends wherever the last session left it -- silently. The conductor is not
@@ -711,14 +732,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         summary = run_agent(
-            repo=args.repo,
+            repo=repo,
             policy_path=args.policy,
             features_root=features_root,
             max_minutes=args.max_minutes,
             max_tokens=args.max_tokens,
             max_items=args.max_items,
             providers=default_providers(
-                repo=args.repo,
+                repo=repo,
                 policy_path=args.policy,
                 features_root=features_root,
                 monitoring_config_path=args.monitoring_config,

@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`specfuse agent` with no `--repo` ran to completion, reported `stop reason: drained`, and exited 0 — having done nothing.** `--repo` defaulted to `None` and nothing filled it in, so the ordinary invocation (`specfuse agent`, from inside the checkout you mean) carried no repo at all; observed 2026-08-14 on two unrelated projects. `default_providers` returns `()` on a `None` repo, so the run had **nothing selectable** and drained in 0.00 minutes — a summary indistinguishable from "there was genuinely nothing to do", printed by a run that never asked. The same `None` also reached `gh issue list --repo None`, which `subprocess` rejected with `expected str, bytes or os.PathLike object, not NoneType`, reported as `snapshot: issues unreadable` — a message naming neither `--repo` nor `gh`. `main()` now resolves the repo from the checkout when the flag is absent (`specfuse/agent/repo_detect.py`): `gh repo view --json nameWithOwner` first, because it resolves the same default remote the run's own `gh` calls will use and so cannot disagree with them, then the `origin` remote as the fallback for an absent or unauthenticated `gh`. **Only GitHub remotes are accepted** — a `gitlab.com` remote yields no repo rather than a plausible-looking `OWNER/NAME` that would fail further downstream with a worse message. A run that still cannot determine one **fails with exit 2 before the lock is taken**, naming `--repo`, rather than draining successfully. The repo-scoped snapshot sections are guarded independently and report `no repo given — pass --repo OWNER/NAME (nothing was queried)` without issuing a command, so the confusing `PathLike` message cannot return through another caller. **Detection never raises** — every probe failure is a `None` the caller decides about, so a missing `gh`, a missing `git`, or a detached checkout produces the plain error and not a traceback (#2271)
+
 ## [0.12.1+umbrella.0.12.1] - 2026-08-13
 
 ### Fixed
