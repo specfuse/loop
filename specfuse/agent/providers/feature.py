@@ -22,6 +22,7 @@ from __future__ import annotations
 import time
 from typing import Any, Callable, Optional, Sequence
 
+from specfuse.agent import driver_command as driver_command_module
 from specfuse.agent import driver_invoke, queue_read, state
 from specfuse.agent.run import (
     KIND_FEATURE,
@@ -72,6 +73,7 @@ class FeatureProvider:
         features_root: Any = None,
         stream_driver_output: bool = False,
         reporter: Optional[Callable[[str], None]] = None,
+        driver_command: Optional[Sequence[str]] = None,
     ):
         self._repo = repo
         self._runner = runner
@@ -87,6 +89,12 @@ class FeatureProvider:
         #: the module default and streaming is what the operator wants.
         self._stream_driver_output = stream_driver_output
         self._reporter = reporter
+        #: Resolved once per provider, not per dispatch: which build gets run
+        #: is a property of where the conductor is standing, and re-deciding
+        #: it mid-run could dispatch two different drivers in one run (#2186).
+        self._driver_command = driver_command_module.resolve_driver_command(
+            override=driver_command
+        )
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         features, errors = state.read_feature_summaries(self._features_root)
@@ -236,11 +244,16 @@ class FeatureProvider:
         one.
         """
         restarts = 0
+        self._say(
+            f"{feature_id}: "
+            f"{driver_command_module.describe_command(self._driver_command)}"
+        )
         while True:
             halt = driver_invoke.advance_feature(
                 self._driver_runner(feature_id),
                 feature_id,
                 features_root=self._features_root,
+                command=self._driver_command,
             )
             if halt.halt_class != driver_invoke.HALT_DRIVER_RESTART:
                 return self._map_halt(feature_id, halt)
