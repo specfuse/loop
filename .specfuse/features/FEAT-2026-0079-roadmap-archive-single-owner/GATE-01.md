@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 19.00
 baseline:
   sha: 468b9d1e9211df913cdba551aeb5eddf376047df
@@ -57,3 +57,12 @@ Gate set `code`, per `.specfuse/verification.yml`:
 - `coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90`
 - `bats tests/sync_scaffold.bats` — T02 touches the vendoring path
 - `python3 .specfuse/scripts/roadmap_link_gate.py`
+
+## Auto-close note
+
+**PASSED — auto-closed** (`evaluate_auto_close`, predicate=v1). The close ceremony **did not run**.
+
+- gate_total_cost: $2.73 of $19.00
+- reasons: [] (auto=True)
+
+The per-criterion deferred-verification list was **not** enumerated. Before treating this gate as fully verified, read `RETROSPECTIVE.md` § "What the loop did NOT verify" and the `specfuse:autoclose-debt` marker it carries.
