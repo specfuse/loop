@@ -27,9 +27,7 @@ on both surfaces.
   - `blocked` — cannot proceed because a **named** dependency is unmet: an ADR
     awaiting approval, or an upstream `FEAT-YYYY-NNNN` that must complete first.
     A blocked feature always names and links its blocker, so the roadmap shows
-    the dependency at a glance. Only `planned` or `active` may be blocked; set
-    and cleared with `/block-feature`, which owns the `**Blocked by.**` detail
-    block's format.
+    the dependency at a glance. Only `planned` or `active` may be blocked.
   - `deferred` — a *voluntary* park with no named blocker, pending an external
     decision or dependency. The absence of a named blocker is the entire
     difference from `blocked`.
