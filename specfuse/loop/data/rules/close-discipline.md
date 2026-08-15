@@ -77,7 +77,7 @@ than re-deriving it.
 has the context — it just tried to meet the criterion and knows why it
 didn't. A reader (human or skill) sees only the prose after the fact and
 would be guessing; a confident guess on an ambiguous entry is worse than an
-unclassified one. `specfuse-lint --closing` refuses a hedged close whose
+unclassified one. `specfuse lint --closing` refuses a hedged close whose
 record — the one belonging to the WU currently under lint — has an entry
 with no `kind:` or an unrecognised one; it does not read any other feature's
 retrospective.
@@ -104,7 +104,7 @@ read it — not a second write.** An author who treats the changelog append as
 new work will write the enumeration twice, badly; write it once, in both
 places, from the same understanding. `closing_requirements.py`'s `close-k`
 requirement (enforced by `assert_changelog_entry_for_contract_changes` in
-`loop.py`, and pre-squash by `specfuse-lint --closing`) fires when this
+`loop.py`, and pre-squash by `specfuse lint --closing`) fires when this
 section names a real change and `Unreleased` gained no entry tracing to this
 feature's FEAT-ID.
 
@@ -135,7 +135,7 @@ does. Two mechanical surfaces replace the table:
   filename) — see `precreate_dispatch_skeleton` in `specfuse/loop/loop.py`.
   You fill the skeleton in; you do not need to remember its shape from
   scratch.
-- **`specfuse-lint --closing` is the mandatory pre-report check.** Run it
+- **`specfuse lint --closing` is the mandatory pre-report check.** Run it
   before emitting your `RESULT` block. It reads the same registry the driver
   itself checks and reports pass/fail per requirement in-session, so a format
   mismatch is caught while you can still fix it, not after the driver refuses.
@@ -161,6 +161,23 @@ old WU body is optional cleanup, not required migration work.
 > FEAT-2026-0054 replaced the copy with the two mechanical surfaces above and
 > made `closing_requirements.py` the single registry both the driver and the
 > lint read.
+
+## 5. Per-criterion state and the narrow/broad oracle contract
+
+A gate may carry a `GATE-NN-CRITERIA.md` artifact recording, per acceptance
+criterion, which oracle proved it, that oracle's exit code, and the tree state it
+ran against. Each entry also carries a `kind` (`narrow` or `broad`) and a `state`
+(the pass/fail result the oracle produced).
+
+A `narrow` oracle has a knowable scope — a scoped test nodeid, a symbol-existence
+import, a structural assert, a grep with a countable output — so its green may be
+carried forward across close attempts. A `broad` oracle — the full test suite, a
+full regeneration, a scenario matrix — has no knowable scope, so a carried-forward
+green would be an unsound coverage claim; it re-runs on every close attempt.
+
+`kind` and `state` are written by the close that ran the oracle and are never
+inferred by a reader, the same posture §2 already takes on the hedged-record
+`kind:`. `specfuse lint --closing` is the check.
 
 ## Split with project-local rules
 

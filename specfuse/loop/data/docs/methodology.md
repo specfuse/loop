@@ -172,7 +172,7 @@ time and the driver never re-dispatches a `done` close WU. Two surfaces now clos
 that gap, and **neither writes terminal state itself** — both route through the
 one owner:
 
-- `specfuse-loop --recheck-verdict <FEATURE_ID>` re-reads the terminal close WU's
+- `specfuse run --recheck-verdict <FEATURE_ID>` re-reads the terminal close WU's
   verdict from disk and fires the flips if it now permits them, without
   re-dispatching the WU. Use it when follow-ups were genuinely discharged and the
   verdict was honestly upgraded to `met`. It is a no-op (exit `0`, printing why)

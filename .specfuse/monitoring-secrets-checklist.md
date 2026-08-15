@@ -1,6 +1,6 @@
 # Monitoring secrets checklist
 
-Merge and execution semantics land in FEAT-2026-0040 (`specfuse-monitor run`).
+Merge and execution semantics land in FEAT-2026-0040 (`specfuse monitor run`).
 This file is a shape declaration only: the list of environment-variable
 **names** an operator must export before running monitoring checks locally.
 It names variables, never values — it is safe to commit and safe to read.
@@ -23,7 +23,7 @@ is one of the names below.
 ## How to use this checklist
 
 1. Export each name above on the machine that will run
-   `specfuse-monitor run --dry-run` (FEAT-2026-0040), using whatever secret
+   `specfuse monitor run --dry-run` (FEAT-2026-0040), using whatever secret
    store your shell profile or process manager already uses.
 2. Never write a value for any of these names into a tracked file, a commit
    message, or this checklist itself — only the name belongs here.

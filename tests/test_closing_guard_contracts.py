@@ -9,7 +9,7 @@
 §4 used to restate every closing guard's literal string inline — a table
 that was itself a second, hand-maintained copy of `closing_requirements.py`
 and drifted from it. FEAT-2026-0054 replaced the table with two mechanical
-surfaces (the pre-created dispatch skeleton, and `specfuse-lint --closing`
+surfaces (the pre-created dispatch skeleton, and `specfuse lint --closing`
 as the mandatory pre-report check) and made `closing_requirements.py` the
 one registry both the driver's guards and the lint read.
 
@@ -67,8 +67,8 @@ class TestSectionFourPointsAtRealSurfaces(unittest.TestCase):
         lint_path = _REPO_ROOT / "specfuse" / "loop" / "lint_closing.py"
         self.assertTrue(lint_path.exists(), "lint_closing.py is missing")
         self.assertIn(
-            "specfuse-lint --closing", _doc(),
-            "§4 does not tell the author to run `specfuse-lint --closing` before reporting",
+            "specfuse lint --closing", _doc(),
+            "§4 does not tell the author to run `specfuse lint --closing` before reporting",
         )
 
     def test_does_not_reintroduce_the_literal_guard_table(self):

@@ -48,7 +48,7 @@ the planning rigor Ralph's bare task list lacks.
   `.specfuse/scripts/adopt_feature.py <repo> <issue-number>` (or the
   interactive `/adopt-feature` skill) to scaffold a dispatchable feature
   folder from a picked issue.
-- The **driver** (`specfuse-loop`, from the pip package) walks the current gate's
+- The **driver** (`specfuse run`, from the `specfuse-loop` pip package) walks the current gate's
   ready work units, dispatches each as a fresh `claude -p` session, runs the unit's
   verification itself as the exit oracle, and commits one squashed,
   trailer-carrying commit per unit. A failed gate is retried with a fresh
@@ -75,8 +75,9 @@ checks CI runs — before each `git push`). Bypass with `git push --no-verify`.
 The driver installs from PyPI and the skills ship as a Claude Code plugin:
 
 ```bash
-pipx install specfuse                           # umbrella CLI; pulls specfuse-loop>=0.3.0
-#   gives you: specfuse, specfuse-loop, specfuse-lint  (or: python3 -m pip install specfuse, in a venv)
+pipx install specfuse                           # or: uv tool install specfuse
+#   one command for the whole suite: specfuse run / lint / monitor / stats / …
+#   (or: python3 -m pip install specfuse, in a venv)
 
 # in Claude Code, enable the skills plugin (one-time):
 #   /plugin marketplace add specfuse/specfuse
@@ -87,19 +88,28 @@ specfuse init /path/to/your-project             # scaffold .specfuse/ + wire .cl
 cd /path/to/your-project
 $EDITOR .specfuse/verification.yml              # match the `code` gates to your stack
 # author your first feature (in Claude Code: /draft-feature)
-specfuse-loop --dry-run                          # show the gate walk, no dispatch
-specfuse-loop                                    # the real run
+specfuse run --dry-run                           # show the gate walk, no dispatch
+specfuse run                                     # the real run
 ```
 
-> **Distribution.** Code ships via pip — `specfuse` (umbrella CLI: `init` /
-> `upgrade`) pulls `specfuse-loop` (the driver); Claude assets ship via the
+> **Distribution.** Code ships via pip — the `specfuse` umbrella hard-depends on
+> `specfuse-loop` (the driver) and every other component, so `pipx upgrade
+> specfuse` / `uv tool upgrade specfuse` re-resolves the whole suite. Claude
+> assets ship via the
 > [`specfuse/specfuse`](https://github.com/specfuse/specfuse) plugin marketplace.
 > `specfuse init` lays down `.specfuse/` and wires `.claude/`; `specfuse upgrade`
-> overlays a newer scaffold and pip-upgrades both packages. Every `specfuse-loop`
-> run self-provisions (version-syncs `.specfuse/` from the installed package), so
+> is the same idempotent operation over an existing scaffold. Every `specfuse
+> run` self-provisions (version-syncs `.specfuse/` from the installed package), so
 > an upgrade reaches existing projects on their next run. (`./init.sh` is a
 > deprecated v1.0 shim that delegates to `specfuse init`/`upgrade`; slated for
 > removal.)
+>
+> **Flat commands are deprecated.** `specfuse-loop`, `specfuse-lint`,
+> `specfuse-monitor`, `specfuse-monitor-lint` and `specfuse-stats` still work as
+> aliases until 1.0.0, with identical arguments and behaviour. Use the
+> subcommands. `specfuse doctor` reports which flat names are still on your PATH;
+> `SPECFUSE_NO_DEPRECATION_WARNING=1` silences the notice in noisy hooks or CI.
+> `pip install specfuse-loop` on its own remains supported for library use.
 
 > **One driver per working tree.** The driver holds an exclusive advisory lock on
 > `.specfuse/.loop.lock` for the duration of a run; a second driver targeting the

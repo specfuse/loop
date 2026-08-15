@@ -263,10 +263,17 @@ Report the ready WUs (those whose `depends_on` are all done and
 status is `pending`). Tell the user the gate would continue if they
 re-ran the loop.
 
-### 6. End with the RESULT block
+### 6. Emit the RESULT block only for a non-interactive run
 
-Per [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the report was produced and shown.
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
+[`../../rules/result-contract.md`](../../rules/result-contract.md).
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the report was produced and shown.
 `status: blocked` is reserved for the case where the canonical files
 themselves are missing or corrupt enough that the report can't be
 assembled (e.g. no `PLAN.md`, no `events.jsonl` for a feature whose
@@ -277,9 +284,8 @@ WUs have non-pending statuses).
 - **Does not write or commit anything.** Read-only.
 - **Does not insert hygiene WUs, edit WU bodies, or flip statuses.**
   Recommends — the user (or `/draft-feature` / their editor) acts.
-- **Does not re-run the loop.** That's `python3
-  .specfuse/scripts/loop.py`; the skill names it in the recommended
-  action when relevant.
+- **Does not re-run the loop.** That's `specfuse run`; the skill names it
+  in the recommended action when relevant.
 - **Does not diagnose codebase bugs.** It reads what the agent and
   the verify-output said and quotes them; it doesn't go investigate
   whether the bug the agent named is actually a bug.
@@ -297,6 +303,32 @@ with their pros and cons; and a recommendation.
 Never author the operator's own justification. Where a field records *why a human
 decided something*, that text comes from them.
 
+**A halted feature is feature scope, so the briefing is required too.** This
+skill's whole reason to exist is a feature that stopped partway and needs a
+human, which is exactly the case that rule's § *The feature briefing — required
+when the halt is at feature scope* names. Lead with it: why we picked this, what
+we set out to accomplish and whether that claim still stands, what has been
+delivered so far, where it fell short and why, what it has cost against plan,
+what the operator must do, and what to be aware of going forward. The blocked
+unit's diagnosis — root cause, options, recommendation — is part 6 of that
+briefing, not a substitute for it.
+
+Two adjustments for a mid-flight halt rather than a close:
+
+- **Part 3 is "what has been delivered *so far*", and part 4 must say whether
+  the feature is still on track to deliver its benefit at all.** A gate that
+  halts on a defect in its own premise is a different business situation from
+  one that halts on a flaky environment, and the operator cannot tell those
+  apart from a work-unit status.
+- **Sunk cost belongs in part 5, next to the estimate to finish.** The decision
+  a halted feature actually poses is often *continue, re-scope, or abandon*, and
+  that decision is unmakeable without both numbers. Where continuing looks
+  unwise, say so and name `/abandon-feature` as a live option — the do-nothing
+  and reject options are required by the six parts.
+
+Do not narrate work units. Which unit failed on which attempt is part 6's
+evidence, below the framing, not the framing itself.
+
 ## Version
 
 **v0.3.** Added `#### Per-attempt outcomes` and `#### Re-arm history`
@@ -306,6 +338,13 @@ from `events.jsonl` (correlation-id-filtered); re-arm history reads
 locked at v1 by FEAT-2026-0016 gate 1 (T01 emits, T02 writes
 frontmatter). Legacy features with no `attempt_outcome` records
 degrade gracefully to a note rather than failing.
+
+**v0.3.** Escalation framing now requires `operator-escalation.md`'s feature
+briefing, not only the six parts — a halted feature is feature scope, so the
+operator needs the business picture (why we picked it, whether it is still on
+track to deliver, sunk cost against estimate-to-finish, continue / re-scope /
+abandon) with the blocked-unit diagnosis as one part of it rather than the whole
+answer. Same operator request as `/accept-hedged-close` v0.2.
 
 **v0.2.** Added budget-brake fields to §2: `cost_budget_usd` in GATE
 files and the `gate_budget_exceeded` escalation event in `events.jsonl`

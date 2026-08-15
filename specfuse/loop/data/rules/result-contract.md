@@ -16,6 +16,26 @@ The agent's RESULT is **advisory**. The driver runs verification itself (see
 what decides done. Report honestly: claiming `complete` on work that fails the gates
 wastes an attempt and teaches the next session nothing.
 
+## Who reads it — emit it only when something does
+
+This block is a **machine interface**, not a report. Emit it when a program is on
+the other end:
+
+- a work-unit session the driver dispatched — always;
+- a skill invoked **non-interactively**, headless from a calling program that
+  parses the outcome (`fix-bug` under `autofix_invoke` is the live example).
+
+Do **not** emit it on an interactive run. A human who typed `/pick-feature` or
+`/gate-status` has no parser; the block lands as a fenced slab of `status:`,
+`acceptance_criteria:` and `evidence:` they have to scroll past, which is the
+verbosity [`human-output.md`](human-output.md) exists to prevent. Report to them
+per that rule instead. Emitting nothing costs nothing here — no driver is waiting
+on it, and the absence of a block is only a failed attempt when a driver
+dispatched the session.
+
+When in doubt about which you are in, look at who invoked you: a slash command
+typed by a person is interactive; a `claude -p` dispatch is not.
+
 ## The four-step discipline
 
 This contract is the loop-surface expression of the neutral
@@ -106,6 +126,15 @@ blocked_reason: <present only when status is blocked>
    three fresh attempts chasing a `complete` that verification keeps rejecting.
 5. **No secret-looking values in evidence.** The RESULT block is read by the driver
    and may be archived. See [`security-boundaries.md`](security-boundaries.md).
+6. **A "pre-existing" failure claim cites the commit it was measured on.** Calling
+   a failure pre-existing is a claim about a *different commit* — typically the
+   merge-base — and nothing observed on your own branch establishes it. Name the
+   command and the commit, and give the numbers from both sides. If the baseline
+   cannot be measured, emit `status: blocked` rather than asserting one: a
+   fabricated baseline lowers the bar the checks exist to hold, and a mass of
+   errors sharing one signature (network refused, unresolvable build
+   dependencies) is a report about where the suite ran, not about the repository
+   (#2075).
 
 ## Closing obligations for implementation WUs (FEAT-2026-0049)
 

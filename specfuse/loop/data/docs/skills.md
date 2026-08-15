@@ -23,7 +23,7 @@ A feature moves through these phases. The skill for each phase is named.
 ```
 roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1 detailed
                                                             │
-                                                   specfuse-loop
+                                                   specfuse run
                                                             │
                                    ┌────────────────────────┴───────────────┐
                                    ▼                                         ▼
@@ -74,14 +74,14 @@ roadmap ──/pick-feature──▶ active ──/draft-feature──▶ gate 1
 
 ### 3. Run — the driver (not a skill)
 
-`specfuse-loop` (the pip-installed driver) walks the active gate, dispatches each
+`specfuse run` (the pip-installed driver) walks the active gate, dispatches each
 WU as a fresh session, verifies, and commits. It is a command, not a skill. It
 either auto-closes a clean gate or halts at the gate boundary for review.
 
 It also owns every terminal flip (gate → `passed`, roadmap row → `done`, PLAN.md →
 `done`, auto-archive) — no skill writes those surfaces. When a verdict is upgraded
 *after* its close WU is already `done`, re-fire them with
-`specfuse-loop --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
+`specfuse run --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
 verdict from disk and flips only if it now permits, printing why when it does not.
 Safe to run on an already-`done` or still-hedged feature — it writes nothing.
 
@@ -102,6 +102,19 @@ Safe to run on an already-`done` or still-hedged feature — it writes nothing.
   underlying cause (credentials, spec ambiguity, missing dep). Flips
   `blocked_human → pending`, resets attempts, re-opens the gate if needed, prints
   the resume command.
+- **`/answer-escalation`** — work the `needs-human` GitHub queue one issue at a
+  time. Reads one parked escalation, explains in plain English what stopped the
+  agent, and records one of four dispositions: **hand off** to the skill that
+  owns the escalation's category, **answer** with guidance recorded as a marked
+  issue comment, **close** as won't-fix, or **skip**. Every disposition except
+  `skip` releases the `needs-human` *and* `blocked-wu` labels — both, because
+  `BugsProvider` skips an issue carrying either, so releasing one leaves the
+  issue answered and still parked. Human-invoked only; it triggers no fix and no
+  retry. Its product is guidance the next agent run reads, carried in a comment
+  marked `<!-- specfuse:operator-guidance id=… -->` so a later reader can find it
+  mechanically. Write order is deliberate — comment first, labels second — so a
+  failed label release leaves an issue correctly answered and merely still
+  parked, never unparked with no guidance.
 - **`/abandon-feature`** — cleanly abandon the active feature when retry isn't
   worth it. Flips every non-terminal WU/gate/PLAN/roadmap surface to its
   abandoned state behind a single up-front confirmation.

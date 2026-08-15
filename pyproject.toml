@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "specfuse-loop"
-version = "0.9.3"
+version = "0.12.1"
 description = "Local-first executor for the Specfuse Plan + Work Unit gate-cycle methodology."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -75,6 +75,7 @@ specfuse-lint = "specfuse.loop.lint_plan:main"
 specfuse-monitor-lint = "specfuse.loop.lint_monitoring:main"
 specfuse-monitor = "specfuse.monitor.cli:main"
 specfuse-stats = "specfuse.loop.events_stats:main"
+specfuse-agent = "specfuse.agent.run:main"
 
 [tool.setuptools.packages.find]
 # Ship ONLY the specfuse namespace package. Without this scope, setuptools'

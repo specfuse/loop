@@ -59,19 +59,19 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
 | FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
 | FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
-| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | planned | — | — |
-| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | planned | — | — |
+| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | done | `.specfuse/features/FEAT-2026-0044-agent-policy-schema/` | [→ archive](roadmap-archive.md#feat-2026-0044) |
+| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
 | FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
-| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | planned | — | — |
-| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | blocked | — | — |
-| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | blocked | — | — |
-| FEAT-2026-0050 | Async feature-drafting interview via question issues | blocked | — | — |
+| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
+| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
+| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
+| FEAT-2026-0050 | Async feature-drafting interview via question issues | planned | — | — |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
 | FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | planned | — | [→ detail](#feat-2026-0056) |
+| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
 | FEAT-2026-0058 | Feature decision registry + override lint | planned | — | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
@@ -88,7 +88,13 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
 | FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
 | FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | planned | — | [→ detail](#feat-2026-0074) |
-| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | planned | — | [→ detail](#feat-2026-0075) |
+| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
+| FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | done | — | [→ archive](roadmap-archive.md#feat-2026-0076) |
+| FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
+| FEAT-2026-0078 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-2026-0078) |
+| FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-2026-0079) |
+| FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
+| FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | — | [→ detail](#feat-2026-0081) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -787,65 +793,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0044"></a>
-## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
-
-**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
-
-**Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run — entries must exist and be `planned`/`active`/`blocked`; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
-
-**Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
-
-**Status: planned.**
-
-<a id="feat-2026-0045"></a>
-## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
-
-**Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
-
-**Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
-
-**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
-
-**Status: planned.**
-
-<a id="feat-2026-0047"></a>
-## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
-
-**Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
-
-**Goal.** A webhook notifier in agent-policy.yml (`escalation.webhook`): on new/re-pinged needs-human issues, post a one-liner + link to the configured channel; provider = any incoming-webhook URL (Discord/Slack/Teams payload adapters, provider swap = URL change). SLA handling: unanswered escalation past the configured window re-pings once, then the item is parked and the queue continues. Heartbeat-silence self-alert: the agent records a last-run timestamp (repo-derivable); a scheduled check (or /attention on open) flags "agent has not run in M hours" — and where a schedule exists, fires the same webhook.
-
-**Benefits.** The operator hears about blockers within minutes wherever they live, answers where the audit trail lives, and can trust that agent silence is itself alarmed — monitoring the monitor at near-zero build cost.
-
-**Status: planned.**
-
-<a id="feat-2026-0048"></a>
-## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
-
-**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
-
-**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
-
-**Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
-
-**Blocked by.** [FEAT-2026-0045](#feat-2026-0045) — needs machine-readable triage intake; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — refusals and guardrail failures escalate through the contract
-
-**Status: blocked.**
-
-<a id="feat-2026-0049"></a>
-## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
-
-**Why.** The capstone: a script that drives the whole lifecycle of a specfuse-configured repo — monitoring findings, issue triage, bug fixing, prioritized feature advancement — as a thin conductor over the existing loop driver and skills (none of which it modifies), escalating whatever it cannot handle. The operator controls when and how long it runs, and therefore what it costs.
-
-**Goal.** `specfuse-agent run` — operator-launched, run-to-drain: acquire a lock file (PID + heartbeat timestamp, stale-lock detection, exactly one agent per repo); loop — read repo state (issues, PRs, roadmap, agent-policy.yml, feature folders: the entire agent memory, per the derivable-from-GH-or-safely-losable principle — no agent database), pick the highest-value action under policy (bugs preempt per rules; queue top for features; parse answered needs-human issues first), execute via the existing skill/driver surfaces, reconcile — until the queue is drained or a cap hits (`--max-minutes`, `--max-tokens`, `--max-items`). Feature execution respects gate checkpoints: driver halts `awaiting_review` → escalate per contract and switch to the next workable item (pause = stop and pick different work; feature folders already persist all state). Blocked items park with an escalation; drafting-needed queue tops escalate (drafting stays human in v1). Kill switch: a PAUSE marker checked each iteration. Cron or event triggers later invoke the same script unchanged.
-
-**Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
-
-**Blocked by.** [FEAT-2026-0044](#feat-2026-0044) — policy file is the agent's contract; [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) — escalation queue; [FEAT-2026-0047](#feat-2026-0047) — outbound notification; [FEAT-2026-0048](#feat-2026-0048) — the autonomous bug lane
-
-**Status: blocked.**
-
 <a id="feat-2026-0050"></a>
 ## FEAT-2026-0050 — Async feature-drafting interview via question issues
 
@@ -855,9 +802,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
 
-**Blocked by.** [FEAT-2026-0049](#feat-2026-0049) — an agent capability; the runner and its escalation loop must exist
-
-**Status: blocked.**
+**Status: planned.**
 
 <a id="feat-2026-0052"></a>
 ## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
@@ -870,23 +815,12 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0056"></a>
-## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
-
-**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
-
-**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
-
-**Benefits.** Roughly halves close cost on multi-attempt gates — the dominant close-cost mechanic in the two most expensive features ($157.75 and $140.30). A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices the whole ceremony.
-
-**Status: planned.**
-
 <a id="feat-2026-0058"></a>
 ## FEAT-2026-0058 — Feature decision registry + override lint
 
 **Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
 
-**Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse-lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
+**Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
 
 **Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
 
@@ -957,16 +891,62 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 
 **Status: planned.**
 
-<a id="feat-2026-0075"></a>
-## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
+<a id="feat-2026-0078"></a>
+## FEAT-2026-0078 — Declarable in-place produces overlap: `produces_incremental` field, documented and validated
 
-**Why.** Python caches modules in `sys.modules` at first import, so a work unit that edits the driver cannot change behaviour for any work unit the same driver process dispatches afterwards — including the close that judges it. This is not hypothetical and it is not cheap. FEAT-2026-0057 paid for it twice in one gate. Its T04 wired a pre-dispatch call site into `loop.py` at 13:58 UTC; the driver process had imported `loop.py` at 13:30, so the close dispatched one second later ran the pre-T04 function, received nothing, and could not make the observation that would have cleared its follow-up — a $5.33 close that closed `met_locally` for want of a restart. The second occurrence is one layer down: `execute_unit_attempt` imports `prerun_capture` at call time but calls it for **every** work unit, so the first dispatch of any process caches it. That round was deliberately split into two driver invocations to dodge the hazard, and the sequencing cost was paid for nothing because the fix it protected turned out to be defective for an unrelated reason. The methodology has no name for this and no guard against it; both times it was diagnosed after the money was spent. It is the self-hosting form of the harness-migration hazard `.specfuse/LEARNINGS.md` already warns about, and it will keep taxing every driver-editing feature until something detects or prevents it. Tracked as issue #757.
+**Why.** `check_produces_satisfiability` WARNs when a dispatchable WU declares a `produces:` path an earlier `done` WU already delivered, and tells the author to "state the incremental edit this WU makes to it in the body". **The check reads only WU frontmatter and never opens the body**, so that resolution can never fire — the WARN is permanent on a correctly-authored WU, and the only action that silences it is dropping the `produces:` path. Dropping it is usually the *wrong* fix: `produces:` feeds the driver's presence and in-diff guards, so understating it weakens a real contract to silence advisory noise. Reported as [#1041](https://github.com/specfuse/loop/issues/1041) and observed repeatedly in FEAT-2026-0049, where T05 legitimately edited a file T04 created and carried the WARN through four gates.
 
-**Goal.** Make the hazard visible or impossible rather than rediscovered. The design is genuinely open and should be settled in gate 1 rather than assumed here; at least three shapes are viable and they are not mutually exclusive. **Detect and warn** — at gate completion, if any work unit in the gate declared `produces:` naming a file under `specfuse/loop/`, print that later units in the same run executed against the pre-edit modules and that a fresh process is required before any close can verify the change; cheapest, and it converts a silent tax into a visible one. **Isolate the dispatch** — run each work-unit attempt in a subprocess so every attempt re-imports; strongest guarantee, largest blast radius, and it interacts with the driver's tree-reset and event-buffer bookkeeping in ways that need real design. **Refuse at arm time** — detect a driver-editing unit scheduled ahead of a close in the same gate and refuse to arm, forcing the two-invocation split the operator currently has to know to perform by hand. Whichever is chosen, the feature should also give the two-invocation pattern a sanctioned name: holding a close at `status: draft` does **not** work (the arm check rejects an entire gate containing any draft unit), and `blocked_human` is the only usable hold today, which reads as a failure in `/attention` and every other consumer.
+**Goal.** An optional `produces_incremental:` frontmatter list naming paths this WU deliberately edits in place, which `check_produces_satisfiability` reads and exempts — a resolution the check can actually observe. Shipped as one coherent change with the three things a new frontmatter field needs and a bug fix would skip: the field's entry in `WU.template.md`'s frontmatter notes, its mention in `/authoring-work-units` beside §13's `produces:` guidance, and schema validation so a typo is a lint error rather than a silently-ignored key. The WARN message names the field as a resolution alongside dropping the path.
 
-**Benefits.** The most expensive class of work unit stops paying a tax nobody budgeted for: two close cycles were lost to this in a single feature, and closes are already the costliest attempt type in the portfolio. A hazard that currently depends on an operator remembering it becomes a property of the system. And the sanctioned hold removes the last hand-improvised step in a driver-editing feature, so a run that must span two invocations says so in its plan instead of being discovered mid-gate.
+**Benefits.** An author who declares a real in-place edit gets a clean lint without weakening the driver's guards, and the linter stops advising an action it cannot detect. Every consumer that reads WU frontmatter learns the field from the template rather than from the linter's source.
+
+**Provenance — worth reading before this is drafted.** A working implementation of the exemption already existed and was reverted (`25e6bc5`), not because it was wrong but because of how it arrived. Headless `/fix-bug` produced it while closing #1041, even though `/fix-bug`'s own Step 2 lists "frontmatter-field addition" among the feature indicators that require refusing and escalating. It then reached `main` inside an unrelated PR because a branch was cut from the agent's branch instead of `main`, so it merged without review. The reverted diff is a sound starting point for the implementation half — the parts it was missing are exactly the template, skill and validation work above.
 
 **Status: planned.**
+
+<a id="feat-2026-0077"></a>
+## FEAT-2026-0077 — Provenance-recorded policy values: know who chose a value, not just what it is
+
+**Why.** [FEAT-2026-0076](roadmap-archive.md#feat-2026-0076)'s review mode has to answer "did anyone actually
+choose this value, or is it the shipped default nobody looked at?" It answers by **comparing
+against the shipped baseline**, which is cheap, needs no schema change, and is deliberately
+lossy in one direction: an operator who *deliberately* chooses a value equal to the shipped
+one is indistinguishable from one who never chose. That was the right trade at the time and
+the reason is recorded honestly in that feature's `GATE-02-REVIEW.md` — but the reasoning
+carries its own expiry, stated there as the strongest argument against itself: gate 1 found
+this repository's file had *no operator intent in it to protect yet*, so comparison was
+chosen partly because the hard case did not exist in the sample rather than because it
+handles it. On a repository where someone has genuinely tuned their budgets, the lossy
+direction stops being harmless.
+
+**Goal.** Record provenance when a policy value is written, so review can distinguish
+"operator chose this" from "this is the shipped default" without inference. The shape is a
+schema change to `.specfuse/agent-policy.yml` — deliberately out of FEAT-2026-0076's scope
+boundary, which is why this is a separate feature rather than a widening of that one. It
+must also answer what happens to files written before provenance existed, since every
+consumer project's file is one: an absent provenance record has to degrade to the
+comparison heuristic rather than to a wrong answer.
+
+**Benefits.** Review stops hedging on the one question it exists to answer. The caveat
+FEAT-2026-0076 attaches to every baseline-match ("this may never have been decided") becomes
+unnecessary where a provenance record exists. And the ordering is deliberate — a cheap
+mechanism shipped first and replaced by the accurate one costs a migration; the reverse
+ordering costs a schema migration before anyone knows whether the precision is worth it.
+
+**Status: planned.** Filed at FEAT-2026-0076's gate-2 arming review by operator decision
+(open question 2). Not urgent: it becomes worth building when a real repository's policy file
+carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
+
+<a id="feat-2026-0081"></a>
+## FEAT-2026-0081 — Feature-ID collision prevention and cheap renumbering
+
+**Why.** Two features were drafted three minutes apart in different worktrees of the same repo and both took `FEAT-2026-0093`. One merged; the other was renumbered *after its gate had closed* — folder, `PLAN.md` frontmatter, every WU `id`, retrospective, staged lessons, criteria file, generated docs, two roadmap rows, the archive anchor, the branch, and a closed-and-reopened PR, by hand, where getting it wrong is silent. The next-ID scan is a point-in-time read and cannot close that window: the colliding PR was created *after* the draft ran, so no query shape would have caught it. #1644 investigated the scan's GitHub query and found it sound (`FEAT-<YYYY>-` matches; the reported zero-result prefix is a query the skill never issues), and the contamination defect it surfaced instead was fixed separately as #1872 — leaving the race itself, and the cost of recovering from it, unaddressed. Filing this feature is what #1644 was closed in favour of. The ambiguity is live, not historical: picking this very ID required an operator ruling on `FEAT-2026-0098`, which appears only in merged PR #1843's title with no roadmap row and no folder, its work having actually landed as `FEAT-2026-0078`.
+
+**Goal.** Make an ID collision cheap to prevent and cheap to recover from, along three independent lines, each shippable alone: narrow the race window by re-running the next-ID scan immediately before `/draft-feature` writes the feature folder, rather than only at step 1; catch a collision at the next lint rather than at merge, by making a `feature_id` claimed by a *different* slug anywhere in `roadmap.md` an error — which also resolves the title-only-claim ambiguity above mechanically; and make renumbering a command (`specfuse renumber <old> <new>`) instead of a careful manual sweep. **`events.jsonl` and `PLAN.baseline.json` must keep the old ID** under any renumbering: they are the driver's record of what actually ran, and the run really did execute under the old correlation ID. Rewriting a log to match a later rename falsifies history to tidy a name; the retrospective should carry a note so a future reader correlating events knows what to expect.
+
+**Benefits.** The expensive moment moves from merge — where the ID is already embedded in a dozen files across a closed gate — to lint, or is avoided entirely. Renumbering stops being a silent-failure operation performed by hand under time pressure. And the rule about which files keep the old ID is written down once, rather than being rediscovered by whoever pays for the next collision.
+
+**Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
 
 ## Notes
 

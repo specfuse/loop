@@ -14,22 +14,26 @@ each project you want to drive with one command.
 
 ## 1. Install the tooling and scaffold your project
 
-Install the umbrella package — it pulls the driver (`specfuse-loop>=0.3.0`) as a
-dependency and puts the `specfuse`, `specfuse-loop`, and `specfuse-lint` commands
-on your PATH. It's a command-line app, so **pipx** is the recommended installer
-(isolated environment, no `--break-system-packages` on PEP 668 / externally-
-managed Pythons):
+Install the umbrella package — it hard-depends on every component, so one
+install puts the whole suite behind a single `specfuse` command. It's a
+command-line app, so **pipx** (or **uv**) is the recommended installer (isolated
+environment, no `--break-system-packages` on PEP 668 / externally-managed
+Pythons):
 
 ```bash
 pipx install specfuse           # recommended
+uv tool install specfuse        # equivalent
 # or, inside a virtualenv you control:
 python3 -m pip install specfuse
 ```
 
+Upgrade the whole suite the same way — `pipx upgrade specfuse` /
+`uv tool upgrade specfuse` re-resolves every component. No extras, no flags, no
+bracket quoting.
+
 > On Debian/Ubuntu/macOS-Homebrew Pythons a bare `pip install` into the system
 > interpreter is blocked (`externally-managed-environment`). Use `pipx` (or a
-> venv) — that's what puts `specfuse-loop` / `specfuse-lint` on PATH for the gate
-> commands to find.
+> venv) — that's what puts `specfuse` on PATH for the gate commands to find.
 
 > **Windows: Git-Bash is required.** The driver runs natively on Windows (no WSL),
 > but it routes gate commands through **Git-Bash** so a target repo's
@@ -65,7 +69,7 @@ files copied into your repo.)
 > **Don't gitignore `.specfuse/`.** The loop's durable state lives there and must
 > be committed for the loop to work.
 
-> **Self-provisioning.** Every `specfuse-loop` run first version-syncs `.specfuse/`
+> **Self-provisioning.** Every `specfuse run` first version-syncs `.specfuse/`
 > from the installed package (missing → scaffold, older → overlay, equal → no-op,
 > never downgrades). So `pip install -U specfuse` followed by a run keeps the
 > scaffold current — `specfuse upgrade` is the explicit equivalent. Disable with
@@ -124,7 +128,7 @@ the loop will refuse to start until the folder is on its branch and committed.
 Let the driver do both for you:
 
 ```bash
-specfuse-loop --prepare      # create the PLAN.md `branch:`, commit the folder, then run
+specfuse run --prepare      # create the PLAN.md `branch:`, commit the folder, then run
 ```
 
 (Or by hand: `git checkout -b <branch>` from `PLAN.md`'s frontmatter, then
@@ -133,7 +137,7 @@ specfuse-loop --prepare      # create the PLAN.md `branch:`, commit the folder, 
 ## 4. Validate before running
 
 ```bash
-specfuse-lint .specfuse/features/FEAT-YYYY-NNNN-your-feature
+specfuse lint .specfuse/features/FEAT-YYYY-NNNN-your-feature
 ```
 
 The linter checks structure: every WU has the five mandatory sections, the closing
@@ -144,8 +148,8 @@ dispatch.
 ## 5. Dry-run, then run
 
 ```bash
-specfuse-loop --dry-run     # show the gate walked, in dep order, no dispatch
-specfuse-loop               # the real thing
+specfuse run --dry-run     # show the gate walked, in dep order, no dispatch
+specfuse run               # the real thing
 ```
 
 With no `--feature` flag the driver picks the single `active` feature. For each
@@ -188,7 +192,7 @@ the ones you accept to `pending`, marks the finished gate `passed`, and prints t
 resume command. Read the `GATE-NN-REVIEW.md` the planner wrote first: it's
 weighted toward where the planner was *least* certain.
 
-Then re-run `specfuse-loop`. Repeat until the terminal gate is `done`.
+Then re-run `specfuse run`. Repeat until the terminal gate is `done`.
 
 ## 7. Wrap up
 

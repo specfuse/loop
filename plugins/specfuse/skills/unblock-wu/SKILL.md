@@ -45,7 +45,7 @@ WUs and stop" mode.
 
 ## When to invoke
 
-When `python3 .specfuse/scripts/loop.py` printed:
+When `specfuse run` printed:
 
 ```
 Gate N halted: M work unit(s) need human attention.
@@ -91,7 +91,7 @@ being touched.
 > **Write-ordering invariant (BEFORE driver dispatch).** For `r` and
 > `u` choices, the frontmatter write — `status: pending`, `attempts: 0`,
 > incremented `re_arm_count`, and appended `re_arm_history` entry — MUST
-> complete before the operator runs `loop.py`. The driver's
+> complete before the operator runs `specfuse run`. The driver's
 > `detect_rearm_dispatch` reads `re_arm_count` from disk on the first
 > dispatch of the new cycle; if the write has not landed, the cumulative
 > fold misfires. The "Print the resume command" step (§5) follows this
@@ -237,15 +237,21 @@ After per-WU decisions, look at each gate that had a re-armed WU:
 
 ### 5. Print the resume command
 
-- One active feature: `python3 .specfuse/scripts/loop.py`
-- Multiple active features: `python3 .specfuse/scripts/loop.py
-  --feature FEAT-YYYY-NNNN-<slug>` (name the chosen feature).
+- One active feature: `specfuse run`
+- Multiple active features: `specfuse run --feature FEAT-YYYY-NNNN-<slug>`
+  (name the chosen feature).
 
 Mention: `--dry-run` confirms the ready-set before dispatch.
 
-End with the RESULT block per
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means every blocked WU was decided (re-armed,
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means every blocked WU was decided (re-armed,
 abandoned, or knowingly skipped) and any necessary gate-reopen
 flips wrote.
 

@@ -1,0 +1,1 @@
+assert_learnings_appended_or_noop: no .specfuse/LEARNINGS.md additions in squash and no 'nothing generalizes' note in RETROSPECTIVE.md

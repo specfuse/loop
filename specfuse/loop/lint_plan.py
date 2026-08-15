@@ -23,7 +23,7 @@ Two jobs:
 
 Exit 0 = clean, 1 = problems (printed).
 
-Usage:  specfuse-lint .specfuse/features/FEAT-XXXX-slug
+Usage:  specfuse lint .specfuse/features/FEAT-XXXX-slug
 """
 
 from __future__ import annotations
@@ -34,7 +34,13 @@ from pathlib import Path
 
 from . import _miniyaml
 from . import _wu_sections
-from .closing_requirements import gate_review_filename
+from .closing_requirements import (
+    LEARNINGS_PATH,
+    LEARNINGS_PENDING_FILENAME,
+    gate_review_filename,
+    learnings_staging_is_required,
+)
+from .criteria_state import CRITERIA_FILENAME_RE
 from .loop import VERDICT_VALUES
 
 FM = re.compile(r"^---\s*$")
@@ -85,17 +91,19 @@ VALID_EFFORT = frozenset({"low", "medium", "high", "xhigh", "max"})
 FULL_MODEL_ID_RE = re.compile(r"^claude-\w[\w.-]*$")
 
 # Two enforcement surfaces, one contract. This pattern governs PLAN.md graphs
-# and WU frontmatter. The event envelope enforces its own, narrower
-# `correlation_id` pattern (`data/schemas/event.schema.json`, vendored from the
-# methodology core and never edited here); the driver widens it via the
-# driver-local registry `data/schemas/driver-event.schema.json`, read by
-# `validate_event.load_validator` on a deep copy — the fall-through
+# and WU frontmatter. The event envelope enforces its own `correlation_id`
+# pattern (`data/schemas/event.schema.json`, vendored from the methodology core
+# and never edited here); since #1433 that envelope carries all three documented
+# work-unit shapes, so the two surfaces agree on their own. The driver-local
+# registry `data/schemas/driver-event.schema.json` — read by
+# `validate_event.load_validator` on a deep copy, the fall-through
 # FEAT-2026-0060 established for `event_type` and FEAT-2026-0073 extended to
-# correlation IDs.
+# correlation IDs — is now an inert safety net against an older schema root.
 #
-# ADDING A NEW `<NAME>` SEGMENT: update this pattern AND that registry's
-# `closing_names`, or IDs the linter accepts will be rejected by envelope
-# validation. This note lives here, at the change site, rather than in
+# ADDING A NEW `<NAME>` SEGMENT: it belongs in core's envelope. Update this
+# pattern AND that registry's `closing_names` in the same change, then get core
+# to adopt it — until it does, only the registry's widening makes envelope
+# validation accept what the linter already does. This note lives here, at the change site, rather than in
 # `rules/correlation-ids.md` — that file is vendored from core, so a loop-local
 # addition to it is reverted by the next `sync-scaffold.sh` run (#581).
 CORRELATION_ID_RE = re.compile(
@@ -545,6 +553,70 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
             )
 
 
+#: `LEARNINGS_PATH` named as a lessons destination. Anchored on the filename
+#: rather than the full path so `LEARNINGS.md` and `.specfuse/LEARNINGS.md`
+#: both match, and bounded on the left so `LEARNINGS-archive.md` — a different
+#: surface entirely — does not. `LEARNINGS-pending.md` cannot match this
+#: pattern either: the segment after `LEARNINGS` is `-pending`, not `.md`.
+_LEARNINGS_DESTINATION_RE = re.compile(r"(?<![\w-])LEARNINGS\.md")
+
+
+def check_closing_learnings_destination(
+    feature_dir: Path, plan_fm: dict, gates: list
+) -> None:
+    """WARN when an `auto` feature's closing WU names the one lessons
+    destination `close-i` forbids (#2173).
+
+    Under `autonomy_default: auto`, `assert_learnings_staged_under_auto`
+    forbids a closing WU from appending to `LEARNINGS_PATH`; lessons stage to
+    `LEARNINGS_PENDING_FILENAME` instead. A WU whose body names only the
+    forbidden path is *describing* a write the guard will refuse, so a session
+    following its own acceptance criteria literally is left with a forbidden
+    door and a false one -- the shape #2173 was filed on.
+
+    **This is not what caused that issue's headline $40.27.** The author
+    retracted that diagnosis with reflog evidence: every refused attempt had in
+    fact staged correctly, and the spin was the stale-build hazard (#1040,
+    fixed dispatcher-side in #2186). What survives the retraction is the
+    narrower defect checked here -- a work unit that describes a forbidden
+    destination is wrong whether or not a session has yet been misled by it.
+
+    WARN, never ERROR, for the reason `check_closing_guard_literals` gives:
+    measured on this repo, 9 of 14 historical `auto` closing WUs would fail it.
+    All 14 are `done` and skipped as sealed history, so the live tree is clean
+    -- but a prose match on a body is not a strong enough signal to fail a
+    build over, and a body may name the path descriptively without instructing
+    a write.
+    """
+    if not learnings_staging_is_required(plan_fm.get("autonomy_default")):
+        return
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wfile = feature_dir / str(entry.get("file", ""))
+            if not wfile.is_file():
+                continue
+            try:
+                wfm, wbody = read_frontmatter(wfile)
+            except Exception:  # noqa: BLE001 - malformed WU is another check's finding
+                continue
+            if wfm.get("type") not in ("close", "close-intermediate"):
+                continue
+            if wfm.get("status") == "done":
+                continue  # sealed; backfilling instructions on history is pointless
+            if LEARNINGS_PENDING_FILENAME in wbody:
+                continue  # names the routing, not just the forbidden half
+            if not _LEARNINGS_DESTINATION_RE.search(wbody):
+                continue
+            print(
+                f"WARN: {wfile}: body names {LEARNINGS_PATH} as a lessons "
+                f"destination, but this feature is autonomy_default=auto, where "
+                f"assert_learnings_staged_under_auto forbids that write — "
+                f"lessons stage to {LEARNINGS_PENDING_FILENAME}. A session "
+                f"following this criterion literally is refused after dispatch. "
+                f"See close-discipline.md §4."
+            )
+
+
 _AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
 
 _PRODUCES_DISPATCHABLE_STATUSES = {"draft", "pending", "ready"}
@@ -757,7 +829,7 @@ def check_produces_shape(feature_dir: Path, gates: list) -> list[str]:
     driver refuses this outright, but only after a full `claude -p` session.
     Since the agent cannot edit its own frontmatter, every retry is
     byte-identical -- a real feature paid $6.42 and 20.6 minutes across three
-    of them before `spinning_detected` fired, while `specfuse-lint` reported
+    of them before `spinning_detected` fired, while `specfuse lint` reported
     `OK - structurally valid` throughout (#593).
 
     Every input is static, so this belongs in the pre-dispatch checklist. The
@@ -978,7 +1050,10 @@ def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     is correct, not drift — see the reasons recorded there.
 
     GATE-NN-REVIEW.md artifacts carry no `status` frontmatter and are not
-    gate files, so they're skipped by name.
+    gate files, so they're skipped by name. GATE-NN-CRITERIA.md (FEAT-2026-0056)
+    is skipped for the same reason and matched through `CRITERIA_FILENAME_RE`
+    rather than a fresh literal — that pattern is the artifact basename's one
+    home, and this is its fifth reader.
     """
     if plan_fm.get("status") != "done":
         return []
@@ -987,6 +1062,8 @@ def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     errs: list[str] = []
     for gate_path in sorted(feature_dir.glob("GATE-*.md")):
         if gate_path.stem.endswith("-REVIEW"):
+            continue
+        if CRITERIA_FILENAME_RE.fullmatch(gate_path.name):
             continue
         gfm, _ = read_frontmatter(gate_path)
         gstatus = gfm.get("status")
@@ -1402,6 +1479,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     # Planning-discipline section presence (#201): WARN-only.
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
+    check_closing_learnings_destination(feature_dir, fm, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
@@ -1552,6 +1630,9 @@ def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
 
 def main() -> int:
     import argparse
+
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
     parser = argparse.ArgumentParser(
         description="Specfuse plan linter.",
         usage="lint_plan.py <feature_dir> [--just-closed-gate N] [--closing]",

@@ -3,7 +3,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""`specfuse-lint --closing` — the closing contract, checkable in-session.
+"""`specfuse lint --closing` — the closing contract, checkable in-session.
 
 Reads `specfuse.loop.closing_requirements.CLOSING_REQUIREMENTS` (T01) and
 evaluates a feature's currently-in-progress closing WU (`close`,
@@ -19,12 +19,14 @@ registry the post-squash guards in `loop.py` import from.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import closing_requirements as creq
+from . import criteria_state
 from .changelog import parse_changelog
 from .loop import _gate_number_from_wu_id, summarize_attempt_failure_classes
 from .lint_plan import _find_task_graph_block, read_frontmatter
@@ -116,11 +118,27 @@ def _check_retrospective_exists(req: creq.Requirement, ctx: ClosingContext):
 def _check_learnings_appended_or_noop(req: creq.Requirement, ctx: ClosingContext):
     if _git_diff_added_lines(ctx.repo_root, creq.LEARNINGS_PATH):
         return True, ""
+    # Under `autonomy_default: auto` the append above is what close-i
+    # forbids, so the feature-local staging file carries the same evidence.
+    # The mirror has to agree with the driver guard here or lint keeps
+    # telling an auto session to write the no-op phrase it just earned the
+    # right not to write (#1419).
+    staged_rel: str | None = None
+    if creq.learnings_staging_is_required(ctx.plan_fm.get("autonomy_default")):
+        staged_rel = os.path.relpath(
+            ctx.feature_dir / creq.LEARNINGS_PENDING_FILENAME, ctx.repo_root,
+        )
+        if _git_diff_added_lines(ctx.repo_root, staged_rel):
+            return True, ""
     retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
     if retro.exists() and creq.NOTHING_GENERALIZES_PHRASE in retro.read_text().lower():
         return True, ""
+    accepted = (
+        creq.LEARNINGS_PATH if staged_rel is None
+        else f"{creq.LEARNINGS_PATH} or {staged_rel}"
+    )
     return False, (
-        f"no {creq.LEARNINGS_PATH} additions in the working tree and no "
+        f"no {accepted} additions in the working tree and no "
         f"'{creq.NOTHING_GENERALIZES_PHRASE}' note in {creq.RETROSPECTIVE_FILENAME}"
     )
 
@@ -314,6 +332,61 @@ def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: Clos
     )
 
 
+def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext) -> list[str]:
+    """One finding per untrustworthy entry in `GATE-NN-CRITERIA.md`, or none.
+
+    Three shapes make an entry untrustworthy: a `kind:` missing or outside
+    `criteria_state.ORACLE_KINDS`; a `state:` missing or outside
+    `criteria_state.CRITERION_STATES`; or an entry whose oracle has no
+    knowable scope (`kind: broad`) reading `state: pass` with an `attempt:`
+    that is not the current attempt — a broad oracle's green can never be
+    carried forward from a prior attempt (PLAN.md § *Scope decision*). Each
+    is its own finding so one bad entry never masks another, and an entry
+    contributes at most one finding — the first problem found. Returns an
+    empty list when the artifact does not exist yet; a close that has not
+    started recording state is not this requirement's concern.
+
+    A **pristine** entry — `state: unverified`, no `kind:`, no `oracle:`,
+    byte for byte what `_precreate_criteria_state_stub` seeds and nothing
+    else — is likewise not this requirement's concern: no close has
+    annotated it yet, so there is nothing to have gotten wrong. Any
+    deviation (a `state` other than `unverified`, or an `oracle` recorded)
+    means a close has begun touching the entry, and it re-enters scope.
+    """
+    if ctx.gate_num is None:
+        return []
+    path = ctx.feature_dir / criteria_state.criteria_filename(ctx.gate_num)
+    if not path.is_file():
+        return []
+    entries = criteria_state.parse_criteria_state(path.read_text())
+    current_attempt = str(ctx.wfm.get("attempts"))
+    findings: list[str] = []
+    for entry in entries:
+        if entry.kind is None and entry.oracle is None and entry.state == "unverified":
+            continue
+        if entry.kind is None:
+            findings.append(f"{entry.criterion_id}: missing kind:")
+            continue
+        if entry.kind not in criteria_state.ORACLE_KINDS:
+            findings.append(
+                f"{entry.criterion_id}: kind {entry.kind!r} not one of "
+                f"{sorted(criteria_state.ORACLE_KINDS)}"
+            )
+            continue
+        if entry.state not in criteria_state.CRITERION_STATES:
+            findings.append(
+                f"{entry.criterion_id}: state {entry.state!r} not one of "
+                f"{sorted(criteria_state.CRITERION_STATES)}"
+            )
+            continue
+        if entry.kind == "broad" and entry.state == "pass" and entry.attempt != current_attempt:
+            findings.append(
+                f"{entry.criterion_id}: broad entry reads state: pass but "
+                f"attempt {entry.attempt!r} != current attempt {current_attempt!r}"
+            )
+    return findings
+
+
 _CHECKS = {
     "assert_retrospective_exists": _check_retrospective_exists,
     "assert_learnings_appended_or_noop": _check_learnings_appended_or_noop,
@@ -327,6 +400,7 @@ _CHECKS = {
     "assert_next_gate_drafted_or_terminal": _check_next_gate_drafted_or_terminal,
     "assert_hedged_followup_kinds_classified": _check_hedged_followup_kinds_classified,
     "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
+    "check_criteria_state_well_formed": check_criteria_state_well_formed,
 }
 
 
@@ -425,6 +499,12 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
             # No pre-squash requirement currently carries this condition
             # (close-g is post-pass); nothing to evaluate here.
             continue
+        elif req.applies_when == "criteria_artifact_present":
+            if ctx.gate_num is None:
+                continue
+            artifact_path = ctx.feature_dir / criteria_state.criteria_filename(ctx.gate_num)
+            if not artifact_path.is_file():
+                continue
 
         checker = _CHECKS.get(req.enforced_by)
         if checker is None:
@@ -439,6 +519,10 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
 
         result = checker(req, ctx)
         if result is None:
+            continue
+        if isinstance(result, list):
+            for reason in result:
+                findings.append(_format_finding(req, reason))
             continue
         ok, reason = result
         if not ok:

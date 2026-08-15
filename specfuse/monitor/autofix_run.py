@@ -18,7 +18,7 @@ The `invoker` parameter builds and classifies the run
 (`specfuse.monitor.autofix_invoke`'s contract); this module executes what it
 builds via `runner` and hands the result back to it for classification.
 
-**Not wired into `specfuse-monitor run`.** The harvest cycle
+**Not wired into `specfuse monitor run`.** The harvest cycle
 (`specfuse/monitor/cli.py`) gains no caller here, on purpose: a routine
 harvest that could launch a fix is a far wider blast radius than this gate
 can verify, and it would fire on findings nobody read. `run_autofix` is its

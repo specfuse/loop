@@ -257,7 +257,7 @@ doc:
 
 plannext:
   - name: plan-lint
-    command: "python .specfuse/scripts/lint_plan.py {feature_dir}"
+    command: "specfuse lint {feature_dir}"
 ```
 
 Every entry in the `code` set has a `name` from the methodology's five
@@ -317,7 +317,7 @@ Report template:
 ## Recommended next step
 - Review the draft above; if accepted, write it to `.specfuse/verification.yml`
   (overwriting the example placeholder), then run
-  `python .specfuse/scripts/loop.py --dry-run` against a feature folder to
+  `specfuse run --dry-run` against a feature folder to
   confirm the loop loads it cleanly.
 ```
 
@@ -342,10 +342,10 @@ in step 2 stays fixed.
 ## What this skill does *not* do
 
 - It does not run any of the commands it proposes. It is an authoring aid,
-  not a smoke test. Once the file is accepted, the user runs `loop.py
-  --dry-run` (which uses the file but doesn't execute the gates) and then
+  not a smoke test. Once the file is accepted, the user runs `specfuse run --dry-run` (which uses the file but doesn't execute the gates) and then
   the first real feature exercises the gates for real.
-- It does not modify `.specfuse/scripts/loop.py`, `lint_plan.py`, or the
+- It does not modify the driver's own modules (`specfuse.loop.loop`,
+  `specfuse.loop.lint_plan`) or the
   methodology. If applying this skill reveals that those need to change,
   the skill stops and reports the need — it never edits them as part of its
   work.
@@ -355,7 +355,7 @@ in step 2 stays fixed.
 
 ## Worked example
 
-See the "Dogfood: deriving against `specfuse-loop` itself" section in the
+See the "Dogfood: deriving against the `specfuse-loop` repo itself" section in the
 commit that introduced this skill — that walk-through demonstrates the
 output format on a real Python repo with a CI workflow and a `tests/`
 directory, and shows where the skill defers to questions versus where it

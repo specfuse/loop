@@ -58,9 +58,17 @@ Read `.specfuse/rules/*.md` headings and the existing `.specfuse/LEARNINGS-archi
 (if present) so promotion and retirement proposals can reference where a rule
 already lives and avoid re-archiving something already archived.
 
+Read `.specfuse/.vendored.json` (if present) and classify every `rules/<file>.md`
+by whether it appears as a `rules/<file>.md` key in that manifest:
+**core-vendored** (a key present — the file is vendored from
+`specfuse/specfuse` and this repo cannot edit it directly) or
+**locally-owned** (no key — the file is safe to edit here). §4's Promote step
+uses this classification to pick the write-in-place path or the flag-only path.
+
 **Scope statement.** The skill reads only `.specfuse/LEARNINGS.md`,
-`.specfuse/LEARNINGS-archive.md`, and `.specfuse/rules/*.md`. It does not read
-feature folders — `learnings-suggest` owns the events.jsonl evidence path.
+`.specfuse/LEARNINGS-archive.md`, `.specfuse/rules/*.md`, and
+`.specfuse/.vendored.json`. It does not read feature folders —
+`learnings-suggest` owns the events.jsonl evidence path.
 
 ---
 
@@ -124,12 +132,22 @@ supersedes it). On **accept**, move the entry verbatim from `LEARNINGS.md` into
 LEARNINGS and the append to the archive happen together — never one without the
 other.
 
-**Promote.** Show the entry and the target `.specfuse/rules/<file>.md` it
-belongs in, with the proposed rule text. On **accept**, append the rule to that
-rules file, then retire the LEARNINGS copy to `LEARNINGS-archive.md` with a note
-`promoted to rules/<file>.md`. If the operator prefers to write the rule
-themselves, **flag-only**: leave LEARNINGS untouched and print the suggested
-rules-file edit for them to apply.
+**Promote.** Show the entry, the target `.specfuse/rules/<file>.md` it belongs
+in, and whether §1 classified that file **core-vendored** or **locally-owned**
+— the operator's accept must mean what they think it means.
+
+- **Locally-owned target.** On **accept**, append the rule to that rules file,
+  then retire the LEARNINGS copy to `LEARNINGS-archive.md` with a note
+  `promoted to rules/<file>.md`. If the operator prefers to write the rule
+  themselves, **flag-only**: leave LEARNINGS untouched and print the suggested
+  rules-file edit for them to apply.
+- **Core-vendored target.** Never propose an apply-in-place write — the
+  target is owned by the methodology core and `scripts/sync-scaffold.sh`
+  refuses local edits to it, discovered only after the write already
+  landed. Always **flag-only**: print the proposed rule text and say it
+  must be raised against `specfuse/specfuse`'s `methodology/rules/<file>.md`
+  instead. Leave `LEARNINGS.md` untouched — the entry stays authoritative
+  here until the upstream rule lands and is vendored back.
 
 **edit** — operator supplies revised text; confirm once more before writing.
 
@@ -183,16 +201,27 @@ not invent one.
    archive (or a merge that preserves its tag and rule).
 4. **Merges preserve every tag.** A merged entry carries the union of its
    sources' tags. No provenance is dropped.
-5. **Scope boundary.** Reads/writes confined to `.specfuse/LEARNINGS.md`,
-   `.specfuse/LEARNINGS-archive.md`, and `.specfuse/rules/*.md`. No feature
-   folders, no events.jsonl — that is `learnings-suggest`'s domain.
+5. **Scope boundary, and vendored files are not writable here.** Reads
+   confined to `.specfuse/LEARNINGS.md`, `.specfuse/LEARNINGS-archive.md`,
+   `.specfuse/rules/*.md`, and `.specfuse/.vendored.json`. Writes confined to
+   `.specfuse/LEARNINGS.md` and `.specfuse/LEARNINGS-archive.md`, plus
+   `.specfuse/rules/<file>.md` **only when §1 classified that file
+   locally-owned** — a core-vendored target is always flag-only (see §4
+   Promote). No feature folders, no events.jsonl — that is
+   `learnings-suggest`'s domain.
 6. **No silent re-ordering.** Apart from the entries an accepted action moves,
    leave the order of LEARNINGS untouched, so a diff shows exactly what curation
    changed.
 
-End with the RESULT block from
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` once the operator has walked every cluster and the accepted
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` once the operator has walked every cluster and the accepted
 writes landed. `status: blocked` only if `LEARNINGS.md` cannot be parsed into
 entries (malformed structure the operator must fix first).
 

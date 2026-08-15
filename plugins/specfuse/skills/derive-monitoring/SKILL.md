@@ -71,7 +71,7 @@ invention.
   builds. `autofix` is **quoted** — `_miniyaml` does not accept the bare
   `off`/`on` spellings.
 - **The draft must validate.** The closing step tells the operator to run
-  `python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml`. A
+  `specfuse monitor-lint .specfuse/monitoring.yml`. A
   non-empty finding list means the draft is wrong, not the validator — the
   validator is gate 1's shipped oracle, never loosened to fit an example.
 - **Uncomment the gate afterwards.** `.specfuse/verification.yml.example` carries a
@@ -336,7 +336,7 @@ plus the diagnosability audit's `WARN` findings:
 ## Recommended next step
 - Review the draft above. If accepted, copy it to
   `.specfuse/monitoring.yml`, run
-  `python3 .specfuse/scripts/lint_monitoring.py .specfuse/monitoring.yml`,
+  `specfuse monitor-lint .specfuse/monitoring.yml`,
   and uncomment the `monitoring-example-lint`-shaped gate in
   `.specfuse/verification.yml.example` once satisfied.
 ```
@@ -365,7 +365,7 @@ see `tests/test_derive_monitoring_discovery.py`'s boundary tests.
   or `monitoring-secrets-checklist.md` to disk on its own. It is an authoring aid;
   the operator copies the accepted draft themselves.
 - It does not run any of the checks it drafts, and it does not invoke
-  `specfuse-monitor run` — that CLI is FEAT-2026-0040's scope.
+  `specfuse monitor run` — that CLI is FEAT-2026-0040's scope.
 - It does not modify `specfuse/loop/lint_monitoring.py`,
   `.specfuse/monitoring.yml.example`, or `.specfuse/rules/design-for-diagnosis.md`.
   If applying this skill reveals that those need to change, the skill stops and

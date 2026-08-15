@@ -1,0 +1,62 @@
+# .specfuse/agent-policy.yml.example
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# Declares the operator's priorities for what the loop works on next: bug vs.
+# feature preemption, gate-review automation, budgets, and where to escalate.
+# Copy this file to `.specfuse/agent-policy.yml` and edit it for your own
+# priorities to opt in.
+#
+# This file is validated structurally by `specfuse/loop/agent_policy.py`
+# (`validate_agent_policy`).
+
+version: 1                      # int, must equal 1
+
+# Feature work-queue order, by FEAT-ID. May be empty — an empty queue is a
+# valid, meaningful declaration: "agent works bugs only and asks for
+# priorities" when nothing here is ready to pick up.
+# Ordered FEAT-IDs, highest priority first. Empty is valid and meaningful:
+# the agent works bugs only and asks for priorities. Entries are validated
+# against .specfuse/roadmap.md — an unknown ID is an ERROR, and one whose
+# feature has since gone done/abandoned is a WARN for /groom-backlog to clear.
+#   queue:
+#     - FEAT-2026-0123
+queue: []
+
+rules:
+  bugs:
+    preempt: true                # bool — bugs jump the feature queue when true
+    min_severity: low            # low | medium | high | critical
+    automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
+    max_diff_lines: 150          # OPTIONAL int > 0 — merge-eligibility size cap; defaults to 150
+    max_merges_per_day: 3        # OPTIONAL int > 0 — rolling 24h auto-merge cap; defaults to 3
+    # Path prefixes accepted as test-first evidence by the bug lane's merge
+    # guardrail. Optional; defaults to [tests/]. A declared list REPLACES the
+    # default rather than extending it. Declare your project's real layout —
+    # e.g. [spec/], [src/__tests__/], or the package dirs holding *_test.go —
+    # or the guardrail can never be satisfied and the lane silently never
+    # merges. The check is structural (does the diff touch one of these?), never
+    # a judgement about test quality.
+    # test_paths:
+    #   - tests/
+  features:
+    gate_review: human           # human | auto
+    wip_limit: 1                 # int >= 1
+    # overrides:                 # OPTIONAL map of FEAT-ID -> human|auto,
+    #   FEAT-2026-0048: auto     # overriding gate_review per feature
+  triage:
+    auto: false                  # bool — wired to apply_triage(..., auto=)
+
+budgets:
+  max_tokens_per_run: 2000000    # int > 0
+  max_open_prs: 3                # int > 0
+  max_items_per_day: 10          # int > 0
+
+escalation:
+  webhook_env: ""                 # env-var NAME holding the webhook URL (not the URL itself); may be empty
+  provider: none                  # discord | slack | teams | none
+  assignee: ""                    # str, may be empty
+  quiet_hours: ""                 # str, may be empty; "HH:MM-HH:MM" when set
+  sla_hours: 24                   # int > 0
+  silence_hours: 24               # OPTIONAL int > 0 — no run within this window flags stale; defaults to 24

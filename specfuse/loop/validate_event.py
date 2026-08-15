@@ -188,6 +188,13 @@ def _widen_correlation_id_pattern(vendored_pattern: str, patterns: dict) -> str:
     the result, since ``T\\d{2}`` remains one branch of the widened
     alternation. If the vendored pattern's tail does not look as expected,
     the pattern is returned unchanged rather than guessing.
+
+    Since #1433 that unchanged path is the one the PACKAGED schemas take: core
+    adopted all three documented shapes (specfuse#135), so the vendored tail is
+    already the widened alternation and no longer ends in ``(/T\\d{2})?$``. The
+    function is retained for a schema root that predates the adoption —
+    SPECFUSE_SCHEMA_ROOT can still point at one — and because being inert costs
+    nothing while being absent would cost a rebuild.
     """
     old_tail = r"(/T\d{2})?$"
     if not vendored_pattern.endswith(old_tail):

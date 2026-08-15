@@ -172,16 +172,28 @@ class TestGitHubActionsTemplate(unittest.TestCase):
         self.assertIn("workflow_dispatch", on)
 
     def test_a_step_invokes_the_real_entry_point(self):
+        """The template runs `specfuse monitor run`, and that subcommand has a
+        real backing module.
+
+        The umbrella dispatches `specfuse monitor` into the module this
+        package's `specfuse-monitor` console script names, so the entry-point
+        declaration is still what makes the subcommand resolvable — renaming
+        the module or its `main()` without telling the umbrella turns the
+        subcommand into a run-time ImportError.
+        """
         pyproject = PYPROJECT_PATH.read_text(encoding="utf-8")
         match = re.search(r'^specfuse-monitor\s*=\s*"([^"]+)"', pyproject, re.MULTILINE)
         self.assertIsNotNone(match, "pyproject.toml must declare the specfuse-monitor entry point")
-        entry_point = "specfuse-monitor"
 
         steps = self.data["jobs"]["monitor"]["steps"]
         run_commands = [step["run"] for step in steps if "run" in step]
         self.assertTrue(
-            any(cmd.startswith(f"{entry_point} run") for cmd in run_commands),
-            f"no step invokes {entry_point!r}; got {run_commands}",
+            any(cmd.startswith("specfuse monitor run") for cmd in run_commands),
+            f"no step invokes 'specfuse monitor run'; got {run_commands}",
+        )
+        self.assertFalse(
+            any(cmd.startswith("specfuse-monitor") for cmd in run_commands),
+            f"template still uses the deprecated flat command; got {run_commands}",
         )
 
     def test_permissions_are_exactly_least_privilege(self):

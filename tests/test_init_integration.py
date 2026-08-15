@@ -45,6 +45,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "rules/security-boundaries.md",
     "rules/verification-discipline.md",
     "rules/operator-escalation.md",
+    "rules/human-output.md",
     "schemas/event.schema.json",
     "schemas/driver-event.schema.json",
     "schemas/events/initiative_created.schema.json",
@@ -63,6 +64,7 @@ _EXPECTED_SPECFUSE_TREE = {
     "docs/concepts/autonomy-stop-classes.md",
     "docs/concepts/adopting-auto-mode.md",
     "docs/concepts/ralph-lineage.md",
+    "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",
     "docs/skills.md",
@@ -138,6 +140,7 @@ class TestInitFullLayout(unittest.TestCase):
             "rules/security-boundaries.md",
             "rules/verification-discipline.md",
             "rules/operator-escalation.md",
+            "rules/human-output.md",
         ):
             self.assertTrue((self.sf / rel).exists(), f"{rel} not written")
             self.assertEqual(
@@ -180,8 +183,7 @@ class TestInitFullLayout(unittest.TestCase):
     def test_settings_allowlist(self):
         data = json.loads((self.claude / "settings.json").read_text(encoding="utf-8"))
         allow = data["permissions"]["allow"]
-        self.assertIn("Bash(specfuse-loop:*)", allow)
-        self.assertIn("Bash(specfuse-lint:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
     def test_settings_marketplace(self):
         data = json.loads((self.claude / "settings.json").read_text(encoding="utf-8"))

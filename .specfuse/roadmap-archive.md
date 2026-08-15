@@ -43,6 +43,225 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0079"></a>
+## FEAT-2026-0079 — One owner for the roadmap-archive algorithm (skill/driver de-duplication)
+
+**Why.** `auto_archive_feature` and the `/roadmap-archive` skill are two implementations of one algorithm — the driver's docstring says so outright ("Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver"). #1169 fixed the driver to reconcile a moved section's cross-references and its `**Status:**` marker; the skill was deliberately left alone to keep that PR inside bug scope, so the two now describe different behaviour for the same operation. The skill is the path a human takes, so an operator following its prose reproduces the pre-fix defect — on rows an unrelated feature owns, which is the part of #1169 that landed the failure on the wrong person. `[FEAT-2026-0010/G1]` records this exact pattern and closes by requiring the contract be stated explicitly; it also notes the two copies agreed only because the operation had no side effects on unrelated rows. Archiving now rewrites inbound links, so that condition no longer holds. Promoted from #1183 after the bug lane refused it three times: the resolution is a design choice spanning two vendored copies, not a bug-sized fix.
+
+**Goal.** Pick one owner deliberately and implement it across both the canonical plugin skill and its vendored `.specfuse/skills/` copy. Two candidates to weigh with evidence rather than by preference: restate the reconciliation rules in the skill's own prose — a third copy of the algorithm, but `/roadmap-archive` keeps working on a tree with no driver installed — or have the skill invoke the driver's function and stop describing the mechanics, which removes the drift surface entirely at the cost of that independence. #1183 is explicit that either resolution is acceptable and that choosing one deliberately is the point.
+
+**Benefits.** One operation behaves one way regardless of which path an operator takes, so archiving by hand stops being able to reintroduce a defect the driver no longer has. Removes a drift surface rather than re-syncing it. And it settles a question that recurs whenever a skill and the driver implement the same thing — flagged once by `[FEAT-2026-0010/G1]` and never decided.
+
+**Status: done.**
+
+<a id="feat-2026-0080"></a>
+## FEAT-2026-0080 — Operator-answered escalations: guidance that survives into the next agent run
+
+**Why.** `AnsweredEscalationProvider` parses the operator's chosen option off an escalation issue and posts an acknowledgment, but by its own docstring it "does not carry out the chosen option" and leaves `NEEDS_HUMAN_LABEL` in place "until whichever future provider executes the option removes it". That future provider does not exist: the only `--remove-label` calls in the tree are `state:ready` / `state:in-progress` in `gh_backend.py`, neither of which touches the human-owned labels. Meanwhile `BugsProvider.advertise` skips every issue carrying `needs-human` or `blocked-wu` (`_HUMAN_OWNED_LABELS`), so an answered escalation is acknowledged and then stays parked forever. Observed 2026-08-12: eight open `needs-human` issues, every one also `blocked-wu` — answering any of them changes nothing until a human edits its labels by hand. Worse, simply releasing the label would make the lane retry an *unchanged* problem and collect the same refusal, which is how several of those issues accumulated in the first place.
+
+**Goal.** One human-invoked skill, `/answer-escalation`, that reads a parked escalation, explains in plain English what stopped the agent, and offers four dispositions: hand off to the skill that owns the escalation's category, answer with guidance recorded as a marked issue comment, close as won't-fix, or skip. Every disposition except `skip` releases the `needs-human` / `blocked-wu` labels so the lane can act again; `skip` writes nothing at all. The skill triggers no fix and no retry — its product is guidance plus the unpark. Paired with it, `/fix-bug` is corrected to read the issue comments its Step 1 already claims to read, so that guidance reaches the retry rather than being written into a void. Agent-side autonomous execution of an answer is explicitly excluded, not deferred.
+
+**Benefits.** An operator check-in becomes "work the queue one issue at a time and leave a real answer" instead of hand-editing labels, and the next agent run starts better-informed rather than merely unblocked — the difference between repeating a refusal and resolving it. Formalizes a promotion path the operator already walks by hand: FEAT-2026-0079 was itself promoted from #1183 after the bug lane refused it three times. Also removes a permanent side effect nobody chose — because the label is never released today, `notify_sla` re-pings answered escalations forever.
+
+**What shipped (gate 1, terminal).** `/answer-escalation` exists in both the canonical and vendored skill trees, byte-identical, human-invoked only and refusing to run headless. It names all four dispositions, carries a routing entry for every value in `escalation.CATEGORY_LABELS`, documents the `<!-- specfuse:operator-guidance id=<correlation_id> -->` marker, fixes the write order at guidance-comment-first / label-release-second, makes `skip` inert, and states that it triggers no fix and no retry. `/fix-bug` Step 1 now names `gh issue view <issue-number> --comments`, so the guidance reaches the retry instead of being written into a void. **Agent-side autonomous execution of an answer was excluded, not deferred** — PLAN.md's D1 records this as a decision, not a remaining slice, and `AnsweredEscalationProvider` is untouched; a later reader should not log it as unfinished work from this feature.
+
+**What was not verified.** The skill's acceptance is structural — its tests assert on `SKILL.md` prose — so no live `gh` round-trip has ever run. Two verifications stand open: whether the guidance marker survives a real `gh issue comment` write and is found by a subsequent `gh issue view --comments`, and the `gate-review` routing branch, unexercisable while the repository has zero open `gate-review` escalations and zero `awaiting_review` gates. Both are recorded with their exact re-run conditions in the feature's `RETROSPECTIVE.md`, which closes `met_locally` on that basis.
+
+**Status: done.**
+
+<a id="feat-2026-0049"></a>
+## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
+
+**Why.** The capstone: a script that drives the whole lifecycle of a specfuse-configured repo — monitoring findings, issue triage, bug fixing, prioritized feature advancement — as a thin conductor over the existing loop driver and skills (none of which it modifies), escalating whatever it cannot handle. The operator controls when and how long it runs, and therefore what it costs.
+
+**Goal.** `specfuse-agent run` — operator-launched, run-to-drain: acquire a lock file (PID + heartbeat timestamp, stale-lock detection, exactly one agent per repo); loop — read repo state (issues, PRs, roadmap, agent-policy.yml, feature folders: the entire agent memory, per the derivable-from-GH-or-safely-losable principle — no agent database), pick the highest-value action under policy (bugs preempt per rules; queue top for features; parse answered needs-human issues first), execute via the existing skill/driver surfaces, reconcile — until the queue is drained or a cap hits (`--max-minutes`, `--max-tokens`, `--max-items`). Feature execution respects gate checkpoints: driver halts `awaiting_review` → escalate per contract and switch to the next workable item (pause = stop and pick different work; feature folders already persist all state). Blocked items park with an escalation; drafting-needed queue tops escalate (drafting stays human in v1). Kill switch: a PAUSE marker checked each iteration. Cron or event triggers later invoke the same script unchanged.
+
+**Benefits.** One command turns the repo self-healing for exactly as long as the operator allows: value delivered per invocation, cost bounded by flags, every human touchpoint flowing through one escalation queue, and every safety property (locks, caps, checkpoints, guardrails) enforced by construction rather than agent judgment.
+
+**Shape.** Three gates. Gate 1 builds the conductor's stopping properties — its own `.specfuse/.agent.lock` (separate from the driver's, which `loop.run()` takes itself), item-boundary caps, PAUSE marker, one repo-state snapshot carrying the first real reader of `queue:` — and drains an empty provider registry. Gate 2 adds the four cheap action classes over already-shipped composition (`run_bug_lane`, `apply_triage`, `diagnose_cli`, `run_autofix`). Gate 3 adds feature advancement, invoking the driver as a subprocess and switching away on an `awaiting_review` halt. New code lives in a new `specfuse/agent/` package, deliberately outside `driver_edit`'s `specfuse/loop/` halt prefix.
+
+**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](roadmap.md#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
+
+**Status: done.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
+
+<a id="feat-2026-0076"></a>
+## FEAT-2026-0076 — Policy-interview skill: derive-agent-policy
+
+**Why.** `.specfuse/agent-policy.yml` shipped with [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) as the operator's declared policy — the file the agent reads *instead of guessing intent*. Every value in it is currently a default an agent chose: `wip_limit`, `gate_review`, the three budgets, `sla_hours`, and since [FEAT-2026-0047](roadmap-archive.md#feat-2026-0047) and issue #1418 also `provider`, `webhook_env`, `silence_hours`, and `test_paths`. `/groom-backlog` covers only the `queue:` key; `/triage-issues` merely reads one dial. Nothing has ever asked the operator for the rest, and the un-interviewed surface grows with each feature that adds a dial. Issue #1418 showed the cost of a wrong value: the bug lane's test-evidence guardrail failed closed and silently, reading as "the dial is on and nothing qualifies" rather than as a misconfiguration.
+
+**Goal.** A `derive-agent-policy` skill, sibling to `derive-verification` and `derive-monitoring` and sharing their posture — evidence first, ask only what the repo cannot answer, draft and never auto-write, staged per-block accepts. It covers the blocks `/groom-backlog` does not: `rules`, `budgets`, `escalation`. Several values are derivable as *proposals* rather than questions — `max_tokens_per_run` and `max_items_per_day` have real history in `events.jsonl`, `max_open_prs` is readable from the repo, and `test_paths` is answered by the directory tree plus `verification.yml`'s gate commands. One constraint is load-bearing: the webhook prompt must collect an environment-variable **name** and never a pasted URL, or it hand-feeds the credential `validate_agent_policy` was built to refuse.
+
+**Benefits.** The file's premise becomes true — the agent stops guessing intent because the operator was actually asked. Closes the compounding gap that issues #1417, #1418 and the FEAT-2026-0047 acceptance all point at. And it completes the derive-* trio, so a project bootstrapping Specfuse has one interview per config surface, each with a single writer.
+
+**Status: done.**
+
+<a id="feat-2026-0047"></a>
+## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
+
+**Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
+
+**Goal.** A webhook notifier in agent-policy.yml (`escalation.webhook`): on new/re-pinged needs-human issues, post a one-liner + link to the configured channel; provider = any incoming-webhook URL (Discord/Slack/Teams payload adapters, provider swap = URL change). SLA handling: unanswered escalation past the configured window re-pings once, then the item is parked and the queue continues. Heartbeat-silence self-alert: the agent records a last-run timestamp (repo-derivable); a scheduled check (or /attention on open) flags "agent has not run in M hours" — and where a schedule exists, fires the same webhook.
+
+**Benefits.** The operator hears about blockers within minutes wherever they live, answers where the audit trail lives, and can trust that agent silence is itself alarmed — monitoring the monitor at near-zero build cost.
+
+**Status: done.**
+
+<a id="feat-2026-0048"></a>
+## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
+
+**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
+
+**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
+
+**Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
+
+**Drafted 2026-08-09, ahead of its turn.** The feature folder exists and lints
+clean, drafted solo without an operator interview and **before
+[FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) shipped the schema it builds on** — both on
+operator instruction. Its `PLAN.md` records seven assumed decisions for veto at
+PR review, and its `T01` verifies the shipped schema against the assumed one and
+escalates on divergence rather than adapting silently. Dispatch only after 0044
+merges.
+
+**Status: done.** Unblocked 2026-08-10: both named blockers cleared —
+[FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) (machine-readable triage intake) and
+[FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) (escalation contract) are both `done`.
+
+<a id="feat-2026-0044"></a>
+## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
+
+**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
+
+**Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
+
+**Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
+
+**Inherited handoff — one dial is already waiting for this file
+(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
+dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
+auto=False)`, reading no configuration of any kind — deliberately, because
+`agent-policy.yml` is this feature's core deliverable and did not exist, and building a
+minimal reader there would have taken this feature's scope and left it shipping against a
+partial schema someone else authored. **This feature must wire its policy file to that
+parameter.** The parameter exists, is tested at both settings, and its semantics are
+fixed: under `auto=True` a decision whose confidence is not `high` is recorded as the
+`question` category and routed to `needs-human`, **still marked**, never skipped. Supply
+the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
+`autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
+`monitoring.yml`, and inbound issues are not components. See that feature's
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
+
+**What shipped (gate 1, four work units).** `.specfuse/agent-policy.yml` and its
+example, with a structural validator
+`specfuse.loop.agent_policy.validate_agent_policy(path=None) -> list[str]` and a
+new `agent-policy-example-lint` CI gate that runs it against both the example
+and this repo's live policy file. A reader API — `load_policy(path=None) -> dict`,
+which raises rather than returning defaults when the file is absent, and
+`resolve_triage_auto(path=None) -> bool`. A new public
+`lint_roadmap.roadmap_statuses(repo_root=None) -> dict` behind the queue check.
+The `/triage-issues` skill now obtains `apply_triage`'s `auto` argument from
+`rules.triage.auto` instead of prompting the operator each run; the default is
+unchanged (`False` when the file or the key is absent). And `/groom-backlog`,
+a propose-and-confirm skill that writes only `.specfuse/agent-policy.yml`, only
+on explicit accept, with no `--auto` mode.
+
+**Queue-drift severity, as delivered.** The three-way split matters to anyone
+adopting the gate, and it is not the two-way rule the Goal paragraph above
+originally sketched. A queue entry naming a FEAT-ID with **no row in
+`roadmap.md`** is an `ERROR: ` and fails the gate — unresolvable without a
+human. An entry whose feature has gone **`done` or `abandoned`** is a `WARN: `
+that prints and does **not** fail — normal backlog evolution, which
+`/groom-backlog` proposes cleaning up. `planned`, `active`, `blocked` and
+`deferred` are all silent; `deferred` is included deliberately, as a legitimate
+parked slot in the status legend. A uniformly fatal check would turn the gate
+red on a correct tree the first time any queued feature completed.
+
+**Status: done.**
+
+<a id="feat-2026-0045"></a>
+## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
+
+**Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
+
+**Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
+
+**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
+
+**Shape (drafted 2026-08-09).** Single gate, 3 substantive WUs + terminal close, $18.00
+planned. The seam is **module = mechanism, agent = judgment**: `specfuse/loop/triage.py`
+owns the closed category vocabulary, the category→route map, the marker pair, and the
+untriaged scan; `/triage-issues` owns classifying free text. Three decisions were settled
+at draft time — a triaged issue carries **both** an authoritative body marker
+(`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
+projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
+argument** at the headless entry point rather than a config surface, because
+[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+`duplicate` ships judgment-only with no detection mechanism.
+
+**Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
+closing duplicates — that is [FEAT-2026-0048](#feat-2026-0048) for bugs and the operator
+otherwise); `.specfuse/agent-policy.yml` in any form; refactoring the five existing
+`gh issue list` call sites into a shared client; re-triaging an issue that already carries
+a marker.
+
+**Expected verdict `met_locally`.** Two surfaces are unreachable from inside a dispatched
+session: triage against live GitHub (the `gh`-in-sandbox constraint), and "an agent
+following the skill's prose reproduces the module's routing on an unseen issue" — the
+skill test binds prose to constants and proves drift-freedom, not correctness.
+
+**Delivered** (gate 1, terminal — see
+[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md)).
+`specfuse/loop/triage.py`: the closed `CATEGORIES` / `CONFIDENCES` tuples, the total
+category→route map behind `route_for`, the category→label projection behind `label_for`,
+the `render_marker` / `parse_marker` pair over
+`<!-- specfuse:triage category=… confidence=… -->`, `list_untriaged` filtering
+client-side on the marker's absence over an injected runner (a harvester issue is returned
+flagged `already_structured`, not excluded), and `apply_triage(..., auto=False)` writing
+marker-first, projecting the label best-effort, idempotent on an already-marked body, and
+recording a failed label write rather than raising. Four new `LabelSpec` entries importing
+their names from `triage.py`; one new public predicate `has_finding_marker` in
+`specfuse/monitor/issues.py` so the marker literal has one home. `/triage-issues` ships
+canonical at `plugins/specfuse/skills/triage-issues/SKILL.md`, vendored byte-identically
+and discovery-symlinked, with a drift test binding its documented vocabulary and routes to
+the module's constants — which proves prose has not drifted from code, and deliberately
+does not claim the skill classifies correctly.
+
+**Verdict `met_locally`, as predicted — three open follow-ups.** Triage against a live
+GitHub repository is `externally-verifiable-later` (an operator run post-merge upgrades
+it); "an agent following the prose reproduces the routing" is `inherent` (no in-repo
+oracle can ever assert it, so `met` is unreachable through it); the consumer-visible
+contract list awaits human acknowledgment. `duplicate` shipped judgment-only, with no
+detection mechanism, by decision. Terminal flips are withheld on a hedged verdict —
+`PLAN.md`, the gate, and this row stay un-flipped until an operator accepts through
+`/accept-hedged-close`. The driver owns that flip; it is not hand-edited.
+
+**Status: done.** Accepted 2026-08-10 via `/accept-hedged-close`; the driver fired the
+terminal flips through `--recheck-verdict`. D1 was discharged by a live triage run against
+this repository's own issues before the acceptance; D2 (`inherent`) and D3 are carried
+forward in `RETROSPECTIVE.md`.
+
+<a id="feat-2026-0075"></a>
+## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
+
+**Why.** Python caches modules in `sys.modules` at first import, so a work unit that edits the driver cannot change behaviour for any work unit the same driver process dispatches afterwards — including the close that judges it. This is not hypothetical and it is not cheap. FEAT-2026-0057 paid for it twice in one gate. Its T04 wired a pre-dispatch call site into `loop.py` at 13:58 UTC; the driver process had imported `loop.py` at 13:30, so the close dispatched one second later ran the pre-T04 function, received nothing, and could not make the observation that would have cleared its follow-up — a $5.33 close that closed `met_locally` for want of a restart. The second occurrence is one layer down: `execute_unit_attempt` imports `prerun_capture` at call time but calls it for **every** work unit, so the first dispatch of any process caches it. That round was deliberately split into two driver invocations to dodge the hazard, and the sequencing cost was paid for nothing because the fix it protected turned out to be defective for an unrelated reason. The methodology has no name for this and no guard against it; both times it was diagnosed after the money was spent. It is the self-hosting form of the harness-migration hazard `.specfuse/LEARNINGS.md` already warns about, and it will keep taxing every driver-editing feature until something detects or prevents it. Tracked as issue #757.
+
+**Goal.** Make the hazard visible or impossible rather than rediscovered. The design is genuinely open and should be settled in gate 1 rather than assumed here; at least three shapes are viable and they are not mutually exclusive. **Detect and warn** — at gate completion, if any work unit in the gate declared `produces:` naming a file under `specfuse/loop/`, print that later units in the same run executed against the pre-edit modules and that a fresh process is required before any close can verify the change; cheapest, and it converts a silent tax into a visible one. **Isolate the dispatch** — run each work-unit attempt in a subprocess so every attempt re-imports; strongest guarantee, largest blast radius, and it interacts with the driver's tree-reset and event-buffer bookkeeping in ways that need real design. **Refuse at arm time** — detect a driver-editing unit scheduled ahead of a close in the same gate and refuse to arm, forcing the two-invocation split the operator currently has to know to perform by hand. Whichever is chosen, the feature should also give the two-invocation pattern a sanctioned name: holding a close at `status: draft` does **not** work (the arm check rejects an entire gate containing any draft unit), and `blocked_human` is the only usable hold today, which reads as a failure in `/attention` and every other consumer.
+
+**Benefits.** The most expensive class of work unit stops paying a tax nobody budgeted for: two close cycles were lost to this in a single feature, and closes are already the costliest attempt type in the portfolio. A hazard that currently depends on an operator remembering it becomes a property of the system. And the sanctioned hold removes the last hand-improvised step in a driver-editing feature, so a run that must span two invocations says so in its plan instead of being discovered mid-gate.
+
+**Status: done.** Terminal close ran with verdict `met_locally`; the operator accepted the hedge via `/accept-hedged-close` on 2026-08-08, carrying four follow-ups forward — the contract-change acknowledgment (discharged by the acceptance), gate 1's central claim (`externally-verifiable-later`), and two `routed-finding` entries left untracked at acceptance. **The benefit is built and tested but has never been observed:** `driver_staleness_detected` has fired zero times repo-wide, because gate 1's diagnostic never executed and gate 2's halt is not live in the process that shipped it. The re-run condition is the next driver-editing gate under a `T06`-carrying driver, which writes a durable event rather than a printed line. Cost **$45.55** against $32.00 planned; gate 2's budget was re-baselined $17.50 -> $31.00 by operator decision. Gate 1 shipped a diagnostic that never fired — occurrence four of the feature's own subject — and its first terminal close was itself occurrence five.
+
+<a id="feat-2026-0056"></a>
+## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
+
+**Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
+
+**Goal.** GATE files carry the DoD as a per-criterion checklist; each close attempt records per-criterion pass/fail state. A re-dispatched close re-verifies only failed and newly-added criteria plus a regression check scoped to the diff landed since the last close attempt. Terminal closes keep a full-walk option (flag or default) for the final pass, so end-to-end freshness is still available where it matters.
+
+**Benefits.** This repository's `tests` gate (`python3 -m unittest discover -s tests -v -b`) is a `broad` oracle with no diff awareness, so it re-runs in full on every close attempt — the design does not reduce that cost. What it saves is the per-criterion agent reasoning, the regeneration, and the scenario matrix that a re-dispatched close otherwise redoes from scratch on criteria already proven green. A cheaper `not_met` keeps closes honest: the incentive pressure toward optimistic `met` verdicts drops when finding a defect no longer re-prices that portion of the ceremony.
+
+**Status: done.** Terminal close ran with verdict `met_locally`; the operator accepted the hedge via `/accept-hedged-close` on 2026-08-07, carrying three follow-ups forward — the contract-change acknowledgment (discharged by the acceptance itself), the `events.jsonl` assertion (discharged post-close at `04fbc80`, `T05#6` flipped to `pass`), and the red-before-green observation (`inherent`, never upgradeable). **The cost saving is built and wired end-to-end but remains unmeasured:** the terminal close was a first attempt, whose carry-forward set is empty by construction, so it skipped 0 of 44 criteria. The operator's accepted reason records that the next feature exercises the worklist on repeat closes, which is where the claim actually gets tested.
+
 <a id="feat-2026-0057"></a>
 ## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
 
@@ -437,7 +656,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Delivered** (gate 1, terminal — see [RETROSPECTIVE](features/FEAT-2026-0046-escalation-contract/RETROSPECTIVE.md)). `specfuse/loop/escalation.py`: `NEEDS_HUMAN_LABEL`, the five-member `CATEGORY_LABELS` frozenset (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval), `render_escalation_body` producing the six-part body from `operator-escalation.md` plus a `Reply with a number` section and the `<!-- specfuse:escalation id=… -->` correlation marker, `validate_escalation_body` holding the renderer to that shape, and `emit_escalation` — idempotent per correlation ID via find-then-create over an injectable runner, mirroring `gh_backend.GitHubBackend`'s `_runner` seam. The `/attention` skill ships canonical at `plugins/specfuse/skills/attention/SKILL.md`, vendored byte-identically into `.specfuse/skills/`, sweeping blocked WUs, `awaiting_review` gates, `blocked` features and stale PRs into one priority-ordered view and delegating per-feature depth to `gate-status`. Its read-only claim is enforced by a grep guard with a positive control over both copies, not by prose. 21 tests across four new modules, plus the 4-test vendoring guard.
 
-**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-2026-0049](roadmap.md#feat-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-2026-0047](roadmap.md#feat-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
+**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-2026-0049](#feat-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-2026-0047](#feat-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
 
 **Operator step before first real use.** No work unit touched live GitHub — every `gh` interaction ran through an injected stub. Create the six labels in the target repository and run one real emission twice to confirm the create call and the idempotency search; the retrospective's `## What the loop did NOT verify` section carries the detail and the fallback if the marker search does not match.
 

@@ -32,10 +32,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install specfuse-loop
-        run: pip install specfuse-loop
+      - name: Install specfuse
+        run: pip install specfuse
       - name: Run monitoring cycle
-        run: specfuse-monitor run --runner gh-actions
+        run: specfuse monitor run --runner gh-actions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACME_TELEMETRY_PROD_API_KEY: ${{ secrets.ACME_TELEMETRY_PROD_API_KEY }}

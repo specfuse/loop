@@ -43,7 +43,7 @@ degraded "list drafts and stop" mode.
 
 ## When to invoke
 
-When `./scripts/smoke-test.sh` or `python3 .specfuse/scripts/loop.py`
+When `./scripts/smoke-test.sh` or `specfuse run`
 just printed that a gate is complete and the next gate has been drafted,
 or any time a gate file sits at `status: awaiting_review` and the next
 gate has drafts pending review.
@@ -78,7 +78,7 @@ If no gate is in `awaiting_review`, the skill stops with a hint
 
 ### 3. Per-draft accept / revise / reject
 
-Run `specfuse-lint <feature-dir>` before walking the drafts; its WARN/ERROR
+Run `specfuse lint <feature-dir>` before walking the drafts; its WARN/ERROR
 findings (produces-path satisfiability, Do-not-touch boundary collisions,
 etc.) are review input for the accept/revise/reject decision below, not a
 separate gate to pass silently.
@@ -141,16 +141,22 @@ passed. Tell the user which drafts remain and stop.
 
 Tell the user the exact command to resume:
 
-- One active feature: `python3 .specfuse/scripts/loop.py`
-- Multiple active features: `python3 .specfuse/scripts/loop.py
-  --feature FEAT-YYYY-NNNN-<slug>` (name the chosen feature).
+- One active feature: `specfuse run`
+- Multiple active features: `specfuse run --feature FEAT-YYYY-NNNN-<slug>`
+  (name the chosen feature).
 
 Mention: if you want to confirm before dispatching, run with
 `--dry-run` first.
 
-End with the RESULT block per
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means every draft was decided and the gate was
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means every draft was decided and the gate was
 marked passed (or the user accepted that some drafts stay at
 `draft` and the gate stays `awaiting_review`).
 

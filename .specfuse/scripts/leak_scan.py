@@ -44,6 +44,21 @@ _PRIVATE_HOST_RE = re.compile(
     re.IGNORECASE,
 )
 
+# A `Co-authored-by:` git trailer, anchored to the START of the line (git trailer
+# keys are case-insensitive, and a trailer may be indented). Its address is
+# machine-written by the commit convention, and `gh pr create --fill` copies a
+# single commit's message into the PR body verbatim — so `leak_scan_content.py`,
+# which scans `pull_request.body`, tripped `_EMAIL_RE` on EVERY single-commit PR
+# opened that way, on a clean diff. See #1171.
+#
+# This exempts the EMAIL rule only, and only on a matching line: user-path,
+# private-host and denylist checks all still run, so the trailer cannot be used
+# to smuggle a home path or a private org name past the scan. It is deliberately
+# NOT a DEFAULT_ALLOWLIST entry — `_line_exempt` is a substring match over the
+# whole line, which would exempt the address anywhere in any file and bake a
+# specific vendor address into the scaffold.
+_COAUTHOR_TRAILER_RE = re.compile(r"^\s*co-authored-by:", re.IGNORECASE)
+
 # ---------------------------------------------------------------------------
 # Default allowlist — canonical samples that must never be flagged.
 # INIT-2026-0001 is the reference orchestrated-initiative ID per
@@ -278,8 +293,9 @@ def _check_patterns(
             continue
         for m in _USER_PATH_RE.finditer(line):
             hits.append(f"line {lineno}: user-path: {m.group()!r}")
-        for m in _EMAIL_RE.finditer(line):
-            hits.append(f"line {lineno}: email: {m.group()!r}")
+        if not _COAUTHOR_TRAILER_RE.match(line):
+            for m in _EMAIL_RE.finditer(line):
+                hits.append(f"line {lineno}: email: {m.group()!r}")
         for m in _PRIVATE_HOST_RE.finditer(line):
             hits.append(f"line {lineno}: private-host: {m.group()!r}")
         for entry in denylist:

@@ -56,7 +56,14 @@ four classes of state, purely from files on disk:
    staleness window. This is the one class that cannot be read from
    `.specfuse/` files.
 
-### 2. Sweep the needs-human issue queue
+### 2. Check for silence
+
+Call `specfuse.loop.heartbeat.silence_check` on open and print the staleness
+line among this sweep's sections. Do **not** fire the webhook from here — a
+human is already reading this output, so the notification the scheduled path
+exists for would be redundant.
+
+### 3. Sweep the needs-human issue queue
 
 Query GitHub for open issues carrying the `needs-human` label (the label defined
 by `specfuse/loop/escalation.py`'s `NEEDS_HUMAN_LABEL`). For each, read its
@@ -69,7 +76,7 @@ sweep, report plainly that they were skipped and why, and continue — the local
 `.specfuse/` sweep from step 1 still runs and is still reported in full. Do not
 fail the whole sweep because one input is unreachable.
 
-### 3. Delegate per-feature depth to gate-status
+### 4. Delegate per-feature depth to gate-status
 
 For any `blocked_human` work unit or `awaiting_review` gate this sweep surfaces,
 do not re-derive root cause, options, or a recommendation here — name the feature
@@ -77,7 +84,7 @@ and point at `gate-status`, which already synthesizes that diagnosis for a singl
 feature. Running `gate-status` against each flagged feature is how depth is added
 without duplicating its logic.
 
-### 4. Present in priority order, top-down
+### 5. Present in priority order, top-down
 
 Render one combined list, most urgent first, so the operator can work strictly
 top-down without re-sorting mentally.

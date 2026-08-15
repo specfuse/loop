@@ -52,6 +52,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -59,6 +60,7 @@ from pathlib import Path
 from . import _filelock
 from . import _miniyaml
 from . import _wu_sections
+from . import criteria_state
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
@@ -89,6 +91,7 @@ from .closing_requirements import (
     find_consumer_visible_section,
     gate_review_filename,
     gate_section_heading_re,
+    learnings_staging_is_required,
 )
 from .gate_eval import (
     evaluate_auto_close,
@@ -99,13 +102,14 @@ from .gate_eval import (
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .cost import wu_lifetime_cost_usd
+from .driver_edit import changed_paths_for_commit, driver_paths_in
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
 
 SPECFUSE_DIR = Path(".specfuse")
 REPO_ROOT = SPECFUSE_DIR.parent
 FEATURES_DIR = SPECFUSE_DIR / "features"
 VERIFICATION_PATH = SPECFUSE_DIR / "verification.yml"
-DRIVER_VERSION = "0.9.3"
+DRIVER_VERSION = "0.12.1"
 # Oldest scaffold layout this driver can drive. init.sh stamps the scaffold's own
 # version into `.specfuse/VERSION`; check_scaffold_version() fails loud at startup if
 # the consumer's scaffold is older than this, pointing at `specfuse upgrade`. Bump
@@ -169,6 +173,62 @@ GATES_FOR_TYPE = {
 # writes the next gate's WUs as drafts, and a human must arm them first.
 DISPATCHABLE = {"pending", "ready"}
 DONE = "done"
+
+
+def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
+    """The operator-facing message for a terminal gate whose PLAN.md is not `done`.
+
+    Three states look identical from `PLAN.md` alone, and reporting them the same
+    way is #1416:
+
+    - **the verdict permits the flips** but they did not fire — a genuine defect,
+      and what the original message was written for.
+    - **the verdict is a recognised hedge** (`met_locally` / `partially_met`) —
+      the flips were withheld *because* the close said so. That is the
+      verdict-coupling rule working, and telling the operator to hand-flip
+      `PLAN.md` is advice to violate the contract `fire_terminal_flips` just
+      enforced.
+    - **no usable verdict** — absent, empty, `not_met`, or unrecognised. NOT a
+      deliberate hedge: a close that recorded no verdict did not finish its job,
+      and softening that into the reassuring message would hide it.
+
+    Both the flip predicate and the hedged set are imported rather than
+    re-derived, so this message can never disagree with the gate that produced
+    the state it describes.
+    """
+    header = (
+        f"\nGate {gate_number} complete (retro, lessons, docs, plan-next); "
+    )
+    if verdict_permits_terminal_flips(verdict):
+        return (
+            header + "terminal gate but PLAN.md not yet `done`.\n"
+            "Inconsistency: the close recorded a verdict that permits the "
+            "terminal flips, but PLAN.md is not `done`. Inspect "
+            "RETROSPECTIVE.md / events.jsonl. Likely fix: manually flip PLAN.md "
+            "`status: active -> done`, then `/wrap-feature`."
+        )
+    if verdict in HEDGED_VERDICT_VALUES:
+        return (
+            header + "terminal gate, PLAN.md deliberately left `active`.\n"
+            f"The close recorded verdict `{verdict}`, which does not permit the "
+            "terminal flips, so the gate, the roadmap row and PLAN.md were all "
+            "left un-flipped on purpose. This is the verdict-coupling rule "
+            "working, not a defect — do NOT hand-flip PLAN.md.\n"
+            f"Next: read the `## {HEDGED_RECORD_HEADING}` in RETROSPECTIVE.md "
+            "for what is unmet and what would upgrade it, then either discharge "
+            "those follow-ups or accept the hedge deliberately with "
+            "`/accept-hedged-close`, which records your reason and fires the "
+            "flips through their one owner."
+        )
+    shown = verdict if verdict else "none recorded"
+    return (
+        header + "terminal gate but PLAN.md not yet `done`.\n"
+        f"Inconsistency: the close recorded verdict `{shown}`, which is neither "
+        "a pass nor a recognised hedge, so the terminal flips were withheld and "
+        "there is no follow-up record to accept. A close that records no usable "
+        "verdict has not finished its job. Inspect RETROSPECTIVE.md / "
+        "events.jsonl before flipping anything by hand."
+    )
 
 
 def verdict_permits_terminal_flips(verdict: str | None) -> bool:
@@ -1466,8 +1526,8 @@ def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> st
     lines = [
         "",
         "Easiest — let the loop create the branch and commit for you:",
-        "    specfuse-loop --prepare        # …then run",
-        "    specfuse-loop --prepare-only   # …then stop, so you can review first",
+        "    specfuse run --prepare        # …then run",
+        "    specfuse run --prepare-only   # …then stop, so you can review first",
         "",
         "Or do it manually:",
     ]
@@ -1476,6 +1536,57 @@ def _branch_prep_hint(feature_dir: "Path", feat_fm: dict, feature_id: str) -> st
     lines.append(f"    git add {feature_dir}")
     lines.append(f"    git commit -m 'chore: scaffold feature {feature_id}'")
     return "\n".join(lines)
+
+
+def _session_env_root() -> "Path":
+    """Where a dispatched `claude -p` session creates its own session directory.
+
+    Isolated so the preflight can probe the real location rather than a guess,
+    and so a test can point it somewhere harmless.
+    """
+    return Path(os.path.expanduser("~")) / ".claude" / "session-env"
+
+
+def require_session_env_writable(root: "Path | None" = None) -> None:
+    """Hard-stop if a dispatched session could not create its session dir (#1414).
+
+    A `specfuse run` launched from a sandboxed shell whose deny-list covers
+    `~/.claude/session-env` dispatches happily — the PARENT process has a working
+    shell. Every `claude -p` session it spawns then fails on
+
+        EPERM: operation not permitted, mkdir '.../session-env/<session-id>'
+
+    and that session's Bash tool is dead for the entire attempt. Nothing in the
+    driver's output suggests an environment problem, and the agent can still use
+    Write, so `files_touched` comes back non-empty and the run reads as ordinary
+    work-unit trouble. Observed cost before this guard: **$7.85 across two
+    attempts**, the second of which correctly diagnosed the EPERM itself and
+    reported `blocked` — a good outcome for $7.20 that a `mkdir` could have
+    produced for free.
+
+    The probe is a create-and-remove of a throwaway subdirectory. An absent root
+    is created rather than refused: a first-ever run has no session-env
+    directory, and refusing there would halt every clean machine.
+    """
+    root = root if root is not None else _session_env_root()
+    probe = root / f".specfuse-preflight-probe-{os.getpid()}-{threading.get_ident()}"
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        probe.mkdir(exist_ok=True)
+    except OSError as exc:
+        sys.exit(
+            f"loop.py: cannot create a directory under '{root}' ({exc.strerror}). "
+            f"Every dispatched `claude -p` session creates its session directory "
+            f"there, so each one would start with a dead Bash tool and burn a full "
+            f"attempt before failing — the parent shell working is not evidence "
+            f"that the children will. This is usually a sandbox deny-list covering "
+            f"the path: re-run outside the sandbox, or allow writes to '{root}'.\n"
+        )
+    finally:
+        try:
+            probe.rmdir()
+        except OSError:
+            pass
 
 
 def require_feature_folder_committed(
@@ -1685,22 +1796,81 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
         capture_output=True, text=True, check=False,
     ).returncode == 0
     if exists:
-        # Surface a stale branch that diverged from the declared base instead
-        # of silently reusing it. `merge-base --is-ancestor B <base>` exits 0
-        # iff B is an ancestor of base (i.e. base already contains B — safe).
-        is_ancestor = subprocess.run(
-            ["git", "merge-base", "--is-ancestor", branch, base],
+        # Surface a branch built on a STALE base, without refusing healthy
+        # in-progress work (#2186).
+        #
+        # This used to ask `merge-base --is-ancestor <branch> <base>`, which
+        # exits 0 only when the base already CONTAINS the branch -- true only
+        # once the feature is merged. Every feature branch carrying unmerged
+        # work failed it by construction, so the driver refused to resume any
+        # feature that had done anything.
+        #
+        # It was masked for a long time: `specfuse-agent` used to leave the
+        # working tree ON the feature branch, so the next run hit the
+        # `current == branch` early return above and never reached here.
+        # Restoring the operator's branch at run end (#2055) removed that
+        # accident and exposed the guard.
+        #
+        # Worse, the refusal told the operator to `git rebase <base>` -- which
+        # cannot satisfy an is-ancestor test in that direction. Rebasing makes
+        # the BRANCH contain the base; the test wanted the base to contain the
+        # branch. A branch rebased exactly as instructed was refused again.
+        #
+        # The question the guard actually wants to ask is "is this branch
+        # built on the current base?", which is what comparing its merge-base
+        # against the base's tip answers. A rebased or freshly-created branch
+        # passes; a branch forked from an older tip does not.
+        # A feature branch falls behind its base every time anything else
+        # merges. That is the normal life of a feature branch, not a fault --
+        # and refusing it made the driver unable to advance ANY in-flight
+        # feature after any merge, which for an unattended agent is a deadlock
+        # generator rather than a safety property.
+        #
+        # This guard's stated purpose is that a pre-existing branch "is
+        # surfaced rather than silently checked out" (#48). Surfaced, not
+        # refused. The hazard is silently reusing a branch from a DIFFERENT
+        # lineage; a branch the driver has been committing to, merely behind
+        # its base, is not that.
+        #
+        # So: bring it up to date the way a human would, and refuse only when
+        # that cannot be done automatically. `merge` rather than `rebase`
+        # deliberately -- the branch may already be pushed, and rewriting its
+        # history would force every consumer to recover from a force-push to
+        # fix a condition that is not their fault.
+        counts = subprocess.run(
+            ["git", "rev-list", "--left-right", "--count", f"{base}...{branch}"],
             capture_output=True, text=True, check=False,
-        ).returncode == 0
-        if not is_ancestor:
-            raise FeatureBranchError(
-                f"branch '{branch}' has diverged from '{base}' — it carries "
-                f"commits '{base}' does not, likely because it was created "
-                f"from a different starting point or '{base}' has since moved "
-                f"on. The safe action is to bring it up to date with the base:\n"
-                f"  git checkout {branch} && git rebase {base}"
-            )
+        )
+        behind = 0
+        if counts.returncode == 0:
+            parts = counts.stdout.split()
+            if len(parts) == 2:
+                behind = int(parts[0])
+
         _checked_checkout(["checkout", branch], f"checkout of existing branch '{branch}'")
+
+        if behind:
+            merged = subprocess.run(
+                ["git", "merge", "--no-edit", base],
+                capture_output=True, text=True, check=False,
+            )
+            if merged.returncode != 0:
+                subprocess.run(
+                    ["git", "merge", "--abort"],
+                    capture_output=True, text=True, check=False,
+                )
+                raise FeatureBranchError(
+                    f"branch '{branch}' is {behind} commit(s) behind '{base}' and "
+                    f"cannot be brought up to date automatically -- merging "
+                    f"'{base}' into it conflicts. The merge was aborted and the "
+                    f"branch left exactly as it was. Resolve by hand:\n"
+                    f"  git checkout {branch} && git merge {base}\n"
+                    f"git's own report:\n{(merged.stdout + merged.stderr).strip()}"
+                )
+            print(
+                f"Brought '{branch}' up to date with '{base}' "
+                f"({behind} commit(s) behind)."
+            )
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
         # Create-from-base carries the working tree onto the new branch. Only
@@ -1950,6 +2120,59 @@ def _should_halt_for_budget(plan: dict, gate: dict, feature_dir: Path) -> bool:
     return gate_spent_usd(plan, gate, feature_dir) >= budget
 
 
+# Sanctioned name for the two-invocation-split halt (FEAT-2026-0075/T05).
+# Not a WU status and not a gate status — the halt flips neither, so no
+# vocabulary change is needed in lint_plan.py's VALID_STATUS or any of the
+# per-type tables. `2` is already taken by the unarmed-drafts check above;
+# a shared exit code would make the two halts indistinguishable to any
+# script reading the process's exit status.
+HALT_REASON_DRIVER_RESTART = "driver_restart_required"
+EXIT_DRIVER_RESTART_REQUIRED = 3
+
+
+def _halt_for_driver_restart(
+    gate_number: int,
+    feature_id: str,
+    events_path: Path,
+    wu_id: str,
+    driver_paths: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> int:
+    """Run-loop brake: the sanctioned halt a driver performs on itself when a
+    squash it just made edits the driver's own importable surface and the
+    gate still has units left to dispatch (FEAT-2026-0075/T05).
+
+    Sibling of `_should_halt_for_budget` at the same `for wu in pending`
+    seam — this unit builds the mechanism, `T06` builds the predicate that
+    decides when to call it. Deliberately flips NO gate status and NO WU
+    status: the run is suspended, not concluded, so a fresh process must see
+    the same `open` gate and the same `pending` units `ready()` would have
+    handed to this one. Durability is via the existing `commit_bookkeeping`
+    path (same as the budget brake), so the event survives even if the
+    operator does not restart immediately.
+    """
+    message = format_driver_restart_halt(
+        wu_id, driver_paths, remaining_wu_ids, resume_command)
+    flush_events(events_path, [build_event(
+        "driver_staleness_detected", feature_id, {
+            "gate": gate_number,
+            "wu_id": wu_id,
+            "driver_paths": driver_paths,
+            "halted": True,
+            "reason": HALT_REASON_DRIVER_RESTART,
+            "remaining_wu_ids": remaining_wu_ids,
+            "resume_command": resume_command,
+        })])
+    commit_bookkeeping(
+        [events_path],
+        f"chore(loop): gate {gate_number} halted for driver restart "
+        f"({wu_id})\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return EXIT_DRIVER_RESTART_REQUIRED
+
+
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
     """Run-loop predicate: sibling of `_should_halt_for_budget`, evaluated
     AFTER a work unit's outcome resolves rather than before the next dispatch.
@@ -1964,6 +2187,40 @@ def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> b
     if budget is None:
         return False
     return gate_spent_usd(plan, gate, feature_dir) >= budget
+
+
+def _report_post_dispatch_budget_breach_if_final(
+    plan: dict, gate: dict, feature_dir: Path, gate_number: int,
+    units: list, done_ids: set, wu, events_path: Path,
+) -> None:
+    """Call once a WU reaches ANY terminal outcome — `done` or
+    `blocked_human` alike (#2174) — so the report fires whether the gate's
+    last WU passes or spins out, not only on the all-`done` shape the
+    original guard assumed. `wu` need not be in `done_ids`: a WU is this
+    gate's last one to finish once every OTHER unit is already done.
+
+    Must be called AFTER the caller's own `flush_events(events_path,
+    wu_events)` for this WU's outcome — `gate_spent_usd` sums
+    `attempt_outcome` events from `events.jsonl` on disk, so calling this
+    before that flush undercounts by the finishing WU's own cost (#2174).
+    """
+    if not all(u.wu_id in done_ids or u.wu_id == wu.wu_id for u in units):
+        return
+    if not _should_report_budget_breach(plan, gate, feature_dir):
+        return
+    budget = gate_budget_usd(feature_dir / gate["file"])
+    spent = gate_spent_usd(plan, gate, feature_dir)
+    flush_events(events_path, [build_event(
+        "human_escalation", wu.wu_id.split("/")[0], {
+            "reason": "gate_budget_exceeded_post_dispatch",
+            "gate": gate_number,
+            "budget_usd": budget,
+            "spent_usd": round(spent, 6),
+            "final_wu_id": wu.wu_id,
+        })])
+    print(f"\nGate {gate_number} budget exceeded "
+          f"(post-dispatch): spent ${spent:.4f} "
+          f">= budget ${budget:.4f}. Reported after {wu.wu_id}.")
 
 
 class BookkeepingCommitError(RuntimeError):
@@ -2035,7 +2292,9 @@ def _clean_attempt_untracked(
     scratch dirs.
 
     Never deletes: paths in *untracked_before* (the operator's, per #150),
-    *events_path* (driver-managed, and untracked on a fresh branch), or
+    *events_path* (driver-managed, and untracked on a fresh branch), any file
+    whose basename matches `criteria_state.CRITERIA_FILENAME_RE`
+    (driver-managed per-criterion close state — FEAT-2026-0056/T05), or
     gitignored paths (`untracked_paths` honors .gitignore, so a feature's
     `work/` scratch dir never enters the delete set).
 
@@ -2055,6 +2314,8 @@ def _clean_attempt_untracked(
         target = root / rel
         try:
             if keep is not None and target.resolve() == keep:
+                continue
+            if criteria_state.CRITERIA_FILENAME_RE.match(target.name):
                 continue
             if target.is_file() or target.is_symlink():
                 target.unlink()
@@ -2152,9 +2413,167 @@ def persist_attempt_notes(
     for atmpt, evidence in attempt_notes:
         p = work_dir / wu_key / f"attempt-{atmpt}.md"
         p.parent.mkdir(parents=True, exist_ok=True)
+        # Terminate the last line. A note without one counts 0 under `wc -l`,
+        # which is how #1412 came to be reported as a 0-byte file when it
+        # actually carried 43 bytes. Empty evidence still writes empty: a
+        # newline-only file would signal that evidence exists when none does.
+        if evidence and not evidence.endswith("\n"):
+            evidence += "\n"
         p.write_text(evidence)
         paths.append(p)
     return paths
+
+
+def format_deliverable_missing_note(
+    wu: "WorkUnit", summary: str, touched: list, attempt: int,
+) -> str:
+    """Compose the attempt note for a deliverable-presence refusal (#1412).
+
+    The presence gate fires BEFORE verification, so there is no verify output
+    to write — which is why this branch used to buffer only
+    ``assert_declared_deliverables``' one-line summary. That single line is
+    the same string the retry prompt already prints, so the artifact set said
+    nothing the next attempt did not already know: not which of several
+    declared paths landed, not what the attempt actually wrote instead. A
+    real run spent $3.88 over three attempts, each reaching the same wall,
+    with none of that recorded.
+
+    Renders what IS knowable at the refusal: every declared ``produces:``
+    entry marked present or absent as measured on disk, and the paths the
+    attempt's squash actually touched (``git diff`` against ``head_before``,
+    measured before the reset). An empty touched list is stated explicitly —
+    "the agent wrote nothing" is evidence, and the reported run's third
+    attempt was exactly that.
+
+    The issue also asked for ``git status --porcelain``. At this point the
+    attempt's work is already squashed, so the working tree is clean and the
+    porcelain output would be empty; *touched* is the meaningful equivalent
+    and is what this renders instead.
+    """
+    lines = [
+        f"# Deliverable-presence refusal — attempt {attempt}",
+        "",
+        f"`{wu.wu_id}` was refused by `assert_declared_deliverables`:",
+        "",
+        f"    {summary}",
+        "",
+        "## Declared `produces:` vs what is on disk",
+        "",
+    ]
+    if not wu.produces:
+        lines.append("(none declared)")
+    for raw in wu.produces or []:
+        path = str(raw)
+        p = Path(path)
+        if produces_is_glob(path):
+            matches = [
+                # recursive=True or `**` collapses to a single `*`, matches one
+                # level, yields directories, and the is_file() filter drops them
+                # all -- a WU that produced everything is refused (#1744).
+                m for m in glob.glob(produces_glob_pattern(path), recursive=True)
+                if Path(m).is_file() and Path(m).stat().st_size > 0
+            ]
+            state = (
+                f"PRESENT — {len(matches)} non-empty match(es)" if matches
+                else "ABSENT — glob matched no existing non-empty file"
+            )
+        elif not p.exists():
+            state = "ABSENT — no such file"
+        elif p.stat().st_size == 0:
+            state = "ABSENT — exists but is empty (0 bytes)"
+        else:
+            state = f"PRESENT — {p.stat().st_size} bytes"
+        lines.append(f"- `{path}` — {state}")
+    lines += ["", "## Files this attempt touched", ""]
+    if touched:
+        lines += [f"- `{t}`" for t in touched]
+    else:
+        lines.append("(none — the attempt's squash changed no tracked file)")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
+    """Render the driver-editing staleness warning for `wu_id`, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T02).
+
+    Python caches `specfuse.loop.loop` in `sys.modules` at first import, so a
+    work unit that edits the driver changes nothing for anything this same
+    process dispatches next — including a close armed to verify it. The
+    message names the offending unit and every path it touched, and states
+    the required remedy explicitly rather than leaving the reader to infer it.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    return (
+        f"STALE DRIVER PROCESS: {wu_id} edited the driver itself ({paths}). "
+        f"This process cached the pre-edit versions of those modules at "
+        f"import time, so every work unit dispatched next in this process — "
+        f"including any close — will execute the OLD code, not what {wu_id} "
+        f"just wrote. A fresh driver process is required before any close "
+        f"can verify this change: stop this driver now and start a new one "
+        f"before dispatching the next work unit."
+    )
+
+
+def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
+    """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
+
+    `edits` is `[(wu_id, driver_paths), ...]` for units that edited the
+    driver in this gate, in dispatch order. `dispatched_after` is the IDs of
+    units this same process dispatched after the earliest of those edits —
+    each executed the pre-edit module, per
+    `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b). This is
+    the gate-end counterpart to `format_driver_staleness_warning` (T02) — it
+    does not replace the immediate warning, it is what a close reads instead
+    of reconstructing the fact from `ps` output and `started_at` timestamps.
+    Returns "" when `edits` is empty so a gate with no driver-editing unit
+    stays silent.
+    """
+    if not edits:
+        return ""
+    lines = ["STALE DRIVER PROCESS (gate summary):"]
+    for wu_id, paths in edits:
+        lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
+    if dispatched_after:
+        affected = ", ".join(dispatched_after)
+        lines.append(
+            f"  Dispatched after the edit above in this same process: "
+            f"{affected} — each executed the pre-edit module(s), not what "
+            f"the edit(s) wrote. A fresh driver process is required before "
+            f"any of these can be trusted as a verification of the change."
+        )
+    return "\n".join(lines)
+
+
+def format_driver_restart_halt(
+    wu_id: str, driver_paths: list, remaining_wu_ids: list, resume_command: str,
+) -> str:
+    """Render the sanctioned driver-restart halt message, or "" if
+    `driver_paths` is empty (FEAT-2026-0075/T05) — the same empty-input
+    contract as `format_driver_staleness_warning`.
+
+    Unlike the T02/T03 formatters, which only print, this message accompanies
+    a run that actually stopped: it names the offending unit and its edited
+    paths, states plainly that this process cannot execute what was just
+    written, lists every work unit left `pending` in the gate, and gives the
+    exact command the operator runs to resume — omitting it would send the
+    reader back to the source to reconstruct it by hand.
+    """
+    if not driver_paths:
+        return ""
+    paths = ", ".join(driver_paths)
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    return (
+        f"DRIVER RESTART REQUIRED: {wu_id} edited the driver itself "
+        f"({paths}). This process cached the pre-edit versions of those "
+        f"modules at import time and cannot execute the edited modules, so "
+        f"it has halted rather than dispatch into a process that cannot "
+        f"observe its own change. Work unit(s) left pending in this gate: "
+        f"{remaining}. Start a fresh driver process and resume with:\n"
+        f"  {resume_command}"
+    )
 
 
 class SquashCommitError(RuntimeError):
@@ -2408,6 +2827,119 @@ def precreate_dispatch_skeleton(wu: WorkUnit, feature_dir: Path) -> None:
         _precreate_gate_review_stub(feature_dir, gate_n)
     else:
         _precreate_retrospective_stub(wu, feature_dir, gate_n)
+        _precreate_criteria_state_stub(feature_dir, gate_n)
+
+
+def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
+    """Seed/extend `GATE-NN-CRITERIA.md` from the gate's substantive WUs'
+    acceptance criteria, ahead of a `close` / `close-intermediate` session.
+
+    Additive: a criterion already recorded in the artifact keeps its entry
+    untouched (a close may have already set its `state`); a criterion that
+    has appeared since the last seed is appended as `unverified`; a
+    criterion no longer produced by any WU is left in place rather than
+    deleted — the close, not this stub, gets to say whether that was
+    intended. Every appended entry is seeded with only `criterion_id` and
+    `criterion`/`state: unverified` — `oracle`, `kind`, `proved_at_sha`, and
+    `attempt` are absent until the close's own session fills them in.
+    """
+    fresh: list[tuple[str, str]] = []
+    for wc in extract_wu_criteria(feature_dir, gate_n):
+        if wc.status != "ok":
+            continue
+        for ordinal, criterion in enumerate(wc.criteria, start=1):
+            fresh.append((criteria_state.criterion_id_for(wc.sub_id, ordinal), criterion))
+
+    if not fresh:
+        return
+
+    path = feature_dir / criteria_state.criteria_filename(gate_n)
+    existing = criteria_state.parse_criteria_state(path.read_text()) if path.is_file() else []
+    existing_ids = {e.criterion_id for e in existing}
+
+    appended = [
+        criteria_state.CriterionStateEntry(
+            criterion_id=cid,
+            criterion=criterion,
+            oracle=None,
+            kind=None,
+            state="unverified",
+            proved_at_sha=None,
+            attempt=None,
+        )
+        for cid, criterion in fresh
+        if cid not in existing_ids
+    ]
+    if not appended and existing:
+        return
+
+    path.write_text(criteria_state.render_criteria_state(existing + appended))
+
+
+def format_reverification_worklist(wu: WorkUnit, feature_dir: Path) -> str:
+    """Render T07's per-criterion partition into a `close` / `close-intermediate`
+    dispatch's session prompt (FEAT-2026-0056/T08).
+
+    Returns `""` for any WU type other than `close`/`close-intermediate`, when
+    the gate's `GATE-NN-CRITERIA.md` artifact does not exist, or when it
+    parses to zero entries — a close dispatched into a gate with no recorded
+    state gets no section, not an empty one.
+
+    Partitioning itself is `criteria_state.build_reverification_worklist`'s
+    job (T07); this function only renders that partition. `current_attempt`
+    is `wu.attempts`, which the driver's attempt loop sets on `wu` before
+    `execute_unit_attempt` runs.
+    """
+    if wu.type not in ("close", "close-intermediate"):
+        return ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is None:
+        return ""
+    path = feature_dir / criteria_state.criteria_filename(gate_n)
+    if not path.is_file():
+        return ""
+    entries = criteria_state.parse_criteria_state(path.read_text())
+    if not entries:
+        return ""
+
+    worklist = criteria_state.build_reverification_worklist(
+        entries, current_attempt=str(wu.attempts)
+    )
+
+    lines = [
+        f"## Re-verification worklist (gate {gate_n})",
+        "",
+        f"{len(worklist.carry_forward)} criterion/criteria carried forward from a "
+        f"prior attempt; {len(worklist.reverify)} require re-verification this "
+        "attempt.",
+        "",
+    ]
+
+    if worklist.carry_forward:
+        lines.append("### Carried forward — do not re-verify")
+        lines.append("")
+        for entry in worklist.carry_forward:
+            lines.append(
+                f"- `{entry.criterion_id}` — oracle: `{entry.oracle}` — "
+                f"proved on attempt `{entry.attempt}`"
+            )
+        lines.append("")
+
+    if worklist.oracle_groups:
+        lines.append("### Re-verify — grouped by oracle command")
+        lines.append("")
+        for oracle, criterion_ids in worklist.oracle_groups:
+            lines.append(f"- `{oracle}` — covers: {', '.join(criterion_ids)}")
+        lines.append("")
+
+    lines.append(
+        "This worklist bounds per-criterion re-verification only. The close's "
+        "own feature-level question (close-discipline.md §1's fresh, "
+        "feature-level re-run) is never carried forward by this worklist and "
+        "runs this attempt regardless of the above."
+    )
+
+    return "\n".join(lines) + "\n"
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
@@ -2769,23 +3301,36 @@ def resolve_bash() -> str | None:
 
 
 # Lines a reader needs in a gate's FAIL report: test-runner verdicts, coverage
-# totals, and the first line of a traceback. Matched against a stripped line.
+# totals, and the first line of a traceback. Searched within a stripped line
+# (not anchored to its start): Maven prefixes every line with a
+# `[INFO]`/`[ERROR]`/`[WARNING]` reactor tag, and surefire's own per-test
+# failure marker trails the test name and elapsed time rather than leading
+# the line, so an anchored match would miss both (#1413).
 _VERDICT_RE = re.compile(
-    r"^(?:"
-    r"OK\b"                                  # unittest pass
-    r"|FAILED\b"                             # unittest fail
-    r"|Ran \d+ tests?\b"                     # unittest count
-    r"|ERROR:|FAIL:"                         # unittest per-test headers
-    r"|AssertionError\b"
-    r"|Traceback \(most recent call last\)"
-    r"|\d+ (?:passed|failed|error)"          # pytest summary
-    r"|TOTAL\s+\d"                           # coverage total
+    r"(?:"
+    r"\bOK\b"                                # unittest pass
+    r"|\bFAILED\b"                           # unittest fail
+    r"|\bRan \d+ tests?\b"                   # unittest count
+    r"|\bERROR:|\bFAIL:"                     # unittest per-test headers
+    r"|\bAssertionError\b"
+    r"|\bTraceback \(most recent call last\)"
+    r"|\b\d+ (?:passed|failed|error)"        # pytest summary
+    r"|\bTOTAL\s+\d"                         # coverage total
     # ruff (#723). Its summary is the verdict for this repo's own `lint` gate,
     # the second entry in the `code` set. Without these two the selector pinned
     # nothing on a lint failure, appended _NO_VERDICT_NOTE, and fell back to the
     # positional tail FEAT-2026-0068 exists to prevent.
-    r"|Found \d+ errors?\b"                  # ruff failure summary
-    r"|All checks passed!"                   # ruff clean summary
+    r"|\bFound \d+ errors?\b"                # ruff failure summary
+    r"|\bAll checks passed!"                 # ruff clean summary
+    # Maven surefire (#1413). The actionable content — the run summary and
+    # the per-test failure marker naming the failing class — sits well above
+    # the final `[ERROR] Failed to execute goal ...` block, which names no
+    # test at all, and Maven prefixes every line with a reactor tag
+    # (`[INFO]`/`[ERROR]`/`[WARNING]`) that an anchored match would trip on.
+    # Without these two, every surefire failure pins nothing and degrades to
+    # that content-free tail.
+    r"|\bTests run: \d+, Failures: \d+"      # surefire run summary
+    r"|<<< (?:FAILURE|ERROR)!"               # surefire per-test failure marker
     r")"
 )
 
@@ -2820,7 +3365,7 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     tail = lines[-window:] if window > 0 else []
     head = lines[: len(lines) - len(tail)]
 
-    pinned = [ln for ln in head if _VERDICT_RE.match(ln.strip())]
+    pinned = [ln for ln in head if _VERDICT_RE.search(ln.strip())]
     if pinned:
         # Cap the pinned block so a suite emitting hundreds of `FAIL:` headers
         # cannot itself flood the report it exists to make readable.
@@ -2829,7 +3374,7 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
         marker = [f"... ({elided} line(s) elided) ..."] if elided > 0 else []
         return pinned + marker + tail
 
-    if any(_VERDICT_RE.match(ln.strip()) for ln in tail):
+    if any(_VERDICT_RE.search(ln.strip()) for ln in tail):
         return tail
     return tail + [_NO_VERDICT_NOTE]
 
@@ -3110,8 +3655,10 @@ def format_preexisting_gate_failure(
             )
         else:
             lines.append(
-                "Proof the feature's tree matches its integration branch "
-                "(so the failure predates this feature):"
+                "Proof the failing check(s)' input files are unchanged vs "
+                "the integration branch (so the failure predates this "
+                "feature; the diff below is the feature's own plan/scaffold "
+                "files, not code the failing check(s) read):"
             )
         lines.append(diffstat)
     else:
@@ -3307,6 +3854,9 @@ def execute_unit_attempt(
     if verify_fn is None:
         verify_fn = verify
     precreate_dispatch_skeleton(wu, feature_dir)
+    worklist_section = format_reverification_worklist(wu, feature_dir)
+    if worklist_section:
+        wu.body = wu.body + "\n\n" + worklist_section
     if dispatch_fn is None:
         result = dispatch(wu, failure_note, cost_tracking)
     else:
@@ -3421,6 +3971,62 @@ def _parse_roadmap_row(roadmap_text: str, feature_id: str) -> dict | None:
 # --------------------------------------------------------------------------- #
 
 
+_BARE_FEAT_REF_RE = re.compile(r'\]\(#(feat-\d{4}-\d{4})\)')
+#: A section's status marker stands alone at the start of its own line. Kept
+#: deliberately in step with `lint_roadmap._SECTION_STATUS_RE`, which is what
+#: judges the result -- an archiver matching something the linter does not can
+#: only ever rewrite the wrong text. Unanchored, this matched a `**Status:**`
+#: quoted mid-sentence, and `count=1` then spent the one substitution on it:
+#: FEAT-2026-0079's prose became `its **Status: done.** marker` while its real
+#: marker kept saying `planned` against a `done` row (#2345). `[^*\n]` rather
+#: than `[^*]` so a marker can never swallow the blank line after it either.
+_STATUS_MARKER_RE = re.compile(r'^\*\*Status:[^*\n]*\*\*', re.MULTILINE)
+
+
+def _reconcile_moved_section(
+    section_text: str,
+    *,
+    feat_id_lower: str,
+    row_status: str,
+    roadmap_text: str,
+) -> str:
+    """Fix a detail section's own links and status marker for life in the archive.
+
+    The archiver used to move a section VERBATIM, which broke two things at once
+    (#1169 and #1038 — one cause, one pass):
+
+    - **Outbound links.** A bare `](#feat-…)` resolves only while both ends sit in
+      the same file. Once the section is in `roadmap-archive.md`, a reference to a
+      feature still inline in `roadmap.md` dangles. Rewritten to `roadmap.md#…`.
+      Deliberately NOT rewritten: a reference to the feature's own anchor (it
+      travels to the archive with the section) or to an already-archived feature
+      (both ends land in the archive). Those still resolve bare, and qualifying
+      them would be wrong.
+    - **Status marker.** The row is authoritative — that is `lint_roadmap`'s own
+      rule — so a section archived against a `done` row must not keep saying
+      `active`. Any prose after the marker is preserved, which is the contract
+      `lint_roadmap`'s error message already states. Observed three times before
+      this fix: FEAT-2026-0056, FEAT-2026-0075, FEAT-2026-0045.
+    """
+    def _requalify(m):
+        target = m.group(1)
+        if target == feat_id_lower:
+            return m.group(0)  # own anchor travels with the section
+        if f'<a id="{target}"></a>' in roadmap_text or re.search(
+            r'^## ' + re.escape(target.upper()) + r'\b', roadmap_text, re.MULTILINE | re.IGNORECASE
+        ):
+            return f'](roadmap.md#{target})'
+        return m.group(0)  # already archived — bare anchor still resolves
+
+    section_text = _BARE_FEAT_REF_RE.sub(_requalify, section_text)
+
+    if row_status:
+        section_text = _STATUS_MARKER_RE.sub(
+            f'**Status: {row_status}.**', section_text, count=1
+        )
+    return section_text
+
+
 def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     """Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver.
 
@@ -3510,6 +4116,29 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     archive_text = archive_path.read_text()
     if marker not in archive_text:
         return "refused: archive marker absent"
+
+    # Reconcile the section for its new home BEFORE it is written (#1169, #1038).
+    # `roadmap_text` here still holds every other feature's inline section, which
+    # is exactly what decides whether an outbound reference needs qualifying.
+    section_text = _reconcile_moved_section(
+        section_text,
+        feat_id_lower=feat_id_lower,
+        row_status=status,
+        roadmap_text=roadmap_text,
+    )
+
+    # Third inbound direction (#1425). #1169 rewrote inbound refs living in
+    # `roadmap.md`; sections ALREADY in this archive hold the *qualified*
+    # `](roadmap.md#feat-this-one)` form, correct while the target was inline and
+    # dangling the moment it moves here. Both ends now live in this file, so the
+    # bare form is right — the same rule `_reconcile_moved_section` already
+    # applies outbound for an already-archived target. Scoped to THIS feature's
+    # anchor: every other qualified ref still points at a live inline section and
+    # is none of this archive's business.
+    archive_text = archive_text.replace(
+        f"](roadmap.md#{feat_id_lower})", f"](#{feat_id_lower})"
+    )
+
     marker_end = archive_text.index(marker) + len(marker)
     new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
     archive_path.write_text(new_archive)
@@ -3535,6 +4164,18 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     # archive. Strip the now-orphaned anchor line; Step 3 already re-emitted the
     # canonical anchor in roadmap-archive.md, so the link target travels with it.
     roadmap_text = roadmap_text.replace(f"{anchor}\n", "")
+
+    # Inbound half of #1169: every OTHER section's bare `](#feat-this-one)` link
+    # pointed at an anchor that has just left this file. Those references live in
+    # unrelated features' prose — most often a `**Blocked by.**` block — so a
+    # clean close would otherwise redden the gate on rows this feature never
+    # wrote, and the breakage would land on whoever ran the gate next rather than
+    # on the run that caused it. Scoped to THIS feature's anchor: other bare
+    # refs are none of this archive's business.
+    roadmap_text = roadmap_text.replace(
+        f"](#{feat_id_lower})", f"](roadmap-archive.md#{feat_id_lower})"
+    )
+
     roadmap_text = re.sub(r'\n{3,}', '\n\n', roadmap_text)
     roadmap_path.write_text(roadmap_text)
 
@@ -3917,6 +4558,66 @@ def _truncate_debt_criterion(text: str) -> str:
     return text
 
 
+@dataclass(frozen=True)
+class WUCriteria:
+    """One gate ref's acceptance-criteria extraction result.
+
+    `status` is `"ok"` (substantive WU, frontmatter+body read cleanly —
+    `criteria` may still be empty if the body has no parseable AC list),
+    `"missing"` (WU file absent), `"unparseable"` (frontmatter read failed),
+    or `"skipped"` (non-substantive `wu.type`, per `NON_SUBSTANTIVE_TYPES`).
+    `sub_id` is set only for `"ok"`.
+    """
+
+    wu_id: str
+    ref_file: str
+    sub_id: str | None
+    criteria: list[str]
+    status: str
+
+
+def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]:
+    """Walk a gate's WU refs and extract each substantive WU's ordered
+    acceptance-criterion strings, from disk, in ref order.
+
+    Shared by `build_autoclose_debt_enumeration` and
+    `_precreate_criteria_state_stub` — one parser for "what are this gate's
+    acceptance criteria" so the two surfaces cannot silently disagree.
+    """
+    try:
+        _fm, gates = load_graph(feature_dir)
+    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
+        gates = []
+    gate = next((g for g in gates if g.number == gate_number), None)
+    refs = gate.refs if gate is not None else []
+
+    results: list[WUCriteria] = []
+    for ref in refs:
+        wu_file = feature_dir / ref["file"]
+        wu_id = ref.get("id", ref["file"])
+
+        if not wu_file.is_file():
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "missing"))
+            continue
+
+        try:
+            fm, body = read_frontmatter(wu_file)
+        except (_miniyaml.MiniYAMLError, OSError):
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "unparseable"))
+            continue
+
+        wu_type = fm.get("type", "implementation")
+        if wu_type in NON_SUBSTANTIVE_TYPES:
+            results.append(WUCriteria(wu_id, ref["file"], None, [], "skipped"))
+            continue
+
+        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
+        ac_text = _wu_sections.slice_acceptance_criteria(body)
+        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
+        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok"))
+    return results
+
+
 def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
     """Return the deferred-verification worklist for an auto-closed gate.
 
@@ -3926,52 +4627,33 @@ def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str
     `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
     call: this only reads files the driver has already located.
     """
-    try:
-        _fm, gates = load_graph(feature_dir)
-    except (FileNotFoundError, OSError, _miniyaml.MiniYAMLError, SystemExit):
-        gates = []
-    gate = next((g for g in gates if g.number == gate_number), None)
-    refs = gate.refs if gate is not None else []
-
     sub_ids: list[str] = []
     entries: list[str] = []
     total_criteria = 0
 
-    for ref in refs:
-        wu_file = feature_dir / ref["file"]
-        wu_id = ref.get("id", ref["file"])
-        sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
-
-        if not wu_file.is_file():
+    for wc in extract_wu_criteria(feature_dir, gate_number):
+        if wc.status == "skipped":
+            continue
+        if wc.status == "missing":
             entries.append(
-                f"- **{wu_id}** (`{ref['file']}`)\n"
+                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
                 f"  - deferred: <criteria not parseable> (file not found)"
             )
             continue
-
-        try:
-            fm, body = read_frontmatter(wu_file)
-        except (_miniyaml.MiniYAMLError, OSError):
+        if wc.status == "unparseable":
             entries.append(
-                f"- **{wu_id}** (`{ref['file']}`)\n"
-                f"  - deferred: <criteria not parseable> ({ref['file']})"
+                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
+                f"  - deferred: <criteria not parseable> ({wc.ref_file})"
             )
             continue
 
-        wu_type = fm.get("type", "implementation")
-        if wu_type in NON_SUBSTANTIVE_TYPES:
-            continue
-
-        sub_ids.append(sub_id)
-        ac_text = _wu_sections.slice_acceptance_criteria(body)
-        criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
-
-        lines = [f"- **{wu_id}** (`{ref['file']}`)"]
-        if not criteria:
-            lines.append(f"  - deferred: <criteria not parseable> ({ref['file']})")
+        sub_ids.append(wc.sub_id)
+        lines = [f"- **{wc.wu_id}** (`{wc.ref_file}`)"]
+        if not wc.criteria:
+            lines.append(f"  - deferred: <criteria not parseable> ({wc.ref_file})")
         else:
-            total_criteria += len(criteria)
-            for criterion in criteria:
+            total_criteria += len(wc.criteria)
+            for criterion in wc.criteria:
                 lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
         entries.append("\n".join(lines))
 
@@ -4431,26 +5113,61 @@ def assert_retrospective_exists(
     return True, ""
 
 
-def assert_learnings_appended_or_noop(
-    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
-) -> tuple[bool, str]:
-    """(close-b) LEARNINGS.md has ≥1 added line in this squash, or RETRO says 'nothing generalizes'."""
+def _squash_added_lines(rel_path: str, head_before: str) -> bool:
+    """True if *rel_path* gained ≥1 added line between *head_before* and HEAD."""
     proc = subprocess.run(
-        ["git", "diff", head_before, "HEAD", "--", LEARNINGS_PATH],
+        ["git", "diff", head_before, "HEAD", "--", rel_path],
         capture_output=True, text=True, check=False,
     )
-    added = any(
+    return any(
         ln.startswith("+") and not ln.startswith("+++")
         for ln in proc.stdout.splitlines()
     )
-    if added:
+
+
+def _feature_autonomy_default(feature_dir: Path) -> str | None:
+    """`autonomy_default` from PLAN.md, or None when there is no PLAN.md.
+
+    Deliberately not `load_graph`, which exits the process when PLAN.md
+    carries no graph block — the closing guards must stay callable against a
+    bare feature dir.
+    """
+    plan = feature_dir / "PLAN.md"
+    if not plan.exists():
+        return None
+    fm, _ = read_frontmatter(plan)
+    return fm.get("autonomy_default")
+
+
+def assert_learnings_appended_or_noop(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-b) A generalizable lesson was recorded, or RETRO says 'nothing generalizes'.
+
+    "Recorded" means ≥1 added line in `LEARNINGS_PATH` — except under
+    `autonomy_default: auto`, where `assert_learnings_staged_under_auto`
+    (close-i) forbids exactly that and routes the lesson to the feature-local
+    `LEARNINGS_PENDING_FILENAME` instead. Accepting the staging file as the
+    same evidence is what keeps the two guards from contradicting: before
+    this, an `auto` close could satisfy close-b only by asserting that
+    nothing generalized while a populated staging file sat beside it (#1419).
+    """
+    if _squash_added_lines(LEARNINGS_PATH, head_before):
         return True, ""
+    staged_rel: str | None = None
+    if learnings_staging_is_required(_feature_autonomy_default(feature_dir)):
+        staged_rel = os.path.relpath(
+            feature_dir / LEARNINGS_PENDING_FILENAME, repo_root,
+        )
+        if _squash_added_lines(staged_rel, head_before):
+            return True, ""
     retro = feature_dir / RETROSPECTIVE_FILENAME
     if retro.exists() and NOTHING_GENERALIZES_PHRASE in retro.read_text().lower():
         return True, ""
+    accepted = LEARNINGS_PATH if staged_rel is None else f"{LEARNINGS_PATH} or {staged_rel}"
     return (
         False,
-        f"assert_learnings_appended_or_noop: no {LEARNINGS_PATH} additions in squash "
+        f"assert_learnings_appended_or_noop: no {accepted} additions in squash "
         f"and no '{NOTHING_GENERALIZES_PHRASE}' note in {RETROSPECTIVE_FILENAME}",
     )
 
@@ -5006,6 +5723,60 @@ def assert_implementation_touched_files(
     )
 
 
+#: The metacharacters that make a `produces:` entry a glob rather than a
+#: literal path. `[` is deliberately NOT here: every file-based routing
+#: convention (Next.js App Router, Remix, SvelteKit) spells a dynamic segment
+#: as a literal `[id]` directory, so a bracket with no accompanying wildcard
+#: is far more likely to be that than an intentional character class (#1181).
+GLOB_METACHARACTERS = "*?"
+
+
+def produces_is_glob(path: str) -> bool:
+    """True when *path* should be matched as a glob rather than a literal.
+
+    One rule, so `assert_declared_deliverables`' presence check and
+    `assert_produces_in_diff`'s cross-check classify an entry identically —
+    the unified literal/glob contract (FEAT-2026-0055/T03) claims they do,
+    and for a bracketed path they did not: `glob.glob` read `[id]` as a
+    character class and returned nothing however the file was spelled on
+    disk, while the diff check's literal-equality branch matched it fine. A
+    WU declaring such a path was refused every attempt with a byte-identical
+    error and spun to `spinning_detected` (#1181).
+
+    A wildcard anywhere in the entry still means the whole entry is a
+    pattern, so `src/[abc]*.ts` keeps its character-class meaning — an author
+    who wants a class writes one alongside a wildcard. The residual case is
+    an entry mixing a *literal* bracket segment with a wildcard elsewhere
+    (`src/app/[id]/*.ts`); that is still read as a class and is not fixed
+    here.
+    """
+    return any(ch in path for ch in GLOB_METACHARACTERS)
+
+
+def produces_glob_pattern(path: str) -> str:
+    """Escape `[...]` segments that carry no wildcard of their own (#1589).
+
+    #1181 made a bare bracketed path literal, but an entry mixing a literal
+    bracket segment with a wildcard ELSEWHERE is still a pattern, so `[id]`
+    recovers its character-class meaning and matches nothing:
+    `glob.glob('src/app/[id]/*.ts')` is `[]` even with both files present, and
+    `fnmatch` fails the same way — so unlike #1181, BOTH halves of the unified
+    contract missed it.
+
+    Escaping is per SEGMENT, not whole-pattern: a class written in the same
+    segment as a wildcard (`src/[abc]*.ts`) is left alone, which preserves the
+    escape hatch #1181 deliberately kept for an author who wants a real class.
+    Segments with no bracket, and paths with no bracket at all, come back
+    unchanged.
+    """
+    return "/".join(
+        glob.escape(seg)
+        if "[" in seg and not any(ch in seg for ch in GLOB_METACHARACTERS)
+        else seg
+        for seg in path.split("/")
+    )
+
+
 def produces_shape_error(path: str) -> "str | None":
     """Return why *path* is an invalid ``produces:`` entry, or None if it is fine.
 
@@ -5017,7 +5788,7 @@ def produces_shape_error(path: str) -> "str | None":
     session output can be checked by every surface that has the frontmatter:
     ``lint_plan`` at draft/arm/conformance time, and the driver before it
     spends a token (#593). A real feature paid $6.42 across three byte-identical
-    refusals for a ``Path.is_dir()`` call, with ``specfuse-lint`` reporting
+    refusals for a ``Path.is_dir()`` call, with ``specfuse lint`` reporting
     ``OK - structurally valid`` the whole time.
 
     The three surfaces must read identically, so all render this one string.
@@ -5061,10 +5832,11 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     absence opt-out (loop.py:994). Otherwise every declared entry must satisfy
     one of two forms:
 
-    - **Literal path** (no ``fnmatch`` metacharacter — none of ``* ? [``):
-      must exist and be non-empty (``test -s`` semantics). Unchanged from the
-      original presence gate.
-    - **Glob** (contains an ``fnmatch`` metacharacter): at least one existing,
+    - **Literal path** (no glob metacharacter — see ``produces_is_glob``,
+      which reads ``*`` and ``?`` but deliberately not ``[``): must exist and
+      be non-empty (``test -s`` semantics). Unchanged from the original
+      presence gate.
+    - **Glob** (contains a glob metacharacter): at least one existing,
       non-empty file must match, via ``glob.glob`` (same pattern syntax
       ``assert_produces_in_diff`` matches against the squash diff with
       ``fnmatch.fnmatch``, so a pattern that satisfies one satisfies the other).
@@ -5088,9 +5860,12 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
         shape_err = produces_shape_error(path)
         if shape_err:
             return False, shape_err
-        if any(ch in path for ch in "*?["):
+        if produces_is_glob(path):
             matches = [
-                m for m in glob.glob(path)
+                # recursive=True or `**` collapses to a single `*`, matches one
+                # level, yields directories, and the is_file() filter drops them
+                # all -- a WU that produced everything is refused (#1744).
+                m for m in glob.glob(produces_glob_pattern(path), recursive=True)
                 if Path(m).is_file() and Path(m).stat().st_size > 0
             ]
             if not matches:
@@ -5135,7 +5910,11 @@ def assert_produces_in_diff(
     for raw in wu.produces:
         entry = str(raw)
         probe = entry.removeprefix("./")
-        if not any(t == probe or fnmatch.fnmatch(t, probe) for t in touched_norm):
+        # Escaped so a literal `[id]` segment beside a wildcard matches here
+        # too -- this half failed for the same reason the presence gate did
+        # (#1589). Literal equality is still tried first.
+        pattern = produces_glob_pattern(probe)
+        if not any(t == probe or fnmatch.fnmatch(t, pattern) for t in touched_norm):
             unmatched.append(entry)
     if unmatched:
         return False, (
@@ -5206,7 +5985,7 @@ def assert_terminal_flips_fired(
             f"roadmap_row_not_done: row for {feature_id} not found in "
             f"{roadmap_path}. /draft-feature writes this row but leaves it "
             f"uncommitted; if it was dropped before dispatch, restore it and "
-            f"re-commit. `specfuse-loop --prepare` folds the row into the "
+            f"re-commit. `specfuse run --prepare` folds the row into the "
             f"scaffold commit — dispatch through it so the row survives the "
             f"per-attempt reset.",
         )
@@ -5333,7 +6112,7 @@ def assert_learnings_staged_under_auto(
     between `head_before` and `HEAD` does not touch `LEARNINGS_PATH`.
     """
     feat_fm, _ = load_graph(feature_dir)
-    if feat_fm.get("autonomy_default") != "auto":
+    if not learnings_staging_is_required(feat_fm.get("autonomy_default")):
         return True, ""
     proc = subprocess.run(
         ["git", "diff", "--name-only", head_before, "HEAD"],
@@ -5495,7 +6274,7 @@ def run(
                 return 1
         if prepare_only:
             print("Prepared: feature is on its branch and committed. "
-                  "Re-run `specfuse-loop` to start the gate.")
+                  "Re-run `specfuse run` to start the gate.")
             return 0
         # Pre-flight guards — both run BEFORE ensure_feature_branch so the
         # refusal happens before any branch mutation, and both protect against
@@ -5504,6 +6283,10 @@ def run(
         #         deleted by the reset (and crash the next frontmatter write).
         #   #74 — uncommitted arm-gate / WU-revision edits (armed statuses, AC
         #         revisions) would be silently discarded by the reset.
+        #   #1414 — a sandboxed launch leaves every dispatched session's Bash
+        #         tool dead; the parent shell working proves nothing about the
+        #         children, and the run burns full attempts before failing.
+        require_session_env_writable()
         require_feature_folder_committed(feature_dir, feat_fm, feature_id)
         require_feature_folder_unmodified(feature_dir, feat_fm, feature_id)
         ensure_feature_branch(feat_fm, feature_dir)
@@ -5568,6 +6351,13 @@ def run(
                 wfm, _ = read_frontmatter(wu_path)
                 if wfm.get("status") == DONE:
                     done_ids.add(ref["id"])
+        # Dispatch-order tracking for the gate-completion staleness summary
+        # (FEAT-2026-0075/T03): the order this run actually dispatched units
+        # in, never re-derived from PLAN.md's dependency graph — intent is
+        # not history. Units already DONE before this run started (populated
+        # above) are not "dispatched" by this process and are excluded.
+        dispatch_order: list[str] = []
+        driver_edits: list[tuple[str, list[str]]] = []
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
@@ -5651,6 +6441,32 @@ def run(
                               f"Halted before {wu.wu_id}.")
                         return 1
 
+                    # Driver-restart halt (FEAT-2026-0075/T06): sibling of the
+                    # budget brake above, same seam. A prior squash in this
+                    # pass touched the driver's own importable surface (the
+                    # squash-site warning just above recorded it into
+                    # `driver_edits`). This process's `sys.modules` still
+                    # holds the pre-edit code, so dispatching `wu` next would
+                    # execute stale modules — halt instead of dispatching
+                    # into a process that cannot observe its own change. Not
+                    # reached when driver_edits is empty (the common case:
+                    # 49 of 90 gates repo-wide never edit the driver) or on
+                    # the gate's final unit (nothing left in `pending` after
+                    # it, so this check is never reached for it at all).
+                    if driver_edits:
+                        _edit_wu_id, _edit_paths = driver_edits[-1]
+                        _remaining_ids = [
+                            w.wu_id for w in pending[pending.index(wu):]]
+                        return _halt_for_driver_restart(
+                            gate_number=gate.number,
+                            feature_id=feature_id,
+                            events_path=events_path,
+                            wu_id=_edit_wu_id,
+                            driver_paths=_edit_paths,
+                            remaining_wu_ids=_remaining_ids,
+                            resume_command=f"specfuse run --feature {feature_id}",
+                        )
+
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 # Summary line: the WU's title, so the log says WHAT is being
@@ -5690,6 +6506,7 @@ def run(
                         # duplicate bookkeeping commit are produced (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif wu.type == "close-intermediate" and _override_active:
                     flush_events(events_path, [build_event(
@@ -5727,6 +6544,7 @@ def run(
                         # so ready() filters this WU on the next pass (issue #23).
                         wu.status = DONE
                         done_ids.add(wu.wu_id)
+                        dispatch_order.append(wu.wu_id)
                         continue
                 elif (wu.type == "close" and gate is gates[-1]
                         and _override_active and wu.verdict is None):
@@ -6048,6 +6866,25 @@ def run(
                             print(f"   SQUASH COMMIT REJECTED attempt "
                                   f"{attempt}/{MAX_ATTEMPTS}")
                             continue
+                        # Driver-editing staleness warning (FEAT-2026-0075/T02):
+                        # the squash just landed, so its diff is ground truth for
+                        # what this WU changed. If it touched the driver's own
+                        # importable surface, this process's sys.modules still
+                        # holds the pre-edit code — print the hazard NOW, while
+                        # the operator can still restart before the next
+                        # dispatch, rather than only at gate completion.
+                        if sha is not None:
+                            _changed = changed_paths_for_commit(sha, REPO_ROOT)
+                            _driver_paths = driver_paths_in(_changed)
+                            _warning = format_driver_staleness_warning(
+                                wu.wu_id, _driver_paths)
+                            if _warning:
+                                print(_warning)
+                                # Recorded for the gate-completion summary
+                                # (FEAT-2026-0075/T03) — the immediate print
+                                # above and this recording are independent;
+                                # neither replaces the other.
+                                driver_edits.append((wu.wu_id, _driver_paths))
                         # Smoke-import runner (FEAT-2026-0008/T03): after a
                         # successful verify() AND squash, run each
                         # `python3 -c "from X import Y"` line declared in the WU
@@ -6133,6 +6970,14 @@ def run(
                         # every current WU is unchanged.
                         deliv_ok, deliv_summary = assert_declared_deliverables(wu)
                         if not deliv_ok:
+                            # Composed BEFORE the reset. The reset rolls the
+                            # squash back, so afterwards every declared path
+                            # reads ABSENT and the note would lose the one
+                            # distinction it exists to record — which of the
+                            # declared deliverables the attempt did land (#1412).
+                            _deliv_note = format_deliverable_missing_note(
+                                wu, deliv_summary, _refusal_touched, attempt,
+                            )
                             reset_preserving_events(head_before, events_path,
                                                     untracked_before=untracked_before)
                             missing = deliv_summary.split(": ", 1)[-1]
@@ -6147,7 +6992,7 @@ def run(
                             ))
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
-                            attempt_notes.append((attempt, deliv_summary))
+                            attempt_notes.append((attempt, _deliv_note))
                             failure_note = deliv_summary
                             print(
                                 f"   DELIVERABLE MISSING attempt "
@@ -6364,36 +7209,25 @@ def run(
                             "planned_cost_usd": _planned,
                         }))
                         done_ids.add(wu.wu_id)
-                        # Post-dispatch budget breach check (#T03): the
+                        dispatch_order.append(wu.wu_id)
+                        flush_events(events_path, wu_events)
+                        # Post-dispatch budget breach check (#T03, #2174): the
                         # pre-dispatch brake above only ever sees spend
                         # BEFORE the next WU it would halt in front of, so a
                         # gate's own final WU can breach budget with no
-                        # subsequent dispatch left to catch it. Evaluated only
-                        # once every WU in this gate is done — a gate with
-                        # more pending WUs already gets the pre-dispatch halt
-                        # on its next iteration, so this never double-reports
-                        # the same overrun.
-                        if all(u.wu_id in done_ids for u in units):
-                            _gate_dict = {"file": gate.file.name,
-                                          "work_units": gate.refs}
-                            if _should_report_budget_breach(
-                                    feat_fm, _gate_dict, feature_dir):
-                                _budget = gate_budget_usd(gate.file)
-                                _spent = gate_spent_usd(
-                                    feat_fm, _gate_dict, feature_dir)
-                                wu_events.append(build_event(
-                                    "human_escalation", feature_id, {
-                                        "reason": "gate_budget_exceeded_post_dispatch",
-                                        "gate": gate.number,
-                                        "budget_usd": _budget,
-                                        "spent_usd": round(_spent, 6),
-                                        "final_wu_id": wu.wu_id,
-                                    }))
-                                print(f"\nGate {gate.number} budget exceeded "
-                                      f"(post-dispatch): spent ${_spent:.4f} "
-                                      f">= budget ${_budget:.4f}. Reported "
-                                      f"after {wu.wu_id}.")
-                        flush_events(events_path, wu_events)
+                        # subsequent dispatch left to catch it. Evaluated
+                        # once every OTHER WU in this gate is done — a gate
+                        # with more pending WUs already gets the pre-dispatch
+                        # halt on its next iteration, so this never
+                        # double-reports the same overrun. Called AFTER the
+                        # flush above so this WU's own attempt_outcome/cost
+                        # is already on disk for gate_spent_usd to sum.
+                        _gate_dict = {"file": gate.file.name,
+                                      "work_units": gate.refs}
+                        _report_post_dispatch_budget_breach_if_final(
+                            feat_fm, _gate_dict, feature_dir, gate.number,
+                            units, done_ids, wu, events_path,
+                        )
                         print(f"   PASS — committed {sha}")
                         break
 
@@ -6506,6 +7340,18 @@ def run(
                                        _fs or "")
                         write_cost_to_wu(backend, wu, cum_usage)
                         flush_events(events_path, wu_events)
+                        # Post-dispatch budget breach check (#2174): a
+                        # blocked_human terminal outcome ends this gate's
+                        # advancement just as surely as a `done` one, so the
+                        # gate's own final WU must be checked here too — not
+                        # only on the all-`done` shape (see
+                        # `_report_post_dispatch_budget_breach_if_final`).
+                        _gate_dict = {"file": gate.file.name,
+                                      "work_units": gate.refs}
+                        _report_post_dispatch_budget_breach_if_final(
+                            feat_fm, _gate_dict, feature_dir, gate.number,
+                            units, done_ids, wu, events_path,
+                        )
                         commit_bookkeeping(
                             [wu.file, events_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
@@ -6550,6 +7396,16 @@ def run(
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
+                    # Post-dispatch budget breach check (#2174): see the
+                    # spinning_signature_repeat block above — attempt
+                    # exhaustion is the other blocked_human terminal shape
+                    # the original all-`done` guard missed.
+                    _gate_dict = {"file": gate.file.name,
+                                  "work_units": gate.refs}
+                    _report_post_dispatch_budget_breach_if_final(
+                        feat_fm, _gate_dict, feature_dir, gate.number,
+                        units, done_ids, wu, events_path,
+                    )
                     commit_bookkeeping(
                         [wu.file, events_path, *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
@@ -6567,12 +7423,35 @@ def run(
             print(f"\n(dry run) Gate {gate.number} would complete and await review.")
             return 0
 
+        # Driver staleness gate summary (FEAT-2026-0075/T03): names which
+        # units in THIS gate edited the driver and which units this same
+        # process dispatched afterward, so a close reads the fact instead of
+        # reconstructing it from `ps` output and `started_at` timestamps
+        # (`[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]` rule (b)).
+        # Independent of T02's immediate warning at the squash site — this is
+        # the gate-end half, printed before the gate flips to awaiting_review.
+        staleness_gate_events: list = []
+        if driver_edits:
+            _first_edit_idx = dispatch_order.index(driver_edits[0][0])
+            _dispatched_after = dispatch_order[_first_edit_idx + 1:]
+            _staleness_summary = format_driver_staleness_summary(
+                driver_edits, _dispatched_after)
+            if _staleness_summary:
+                print(f"\n{_staleness_summary}")
+                staleness_gate_events.append(build_event(
+                    "driver_staleness_detected", feature_id, {
+                        "gate": gate.number,
+                        "edits": [{"wu_id": wu_id, "driver_paths": paths}
+                                  for wu_id, paths in driver_edits],
+                        "dispatched_after": _dispatched_after,
+                    }))
+
         backend.set_gate(gate, "awaiting_review")
         # on_gate_passed fires here: WUs all done, gate now awaiting human review
         backend.on_gate_passed(feature_id, gate.number)
         arm_event = build_arm_predicate_event(feature_dir, feature_id, gate.number)
         gate_events = [build_event("gate_reached", feature_id, {"gate": gate.number}),
-                       arm_event]
+                       arm_event, *staleness_gate_events]
 
         # Live arm (FEAT-2026-0053/T06): `auto` + a clean predicate verdict
         # carries the draft->pending / gate awaiting_review->passed writes into
@@ -6669,14 +7548,19 @@ def run(
                 "git push, gh pr create."
             )
         elif is_terminal_gate:
-            print(f"\nGate {gate.number} complete (retro, lessons, docs, "
-                  f"plan-next); terminal gate but PLAN.md not yet `done`.")
-            print(
-                "Inconsistency: terminal gate closed without close ceremony "
-                "flipping PLAN.md to `done`. Inspect RETROSPECTIVE.md / "
-                "events.jsonl. Likely fix: manually flip PLAN.md `status: "
-                "active -> done`, then `/wrap-feature`."
-            )
+            # Verdict-aware (#1416): a hedged verdict means the flips were
+            # withheld deliberately, and the old message told the operator to
+            # undo that by hand.
+            close_verdict = None
+            for ref in gate.refs:
+                ref_file = feature_dir / ref["file"]
+                if not ref_file.is_file():
+                    continue
+                ref_fm, _ = read_frontmatter(ref_file)
+                if ref_fm.get("type") == "close":
+                    close_verdict = ref_fm.get("verdict") or None
+                    break
+            print(terminal_gate_message(gate.number, close_verdict))
         else:
             print(f"\nGate {gate.number} complete (retro, lessons, docs, "
                   f"plan-next).")
@@ -6686,7 +7570,7 @@ def run(
                 f"flip accepted WUs to `pending`,\n"
                 f"                          mark this gate `passed`. "
                 f"Reads {review.name} for planner findings.\n"
-                f"  - Resume               specfuse-loop"
+                f"  - Resume               specfuse run"
             )
         return 0
     except BookkeepingCommitError as exc:
@@ -6965,6 +7849,9 @@ def _force_utf8_console() -> None:
 
 def main() -> int:
     _force_utf8_console()
+
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
     ap = argparse.ArgumentParser(description="Specfuse loop driver (single-repo).")
     ap.add_argument("--feature", help="Feature dir name or bare FEAT-ID (e.g. "
                     "FEAT-2026-0039) under .specfuse/features/ "
@@ -6984,7 +7871,7 @@ def main() -> int:
     ap.add_argument("--prepare-only", action="store_true",
                     help="Like --prepare (create branch + commit the folder) but "
                     "STOP afterwards without dispatching — review the commit, then "
-                    "re-run `specfuse-loop` to start.")
+                    "re-run `specfuse run` to start.")
     ap.add_argument("--no-baseline-probe", action="store_true",
                     help="Skip the pre-flight baseline gate probe entirely — "
                     "dispatch proceeds exactly as it did before the probe existed. "

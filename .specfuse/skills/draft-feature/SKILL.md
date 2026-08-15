@@ -77,7 +77,7 @@ Before any proposal, read what shapes good plans in *this* project:
   this step, so build a short query from what's already in hand: the
   one-line feature idea the user gave you, the provisional slug, and any
   surface names the idea already mentions. Run
-  `python3 .specfuse/scripts/learnings_query.py "<query>" --top 8` and read
+  `python3 -m specfuse.loop.learnings_query "<query>" --top 8` and read
   only the returned bullets — durable rules from past gates that would
   change how this feature is planned or sized. If the CLI prints the
   sentinel line `LEARNINGS-LOAD-WHOLE` (small/early-stage repos, too few
@@ -263,7 +263,7 @@ For gate 1 only:
   Surface whichever set applies for confirmation rather than per-section
   discussion.
 
-  **Rely on the pre-created skeleton and `specfuse-lint --closing`, not a
+  **Rely on the pre-created skeleton and `specfuse lint --closing`, not a
   restated list of section headings.** Every `close` / `close-intermediate`
   WU gets its required sections (`## Cost analysis`, `## What the loop did
   NOT verify`, etc.) scaffolded at dispatch time — see
@@ -273,7 +273,7 @@ For gate 1 only:
   `planned_cost_usd` and events.jsonl; the deferred-verification list with
   criterion/reason/where-it-actually-gets-checked for each entry, or
   `(nothing — every acceptance criterion was verified in-loop)` if empty),
-  and close with: "`specfuse-lint --closing` exits 0 before this WU reports
+  and close with: "`specfuse lint --closing` exits 0 before this WU reports
   `complete`." Don't restate guard names or heading literals here — that
   copy drifts from the registry; the lint is the check.
 
@@ -336,16 +336,21 @@ When the user has accepted the structure:
   requires. A row without a detail section forces the driver to synthesize a
   stub at archive time (it no longer halts, since FEAT-2026-0022, but the stub
   carries no real record). Write the real section now.
-- Run `python3 .specfuse/scripts/lint_plan.py
-  .specfuse/features/<new-folder>`. Report PASS or the errors. If it
+- Run `specfuse lint .specfuse/features/<new-folder>`. Report PASS or the errors. If it
   fails, point at the `/feature-conversion` skill to walk the diff
   before the user re-runs.
-- Optionally run `python3 .specfuse/scripts/loop.py --dry-run` to
+- Optionally run `specfuse run --dry-run` to
   confirm the loop loads the feature cleanly.
 
-End with the RESULT block defined in
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the user accepted, files are written, and
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the user accepted, files are written, and
 lint passes. If the user abandoned partway, emit `status: blocked`
 with what was decided so far in `blocked_reason`.
 

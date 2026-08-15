@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from specfuse.loop import escalation, gh_features
+from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 
 
@@ -80,7 +80,7 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
     LabelSpec(
         name=issues.FINDING_LABEL,
         colour="b60205",
-        description="A failure artifact reported by specfuse-monitor",
+        description="A failure artifact reported by specfuse monitor",
         consumer="monitor/issues.py",
     ),
     # Registered ahead of its consumer (gate 2, FEAT-2026-0042) on purpose:
@@ -91,6 +91,84 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="5319e7",
         description="auto-fix attempted, failed",
         consumer="monitor/autofix_state.py",
+    ),
+    # FEAT-2026-0045/T01: the category->label projection of the triage
+    # marker. `question` reuses the existing `triage-question` entry above
+    # rather than minting a second label -- see triage.py's module docstring.
+    LabelSpec(
+        name=triage.BUG_LABEL,
+        colour="ededed",
+        description="An inbound issue triaged as a bug",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.FEATURE_LABEL,
+        colour="006b75",
+        description="An inbound issue triaged as a feature request",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.DUPLICATE_LABEL,
+        colour="f9d0c4",
+        description="An inbound issue triaged as a duplicate",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=triage.WONTFIX_LABEL,
+        colour="bfdadc",
+        description="An inbound issue triaged as won't-fix",
+        consumer="loop/triage.py",
+    ),
+    LabelSpec(
+        name=notify_sla.PARKED_LABEL,
+        colour="c2e0c6",
+        description="An unanswered escalation was re-pinged once and is now parked",
+        consumer="loop/notify_sla.py",
+    ),
+    # Bug-lane declining reasons (#1420). Every name here is a value in
+    # `bug_lane.DECLINE_LABELS`; the lane cannot emit a label this registry does
+    # not declare, and tests/test_bug_lane_labels_registered.py asserts it.
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_NO_TEST_EVIDENCE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: the diff adds no test file",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_CI_NOT_GREEN],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: CI did not conclude success",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_DIFF_TOO_LARGE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: diff exceeds rules.bugs.max_diff_lines",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_JUDGE_PATH_TOUCHED],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: the diff touches a never-auto-merge path",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_UNTRACEABLE],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: not traced to a triaged issue or diagnosed finding",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_DAILY_CAP_REACHED],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: rolling 24h merge cap reached",
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_UNREADABLE_INPUT],
+        colour="fbca04",
+        description="Bug-lane auto-merge declined: a guardrail input could not be read",
+        consumer="loop/bug_lane_run.py",
     ),
 )
 
@@ -115,8 +193,31 @@ def provision_labels(
     target: str | Path,
     *,
     runner: Optional[Callable] = None,
+    repo: Optional[str] = None,
 ) -> ProvisionReport:
     """Create every LABEL_REGISTRY label the repo at ``target`` is missing.
+
+    *repo* (``OWNER/NAME``) selects the repository with ``--repo`` instead of
+    inferring it from *target* as the working directory. **Pass it whenever
+    you inject a runner** (#2081).
+
+    This module's own default runner takes ``cwd``; every other runner in the
+    codebase is ``(argv, check)`` -- `agent.run`, `escalation`, `gh_backend`
+    all use that shape, and `labels` is the sole outlier. So injecting any of
+    them raised ``TypeError: got an unexpected keyword argument 'cwd'`` on the
+    very first ``gh`` call, which this function then caught into
+    ``ProvisionReport.reason`` and returned as ``skipped``.
+
+    That is not theoretical. `bug_lane_run.add_guardrail_label` has injected
+    the lane's runner since #1785 added on-demand provisioning, so **the
+    on-demand path has never once created a label** -- the seven
+    ``bug-lane:*`` entries were registered by FEAT-2026-0048 and no repository
+    has them, while every label `scaffold.py` provisions (it passes no runner,
+    so it gets the compatible default) exists.
+
+    With *repo* set, no ``cwd`` is passed and the runner is called as
+    ``runner(argv, check=False)``, which every caller in the codebase
+    satisfies.
 
     Best-effort and idempotent: lists existing labels first and creates only
     what is missing, never overwriting so an operator's edited colour or
@@ -127,11 +228,15 @@ def provision_labels(
     runner = runner if runner is not None else _default_runner
     report = ProvisionReport()
 
+    def _invoke(argv: list):
+        """Call *runner* with the contract its caller actually implements."""
+        if repo is not None:
+            return runner(argv + ["--repo", repo], check=False)
+        return runner(argv, cwd=target, check=False)
+
     try:
-        listed = runner(
-            ["gh", "label", "list", "--json", "name,color,description", "--limit", "1000"],
-            cwd=target,
-            check=False,
+        listed = _invoke(
+            ["gh", "label", "list", "--json", "name,color,description", "--limit", "1000"]
         )
     except FileNotFoundError:
         report.skipped = True
@@ -161,14 +266,12 @@ def provision_labels(
             report.already_present.append(spec.name)
             continue
         try:
-            created = runner(
+            created = _invoke(
                 [
                     "gh", "label", "create", spec.name,
                     "--color", spec.colour,
                     "--description", spec.description,
-                ],
-                cwd=target,
-                check=False,
+                ]
             )
         except Exception:  # noqa: BLE001 - keep provisioning remaining labels
             report.failed.append(spec.name)

@@ -331,6 +331,46 @@ class TestPostDispatchBreach(_RunLoopCase):
             self.assertNotEqual(t02_fm.get("status"), "done",
                                 "T02 must never have dispatched")
 
+    def test_final_wu_blocked_human_overrun_is_reported(self):
+        """Issue #2174: a gate whose final WU spins out to `blocked_human`
+        (rather than passing) breaches budget just as surely, but the
+        original `all(u.wu_id in done_ids for u in units)` guard skipped
+        the check entirely — `blocked_human` WUs never enter `done_ids`.
+        The report must fire here too, keyed off "every OTHER WU already
+        done", not "every WU done"."""
+        with integration_workspace() as root:
+            os.chdir(root)
+            _write_feature(
+                root, "FEAT-2026-9105", "final-blocked-overrun",
+                "feat/test-final-blocked-overrun",
+                [("FEAT-2026-9105/T01", "implementation", "pending")],
+                budget=1.0,
+            )
+            self._patch("dispatch", _cost_dispatch({"T01": 1.5}))
+
+            def _always_failing_verify(wu, feature_dir, cfg=None):
+                return False, "simulated verification failure"
+            self._patch("verify", _always_failing_verify)
+
+            rc = loop.run(None, dry_run=False)
+            self.assertEqual(rc, 1, "gate should halt on blocked_human")
+
+            fdir = root / ".specfuse/features/FEAT-2026-9105-final-blocked-overrun"
+            events = _read_events(fdir / "events.jsonl")
+            breaches = self._breaches(events)
+            self.assertEqual(
+                len(breaches), 1,
+                f"expected exactly one post-dispatch breach for a "
+                f"blocked_human final WU; events={events}")
+            payload = breaches[0]["payload"]
+            self.assertEqual(payload["gate"], 1)
+            self.assertEqual(payload["budget_usd"], 1.0)
+            self.assertGreaterEqual(payload["spent_usd"], 1.5)
+            self.assertEqual(payload["final_wu_id"], "FEAT-2026-9105/T01")
+
+            t01_fm = loop.read_frontmatter(fdir / "WU-T01.md")[0]
+            self.assertEqual(t01_fm.get("status"), "blocked_human")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,7 +31,7 @@
 # PER-GATE `wu_must_reference: true` (optional, default false). Flag a gate
 # whose fix is MECHANICAL over a work unit's own output — a formatter, an
 # auto-fixable linter (`spotless:check`, `black --check`, `gofmt -l`,
-# `prettier --check`). The plan linter (specfuse-lint) then WARNs when an
+# `prettier --check`). The plan linter (`specfuse lint`) then WARNs when an
 # implementation WU's Verification section names none of that gate's command —
 # catching, at authoring time and zero model cost, the case where a WU forgets
 # a mechanical gate and the driver spins retries on the identical failure until
@@ -53,7 +53,7 @@ code:
     command: "bandit -r src -ll"             # or your OWASP-aligned scanner
   # Uncomment after running /derive-monitoring to draft .specfuse/monitoring.yml.
   # - name: monitoring-example-lint
-  #   command: "specfuse-monitor-lint .specfuse/monitoring.yml"
+  #   command: "specfuse monitor-lint .specfuse/monitoring.yml"
 
 # Reflective units (retrospective, lessons, docs): the artifact exists / something
 # changed. Tighten as you like.
@@ -65,7 +65,7 @@ doc:
 # a malformed next-gate draft fails here, where you are already reviewing.
 plannext:
   - name: plan-lint
-    command: "specfuse-lint {feature_dir}"
+    command: "specfuse lint {feature_dir}"
 
 # Pre-dispatch sets, referenced by a WU's `prep`/`oracles` frontmatter keys —
 # they run BEFORE the session is dispatched, not at exit. Entries here are

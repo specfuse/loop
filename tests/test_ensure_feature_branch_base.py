@@ -106,7 +106,15 @@ class TestEnsureFeatureBranchBase(unittest.TestCase):
     # ancestor of HEAD) is surfaced with an operator-readable message that
     # names the branch and base, offers the rebase-onto-base hint, and never
     # offers `git branch -D`.
-    def test_stale_branch_surfaced_against_base_not_head(self):
+    def test_branch_is_synced_against_the_declared_base_not_head(self):
+        """CONTRACT CHANGE (#2186): repaired rather than refused.
+
+        What this test protects is unchanged and still asserted — the guard
+        must act on the DECLARED base (`release/2.0`), not on HEAD. It now
+        proves that by checking which base's commit lands on the branch,
+        which is a stronger statement than checking which name appears in a
+        refusal message.
+        """
         with _repo_no_remote() as root:
             _git(root, "checkout", "-q", "-b", "release/2.0")
             _commit_file(root, "release_only.txt", "1\n", "release-only commit")
@@ -117,16 +125,15 @@ class TestEnsureFeatureBranchBase(unittest.TestCase):
             _git(root, "checkout", "-q", "main")
 
             with _chdir(root):
-                with self.assertRaises(loop.FeatureBranchError) as ctx:
-                    loop.ensure_feature_branch({"branch": "feat/x", "base": "release/2.0"})
+                loop.ensure_feature_branch({"branch": "feat/x", "base": "release/2.0"})
                 current = _git(root, "branch", "--show-current")
+                behind_base = _git(root, "rev-list", "--count", "feat/x..release/2.0")
 
-            self.assertEqual(current, "main")  # not silently switched
-            msg = str(ctx.exception)
-            self.assertIn("feat/x", msg)
-            self.assertIn("release/2.0", msg)
-            self.assertIn("git rebase release/2.0", msg)
-            self.assertNotIn("-D", msg)
+            self.assertEqual(current, "feat/x")
+            self.assertEqual(behind_base, "0", "the DECLARED base was folded in")
+            # The declared base's commit landed; HEAD's lineage did not drive it.
+            self.assertTrue((root / "release_only.txt").exists())
+            self.assertTrue((root / "feat_only.txt").exists(), "feature work preserved")
 
     # AC 11 — regression: the dirty-tree allowlist (_expected_flip_paths |
     # _scaffold_managed_dirty) is unchanged; unexpected tracked edits still

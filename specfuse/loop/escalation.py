@@ -16,7 +16,15 @@ from typing import Callable, Optional
 
 NEEDS_HUMAN_LABEL = "needs-human"
 
-DEFAULT_ASSIGNEE = "specfuse-operator"
+#: `gh issue create` succeeded but printed no parseable issue number. Distinct
+#: from `""`, which means it did not succeed at all.
+CREATED_NUMBER_UNKNOWN = "created (number unknown)"
+
+#: Empty by default (#1762). A username that is valid on no repository is
+#: not a safe default -- it failed every `gh issue create` on every repo
+#: that had not happened to create that user. Callers pass the operator's
+#: own `escalation.assignee` from agent-policy.yml; empty means unassigned.
+DEFAULT_ASSIGNEE = ""
 
 CATEGORY_LABELS = frozenset(
     {
@@ -182,6 +190,38 @@ def _extract_issue_number(stdout: str) -> str:
     return stdout.strip()
 
 
+#: GitHub rejects an over-long issue title outright. 256 is the documented
+#: ceiling; this leaves room for the `[correlation-id] ` prefix.
+_TITLE_LIMIT = 180
+
+
+def issue_title(correlation_id: str, issue_summary: str) -> str:
+    """One short line, whatever the summary contains.
+
+    The title used to be `f"[{cid}] {issue_summary}"` verbatim. When a
+    provider's summary is a Python traceback -- which is exactly what the
+    feature provider produces for a driver crash -- that is a multi-line,
+    ~2000-character title, and `gh issue create` rejects it. Observed
+    2026-08-12: the rejection raised out of `emit_escalation` and killed the
+    entire agent run, so a *reporting* failure destroyed the run it was
+    trying to report on.
+
+    Takes the first non-empty line, collapses whitespace, and truncates. The
+    full text is untouched in the body, which is where detail belongs.
+    """
+    first = ""
+    for line in (issue_summary or "").splitlines():
+        if line.strip():
+            first = " ".join(line.split())
+            break
+    if not first:
+        first = "escalation"
+    title = f"[{correlation_id}] {first}"
+    if len(title) > _TITLE_LIMIT:
+        title = title[: _TITLE_LIMIT - 1].rstrip() + "…"
+    return title
+
+
 def emit_escalation(
     correlation_id: str,
     *,
@@ -221,16 +261,151 @@ def emit_escalation(
         recommendation=recommendation,
     )
 
+    argv = [
+        "gh", "issue", "create",
+        "--repo", repo,
+        "--title", issue_title(correlation_id, issue_summary),
+        "--body", body,
+        "--label", NEEDS_HUMAN_LABEL,
+        "--label", category,
+    ]
+    # Assign only when an assignee is actually configured (#1762). The old
+    # default was the literal `specfuse-operator`, a placeholder assignable on
+    # no repository, so `gh issue create` exited 1 on that flag and the whole
+    # escalation was lost -- the caller recorded "escalated" and the human
+    # inbox stayed empty. An unassigned needs-human issue is strictly better
+    # than an unfiled one. An empty value must OMIT the flag rather than pass
+    # `--assignee ""`, which fails the same way.
+    if assignee and assignee.strip():
+        argv += ["--assignee", assignee.strip()]
+
+    # NOT check=True (#2170). A rejected `gh issue create` used to raise
+    # `CalledProcessError` out of this function, through the caller, and out
+    # of the whole run -- a reporting failure destroying the run it was
+    # reporting on. The escalation is best-effort like every other GitHub
+    # projection in this codebase; the caller decides what an unfiled one
+    # means.
+    try:
+        result = runner(argv, check=False)
+    except Exception:  # noqa: BLE001 - a raising runner must not end the run
+        return ""
+    if getattr(result, "returncode", 1) != 0:
+        return ""
+    number = _extract_issue_number(getattr(result, "stdout", "") or "")
+    # Created, but `gh` printed nothing we could parse a number from. That is
+    # not the same as "not created", and reporting it as such would send the
+    # operator looking for an issue that exists.
+    return number or CREATED_NUMBER_UNKNOWN
+
+
+def _issue_carries_marker(
+    runner: Callable, repo: str, issue_number: int, correlation_id: str
+) -> bool:
+    """True when *issue_number*'s body or comments already carry this marker."""
+    marker = _correlation_marker(correlation_id)
     result = runner(
         [
-            "gh", "issue", "create",
+            "gh", "issue", "view", str(issue_number),
             "--repo", repo,
-            "--title", f"[{correlation_id}] {issue_summary}",
-            "--body", body,
-            "--label", NEEDS_HUMAN_LABEL,
-            "--label", category,
-            "--assignee", assignee,
+            "--json", "body,comments",
         ],
-        check=True,
+        check=False,
     )
-    return _extract_issue_number(result.stdout)
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return False
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return False
+    if not isinstance(data, dict):
+        return False
+    if marker in (data.get("body") or ""):
+        return True
+    for comment in data.get("comments") or []:
+        if isinstance(comment, dict) and marker in (comment.get("body") or ""):
+            return True
+    return False
+
+
+def annotate_escalation(
+    issue_number: int,
+    correlation_id: str,
+    *,
+    category: str,
+    repo: str,
+    done_so_far: str,
+    issue_summary: str,
+    decision_needed: str,
+    why_not_auto: str,
+    options: list[tuple[str, str, str]],
+    recommendation: str,
+    assignee: str = DEFAULT_ASSIGNEE,
+    runner: Optional[Callable] = None,
+) -> int:
+    """Record a needs-human escalation **on the issue it is about**.
+
+    Same six-part body as ``emit_escalation``, posted as a comment on
+    *issue_number*, which is then labelled ``needs-human`` + *category* and
+    assigned to the operator. Returns *issue_number*.
+
+    Filing a separate tracking issue -- what this replaces for any caller that
+    knows the issue -- costs the reader a correlation step for no gain, and a
+    halt that recurs files another one each time: one live run left three
+    tracking issues for a single bug and then re-triaged its own reports as
+    bugs to fix. The rule this encodes: **an escalation about an issue belongs
+    on that issue.** ``emit_escalation`` stays for escalations that are about
+    no issue -- a gate review, a queue entry with no feature folder.
+
+    Idempotent on the comment: a second call for the same *correlation_id*
+    finds its marker in the body or an existing comment and posts nothing, but
+    still re-asserts the labels and assignee, so a first call whose label write
+    failed is repaired rather than left half-applied.
+
+    Labelling and assigning are best-effort and never raise (#1785's rule: the
+    record is the verdict, the label is a projection of it). Only the comment,
+    which is the record itself, is written with ``check=True``.
+    """
+    runner = runner if runner is not None else _default_runner
+
+    if not _issue_carries_marker(runner, repo, issue_number, correlation_id):
+        body = render_escalation_body(
+            correlation_id,
+            category=category,
+            done_so_far=done_so_far,
+            issue_summary=issue_summary,
+            decision_needed=decision_needed,
+            why_not_auto=why_not_auto,
+            options=options,
+            recommendation=recommendation,
+        )
+        runner(
+            ["gh", "issue", "comment", str(issue_number), "--repo", repo, "--body", body],
+            check=True,
+        )
+
+    edit_argv = [
+        "gh", "issue", "edit", str(issue_number),
+        "--repo", repo,
+        "--add-label", NEEDS_HUMAN_LABEL,
+        "--add-label", category,
+    ]
+    # Assign only when one is configured -- `--assignee ""` fails the same way
+    # an unassignable placeholder did (#1762).
+    if assignee and assignee.strip():
+        edit_argv += ["--add-assignee", assignee.strip()]
+    _try_run(runner, edit_argv)
+
+    return issue_number
+
+
+def _try_run(runner: Callable, argv: list) -> bool:
+    """Run *argv*, swallowing any failure. Returns whether it succeeded.
+
+    For projections of a record that is already written — a label, an
+    assignee. Losing one must not lose the record itself (#1785).
+    """
+    try:
+        result = runner(argv, check=False)
+    except Exception:  # noqa: BLE001 - a projection failure must not lose the record
+        return False
+    return getattr(result, "returncode", 1) == 0

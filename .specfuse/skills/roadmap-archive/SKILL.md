@@ -16,7 +16,7 @@ with a back-link, and shrinks the hot roadmap file.
   still has an inline detail section (batch mode with confirmation)
 - When the user says "archive feature X", "move X to the archive",
   "clean up the roadmap", or "the roadmap is too long, archive the done features"
-- **Note:** As of FEAT-2026-0010 Gate 2, `loop.py` automatically archives a
+- **Note:** As of FEAT-2026-0010 Gate 2, the driver automatically archives a
   feature's detail section when it flips `PLAN.md` status to `complete`. Manual
   invocation of this skill remains valid for back-filling older features or
   correcting a failed auto-archive.
@@ -71,59 +71,32 @@ Read `.specfuse/roadmap.md`. Locate the table row whose first cell is
   `active`, `blocked`, or `deferred`) → `FEAT-YYYY-NNNN: refused (status=<status>)`.
   Archive only terminal features; a parked or blocked feature is still live.
 
-### Step 2 — Extract the inline detail section
+### Steps 2–5 — Run the archiver
 
-Locate the line that begins exactly `## FEAT-YYYY-NNNN — ` (at column 0).
-If no such line exists → `FEAT-YYYY-NNNN: already archived` (stop).
-
-Take from that heading through the line immediately before the next `## `
-heading at column 0 (or through EOF). Strip trailing blank lines, preserving
-one final newline.
-
-**Include a preceding `<a id="feat-yyyy-nnnn"></a>` anchor** if one sits on the
-line immediately above the heading (a live feature blocked via `/block-feature`
-gets one so intra-page `#feat-…` links resolve). Extend the extracted span
-upward to swallow it, so Step 5 removes it from `roadmap.md` rather than leaving
-an orphan anchor pointing at a section that has moved to the archive. Step 3
-re-emits the canonical anchor above the section in the archive file, so the
-link target travels with it — do not emit a second one.
-
-### Step 3 — Append to archive
-
-Read `.specfuse/roadmap-archive.md`. Locate the marker line:
+Invoke the CLI for the target feature:
 
 ```
-<!-- Archived sections appended below -->
+python3 -m specfuse.loop.roadmap_archive FEAT-YYYY-NNNN
 ```
 
-After that marker, insert:
+This runs `auto_archive_feature` — the archiver reconciles cross-references and the
+status marker; see `auto_archive_feature` in `specfuse/loop/loop.py` for the
+mechanics. Do not re-derive the anchor format, the back-link format, or the
+archive-file edit by hand — the CLI is the one place that logic lives.
 
-```
-<blank line>
-<a id="feat-yyyy-nnnn"></a>
-<the extracted section>
-```
+The command prints one of three outcomes:
 
-Write the updated content back to `.specfuse/roadmap-archive.md`.
-
-### Step 4 — Update the `Detail` cell
-
-In the table row for `FEAT-YYYY-NNNN`, replace the `Detail` cell content
-(currently `—`) with:
-
-```
-[→ archive](roadmap-archive.md#feat-yyyy-nnnn)
-```
-
-### Step 5 — Remove the inline section
-
-Remove the extracted section (Step 2) from `.specfuse/roadmap.md`. Normalize
-any run of three or more consecutive blank lines down to two. Write the
-updated content back.
+- `FEAT-YYYY-NNNN: archived` — the section moved and the `Detail` cell was
+  updated.
+- `FEAT-YYYY-NNNN: already archived` — no-op, zero file edits.
+- `FEAT-YYYY-NNNN: refused: <reason>` — no file edits; the CLI declined
+  (exit code 1). Surface the reason to the operator rather than reporting
+  success.
 
 ### Step 6 — Report
 
-Emit: `FEAT-YYYY-NNNN: archived`
+Relay the CLI's outcome line verbatim: `FEAT-YYYY-NNNN: archived`,
+`FEAT-YYYY-NNNN: already archived`, or `FEAT-YYYY-NNNN: refused: <reason>`.
 
 ## Algorithm — `--auto` mode
 
@@ -138,7 +111,7 @@ Emit: `FEAT-YYYY-NNNN: archived`
    holding a **folder path** (e.g. `features/FEAT-…/`, an older convention) is
    orthogonal to whether the inline prose was archived — gating on `Detail ==
    —` silently skips those done features and leaves their prose inline forever
-   (#102). Step 4 rewrites whatever the `Detail` cell holds (`—` *or* a folder
+   (#102). The CLI rewrites whatever the `Detail` cell holds (`—` *or* a folder
    path) to the back-link; the feature folder stays discoverable at its
    conventional `.specfuse/features/FEAT-…/` path.
 2. If none match: report `No features eligible for archiving.` and exit.
@@ -154,7 +127,9 @@ Emit: `FEAT-YYYY-NNNN: archived`
 4. Read the user's reply. On anything other than `y`/`yes` (case-insensitive):
    exit without any file changes.
 5. For each eligible feature in table order, run Steps 1–6 of the
-   single-feature algorithm.
+   single-feature algorithm — Step 1's guard checks locally, then the CLI
+   invocation for Steps 2–5. A `refused: <reason>` outcome for one feature
+   does not stop the batch; report it and continue to the next.
 6. After all features processed, emit the final line count of
    `.specfuse/roadmap.md`:
 

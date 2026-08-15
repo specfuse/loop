@@ -1,0 +1,56 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Add the per-criterion state schema and its parser/renderer",
+          "id": "FEAT-2026-0056/T01",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Pre-create the criteria-state artifact on every close dispatch",
+          "id": "FEAT-2026-0056/T02",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Refuse a close whose criteria-state artifact is malformed",
+          "id": "FEAT-2026-0056/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document the per-criterion state contract and re-baseline the roadmap claim",
+          "id": "FEAT-2026-0056/T04",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs, and the contract-change list",
+          "id": "FEAT-2026-0056/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the incremental re-close policy",
+          "id": "FEAT-2026-0056/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Close gate 2 \u2014 terminal close for FEAT-2026-0056",
+          "id": "FEAT-2026-0056/G2-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

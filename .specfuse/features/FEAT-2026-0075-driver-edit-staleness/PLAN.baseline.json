@@ -1,0 +1,50 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Detect a driver-editing diff from a commit's changed paths",
+          "id": "FEAT-2026-0075/T01",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Warn the moment a driver-editing unit's squash lands",
+          "id": "FEAT-2026-0075/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Summarize driver staleness at gate completion and record it as an event",
+          "id": "FEAT-2026-0075/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 retrospective, lessons, docs, and the contract-change list",
+          "id": "FEAT-2026-0075/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the arm-time refusal and the sanctioned hold",
+          "id": "FEAT-2026-0075/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Close gate 2 \u2014 terminal close for FEAT-2026-0075",
+          "id": "FEAT-2026-0075/G2-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

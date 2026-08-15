@@ -1,6 +1,6 @@
 ---
 name: pick-feature
-description: "Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, loop.py if gate 1 is detailed). The human picks; the skill executes the pick."
+description: "Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, `specfuse run` if gate 1 is detailed). The human picks; the skill executes the pick."
 ---
 
 <!--
@@ -72,7 +72,7 @@ roadmap, this skill is solving nothing — just start it.
   (`planned` / `active` / `blocked` / `deferred` / `done` / `abandoned`) and
   one-line goal are the primary input.
 - **Durable lessons, sliced, not the whole file.** Run
-  `python3 .specfuse/scripts/learnings_query.py "<query>" --top 15`
+  `python3 -m specfuse.loop.learnings_query "<query>" --top 15`
   rather than reading `.specfuse/LEARNINGS.md` whole. Because this
   skill ranks 2-3 candidate features, not one, there is no single
   feature query — build `<query>` as the **concatenated one-line
@@ -176,24 +176,29 @@ When the user picks a candidate by number (or by ID):
 - **Print the next command:**
   - If no feature folder exists for the pick: `Run /draft-feature
     to author the feature folder.`
-  - If a folder exists with gate 1's WUs detailed: `Run python3
-    .specfuse/scripts/lint_plan.py .specfuse/features/<folder> &&
-    python3 .specfuse/scripts/loop.py --dry-run to verify, then
-    python3 .specfuse/scripts/loop.py to start dispatching.`
+  - If a folder exists with gate 1's WUs detailed: `Run specfuse run to
+    start dispatching.` (Mention `specfuse lint .specfuse/features/<folder>`
+    and `specfuse run --dry-run` only if the user asks how to check first.)
   - If a folder exists but gate 1 isn't detailed: `Run /draft-feature
     to fill in gate 1's WUs.`
 - **If another feature is `active`,** the skill flipped the pick to
   active too — the loop driver requires `--feature` to disambiguate
   when more than one is active. Surface this in the output: `Note: N
-  features are now active. Either pass --feature to loop.py, or
+  features are now active. Either pass --feature to `specfuse run`, or
   demote one of {list} via roadmap.md and its PLAN frontmatter.`
 
 If the user says "skip — I'll pick later" or "none — show me more,"
 exit without modifying anything.
 
-End with the RESULT block defined in
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the user picked, the status flip(s) wrote,
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the user picked, the status flip(s) wrote,
 and the next-command instruction printed. `status: blocked` is used
 only if the roadmap edit could not be applied (e.g. the roadmap row
 isn't in the expected format and the linter would reject the edit).

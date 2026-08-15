@@ -297,6 +297,22 @@ def _parse_table_rows(lines) -> list:
     return rows
 
 
+def roadmap_statuses(repo_root=None) -> dict:
+    """Map FEAT-ID -> status string, read from .specfuse/roadmap.md.
+
+    Every feature row — including `done`, `abandoned`, and `deferred` ones —
+    lives in roadmap.md; roadmap-archive.md holds only detail sections, never
+    rows. Returns {} when roadmap.md is absent, rather than raising, so
+    callers (e.g. a policy file present before a roadmap) can skip cleanly.
+    """
+    root = Path(repo_root) if repo_root is not None else Path.cwd()
+    roadmap_path = root / ".specfuse" / ROADMAP_FILENAME
+    if not roadmap_path.is_file():
+        return {}
+    lines = roadmap_path.read_text(encoding="utf-8").splitlines()
+    return {row["id"]: row["status"] for row in _parse_table_rows(lines)}
+
+
 def _detail_sections(lines) -> dict:
     """Map lowercase feat id -> (heading_idx, body_start_idx, body_end_idx).
 

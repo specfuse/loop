@@ -183,9 +183,15 @@ FEAT-YYYY-NNNN: blocked
 When any blocker is a feature, add: `Resume with /block-feature FEAT-… --unblock
 once <blocker> clears.`
 
-End with the RESULT block per
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means every planned write landed; `status: blocked` only if a
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means every planned write landed; `status: blocked` only if a
 roadmap edit could not be applied (row not in expected format).
 
 ## Unblock

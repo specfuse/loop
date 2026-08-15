@@ -23,6 +23,7 @@ status: open        # open | awaiting_review | passed
 - Generalizable lessons are promoted to `.specfuse/LEARNINGS.md`.
 - Documentation and roadmap status reflect what was actually built.
 - The next gate's work units are drafted, and `GATE-NN-REVIEW.md` is written.
+- Per-criterion state and the narrow/broad oracle contract: `close-discipline.md` §5.
 
 The closing sequence (retrospective → lessons → docs → plan-next) is part of every
 gate and is enforced by the linter. The driver runs the gate unattended, then stops

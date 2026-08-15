@@ -380,6 +380,9 @@ def _check_cron_dialect(target: dict, where: str, t_index: int) -> list[str]:
 def main() -> int:
     import argparse
 
+    from specfuse.loop.build_provenance import warn_if_out_of_tree
+    warn_if_out_of_tree()
+
     parser = argparse.ArgumentParser(
         description="Specfuse monitoring-schema linter.",
         usage="lint_monitoring.py [path/to/monitoring.yml]",

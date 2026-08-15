@@ -777,30 +777,35 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and-CI-re-fail cycles + a re-arm cycle = ~$5 in agent costs and
   three days of methodology rounds.
 
-- [FEAT-2026-0013/G1-CLOSE] Global git config can ambush WU
-  dispatch. A developer machine carrying `commit.gpgsign=true` +
-  `gpg.format=ssh` GLOBALLY (the default for some setups) will
-  fail any `git commit` inside a dispatched agent session when no
-  ssh-agent is reachable in the session's environment. The failure
-  surfaces as `gpg failed to sign the data` / exit 128 inside any
-  test fixture that runs `git commit`, including
-  `_minimal_git_repo()` helpers. The agent — correctly — emits
-  `status: blocked` rather than scope-creep into the test file,
-  burning a dispatch cycle. Recovery is an operator-side
-  `git config --local commit.gpgsign false` (working-copy only;
-  preserves the global setting for the operator's own commits).
-  FEAT-2026-0013 v3-attempts-1 and 2 burned $4.70 / 2552s on this
-  block before the operator disabled it locally. Rule: every WU
-  spec that requires `git commit` inside a temp-repo test fixture
-  MUST also (a) set `commit.gpgSign=false` on the temp repo
-  (`git -C <root> config commit.gpgSign false` right after
-  `git init`), AND (b) document in the feature folder's PLAN.md or
-  RETROSPECTIVE.md that the operator must verify
-  `git config --get commit.gpgsign` returns `false` or empty in
-  the repo's working copy BEFORE the first dispatch. The skill-side
-  remedy is to extend `init.sh` or `/wrap-feature` with a preflight
-  check on the operator's global gpg config; until that lands, this
-  is a known dispatch-time foot-gun.
+- [FEAT-2026-0013/G1-CLOSE; FEAT-2026-0040/G2-CLOSE-INTERMEDIATE; FEAT-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors; FEAT-2026-0059/G1-CLOSE/signing-agent-in-sandbox]
+  **`git commit` exiting 128 inside a throwaway temp repo is host config or the sandbox, not
+  a regression — and four separate features each paid to rediscover that.** Signature:
+  `error: Couldn't get agent socket?` or `gpg failed to sign the data`, then
+  `fatal: failed to write commit object`, exit 128, from a `git commit` inside a
+  `TemporaryDirectory` fixture. Cause: `commit.gpgsign = true` with `gpg.format = ssh` is set
+  in the operator's GLOBAL config, and the signing agent's unix socket is unreachable from a
+  dispatched or sandboxed session. Confirmed both ways — re-running under
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false` passes, and
+  the same modules pass unsandboxed. Cost: FEAT-2026-0013 burned $4.70 / 2552s across two
+  attempts before an operator disabled it locally; three consecutive WUs of FEAT-2026-0041
+  each re-established it independently; FEAT-2026-0040 and FEAT-2026-0059 hit it again after
+  that entry was written. **This merged entry exists because four tags nobody reads together
+  failed to stop the fifth rediscovery.** Rules. (a) A fixture that builds a scratch repo pins
+  `commit.gpgsign` and `tag.gpgsign` to false alongside `user.name`/`user.email` —
+  `git -C <root> config commit.gpgSign false` right after `git init`. (b) Before recording a
+  red gate as a regression, ask whether the failing command reads ambient host config, and
+  reproduce the primitive in isolation (`git init` + `git commit` in a temp dir): a
+  sandbox- or config-caused failure reproduces there with zero test code involved. (c) When a
+  sandboxed suite reports errors whose tracebacks are all `git` subprocess calls against temp
+  directories, re-run just those modules unsandboxed and quote that as the evidence rather
+  than bisecting the change under test. (d) This is a DIFFERENT failure from the
+  `mktemp`/sandbox one — that is the executor lacking a filesystem privilege, this is host
+  configuration leaking into a fixture, and they need different fixes. (e) Sibling trap in the
+  opposite direction ([FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the
+  unsandboxed re-run that clears these false reds is also the run where credential-gated live
+  tests stop skipping and reach the real external system. The sandbox boundary silently
+  changes which tests are meaningful, and a close that re-runs oracles crosses it in both
+  directions.
 
 - [FEAT-2026-0013/G1-CLOSE] FEAT-2026-0008's `files_changed` diff
   guard is recursively validated. During FEAT-2026-0013 v3-attempt-3
@@ -1859,15 +1864,24 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   duplicate each other's work, which is a `verification.yml` authoring concern rather than a
   driver one.
 
-- [FEAT-2026-0051/G1-CLOSE] A driver change to dispatch control flow does NOT take effect for
-  the run that writes it: Python loads the driver module once at process start, and
-  gate-entry code has already executed before the first WU is dispatched. This cuts both
-  ways, so state it explicitly in any self-hosting hazard note. It defuses the hazard — a WU
-  editing the dispatch path cannot break the run dispatching it — and it equally invalidates
-  self-hosting as EVIDENCE: a feature cannot cite "it ran against our own gates" when the
-  probe it added never executed. Phrase such notes as "takes effect on the NEXT driver
-  invocation," and plan a separate observation point if the self-hosted run is meant to be
-  part of the acceptance evidence.
+- [FEAT-2026-0051/G1-CLOSE; FEAT-2026-0053/G1-CLOSE; FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]
+  **Python loads the driver once at process start, so a work unit's edit to `loop.py` is dead
+  code for everything that same run dispatches afterwards — including the close armed to
+  verify it.** Observed in its most expensive form in FEAT-2026-0057: T04 wired a pre-dispatch
+  hook correctly in one attempt with eight passing tests, and the very next unit dispatched was
+  the close designed to read the injected output — whose prompt carried none. Timestamps were
+  decisive. Three consequences, each of which a separate feature had to learn on its own.
+  (a) **It defuses the hazard**: a WU editing the dispatch path cannot break the run
+  dispatching it. (b) **It equally invalidates self-hosting as evidence**: a feature cannot
+  cite "it ran against our own gates" when the probe it added never executed — phrase such
+  notes as "takes effect on the NEXT run". (c) **A gate whose definition of done asserts
+  driver runtime behavior must name its observation point**, and an absent signal must never
+  be read as a false claim; sequence a driver restart between the wiring unit and its proof,
+  or the proof measures the old code. Note that FEAT-2026-0075 later shipped a control for
+  this (the `driver_restart_required` halt on a squash touching `specfuse/loop/`), which
+  detects the hazard rather than removing it — the rules above still govern how a gate is
+  planned around it.
+
 - [FEAT-2026-0039/T04] A work unit that enumerates N hand-maintained "surfaces" in prose
   will get the enumeration missed, and the miss costs a whole attempt. T04's body listed
   five seeding surfaces in a numbered block with a per-surface explanation of what breaks
@@ -2370,23 +2384,6 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   inputs via `git ls-files` rather than naming paths. When the close re-ran it, the sweep
   collected 14 targets across 4 files — but one of those files, `tests/test_heartbeat_adapter.py`,
   did not exist when T04 ran: T07 created it later in the same gate, and it carries the
-  tree's only instance of the second dialect. A hand-written tuple would have gone on
-  reporting "zero non-conforming" while never once looking at the file that exercises the
-  case the enum was added for. Rule: a migrate-step criterion asserts over a **discovered**
-  file set, and is paired with a non-vacuity assertion (collected count above a floor, plus
-  named files that must appear) so "zero offenders" cannot be satisfied by an empty walk.
-  Corollary for closes: re-run the sweep rather than inheriting the producing WU's pass —
-  the tree it swept is not the tree at close time, and only the fresh run says which one
-  the claim covers.
-
-- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **A test fixture that builds a throwaway git repo
-  must pin every commit-affecting setting, not just identity — otherwise it inherits the
-  host operator's global config and fails for reasons that have nothing to do with the
-  code under test.** `tests/test_autosync_no_cwd_leak.py` sets `user.name` and `user.email`
-  on its temp repos and stops there, so each `git commit` inherited a global
-  `commit.gpgsign = true` with `gpg.format = ssh`, and the signing agent socket is
-  unreachable from a sandboxed session: `error: Couldn't get agent socket?` /
-  `fatal: failed to write commit object`, exit 128, three errors in an otherwise green
   1753-test run. Confirmed by re-running the same module under
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false` → OK. This
   is a **different** failure from the already-recorded `mktemp`/sandbox one: that is the
@@ -2562,23 +2559,6 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   verdict-driven rework as its own line rather than letting it disappear into "passed" attempts,
   and treat a large uniform under-run on rule-authoring work as a prompt to check whether the
   rule has ever been observed firing on a real input.
-
-- [FEAT-2026-0053/G1-CLOSE] **A work unit that wires new code into the driver cannot be
-  verified by the driver run that wired it — so a gate whose definition of done asserts driver
-  runtime behavior must name its observation point, and an absent signal must never be read as
-  a false claim.** The driver imports `loop.py` once at process start. Edits a work unit lands
-  mid-run are dead code for the remainder of that invocation, including for every closing unit
-  that follows. Gate 1 wired two call sites into `run()` (a baseline write at first dispatch, an
-  `arm_predicate_evaluated` emit at every `awaiting_review` flip) and neither could fire in the
-  run that landed them: `PLAN.baseline.json` existed in 0 of 43 feature directories at close
-  time, which is the corroborating tell that the running process predated the edit. The trap is
-  not the deferral — it is the inference the gate file had already written down: *"No event =
-  the claim is false — do not arm; escalate."* That reads a stale-process artifact as a defect
-  and escalates a working mechanism. Rule: when a definition-of-done criterion asserts runtime
-  behavior of the driver itself, write the observation point into the criterion at drafting
-  ("verified at the next driver invocation", "verified by the human at the arming checkpoint"),
-  and phrase any absence check to disambiguate first — did a process launched *after* the
-  commit run this path? Only then is silence evidence.
 
 - [FEAT-2026-0053/G1-CLOSE] **A reference snapshot captured at a lifecycle event is meaningless
   for the feature that installs the capture, because that feature is already past the event.**
@@ -2772,21 +2752,6 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   throwaway temp repo. Three consecutive WUs of one feature each spent attention
   independently establishing this. Rule: when a sandboxed suite reports errors whose
   tracebacks are all `git` subprocess calls against temp directories, re-run just
-  those modules unsandboxed (`python3 -m unittest tests.test_lint_closing
-  tests.test_autosync_no_cwd_leak` → `Ran 11 tests ... OK`) and quote that as the
-  evidence, rather than bisecting the change under test. These two modules are safe
-  to run unsandboxed: both operate exclusively inside `TemporaryDirectory` repos and
-  `chdir` back on exit. Applies to any suite mixing real-`git` fixtures with a
-  sandboxed gate run.
-
-- [FEAT-2026-0041/G1-CLOSE/live-roundtrip-must-name-its-artifact] **A work unit that creates a remote artifact must have
-  the automated TEST report the artifact's identifier, not only the hand-driven
-  probe.** A live-round-trip WU satisfied "report the scratch issue's number" from
-  its manual probe (#327, closed) while the committed unittest independently created
-  and closed a *second* scratch issue whose number appears nowhere. A residue search
-  bounded the risk to zero, but the artifact was unnameable. Rule: when an acceptance
-  criterion asks for a created remote object's identifier, word it as "the test
-  prints the identifier it created" and have the test emit it, so the number survives
   in the run log rather than in whatever the agent happened to do by hand.
 
 - [FEAT-2026-0041/G1-CLOSE/one-renderer-two-callers] **When one format must be identical across two entry
@@ -3062,24 +3027,6 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   because commit signing is configured globally and the signing agent's unix socket is
   outside the sandbox, not because anything under test was broken. All five passed
   unsandboxed. Rule for any session obliged to re-run oracles fresh: before reporting a
-  red, reproduce the failing primitive in isolation (`git init` + `git commit` in a temp
-  dir) — a sandbox-caused failure reproduces there with zero test code involved, and the
-  distinction between "the suite is red" and "the environment is red" is worth the ten
-  seconds every time. Sibling trap, in the opposite direction
-  ([FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the unsandboxed re-run
-  that fixes these false reds is also the run where credential-gated live tests stop
-  skipping and reach the real external system. Both are the same underlying fact — the
-  sandbox boundary silently changes which tests are meaningful — and a close that
-  re-runs oracles crosses it in both directions.
-
-- [FEAT-2026-0064/G1-CLOSE/write-the-compressed-artifact-first] **When a ceremony
-  already produces material that a second audience needs, relocate it instead of
-  commissioning a second write — and write the compressed rendering FIRST, because the
-  order is what decides whether the second surface costs anything.** Every close was
-  already required to enumerate consumer-visible contract changes in prose; nothing
-  collected it, so release notes were re-derived at release time from commit subjects,
-  worse. Relocating it was right. But "it is the same material, not a second write" is
-  imprecise as guidance and this close is the evidence: the *thinking* happens once and
   serves both surfaces, while the *writing* genuinely happens twice, at two compression
   levels — six sentences of context in the retrospective, one clause in the changelog.
   The near-free version is only available in one direction. Writing the one-liners
@@ -3267,33 +3214,6 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   expensive attempt in the feature. Group on `outcome` too. Here that one refused
   attempt was $5.73 of a $19.87 lifetime, 29%, for a missing `CHANGELOG.md` append.
 
-- [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart] **A work unit that edits the
-  driver has no effect on anything the same driver process dispatches afterwards —
-  including the close work unit armed to verify it. Restart the driver between the
-  wiring unit and its proof, or the proof measures the old code.** Observed here in
-  its most expensive form: T04 wired the pre-dispatch hook into `execute_unit_attempt`
-  correctly, in one attempt, with eight passing tests; the very next unit dispatched
-  was the close designed to read the injected output, and its prompt carried none.
-  Timestamps were decisive — the driver process imported `specfuse/loop/loop.py` at
-  13:30:46 UTC (matching `GATE-01.md`'s `baseline.probed_at` to the second), T04's
-  session began at 13:35:25 and ran 1413s, and the close began at 13:58:59. Python
-  caches modules in `sys.modules` at first import, so the `execute_unit_attempt` in
-  memory was the pre-T04 function object with no call site at all. **A deferred import
-  inside the new code does not save you** — deferral moves the *callee's* import to
-  call time, but the call site lives in the stale caller and is never reached. Nothing
-  in the gate can catch this: unit tests, symbol imports, and close-time probes all
-  run in fresh interpreters and all report the new behaviour correctly, which is
-  precisely why the disagreement reads as a mystery instead of an obvious staleness
-  bug. Rules. (a) When any work unit's `produces:` names a driver module, plan a
-  driver restart before the unit that verifies it — treat "restart the loop" as a step
-  in the gate, not an operator afterthought. (b) A close that cannot explain why a
-  driver behaviour it can reproduce in-process did not happen in its own dispatch
-  should check the driver process's start time (`ps -eo pid,lstart,command`) against
-  the wiring unit's `started_at` before writing anything else. (c) This is the
-  self-hosting form of the harness-migration hazard already in this file: there, a WU
-  editing `verification.yml` or the test loader breaks its siblings' oracles; here, a
-  WU editing the dispatch path silently fails to reach them.
-
 - [FEAT-2026-0057/G1-CLOSE/informational-output-has-no-verdict] **Do not run
   informational captured output through a pass/fail verdict selector — it will
   confidently report that the verdict is missing, and tell the reader to go run the
@@ -3376,3 +3296,414 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   is already paying a sequencing tax to prove one unit, that is the cheapest moment
   to also strengthen that unit's own test, because a second sequencing round costs
   the same as the first and the round you are in is already sunk.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/survival-needs-the-whole-path-set] **When a
+  work unit's job is to make state survive a retry, enumerate every path that destroys
+  that state and test against each — the path the plan names is the one the author
+  already thought about, and therefore rarely the one that kills you.** Here the plan
+  named `fold_cumulative_on_rearm` and the unit tested it correctly against the real
+  function; the property was also unfalsifiable, because the fold rewrites work-unit
+  frontmatter and the artifact is a separate file, so no possible fold could have
+  touched it. The path that actually deletes the artifact is the per-attempt reset:
+  the untracked-file snapshot is taken once per work unit *before* the attempt loop,
+  the artifact is created *inside* each attempt, so a failing attempt's cleanup sees
+  it as "appeared since the snapshot" and unlinks it — and it stays untracked until a
+  passing attempt commits it, meaning the state is wiped on exactly the multi-attempt
+  runs it exists to serve. `events.jsonl` survives only because it has an explicit
+  hand-written carve-out in that cleanup. Rules. (a) Write the destroyer list before
+  the test list: for a file, that is at minimum the hard reset, the untracked clean,
+  the regeneration, and any fold; for a field, every writer of its container. (b) Be
+  suspicious of a survival test that passes on the first attempt with no scaffolding —
+  ask what would have to change for it to fail, and if the answer is "nothing
+  reachable", it is a tautology and the real path is untested. (c) An artifact is only
+  as durable as its most recent commit; anything created at dispatch and read across
+  attempts is untracked for its whole useful life.
+
+- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/console-script-is-not-the-tree] **A console
+  script installed into the environment and the source checkout you are editing are two
+  different programs — any sweep, probe, or corpus check must name which one it ran, or
+  it is evidence about neither.** A gate-arming baseline and a work unit's
+  "reports zero findings across every existing feature" criterion both invoked the
+  project's installed CLI entry point, which resolves the package from `site-packages`
+  at whatever version was last pip-installed — in this case an older release that did
+  not contain the requirement being measured. Both reported the expected zero, and both
+  would have reported it had the work unit shipped nothing at all. The repo's own
+  script shims path-insert the repo root and do resolve from source, so the correct
+  command existed and was one character-class away from the one used. Rules. (a) In a
+  repo that both ships a CLI and dogfoods it, prefer the from-source invocation in
+  every acceptance criterion, and say in the criterion which one it is. (b) A
+  "zero findings over corpus C" criterion needs a positive control: run the check
+  against one input you know should fire, and paste that too — a sweep that cannot
+  distinguish "correctly silent" from "not running" has measured nothing. This is the
+  same shape as [FEAT-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
+  run, here it was run against the wrong binary.
+
+- [FEAT-2026-0056/G2-CLOSE/evidence-clause-needs-its-own-oracle] **When an acceptance
+  criterion names both a property and the place that must assert it — "X holds, asserted
+  in <module>" — the oracle that runs <module> cannot detect that the assertion is
+  missing, because a module with no assertion about X passes whether or not X holds. The
+  evidence clause needs an oracle of its own.** Here a unit was required to keep an
+  existing carve-out intact "asserted in the same test module"; the carve-out was intact,
+  the module was green, and the module contained one test that constructed the relevant
+  path, passed it to the function under test, never created the file and never asserted
+  on its survival. Every oracle the unit declared reported pass, and so did the driver's
+  produces-vs-diff guard, because the source really was edited. Only the close's own
+  re-run caught it, and only because it read the test rather than running it. Rules.
+  (a) Write two-clause criteria as two criteria, each with its own oracle — the property
+  gets a behavioural probe, the evidence clause gets a countable one
+  (`grep -c 'def test_'`, an assertion count, a coverage delta on the specific branch).
+  (b) Treat "still works / still intact / unchanged" criteria as the high-risk class:
+  they are satisfied by the absence of a regression, and absence is what a missing test
+  also looks like. (c) A close re-running a producing unit's oracle should ask what the
+  oracle would report if the deliverable were absent — if the answer is "the same
+  thing", the oracle is measuring nothing.
+
+- [FEAT-2026-0056/G2-CLOSE/a-cache-cannot-prove-itself-on-attempt-one] **A feature whose
+  value is that a second run is cheaper than the first cannot be demonstrated by its own
+  terminal close, because that close is a first run: its carried-forward set is empty by
+  construction, not by defect. Plan the gate to measure wiring, and hand the saving to a
+  falsifiable prediction instead.** Recorded state, memoized results, incremental
+  regeneration, warm caches and skip policies all share this shape — the mechanism reads
+  state a *prior attempt* wrote, and on attempt 1 no prior attempt exists, so every
+  correct implementation and every broken one produce the identical empty result. Here
+  the close's own dispatch was the designed experiment; it received the section, the
+  section was correct, and it carried 0 of 44 criteria forward, because the artifact is
+  seeded with exactly the fields the carry-forward predicate requires to be absent. Rules.
+  (a) Do not write an acceptance criterion asserting a non-empty cache hit in a close
+  that will run as attempt 1 — it is unsatisfiable, and a unit that must report "empty"
+  to be honest reads as a failure to everyone who skims it. Say in the criterion that an
+  empty result is a legitimate answer, and why. (b) Verify the mechanism on synthetic
+  state instead: drive the partition and the renderer over hand-built entries covering
+  every branch, which *is* checkable at attempt 1. (c) Close with the prediction rather
+  than the measurement — record the exact counts the next attempt's prompt must print
+  ("37 carried forward, 7 re-verify, 3 oracle groups"). That is a cheap, dated, falsifiable
+  claim, and it converts an unmeasurable close into one that a later run either confirms
+  or refutes for free.
+
+- [FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control] **A
+  hazard whose only mitigation is a written instruction that a human must remember to
+  execute is unmitigated. Promoting the rule, citing it verbatim in the gate, and
+  building the tooling that detects the hazard all leave the failure rate unchanged,
+  because none of them is the thing that has to happen at the moment it has to
+  happen.** The evidence is the fourth occurrence, and it landed on the close of the
+  feature written to fix the first three. `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]`
+  was already in this file. Its gate file quoted it, named the two features it had
+  already cost money (a $5.33 close, then three attempts and $3.66 in a
+  `spinning_detected` escalation), set the restart in bold as REQUIRED operator
+  action, and armed the close's criterion 1 to detect a missed restart. The restart
+  still did not happen: the process that dispatched the close was the same process
+  that had probed the gate's baseline ninety minutes before the first work unit ran,
+  identifiable because the gate's `baseline.probed_at` matched its start time to the
+  second. Every producing unit was green, all 31 acceptance criteria passed a fresh
+  re-run, and the feature's own detection code — a warning, a gate summary, and a new
+  event type — executed exactly zero times, because the process running the gate had
+  cached the pre-edit modules at import. The lesson is not "restart the driver"; that
+  rule existed and was consumed. It is that **detection and instruction are not
+  controls, and a close's criterion that merely *checks* a precondition converts a
+  silent wrong answer into an honest blocked one without raising the odds the
+  precondition is ever met.** Rules. (a) When a hazard has recurred with the rule
+  already promoted, stop writing rule text — the next artifact must be a control that
+  fires without anyone remembering it: the driver refusing to dispatch a close whose
+  gate contains a work unit that edited the driver after this process started, or
+  re-execing itself. Warn-only detection is a diagnostic, and the third recurrence is
+  the evidence that diagnostics were never the gap. (b) Do not let a gate's own design
+  depend on the operator action the gate exists to make unnecessary. A feature that
+  requires a manual restart in order to observe the code that automates away the
+  manual restart cannot demonstrate itself; plan the observation on a *separate*
+  feature's run, or on a subprocess the gate spawns itself, and say in the gate that
+  the in-situ observation is expected to be unavailable. (c) Prefer a precondition the
+  process can enforce on itself to one a human must satisfy between two dispatches.
+  Where the enforcing change is out of scope, the honest gate output is "unverified in
+  situ, predicted as follows" with a falsifiable prediction the next run confirms for
+  free — not a claim carried on seam tests that were never composed.
+
+- [FEAT-2026-0075/G2-CLOSE/a-control-closes-the-loop-a-diagnostic-cannot-close-its-own] **A
+  control that fires without anyone remembering it does close the loop a promoted rule
+  leaves open — but it cannot cover the gate that builds it, so the last manual
+  execution of the rule is always the one that ships the control. Plan for that
+  occurrence instead of hoping it will not happen.** This is the answer to the question
+  `[FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]`
+  posed, and it carries the negative half. **The positive half.** Replaying five
+  recorded occurrences of the same hazard — a work unit editing the driver, then the
+  same process dispatching more units that execute the pre-edit modules — through the
+  shipped squash-diff halt, all five stop at the *first* driver-editing unit, several
+  dispatches ahead of the close where the money was actually lost ($5.33, then $3.66 in
+  a spinning escalation, then $9.32). A sweep of 90 gates shows the control silent on
+  the 48 that never edit the driver: it costs one re-run of a command the operator
+  already ran, and only on gates that would otherwise produce a false verification.
+  Detection had been shipped one gate earlier, was correct, and prevented none of them.
+  **The negative half, which is the part worth keeping.** The gate that shipped the
+  control still required the manual restart, because the halt is not live in the
+  process that writes it — and the first attempt at that gate's own close *did* skip
+  the restart, burning $9.32 across three attempts that produced nothing but a
+  per-criterion state file. Every control of this shape has an irreducible last manual
+  occurrence: the one on its own gate. Rules. (a) When planning the gate that ships a
+  self-enforcing control, budget for the hazard firing one final time **on that gate**
+  and write the recovery into the plan (re-arm, restart, one extra close) rather than
+  writing "REQUIRED, operator action" in bold and treating the bold as mitigation —
+  that phrasing has now failed twice in this repository with the rule promoted both
+  times. (b) A close's precondition check is worth having anyway: it converts a silent
+  wrong answer into an honest blocked one, and the blocked answer is what forced the
+  restart that made the terminal close truthful. It raises the odds of a correct
+  observation not at all — only the odds of an honest one. (c) Do not size the
+  shipping gate's budget from the pre-control gate's actuals; the wiring unit at the
+  dispatch seam came in at 3.2x its estimate, and the close ran twice.
+
+- [FEAT-2026-0075/G2-CLOSE/a-control-retires-the-diagnostic-that-reported-it] **Shipping
+  a control that prevents a hazard usually makes the diagnostic that reported it
+  unreachable, and nothing tells you — the tests still pass, because they assert the
+  diagnostic's behaviour and not its reachability.** Gate 1 shipped a gate-completion
+  summary that named every driver-editing unit in a gate plus the units dispatched
+  after them, and emitted an event carrying the same. Gate 2 shipped a halt that stops
+  the run at the first such unit. The summary's input list is accumulated **per
+  process**; once the halt is live, the gate always finishes under a *fresh* process
+  whose list is empty, so the summary prints nothing and the event is never emitted.
+  Both are now reachable only when the gate's *final* unit edits the driver, or on a
+  driver too old to carry the halt. Every test of the summary still passes — they drive
+  it with a non-empty list. Rules. (a) When a gate makes an earlier gate's hazard
+  impossible, explicitly ask what the earlier gate's *reporting* path now sees, and put
+  the answer in the retrospective; it is a question no acceptance criterion asks,
+  because each gate's criteria only look forward. (b) State-accumulated-in-a-process is
+  the smell: any list built during a run and read at the end of it is silently emptied
+  by anything that makes the run restart. Rehydrating from the durable log
+  (`events.jsonl`) at read time costs little and survives the restart the control now
+  mandates. (c) A superseded diagnostic is not automatically a defect — the halt's own
+  event is strictly more informative than the summary — but leaving it undeclared means
+  the next reader finds shipped, tested, dead code and cannot tell whether it is
+  intentional.
+
+- [FEAT-2026-0045/G1-CLOSE/declare-precedence-between-redundant-records] **When one fact
+  needs two records — a machine-readable one and a human-visible one — the cheap fix is
+  not to cut one, it is to declare which one WINS and make the other a projection of it.**
+  The standing objection to storing a fact twice is that the copies drift. The usual
+  response is to pick one surface and lose the other's benefit; the better response is
+  three declarations made at plan time, before any code: (a) which record is
+  authoritative, (b) that the other is a projection re-derived from it, never
+  independently authored, and (c) the WRITE ORDER, which follows from (a) rather than
+  being a style choice. Worked example: a triaged issue carries both an authoritative body
+  marker and a category label. The marker wins on disagreement, the label is a projection,
+  and the marker is written first — so a failed label write leaves an issue correctly
+  triaged and merely lacking a swatch, while the reverse order would have produced an
+  issue that is labelled and still scans as untriaged, i.e. triaged and not-triaged at
+  once. Re-labelling then becomes idempotent repair rather than a second source of truth.
+  Rules. (a) State precedence and write order in the plan, not in the implementation WU —
+  by implementation time it reads as an arbitrary detail and gets reordered. (b) The
+  projection's absence must be tolerable by construction: if losing it breaks the
+  consumer, it was never a projection. (c) Look for the pattern already in the codebase
+  before inventing it — this repository's `autofix_state.has_prior_attempt` had been
+  locating an issue by label and then re-checking the body marker client-side, precisely
+  so a coincidental label match never reads as a hit, which is this rule with the
+  reasoning left implicit.
+
+- [FEAT-2026-0045/G1-CLOSE/verb-check-table-earns-its-cost] **A roadmap row's verbs are
+  claims about mechanisms that may not exist; grep each one at plan time and put the
+  verdicts in a table.** The practice came from `[FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/
+  roadmap-row-verbs-are-claims]`; this is the measurement of whether it pays. On this
+  feature four verbs were checked ("queued for fix-bug", "recognizes harvester-created
+  issues", "labeled", "behind an `auto` dial") and **one of the four was backed by nothing
+  that exists** — the dial's config file was an unbuilt future feature. Catching it at
+  plan time produced a settled design decision (the dial ships as a function argument, and
+  the unbuilt feature wires its file to the parameter later); catching it at implementation
+  time would have produced a blocked WU and a re-attempt. One in four is a high enough hit
+  rate to justify the table's cost on any feature drafted from a roadmap row written more
+  than a few weeks earlier. **Recommendation for whoever next edits
+  `.specfuse/rules/planning-discipline.md`:** promote the verb-check table from a
+  remembered practice to a standard, named section of that rule alongside the existing
+  numbered checks, so it is performed by default rather than by whoever happens to recall
+  it. That edit is a rule change and is deliberately not made here.
+
+- [FEAT-2026-0045/G1-CLOSE/script-produced-paths-are-not-declarable-until-the-script-ran]
+  **A path that a helper script generates is not declarable in `files_changed` until you
+  have actually run that script in this attempt.** A WU authored a skill at its canonical
+  location, correctly declared the canonical path and the vendored copy, and also declared
+  the discovery symlink that the repo's sync script creates — without having run the sync
+  script. The driver's files-changed guard failed the attempt on an unchanged path, and
+  the re-attempt cost 23% of the feature's implementation spend on a deliverable that was
+  otherwise finished. Rules. (a) When a WU's `produces:` list mixes hand-authored files
+  with script-generated ones, run the generator BEFORE composing the RESULT block, not
+  after — the block is a claim about the tree as it stands. (b) A WU body that says "run
+  the sync script" should say it in the acceptance criteria, where it is checked, rather
+  than only in the prose, where it is read once. (c) The guard is doing its job: the
+  alternative to a failed attempt here is a WU reporting `done` on a path that does not
+  exist, which is strictly worse and much harder to find later.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test] **When "produce
+  nothing" is a designed first-class outcome, at least one test must distinguish
+  absence-because-there-was-no-evidence from absence-because-the-lookup-failed.** A test
+  that only asserts a key is missing passes identically for both, and the second is a
+  defect wearing the first's clothes. Worked example: a proposer whose whole premise is
+  "propose only what the repository can answer, never a guess" resolved its input path
+  after building a scratch directory from it, so for any relative root the evidence walk
+  found nothing and every budget proposal was silently withheld — reported as "this
+  repository has no history" when the truth was "the code could not see the history."
+  Twelve acceptance criteria passed. Rule: pair every absence assertion with a presence
+  assertion over the SAME code path differing only in the data (same path shape, history
+  vs no history), so the test fails when the mechanism breaks rather than only when the
+  policy changes. The general form: an assertion that something is missing is only
+  evidence when you have separately shown the same call CAN find it.
+
+- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/fixtures-that-share-an-incidental-property]
+  **A fixture set that unanimously shares a property nobody chose cannot fail on that
+  property — enumerate what your fixtures have in common before trusting their green.**
+  Every fixture in the case above built its repository under `tempfile.TemporaryDirectory()`
+  and passed the resulting ABSOLUTE path in; not one exercised a relative path, a `./`, or
+  a `../`, because absolute-tempdir is what the idiom hands you, not a decision anyone
+  made. The defect lived exactly in the gap. Rules. (a) At authoring time, list the
+  properties every fixture shares (path shape, encoding, ordering, size, clock) and ask
+  which of them the code under test actually reads — those are your missing cases. (b)
+  Argument-shape variation is cheap and belongs beside data variation: if a parameter
+  accepts `str | Path | None`, absolute and relative, at least one fixture should be each.
+  (c) A hygiene WU that fixes this costs a fraction of a rewrite — here $0.77, 11% of the
+  gate's implementation spend — but only if review catches it before the next WU builds
+  prose on top of the wrong behaviour.
+
+- [FEAT-2026-0076/G2-CLOSE/a-precedence-computed-summary-field-collapses-combinations]
+  **A single summary field computed by precedence over N conditions cannot distinguish the
+  cases where two of those conditions hold at once — so a criterion demanding "these
+  outcomes must be distinguishable" is met by the whole returned entry, never by the
+  summary field alone.** Worked example: a review function classified each key as
+  `matches_baseline` / `differs_from_baseline` / `absent_from_file` /
+  `baseline_unavailable`, checking baseline-availability first. A key that was *both*
+  absent from the file *and* had an unreadable baseline reported `baseline_unavailable`,
+  identical to a key that was present with an unreadable baseline; the two are only
+  separable by reading the entry's `current.present` field. Every test passed, because
+  each test constructed one condition at a time. Rules. (a) When a design says "N
+  distinguishable states", enumerate the 2^N *combinations* and ask which ones the
+  ranking silently merges — the ones the fixtures never build together are the ones
+  nobody checked. (b) Publish the precedence in the consumer-visible contract, since a
+  downstream renderer showing only the summary field will collapse what the data kept
+  apart. (c) This is the combination-shaped sibling of
+  `[FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test]`: that one is
+  about one absence with two causes, this one about two absences with one label.
+
+- [FEAT-2026-0076/G2-CLOSE/read-files-touched-before-trusting-failure-signature]
+  **A failed attempt's `failure_signature` tells you which oracle went red, not whether
+  the work unit did its work — read `files_touched` against the WU's `produces:` list
+  first.** Worked example: an attempt was dispatched to write skill prose plus a
+  structural test, touched only the test file, and was recorded with a `failure_class:
+  tests` and a signature naming a test in an unrelated module (an event-schema pattern
+  assertion). Reading the signature first sends the next session hunting a schema
+  regression; reading `files_touched` first shows an attempt that wrote its red test and
+  stopped, whose own oracle could not have been green. Rules. (a) `files_touched` ∩
+  `produces:` = ∅ means the attempt never produced its deliverable, and that is the
+  diagnosis regardless of what the signature says. (b) A signature stored alongside the
+  driver's own `NO VERDICT FOUND … may be unrelated to the failure` note is a tail
+  artifact, not a finding — re-run the gate before treating it as one. (c) A close that
+  cannot reproduce a recorded failure should say the root cause is not established
+  rather than supply a plausible one; an invented cause in a retrospective outlives the
+  event it explains.
+
+- [FEAT-2026-0076/G2-CLOSE/the-maturity-discount-applies-to-implementation-only]
+  **Implementation WUs whose plan-time existing-mechanism search returns "found and
+  reused" land at roughly half their estimate — and closing WUs do not get that discount,
+  so applying it uniformly underfunds the close.** Two gates of data on one feature:
+  implementation spent $11.86 of $23.00 (52%) across seven units, holding at ~50% even in
+  gate 2, whose estimates had *already* been cut on gate 1's evidence. The closing units
+  went the other way: the one close that ran a full fresh oracle sweep overran by +62.3%
+  ($7.30 against $4.50), and the closing subtotal came in +11.5%. Rules. (a) Discount an
+  implementation estimate when the existing-mechanism table says reuse or copy; leave it
+  alone when the unit's work is neither (the one gate-1 unit that went over, +27.2%, was
+  the only one writing a new invariant into two surfaces). (b) Never discount a close on
+  implementation evidence — a close re-runs every oracle, and its cost tracks the size of
+  the gate set, not the maturity of the parts. (c) A close reporting its own gate's cost
+  analysis is reporting from inside its own unstamped spend, so the closing overrun is
+  structurally invisible to it; the *next* gate's close is the first surface that can see
+  it, which is an argument for a terminal close reconciling every gate rather than only
+  its own.
+
+- [meta/agent-live-runs/a-stub-that-agrees-with-the-code-proves-nothing]
+  **Three defects shipped green through a full gate set because a test stub encoded the
+  same wrong assumption the production code did — the stub agreed with the code, and
+  neither was ever compared to the real tool.** All three were found by running the
+  thing for real, not by testing it. (1) `emit_escalation` defaulted its assignee to the
+  literal `specfuse-operator`, a username assignable on no repository, and
+  `test_escalation_emit.py` asserted `DEFAULT_ASSIGNEE in create_call` — an assertion
+  that passed for the whole life of the bug because it pinned the placeholder rather
+  than any property anyone wanted. Every escalation failed to file while the run
+  reported success (#1762). (2) `pr_ci_conclusion` asked `gh pr checks` for a `--json
+  conclusion` field that exists in no version of `gh`; the command exited 1 every time,
+  so CI was unreadable on every PR since the bug lane shipped and `rules.bugs.automerge`
+  could never fire. Its tests injected `[{"conclusion": "SUCCESS"}]` (#1826). (3) The
+  fix for (2)'s *symptom* — polling, on the theory that CI was read too early — passed
+  its own tests for the same reason and could not have helped, because it polled a
+  command that failed on argument parsing (#1786). Rules. (a) When a module's contract
+  is *what an external tool returns*, at least one test must compare the assumption
+  against the real tool — assert the requested `--json` field names against the
+  binary's own advertised list, `skipTest` where the binary is absent. `gh pr checks
+  --json` with no value prints its field list and costs nothing. (b) Capture the real
+  output before writing the parser, and paste it into the test module's docstring; a
+  fixture built from memory of an API is the defect, not the test of it. (c) A
+  placeholder that is valid nowhere is not a safe default — prefer empty and omit the
+  flag, so a missing configuration degrades to "unassigned" rather than "the whole
+  command fails". (d) When a fix addresses a symptom rather than a reproduced cause,
+  say so in the commit; (3) above looked like a clean fix with green tests and was
+  treating the wrong defect, and only a live run distinguished them.
+
+- [meta/agent-live-runs/an-outward-failure-that-reports-success-is-the-worst-shape]
+  **Every one of those three defects turned a non-zero `gh` exit into a lost
+  operator-facing record while the run's own summary read as success.** The bug lane
+  fixed a bug, opened a mergeable PR, then died labelling it — `items completed: 0`,
+  29.8 minutes discarded, and the escalation carried a `CalledProcessError` repr instead
+  of the guardrail verdict, so the operator learned a command failed and never learned
+  *why the lane declined to merge* (#1785). Rules. (a) A projection of a verdict — a
+  label, an assignee, a comment — must never be able to destroy the verdict it projects;
+  record `label_written: False` and continue, as `apply_triage` already did. (b) Two
+  consumers of one registry must not disagree about whether a missing entry is
+  survivable; that disagreement, not the missing label, was the defect. (c) `registered
+  is not provisioned` is a real state — provision on demand at the point of use and
+  retry once, rather than assuming an install-time step ran.
+
+- [FEAT-2026-0080/G1/a-refusal-message-shorter-than-its-source-means-a-stale-build]
+  **When a guard refusal's message names fewer accepted paths than the guard's source
+  offers, you are not running that source.** Three close attempts were refused by
+  `assert_learnings_appended_or_noop` at $40.27 total. The sessions had complied — each
+  committed a populated `LEARNINGS-pending.md` (180, 85, 138 added lines, visible at
+  reflog commits `22ff27c`, `bc27b30`, `9292986`). Post-#1582 that guard renders `no
+  <LEARNINGS.md> or <staging file> additions in squash` when the staging arm is live;
+  the recorded refusals named only `.specfuse/LEARNINGS.md`, which is byte-for-byte what
+  `08a2210^` — the revision before the fix — emits. The branch tree carried the fix; the
+  *running* build did not. Diagnosis rule: before treating a guard refusal as a content
+  defect, check that the message's **shape** matches the guard source you are reading. A
+  message missing a clause the current code always emits is evidence of a stale build,
+  and no amount of attempt budget will converge against it. Second instance of the
+  `build_provenance` hazard (the first cost 14 spurious red results in another close).
+
+- [FEAT-2026-0080/G1/an-instruction-naming-a-mechanism-that-cannot-satisfy-it]
+  **"An instruction naming a mechanism that cannot satisfy the instruction" is a
+  recurring defect shape, and it is invisible to review because both halves read as
+  correct in isolation.** Two independent instances in one feature. `/fix-bug` Step 1
+  said "Read: title, labels, body, comments" one line under `gh issue view
+  <issue-number>`, a command that does not return comments — the intent was right, the
+  named mechanism could not deliver it, and it survived undetected long enough to need a
+  feature to fix. Then that feature's own close WU criterion 5 told the session to
+  promote lessons to `.specfuse/LEARNINGS.md`, the one destination `close-i` forbids
+  under `autonomy_default: auto`. Both have the same form: a stated intent, and directly
+  beside it a named command/path/destination that provably cannot achieve it. Authoring
+  rule: when a work unit names both an intent and the mechanism for it, verify the
+  mechanism against the intent — run the command and read its output, or check the named
+  path against the guard that governs it. Reviewing the sentence for plausibility does
+  not catch this class.
+
+- [FEAT-2026-0080/G1/price-a-wu-against-its-declared-acceptance-not-its-runtime-surface]
+  **Price a work unit against the acceptance its own plan declares, not against the
+  runtime surface it touches.** T01 was estimated at $8.00 and T02 at $3.00 on the
+  reasoning that they wire skills driving `gh`; they landed at $2.68 and $0.58 (−66% and
+  −81%). PLAN.md had already recorded, in *Verification the loop cannot perform*, that
+  their acceptance is structural — unit tests asserting on `SKILL.md` prose, no live API
+  call. The estimate contradicted a decision the same document made. Estimating rule: a
+  work unit whose oracles are structural asserts on files is priced as a documentation
+  unit, whatever runtime surface the shipped artifact eventually drives. Where the plan
+  already names the oracle, read it before pricing.
+
+- [FEAT-2026-0080/G1/a-recovery-diagnosis-is-a-hypothesis-until-checked-against-the-reflog]
+  **A diagnosis written into a commit message or a gate comment becomes durable state,
+  and gets read as evidence rather than as a claim.** The recovery commit for this
+  feature's spin (`589fd96`) recorded that "Neither RETROSPECTIVE.md nor
+  LEARNINGS-pending.md was ever produced" and that the cause was "an authoring defect in
+  the work unit, not a tool defect". Both are contradicted by the attempts' own commits,
+  which are still in the reflog. That diagnosis had already propagated into
+  `GATE-01.md`'s budget-raise rationale and into issue #2173 before anything checked it
+  against the artifacts. Rule: a post-mortem written at recovery time is a hypothesis
+  until it is checked against the failed attempts' actual diffs; where those attempts
+  were rolled back, `git reflog` still holds them. State the evidence you checked
+  alongside the conclusion, so the next reader can tell which it is.

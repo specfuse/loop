@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from specfuse.loop import escalation, gh_features
+from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 from specfuse.loop.labels import LABEL_REGISTRY
 
@@ -15,16 +15,23 @@ _COLOUR_RE = re.compile(r"^[0-9a-f]{6}$")
 
 
 class TestLabelRegistry(unittest.TestCase):
-    def test_registry_has_exactly_nine_entries(self):
+    def test_registry_has_exactly_fourteen_entries(self):
         # Seven at FEAT-2026-0071; the eighth is the harvester's finding label,
         # added by #300 after `gh issue create` rejected it on a fresh repository.
         # The ninth is FEAT-2026-0042/T02's autofix-failed label, registered
-        # ahead of gate 2, its consumer, for the same reason.
+        # ahead of gate 2, its consumer, for the same reason. The tenth through
+        # thirteenth are FEAT-2026-0045/T01's category->label projection. The
+        # fourteenth is FEAT-2026-0047/T03's parked-escalation label. The
+        # fifteenth through twenty-first are the bug lane's declining-reason
+        # labels, registered by the #1420 fix — the lane emitted them as raw
+        # REASON_* constants that this registry never declared, so
+        # provision_labels created none of them and every declining path
+        # failed against a real repository.
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 9)
+        self.assertEqual(len(LABEL_REGISTRY), 21)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -46,6 +53,14 @@ class TestLabelRegistry(unittest.TestCase):
             | {gh_features.FEATURE_LABEL}
             | {issues.FINDING_LABEL}
             | {autofix_state.AUTOFIX_FAILED_LABEL}
+            | {
+                triage.BUG_LABEL,
+                triage.FEATURE_LABEL,
+                triage.DUPLICATE_LABEL,
+                triage.WONTFIX_LABEL,
+            }
+            | {notify_sla.PARKED_LABEL}
+            | set(bug_lane.DECLINE_LABELS.values())
         )
         actual = {entry.name for entry in LABEL_REGISTRY}
         self.assertEqual(actual, expected)

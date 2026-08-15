@@ -44,7 +44,7 @@ suspect has drifted, even without running `--upgrade` — the skill's
 discovery surface is `lint_plan.py`'s output, which you can read any
 time with:
 
-    python .specfuse/scripts/lint_plan.py .specfuse/features/<feature-folder>
+    specfuse lint .specfuse/features/<feature-folder>
 
 ## Method
 
@@ -63,9 +63,9 @@ Before reading the failing feature, ground in the current scaffold:
 
 ### 2. Run the linter, capture every error verbatim
 
-    python .specfuse/scripts/lint_plan.py <feature-folder>
+    specfuse lint <feature-folder>
 
-`lint_plan.py` is the source of truth for what passes. **Every proposed
+`specfuse lint` is the source of truth for what passes. **Every proposed
 edit must trace to a specific error in this output**, named by the
 linter. Do not propose edits the linter is silent about — adding fields
 the templates document but the linter doesn't require is a quiet way to
@@ -128,7 +128,7 @@ the edit should look like. Then propose-and-confirm normally.
 
 Once the user has accepted (or skipped) every proposal:
 
-  - Re-run `python .specfuse/scripts/lint_plan.py <feature-folder>`.
+  - Re-run `specfuse lint <feature-folder>`.
   - Report the new state: either "PASS" or the remaining errors.
   - For remaining errors (skipped or unresolved), report them so the
     user knows the feature still needs attention.
@@ -157,7 +157,7 @@ Once the user has accepted (or skipped) every proposal:
 ## Closing-contract migration
 
 Already-drafted features need no conversion for the closing-skeleton /
-`specfuse-lint --closing` machinery (`.specfuse/rules/close-discipline.md`
+`specfuse lint --closing` machinery (`.specfuse/rules/close-discipline.md`
 §4): the skeleton applies at dispatch time regardless of when the WU body was
 authored, and old bodies that restate guard strings inline are inert, not a
 lint failure. Do not propose edits to strip that prose — it's advisory
@@ -165,8 +165,15 @@ cleanup, never a required conversion.
 
 ## Closing rule
 
-End with the RESULT block defined in
-`.specfuse/rules/result-contract.md`. `status: complete` means "I
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
+`.specfuse/rules/result-contract.md`.
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means "I
 walked every lint error and the user decided on each." If the user
 abandoned the conversion partway, emit `status: blocked` with the
 remaining error list as `blocked_reason`.

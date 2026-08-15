@@ -3,9 +3,9 @@
   "rules/never-touch.md": "60d590668cffeb759d7706d927e85e2d7d11b8aaacc648741a54de20faf3bfc2",
   "rules/security-boundaries.md": "c6d4cdeb4aa1dfa16eca295bc07d5899e90155eef3d5fed57d1ad9338fc7e7e6",
   "rules/verification-discipline.md": "17b8434dce245aac5dd59b132a8cfb2256e4ff934b1f3803e0a1048a10e5e4a5",
-  "schemas/event.schema.json": "07bb38b648eba01b518736ca93968d68714ce857037a83031b2213439f01068a",
+  "schemas/event.schema.json": "e5767027863eeb428b85a01b6cbfb368b6a45bb5fa4866533e362b6bb0b7ee5a",
   "schemas/events/initiative_created.schema.json": "961bd517d1e7594ff0820fdfb466adcc6f413f156465835485eba1a267fed233",
   "schemas/events/spec_validated.schema.json": "7643e04ea4d877e48d61b755a63b729d2256061fbf2c398fb48458ad1bb66eea",
-  "schemas/events/spec_issue_resolved.schema.json": "7924efcdc9feff0627507eb0ecd977afdda24f07ee66e10036d1759cc93e7e06",
-  "schemas/events/spec_issue_routed.schema.json": "7d3ee53edf1e92e5579a85001ffe0a55f5d302ad7d8335049dd384583768446c"
+  "schemas/events/spec_issue_resolved.schema.json": "2a2c87b0f40d2cde0dcfc2597673dbcd01da07945d1d6e2c26d08b1e01695e23",
+  "schemas/events/spec_issue_routed.schema.json": "4bf87a9d56eff9bd8d47f4b311910da955e12cc35c1f0f8b45f6c47e1b78b712"
 }

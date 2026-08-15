@@ -99,7 +99,7 @@ For each `active` and `done` feature, build a one-paragraph report. Run the
 predicate read-only via:
 
 ```bash
-python3 .specfuse/scripts/gate_eval.py backtest <feature_id>
+python3 -m specfuse.loop.gate_eval backtest <feature_id>
 ```
 
 Capture the per-gate auto verdict (`auto: True/False`, `reasons: [...]`). If
@@ -196,4 +196,4 @@ If K > 0, list the feature IDs that were flipped.
 ## Version
 
 **v0.1** (FEAT-2026-0018/T09). Initial release — read-only survey, opt-in
-`auto_close_disabled` flip, predicate=v1 backtest via `gate_eval.py backtest`.
+`auto_close_disabled` flip, predicate=v1 backtest via `python3 -m specfuse.loop.gate_eval backtest`.

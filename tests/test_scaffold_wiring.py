@@ -44,8 +44,7 @@ class TestWiringCore(unittest.TestCase):
                 (target / ".claude" / "settings.json").read_text(encoding="utf-8")
             )
             allow = data["permissions"]["allow"]
-            self.assertEqual(allow.count("Bash(specfuse-loop:*)"), 1)
-            self.assertEqual(allow.count("Bash(specfuse-lint:*)"), 1)
+            self.assertEqual(allow.count("Bash(specfuse:*)"), 1)
 
     def test_wiring_writes_all_surfaces(self):
         """AC2, AC4, AC5: all surfaces written with correct content; no symlinks."""
@@ -77,8 +76,7 @@ class TestWiringCore(unittest.TestCase):
 
             # Bash allowlist (pip-native commands, AC2)
             allow = data["permissions"]["allow"]
-            self.assertIn("Bash(specfuse-loop:*)", allow)
-            self.assertIn("Bash(specfuse-lint:*)", allow)
+            self.assertIn("Bash(specfuse:*)", allow)
 
             # Marketplace identifier (AC4)
             self.assertIn("specfuse", data["extraKnownMarketplaces"])
@@ -145,6 +143,36 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         self.assertIn("@.specfuse/rules/result-contract.md", text)
 
     def test_existing_claude_md_no_duplicate_when_sentinel_present(self):
+        """The sentinel suppresses re-appending the block, not the backfill.
+
+        A project whose CLAUDE.md predates a rule must still gain that rule's
+        import — otherwise the scaffold ships a binding rule the project never
+        loads. So the guarantee here is *no duplication and no clobbering*:
+        the user's own content survives, the block is not appended a second
+        time, and every import appears exactly once.
+        """
+        from specfuse.loop.scaffold import _RULES_BLOCK, wire_claude
+
+        claude_dir = self.target / ".claude"
+        claude_dir.mkdir(parents=True)
+        claude_md = claude_dir / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project\n@.specfuse/rules/result-contract.md\n", encoding="utf-8"
+        )
+        wire_claude(self.target)
+        after = claude_md.read_text(encoding="utf-8")
+
+        self.assertIn("# Project", after)
+        self.assertNotIn(
+            "## Specfuse binding rules", after,
+            "the block header was appended even though the sentinel was present",
+        )
+        for line in _RULES_BLOCK.splitlines():
+            if line.startswith("@.specfuse/rules/"):
+                with self.subTest(rule=line):
+                    self.assertEqual(after.count(line), 1)
+
+    def test_existing_claude_md_wiring_is_idempotent(self):
         from specfuse.loop.scaffold import wire_claude
 
         claude_dir = self.target / ".claude"
@@ -153,10 +181,10 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         claude_md.write_text(
             "# Project\n@.specfuse/rules/result-contract.md\n", encoding="utf-8"
         )
-        original = claude_md.read_text(encoding="utf-8")
         wire_claude(self.target)
-        after = claude_md.read_text(encoding="utf-8")
-        self.assertEqual(original, after)
+        once = claude_md.read_text(encoding="utf-8")
+        wire_claude(self.target)
+        self.assertEqual(once, claude_md.read_text(encoding="utf-8"))
 
     def test_existing_settings_json_user_keys_preserved(self):
         from specfuse.loop.scaffold import wire_claude
@@ -168,9 +196,33 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         wire_claude(self.target)
         data = json.loads(settings.read_text(encoding="utf-8"))
         self.assertEqual(data["theme"], "dark")
-        self.assertIn("Bash(specfuse-loop:*)", data["permissions"]["allow"])
+        self.assertIn("Bash(specfuse:*)", data["permissions"]["allow"])
 
     def test_existing_settings_json_allow_entries_not_duplicated(self):
+        from specfuse.loop.scaffold import wire_claude
+
+        claude_dir = self.target / ".claude"
+        claude_dir.mkdir(parents=True)
+        settings = claude_dir / "settings.json"
+        settings.write_text(
+            json.dumps(
+                {"permissions": {"allow": ["Bash(specfuse:*)"]}}
+            ),
+            encoding="utf-8",
+        )
+        wire_claude(self.target)
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        allow = data["permissions"]["allow"]
+        self.assertEqual(allow.count("Bash(specfuse:*)"), 1)
+
+    def test_existing_settings_json_legacy_flat_allow_entries_preserved(self):
+        """A repo wired before the subcommand migration keeps its old entries.
+
+        `Bash(specfuse-loop:*)` / `Bash(specfuse-lint:*)` still authorise the
+        deprecated flat aliases, which keep working until 1.0.0. The merge is
+        additive, so upgrading such a repo gains `Bash(specfuse:*)` without
+        revoking anything it already had.
+        """
         from specfuse.loop.scaffold import wire_claude
 
         claude_dir = self.target / ".claude"
@@ -183,10 +235,10 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
             encoding="utf-8",
         )
         wire_claude(self.target)
-        data = json.loads(settings.read_text(encoding="utf-8"))
-        allow = data["permissions"]["allow"]
-        self.assertEqual(allow.count("Bash(specfuse-loop:*)"), 1)
-        self.assertEqual(allow.count("Bash(specfuse-lint:*)"), 1)
+        allow = json.loads(settings.read_text(encoding="utf-8"))["permissions"]["allow"]
+        self.assertIn("Bash(specfuse-loop:*)", allow)
+        self.assertIn("Bash(specfuse-lint:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
     def test_existing_settings_json_user_allow_entries_preserved(self):
         from specfuse.loop.scaffold import wire_claude
@@ -202,7 +254,7 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         data = json.loads(settings.read_text(encoding="utf-8"))
         allow = data["permissions"]["allow"]
         self.assertIn("Bash(npm:*)", allow)
-        self.assertIn("Bash(specfuse-loop:*)", allow)
+        self.assertIn("Bash(specfuse:*)", allow)
 
 
 class TestWiringNewFiles(unittest.TestCase):

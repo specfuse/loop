@@ -28,10 +28,10 @@ for the contracts these skills manipulate.
 
 ## Driver
 
-These skills drive the **specfuse-loop** driver:
+These skills drive the **specfuse-loop** driver (`specfuse run`):
 
 ```
-pip install specfuse-loop
+pipx install specfuse    # or: uv tool install specfuse
 ```
 
 ## License

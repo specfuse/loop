@@ -62,7 +62,7 @@ Only proceed to step 3 on explicit user override.
 
 ### 3. Enumerate candidates
 
-Call `list_features('<repo>')` from `.specfuse/scripts/gh_features.py`
+Call `list_features('<repo>')` from `specfuse.loop.gh_features`
 programmatically (preferred — returns the full candidate dict including `title`,
 `initiative`, `number`, and `body`):
 
@@ -75,7 +75,7 @@ candidates = list_features('<repo>')
 Alternatively run:
 
 ```
-python3 .specfuse/scripts/gh_features.py <repo>
+python3 -m specfuse.loop.gh_features <repo>
 ```
 
 Issues whose titles lack a parseable `[<id>]` tag are skipped by the script with a
@@ -113,7 +113,7 @@ picked candidate's GitHub issue `number` for step 6.
 Run:
 
 ```
-python3 .specfuse/scripts/adopt_feature.py <repo> <issue-number>
+python3 -m specfuse.loop.adopt_feature <repo> <issue-number>
 ```
 
 where `<issue-number>` is the GitHub issue `number` from the picked candidate row
@@ -127,16 +127,22 @@ print stderr verbatim and stop without further writes.
 
 ```
 Run /draft-feature on the new folder to refine gate 1, or
-python3 .specfuse/scripts/loop.py --feature <folder> to dispatch as-seeded.
+specfuse run --feature <folder> to dispatch as-seeded.
 ```
 
 where `<folder>` is the path printed in step 6.
 
 ---
 
-End with the RESULT block defined in
+Emit the RESULT block only when this skill was invoked **non-interactively**
+— dispatched by the driver, or run headless by a calling program. Its shape
+is defined in
 [`../../rules/result-contract.md`](../../rules/result-contract.md).
-`status: complete` means the human picked, `adopt_feature.py` ran without error, the
+It is the agent-to-driver interface; on an interactive run nothing reads it,
+so report to the operator per
+[`../../rules/human-output.md`](../../rules/human-output.md) instead.
+
+When emitted, `status: complete` means the human picked, `adopt_feature.py` ran without error, the
 folder path printed, and the next-command line printed. `status: blocked` if
 `adopt_feature.py` exited non-zero, `gh` is unauthenticated, or the active-feature
 warning was not overridden.
@@ -152,7 +158,7 @@ warning was not overridden.
 - **Does not refine the seeded WU-01.** `adopt_feature.py` seeds `WU-01` with the raw
   issue body; refinement is `/draft-feature` or the gate 1 grind.
 - **Does not loop or auto-dispatch.** After printing the next command, the skill exits.
-  The human runs `loop.py` when ready.
+  The human runs `specfuse run` when ready.
 
 ## Version
 

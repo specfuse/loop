@@ -1,0 +1,50 @@
+# .specfuse/agent-policy.yml
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+# This repo's own operator priorities, per FEAT-2026-0044/T02: feature-work
+# queue order, gate-review and triage dials, budgets, and escalation contact
+# points. Validated structurally by `specfuse/loop/agent_policy.py`
+# (`validate_agent_policy`) and, since T02, cross-checked against
+# `.specfuse/roadmap.md` — queue entries with no roadmap row are an ERROR,
+# entries whose roadmap status has gone `done`/`abandoned` are a WARN.
+
+version: 1
+
+# Operator's stated sequence as of 2026-08-13.
+# FEAT-2026-0080 dropped: shipped and `done` (PR #2245), which validate_agent_policy
+# WARNed on. Only FEAT-2026-0079 is queued: it is the sole `planned` roadmap row with
+# a drafted folder and armed work units, so it is the only entry the feature lane can
+# actually advance. The other eight `planned` rows have no feature folder, and queuing
+# an undrafted entry produces a `drafting-needed` escalation rather than work -- that
+# list is uncapped by `wip_limit`, so it would spend the run's item budget on
+# escalations.
+queue:
+  - FEAT-2026-0079
+
+rules:
+  bugs:
+    preempt: true
+    min_severity: low
+    automerge: "off"           # FEAT-2026-0048 owns enforcement; not built yet
+    test_paths:                 # accepted at the FEAT-2026-0076 review: measured from
+      - tests/                  # the tree and verification.yml gate commands, which agree
+  features:
+    gate_review: human
+    wip_limit: 1
+  triage:
+    auto: false                # T03 wires this; false preserves today's behavior
+
+budgets:
+  max_tokens_per_run: 2000000
+  max_open_prs: 3
+  max_items_per_day: 10
+
+escalation:
+  webhook_env: ""               # env-var NAME holding the webhook URL, not the URL itself
+  provider: none                # discord | slack | teams | none
+  assignee: "clabonte"       # verified assignable: gh api repos/specfuse/loop/assignees/clabonte
+  quiet_hours: ""
+  sla_hours: 24
+  silence_hours: 24
