@@ -34,7 +34,12 @@ from pathlib import Path
 
 from . import _miniyaml
 from . import _wu_sections
-from .closing_requirements import gate_review_filename
+from .closing_requirements import (
+    LEARNINGS_PATH,
+    LEARNINGS_PENDING_FILENAME,
+    gate_review_filename,
+    learnings_staging_is_required,
+)
 from .criteria_state import CRITERIA_FILENAME_RE
 from .loop import VERDICT_VALUES
 
@@ -545,6 +550,70 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
                 f"{label.format(n=n, n1=n + 1)}. {guard} checks this AFTER "
                 f"dispatch, so the refusal costs a full re-attempt. See "
                 f"close-discipline.md §4."
+            )
+
+
+#: `LEARNINGS_PATH` named as a lessons destination. Anchored on the filename
+#: rather than the full path so `LEARNINGS.md` and `.specfuse/LEARNINGS.md`
+#: both match, and bounded on the left so `LEARNINGS-archive.md` — a different
+#: surface entirely — does not. `LEARNINGS-pending.md` cannot match this
+#: pattern either: the segment after `LEARNINGS` is `-pending`, not `.md`.
+_LEARNINGS_DESTINATION_RE = re.compile(r"(?<![\w-])LEARNINGS\.md")
+
+
+def check_closing_learnings_destination(
+    feature_dir: Path, plan_fm: dict, gates: list
+) -> None:
+    """WARN when an `auto` feature's closing WU names the one lessons
+    destination `close-i` forbids (#2173).
+
+    Under `autonomy_default: auto`, `assert_learnings_staged_under_auto`
+    forbids a closing WU from appending to `LEARNINGS_PATH`; lessons stage to
+    `LEARNINGS_PENDING_FILENAME` instead. A WU whose body names only the
+    forbidden path is *describing* a write the guard will refuse, so a session
+    following its own acceptance criteria literally is left with a forbidden
+    door and a false one -- the shape #2173 was filed on.
+
+    **This is not what caused that issue's headline $40.27.** The author
+    retracted that diagnosis with reflog evidence: every refused attempt had in
+    fact staged correctly, and the spin was the stale-build hazard (#1040,
+    fixed dispatcher-side in #2186). What survives the retraction is the
+    narrower defect checked here -- a work unit that describes a forbidden
+    destination is wrong whether or not a session has yet been misled by it.
+
+    WARN, never ERROR, for the reason `check_closing_guard_literals` gives:
+    measured on this repo, 9 of 14 historical `auto` closing WUs would fail it.
+    All 14 are `done` and skipped as sealed history, so the live tree is clean
+    -- but a prose match on a body is not a strong enough signal to fail a
+    build over, and a body may name the path descriptively without instructing
+    a write.
+    """
+    if not learnings_staging_is_required(plan_fm.get("autonomy_default")):
+        return
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wfile = feature_dir / str(entry.get("file", ""))
+            if not wfile.is_file():
+                continue
+            try:
+                wfm, wbody = read_frontmatter(wfile)
+            except Exception:  # noqa: BLE001 - malformed WU is another check's finding
+                continue
+            if wfm.get("type") not in ("close", "close-intermediate"):
+                continue
+            if wfm.get("status") == "done":
+                continue  # sealed; backfilling instructions on history is pointless
+            if LEARNINGS_PENDING_FILENAME in wbody:
+                continue  # names the routing, not just the forbidden half
+            if not _LEARNINGS_DESTINATION_RE.search(wbody):
+                continue
+            print(
+                f"WARN: {wfile}: body names {LEARNINGS_PATH} as a lessons "
+                f"destination, but this feature is autonomy_default=auto, where "
+                f"assert_learnings_staged_under_auto forbids that write — "
+                f"lessons stage to {LEARNINGS_PENDING_FILENAME}. A session "
+                f"following this criterion literally is refused after dispatch. "
+                f"See close-discipline.md §4."
             )
 
 
@@ -1410,6 +1479,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     # Planning-discipline section presence (#201): WARN-only.
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
+    check_closing_learnings_destination(feature_dir, fm, gates)
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
