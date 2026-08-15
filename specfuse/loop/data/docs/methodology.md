@@ -19,10 +19,18 @@ on both surfaces.
 
 - **Roadmap** — the master index of features for a repository/project, with each
   feature's status (`planned → active → done`/`abandoned`). A feature may also be
-  `deferred` — parked pending an external decision or dependency: nothing is
-  loop-dispatchable, so the driver skips it (like `abandoned`), but it stays
-  resumable — a human flips it back to `active` when the blocker clears. `deferred`
-  is distinct from `abandoned` (dead) and `done` (complete).
+  parked in one of two states — `blocked` or `deferred`. Nothing is
+  loop-dispatchable in either, so the driver skips them (like `abandoned`), but
+  both stay resumable: a human flips the feature back to `active` when the
+  obstacle clears. Both are distinct from `abandoned` (dead) and `done`
+  (complete).
+  - `blocked` — cannot proceed because a **named** dependency is unmet: an ADR
+    awaiting approval, or an upstream `FEAT-YYYY-NNNN` that must complete first.
+    A blocked feature always names and links its blocker, so the roadmap shows
+    the dependency at a glance. Only `planned` or `active` may be blocked.
+  - `deferred` — a *voluntary* park with no named blocker, pending an external
+    decision or dependency. The absence of a named blocker is the entire
+    difference from `blocked`.
 - **Feature** — a spec-driven *or directly-authored* unit of value, identified by
   a correlation ID `FEAT-YYYY-NNNN`. A feature owns an ordered list of gates.
 - **Gate** — a milestone partition of a feature: an ordered batch of substantive
