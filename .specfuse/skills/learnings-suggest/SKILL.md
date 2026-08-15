@@ -60,8 +60,31 @@ folders contribute nothing to the clusters and are rendered silently as
 
 ## §2 Cluster
 
-Group retained records by the tuple `(payload.failure_class,
-payload.failure_signature)`.
+**Exclude records whose signature is non-informative, before grouping.** A
+signature that cannot distinguish one failure from another — a bare ` ``` `
+fence, whitespace, a pure-ANSI string — is not a pattern, and clustering on it
+produces the largest bucket in the scan carrying the least information. The
+driver's `_is_noninformative_signature` (`specfuse/loop/loop.py`) is the
+predicate of record: apply that, do not restate its rules here. A second copy
+of this definition is exactly what let the two disagree before (#1977).
+
+Report the exclusions in the run header rather than dropping them quietly —
+`excluded N records with non-informative signatures (M distinct WUs)` — so an
+operator seeing a thin candidate list can tell a clean scan from a poisoned
+one.
+
+**Why this is needed even though the driver no longer writes such signatures.**
+`parse_gate_failure_signature` has skipped fences, whitespace and pure-ANSI
+lines since **#169**, so no current driver produces them. But that fix cannot
+unwrite history, and this skill reads history: a repository that ran a pre-#169
+driver keeps those records in `events.jsonl` permanently, where they outrank
+genuine clusters and survive any `--min-wus` an operator raises. Finding fence
+signatures in old data is expected and is **not** a driver bug to re-file.
+
+Group the retained records by the tuple `(payload.failure_class,
+payload.failure_signature)`. The key itself is not the defect — #1977's own
+finding is that "the clustering itself is fine; it is being fed a degenerate
+key".
 
 For each cluster, track:
 
