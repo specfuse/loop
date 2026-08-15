@@ -38,6 +38,7 @@ from specfuse.agent.run import (
 )
 from specfuse.agent.state import AgentSnapshot
 from specfuse.agent.triage_invoke import build_invocation, classify_result
+from specfuse.loop.escalation import CATEGORY_LABELS
 from specfuse.loop.triage import CATEGORIES, apply_triage, list_untriaged
 
 _ITEM_ID_PREFIX = "triage-"
@@ -135,6 +136,32 @@ def _marker_write_failed_payload(number: int, error: str) -> EscalationPayload:
     )
 
 
+def _is_agent_escalation(row: dict) -> bool:
+    """Whether this issue was filed by the agent's own escalation path.
+
+    Keyed on `escalation.CATEGORY_LABELS`, which `escalation.py` writes and
+    nothing else does, so the label identifies an agent-authored issue on its
+    own -- an operator who has released `needs-human` has not thereby made the
+    generated body worth classifying.
+
+    Such an issue is **categorised by construction**: the code that wrote it
+    chose its category. Re-deriving one adds nothing, and measurably so --
+    four near-identical generated bodies came out three `triage:feature` and
+    one `triage:question` (#2384). It also costs a second item per escalation,
+    which is how one run spent 8 items on 0 units of work.
+
+    `BugsProvider._HUMAN_OWNED_LABELS` is the same rule from the other side;
+    its comment records the lane "trying to 'fix' its own 'PR was declined by
+    the merge guardrails' report."
+    """
+    names = {
+        label.get("name")
+        for label in (row.get("labels") or [])
+        if isinstance(label, dict)
+    }
+    return bool(names & CATEGORY_LABELS)
+
+
 class TriageProvider:
     """`ActionProvider` over `specfuse.loop.triage` plus headless
     classification."""
@@ -162,6 +189,8 @@ class TriageProvider:
         items = []
         for row in rows:
             if row.get("already_structured"):
+                continue
+            if _is_agent_escalation(row):
                 continue
             item_id = f"{_ITEM_ID_PREFIX}{row['number']}"
             self._rows[item_id] = row
