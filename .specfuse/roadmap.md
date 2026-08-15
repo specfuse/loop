@@ -94,6 +94,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0078 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-2026-0078) |
 | FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-2026-0079) |
 | FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
+| FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | — | [→ detail](#feat-2026-0081) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -935,6 +936,17 @@ ordering costs a schema migration before anyone knows whether the precision is w
 **Status: planned.** Filed at FEAT-2026-0076's gate-2 arming review by operator decision
 (open question 2). Not urgent: it becomes worth building when a real repository's policy file
 carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
+
+<a id="feat-2026-0081"></a>
+## FEAT-2026-0081 — Feature-ID collision prevention and cheap renumbering
+
+**Why.** Two features were drafted three minutes apart in different worktrees of the same repo and both took `FEAT-2026-0093`. One merged; the other was renumbered *after its gate had closed* — folder, `PLAN.md` frontmatter, every WU `id`, retrospective, staged lessons, criteria file, generated docs, two roadmap rows, the archive anchor, the branch, and a closed-and-reopened PR, by hand, where getting it wrong is silent. The next-ID scan is a point-in-time read and cannot close that window: the colliding PR was created *after* the draft ran, so no query shape would have caught it. #1644 investigated the scan's GitHub query and found it sound (`FEAT-<YYYY>-` matches; the reported zero-result prefix is a query the skill never issues), and the contamination defect it surfaced instead was fixed separately as #1872 — leaving the race itself, and the cost of recovering from it, unaddressed. Filing this feature is what #1644 was closed in favour of. The ambiguity is live, not historical: picking this very ID required an operator ruling on `FEAT-2026-0098`, which appears only in merged PR #1843's title with no roadmap row and no folder, its work having actually landed as `FEAT-2026-0078`.
+
+**Goal.** Make an ID collision cheap to prevent and cheap to recover from, along three independent lines, each shippable alone: narrow the race window by re-running the next-ID scan immediately before `/draft-feature` writes the feature folder, rather than only at step 1; catch a collision at the next lint rather than at merge, by making a `feature_id` claimed by a *different* slug anywhere in `roadmap.md` an error — which also resolves the title-only-claim ambiguity above mechanically; and make renumbering a command (`specfuse renumber <old> <new>`) instead of a careful manual sweep. **`events.jsonl` and `PLAN.baseline.json` must keep the old ID** under any renumbering: they are the driver's record of what actually ran, and the run really did execute under the old correlation ID. Rewriting a log to match a later rename falsifies history to tidy a name; the retrospective should carry a note so a future reader correlating events knows what to expect.
+
+**Benefits.** The expensive moment moves from merge — where the ID is already embedded in a dozen files across a closed gate — to lint, or is avoided entirely. Renumbering stops being a silent-failure operation performed by hand under time pressure. And the rule about which files keep the old ID is written down once, rather than being rediscovered by whoever pays for the next collision.
+
+**Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
 
 ## Notes
 
