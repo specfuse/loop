@@ -260,6 +260,42 @@ verification keeps rejecting.
   legitimately not applicable, that is a `blocked` condition to report, not a
   shortcut to take.
 
+## "Pre-existing" is a claim about another commit — cite it or don't write it
+
+Calling a failure *pre-existing* asserts it was already there before your
+change. That is a claim about a **different commit**, and nothing you observe
+on your own branch can establish it. Either you ran that commit, or you are
+guessing and calling the guess evidence.
+
+So: a verification report may say a failure predates the change only if it
+names **the command** and **the commit** it was measured on — typically the
+merge-base:
+
+```
+git stash && git checkout $(git merge-base HEAD main)
+python3 -m unittest discover -s tests   # 3232 tests OK
+git checkout - && git stash pop
+```
+
+Write the measured numbers from both sides. "Identical to the pre-fix
+baseline" without them is not a weaker version of the claim, it is a different
+claim — that a comparison was performed — and it is false if no baseline was
+run.
+
+**If you cannot measure the baseline, report `blocked` / `could_not_proceed`
+rather than asserting one.** An honest "verification could not establish a
+baseline in this environment" costs one escalation. A fabricated baseline
+costs the reader's ability to trust every other number in the report.
+
+Watch for the environment-shaped version of this, which is where it comes
+from: a mass of errors sharing one signature — network refused, pip build
+dependencies unresolvable, a sandbox denying a socket — is a report about
+**where the suite ran**, not about the repository. Re-run outside the
+restriction and say that you did. Observed 2026-08-12 (#2075): two PRs
+reported 110+ "pre-existing" errors and coverage "below the floor" on
+branches that measured clean and above it, and each shipped reasoning from a
+baseline nobody had run.
+
 ## Forbidden shortcuts
 
 - Reporting `status: complete` and then "let me go verify." The order is the
@@ -273,3 +309,7 @@ verification keeps rejecting.
 - Running the commands once, seeing a failure, fixing the artifact, and reporting
   without running them again. Every verification cycle ends with a green run of
   the full set, or the cycle is not complete.
+- Calling a failure **pre-existing** without having run the commit you claim it
+  pre-exists. See the section above: cite the command and the commit, or report
+  `blocked` because the baseline could not be measured. A number nobody measured
+  is not a softer claim than a wrong one — it is the same claim, unfalsifiable.

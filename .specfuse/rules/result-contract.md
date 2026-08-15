@@ -126,6 +126,15 @@ blocked_reason: <present only when status is blocked>
    three fresh attempts chasing a `complete` that verification keeps rejecting.
 5. **No secret-looking values in evidence.** The RESULT block is read by the driver
    and may be archived. See [`security-boundaries.md`](security-boundaries.md).
+6. **A "pre-existing" failure claim cites the commit it was measured on.** Calling
+   a failure pre-existing is a claim about a *different commit* — typically the
+   merge-base — and nothing observed on your own branch establishes it. Name the
+   command and the commit, and give the numbers from both sides. If the baseline
+   cannot be measured, emit `status: blocked` rather than asserting one: a
+   fabricated baseline lowers the bar the checks exist to hold, and a mass of
+   errors sharing one signature (network refused, unresolvable build
+   dependencies) is a report about where the suite ran, not about the repository
+   (#2075).
 
 ## Closing obligations for implementation WUs (FEAT-2026-0049)
 
