@@ -12,16 +12,22 @@
 
 version: 1
 
-# Operator's stated sequence as of 2026-08-13.
-# FEAT-2026-0080 dropped: shipped and `done` (PR #2245), which validate_agent_policy
-# WARNed on. Only FEAT-2026-0079 is queued: it is the sole `planned` roadmap row with
-# a drafted folder and armed work units, so it is the only entry the feature lane can
-# actually advance. The other eight `planned` rows have no feature folder, and queuing
-# an undrafted entry produces a `drafting-needed` escalation rather than work -- that
-# list is uncapped by `wip_limit`, so it would spend the run's item budget on
-# escalations.
+# Operator's stated sequence as of 2026-08-15, groomed via /groom-backlog.
+# FEAT-2026-0079 dropped: shipped and `done` (PR #2344), which validate_agent_policy
+# WARNed on.
+#
+# KNOWN CONSEQUENCE, accepted deliberately: none of these four has a feature folder,
+# and an undrafted queue entry produces a `drafting-needed` escalation rather than
+# work. That list is uncapped by `wip_limit`, so an unattended run will spend items
+# on escalations until the top entry is drafted. FEAT-2026-0050 is #1 precisely
+# because it is the fix for that -- async drafting via question issues -- and until
+# it lands, drafting is the bottleneck every other entry hits first. Draft the top
+# entry with /draft-feature before an unattended run to avoid the escalation flood.
 queue:
-  - FEAT-2026-0079
+  - FEAT-2026-0050   # async drafting -- unblocks drafting for everything below
+  - FEAT-2026-0081   # ID collision -- live ambiguity, cheap, loop-owned surfaces
+  - FEAT-2026-0058   # decision registry -- drift defects with measured cost
+  - FEAT-2026-0052   # baseline-delta ratchet -- operator exits on a red base tree
 
 rules:
   bugs:
