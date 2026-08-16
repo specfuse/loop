@@ -7419,6 +7419,28 @@ def run(
         if blocked:
             print("\nGate halted: work unit(s) need human attention.")
             return 1
+
+        # A WU that `depends_on` an `abandoned` sibling never becomes ready —
+        # ready() only treats `done` as a satisfied dependency (#2396) — so the
+        # frontier can go empty with substantive WUs (often the whole closing
+        # sequence) still `pending`. Nothing above sets `blocked` for that
+        # case, so without this check the run falls through to the
+        # gate-complete path below and announces a closing sequence that never
+        # ran. Refuse instead: "nothing left ready" and "the gate finished"
+        # are different states and must not print the same message.
+        stranded = [u for u in units if u.status not in (DONE, "abandoned")]
+        if stranded:
+            stranded_ids = ", ".join(u.wu_id for u in stranded)
+            print(
+                f"\nGate {gate.number} halted: {len(stranded)} work unit(s) "
+                f"never became ready — {stranded_ids}. This usually means "
+                f"one of their dependencies was abandoned; abandoning a WU "
+                f"strands anything that still depends on it. Fix PLAN.md's "
+                f"dependency graph (or un-abandon the blocking WU) and "
+                f"re-run."
+            )
+            return 1
+
         if dry_run:
             print(f"\n(dry run) Gate {gate.number} would complete and await review.")
             return 0
