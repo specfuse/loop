@@ -52,3 +52,12 @@ Before arming gate 2, check — and record the result in `GATE-02-REVIEW.md`:
   gate 2 unit declares in `produces:` — a unit editing the driver's importable
   surface halts the run for a restart mid-gate (FEAT-2026-0075), which is worth
   knowing at arming rather than at dispatch.
+
+## Auto-close note
+
+**PASSED — auto-closed** (`evaluate_auto_close`, predicate=v1). The close ceremony **did not run**.
+
+- gate_total_cost: $4.30 of $27.00
+- reasons: [] (auto=True)
+
+The per-criterion deferred-verification list was **not** enumerated. Before treating this gate as fully verified, read `RETROSPECTIVE.md` § "What the loop did NOT verify" and the `specfuse:autoclose-debt` marker it carries.

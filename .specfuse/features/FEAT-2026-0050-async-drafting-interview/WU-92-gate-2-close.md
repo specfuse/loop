@@ -13,14 +13,18 @@ auto_close_disabled: true
 the terminal verdict.
 
 **Context.** FEAT-2026-0050/G2-CLOSE, gate 2, terminal. Pre-declared at draft
-time so the linter reads gate 2 — not gate 1 — as this feature's terminal gate;
-`plan-next` inserts gate 2's substantive units before it and updates
-`depends_on`, which is empty only until then.
+time so the linter reads gate 2 — not gate 1 — as this feature's terminal gate.
+`G1-PLAN` has since inserted gate 2's four substantive units (T04–T07) before
+it and updated `depends_on` to name them.
+
+Gate 1 auto-closed, so its per-criterion deferred-verification list was never
+enumerated — `RETROSPECTIVE.md` carries the `specfuse:autoclose-debt` marker
+for T01–T03 (19 criteria). This close must reconcile that debt; auto-close
+cannot.
 
 `autonomy_default: auto`, so lessons stage to `LEARNINGS-pending.md`.
 
-**Acceptance criteria.** Drafted by gate 1's `plan-next` alongside gate 2's
-substantive units. At minimum this close must carry:
+**Acceptance criteria.**
 
 1. Cost reconciliation against `planned_cost_usd` and gate 2's budget, under
    a `## Cost analysis` heading in `RETROSPECTIVE.md`.
@@ -32,7 +36,16 @@ substantive units. At minimum this close must carry:
    through this path before close, say so plainly rather than reporting the
    mechanism as proven — FEAT-2026-0080 closed `met_locally` on exactly that
    distinction and recorded it.
-4. `specfuse lint --closing` exits 0 before this unit reports `complete`.
+4. **Whether a real operator reply was ever observed, and in what shape.**
+   `GATE-02-REVIEW.md` § Runtime probe records that none was as of gate 2's
+   arming, and that gate 2's parsing criteria were drafted against a measured
+   round-trip rather than a human. If that is still true at close, say so
+   plainly — the parser is unvalidated against a human, and reporting it as
+   validated is the failure `GATE-01.md`'s arming discipline names.
+5. Gate 1's auto-close debt is reconciled: the 19 deferred criteria the
+   `specfuse:autoclose-debt` marker names are each verified or carried into the
+   deferred-verification list of criterion 2.
+6. `specfuse lint --closing` exits 0 before this unit reports `complete`.
 
 **Do not touch.** Any surface outside this feature's folder except the staged
 `LEARNINGS-pending.md` this close is required to write. No source file under

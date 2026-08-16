@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0050-async-drafting-interview
 roadmap_goal: Drafting progresses on the operator's schedule — the agent posts the draft-feature interview as a question issue and drafts from the answers, while planning judgment and the gate-1 checkpoint stay human.
 autonomy_default: auto
 status: planned
-planned_cost_usd: 33.00
+planned_cost_usd: 46.00
 ---
 
 # Plan: Async feature-drafting interview
@@ -181,12 +181,33 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
-      # Substantive units are drafted by gate 1's plan-next. The terminal
-      # close is pre-declared so the linter reads gate 2 — not gate 1 — as
-      # this feature's terminal gate.
+      # Drafted by G1-PLAN. T04 is first and unconditional: gate 1's
+      # interview instructs a reply shape its own parser discards
+      # (GATE-02-REVIEW.md § Runtime probe), so every later unit consumes
+      # what T04 fixes.
+      - id: FEAT-2026-0050/T04
+        file: WU-04-reply-shape-round-trip.md
+        depends_on: []
+      - id: FEAT-2026-0050/T05
+        file: WU-05-draft-feature-answers-mode.md
+        depends_on: []
+      - id: FEAT-2026-0050/T06
+        file: WU-06-drafting-invoke.md
+        depends_on:
+          - FEAT-2026-0050/T04
+          - FEAT-2026-0050/T05
+      - id: FEAT-2026-0050/T07
+        file: WU-07-provider-dispatches-drafting.md
+        depends_on: [FEAT-2026-0050/T06]
+      # The terminal close was pre-declared at draft time so the linter reads
+      # gate 2 — not gate 1 — as this feature's terminal gate.
       - id: FEAT-2026-0050/G2-CLOSE
         file: WU-92-gate-2-close.md
-        depends_on: []
+        depends_on:
+          - FEAT-2026-0050/T04
+          - FEAT-2026-0050/T05
+          - FEAT-2026-0050/T06
+          - FEAT-2026-0050/T07
 ```
 
 ## Notes
@@ -198,9 +219,16 @@ gates:
   post at all; gate 2 changes what happens once answers arrive. One file across
   two gates is the shape that produced FEAT-2026-0075's driver-staleness hazard
   — worth watching at gate 2's arming review, not worth restructuring around.
-- `planned_cost_usd` covers gate 1 plus the pre-declared terminal close.
-  Gate 2's substantive units do not exist yet, so they are not in the sum;
-  `plan-next` raises it when it drafts them.
+- `planned_cost_usd` was $33.00 at draft time — gate 1 plus the pre-declared
+  terminal close. `G1-PLAN` raised it to $46.00 when it drafted gate 2's four
+  substantive units (T04 $3.00, T05 $3.50, T06 $3.00, T07 $3.50).
+- **The provider-wiring overlap was checked, not assumed.**
+  `driver_edit.is_driver_module_path` returns `False` for every path a gate 2
+  unit declares in `produces:`, including `specfuse/agent/providers/feature.py`
+  — the predicate keys on `specfuse/loop/*.py`. No gate 2 unit halts the run
+  for a driver restart. `specfuse/loop/escalation.py` *is* on that surface and
+  is named in T04's **Do not touch** for exactly that reason. See
+  `GATE-02-REVIEW.md` § Predicate check.
 - Costs feed `evaluate_auto_close`'s per-WU ratio check. `G1-PLAN` is budgeted
   **$9.00**, above the $5.00 floor, because `[FEAT-2026-0069/G2-CLOSE]` records
   a real `plan-next` at $16.44 and notes the floor is priced as if closing WUs
