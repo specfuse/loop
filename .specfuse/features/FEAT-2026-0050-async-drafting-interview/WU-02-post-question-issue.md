@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0050/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
   - specfuse/agent/drafting_questions.py
   - tests/test_drafting_question_issue.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-16T12:32:24.455469+00:00
+duration_seconds: 547.812
+cost_usd: 1.009557
+input_tokens: 38
+output_tokens: 14807
 ---
 
 # Post the interview as a question issue
