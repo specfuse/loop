@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0050/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
+verdict: partially_met
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.12.1
+started_at: 2026-08-16T21:12:46.876892+00:00
+duration_seconds: 619.619
+cost_usd: 7.440376
+input_tokens: 3269
+output_tokens: 46194
 ---
 
 # Gate 2 terminal close
