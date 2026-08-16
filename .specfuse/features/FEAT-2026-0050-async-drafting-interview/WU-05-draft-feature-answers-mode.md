@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0050/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 human_only: true
@@ -12,6 +12,13 @@ produces:
   - tests/test_draft_feature_answers_mode.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-16T20:39:34.864412+00:00
+duration_seconds: 719.645
+cost_usd: 1.003346
+input_tokens: 44
+output_tokens: 7785
 ---
 
 # Add `/draft-feature`'s answers-supplied mode
