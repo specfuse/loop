@@ -12,22 +12,29 @@
 
 version: 1
 
-# Operator's stated sequence as of 2026-08-15, groomed via /groom-backlog.
-# FEAT-2026-0079 dropped: shipped and `done` (PR #2344), which validate_agent_policy
-# WARNed on.
+# Operator's stated sequence as of 2026-08-15, groomed via /groom-backlog and
+# reordered the same day.
 #
-# KNOWN CONSEQUENCE, accepted deliberately: none of these four has a feature folder,
-# and an undrafted queue entry produces a `drafting-needed` escalation rather than
-# work. That list is uncapped by `wip_limit`, so an unattended run will spend items
-# on escalations until the top entry is drafted. FEAT-2026-0050 is #1 precisely
-# because it is the fix for that -- async drafting via question issues -- and until
-# it lands, drafting is the bottleneck every other entry hits first. Draft the top
-# entry with /draft-feature before an unattended run to avoid the escalation flood.
+# FEAT-2026-0081 demoted from #2 to #4: its first slice re-runs the next-ID scan
+# inside `/draft-feature` before that skill writes, and FEAT-2026-0050's gate 2
+# adds the answered-questions write path to the same skill. Two in-flight
+# features editing one prose surface is how one silently reverts the other's
+# rule, so 0081 is sequenced behind the feature it collides with.
+#
+# 0050 is drafted (folder + armed gate 1) and is the only entry the feature lane
+# can currently advance. 0058 is drafted next as the hedge: if 0050's gate 1
+# escalates, the lane still has work, and 0058 touches lint_plan.py and a
+# per-feature DECISIONS.md -- no overlap with 0050's surfaces.
+#
+# The remaining entries are still undrafted, so each produces a
+# `drafting-needed` escalation rather than work until 0050 lands. Those
+# escalations are no longer double-counted -- #2384 stopped the triage lane
+# re-classifying them.
 queue:
-  - FEAT-2026-0050   # async drafting -- unblocks drafting for everything below
-  - FEAT-2026-0081   # ID collision -- live ambiguity, cheap, loop-owned surfaces
-  - FEAT-2026-0058   # decision registry -- drift defects with measured cost
-  - FEAT-2026-0052   # baseline-delta ratchet -- operator exits on a red base tree
+  - FEAT-2026-0050   # async drafting -- drafted, dispatchable
+  - FEAT-2026-0058   # decision registry -- drafted next as the hedge
+  - FEAT-2026-0052   # baseline-delta ratchet
+  - FEAT-2026-0081   # ID collision -- behind 0050 g2, shares /draft-feature
 
 rules:
   bugs:
