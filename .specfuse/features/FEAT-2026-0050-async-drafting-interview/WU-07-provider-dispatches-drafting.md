@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0050/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces:
@@ -10,6 +10,13 @@ produces:
   - tests/test_feature_provider_drafting_dispatch.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-16T21:02:12.068470+00:00
+duration_seconds: 634.481
+cost_usd: 1.379538
+input_tokens: 54
+output_tokens: 12343
 ---
 
 # Dispatch the drafting path instead of escalating
