@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 27.00
+baseline:
+  sha: 12b97b9bcea75bcf56a65f50ab5d13947e8aa04e
+  probed_at: 2026-08-16T12:17:03.442563+00:00
+  failing: []
 ---
 
 # Gate 1 — the async interview round-trip
