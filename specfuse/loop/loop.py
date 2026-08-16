@@ -3331,6 +3331,13 @@ _VERDICT_RE = re.compile(
     # that content-free tail.
     r"|\bTests run: \d+, Failures: \d+"      # surefire run summary
     r"|<<< (?:FAILURE|ERROR)!"               # surefire per-test failure marker
+    # tsc / vue-tsc (#2390). Neither prints a summary line under a plain
+    # non-TTY invocation in either direction — success is a silent exit 0,
+    # failure is one `file(line,col): error TSxxxx: message` line per
+    # diagnostic with no trailing count — so without this, every typecheck
+    # failure pinned nothing and degraded to `failure_class: other` with no
+    # compiler output reaching the retry.
+    r"|error TS\d+:"                         # tsc/vue-tsc diagnostic
     r")"
 )
 
