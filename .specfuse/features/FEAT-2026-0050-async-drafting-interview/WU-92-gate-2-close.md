@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0050/G2-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 auto_close_disabled: true

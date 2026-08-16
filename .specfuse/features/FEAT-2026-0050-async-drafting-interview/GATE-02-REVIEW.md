@@ -206,6 +206,12 @@ catches a bad plan (human gate-1 review) while removing the one that only
 catches a bad *typist* (a human watching the write). The reviewer is being
 asked to approve unattended writing, not unattended arming.
 
+**Recorded answer (arming, 2026-08-16).** Accepted as drafted — the
+recommendation, i.e. the second option's constraint. T05's criterion 3 already
+carries it (the drafted folder lands `status: planned` and unarmed), so the
+unit's acceptance criteria are armed unchanged. The `human_only: true`
+precondition is satisfied by this record; T05 may dispatch.
+
 ## Open question 2 — which side of the round-trip T04 should change
 
 **The question.** § Runtime probe shows the instructed reply shape and the
@@ -227,6 +233,10 @@ reverse is also available: teach the parser the numbered form.
 **Recommendation: as drafted (instruct the parseable shape).** The second
 option cannot answer an elicitation question, which is the half D1 refuses to
 default — so it does not close the gap it is proposed for.
+
+**Recorded answer (arming, 2026-08-16).** Accepted as drafted — instruct the
+parseable shape. T04's criterion 2 stands unchanged, and its escalation trigger
+on a contradicting arming decision does not fire.
 
 ## One standing lint WARN, expected
 
