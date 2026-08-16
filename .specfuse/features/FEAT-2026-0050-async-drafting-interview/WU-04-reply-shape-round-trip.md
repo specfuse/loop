@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0050/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
@@ -10,6 +10,13 @@ produces:
   - tests/test_drafting_reply_shape.py
 model: sonnet
 effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-16T20:31:03.992316+00:00
+duration_seconds: 510.61
+cost_usd: 1.302884
+input_tokens: 56
+output_tokens: 8570
 ---
 
 # Make the posted interview instruct the reply shape its parser accepts

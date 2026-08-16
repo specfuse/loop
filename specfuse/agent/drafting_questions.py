@@ -33,6 +33,8 @@ __all__ = (
     "load_learnings_slice",
     "load_exemplar_plan",
     "render_question_issue",
+    "ANSWER_TEMPLATE_START",
+    "ANSWER_TEMPLATE_END",
 )
 
 _SURFACE_RE = re.compile(r"`([^`\n]+)`")
@@ -252,6 +254,13 @@ def _question_marker(question_id: str) -> str:
     return _QUESTION_MARKER_TEMPLATE.format(question_id=question_id)
 
 
+#: Delimiters around the copyable answer-template block `render_question_issue`
+#: appends, so a caller (or a test) can extract exactly that block without
+#: parsing the whole rendered body's structure.
+ANSWER_TEMPLATE_START = "<!-- specfuse:answer-template start -->"
+ANSWER_TEMPLATE_END = "<!-- specfuse:answer-template end -->"
+
+
 def render_question_issue(
     correlation_id: str, questions: Sequence[Question]
 ) -> tuple:
@@ -277,6 +286,15 @@ def render_question_issue(
     `"{question.id}: {option}"` so its owning question stays legible, and
     the recommended option named both there and in the rendered
     recommendation part.
+
+    The rendered body's numbered-options section asks for a bare number,
+    a shape `drafting_answers.parse_reply_answers` does not bind (it reads
+    `"{question_id}: <answer>"` lines only, and elicitation questions
+    contribute no number in the first place). To close that gap this also
+    appends an answer-template block -- one `"{question.id}: <answer>"` line
+    per question, elicitation and decision alike -- naming the exact shape a
+    reply must take for `parse_reply_answers` to bind it. Additive: the
+    numbered section above is untouched.
     """
     if not questions:
         raise ValueError("render_question_issue requires at least one question")
@@ -297,6 +315,17 @@ def render_question_issue(
                 cons = "" if recommended else "not the recommended choice"
                 options.append((f"{question.id}: {option}", pros, cons))
         decision_lines.append("")
+
+    decision_lines.append(ANSWER_TEMPLATE_START)
+    decision_lines.append(
+        "Copy this block, fill in each line, and reply with it as-is:"
+    )
+    decision_lines.append("```")
+    for question in questions:
+        decision_lines.append(f"{question.id}: <your answer>")
+    decision_lines.append("```")
+    decision_lines.append(ANSWER_TEMPLATE_END)
+    decision_lines.append("")
 
     body = escalation.render_escalation_body(
         correlation_id,
