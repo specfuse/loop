@@ -2,6 +2,10 @@
 gate: 2
 status: open
 cost_budget_usd: 25.00
+baseline:
+  sha: 0d5a40edbd606c994de8edd64fda53fb9de6eab9
+  probed_at: 2026-08-16T20:25:59.374084+00:00
+  failing: []
 ---
 
 # Gate 2 — drafting from answers
