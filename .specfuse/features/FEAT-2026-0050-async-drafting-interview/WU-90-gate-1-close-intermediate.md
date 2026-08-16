@@ -1,9 +1,11 @@
 ---
 id: FEAT-2026-0050/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
+status: done
 attempts: 0
 planned_cost_usd: 6.00
+auto_close: true
+auto_close_reasons: []
 ---
 
 # Gate 1 close — retrospective, lessons, docs
