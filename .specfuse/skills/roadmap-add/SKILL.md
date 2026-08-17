@@ -43,16 +43,26 @@ issue/PR titles are not reused.
   (Do not confuse a roadmap *feature* `blocked` status with this skill's own
   RESULT `status: blocked` on a sequence-gap escalation below — the latter is
   this run's outcome, never written into the roadmap table.)
+- **Every detail section gets an anchor, and the row's `Detail` cell points at
+  it.** The anchor is what `lint_roadmap`'s ref-resolution invariant resolves
+  against; writing the section without one reds the link gate. See Step 5 and
+  the note under Step 6.
 - **No git.** The driver owns all commits. Edit files only.
 - **Interactive mode only confirms once** — the presented next ID, then collects
   fields. It does not re-ask for confirmation before writing.
 
 ## String formats (load-bearing — do not alter)
 
-Table row:
+Table row (the `Detail` cell links to the detail section's anchor):
 
 ```
-| <FEAT-YYYY-NNNN> | <title> | planned | — | — |
+| <FEAT-YYYY-NNNN> | <title> | planned | — | [→ detail](#feat-yyyy-nnnn) |
+```
+
+Anchor (its own line, immediately above the `## FEAT-…` heading):
+
+```
+<a id="feat-yyyy-nnnn"></a>
 ```
 
 Detail section heading:
@@ -60,6 +70,12 @@ Detail section heading:
 ```
 ## <FEAT-YYYY-NNNN> — <title>
 ```
+
+In the anchor and the `Detail` cell's ref, replace `feat-yyyy-nnnn` with the
+**lower-cased** feature ID (`FEAT-2026-0003` → `feat-2026-0003`). Same strings
+`/roadmap-archive` uses, which is what lets it later rewrite the `Detail` cell
+to `[→ archive](roadmap-archive.md#feat-yyyy-nnnn)` and move the anchor with
+its section.
 
 Detail section body (five blocks, blank line between each):
 
@@ -260,12 +276,15 @@ ERROR: ## Notes section not found in roadmap.md — cannot place detail section.
 ### Step 4 — Build and insert the new row
 
 ```
-| <feat-id> | <title> | planned | — | — |
+| <feat-id> | <title> | planned | — | [→ detail](#<feat-id-lower>) |
 ```
 
 ### Step 5 — Build and insert the detail section
 
+The anchor line is **not optional** — see the note under Step 6.
+
 ```
+<a id="<feat-id-lower>"></a>
 ## <feat-id> — <title>
 
 **Why.** <why>
@@ -290,6 +309,29 @@ Insert before the `## Notes` line.
 
 The `slug` field is for the operator's reference when creating the feature folder
 (`FEAT-YYYY-NNNN-<slug>`). The skill does not create the folder.
+
+**Why the anchor is load-bearing.** `lint_roadmap` (`specfuse/loop/lint_roadmap.py`)
+collects anchors from `<a id="…">` lines **only** — never from heading text — and
+errors on any `#feat-…` ref that does not resolve. A detail section written
+without one therefore fails the link gate as soon as anything points at it:
+
+```
+ERROR: ref '#feat-2026-0082' in roadmap.md does not resolve — no anchor
+       'feat-2026-0082' found in roadmap.md or roadmap-archive.md
+```
+
+That gate runs in CI over the checked-in roadmap (`tests/test_lint_roadmap.py`,
+`tests/test_roadmap_link_gate.py`), so an anchorless section reds the suite for
+whoever touches the roadmap next rather than for whoever ran this skill. The
+anchor must sit on its own line directly above the heading, with nothing but
+blank lines between them — `_check_anchor_adjacency` errors on an anchor whose
+next non-blank line is not its own `## FEAT-…` heading.
+
+After writing, confirm with:
+
+```
+python3 -c "from pathlib import Path; from specfuse.loop.lint_roadmap import lint_roadmap; print(lint_roadmap(Path('.')))"
+```
 
 ## Interactive mode
 
