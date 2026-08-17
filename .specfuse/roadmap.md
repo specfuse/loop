@@ -938,6 +938,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
 
+<a id="feat-2026-0082"></a>
 ## FEAT-2026-0082 — Wire the async drafting interview end to end
 
 **Why.** FEAT-2026-0050 built the async drafting interview — question-set builder, issue renderer, reply parser, D1 answer gate, headless drafting invocation, provider dispatch branch — and closed `partially_met` because none of it is reachable. Two seams were never assigned to any work unit: no production code calls `render_question_issue`, so no question issue is ever posted; and `default_providers` constructs `FeatureProvider` without an `answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real run and `needs_drafting` escalates exactly as it did before. Neither gate's Definition of Done named either seam, so every unit passed first try and the bottleneck the feature was filed for is untouched. The operator accepted the hedge on 2026-08-17 with the reason "This will have to be tested with a real feature"; this row is the work that makes that test possible.
