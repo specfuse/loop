@@ -95,6 +95,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-2026-0079) |
 | FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
 | FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | — | [→ detail](#feat-2026-0081) |
+| FEAT-2026-0082 | Wire the async drafting interview end to end | planned | — | [→ detail](#feat-2026-0082) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -936,6 +937,16 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Benefits.** The expensive moment moves from merge — where the ID is already embedded in a dozen files across a closed gate — to lint, or is avoided entirely. Renumbering stops being a silent-failure operation performed by hand under time pressure. And the rule about which files keep the old ID is written down once, rather than being rediscovered by whoever pays for the next collision.
 
 **Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
+
+## FEAT-2026-0082 — Wire the async drafting interview end to end
+
+**Why.** FEAT-2026-0050 built the async drafting interview — question-set builder, issue renderer, reply parser, D1 answer gate, headless drafting invocation, provider dispatch branch — and closed `partially_met` because none of it is reachable. Two seams were never assigned to any work unit: no production code calls `render_question_issue`, so no question issue is ever posted; and `default_providers` constructs `FeatureProvider` without an `answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real run and `needs_drafting` escalates exactly as it did before. Neither gate's Definition of Done named either seam, so every unit passed first try and the bottleneck the feature was filed for is untouched. The operator accepted the hedge on 2026-08-17 with the reason "This will have to be tested with a real feature"; this row is the work that makes that test possible.
+
+**Goal.** A `specfuse-agent` run over a `queue:` holding one undrafted `planned` feature posts a real `drafting-needed` question issue, and a later run reads the operator's reply from that issue's comments and produces a drafted feature folder — with the run's `events.jsonl` showing `needs_drafting` resolving to a completed drafting dispatch rather than an escalation. At least one gate's Definition of Done asserts that end-to-end outcome, so the plan cannot pass green while the pieces stay disconnected. Gate-1 review of the drafted folder stays human; the drafted folder still lands `status: planned` and unarmed.
+
+**Benefits.** Discharges both carried-forward follow-ups on FEAT-2026-0050 and upgrades its verdict from `partially_met` to `met`. Removes the escalate-and-wait bottleneck the earlier feature was funded for — measured 2026-08-15, four `planned` queue entries produced four `drafting-needed` escalations and zero units of work. And it produces the evidence `GATE-01.md`'s arming discipline asked for and never got: one real operator reply, whose verbatim text validates (or corrects) a parser every reply shape in FEAT-2026-0050 was designed against without a human ever touching it.
+
+**Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
 
 ## Notes
 
