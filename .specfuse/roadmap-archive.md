@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0050"></a>
+## FEAT-2026-0050 — Async feature-drafting interview via question issues
+
+**Why.** In agent v1, an undrafted queue-top feature escalates and waits for an interactive /draft-feature session — correct sequencing (planning is where human judgment adds most), but it becomes the throughput bottleneck once the agent outpaces operator session availability. The interview itself can move async without surrendering drafting quality.
+
+**Goal.** Agent-preparable drafting: for a drafting-needed queue top, the agent studies the roadmap entry, LEARNINGS, exemplars, and the codebase, then posts the draft-feature interview as a needs-human question issue — batched questions in the established format (elicitation open; decisions with prose pros/cons + recommendation), at most two rounds. From the answers it drafts the feature folder, logging explicit assumptions for anything unanswered; gate-1 review remains human per the `gate_review` dial. Falls back to plain escalation when answers are too thin to draft responsibly.
+
+**Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
+
+**Status: done.**
+
 <a id="feat-2026-0079"></a>
 ## FEAT-2026-0079 — One owner for the roadmap-archive algorithm (skill/driver de-duplication)
 
@@ -80,7 +91,7 @@ sections inline in `roadmap.md`.
 
 **Shape.** Three gates. Gate 1 builds the conductor's stopping properties — its own `.specfuse/.agent.lock` (separate from the driver's, which `loop.run()` takes itself), item-boundary caps, PAUSE marker, one repo-state snapshot carrying the first real reader of `queue:` — and drains an empty provider registry. Gate 2 adds the four cheap action classes over already-shipped composition (`run_bug_lane`, `apply_triage`, `diagnose_cli`, `run_autofix`). Gate 3 adds feature advancement, invoking the driver as a subprocess and switching away on an `awaiting_review` halt. New code lives in a new `specfuse/agent/` package, deliberately outside `driver_edit`'s `specfuse/loop/` halt prefix.
 
-**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](roadmap.md#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
+**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
 
 **Status: done.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
 

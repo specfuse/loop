@@ -4,7 +4,7 @@ type: close
 status: done
 attempts: 1
 planned_cost_usd: 6.00
-verdict: partially_met
+verdict: met
 auto_close_disabled: true
 model: opus
 effort: high

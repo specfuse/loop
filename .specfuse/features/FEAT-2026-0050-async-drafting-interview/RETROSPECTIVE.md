@@ -430,3 +430,66 @@ criteria ever asserted them:
 The gap between "every criterion green" and "the feature worked" is exactly the
 distance between those two lists, and it is the reason this feature closes
 `partially_met` rather than `met`.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `partially_met`
+
+**Operator reason (verbatim):** "This will have to be tested with a real
+feature"
+
+**Recorded at:** 2026-08-17T11:47:22Z
+
+**Computed ceiling at acceptance:** `rework exists` — both entries below carry
+`kind: externally-verifiable-later`, so in-repo rework *can* raise this verdict.
+The operator accepted now rather than waiting for the named re-run condition.
+
+Both follow-ups below are carried forward **open**. Accepting the hedge ships
+the feature with them outstanding; it does not discharge either one.
+
+### Carried forward 1 — the feature has not removed the bottleneck it was filed for
+
+**Criterion, verbatim (`WU-92` acceptance criterion 3):** *"Whether the feature
+actually removed the bottleneck it was filed for. The measurable claim: a
+`drafting-needed` queue entry reaches a drafted folder without an interactive
+session."*
+
+**Why it is unmet here.** Not an environment limit — a wiring gap. No
+production code calls `render_question_issue`, so no question issue is ever
+posted; and `default_providers` constructs `FeatureProvider` without an
+`answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real
+run. Both are quoted with their greps in § Did the feature remove the
+bottleneck. The three modules and the skill mode are green in isolation and
+connected to nothing.
+
+**Exact re-run condition that would upgrade this to `met`.** A follow-up
+feature closes the two seams — a caller that posts the rendered issue, and an
+`answer_gate` injected in `default_providers` that reads the reply from that
+issue's comments — after which a `specfuse-agent` run over a `queue:` holding
+one undrafted `planned` feature produces a drafted feature folder, and the run's
+`events.jsonl` shows `needs_drafting` resolving to a completed drafting
+dispatch rather than an escalation. That run, and its resulting folder, is the
+evidence.
+
+- **kind:** `externally-verifiable-later`
+
+### Carried forward 2 — no real operator reply has ever been observed
+
+**Criterion, verbatim (`WU-92` acceptance criterion 4):** *"Whether a real
+operator reply was ever observed, and in what shape."*
+
+**Why it is unmet here.** It is answerable — the answer is "none, ever" — but
+the property gate 2's parsing criteria were drafted to hold cannot be checked:
+with no issue posted (seam 1), there is nothing for an operator to reply to.
+Every reply shape in this feature is designed. The round-trip is proven against
+a synthetic reply and fails closed on a mis-shaped one; neither observation is
+about a human.
+
+**Exact re-run condition that would upgrade this to `met`.** One real
+`drafting-needed` question issue posted to the repository, one operator reply,
+and that reply's verbatim text fed to `parse_reply_answers` with the resulting
+bindings recorded. If it binds every question, the parser is validated; if it
+does not, the recorded shape is what the next iteration is drafted against —
+which is the evidence `GATE-01.md`'s arming discipline asked for and never got.
+
+- **kind:** `externally-verifiable-later`

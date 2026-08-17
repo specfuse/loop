@@ -5,7 +5,7 @@ slug: async-drafting-interview
 branch: feat/FEAT-2026-0050-async-drafting-interview
 roadmap_goal: Drafting progresses on the operator's schedule — the agent posts the draft-feature interview as a question issue and drafts from the answers, while planning judgment and the gate-1 checkpoint stay human.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 46.00
 ---
 

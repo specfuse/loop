@@ -65,7 +65,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
-| FEAT-2026-0050 | Async feature-drafting interview via question issues | planned | `.specfuse/features/FEAT-2026-0050-async-drafting-interview/` | [→ detail](#feat-2026-0050) |
+| FEAT-2026-0050 | Async feature-drafting interview via question issues | done | `.specfuse/features/FEAT-2026-0050-async-drafting-interview/` | [→ archive](roadmap-archive.md#feat-2026-0050) |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
@@ -790,17 +790,6 @@ machine-checkable contract rather than prose.
 **Goal.** Container image build for the harvester CLI, a CronJob manifest template, Azure workload-identity setup docs (read-only Service Bus Listen + App Insights access, GH token for issue writes), and derive-monitoring drafting support for `runner: in-cluster` components. Same CLI, same monitoring.yml, same issue contract — only the launch surface differs.
 
 **Benefits.** Completes the per-component runner matrix (local for tuning, gh-actions for turnkey, in-cluster for perimeter-bound orgs); schedules honored tightly; credentials never leave Azure.
-
-**Status: planned.**
-
-<a id="feat-2026-0050"></a>
-## FEAT-2026-0050 — Async feature-drafting interview via question issues
-
-**Why.** In agent v1, an undrafted queue-top feature escalates and waits for an interactive /draft-feature session — correct sequencing (planning is where human judgment adds most), but it becomes the throughput bottleneck once the agent outpaces operator session availability. The interview itself can move async without surrendering drafting quality.
-
-**Goal.** Agent-preparable drafting: for a drafting-needed queue top, the agent studies the roadmap entry, LEARNINGS, exemplars, and the codebase, then posts the draft-feature interview as a needs-human question issue — batched questions in the established format (elicitation open; decisions with prose pros/cons + recommendation), at most two rounds. From the answers it drafts the feature folder, logging explicit assumptions for anything unanswered; gate-1 review remains human per the `gate_review` dial. Falls back to plain escalation when answers are too thin to draft responsibly.
-
-**Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
 
 **Status: planned.**
 
