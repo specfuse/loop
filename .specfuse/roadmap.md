@@ -65,7 +65,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
 | FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
 | FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
-| FEAT-2026-0050 | Async feature-drafting interview via question issues | planned | `.specfuse/features/FEAT-2026-0050-async-drafting-interview/` | [→ detail](#feat-2026-0050) |
+| FEAT-2026-0050 | Async feature-drafting interview via question issues | done | `.specfuse/features/FEAT-2026-0050-async-drafting-interview/` | [→ archive](roadmap-archive.md#feat-2026-0050) |
 | FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
 | FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | — | — |
 | FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
@@ -95,6 +95,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-2026-0079) |
 | FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
 | FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | — | [→ detail](#feat-2026-0081) |
+| FEAT-2026-0082 | Wire the async drafting interview end to end | planned | — | [→ detail](#feat-2026-0082) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -793,17 +794,6 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0050"></a>
-## FEAT-2026-0050 — Async feature-drafting interview via question issues
-
-**Why.** In agent v1, an undrafted queue-top feature escalates and waits for an interactive /draft-feature session — correct sequencing (planning is where human judgment adds most), but it becomes the throughput bottleneck once the agent outpaces operator session availability. The interview itself can move async without surrendering drafting quality.
-
-**Goal.** Agent-preparable drafting: for a drafting-needed queue top, the agent studies the roadmap entry, LEARNINGS, exemplars, and the codebase, then posts the draft-feature interview as a needs-human question issue — batched questions in the established format (elicitation open; decisions with prose pros/cons + recommendation), at most two rounds. From the answers it drafts the feature folder, logging explicit assumptions for anything unanswered; gate-1 review remains human per the `gate_review` dial. Falls back to plain escalation when answers are too thin to draft responsibly.
-
-**Benefits.** Drafting progresses on the operator's schedule (answer questions from anywhere, agent does the assembly) while planning judgment and the gate-1 checkpoint stay human — the last throughput bottleneck relieved without repeating the assumption-built-plan failure mode.
-
-**Status: planned.**
-
 <a id="feat-2026-0052"></a>
 ## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
 
@@ -947,6 +937,17 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Benefits.** The expensive moment moves from merge — where the ID is already embedded in a dozen files across a closed gate — to lint, or is avoided entirely. Renumbering stops being a silent-failure operation performed by hand under time pressure. And the rule about which files keep the old ID is written down once, rather than being rediscovered by whoever pays for the next collision.
 
 **Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
+
+<a id="feat-2026-0082"></a>
+## FEAT-2026-0082 — Wire the async drafting interview end to end
+
+**Why.** FEAT-2026-0050 built the async drafting interview — question-set builder, issue renderer, reply parser, D1 answer gate, headless drafting invocation, provider dispatch branch — and closed `partially_met` because none of it is reachable. Two seams were never assigned to any work unit: no production code calls `render_question_issue`, so no question issue is ever posted; and `default_providers` constructs `FeatureProvider` without an `answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real run and `needs_drafting` escalates exactly as it did before. Neither gate's Definition of Done named either seam, so every unit passed first try and the bottleneck the feature was filed for is untouched. The operator accepted the hedge on 2026-08-17 with the reason "This will have to be tested with a real feature"; this row is the work that makes that test possible.
+
+**Goal.** A `specfuse-agent` run over a `queue:` holding one undrafted `planned` feature posts a real `drafting-needed` question issue, and a later run reads the operator's reply from that issue's comments and produces a drafted feature folder — with the run's `events.jsonl` showing `needs_drafting` resolving to a completed drafting dispatch rather than an escalation. At least one gate's Definition of Done asserts that end-to-end outcome, so the plan cannot pass green while the pieces stay disconnected. Gate-1 review of the drafted folder stays human; the drafted folder still lands `status: planned` and unarmed.
+
+**Benefits.** Discharges both carried-forward follow-ups on FEAT-2026-0050 and upgrades its verdict from `partially_met` to `met`. Removes the escalate-and-wait bottleneck the earlier feature was funded for — measured 2026-08-15, four `planned` queue entries produced four `drafting-needed` escalations and zero units of work. And it produces the evidence `GATE-01.md`'s arming discipline asked for and never got: one real operator reply, whose verbatim text validates (or corrects) a parser every reply shape in FEAT-2026-0050 was designed against without a human ever touching it.
+
+**Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
 
 ## Notes
 
