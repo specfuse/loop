@@ -35,10 +35,10 @@ from specfuse.loop.loop import (  # noqa: E402  (after sys.path setup above)
 class TestTscVerdictsAreRecognised(unittest.TestCase):
     def test_tsc_diagnostic_line_is_pinned_as_a_verdict(self):
         out = (
-            "> restomanager-admin-app@0.0.0 typecheck\n"
+            "> acme-admin-app@0.0.0 typecheck\n"
             "> vue-tsc --noEmit\n"
             "\n"
-            "packages/restomanager-core/src/data/api/user-api-client.ts"
+            "packages/acme-core/src/data/api/user-api-client.ts"
             "(275,42): error TS6133: 'file' is declared but its value is "
             "never read.\n"
         )
