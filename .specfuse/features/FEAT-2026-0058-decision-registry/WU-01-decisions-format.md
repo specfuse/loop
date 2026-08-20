@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0058/T01
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 4.00
 oracle_env: macos_local
@@ -10,6 +10,10 @@ produces:
   - specfuse/loop/data/templates/DECISIONS.template.md
   - .specfuse/features/FEAT-2026-0058-decision-registry/DECISIONS.md
   - tests/test_decisions_format.py
+duration_seconds: 1720.732
+cost_usd: 4.954247
+input_tokens: 7676
+output_tokens: 38875
 ---
 
 # Define the DECISIONS.md format and fill it for this feature
