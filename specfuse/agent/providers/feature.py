@@ -11,10 +11,13 @@ that already passed. `snapshot.queue` is still trusted: the queue order
 itself does not change mid-run, only what each entry resolves to.
 
 Every un-workable disposition `queue_read.classify_queue_entry` can return
-gets one `blocked-wu` or `drafting-needed` escalation here; drafting a
-feature is out of scope for this provider (`PLAN.md` "Scope boundary") --
-`needs_drafting` always escalates, never invokes anything under
-`/draft-feature`.
+gets one `blocked-wu` or `drafting-needed` escalation here, except
+`needs_drafting`, which has two branches (FEAT-2026-0050/T07): the injected
+`answer_gate` is asked for `feature_id`'s answer-gate result, and a
+`draft_ready` result dispatches the headless drafting session through the
+provider's own `runner` instead of escalating; a `fallback` result still
+escalates with the plain `drafting-needed` payload
+(`drafting_answers.fallback_escalation`), unchanged from before this unit.
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from typing import Any, Callable, Optional, Sequence
 
 from specfuse.agent import driver_command as driver_command_module
 from specfuse.agent import driver_invoke, queue_read, state
+from specfuse.agent import drafting_answers, drafting_invoke
 from specfuse.agent.run import (
     KIND_FEATURE,
     STATUS_COMPLETED,
@@ -36,8 +40,6 @@ from specfuse.agent.run import (
 from specfuse.agent.state import AgentSnapshot
 
 _ITEM_ID_PREFIX = "feature-"
-
-_ARM_GATE_DRAFTING_FEATURE = "FEAT-2026-0050"
 
 
 def _first_unpassed_gate(gates: tuple) -> Optional[int]:
@@ -74,11 +76,18 @@ class FeatureProvider:
         stream_driver_output: bool = False,
         reporter: Optional[Callable[[str], None]] = None,
         driver_command: Optional[Sequence[str]] = None,
+        answer_gate: Optional[
+            Callable[[str], drafting_answers.AnswerGateResult]
+        ] = None,
     ):
         self._repo = repo
         self._runner = runner
         self._policy_path = policy_path
         self._features_root = features_root if features_root is not None else ".specfuse/features"
+        #: Defaults to a fallback-only reader so a caller that injects nothing
+        #: keeps today's behaviour -- no answers exist anywhere yet to read,
+        #: so `needs_drafting` still escalates every time (D3).
+        self._answer_gate = answer_gate or self._fallback_answer_gate
         self._rows: dict = {}
         #: Opt-in rather than default-on so every existing caller that injects
         #: its own `runner` keeps using it. The tests here inject recording
@@ -164,35 +173,7 @@ class FeatureProvider:
             return self._advance(feature_id)
 
         if disposition == queue_read.DISPOSITION_NEEDS_DRAFTING:
-            escalation = EscalationPayload(
-                done_so_far=f"{feature_id} is in the queue but has no feature folder.",
-                issue_summary=(
-                    f"{feature_id} needs to be drafted before it can be advanced."
-                ),
-                decision_needed=f"Draft {feature_id} — its gate skeleton and gate 1 work units.",
-                why_not_auto=(
-                    "Drafting a feature is out of this provider's scope; async "
-                    f"drafting is tracked by {_ARM_GATE_DRAFTING_FEATURE}, which "
-                    f"lists this feature as its blocker."
-                ),
-                options=[
-                    (
-                        "Draft the feature by hand or via /draft-feature",
-                        "unblocks the queue entry",
-                        "costs a human's time",
-                    ),
-                    (
-                        "Remove it from the queue",
-                        "no immediate cost",
-                        "the feature stays undrafted",
-                    ),
-                ],
-                recommendation=f"Draft {feature_id} via /draft-feature.",
-                category="drafting-needed",
-            )
-            return ActionOutcome(
-                status=STATUS_ESCALATED, detail="needs drafting", escalation=escalation
-            )
+            return self._dispatch_drafting(feature_id)
 
         # DISPOSITION_BLOCKED, DISPOSITION_UNREADABLE
         detail = row.get("detail")
@@ -223,6 +204,36 @@ class FeatureProvider:
             status=STATUS_ESCALATED,
             detail=f"{disposition}: {detail}",
             escalation=escalation,
+        )
+
+    def _fallback_answer_gate(self, feature_id: str) -> drafting_answers.AnswerGateResult:
+        return drafting_answers.AnswerGateResult(
+            outcome=drafting_answers.OUTCOME_FALLBACK,
+            escalation=drafting_answers.fallback_escalation(feature_id),
+        )
+
+    def _dispatch_drafting(self, feature_id: str) -> ActionOutcome:
+        """`needs_drafting`'s two branches (FEAT-2026-0050/T07).
+
+        A `fallback` gate result escalates with the same payload this branch
+        has always produced (D3); a `draft_ready` result builds the headless
+        `/draft-feature` invocation and dispatches it through the provider's
+        own `runner`, the same one `_advance` uses for `specfuse run`.
+        """
+        gate_result = self._answer_gate(feature_id)
+        if gate_result.outcome != drafting_answers.OUTCOME_DRAFT_READY:
+            escalation = gate_result.escalation or drafting_answers.fallback_escalation(
+                feature_id
+            )
+            return ActionOutcome(
+                status=STATUS_ESCALATED, detail="needs drafting", escalation=escalation
+            )
+
+        argv, prompt = drafting_invoke.build_invocation(feature_id, gate_result)
+        self._runner(argv + [prompt], check=False)
+        return ActionOutcome(
+            status=STATUS_COMPLETED,
+            detail=f"{feature_id}: drafting session dispatched",
         )
 
     def _advance(self, feature_id: str) -> ActionOutcome:

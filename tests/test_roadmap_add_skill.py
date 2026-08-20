@@ -248,7 +248,11 @@ def add_feature(
     if last_row_idx is None:
         raise ValueError("No feature table rows found in roadmap.md")
 
-    new_row = f"| {feat_id} | {title} | planned | — | — |\n"
+    feat_id_lower = feat_id.lower()
+    new_row = (
+        f"| {feat_id} | {title} | planned | — "
+        f"| [→ detail](#{feat_id_lower}) |\n"
+    )
     lines.insert(last_row_idx + 1, new_row)
 
     # Find ## Notes section (insert detail before it)
@@ -262,6 +266,11 @@ def add_feature(
         raise ValueError("## Notes section not found in roadmap.md")
 
     detail = (
+        # The anchor is what the row's `[→ detail](#feat-…)` ref resolves
+        # against: lint_roadmap collects anchors from `<a id="…">` lines only,
+        # never from heading text, so a detail section written without one
+        # fails the link gate's ref-resolution invariant.
+        f'<a id="{feat_id_lower}"></a>\n'
         f"## {feat_id} — {title}\n"
         f"\n"
         f"**Why.** {why}\n"
@@ -418,6 +427,80 @@ class TestAddFeatureHeadless(unittest.TestCase):
         )
         text = self.roadmap.read_text()
         self.assertIn("## FEAT-2026-0011 — New feature", text)
+
+    def test_detail_section_carries_a_resolvable_anchor(self):
+        """The row's `[→ detail](#feat-…)` ref resolves only against an
+        `<a id="…">` line — `lint_roadmap._find_anchors` never reads heading
+        text. A section written without one reds both roadmap lint invariants
+        on the real tree, which is how this was found: a hand-run of the skill's
+        documented write algorithm produced
+
+            ref '#feat-2026-0082' in roadmap.md does not resolve — no anchor
+            'feat-2026-0082' found in roadmap.md or roadmap-archive.md
+        """
+        add_feature(
+            self.roadmap,
+            "FEAT-2026-0011",
+            "New feature",
+            "Because it matters.",
+            "Ship it.",
+            "Faster, better.",
+        )
+        text = self.roadmap.read_text()
+        self.assertIn('<a id="feat-2026-0011"></a>', text)
+
+    def test_anchor_is_immediately_above_its_heading(self):
+        """`_check_anchor_adjacency` errors unless the next non-blank line after
+        an anchor is that ID's `## FEAT-…` heading."""
+        add_feature(
+            self.roadmap,
+            "FEAT-2026-0011",
+            "New feature",
+            "Because it matters.",
+            "Ship it.",
+            "Faster, better.",
+        )
+        lines = self.roadmap.read_text().splitlines()
+        idx_anchor = next(
+            i for i, line in enumerate(lines)
+            if line.strip() == '<a id="feat-2026-0011"></a>'
+        )
+        self.assertEqual(
+            lines[idx_anchor + 1].strip(),
+            "## FEAT-2026-0011 — New feature",
+        )
+
+    def test_anchor_id_is_lower_cased(self):
+        """Anchor IDs are lower-cased; the ref in the Detail cell must match."""
+        add_feature(
+            self.roadmap,
+            "FEAT-2026-0011",
+            "New feature",
+            "Because it matters.",
+            "Ship it.",
+            "Faster, better.",
+        )
+        text = self.roadmap.read_text()
+        self.assertNotIn('<a id="FEAT-2026-0011"></a>', text)
+
+    def test_row_detail_cell_links_to_the_anchor(self):
+        """An anchor nothing points at is dead weight: every row in a real
+        roadmap carries `[→ detail](#feat-…)`, and `/roadmap-archive` later
+        rewrites that same cell to its `[→ archive](…)` back-link."""
+        add_feature(
+            self.roadmap,
+            "FEAT-2026-0011",
+            "New feature",
+            "Because it matters.",
+            "Ship it.",
+            "Faster, better.",
+        )
+        text = self.roadmap.read_text()
+        self.assertIn(
+            "| FEAT-2026-0011 | New feature | planned | — "
+            "| [→ detail](#feat-2026-0011) |",
+            text,
+        )
 
     def test_detail_section_contains_why(self):
         add_feature(
@@ -867,6 +950,79 @@ class TestCollisionRejection(unittest.TestCase):
         collides, filepath, lineno = check_collision("FEAT-2026-0016", sources)
         self.assertTrue(collides, "GitHub-reserved ID must collide")
         self.assertIn("GitHub", filepath)
+
+
+class TestProducedRoadmapPassesTheLinkGate(unittest.TestCase):
+    """The gate that actually caught this: `lint_roadmap` over the real tree.
+
+    `tests/test_lint_roadmap.py` and `tests/test_roadmap_link_gate.py` both run
+    the link gate against the checked-in roadmap, so a section this skill writes
+    without an anchor reds the suite for whoever adds the next feature — not for
+    whoever ran the skill. Running the gate over the skill's own output closes
+    that loop here.
+    """
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self.repo_root = Path(self._tmpdir.name)
+        specfuse_dir = self.repo_root / ".specfuse"
+        specfuse_dir.mkdir()
+        self.roadmap = specfuse_dir / "roadmap.md"
+        self.roadmap.write_text(_ROADMAP_STUB)
+        (specfuse_dir / "roadmap-archive.md").write_text(
+            "# Roadmap archive\n\n<!-- Archived sections appended below -->\n"
+        )
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_link_gate_is_clean_after_add_feature(self):
+        from specfuse.loop.lint_roadmap import lint_roadmap
+
+        before = lint_roadmap(self.repo_root)
+        self.assertEqual(
+            [f for f in before if f.severity == "error"], [],
+            "fixture roadmap must start clean or the assertion below is vacuous",
+        )
+
+        add_feature(
+            self.roadmap,
+            "FEAT-2026-0011",
+            "New feature",
+            "Because it matters.",
+            "Ship it.",
+            "Faster, better.",
+        )
+
+        errors = [f for f in lint_roadmap(self.repo_root) if f.severity == "error"]
+        self.assertEqual(errors, [], f"link gate found violations: {errors}")
+
+
+class TestSkillDocumentsTheAnchor(unittest.TestCase):
+    """The skill prose must document the anchor, not just the heading.
+
+    The reference implementation above and the authored SKILL.md are two copies
+    of one algorithm; an operator (or an agent) following § String formats and
+    § Write algorithm verbatim must land on a lint-clean roadmap.
+    """
+
+    def setUp(self):
+        repo_root = Path(__file__).resolve().parent.parent
+        self.skill = (
+            repo_root / "plugins" / "specfuse" / "skills"
+            / "roadmap-add" / "SKILL.md"
+        ).read_text()
+
+    def test_string_formats_declare_the_anchor(self):
+        self.assertIn('<a id="feat-yyyy-nnnn"></a>', self.skill)
+
+    def test_row_format_declares_the_detail_ref(self):
+        self.assertIn("[→ detail](#feat-yyyy-nnnn)", self.skill)
+
+    def test_write_algorithm_names_the_link_gate(self):
+        # Naming the gate is what stops a future edit from "simplifying" the
+        # anchor back out again.
+        self.assertIn("lint_roadmap", self.skill)
 
 
 class TestSkillDocumentsGitHubSource(unittest.TestCase):

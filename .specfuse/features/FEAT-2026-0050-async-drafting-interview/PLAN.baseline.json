@@ -1,0 +1,50 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Build the drafting interview's question set",
+          "id": "FEAT-2026-0050/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Post the interview as a question issue",
+          "id": "FEAT-2026-0050/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Read the answers and apply the D1 gate",
+          "id": "FEAT-2026-0050/T03",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 retrospective, lessons, docs",
+          "id": "FEAT-2026-0050/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 6.0,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 and write its arming review",
+          "id": "FEAT-2026-0050/G1-PLAN",
+          "planned_cost_usd": 9.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Gate 2 terminal close",
+          "id": "FEAT-2026-0050/G2-CLOSE",
+          "planned_cost_usd": 6.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
