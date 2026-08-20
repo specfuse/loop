@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0050/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 produces:
   - specfuse/agent/drafting_answers.py
   - tests/test_drafting_answer_gate.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.12.1
+started_at: 2026-08-16T12:41:32.488284+00:00
+duration_seconds: 741.882
+cost_usd: 1.893161
+input_tokens: 74
+output_tokens: 25676
 ---
 
 # Read the answers and apply the D1 gate

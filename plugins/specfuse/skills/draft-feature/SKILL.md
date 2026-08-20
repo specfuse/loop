@@ -354,6 +354,43 @@ When emitted, `status: complete` means the user accepted, files are written, and
 lint passes. If the user abandoned partway, emit `status: blocked`
 with what was decided so far in `blocked_reason`.
 
+## Answers-supplied mode
+
+The skill's write rule, restated for this mode: it **never writes without
+answers** — it writes when it has answers, whatever channel those answers
+arrived through. The interactive Method above gathers answers by asking the
+user one question per turn. This mode gathers them a different way: the
+full answer set arrives already supplied — as reply text handed to the
+invocation rather than typed live — and the skill drafts and writes
+against it in one pass.
+
+In this mode the skill **never prompts and never waits**. Every question
+the interactive interview would have asked is instead resolved by reading
+the supplied answers: an elicitation question binds to the matching
+supplied answer if one exists; a decision question binds to the matching
+supplied answer if one exists, and otherwise takes its stated
+recommendation as a **default**, never a blocking question.
+
+**An unanswered elicitation question means the skill does not write at
+all.** Elicitation questions have no options to default to — only the
+user knows the answer — so a missing one is not a gap this mode papers
+over. This is D1's existing fallback, restated for a non-interactive
+caller: fewer answers than elicitation questions require means no folder
+is written, and the caller (not the skill) decides what happens next.
+
+**A defaulted decision is not silent.** Every decision question answered
+by its recommendation rather than a supplied answer is written into the
+drafted `PLAN.md` as an explicit assumption, naming the question, the
+default taken, and the reason it was recommended — so the gate-1 reviewer
+reads exactly which choices nobody actually made.
+
+**The drafted folder lands `status: planned` and unarmed**, in both
+`PLAN.md` frontmatter and the roadmap row — identically to the
+interactive path's own rule, restated here so it holds for this mode too:
+this mode produces a proposal for gate-1 review to accept, not an armed
+feature. Nothing about this mode changes who arms a feature; see "Does
+not flip status to `active`" below, which continues to apply unchanged.
+
 ## What this skill does NOT do
 
 - **Does not flip status to `active`.** New feature stays `planned`
