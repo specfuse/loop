@@ -23,7 +23,7 @@ load-bearing judgments a predicate cannot make — 2 and 3 below.
 
 1. `RETROSPECTIVE.md` exists with a `## Gate 1` section and a `## Cost analysis`
    heading reconciling actual spend per WU from `events.jsonl` against each
-   unit's `planned_cost_usd` and the gate's $18.00 budget.
+   unit's `planned_cost_usd` and the gate's $20.00 budget.
 2. **State what the guard covers and what it does not.**
    `[FEAT-2026-0071/G1-CLOSE]` is explicit that a partial structural guard
    described as a total one is how the unguarded fields stop being reviewed. So

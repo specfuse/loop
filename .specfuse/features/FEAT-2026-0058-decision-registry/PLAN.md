@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0058-decision-registry
 roadmap_goal: A feature's decisions live in one canonical registry that artifacts cite by ID, so transcription drift and silent overrides become lintable instead of vigilance-dependent.
 autonomy_default: auto
 status: planned
-planned_cost_usd: 18.00
+planned_cost_usd: 20.00
 ---
 
 # Plan: Feature decision registry
@@ -173,7 +173,11 @@ gates:
   real use is the feature that defines it is the cheapest possible dogfood, and
   it means this PLAN's decision prose is itself migrated rather than left as the
   seventh copy of the pattern being retired.
-- `planned_cost_usd` $18.00: T01 $4.00, T02 $5.00, T03 $4.00, close $5.00. The
+- `planned_cost_usd` $20.00: T01 $6.00, T02 $5.00, T03 $4.00, close $5.00. The
+  T01 estimate was raised from $4.00 after its first dispatch spent $4.95 and
+  escalated: the unit also has to register a new seeded template in nine
+  hard-coded registries and classify a new module, which the original
+  estimate did not account for (#2541). The
   close sits at the documented floor rather than above it — unlike
   FEAT-2026-0050's `plan-next`, this is a single terminal close on a
   three-unit gate with no next gate to draft.

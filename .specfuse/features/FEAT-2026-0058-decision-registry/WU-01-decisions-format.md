@@ -1,9 +1,9 @@
 ---
 id: FEAT-2026-0058/T01
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
-planned_cost_usd: 4.00
+planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
   - .specfuse/templates/DECISIONS.template.md
@@ -70,6 +70,39 @@ pattern being retired.
    2.
 6. `python3 -m specfuse.loop.lint_plan .specfuse/features/FEAT-2026-0058-decision-registry`
    exits 0.
+
+**Registering the new scaffold template.** `.specfuse/templates/DECISIONS.template.md`
+is a *seeded* scaffold file, and this repository tracks its seed set in nine
+hard-coded registries. A new template that is not added to all of them reddens
+the tree, and the failures arrive one registry at a time — three prior attempts
+each rediscovered one and were discarded before reaching the next. The list,
+derived from `templates/GATE.template.md`, a fully-registered template:
+
+| File | Site |
+|---|---|
+| `tests/test_init_integration.py` | two sets — `:34` and `:120` |
+| `tests/test_upgrade_integration.py` | `:41` |
+| `tests/test_scaffold_upgrade.py` | `:21` — a dict, key *and* value |
+| `tests/test_scaffold_resources.py` | `:22` — `_EXPECTED_RELPATHS` |
+| `tests/test_scaffold_init.py` | two sites — `:16` set, `:58` dict |
+| `tests/test_scaffold_data_in_sync.py` | `:27` — the `specfuse/loop/data/` sync manifest |
+| `scripts/sync-scaffold.sh` | `:241` — the sync script's own file list |
+
+Line numbers are where `GATE.template.md` sits today and will drift; grep
+`templates/GATE.template.md` across the repo for the current set and match it
+entry for entry. **Do not** copy `LEARNINGS-pending.template.md` as the model —
+it appears in only four of the nine and is not a seeded template.
+
+If a tenth registry surfaces, that is worth reporting in the close notes: nine
+hand-maintained copies of one list is the defect shape this feature exists to
+remove, applied to scaffold files rather than decisions.
+
+**Registering the new module.** Criterion 2's parser lands as a new file under
+`specfuse/loop/`, and every module there must be classified in exactly one of
+`arm_eval.JUDGE_MODULES` or `arm_eval.NON_JUDGE_MODULES` — `test_judge_path_registry`
+fails an unclassified one. A `DECISIONS.md` parser is not on the arm/close/merge
+judge path, so it belongs in `NON_JUDGE_MODULES` with a one-line note saying why,
+matching the entries already there.
 
 **Do not touch.** `specfuse/loop/lint_plan.py` — T02 and T03 own the lint.
 `specfuse/loop/closing_requirements.py` — the close ceremony's contract-change
