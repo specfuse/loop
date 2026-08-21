@@ -155,6 +155,8 @@ NON_JUDGE_MODULES = {
     "notify_sla.py": "as notify.py",
     "policy_proposals.py": "drafts policy changes for a human to accept",
     "policy_review.py": "presents proposals; the human decides",
+    "replay_spin.py": "read-only diagnostic; re-parses recorded attempt notes "
+        "to report what the current parser would have said, and grants no verdict",
     "scaffold.py": "writes scaffold files into a target project",
 }
 
