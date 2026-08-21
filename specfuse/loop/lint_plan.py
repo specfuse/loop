@@ -1040,6 +1040,138 @@ def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
         )
 
 
+#: A decision citation, by this repo's own convention (`D1`, `D2`, ...) —
+#: see `specfuse/loop/decisions_format.py` and FEAT-2026-0058/WU-01. The
+#: format module itself allows any non-space heading token as an ID; this
+#: pattern is the narrower shape every real registry in this tree uses, and
+#: is what lets a *dangling* citation (an ID that looks cited but is not
+#: registered) be told apart from ordinary prose.
+_DECISION_CITATION_RE = re.compile(r"\bD\d+\b")
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+#: Below this many words a statement's own phrasing is too generic to
+#: fingerprint reliably — flagging it would just be matching common English.
+_RESTATEMENT_MIN_WORDS = 8
+#: Sequence-similarity floor for "same clause, one word changed" (the
+#: FEAT-2026-0066 dropped-row shape) without also catching a merely related
+#: sentence that happens to share vocabulary.
+_RESTATEMENT_RATIO = 0.82
+
+
+def _normalize_words(text: str) -> list[str]:
+    return _WORD_RE.findall(text.lower())
+
+
+def _restates(statement: str, body_words: list[str]) -> bool:
+    """True if *body_words* contains a near-verbatim run of *statement*.
+
+    Fuzzy on purpose: exact-substring matching would miss a restatement with
+    "one clause altered" (FEAT-2026-0066's dropped-row shape). Slides windows
+    of roughly the statement's own length across the body and scores each
+    with `difflib.SequenceMatcher` over word tokens; any window at or above
+    `_RESTATEMENT_RATIO` is a restatement.
+    """
+    import difflib
+
+    stmt_words = _normalize_words(statement)
+    if len(stmt_words) < _RESTATEMENT_MIN_WORDS or len(body_words) < len(stmt_words):
+        return False
+    window = len(stmt_words)
+    lo = max(_RESTATEMENT_MIN_WORDS, int(window * 0.7))
+    hi = min(len(body_words), int(window * 1.3) + 1)
+    step = max(1, window // 4)
+    for start in range(0, len(body_words) - lo + 1, step):
+        for size in range(lo, hi + 1, max(1, (hi - lo) // 2 or 1)):
+            end = start + size
+            if end > len(body_words):
+                break
+            chunk = body_words[start:end]
+            ratio = difflib.SequenceMatcher(a=stmt_words, b=chunk, autojunk=False).ratio()
+            if ratio >= _RESTATEMENT_RATIO:
+                return True
+    return False
+
+
+def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> list[str]:
+    """ERROR when an artifact cites a decision ID absent from `DECISIONS.md`,
+    or reproduces a decision's statement text instead of citing its ID
+    (FEAT-2026-0058/T02).
+
+    Opt-in per feature (rule 5): a feature with no `DECISIONS.md` is not
+    scanned at all — 60 of 66 folders have none, and the registry is a
+    convention a feature adopts, not one imposed on every folder. `done` and
+    `abandoned` features are exempt as sealed history, the same exemption
+    `check_closing_guard_literals` already applies.
+
+    Non-restatement is scoped per whole artifact file, not per line: if a
+    document cites a decision's ID *anywhere*, a near-verbatim quotation of
+    its statement elsewhere in the same document is a legitimate quotation,
+    not the restatement this check exists to catch (criterion 3). This is
+    also what keeps a feature's own `PLAN.md` — where decisions are
+    originally taken, each introduced by its own `D<n> —` heading — from
+    false-positiving against the very `DECISIONS.md` extracted from it.
+    """
+    if plan_fm.get("status") in ("done", "abandoned"):
+        return []
+
+    decisions_path = feature_dir / "DECISIONS.md"
+    if not decisions_path.is_file():
+        return []  # opt-in; no registry, nothing to hold this feature to
+
+    from . import decisions_format
+
+    parsed = decisions_format.parse_decisions(decisions_path.read_text())
+    valid_ids = {e.decision_id for e in parsed.entries}
+    statements = {
+        e.decision_id: e.statement for e in parsed.entries if e.statement
+    }
+
+    artifact_paths: list[Path] = []
+    plan_path = feature_dir / "PLAN.md"
+    if plan_path.is_file():
+        artifact_paths.append(plan_path)
+    for gate in gates:
+        gfile = gate.get("file")
+        if gfile and (feature_dir / gfile).is_file():
+            artifact_paths.append(feature_dir / gfile)
+        for entry in gate.get("work_units") or []:
+            wfile = entry.get("file")
+            if wfile and (feature_dir / wfile).is_file():
+                artifact_paths.append(feature_dir / wfile)
+
+    errs: list[str] = []
+    for path in artifact_paths:
+        try:
+            _, body = read_frontmatter(path)
+        except Exception:  # noqa: BLE001 - malformed file is another check's finding
+            continue
+
+        cited_ids = set(_DECISION_CITATION_RE.findall(body))
+
+        for cid in sorted(cited_ids):
+            if cid not in valid_ids:
+                errs.append(
+                    f"ERROR: {path}: cites decision {cid!r}, which is not in "
+                    f"{decisions_path.name}. Add the decision to the "
+                    f"registry, or fix the citation if it names the wrong ID."
+                )
+
+        body_words = _normalize_words(body)
+        for did, statement in statements.items():
+            if did in cited_ids:
+                continue  # cites its own ID somewhere — legitimate quotation
+            if _restates(statement, body_words):
+                errs.append(
+                    f"ERROR: {path}: reproduces decision {did}'s statement "
+                    f"text instead of citing `{did}`. {decisions_path.name} "
+                    f"is the one place the statement lives — cite the ID "
+                    f"rather than restating it."
+                )
+
+    return errs
+
+
 def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     """A `status: done` feature must have every gate `status: passed` (#287).
 
@@ -1485,6 +1617,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_produces_shape(feature_dir, gates))
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
+    errs.extend(check_decision_citations(feature_dir, fm, gates))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
