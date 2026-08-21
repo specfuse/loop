@@ -1,10 +1,15 @@
 ---
 id: FEAT-2026-0058/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: partially_met
+duration_seconds: 1610.416
+cost_usd: 12.098512
+input_tokens: 1722
+output_tokens: 96346
 ---
 
 # Gate 1 terminal close
