@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 20.00
 baseline:
   sha: 433b09dd9b276fab8cedb1a7e34ecc664af0d7ab
