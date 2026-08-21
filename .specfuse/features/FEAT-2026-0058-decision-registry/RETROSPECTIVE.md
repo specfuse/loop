@@ -374,6 +374,66 @@ a real choice between accepting the hedge now and doing the three named
 re-runs. None of the three needs an environment, a credential, or a deployed
 component — all are in-repo work.
 
+### Discharge record — entries 1 and 3 (operator-directed, post-close)
+
+Recorded 2026-08-21. The operator elected to do the rework rather than accept
+the hedge. Entries 1 and 3 are **discharged against their own stated re-run
+conditions**; entry 2 is **not**, and remains open.
+
+**Entry 3 — discharged.** `valid_ids` now unions the parsed entries' IDs with
+`parsed.errors`' IDs, so a present-but-unparseable decision stays known to the
+citation check. `DecisionParseError` already carried `decision_id`; nothing in
+the parser's shape had to change. Re-running the named injection — this
+feature's `D4` set to `overridden-pending-signoff` with no provenance fields,
+cited from `PLAN.md`, `GATE-01.md` and `WU-01.md` — now yields **exactly one
+ERROR, the override one**, where it previously yielded four (one real, three
+spurious dangling-citation findings; the record's "seven" counts the larger
+artifact set of the original observation). Pinned by
+`tests/test_decision_followups_discharged.py::TestOneUnsignedOverrideReportsOnce`.
+
+**Entry 1 — discharged, in both halves.** The exemption is now scoped to the
+quotation rather than the file: `_restates` returns the matching word span, and
+`_cited_near` asks whether the decision's ID appears within
+`_CITATION_PROXIMITY_WORDS` of it. The record understated the defect — the old
+exemption did not require a citation at all, only that the bare token `D3`
+occur somewhere in the document, since `_DECISION_CITATION_RE` is `\bD\d+\b`.
+
+Both halves of the stated re-run condition were run:
+
+- **(a)** `_restates` over this feature's graph artifacts reports **zero
+  restatements**, after `PLAN.md`'s D1 and D3 prose was replaced by citations
+  to `DECISIONS.md` (the rationale unique to `PLAN.md` was kept; only the
+  duplicated statement text was removed).
+- **(b)** `python3 -m specfuse.loop.lint_plan .specfuse/features/FEAT-2026-0058-decision-registry`
+  exits **0**.
+
+Coverage over this feature's own artifacts, measured the same way the record
+measured it: **4 of 36 (artifact, decision) pairs the check could fire on,
+now 36 of 36.** The record's "3 of 24" reflects the artifact set at close
+time; the ratio moved from 11% to 100% on the current set.
+
+**A limit this discharge does not remove, recorded deliberately.** A *labelled*
+second copy — `D1 — <statement text>` — remains exempt, because the ID sits
+adjacent to the text and that is indistinguishable, mechanically, from the
+legitimate quotation criterion 3 requires be allowed. The check now catches a
+statement copied away from its ID; it does not catch one copied next to it.
+`PLAN.md` was the instance that mattered and it now cites, but the guard rests
+on artifacts choosing to cite rather than quote. This is D1's
+"unguarded by construction" boundary moving, not disappearing.
+
+**Entry 2 — NOT discharged.** Its re-run condition needs a second live
+(non-`done`, non-`abandoned`) feature carrying a `DECISIONS.md`. Measured
+2026-08-21, the live corpus is **exactly two folders**: FEAT-2026-0011
+(`blocked`, no `DECISIONS.md`, PLAN-only, no gates or work units) and this
+feature. The only way to reach two in-scope folders today would be to give
+FEAT-2026-0011 a registry it has no decisions for — manufacturing corpus to
+satisfy a test, which is the defect shape this feature exists to remove. Left
+open to discharge honestly when the next feature is drafted (FEAT-2026-0052 and
+FEAT-2026-0081 are queued and undrafted) or when ADR-0002 unblocks
+FEAT-2026-0011 and it acquires real decisions.
+
+The verdict therefore stays hedged, but for **one** reason instead of three.
+
 ## Generalizable lessons
 
 Staged to `LEARNINGS-pending.md` in this feature directory

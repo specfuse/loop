@@ -1063,20 +1063,26 @@ def _normalize_words(text: str) -> list[str]:
     return _WORD_RE.findall(text.lower())
 
 
-def _restates(statement: str, body_words: list[str]) -> bool:
-    """True if *body_words* contains a near-verbatim run of *statement*.
+def _restates(statement: str, body_words: list[str]) -> "tuple[int, int] | None":
+    """The `(start, end)` word span restating *statement*, or None.
 
     Fuzzy on purpose: exact-substring matching would miss a restatement with
     "one clause altered" (FEAT-2026-0066's dropped-row shape). Slides windows
     of roughly the statement's own length across the body and scores each
     with `difflib.SequenceMatcher` over word tokens; any window at or above
     `_RESTATEMENT_RATIO` is a restatement.
+
+    Returns the span rather than a bool so the caller can ask whether the
+    decision's ID is cited *near this passage* (FEAT-2026-0058 hedged
+    follow-up 1). A whole-file exemption made the check inert: any occurrence
+    of the bare token `D3` anywhere in a document exempted every restatement
+    of D3 elsewhere in it.
     """
     import difflib
 
     stmt_words = _normalize_words(statement)
     if len(stmt_words) < _RESTATEMENT_MIN_WORDS or len(body_words) < len(stmt_words):
-        return False
+        return None
     window = len(stmt_words)
     lo = max(_RESTATEMENT_MIN_WORDS, int(window * 0.7))
     hi = min(len(body_words), int(window * 1.3) + 1)
@@ -1089,8 +1095,31 @@ def _restates(statement: str, body_words: list[str]) -> bool:
             chunk = body_words[start:end]
             ratio = difflib.SequenceMatcher(a=stmt_words, b=chunk, autojunk=False).ratio()
             if ratio >= _RESTATEMENT_RATIO:
-                return True
-    return False
+                return (start, end)
+    return None
+
+
+#: How many words either side of a restating passage still count as "cited
+#: alongside it". Wide enough for a lead-in (`Per D2: <statement>`), a trailing
+#: parenthetical (`<statement> (D2)`), or a citation in the same sentence;
+#: far too narrow for a mention in an unrelated section of the same file.
+_CITATION_PROXIMITY_WORDS = 25
+
+
+def _cited_near(
+    decision_id: str, body_words: list[str], span: "tuple[int, int]"
+) -> bool:
+    """True when *decision_id* is cited within the proximity window of *span*.
+
+    This is what "quoting a decision while citing it" actually looks like:
+    the ID sits next to the quotation, not a thousand words away in a
+    different section (FEAT-2026-0058 hedged follow-up 1).
+    """
+    start, end = span
+    lo = max(0, start - _CITATION_PROXIMITY_WORDS)
+    hi = min(len(body_words), end + _CITATION_PROXIMITY_WORDS)
+    target = decision_id.lower()
+    return any(word == target for word in body_words[lo:hi])
 
 
 def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> list[str]:
@@ -1104,13 +1133,22 @@ def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> l
     `abandoned` features are exempt as sealed history, the same exemption
     `check_closing_guard_literals` already applies.
 
-    Non-restatement is scoped per whole artifact file, not per line: if a
-    document cites a decision's ID *anywhere*, a near-verbatim quotation of
-    its statement elsewhere in the same document is a legitimate quotation,
-    not the restatement this check exists to catch (criterion 3). This is
-    also what keeps a feature's own `PLAN.md` — where decisions are
-    originally taken, each introduced by its own `D<n> —` heading — from
-    false-positiving against the very `DECISIONS.md` extracted from it.
+    Non-restatement's exemption is scoped to the quotation, not to the file
+    (FEAT-2026-0058 hedged follow-up 1): a near-verbatim quotation is
+    legitimate when the decision's ID is cited within
+    `_CITATION_PROXIMITY_WORDS` of the restating passage, which is what
+    quoting-while-citing looks like. The exemption was previously per whole
+    artifact, which made the check inert — `_DECISION_CITATION_RE` is
+    `\\bD\\d+\\b`, so the bare token `D3` occurring anywhere in a document
+    exempted every restatement of D3 elsewhere in it. Measured on this
+    feature's own artifacts it was live on 3 of 24 (artifact, decision)
+    pairs.
+
+    A feature's own `PLAN.md` is **not** specially exempt. Where a decision is
+    originally taken, `DECISIONS.md` holds the statement and `PLAN.md` cites
+    it — that is `PLAN.md` D1's rule ("if artifacts may only cite, there is
+    no second copy to drift"), and exempting the one file most likely to hold
+    a second copy would have hollowed it out.
     """
     if plan_fm.get("status") in ("done", "abandoned"):
         return []
@@ -1122,7 +1160,18 @@ def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> l
     from . import decisions_format
 
     parsed = decisions_format.parse_decisions(decisions_path.read_text())
-    valid_ids = {e.decision_id for e in parsed.entries}
+    # Refused entries keep their IDs known to the citation check
+    # (FEAT-2026-0058 hedged follow-up 3). A parse failure excludes an entry
+    # from `.entries`, and reference integrity used to read that as "the ID
+    # does not exist" — so one unsigned override reported as seven ERRORs,
+    # six of them telling the operator to add a decision that is already in
+    # the registry. `DecisionParseError` carries `decision_id`, so a
+    # present-but-unparseable ID is recoverable. The override finding names
+    # the real fault on its own; a dangling-citation error alongside it only
+    # obscures which finding to act on.
+    valid_ids = {e.decision_id for e in parsed.entries} | {
+        e.decision_id for e in parsed.errors
+    }
     statements = {
         e.decision_id: e.statement for e in parsed.entries if e.statement
     }
@@ -1159,15 +1208,17 @@ def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> l
 
         body_words = _normalize_words(body)
         for did, statement in statements.items():
-            if did in cited_ids:
-                continue  # cites its own ID somewhere — legitimate quotation
-            if _restates(statement, body_words):
-                errs.append(
-                    f"ERROR: {path}: reproduces decision {did}'s statement "
-                    f"text instead of citing `{did}`. {decisions_path.name} "
-                    f"is the one place the statement lives — cite the ID "
-                    f"rather than restating it."
-                )
+            span = _restates(statement, body_words)
+            if span is None:
+                continue
+            if _cited_near(did, body_words, span):
+                continue  # quoted with its ID alongside — legitimate quotation
+            errs.append(
+                f"ERROR: {path}: reproduces decision {did}'s statement "
+                f"text instead of citing `{did}`. {decisions_path.name} "
+                f"is the one place the statement lives — cite the ID "
+                f"rather than restating it."
+            )
 
     return errs
 

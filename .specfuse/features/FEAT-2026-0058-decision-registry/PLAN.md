@@ -27,9 +27,8 @@ while an override sits unsigned.
 
 ## Decisions taken at draft time
 
-**D1 — the lint checks reference integrity and non-restatement; it does not
-attempt contradiction detection.** Detecting that an artifact's prose
-*contradicts* a registry entry is a semantic judgment on free text: a lint
+**D1** — statement in `DECISIONS.md`. Rationale: detecting that an artifact's
+prose *contradicts* a registry entry is a semantic judgment on free text: a lint
 claiming it would either fire on every paraphrase or fire on nothing.
 `[FEAT-2026-0071/G1-CLOSE]` names shipping a partial guard described as a total
 one as the failure mode — "a partial structural guard described as a total one
@@ -44,8 +43,8 @@ symptom: if artifacts may only *cite*, there is no second copy to drift. This is
 the same move that resolved the roadmap-archive split — FEAT-2026-0079 gave one
 algorithm one owner instead of keeping two copies in sync.
 
-**Semantic agreement between a cited decision and the work done under it stays
-unguarded by construction.** The close must say so; see `WU-90`.
+The unguarded-by-construction limit D1 records is what the close must say out
+loud; see `WU-90`.
 
 **D2 — ERROR severity, earned by measurement, with the repair landing ahead of
 the feature.** Both sibling checks in this repo are WARN for the same reason:
@@ -67,14 +66,12 @@ FEAT-2026-0050's D1–D3 prose is converted to a `DECISIONS.md` in **its own PR,
 landing before this feature's gate runs**. A feature that both repairs and
 checks cannot demonstrate its checker ever fires.
 
-**D3 — an override carries provenance, not just a status flip.**
+**D3** — statement in `DECISIONS.md`. Rationale:
 `[FEAT-2026-0070/G1-CLOSE-INTERMEDIATE]` records the cost of the alternative:
 when an operator override mutates the very field that recorded the pre-override
 state, the record becomes byte-identical to one that was never overridden, and
-the distinction survives only in prose that nothing parses. So a decision moving
-to `ratified` from `overridden-pending-signoff` carries `overridden_from`,
-`signed_off_by`, and `signed_off_at` — "ratified from the start" and "overridden
-then signed off by a named human on a date" stay distinguishable to a query.
+the distinction survives only in prose that nothing parses. The provenance
+fields D3 requires are what keep that distinction reachable by a query.
 
 **D4 — the close ceremony's contract-change enumeration is OUT of scope.** The
 roadmap goal names it, and it is deliberately deferred: it would wire
