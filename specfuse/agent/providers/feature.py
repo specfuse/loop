@@ -255,6 +255,7 @@ class FeatureProvider:
         one.
         """
         restarts = 0
+        prior: tuple | None = None
         self._say(
             f"{feature_id}: "
             f"{driver_command_module.describe_command(self._driver_command)}"
@@ -270,6 +271,17 @@ class FeatureProvider:
                 return self._map_halt(feature_id, halt)
 
             detail = halt.detail if isinstance(halt.detail, dict) else {}
+            # The cap counts *consecutive restarts that changed nothing*, not
+            # restarts (#2617). A gate whose units each edit a driver module
+            # once -- complete, halt for a reload, hand off to the next -- is
+            # maximally productive, and counting raw restarts escalated it as
+            # a spin on the third unit. Observed on FEAT-2026-0058 (#2616),
+            # whose gate stalled one unit from its close.
+            current = self._restart_progress_key(detail)
+            if prior is not None and current is not None and current != prior:
+                restarts = 0
+            prior = current
+
             if restarts >= self.MAX_DRIVER_RESTARTS:
                 return self._restart_exhausted(feature_id, detail, restarts)
 
@@ -280,6 +292,27 @@ class FeatureProvider:
                 f"({', '.join(detail.get('driver_paths') or []) or 'driver modules'}) "
                 f"— dispatching a fresh driver ({restarts}/{self.MAX_DRIVER_RESTARTS})"
             )
+
+    @staticmethod
+    def _restart_progress_key(detail: dict) -> "tuple | None":
+        """What the gate looked like at this restart, or None if unknowable.
+
+        Two restarts whose keys differ mean the gate advanced between them.
+        `remaining_wu_ids` is the direct signal -- it shrinks as units finish
+        -- with `wu_id` carried alongside so a re-edited unit under an
+        unchanged remaining list is still read as standing still.
+
+        **None when there is no evidence**, which the caller treats as no
+        progress rather than as progress. `_find_restart_detail` returns `{}`
+        when the halting event cannot be re-read, and `driver_invoke` is
+        explicit that such a run is still a restart; resetting the counter
+        there would make the cap unreachable exactly when the driver is least
+        legible.
+        """
+        remaining = detail.get("remaining_wu_ids")
+        if remaining is None:
+            return None
+        return (detail.get("wu_id"), tuple(remaining))
 
     def _restart_exhausted(self, feature_id: str, detail: dict, restarts: int) -> ActionOutcome:
         """Escalate a feature that asked for a restart more times than the cap
