@@ -1172,6 +1172,71 @@ def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> l
     return errs
 
 
+#: Values `signed_off_by` is rejected for even though they are non-empty —
+#: a placeholder standing in for a name rather than one (FEAT-2026-0058/T03,
+#: criterion 3). Checks only that *someone* is named, never what they wrote.
+_PLACEHOLDER_SIGNOFF_RE = re.compile(
+    r"^(tbd|todo|n/?a|unknown|someone|xxx+|\?+|fixme|pending|tba)$",
+    re.IGNORECASE,
+)
+
+
+def check_decision_override_signoff(feature_dir: Path, plan_fm: dict) -> list[str]:
+    """ERROR when an override reaches `ratified` (or sits at
+    `overridden-pending-signoff`) without a named human on record
+    (FEAT-2026-0058/T03).
+
+    `decisions_format.parse_decisions` already refuses to parse an entry
+    whose override provenance is incomplete — it lands in `ParseResult.errors`
+    instead of `.entries`. Left there, an unsigned override is silently
+    invisible to lint rather than blocking arming. This check surfaces those
+    refusals as ERROR findings (criteria 1 and 2). It also catches what the
+    parser cannot: every override field present but `signed_off_by` holding a
+    placeholder rather than a name (criterion 3) — checking only that
+    *someone* is named, never what they wrote, per
+    `.specfuse/rules/operator-escalation.md`'s rule against authoring the
+    human's justification for them.
+
+    Sealed features (done/abandoned) are exempt, matching
+    `check_decision_citations`. A feature with no `DECISIONS.md`, or a
+    decision that was never overridden, produces no findings (criterion 4).
+    """
+    if plan_fm.get("status") in ("done", "abandoned"):
+        return []
+
+    decisions_path = feature_dir / "DECISIONS.md"
+    if not decisions_path.is_file():
+        return []  # opt-in; no registry, nothing to hold this feature to
+
+    from . import decisions_format
+
+    parsed = decisions_format.parse_decisions(decisions_path.read_text())
+
+    errs: list[str] = []
+    for err in parsed.errors:
+        if "override provenance incomplete" in err.reason:
+            errs.append(
+                f"ERROR: {decisions_path}: {err.decision_id} is "
+                f"{err.reason} — an override cannot arm unsigned. Name who "
+                f"signed off and when."
+            )
+
+    for entry in parsed.entries:
+        if not (
+            entry.status == "overridden-pending-signoff" or entry.was_overridden()
+        ):
+            continue
+        signed_off_by = (entry.signed_off_by or "").strip()
+        if _PLACEHOLDER_SIGNOFF_RE.match(signed_off_by):
+            errs.append(
+                f"ERROR: {decisions_path}: {entry.decision_id}'s "
+                f"signed_off_by field is a placeholder ({signed_off_by!r}), "
+                f"not a named human. Name who signed off on the override."
+            )
+
+    return errs
+
+
 def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     """A `status: done` feature must have every gate `status: passed` (#287).
 
@@ -1618,6 +1683,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
     errs.extend(check_decision_citations(feature_dir, fm, gates))
+    errs.extend(check_decision_override_signoff(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
