@@ -14,6 +14,7 @@ from specfuse.loop.scaffold import (
 
 _EXPECTED_TREE = {
     "templates/GATE.template.md",
+    "templates/DECISIONS.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
     "templates/LEARNINGS-pending.template.md",
@@ -56,6 +57,7 @@ _EXPECTED_TREE = {
 # Seed relpaths for versioned files and their target relpaths inside .specfuse/
 _VERSIONED_SEED_TO_TARGET = {
     "templates/GATE.template.md": "templates/GATE.template.md",
+    "templates/DECISIONS.template.md": "templates/DECISIONS.template.md",
     "templates/PLAN.template.md": "templates/PLAN.template.md",
     "templates/WU.template.md": "templates/WU.template.md",
     "rules/close-discipline.md": "rules/close-discipline.md",

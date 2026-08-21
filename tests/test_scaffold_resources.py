@@ -20,6 +20,7 @@ _EXPECTED_RELPATHS = {
     "CHANGELOG.seed.md",
     "LEARNINGS.template.md",
     "templates/GATE.template.md",
+    "templates/DECISIONS.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
     "templates/LEARNINGS-pending.template.md",

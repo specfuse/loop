@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0058/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
@@ -10,10 +10,15 @@ produces:
   - specfuse/loop/data/templates/DECISIONS.template.md
   - .specfuse/features/FEAT-2026-0058-decision-registry/DECISIONS.md
   - tests/test_decisions_format.py
-duration_seconds: 1720.732
-cost_usd: 4.954247
-input_tokens: 7676
-output_tokens: 38875
+duration_seconds: 1492.448
+cost_usd: 1.865657
+input_tokens: 90
+output_tokens: 19295
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.13.0
+started_at: 2026-08-21T12:04:11.516553+00:00
 ---
 
 # Define the DECISIONS.md format and fill it for this feature
