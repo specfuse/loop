@@ -3707,3 +3707,35 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   until it is checked against the failed attempts' actual diffs; where those attempts
   were rolled back, `git reflog` still holds them. State the evidence you checked
   alongside the conclusion, so the next reader can tell which it is.
+
+- [meta/six-bug-sweep/detecting-a-condition-is-not-handling-it] **A guard that
+  detects a condition, reports it accurately, and then proceeds unchanged is not a
+  guard — it is a log line with a guard's name.** Six independent defects found in
+  one sweep (2026-08-20/21) share exactly this shape, and the two sharpest are the
+  ones where the detection was *perfect*. `auto_sync` prints "`.specfuse/VERSION`
+  0.13.0 is newer than installed scaffold 0.12.1. Not downgrading. **Update specfuse
+  to continue.**" and then `return`s — which exits `auto_sync`, not the run; `main()`
+  calls it as a bare statement and dispatches a terminal close against the stale
+  scaffold anyway (#2643). Alongside it, `build_provenance` correctly detects that
+  the CLI is running the installed build rather than the checkout, prints "results
+  can be confidently wrong rather than failing", names the right command to use
+  instead — and the driver's own emitted `resume_command` is the wrong one (#2642).
+  The other four are the same rule with a quieter failure: an unrecognised failure
+  shape degraded to `failure_class: other` instead of failing loudly (#2390, #2557),
+  a dedup search that matched nothing was read as "nothing exists" rather than "the
+  query is broken" (#2548), a `failure_excerpt` written as `null` left refusals
+  retrying blind at $45.79 (#2504), and a restart cap whose docstring says "restart
+  me is only progress if something changed" counted restarts without ever checking
+  whether anything changed (#2617). Rules. (a) When authoring a check, state what
+  happens on the *detecting* branch, and make the message and the control flow agree
+  — if the text says "to continue", the code must not continue. (b) A message whose
+  imperative describes a stop that does not happen is worse than no message: it
+  trains the operator to read a proceed as a halt, which cost a real mis-diagnosis
+  in this sweep. (c) Prefer failing loudly on an *unrecognised* input over
+  classifying it as a known-benign default; `no_gate_marker` and "search returned
+  zero rows" both mean "I could not tell", not "there is nothing there". (d) Where a
+  guard legitimately proceeds, say so in the message ("continuing against the
+  installed scaffold") so the operator can judge the risk. Distinct from
+  [meta/agent-live-runs/an-outward-failure-that-reports-success-is-the-worst-shape],
+  which is about a projection destroying the verdict it reports: here the report is
+  accurate and complete, and nothing consumes it.
