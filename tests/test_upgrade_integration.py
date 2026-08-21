@@ -39,6 +39,7 @@ _REPO_ROOT = pathlib.Path(__file__).parent.parent
 # Versioned relpaths that upgrade_specfuse overlays verbatim into .specfuse/<relpath>
 _VERSIONED_OVERLAY = {
     "templates/GATE.template.md",
+    "templates/DECISIONS.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
     "rules/correlation-ids.md",

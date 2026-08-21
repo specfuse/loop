@@ -1040,6 +1040,254 @@ def check_autoclose_debt_prediction(feature_dir: Path, gates: list) -> None:
         )
 
 
+#: A decision citation, by this repo's own convention (`D1`, `D2`, ...) —
+#: see `specfuse/loop/decisions_format.py` and FEAT-2026-0058/WU-01. The
+#: format module itself allows any non-space heading token as an ID; this
+#: pattern is the narrower shape every real registry in this tree uses, and
+#: is what lets a *dangling* citation (an ID that looks cited but is not
+#: registered) be told apart from ordinary prose.
+_DECISION_CITATION_RE = re.compile(r"\bD\d+\b")
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+#: Below this many words a statement's own phrasing is too generic to
+#: fingerprint reliably — flagging it would just be matching common English.
+_RESTATEMENT_MIN_WORDS = 8
+#: Sequence-similarity floor for "same clause, one word changed" (the
+#: FEAT-2026-0066 dropped-row shape) without also catching a merely related
+#: sentence that happens to share vocabulary.
+_RESTATEMENT_RATIO = 0.82
+
+
+def _normalize_words(text: str) -> list[str]:
+    return _WORD_RE.findall(text.lower())
+
+
+def _restates(statement: str, body_words: list[str]) -> "tuple[int, int] | None":
+    """The `(start, end)` word span restating *statement*, or None.
+
+    Fuzzy on purpose: exact-substring matching would miss a restatement with
+    "one clause altered" (FEAT-2026-0066's dropped-row shape). Slides windows
+    of roughly the statement's own length across the body and scores each
+    with `difflib.SequenceMatcher` over word tokens; any window at or above
+    `_RESTATEMENT_RATIO` is a restatement.
+
+    Returns the span rather than a bool so the caller can ask whether the
+    decision's ID is cited *near this passage* (FEAT-2026-0058 hedged
+    follow-up 1). A whole-file exemption made the check inert: any occurrence
+    of the bare token `D3` anywhere in a document exempted every restatement
+    of D3 elsewhere in it.
+    """
+    import difflib
+
+    stmt_words = _normalize_words(statement)
+    if len(stmt_words) < _RESTATEMENT_MIN_WORDS or len(body_words) < len(stmt_words):
+        return None
+    window = len(stmt_words)
+    lo = max(_RESTATEMENT_MIN_WORDS, int(window * 0.7))
+    hi = min(len(body_words), int(window * 1.3) + 1)
+    step = max(1, window // 4)
+    for start in range(0, len(body_words) - lo + 1, step):
+        for size in range(lo, hi + 1, max(1, (hi - lo) // 2 or 1)):
+            end = start + size
+            if end > len(body_words):
+                break
+            chunk = body_words[start:end]
+            ratio = difflib.SequenceMatcher(a=stmt_words, b=chunk, autojunk=False).ratio()
+            if ratio >= _RESTATEMENT_RATIO:
+                return (start, end)
+    return None
+
+
+#: How many words either side of a restating passage still count as "cited
+#: alongside it". Wide enough for a lead-in (`Per D2: <statement>`), a trailing
+#: parenthetical (`<statement> (D2)`), or a citation in the same sentence;
+#: far too narrow for a mention in an unrelated section of the same file.
+_CITATION_PROXIMITY_WORDS = 25
+
+
+def _cited_near(
+    decision_id: str, body_words: list[str], span: "tuple[int, int]"
+) -> bool:
+    """True when *decision_id* is cited within the proximity window of *span*.
+
+    This is what "quoting a decision while citing it" actually looks like:
+    the ID sits next to the quotation, not a thousand words away in a
+    different section (FEAT-2026-0058 hedged follow-up 1).
+    """
+    start, end = span
+    lo = max(0, start - _CITATION_PROXIMITY_WORDS)
+    hi = min(len(body_words), end + _CITATION_PROXIMITY_WORDS)
+    target = decision_id.lower()
+    return any(word == target for word in body_words[lo:hi])
+
+
+def check_decision_citations(feature_dir: Path, plan_fm: dict, gates: list) -> list[str]:
+    """ERROR when an artifact cites a decision ID absent from `DECISIONS.md`,
+    or reproduces a decision's statement text instead of citing its ID
+    (FEAT-2026-0058/T02).
+
+    Opt-in per feature (rule 5): a feature with no `DECISIONS.md` is not
+    scanned at all — 60 of 66 folders have none, and the registry is a
+    convention a feature adopts, not one imposed on every folder. `done` and
+    `abandoned` features are exempt as sealed history, the same exemption
+    `check_closing_guard_literals` already applies.
+
+    Non-restatement's exemption is scoped to the quotation, not to the file
+    (FEAT-2026-0058 hedged follow-up 1): a near-verbatim quotation is
+    legitimate when the decision's ID is cited within
+    `_CITATION_PROXIMITY_WORDS` of the restating passage, which is what
+    quoting-while-citing looks like. The exemption was previously per whole
+    artifact, which made the check inert — `_DECISION_CITATION_RE` is
+    `\\bD\\d+\\b`, so the bare token `D3` occurring anywhere in a document
+    exempted every restatement of D3 elsewhere in it. Measured on this
+    feature's own artifacts it was live on 3 of 24 (artifact, decision)
+    pairs.
+
+    A feature's own `PLAN.md` is **not** specially exempt. Where a decision is
+    originally taken, `DECISIONS.md` holds the statement and `PLAN.md` cites
+    it — that is `PLAN.md` D1's rule ("if artifacts may only cite, there is
+    no second copy to drift"), and exempting the one file most likely to hold
+    a second copy would have hollowed it out.
+    """
+    if plan_fm.get("status") in ("done", "abandoned"):
+        return []
+
+    decisions_path = feature_dir / "DECISIONS.md"
+    if not decisions_path.is_file():
+        return []  # opt-in; no registry, nothing to hold this feature to
+
+    from . import decisions_format
+
+    parsed = decisions_format.parse_decisions(decisions_path.read_text())
+    # Refused entries keep their IDs known to the citation check
+    # (FEAT-2026-0058 hedged follow-up 3). A parse failure excludes an entry
+    # from `.entries`, and reference integrity used to read that as "the ID
+    # does not exist" — so one unsigned override reported as seven ERRORs,
+    # six of them telling the operator to add a decision that is already in
+    # the registry. `DecisionParseError` carries `decision_id`, so a
+    # present-but-unparseable ID is recoverable. The override finding names
+    # the real fault on its own; a dangling-citation error alongside it only
+    # obscures which finding to act on.
+    valid_ids = {e.decision_id for e in parsed.entries} | {
+        e.decision_id for e in parsed.errors
+    }
+    statements = {
+        e.decision_id: e.statement for e in parsed.entries if e.statement
+    }
+
+    artifact_paths: list[Path] = []
+    plan_path = feature_dir / "PLAN.md"
+    if plan_path.is_file():
+        artifact_paths.append(plan_path)
+    for gate in gates:
+        gfile = gate.get("file")
+        if gfile and (feature_dir / gfile).is_file():
+            artifact_paths.append(feature_dir / gfile)
+        for entry in gate.get("work_units") or []:
+            wfile = entry.get("file")
+            if wfile and (feature_dir / wfile).is_file():
+                artifact_paths.append(feature_dir / wfile)
+
+    errs: list[str] = []
+    for path in artifact_paths:
+        try:
+            _, body = read_frontmatter(path)
+        except Exception:  # noqa: BLE001 - malformed file is another check's finding
+            continue
+
+        cited_ids = set(_DECISION_CITATION_RE.findall(body))
+
+        for cid in sorted(cited_ids):
+            if cid not in valid_ids:
+                errs.append(
+                    f"ERROR: {path}: cites decision {cid!r}, which is not in "
+                    f"{decisions_path.name}. Add the decision to the "
+                    f"registry, or fix the citation if it names the wrong ID."
+                )
+
+        body_words = _normalize_words(body)
+        for did, statement in statements.items():
+            span = _restates(statement, body_words)
+            if span is None:
+                continue
+            if _cited_near(did, body_words, span):
+                continue  # quoted with its ID alongside — legitimate quotation
+            errs.append(
+                f"ERROR: {path}: reproduces decision {did}'s statement "
+                f"text instead of citing `{did}`. {decisions_path.name} "
+                f"is the one place the statement lives — cite the ID "
+                f"rather than restating it."
+            )
+
+    return errs
+
+
+#: Values `signed_off_by` is rejected for even though they are non-empty —
+#: a placeholder standing in for a name rather than one (FEAT-2026-0058/T03,
+#: criterion 3). Checks only that *someone* is named, never what they wrote.
+_PLACEHOLDER_SIGNOFF_RE = re.compile(
+    r"^(tbd|todo|n/?a|unknown|someone|xxx+|\?+|fixme|pending|tba)$",
+    re.IGNORECASE,
+)
+
+
+def check_decision_override_signoff(feature_dir: Path, plan_fm: dict) -> list[str]:
+    """ERROR when an override reaches `ratified` (or sits at
+    `overridden-pending-signoff`) without a named human on record
+    (FEAT-2026-0058/T03).
+
+    `decisions_format.parse_decisions` already refuses to parse an entry
+    whose override provenance is incomplete — it lands in `ParseResult.errors`
+    instead of `.entries`. Left there, an unsigned override is silently
+    invisible to lint rather than blocking arming. This check surfaces those
+    refusals as ERROR findings (criteria 1 and 2). It also catches what the
+    parser cannot: every override field present but `signed_off_by` holding a
+    placeholder rather than a name (criterion 3) — checking only that
+    *someone* is named, never what they wrote, per
+    `.specfuse/rules/operator-escalation.md`'s rule against authoring the
+    human's justification for them.
+
+    Sealed features (done/abandoned) are exempt, matching
+    `check_decision_citations`. A feature with no `DECISIONS.md`, or a
+    decision that was never overridden, produces no findings (criterion 4).
+    """
+    if plan_fm.get("status") in ("done", "abandoned"):
+        return []
+
+    decisions_path = feature_dir / "DECISIONS.md"
+    if not decisions_path.is_file():
+        return []  # opt-in; no registry, nothing to hold this feature to
+
+    from . import decisions_format
+
+    parsed = decisions_format.parse_decisions(decisions_path.read_text())
+
+    errs: list[str] = []
+    for err in parsed.errors:
+        if "override provenance incomplete" in err.reason:
+            errs.append(
+                f"ERROR: {decisions_path}: {err.decision_id} is "
+                f"{err.reason} — an override cannot arm unsigned. Name who "
+                f"signed off and when."
+            )
+
+    for entry in parsed.entries:
+        if not (
+            entry.status == "overridden-pending-signoff" or entry.was_overridden()
+        ):
+            continue
+        signed_off_by = (entry.signed_off_by or "").strip()
+        if _PLACEHOLDER_SIGNOFF_RE.match(signed_off_by):
+            errs.append(
+                f"ERROR: {decisions_path}: {entry.decision_id}'s "
+                f"signed_off_by field is a placeholder ({signed_off_by!r}), "
+                f"not a named human. Name who signed off on the override."
+            )
+
+    return errs
+
+
 def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     """A `status: done` feature must have every gate `status: passed` (#287).
 
@@ -1485,6 +1733,8 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_produces_shape(feature_dir, gates))
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
+    errs.extend(check_decision_citations(feature_dir, fm, gates))
+    errs.extend(check_decision_override_signoff(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #

@@ -19,6 +19,7 @@ from specfuse.loop.scaffold import (
 # Versioned seed relpaths and their target names inside .specfuse/
 _VERSIONED_OVERLAY = {
     "templates/GATE.template.md": "templates/GATE.template.md",
+    "templates/DECISIONS.template.md": "templates/DECISIONS.template.md",
     "templates/PLAN.template.md": "templates/PLAN.template.md",
     "templates/WU.template.md": "templates/WU.template.md",
     "rules/correlation-ids.md": "rules/correlation-ids.md",

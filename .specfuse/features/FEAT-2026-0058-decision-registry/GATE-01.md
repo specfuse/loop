@@ -1,7 +1,11 @@
 ---
 gate: 1
-status: open
-cost_budget_usd: 18.00
+status: awaiting_review
+cost_budget_usd: 20.00
+baseline:
+  sha: 433b09dd9b276fab8cedb1a7e34ecc664af0d7ab
+  probed_at: 2026-08-21T13:53:57.494351+00:00
+  failing: []
 ---
 
 # Gate 1 — decisions cite, they do not restate

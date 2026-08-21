@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0058/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_decision_citation_lint.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.13.0
+started_at: 2026-08-21T12:33:37.836104+00:00
+duration_seconds: 945.474
+cost_usd: 2.537907
+input_tokens: 84
+output_tokens: 27962
 ---
 
 # Lint citations and non-restatement

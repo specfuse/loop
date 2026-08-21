@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0058/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_decision_override_lint.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.13.0
+started_at: 2026-08-21T12:53:37.894210+00:00
+duration_seconds: 639.597
+cost_usd: 1.252386
+input_tokens: 4080
+output_tokens: 12929
 ---
 
 # Lint override sign-off provenance

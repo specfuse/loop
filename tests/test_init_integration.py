@@ -32,6 +32,7 @@ _REPO_ROOT = pathlib.Path(__file__).parent.parent
 
 _EXPECTED_SPECFUSE_TREE = {
     "templates/GATE.template.md",
+    "templates/DECISIONS.template.md",
     "templates/PLAN.template.md",
     "templates/WU.template.md",
     "templates/LEARNINGS-pending.template.md",
@@ -118,6 +119,7 @@ class TestInitFullLayout(unittest.TestCase):
     def test_templates_byte_faithful(self):
         for rel in (
             "templates/GATE.template.md",
+            "templates/DECISIONS.template.md",
             "templates/PLAN.template.md",
             "templates/WU.template.md",
             "templates/LEARNINGS-pending.template.md",

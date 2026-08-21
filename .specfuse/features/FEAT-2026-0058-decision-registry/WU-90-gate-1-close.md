@@ -1,10 +1,15 @@
 ---
 id: FEAT-2026-0058/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: partially_met
+duration_seconds: 1610.416
+cost_usd: 12.098512
+input_tokens: 1722
+output_tokens: 96346
 ---
 
 # Gate 1 terminal close
@@ -23,7 +28,7 @@ load-bearing judgments a predicate cannot make — 2 and 3 below.
 
 1. `RETROSPECTIVE.md` exists with a `## Gate 1` section and a `## Cost analysis`
    heading reconciling actual spend per WU from `events.jsonl` against each
-   unit's `planned_cost_usd` and the gate's $18.00 budget.
+   unit's `planned_cost_usd` and the gate's $20.00 budget.
 2. **State what the guard covers and what it does not.**
    `[FEAT-2026-0071/G1-CLOSE]` is explicit that a partial structural guard
    described as a total one is how the unguarded fields stop being reviewed. So

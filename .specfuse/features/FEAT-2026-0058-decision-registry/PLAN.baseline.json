@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Define the DECISIONS.md format and fill it for this feature",
+          "id": "FEAT-2026-0058/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Lint citations and non-restatement",
+          "id": "FEAT-2026-0058/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Lint override sign-off provenance",
+          "id": "FEAT-2026-0058/T03",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 terminal close",
+          "id": "FEAT-2026-0058/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

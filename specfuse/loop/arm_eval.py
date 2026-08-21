@@ -137,6 +137,8 @@ NON_JUDGE_MODULES = {
     "build_provenance.py": "warns when the running build is not the working "
         "tree's; prints a diagnostic and changes no verdict",
     "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
+    "decisions_format.py": "parses DECISIONS.md into entries; not on the "
+        "arm/close/merge judge path — T02/T03 own the lint that reads it",
     "driver_edit.py": "applies operator edits to a feature folder",
     "escalation.py": "renders and files needs-human records after a halt",
     "events_stats.py": "aggregates the event trail for reporting",

@@ -239,6 +239,7 @@ FILES=(
   LEARNINGS.template.md
   CHANGELOG.seed.md
   templates/GATE.template.md
+  templates/DECISIONS.template.md
   templates/PLAN.template.md
   templates/WU.template.md
   rules/close-discipline.md
