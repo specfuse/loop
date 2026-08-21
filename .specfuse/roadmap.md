@@ -73,7 +73,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
-| FEAT-2026-0058 | Feature decision registry + override lint | planned | `.specfuse/features/FEAT-2026-0058-decision-registry/` | [→ detail](#feat-2026-0058) |
+| FEAT-2026-0058 | Feature decision registry + override lint | active  | `.specfuse/features/FEAT-2026-0058-decision-registry/` | [→ detail](#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
@@ -814,7 +814,7 @@ machine-checkable contract rather than prose.
 
 **Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0069"></a>
 ## FEAT-2026-0069 — monitoring.yml check targets + queue-stalled check type
