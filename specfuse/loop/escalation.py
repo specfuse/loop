@@ -158,7 +158,22 @@ def _default_runner(args: list, check: bool = True):
 def _find_existing_issue(
     runner: Callable, repo: str, correlation_id: str
 ) -> Optional[str]:
-    """Search for an open needs-human issue already carrying this marker."""
+    """Search for an open needs-human issue already carrying this marker.
+
+    Searches by the correlation ID, **not** by the marker (#2548). GitHub's
+    issue-search tokenizer never matches a raw `<!-- ... -->` HTML comment,
+    so passing the full marker returned zero rows against a queue that held
+    five copies of the same escalation -- the find-then-create seam fell
+    through to `gh issue create` every run, and the `needs-human` queue grew
+    to 10 open issues for 2 real escalations.
+
+    Recall comes from the quoted correlation ID; **precision comes from the
+    exact-marker body check below**, which is load-bearing and not a
+    belt-and-braces duplicate of the search. A token search for
+    `feature-FEAT-2026-0058` also returns its `-g1` child, so widening the
+    search term without that filter would trade duplicate issues for the
+    worse failure of reusing the wrong one.
+    """
     marker = _correlation_marker(correlation_id)
     result = runner(
         [
@@ -166,7 +181,7 @@ def _find_existing_issue(
             "--repo", repo,
             "--label", NEEDS_HUMAN_LABEL,
             "--state", "open",
-            "--search", marker,
+            "--search", f'"{correlation_id}"',
             "--json", "number,body",
         ],
         check=False,

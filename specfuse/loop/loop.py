@@ -962,7 +962,15 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         "security": "security",
         "coverage": "coverage",
     }
-    marker_re = re.compile(r"^### (\w+): FAIL", re.MULTILINE)
+    # `[\w-]`, not `\w` (#2557). The marker is written with the gate's raw
+    # name (see the emitters below), and gate names are hyphenated far more
+    # often than not -- 16 of this repo's 20 are. `\w` excludes `-`, so those
+    # 16 missed the search and fell through to the no-marker return, reporting
+    # the sentinel that means *no gate failed* for a gate that plainly did.
+    # The retry then got `no_gate_marker` instead of the failing gate's name.
+    # Every gate name across the shipped verification files is `[A-Za-z0-9_-]`,
+    # so this matches the emitter rather than merely widening by one character.
+    marker_re = re.compile(r"^### ([\w-]+): FAIL", re.MULTILINE)
     m = marker_re.search(stdout)
     if not m:
         return "other", "no_gate_marker"
@@ -982,6 +990,11 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         "lint": [re.compile(r"\b([A-Z]\d{3,4})\b")],
         "security": [re.compile(r"Issue: \[(B\d+)")],
         "coverage": [re.compile(r"^([^\s]+\.py)\s+\d+\s+\d+", re.MULTILINE)],
+        # bats TAP (#2557). Every hyphenated gate classifies as `other`, and
+        # six of this repo's are bats suites; without a pattern they fall to
+        # the line heuristic below and key off the command echo, which is the
+        # same string for every failure of a given gate.
+        "other": [re.compile(r"^not ok \d+ (.+)$", re.MULTILINE)],
     }
     for pattern in _SIG_PATTERNS.get(failure_class, []):
         sm = pattern.search(after_text)
@@ -993,6 +1006,14 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         # Skip non-informative lines (bare fences, whitespace, pure ANSI):
         # keying the signature off one would collapse distinct failures (#167).
         if _is_noninformative_signature(stripped):
+            continue
+        # The command echo the emitter writes as the first line inside the
+        # fence is non-informative for the same reason (#2557): it is byte-
+        # identical across every failure of a given gate, so keying off it
+        # collapses distinct faults onto one signature and can false-fire
+        # spinning_signature_repeat. Unreachable before the marker fix,
+        # because these gates never matched the marker at all.
+        if stripped.startswith("$ "):
             continue
         return failure_class, stripped[:100]
     return failure_class, NO_SIGNATURE
@@ -3331,6 +3352,13 @@ _VERDICT_RE = re.compile(
     # that content-free tail.
     r"|\bTests run: \d+, Failures: \d+"      # surefire run summary
     r"|<<< (?:FAILURE|ERROR)!"               # surefire per-test failure marker
+    # tsc / vue-tsc (#2390). Neither prints a summary line under a plain
+    # non-TTY invocation in either direction — success is a silent exit 0,
+    # failure is one `file(line,col): error TSxxxx: message` line per
+    # diagnostic with no trailing count — so without this, every typecheck
+    # failure pinned nothing and degraded to `failure_class: other` with no
+    # compiler output reaching the retry.
+    r"|error TS\d+:"                         # tsc/vue-tsc diagnostic
     r")"
 )
 
@@ -7419,6 +7447,28 @@ def run(
         if blocked:
             print("\nGate halted: work unit(s) need human attention.")
             return 1
+
+        # A WU that `depends_on` an `abandoned` sibling never becomes ready —
+        # ready() only treats `done` as a satisfied dependency (#2396) — so the
+        # frontier can go empty with substantive WUs (often the whole closing
+        # sequence) still `pending`. Nothing above sets `blocked` for that
+        # case, so without this check the run falls through to the
+        # gate-complete path below and announces a closing sequence that never
+        # ran. Refuse instead: "nothing left ready" and "the gate finished"
+        # are different states and must not print the same message.
+        stranded = [u for u in units if u.status not in (DONE, "abandoned")]
+        if stranded:
+            stranded_ids = ", ".join(u.wu_id for u in stranded)
+            print(
+                f"\nGate {gate.number} halted: {len(stranded)} work unit(s) "
+                f"never became ready — {stranded_ids}. This usually means "
+                f"one of their dependencies was abandoned; abandoning a WU "
+                f"strands anything that still depends on it. Fix PLAN.md's "
+                f"dependency graph (or un-abandon the blocking WU) and "
+                f"re-run."
+            )
+            return 1
+
         if dry_run:
             print(f"\n(dry run) Gate {gate.number} would complete and await review.")
             return 0
