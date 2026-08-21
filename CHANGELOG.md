@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- Guard-refusal attempt-outcome events (`closing_deliverable_missing`, `deliverable_missing`, `no_deliverable_files`, `learnings_not_staged`) now populate `failure_excerpt` with the failing assertion's own summary instead of always recording `null` — a refused attempt previously retried with no more information than the attempt before it had (#2504)
+
 ## [0.13.0+umbrella.0.13.0] - 2026-08-17
 
 ### Added
