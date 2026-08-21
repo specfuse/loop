@@ -116,7 +116,60 @@ DRIVER_VERSION = "0.13.0"
 # this only when a scaffold-format change makes an older `.specfuse/` undriveable.
 MIN_SCAFFOLD_VERSION = "0.2.0"
 SCAFFOLD_VERSION_PATH = SPECFUSE_DIR / "VERSION"
+#: Fallback attempt ceiling. Read through `resolve_max_attempts`, never
+#: directly at a dispatch site — a work unit's own `max_attempts`, then the
+#: project's `defaults.max_attempts` in verification.yml, take precedence
+#: (#2651).
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
+
+
+def _coerce_max_attempts(value, where: str) -> int:
+    """Validate one `max_attempts` value, or raise naming *where* it came from.
+
+    A malformed value is a CONFIGURATION ERROR, never a silent fallback. A
+    `max_attempts: 0` quietly becoming 3 would run a unit its author meant to
+    run once, and a typo quietly becoming 3 would hide the typo forever —
+    the "detect a condition and act on it" rule this repository records as
+    `[meta/six-bug-sweep/detecting-a-condition-is-not-handling-it]`.
+
+    `bool` is rejected explicitly: it is an `int` subclass in Python, so a
+    stray `max_attempts: true` would otherwise mean "1 attempt".
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        # ValueError, not TypeError (ruff TRY004): every other malformed-
+        # frontmatter raise in this module is a ValueError — `effort`,
+        # `oracles`, `prep` — and a caller catching one config error should
+        # not have to catch two exception types depending on which key was
+        # wrong. Consistency with the surrounding contract beats the generic
+        # preference here.
+        raise ValueError(  # noqa: TRY004
+            f"{where}: max_attempts must be a positive integer, "
+            f"got {value!r}")
+    if value < 1:
+        raise ValueError(
+            f"{where}: max_attempts must be >= 1, got {value!r}")
+    return value
+
+
+def resolve_max_attempts(wu, verification_cfg: dict) -> int:
+    """The attempt ceiling for *wu*: unit, then project, then the constant.
+
+    The unit wins because its author knows that unit's oracle — a discovery
+    unit whose shape is unknown wants 1, so a human sees the wall instead of
+    paying to rediscover it twice, while a unit iterating against a
+    convergent validator (#2650) wants far more than 3. Same
+    declared-by-the-party-with-the-context contract as
+    `[FEAT-2026-0059/G1-CLOSE/classify-beats-prose]`.
+    """
+    declared = getattr(wu, "max_attempts", None)
+    if declared is not None:
+        return _coerce_max_attempts(
+            declared, getattr(wu, "wu_id", "work unit"))
+    project = (verification_cfg or {}).get("defaults") or {}
+    if "max_attempts" in project:
+        return _coerce_max_attempts(
+            project["max_attempts"], "verification.yml defaults")
+    return MAX_ATTEMPTS
 # Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
 # FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
 # stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
@@ -281,6 +334,11 @@ class WorkUnit:
     # capture formatter.
     prep: list[str] = field(default_factory=list)
     oracles: list[str] = field(default_factory=list)
+    # OPTIONAL per-unit attempt ceiling (#2651). `None` means "not declared",
+    # which is NOT the same as 3: the project's `defaults.max_attempts` gets
+    # its turn before `MAX_ATTEMPTS` does, and baking the constant in here
+    # would make that tier unreachable. Resolved by `resolve_max_attempts`.
+    max_attempts: "int | None" = None
 
 
 @dataclass
@@ -713,6 +771,13 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `oracles` must be a string or list of strings, "
             f"got {type(raw_oracles).__name__!r}"
         )
+    raw_max_attempts = fm.get("max_attempts")
+    if raw_max_attempts is None:
+        max_attempts: "int | None" = None
+    else:
+        # Validated at resolve time, not here, so a work unit and a project
+        # default fail the same way with the same message.
+        max_attempts = raw_max_attempts
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -732,6 +797,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         extra_gates=extra_gates,
         prep=prep,
         oracles=oracles,
+        max_attempts=max_attempts,
     )
 
 
@@ -6706,7 +6772,13 @@ def run(
                 prior_failure_signature: tuple[str | None, str | None] | None = None
                 # (summary, files_touched) per guard refusal, newest last (#597).
                 refusal_history: list[tuple[str, list]] = []
-                for attempt in range(1, MAX_ATTEMPTS + 1):
+                # Resolved once per unit, then used at every site below in
+                # place of the constant (#2651): unit frontmatter, then the
+                # project's verification.yml `defaults.max_attempts`, then
+                # MAX_ATTEMPTS. A malformed value raises here rather than
+                # silently reverting to 3.
+                wu_max_attempts = resolve_max_attempts(wu, load_verification())
+                for attempt in range(1, wu_max_attempts + 1):
                     # #597: a guard refusal that repeated on a provably
                     # untouched tree cannot be fixed by running again -- the
                     # agent cannot edit its own frontmatter. Checked BEFORE the
@@ -6739,13 +6811,13 @@ def run(
                         )
                         print(f"   BLOCKED — identical guard refusal on an "
                               f"untouched tree at attempt {attempt - 1}"
-                              f"/{MAX_ATTEMPTS}; a retry cannot change the "
+                              f"/{wu_max_attempts}; a retry cannot change the "
                               f"inputs. Not dispatching attempt {attempt}.")
                         blocked = True
                         break
                     backend.set_wu(wu, "attempts", attempt)
                     print(f"   [{time.strftime('%H:%M:%S')}] attempt "
-                          f"{attempt}/{MAX_ATTEMPTS} model={wu.model} "
+                          f"{attempt}/{wu_max_attempts} model={wu.model} "
                           f"effort={wu.effort} — fresh session")
                     if attempt > 1 and failure_note:
                         reason = failure_note.strip().splitlines()[0][:200]
@@ -6784,7 +6856,7 @@ def run(
                         ))
                         reset_preserving_events(head_before, events_path,
                                                 untracked_before=untracked_before)
-                        print(f"   ZERO-TOKEN attempt {attempt}/{MAX_ATTEMPTS} "
+                        print(f"   ZERO-TOKEN attempt {attempt}/{wu_max_attempts} "
                               f"— no agent output, skipping")
                         continue
 
@@ -6892,7 +6964,7 @@ def run(
                             attempt_notes.append((attempt, summary))
                             failure_note = summary
                             print(f"   SQUASH COMMIT REJECTED attempt "
-                                  f"{attempt}/{MAX_ATTEMPTS}")
+                                  f"{attempt}/{wu_max_attempts}")
                             continue
                         # Driver-editing staleness warning (FEAT-2026-0075/T02):
                         # the squash just landed, so its diff is ground truth for
@@ -6943,7 +7015,7 @@ def run(
                                 attempt_notes.append((attempt, smoke_summary))
                                 failure_note = smoke_summary
                                 print(f"   SMOKE FAIL attempt "
-                                      f"{attempt}/{MAX_ATTEMPTS}")
+                                      f"{attempt}/{wu_max_attempts}")
                                 continue
                         # Closing deliverable guard (FEAT-2026-0015/T07):
                         # fires after smoke, before terminal-flip bookkeeping.
@@ -6984,7 +7056,7 @@ def run(
                             failure_note = closing_summary
                             print(
                                 f"   CLOSING DELIVERABLE MISSING attempt "
-                                f"{attempt}/{MAX_ATTEMPTS} — {closing_summary}"
+                                f"{attempt}/{wu_max_attempts} — {closing_summary}"
                             )
                             continue
                         # Deliverable-presence gate (FEAT-2026-0022/T02):
@@ -7026,7 +7098,7 @@ def run(
                             failure_note = deliv_summary
                             print(
                                 f"   DELIVERABLE MISSING attempt "
-                                f"{attempt}/{MAX_ATTEMPTS} — {deliv_summary}"
+                                f"{attempt}/{wu_max_attempts} — {deliv_summary}"
                             )
                             continue
                         # Empty-files escalation (FEAT-2026-0022/T03): compute
@@ -7057,7 +7129,7 @@ def run(
                             failure_note = impl_summary
                             print(
                                 f"   NO DELIVERABLE FILES attempt "
-                                f"{attempt}/{MAX_ATTEMPTS}"
+                                f"{attempt}/{wu_max_attempts}"
                             )
                             continue
                         # Produces-vs-diff cross-check (#198): the presence gate
@@ -7099,7 +7171,7 @@ def run(
                             failure_note = _prod_note
                             print(
                                 f"   PRODUCES NOT IN DIFF attempt "
-                                f"{attempt}/{MAX_ATTEMPTS} — {prod_summary}"
+                                f"{attempt}/{wu_max_attempts} — {prod_summary}"
                             )
                             continue
                         # Auto-mode LEARNINGS staging invariant
@@ -7135,7 +7207,7 @@ def run(
                                 failure_note = stage_reason
                                 print(
                                     f"   LEARNINGS NOT STAGED attempt "
-                                    f"{attempt}/{MAX_ATTEMPTS} — {stage_reason}"
+                                    f"{attempt}/{wu_max_attempts} — {stage_reason}"
                                 )
                                 continue
                         if wu.type == "close":
@@ -7301,7 +7373,7 @@ def run(
                         reset_preserving_events(head_before, events_path,
                                                 untracked_before=untracked_before)
                         print(f"   FILES_CHANGED MISMATCH attempt "
-                              f"{attempt}/{MAX_ATTEMPTS} — {len(payload)} path(s) "
+                              f"{attempt}/{wu_max_attempts} — {len(payload)} path(s) "
                               f"unchanged")
                         continue
 
@@ -7391,7 +7463,7 @@ def run(
                             f"\n\nFeature: {wu.wu_id}",
                         )
                         print(f"   BLOCKED — spinning signature repeat at "
-                              f"attempt {attempt}/{MAX_ATTEMPTS}")
+                              f"attempt {attempt}/{wu_max_attempts}")
                         blocked = True
                         break
                     if (_fc, _fs) != ("other", "no_gate_marker"):
@@ -7400,7 +7472,7 @@ def run(
                     wu_events.clear()
                     reset_preserving_events(head_before, events_path,
                                             untracked_before=untracked_before)
-                    print(f"   FAIL attempt {attempt}/{MAX_ATTEMPTS}")
+                    print(f"   FAIL attempt {attempt}/{wu_max_attempts}")
                 else:
                     # for-else: ran out of attempts without break = spinning.
                     # The reset has already happened in the failed/zero_token
@@ -7424,7 +7496,7 @@ def run(
                     write_cost_to_wu(backend, wu, cum_usage)
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": reason,
-                        "attempts": MAX_ATTEMPTS,
+                        "attempts": wu_max_attempts,
                         "attempts_usage": attempts_usage,
                     }))
                     flush_events(events_path, wu_events)
@@ -7441,10 +7513,10 @@ def run(
                     commit_bookkeeping(
                         [wu.file, events_path, *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
-                        f"({reason}, {MAX_ATTEMPTS} attempts)"
+                        f"({reason}, {wu_max_attempts} attempts)"
                         f"\n\nFeature: {wu.wu_id}",
                     )
-                    print(f"   BLOCKED after {MAX_ATTEMPTS} attempts — "
+                    print(f"   BLOCKED after {wu_max_attempts} attempts — "
                           f"escalated ({reason})")
                     blocked = True
 

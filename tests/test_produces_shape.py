@@ -120,7 +120,11 @@ class TestDispatchRefusesBeforeSpending(unittest.TestCase):
         ).read_text()
         call = src.index("shape_ok, shape_reason = assert_produces_shape(wu)")
         head = src.index('head_before = git("rev-parse", "HEAD")')
-        attempt_loop = src.index("for attempt in range(1, MAX_ATTEMPTS + 1):")
+        # The ceiling became per-unit in #2651, so the loop reads a resolved
+        # local rather than the module constant. Anchored on `for attempt in
+        # range(` alone: the assertion is about ORDER, and pinning the exact
+        # bound re-breaks this test every time that expression is touched.
+        attempt_loop = src.index("for attempt in range(")
         self.assertLess(call, head, "shape gate runs after dispatch begins")
         self.assertLess(call, attempt_loop, "shape gate runs inside the attempt loop")
 

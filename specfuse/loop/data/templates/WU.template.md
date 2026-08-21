@@ -45,6 +45,13 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   fail-fast: the first non-zero exit halts dispatch outright, no session runs. For
   environment setup whose failure is a setup problem, not a verdict. See
   `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
+- `max_attempts` — OPTIONAL. Attempt ceiling for THIS unit, overriding the project's
+  `defaults.max_attempts` in `verification.yml` and the built-in 3. Both directions are
+  useful: `1` when the unit's shape is unknown up front, so a failed pass sends it to a
+  human instead of paying twice more to rediscover the same wall; a higher value when the
+  unit iterates against a convergent oracle and each attempt makes measurable progress.
+  A value below 1, a non-integer, or `true` is a configuration error, never a silent
+  fallback to 3. See #2651.
 - `oracles` — OPTIONAL. Name of a `verification.yml` set to run **before dispatch**,
   capture-all: every entry runs regardless of others' outcome, and its output is
   injected into the session prompt as real repo state. See
