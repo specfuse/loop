@@ -6971,6 +6971,7 @@ def run(
                                 # assert_cost_analysis_section_when_met are
                                 # different failures and must not share a cluster.
                                 failure_signature=_closing_assertion,
+                                failure_excerpt=extract_failure_excerpt(closing_summary),
                                 files_touched=_refusal_touched,
                                 extras={
                                     "assertion": _closing_assertion,
@@ -7014,6 +7015,7 @@ def run(
                                 attempts_usage[-1],
                                 failure_class="guard_refusal",
                                 failure_signature="assert_declared_deliverables",
+                                failure_excerpt=extract_failure_excerpt(deliv_summary),
                                 files_touched=_refusal_touched,
                                 extras={"summary": deliv_summary,
                                         "missing": missing},
@@ -7045,6 +7047,7 @@ def run(
                                 attempts_usage[-1],
                                 failure_class="guard_refusal",
                                 failure_signature="assert_implementation_touched_files",
+                                failure_excerpt=extract_failure_excerpt(impl_summary),
                                 files_touched=_refusal_touched,
                                 extras={"summary": impl_summary},
                             ))
@@ -7122,6 +7125,7 @@ def run(
                                     attempts_usage[-1],
                                     failure_class="guard_refusal",
                                     failure_signature="assert_learnings_staged_under_auto",
+                                    failure_excerpt=extract_failure_excerpt(stage_reason),
                                     files_touched=_refusal_touched,
                                     extras={"summary": stage_reason},
                                 ))
