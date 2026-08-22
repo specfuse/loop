@@ -123,6 +123,36 @@ SCAFFOLD_VERSION_PATH = SPECFUSE_DIR / "VERSION"
 MAX_ATTEMPTS = 3  # spinning threshold: 3 failed verification cycles -> escalate
 
 
+def resume_command_for(feature_id: str, start: "Path | None" = None) -> str:
+    """The command that resumes *feature_id* against THIS build (#2642).
+
+    In a checkout carrying its own source, `specfuse` resolves to the
+    installed build, so telling an operator to run it resumes against
+    different code than the halt came from — silently, because the run then
+    looks normal. `build_provenance` already detects that condition and
+    already recommends the module form; this reads the same source rather
+    than restating a literal that contradicts it.
+
+    Outside a source tree the console script is correct and is what is
+    returned.
+    """
+    from specfuse.loop import build_provenance
+
+    if build_provenance.source_tree_package_dir(start) is not None:
+        return f"python3 -m specfuse.loop.loop --feature {feature_id}"
+    return f"specfuse run --feature {feature_id}"
+
+
+class ScaffoldVersionSkew(RuntimeError):
+    """The working tree's scaffold is newer than the installed one (#2643).
+
+    Raised by `auto_sync` and turned into a non-zero exit by `main`. A
+    distinct type rather than a bare RuntimeError so a caller embedding the
+    driver can catch exactly this and decide for itself, without also
+    swallowing unrelated runtime failures.
+    """
+
+
 def _coerce_max_attempts(value, where: str) -> int:
     """Validate one `max_attempts` value, or raise naming *where* it came from.
 
@@ -6681,7 +6711,7 @@ def run(
                             wu_id=_edit_wu_id,
                             driver_paths=_edit_paths,
                             remaining_wu_ids=_remaining_ids,
-                            resume_command=f"specfuse run --feature {feature_id}",
+                            resume_command=resume_command_for(feature_id),
                         )
 
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
@@ -8008,12 +8038,24 @@ def auto_sync(
     installed_tuple = _parse_version(installed)
 
     if current_tuple > installed_tuple:
-        print(
-            f"WARNING: auto_sync: .specfuse/VERSION {current_str} is newer than "
-            f"installed scaffold {installed}. Not downgrading. Update specfuse to continue.",
-            file=sys.stderr,
+        # Raise, do not warn-and-continue (#2643). The old code printed
+        # "Update specfuse to continue." and then `return`ed — exiting
+        # auto_sync, not the run — so main() dispatched anyway against the
+        # older scaffold. The stated contract was not the implemented one,
+        # and a version guard that proceeds is not a guard. The skew is not
+        # cosmetic: .specfuse/VERSION gates templates, rules and the
+        # closing-requirement surfaces a close ceremony reads, so a close
+        # under a stale scaffold can assert against obligations that have
+        # since changed. Callers who genuinely want to proceed already have
+        # --no-autosync / `autosync: false`, both of which return above.
+        raise ScaffoldVersionSkew(
+            f".specfuse/VERSION {current_str} is newer than the installed "
+            f"scaffold {installed}. Refusing to run against a scaffold older "
+            f"than this tree — templates, rules and closing requirements are "
+            f"versioned with it. Upgrade with `pip install -U specfuse`, or "
+            f"pass --no-autosync (or set `autosync: false` in "
+            f".specfuse/config) to run anyway."
         )
-        return
 
     if current_tuple == installed_tuple:
         if dry_run:
@@ -8214,7 +8256,13 @@ def main() -> int:
         if result["modified"]:
             print("Modified: " + ", ".join(str(p) for p in result["modified"]))
         return 0
-    auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
+    try:
+        auto_sync(dry_run=args.dry_run, no_autosync=args.no_autosync)
+    except ScaffoldVersionSkew as exc:
+        # A precondition, not a diagnostic (#2643): the guard's message says
+        # the run cannot continue, so the run does not continue.
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     return run(args.feature, args.dry_run, force_full_close=args.force_full_close,
                prepare=args.prepare, prepare_only=args.prepare_only,
                no_baseline_probe=args.no_baseline_probe)

@@ -89,12 +89,17 @@ class TestAutoSyncVersionContract(unittest.TestCase):
             shutil.rmtree(tmpdir)
 
     def test_newer_than_installed_refuses_without_exit(self):
-        # Target VERSION newer than installed seed: warn + refuse (no sys.exit, no downgrade).
+        # Target VERSION newer than installed seed: refuse, no downgrade, and
+        # crucially NO sys.exit — a library function must not kill the
+        # process. Since #2643 the refusal is a typed exception the CALLER
+        # turns into an exit code, which preserves that rule rather than
+        # breaking it: ScaffoldVersionSkew is not SystemExit.
         target, tmpdir = self._make_target("99.0.0")
         try:
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
                 with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
-                    loop.auto_sync(target)  # must NOT raise SystemExit
+                    with self.assertRaises(loop.ScaffoldVersionSkew):
+                        loop.auto_sync(target)
             mock_upgrade.assert_not_called()
         finally:
             shutil.rmtree(tmpdir)
