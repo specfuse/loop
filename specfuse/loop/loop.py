@@ -151,6 +151,75 @@ def _coerce_max_attempts(value, where: str) -> int:
     return value
 
 
+#: Consecutive non-improving attempts a convergent unit may take before it
+#: escalates. Two, not one: a single stalled iteration is common when an
+#: agent explores a wrong branch and backs out, while two in a row means the
+#: unit has stopped converging and the ceiling exists for exactly that.
+CONVERGENCE_PLATEAU_LIMIT = 2
+
+#: The metric a convergent unit's validator is contracted to emit. Declared
+#: by the validator rather than inferred by the driver: a raw failure count
+#: is not comparable across attempts when the tree differs, and guessing
+#: from one is the proxy-reading recorded as
+#: `[meta/six-bug-sweep/detecting-a-condition-is-not-handling-it]`.
+_FINDINGS_RE = re.compile(r"^FINDINGS:\s*(\d+)\s*$", re.MULTILINE)
+
+
+def parse_convergence_findings(stdout: str) -> "int | None":
+    """The declared findings count from *stdout*, or None when absent.
+
+    None means "could not tell", which is deliberately NOT zero — reading an
+    absent metric as "nothing is wrong" would retain a tree no one has
+    measured. The last occurrence wins: a validator that reports per phase
+    ends with the tally describing the tree as it now stands.
+    """
+    matches = _FINDINGS_RE.findall(stdout or "")
+    return int(matches[-1]) if matches else None
+
+
+@dataclass
+class ConvergenceState:
+    """Best-so-far findings and the run of attempts that did not improve it."""
+
+    best_findings: "int | None" = None
+    plateau: int = 0
+
+
+def decide_convergence_action(
+    findings: "int | None", state: ConvergenceState,
+) -> "tuple[str, ConvergenceState]":
+    """What to do after a convergent unit's failed attempt.
+
+    Returns one of:
+
+    ``retain``
+        The tree improved (or is the first measurement). Keep it and let the
+        next attempt continue in place; its `oracles` set re-runs the
+        validator, so the prompt opens with current findings.
+    ``restore``
+        The tree did not improve. Roll back to the best tree seen so far, so
+        a worse iteration cannot destroy a better one — the per-attempt
+        reset's original purpose (bugs #71/#74) kept rather than abandoned.
+    ``escalate``
+        Non-improving for `CONVERGENCE_PLATEAU_LIMIT` attempts running. The
+        unit has stopped converging and further attempts buy nothing.
+    ``reset``
+        The validator emitted no metric, so convergence cannot be judged.
+        Falls back to the discard behaviour rather than retaining a tree
+        nobody has measured, and still counts toward the plateau so an
+        oracle that never emits the metric cannot iterate to the ceiling
+        with no progress signal.
+    """
+    if findings is None:
+        return "reset", ConvergenceState(state.best_findings, state.plateau + 1)
+    if state.best_findings is None or findings < state.best_findings:
+        return "retain", ConvergenceState(findings, 0)
+    plateau = state.plateau + 1
+    if plateau >= CONVERGENCE_PLATEAU_LIMIT:
+        return "escalate", ConvergenceState(state.best_findings, plateau)
+    return "restore", ConvergenceState(state.best_findings, plateau)
+
+
 def resolve_max_attempts(wu, verification_cfg: dict) -> int:
     """The attempt ceiling for *wu*: unit, then project, then the constant.
 
@@ -339,6 +408,14 @@ class WorkUnit:
     # its turn before `MAX_ATTEMPTS` does, and baking the constant in here
     # would make that tier unreachable. Resolved by `resolve_max_attempts`.
     max_attempts: "int | None" = None
+    # OPTIONAL opt-in to convergent iteration (#2650). When true, a failed
+    # attempt that IMPROVED the declared `FINDINGS:` count keeps its working
+    # tree, so the next attempt continues in place instead of restarting from
+    # a clean one. Opt-in per unit because only the author knows whether
+    # partial progress is meaningful for that unit's oracle — a genuinely
+    # broken tree compounds, which is what the per-attempt reset protects
+    # against (bugs #71/#74).
+    iterate_on_failure: bool = False
 
 
 @dataclass
@@ -771,6 +848,16 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
             f"{path}: `oracles` must be a string or list of strings, "
             f"got {type(raw_oracles).__name__!r}"
         )
+    raw_iterate = fm.get("iterate_on_failure")
+    if raw_iterate is None:
+        iterate_on_failure = False
+    elif isinstance(raw_iterate, bool):
+        iterate_on_failure = raw_iterate
+    else:
+        raise ValueError(
+            f"{path}: `iterate_on_failure` must be a boolean, "
+            f"got {type(raw_iterate).__name__!r}"
+        )
     raw_max_attempts = fm.get("max_attempts")
     if raw_max_attempts is None:
         max_attempts: "int | None" = None
@@ -798,6 +885,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         prep=prep,
         oracles=oracles,
         max_attempts=max_attempts,
+        iterate_on_failure=iterate_on_failure,
     )
 
 
@@ -1211,7 +1299,8 @@ _RETRY_CLASS_HINT: dict[str, str] = {
 }
 
 
-def synthesize_retry_directive(failure_class: "str | None") -> str:
+def synthesize_retry_directive(failure_class: "str | None", *,
+                               retained: bool = False) -> str:
     """Return a forward-looking retry instruction for *failure_class* (#175).
 
     Prepended to the failure note fed into the next attempt. The note itself
@@ -1221,10 +1310,19 @@ def synthesize_retry_directive(failure_class: "str | None") -> str:
     exhaust. The lead reframes the output as a standing requirement and the
     per-class hint names the remedy generically.
     """
-    lead = ("The previous attempt's work was DISCARDED before this retry, so "
-            "the gate output below refers to files that no longer exist. Do "
-            "not read it as stale advice about a past attempt — treat it as a "
-            "standing requirement for THIS fresh attempt. ")
+    if retained:
+        # A convergent unit (#2650) keeps its tree between attempts, so the
+        # standing "was DISCARDED" lead is false — and acting on it means
+        # re-authoring from scratch, the exact opposite of iterating.
+        lead = ("Your previous attempt's work is STILL PRESENT in the working "
+                "tree — it was not discarded. The gate output below describes "
+                "that tree as it now stands. Continue from it: fix what the "
+                "output reports rather than starting over. ")
+    else:
+        lead = ("The previous attempt's work was DISCARDED before this retry, "
+                "so the gate output below refers to files that no longer "
+                "exist. Do not read it as stale advice about a past attempt — "
+                "treat it as a standing requirement for THIS fresh attempt. ")
     hint = _RETRY_CLASS_HINT.get(
         failure_class or "",
         "Satisfy every declared gate before declaring done.")
@@ -2458,6 +2556,31 @@ def reset_preserving_events(
         events_path.write_text(saved)
     if untracked_before is not None:
         _clean_attempt_untracked(untracked_before, events_path)
+
+
+def apply_diff(diff_text: str) -> bool:
+    """Replay *diff_text* onto the working tree; True when it applied.
+
+    Used to restore the best tree a convergent unit reached after a later
+    attempt regressed (#2650). Best-effort by design: a diff that will not
+    apply must leave the caller on the clean base it just reset to rather
+    than on a half-applied tree, so `--index` is deliberately not used and a
+    failure is reported rather than raised.
+
+    Note the diff was captured with a `max_chars` cap, so a very large
+    changeset may have been truncated and will fail to apply here — the
+    caller falls back to the reset tree and says so.
+    """
+    if not diff_text.strip():
+        return False
+    try:
+        proc = subprocess.run(
+            ["git", "apply", "--whitespace=nowarn", "-"],
+            input=diff_text, text=True, capture_output=True, check=False,
+        )
+    except Exception:  # noqa: BLE001 - restoring is best-effort, never fatal
+        return False
+    return proc.returncode == 0
 
 
 def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
@@ -6778,6 +6901,13 @@ def run(
                 # MAX_ATTEMPTS. A malformed value raises here rather than
                 # silently reverting to 3.
                 wu_max_attempts = resolve_max_attempts(wu, load_verification())
+                # Convergent-iteration state (#2650); inert unless the unit
+                # opts in. `_best_diff` is the working-tree diff of the best
+                # attempt so far, replayed when a later attempt regresses so a
+                # worse iteration cannot destroy a better one.
+                convergence = ConvergenceState()
+                _best_diff = ""
+                _converge_blocked = False
                 for attempt in range(1, wu_max_attempts + 1):
                     # #597: a guard refusal that repeated on a provably
                     # untouched tree cannot be fixed by running again -- the
@@ -7396,14 +7526,10 @@ def run(
                     attempt_notes.append((attempt, _evidence))
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
-                    # Prepend a forward-looking directive so the retry reads the
-                    # gate output as a standing requirement, not stale advice
-                    # about the discarded attempt (#175 fix 1).
-                    failure_note = (
-                        synthesize_retry_directive(_fc)
-                        + "\n\n## Gate output from the discarded attempt\n\n"
-                        + payload
-                    )
+                    # `failure_note` is built AFTER the retain/reset decision
+                    # below (#2650): its lead depends on whether the tree
+                    # survived, and #175 fix 1's directive is only true for
+                    # the discard path.
                     wu_events.append(emit_attempt_outcome(
                         wu, attempt, "failed",
                         attempts_usage[-1],
@@ -7470,8 +7596,74 @@ def run(
                         prior_failure_signature = (_fc, _fs)
                     flush_events(events_path, wu_events)
                     wu_events.clear()
-                    reset_preserving_events(head_before, events_path,
-                                            untracked_before=untracked_before)
+                    # Convergent units iterate instead of restarting (#2650).
+                    # `retained` also flips the retry directive: telling a
+                    # session its work "was DISCARDED" when the tree is still
+                    # there makes it re-author from scratch.
+                    _retained = False
+                    if wu.iterate_on_failure:
+                        _findings = parse_convergence_findings(payload)
+                        _action, convergence = decide_convergence_action(
+                            _findings, convergence)
+                        if _action == "retain":
+                            _retained = True
+                            _best_diff = capture_working_tree_diff(head_before)
+                            print(f"   iterating — findings {_findings}, "
+                                  f"tree retained")
+                        elif _action == "restore":
+                            reset_preserving_events(
+                                head_before, events_path,
+                                untracked_before=untracked_before)
+                            if _best_diff and apply_diff(_best_diff):
+                                _retained = True
+                                print(f"   no progress (findings {_findings}) "
+                                      f"— restored best tree "
+                                      f"({convergence.best_findings})")
+                            else:
+                                print(f"   no progress (findings {_findings}) "
+                                      f"— reset to base")
+                        elif _action == "escalate":
+                            _converge_blocked = True
+                        else:  # "reset" — no metric, cannot judge convergence
+                            reset_preserving_events(
+                                head_before, events_path,
+                                untracked_before=untracked_before)
+                            print("   no FINDINGS metric — reset to base")
+                    else:
+                        reset_preserving_events(
+                            head_before, events_path,
+                            untracked_before=untracked_before)
+                    if _converge_blocked:
+                        note_paths = persist_attempt_notes(
+                            work_dir, wu.wu_id, attempt_notes)
+                        backend.set_wu(wu, "status", "blocked_human")
+                        backend.set_wu(wu, "escalation_reason",
+                                       "convergence_plateau")
+                        write_cost_to_wu(backend, wu, cum_usage)
+                        wu_events.append(build_event(
+                            "human_escalation", wu.wu_id, {
+                                "reason": "convergence_plateau",
+                                "attempts": attempt,
+                                "best_findings": convergence.best_findings,
+                                "attempts_usage": attempts_usage,
+                            }))
+                        flush_events(events_path, wu_events)
+                        commit_bookkeeping(
+                            [wu.file, events_path, *note_paths],
+                            f"chore(loop): {wu.wu_id} blocked_human "
+                            f"(convergence_plateau, attempt {attempt})"
+                            f"\n\nFeature: {wu.wu_id}",
+                        )
+                        print(f"   BLOCKED — stopped converging at attempt "
+                              f"{attempt}/{wu_max_attempts} "
+                              f"(best findings {convergence.best_findings})")
+                        blocked = True
+                        break
+                    failure_note = (
+                        synthesize_retry_directive(_fc, retained=_retained)
+                        + "\n\n## Gate output from the previous attempt\n\n"
+                        + payload
+                    )
                     print(f"   FAIL attempt {attempt}/{wu_max_attempts}")
                 else:
                     # for-else: ran out of attempts without break = spinning.

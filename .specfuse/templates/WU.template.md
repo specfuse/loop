@@ -45,6 +45,16 @@ AUTHOR-SET FIELDS — fill or override these at draft/arm time:
   fail-fast: the first non-zero exit halts dispatch outright, no session runs. For
   environment setup whose failure is a setup problem, not a verdict. See
   `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
+- `iterate_on_failure` — OPTIONAL boolean, default false. Opt in when this unit's oracle
+  is a **convergent whole-tree validator**: one where a failing gate usually means the work
+  is *incomplete* rather than *wrong*. A failed attempt that lowered the validator's
+  reported findings keeps its working tree, so the next attempt continues in place instead
+  of restarting from a clean one. Requires the validator to emit a `FINDINGS: <n>` line —
+  convergence is measured, never guessed — and pairs with an `oracles` set naming that same
+  validator, so each attempt opens with current findings in its prompt. An attempt that does
+  NOT improve is rolled back to the best tree seen, and two non-improving attempts in a row
+  escalate `convergence_plateau`. Leave it off for ordinary units: a genuinely broken tree
+  compounds, which is what the per-attempt reset protects against. See #2650.
 - `max_attempts` — OPTIONAL. Attempt ceiling for THIS unit, overriding the project's
   `defaults.max_attempts` in `verification.yml` and the built-in 3. Both directions are
   useful: `1` when the unit's shape is unknown up front, so a failed pass sends it to a
