@@ -20,6 +20,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+from specfuse.loop import loop
 from specfuse.loop.loop import auto_sync
 
 
@@ -81,7 +82,10 @@ class TestAutoSyncRefusesNewer(unittest.TestCase):
                 with patch("specfuse.loop.loop._scaffold.upgrade_specfuse") as mock_upgrade:
                     with patch("specfuse.loop.loop._scaffold.init") as mock_init:
                         with _chdir(target):
-                            auto_sync(target)
+                            # Raises since #2643; the guarantees this test
+                            # owns — no downgrade, no re-init — are unchanged.
+                            with self.assertRaises(loop.ScaffoldVersionSkew):
+                                auto_sync(target)
             mock_upgrade.assert_not_called()
             mock_init.assert_not_called()
         finally:
@@ -91,11 +95,13 @@ class TestAutoSyncRefusesNewer(unittest.TestCase):
         target, tmpdir = self._make_target("99.0.0")
         try:
             with patch("specfuse.loop.loop._scaffold.scaffold_version", return_value="0.2.0"):
-                with patch("sys.stderr") as mock_err:
-                    with _chdir(target):
+                with _chdir(target):
+                    with self.assertRaises(loop.ScaffoldVersionSkew) as ctx:
                         auto_sync(target)
-                written = "".join(str(c) for c in mock_err.write.call_args_list)
-                self.assertIn("99.0.0", written)
+            # The guarantee is that the operator is TOLD which version is
+            # ahead. Since #2643 that travels on the exception rather than
+            # stderr, because the run now stops on it.
+            self.assertIn("99.0.0", str(ctx.exception))
         finally:
             shutil.rmtree(tmpdir)
 
