@@ -144,6 +144,63 @@ class TestTheExemptionIsScopedToTheQuotation(unittest.TestCase):
             f"a trailing citation must stay legitimate; errs={errs}")
 
 
+class TestTheSweepCorpusIsPinned(unittest.TestCase):
+    """Follow-up 2's other half: the in-scope count asserted, not assumed.
+
+    `test_check_runs_clean_over_this_repository` sweeps every feature folder
+    carrying a `DECISIONS.md` and asserts zero findings. With exactly one
+    such folder — the feature that wrote it — a green sweep proves nothing:
+    the check has never been observed firing on producer output from a
+    session that was not this one.
+
+    This does NOT discharge follow-up 2, which needs a genuine second live
+    adopter. It converts a silently-unfalsifiable green into a **tripwire**:
+    the count is pinned, so the moment a second feature adopts a registry
+    this test fails and forces someone to confirm the sweep still passes
+    against a corpus that can actually falsify it — at which point
+    follow-up 2 is dischargeable and this assertion should be raised to 2.
+    """
+
+    #: Live (non-`done`, non-`abandoned`) features carrying a DECISIONS.md.
+    #: Measured 2026-08-22. Raise this when a second feature adopts one.
+    EXPECTED_IN_SCOPE = 1
+
+    def _in_scope(self) -> list:
+        from tests._loop_loader import REPO_ROOT
+
+        root = REPO_ROOT / ".specfuse" / "features"
+        found = []
+        for feat in sorted(p for p in root.iterdir() if p.is_dir()):
+            plan = feat / "PLAN.md"
+            if not plan.is_file() or not (feat / "DECISIONS.md").is_file():
+                continue
+            fm, _ = lint_plan.read_frontmatter(plan)
+            if fm.get("status") in ("done", "abandoned"):
+                continue  # sealed history, exempt from the check
+            found.append(feat.name)
+        return found
+
+    def test_the_in_scope_corpus_is_the_size_we_think_it_is(self):
+        found = self._in_scope()
+
+        self.assertEqual(
+            len(found), self.EXPECTED_IN_SCOPE,
+            f"in-scope corpus changed: {found}. If it GREW, FEAT-2026-0058's "
+            f"hedged follow-up 2 may now be dischargeable — confirm "
+            f"test_check_runs_clean_over_this_repository still passes with a "
+            f"corpus that can falsify it, then raise EXPECTED_IN_SCOPE.")
+
+    def test_a_single_folder_corpus_cannot_falsify_the_sweep(self):
+        # Records WHY the pin exists, so a future reader does not raise the
+        # number without understanding what it was guarding.
+        if len(self._in_scope()) >= 2:
+            self.skipTest("corpus grew; follow-up 2 is dischargeable")
+        self.assertEqual(self._in_scope(),
+                         ["FEAT-2026-0058-decision-registry"],
+                         "the only in-scope folder should be the feature that "
+                         "wrote the format")
+
+
 class TestTheDogfoodIsActuallyCovered(unittest.TestCase):
     """The measurement follow-up 1 reports: coverage over the real feature."""
 
