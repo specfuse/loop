@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **A work unit's attempt ceiling is now configurable, per unit and per project.** `MAX_ATTEMPTS = 3` was a module constant with no override at any scope. `resolve_max_attempts` reads a unit's own `max_attempts` frontmatter first, then the project's `defaults.max_attempts` in `verification.yml`, then the constant. **Both directions of the knob matter, and #2641 only stated one**: `1` suits a unit whose shape is unknown before dispatch, so a failed pass reaches a human instead of paying twice more to rediscover the same wall — the reporting feature spent $29.30 across six attempts where `1` would have capped it near $7 — while a unit iterating against a convergent oracle wants far more than 3, since under retention (#2650) each attempt is an *iteration* rather than an independent restart, and eleven schema files plus two dozen registrations will not converge in three. A malformed value is a configuration error naming the unit, **never a silent fallback**: `max_attempts: 0` quietly becoming 3 would run a unit its author meant to run once, and a typo quietly becoming 3 would hide the typo forever. `bool` is rejected explicitly, since it is an `int` subclass and a stray `true` would otherwise mean "one attempt". The value is resolved once per unit and used at all 16 runtime sites that previously read the constant, so the attempt counter an operator sees (`attempt 2/10`) matches the ceiling actually in force (#2651)
+
 ### Fixed
 
 - Guard-refusal attempt-outcome events (`closing_deliverable_missing`, `deliverable_missing`, `no_deliverable_files`, `learnings_not_staged`) now populate `failure_excerpt` with the failing assertion's own summary instead of always recording `null` — a refused attempt previously retried with no more information than the attempt before it had (#2504)
