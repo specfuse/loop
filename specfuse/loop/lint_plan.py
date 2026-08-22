@@ -561,6 +561,70 @@ def check_closing_guard_literals(feature_dir: Path, gates: list) -> None:
 _LEARNINGS_DESTINATION_RE = re.compile(r"(?<![\w-])LEARNINGS\.md")
 
 
+def check_convergent_wu_wiring(
+    feature_dir: Path, plan_fm: dict, gates: list
+) -> list:
+    """ERROR when a unit declares `iterate_on_failure` it cannot act on (#2652).
+
+    `iterate_on_failure` (#2650) keeps a failed attempt's working tree when
+    the validator's findings improved. That only helps if the next attempt
+    can *see* what the validator currently reports, which is what an
+    `oracles` set delivers pre-dispatch — the set runs on every attempt and
+    its output is injected into the session prompt. Declared without one, a
+    unit iterates **blind**: it keeps its tree and learns nothing new about
+    it, which is strictly worse than the discard it opted out of, because it
+    also compounds.
+
+    Also refuses `max_attempts: 1` alongside it: one attempt has no second
+    pass to continue into, so the flag is a no-op its author plainly did not
+    intend.
+
+    **ERROR, not WARN**, on `check_closing_guard_literals`' own rule — the
+    signal is structural (frontmatter fields, not a prose match), and an
+    ERROR must be satisfiable on a populated tree
+    (`[FEAT-2026-0015/G2-CLOSE]`). Measured 2026-08-22: zero existing work
+    units in this repository declare `iterate_on_failure`, so the live tree
+    is clean by construction. `done` units are skipped as sealed history, the
+    same exemption every sibling check applies.
+
+    This is #2652's answer made concrete: the loop **hosts** convergent
+    authoring rather than forbidding it, and refuses only the configuration
+    that cannot work. Forbidding the work outright would not stop it
+    happening — it would only lose the loop's record of how it was done.
+    """
+    errs: list = []
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wfile = feature_dir / str(entry.get("file", ""))
+            if not wfile.is_file():
+                continue
+            try:
+                wfm, _ = read_frontmatter(wfile)
+            except Exception:  # noqa: BLE001 - malformed WU is another check's finding
+                continue
+            if not wfm.get("iterate_on_failure"):
+                continue
+            if wfm.get("status") == "done":
+                continue  # sealed; arming rules do not apply retroactively
+            if not wfm.get("oracles"):
+                errs.append(
+                    f"ERROR: {wfile}: declares `iterate_on_failure` but no "
+                    f"`oracles` set. A retained tree is only useful if the "
+                    f"next attempt can see what the validator now reports; "
+                    f"without an oracles set the unit iterates blind and "
+                    f"compounds. Name the validator's verification.yml set "
+                    f"in `oracles`, or drop `iterate_on_failure`."
+                )
+            if wfm.get("max_attempts") == 1:
+                errs.append(
+                    f"ERROR: {wfile}: declares `iterate_on_failure` with "
+                    f"`max_attempts: 1`. One attempt has no second pass to "
+                    f"continue into, so the flag does nothing. Raise the "
+                    f"ceiling, or drop `iterate_on_failure`."
+                )
+    return errs
+
+
 def check_closing_learnings_destination(
     feature_dir: Path, plan_fm: dict, gates: list
 ) -> None:
@@ -1728,6 +1792,10 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
     check_closing_learnings_destination(feature_dir, fm, gates)
+    # Returns rather than prints: an ERROR that does not reach `errs`
+    # never fails the lint, which is the defect shape LEARNINGS records
+    # as detecting-a-condition-is-not-handling-it.
+    errs.extend(check_convergent_wu_wiring(feature_dir, fm, gates))
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
