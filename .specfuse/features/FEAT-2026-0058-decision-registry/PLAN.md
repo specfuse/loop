@@ -5,7 +5,7 @@ slug: decision-registry
 branch: feat/FEAT-2026-0058-decision-registry
 roadmap_goal: A feature's decisions live in one canonical registry that artifacts cite by ID, so transcription drift and silent overrides become lintable instead of vigilance-dependent.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 20.00
 ---
 

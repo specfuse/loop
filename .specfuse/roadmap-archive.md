@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0058"></a>
+## FEAT-2026-0058 — Feature decision registry + override lint
+
+**Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
+
+**Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
+
+**Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
+
+**Status: done.**
+
 <a id="feat-2026-0050"></a>
 ## FEAT-2026-0050 — Async feature-drafting interview via question issues
 

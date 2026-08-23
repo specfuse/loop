@@ -73,7 +73,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
 | FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
 | FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
-| FEAT-2026-0058 | Feature decision registry + override lint | active  | `.specfuse/features/FEAT-2026-0058-decision-registry/` | [→ detail](#feat-2026-0058) |
+| FEAT-2026-0058 | Feature decision registry + override lint | done  | `.specfuse/features/FEAT-2026-0058-decision-registry/` | [→ archive](roadmap-archive.md#feat-2026-0058) |
 | FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
 | FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
 | FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
@@ -804,17 +804,6 @@ machine-checkable contract rather than prose.
 **Benefits.** A feature blocked on externally-caused debt can proceed without anyone weakening a gate: the debt is held constant, tracked in an issue, and visible in the gate review, while every newly-introduced failure still fails. Designed against real baseline records produced by 0051 rather than speculatively, and sequenced after it so the oracle-semantics change lands behind a shipped, proven brake.
 
 **Status: planned.**
-
-<a id="feat-2026-0058"></a>
-## FEAT-2026-0058 — Feature decision registry + override lint
-
-**Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
-
-**Goal.** A per-feature `DECISIONS.md` registry: decision ID, statement, owner, status (`ratified` / `overridden-pending-signoff` / `superseded`), and provenance link. PLAN/GATE/WU artifacts reference decisions by ID instead of restating them. `specfuse lint` blocks arming a gate whose artifacts contradict the registry or carry an override lacking an operator sign-off mark; the close ceremony's contract-change enumeration reads from the registry rather than re-deriving it.
-
-**Benefits.** Transcription drift and silent overrides become lintable instead of vigilance-dependent; multi-gate features keep one canonical decision surface that survives re-arms and reopens; operator review checkpoints get a single place to confirm or veto overrides instead of hunting them in prose diffs.
-
-**Status: active.**
 
 <a id="feat-2026-0069"></a>
 ## FEAT-2026-0069 — monitoring.yml check targets + queue-stalled check type
