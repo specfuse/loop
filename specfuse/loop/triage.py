@@ -25,6 +25,7 @@ import json
 import re
 from typing import Callable, Optional
 
+from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
 from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, has_finding_marker
 
 # Closed. A sixth category is a scope change, not a code change -- see
@@ -83,6 +84,26 @@ def label_for(category: str) -> str:
     if category not in CATEGORY_LABEL_MAP:
         raise ValueError(f"not a triage category: {category!r}")
     return CATEGORY_LABEL_MAP[category]
+
+
+def labels_for(category: str) -> tuple:
+    """Return every label `category` projects onto its issue, category
+    label first. Total over `CATEGORIES`.
+
+    `question` projects two (#2705). Its route is `needs-human`, and
+    `NEEDS_HUMAN_LABEL` is what puts an issue in the queue `/attention`
+    reads -- the category label alone is a classification nobody sweeps.
+    `escalation.py` has always applied both for the issues it files; this
+    is the same pairing on the triage write path.
+
+    Every other category projects exactly one. A triaged bug is a routing
+    decision, not a halt, and labelling it `needs-human` would drown the
+    queue this exists to keep readable.
+    """
+    label = label_for(category)
+    if category == "question":
+        return (label, NEEDS_HUMAN_LABEL)
+    return (label,)
 
 
 def render_marker(category: str, confidence: str) -> str:
@@ -164,23 +185,24 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         marker = parse_marker(body)
         if marker is not None:
             marked_category, _marked_confidence = marker
-            target_label = label_for(marked_category) if marked_category in CATEGORIES else None
+            target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
             existing_labels = {
                 label.get("name") for label in decision.get("labels") or []
             }
+            missing = [label for label in target_labels if label not in existing_labels]
             row = {
                 "number": number,
                 "skipped": True,
                 "marker_written": False,
                 "label_written": False,
             }
-            if target_label is not None and target_label not in existing_labels:
+            if missing:
                 try:
                     runner(
                         [
                             "gh", "issue", "edit", str(number),
                             "--repo", repo,
-                            "--add-label", target_label,
+                            "--add-label", ",".join(missing),
                         ],
                         check=True,
                     )
@@ -223,7 +245,7 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
                 [
                     "gh", "issue", "edit", str(number),
                     "--repo", repo,
-                    "--add-label", label_for(applied_category),
+                    "--add-label", ",".join(labels_for(applied_category)),
                 ],
                 check=True,
             )
@@ -265,9 +287,9 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
         marker = parse_marker(body)
         if marker is not None:
             marked_category, marked_confidence = marker
-            target_label = label_for(marked_category) if marked_category in CATEGORIES else None
+            target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
             existing_labels = {label.get("name") for label in issue.get("labels") or []}
-            if target_label is None or target_label in existing_labels:
+            if not target_labels or all(label in existing_labels for label in target_labels):
                 continue
             row = dict(issue)
             row["needs_repair"] = True

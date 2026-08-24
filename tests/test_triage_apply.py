@@ -6,7 +6,15 @@ from __future__ import annotations
 
 import unittest
 
-from specfuse.loop.triage import CATEGORIES, apply_triage, label_for, parse_marker, route_for
+from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
+from specfuse.loop.triage import (
+    CATEGORIES,
+    apply_triage,
+    label_for,
+    labels_for,
+    parse_marker,
+    route_for,
+)
 
 _REPO = "acme-widget/example"
 
@@ -150,3 +158,92 @@ class TestRouteAndLabelStayConsistent(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestQuestionCarriesNeedsHuman(unittest.TestCase):
+    """Issue #2705: `question` routes to needs-human, so the issue must
+    carry the `needs-human` label too -- that label is what `/attention`
+    filters on. Without it an agent's "a human must decide this" verdict
+    never reaches the human-facing inbox."""
+
+    @staticmethod
+    def _added_labels(runner):
+        added = []
+        for call in runner.calls:
+            if "--add-label" not in call:
+                continue
+            for index, arg in enumerate(call):
+                if arg == "--add-label":
+                    added.extend(call[index + 1].split(","))
+        return added
+
+    def test_question_applies_both_category_and_needs_human(self):
+        runner = _StubRunner()
+        decisions = [{"number": 1, "body": "Which way?", "category": "question"}]
+
+        apply_triage(runner, _REPO, decisions)
+
+        added = self._added_labels(runner)
+        self.assertIn("triage-question", added)
+        self.assertIn(NEEDS_HUMAN_LABEL, added)
+
+    def test_auto_dialled_low_confidence_also_carries_needs_human(self):
+        runner = _StubRunner()
+        decisions = [{"number": 1, "body": "Something broke.", "category": "bug", "confidence": "low"}]
+
+        apply_triage(runner, _REPO, decisions, auto=True)
+
+        self.assertIn(NEEDS_HUMAN_LABEL, self._added_labels(runner))
+
+    def test_non_question_categories_do_not_get_needs_human(self):
+        for category in ("bug", "feature", "duplicate", "wontfix"):
+            with self.subTest(category=category):
+                runner = _StubRunner()
+                decisions = [{"number": 1, "body": "Text.", "category": category}]
+
+                apply_triage(runner, _REPO, decisions)
+
+                added = self._added_labels(runner)
+                self.assertEqual(added, [label_for(category)])
+
+    def test_marked_question_missing_needs_human_is_repaired(self):
+        runner = _StubRunner()
+        decisions = [
+            {
+                "number": 7,
+                "body": "Which way?\n\n<!-- specfuse:triage category=question confidence=high -->",
+                "category": "question",
+                "labels": [{"name": "triage-question"}],
+            }
+        ]
+
+        results = apply_triage(runner, _REPO, decisions)
+
+        self.assertTrue(results[0]["skipped"])
+        self.assertTrue(results[0]["label_written"])
+        self.assertEqual(self._added_labels(runner), [NEEDS_HUMAN_LABEL])
+
+    def test_marked_question_with_both_labels_does_nothing(self):
+        runner = _StubRunner()
+        decisions = [
+            {
+                "number": 7,
+                "body": "Which way?\n\n<!-- specfuse:triage category=question confidence=high -->",
+                "category": "question",
+                "labels": [{"name": "triage-question"}, {"name": NEEDS_HUMAN_LABEL}],
+            }
+        ]
+
+        apply_triage(runner, _REPO, decisions)
+
+        self.assertEqual(runner.calls, [])
+
+    def test_labels_for_is_total_over_categories(self):
+        for category in CATEGORIES:
+            with self.subTest(category=category):
+                projected = labels_for(category)
+                self.assertIn(label_for(category), projected)
+
+    def test_labels_for_rejects_unknown_category(self):
+        with self.assertRaises(ValueError):
+            labels_for("not-a-category")

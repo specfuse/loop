@@ -77,6 +77,44 @@ class TestUntriagedScan(unittest.TestCase):
         self.assertEqual(row["category"], "bug")
         self.assertEqual(row["confidence"], "high")
 
+    def test_marked_question_missing_needs_human_is_returned_for_repair(self):
+        """Issue #2705: the five pre-fix `question` issues carry their
+        category label and nothing else. The repair path only sees rows
+        this scan hands it, so a `question` issue missing `needs-human`
+        has to come back flagged or it stays invisible forever."""
+        marked_body = render_marker("question", "high") + "\n\nWhich way?"
+        runner = _StubRunner([
+            _list_result([
+                {
+                    "number": 1,
+                    "title": "marked question",
+                    "body": marked_body,
+                    "labels": [{"name": "triage-question"}],
+                },
+            ])
+        ])
+
+        untriaged = list_untriaged(runner, _REPO, limit=50)
+
+        self.assertEqual(len(untriaged), 1)
+        self.assertTrue(untriaged[0]["needs_repair"])
+        self.assertEqual(untriaged[0]["category"], "question")
+
+    def test_marked_question_with_both_labels_is_excluded(self):
+        marked_body = render_marker("question", "high") + "\n\nWhich way?"
+        runner = _StubRunner([
+            _list_result([
+                {
+                    "number": 1,
+                    "title": "marked question",
+                    "body": marked_body,
+                    "labels": [{"name": "triage-question"}, {"name": "needs-human"}],
+                },
+            ])
+        ])
+
+        self.assertEqual(list_untriaged(runner, _REPO, limit=50), [])
+
     def test_unmarked_issue_is_flagged_not_needing_repair(self):
         runner = _StubRunner([
             _list_result([
