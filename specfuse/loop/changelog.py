@@ -332,3 +332,88 @@ def append_entry(
 
     newline = "\n" if text.endswith("\n") else ""
     return "\n".join(lines) + newline
+
+
+def released_section_drift(base_text: str, head_text: str) -> list:
+    """Report entries added to or removed from an already-published section.
+
+    The defect this exists for (#2727): five `fixed` entries were written
+    into `[0.13.0+umbrella.0.13.0]` days *after* that release was cut, and
+    nothing noticed. For a week the published notes described five fixes the
+    tag did not contain, while `Unreleased` understated the next release by
+    more than half.
+
+    `parse_changelog` cannot catch it. It validates **shape** — heading form,
+    the four entry classes, a trace on every entry — and all five entries
+    were perfectly well-formed. They were in the wrong section, and section
+    membership is not a property of a single document. It only exists as a
+    difference between two.
+
+    **Adding or removing is the error; editing is not.** The comparison is on
+    each dated section's set of traces, so:
+
+    * a new bullet in a published section grows the set -- refused, this is
+      the defect;
+    * deleting a shipped bullet shrinks it -- also refused, that is erasing
+      release history;
+    * rewording an entry, fixing its prose, or correcting a heading leaves
+      the set untouched -- allowed.
+
+    That distinction is deliberate and was the open question when #2727 was
+    filed. A blanket byte-level freeze would forbid the drift *and* the
+    legitimate corrections, and there is a live example of the latter: the
+    `0.13.0+umbrella.0.13.0` and `0.14.0+umbrella.0.14.0` headings name an
+    umbrella version that was never released (#2757), and fixing them edits
+    a dated section without changing what shipped in it.
+
+    Sections are matched on the **driver version alone**, not the whole
+    version field, precisely so that correcting the umbrella coordinate is
+    not misread as deleting one release and adding another.
+
+    A section present in `head_text` but absent from `base_text` is a new
+    release being cut, and is not reported -- stamping a release is the one
+    sanctioned way for a dated section to appear.
+
+    Returns a list of human-readable findings; empty means no drift. Never
+    raises on malformed input, matching this module's contract: a checker
+    that crashes cannot distinguish "found a problem" from "could not look".
+    """
+    def _by_version(text: str) -> dict:
+        sections = {}
+        for section in parse_changelog(text).sections:
+            if section.is_unreleased or not section.version:
+                continue
+            version, _umbrella = split_version_field(section.version)
+            sections[version] = section
+        return sections
+
+    base_sections = _by_version(base_text)
+    head_sections = _by_version(head_text)
+
+    findings = []
+    for version, base_section in sorted(base_sections.items()):
+        head_section = head_sections.get(version)
+        if head_section is None:
+            findings.append(
+                f"release [{version}] was removed from the changelog; "
+                f"a published section must not disappear"
+            )
+            continue
+
+        base_traces = [e.trace for e in base_section.entries]
+        head_traces = [e.trace for e in head_section.entries]
+
+        for trace in head_traces:
+            if trace not in base_traces:
+                findings.append(
+                    f"entry ({trace}) was added to already-published release "
+                    f"[{version}] — new entries belong under [Unreleased]"
+                )
+        for trace in base_traces:
+            if trace not in head_traces:
+                findings.append(
+                    f"entry ({trace}) was removed from already-published "
+                    f"release [{version}] — published history is not editable"
+                )
+
+    return findings

@@ -78,3 +78,28 @@ jobs:
 
       - name: Real-Windows gate-exec oracle (Git-Bash routing + python3 normalization)
         run: python -m unittest tests.test_windows_gate_exec -v
+
+  # #2727: a dated CHANGELOG section records what a tag actually contains, so
+  # an entry appended to one after the fact makes the published notes describe
+  # a release they are not in. `parse_changelog` cannot see it -- the drifted
+  # document is perfectly well-formed -- so the check is a diff against the
+  # base, and therefore lives here rather than in smoke-test.sh, which has no
+  # base to compare against on a push to main.
+  changelog-append-only:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The check needs the base revision's CHANGELOG.md; the default
+          # depth-1 checkout cannot produce it, and the script degrades to a
+          # skip rather than a failure when it is missing.
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Refuse edits to an already-published release section
+        run: python3 scripts/check_changelog_append_only.py "${{ github.event.pull_request.base.sha }}"
