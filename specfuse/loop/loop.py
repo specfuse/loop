@@ -2070,22 +2070,53 @@ def ensure_feature_branch(feat_fm: dict, feature_dir: "Path | None" = None) -> N
                 capture_output=True, text=True, check=False,
             )
             if merged.returncode != 0:
+                # Warn and carry on, rather than halting (#2556).
+                #
+                # Halting here contradicted the reasoning recorded directly
+                # above: falling behind is "the normal life of a feature
+                # branch, not a fault", and refusing one is "a deadlock
+                # generator rather than a safety property". That argument does
+                # not stop applying because the catch-up happens to conflict.
+                #
+                # It is not a rare case either. Under a squash-merge policy a
+                # squash commit is NOT an ancestor of the branch it came from,
+                # so every feature branch falls behind on every merge, and the
+                # replay conflicts on whatever files the two features share --
+                # by construction, not by accident. `specfuse run` could not
+                # start at all in such a repository, and no operator action
+                # fixed it: the prescribed `git merge <base>` is the command
+                # that just failed, so following the instruction reproduced the
+                # refusal. That is the same self-defeating-remedy shape this
+                # guard already shipped once with `git rebase <base>`.
+                #
+                # Bringing the branch up to date was a convenience the auto-sync
+                # change (#2186) added; failing at a convenience must not be
+                # fatal. The conflict is real and still has to be resolved, but
+                # the moment to resolve it is at the pull request, where a human
+                # is present -- not on a driver run that has work it could be
+                # doing. The merge is aborted first, so the branch is left
+                # exactly as it was and the tree stays clean for the next
+                # squash commit.
                 subprocess.run(
                     ["git", "merge", "--abort"],
                     capture_output=True, text=True, check=False,
                 )
-                raise FeatureBranchError(
-                    f"branch '{branch}' is {behind} commit(s) behind '{base}' and "
-                    f"cannot be brought up to date automatically -- merging "
-                    f"'{base}' into it conflicts. The merge was aborted and the "
-                    f"branch left exactly as it was. Resolve by hand:\n"
+                print(
+                    f"WARNING: '{branch}' is {behind} commit(s) behind '{base}' "
+                    f"and could not be brought up to date automatically -- "
+                    f"merging '{base}' into it conflicts. The merge was aborted "
+                    f"and the branch left exactly as it was; work continues on "
+                    f"it as-is. This is expected in a squash-merge repository, "
+                    f"where the base is never an ancestor of the branch it came "
+                    f"from. Resolve before the pull request:\n"
                     f"  git checkout {branch} && git merge {base}\n"
                     f"git's own report:\n{(merged.stdout + merged.stderr).strip()}"
                 )
-            print(
-                f"Brought '{branch}' up to date with '{base}' "
-                f"({behind} commit(s) behind)."
-            )
+            else:
+                print(
+                    f"Brought '{branch}' up to date with '{base}' "
+                    f"({behind} commit(s) behind)."
+                )
         print(f"Switched to feature branch '{branch}' (was on '{current}').")
     else:
         # Create-from-base carries the working tree onto the new branch. Only

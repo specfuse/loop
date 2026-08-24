@@ -180,19 +180,30 @@ class TestTheOldCheckWasUnsatisfiable(unittest.TestCase):
         self.assertTrue(self.repo.accepted("feat/x"))
 
 
-class TestTheRefusalIsNowConflictOnly(unittest.TestCase):
-    def test_the_guard_refuses_only_a_conflicting_merge(self):
-        """Superseded by the auto-sync change (#2186).
+class TestTheGuardNoLongerRefusesOnCatchUp(unittest.TestCase):
+    def test_a_conflicting_catch_up_warns_instead_of_refusing(self):
+        """Superseded twice: by #2186, then by #2556.
 
         An earlier revision refused on divergence and explained that unmerged
-        commits were acceptable. The driver now brings a behind branch up to
-        date instead, so the only remaining refusal is a merge that conflicts.
+        commits were acceptable. #2186 made the driver bring a behind branch
+        up to date instead, leaving a conflicting merge as the last refusal.
+        #2556 removed that one too: under a squash-merge policy the conflict
+        is guaranteed on every run, so refusing made the driver unusable in
+        such a repository, while the catch-up it was refusing over is only a
+        convenience.
+
+        The abort is still asserted -- proceeding is only safe on a clean
+        tree, so that half of the old behaviour became more load-bearing, not
+        less. Behavioural coverage is in
+        `test_feature_branch_squash_merge.py` and this file's sibling
+        `test_feature_branch_auto_sync.py`; this stays a source check only
+        because it pins that the refusal is gone from the source at all.
         """
         src = (REPO_ROOT / "specfuse" / "loop" / "loop.py").read_text()
 
-        self.assertIn("cannot be brought up to date automatically", src)
-        self.assertIn("merge", src)
+        self.assertIn("could not be brought up to date automatically", src)
         self.assertIn("--abort", src)
+        self.assertNotIn("cannot be brought up to date automatically", src)
 
 
 if __name__ == "__main__":

@@ -24,6 +24,8 @@ from a force-push to fix a condition that is not their fault.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import subprocess
 import sys
@@ -145,7 +147,17 @@ class TestBehindBranchIsBroughtUpToDate(unittest.TestCase):
         self.assertEqual(self.repo.git("rev-parse", "feat/y").stdout.strip(), tip)
 
 
-class TestAConflictIsStillRefused(unittest.TestCase):
+class TestAConflictIsReportedNotRefused(unittest.TestCase):
+    """A conflicting catch-up warns and proceeds; it used to raise (#2556).
+
+    Each guarantee this class asserted when the conflict was fatal is kept
+    and re-asserted at the new boundary -- the tree is still left exactly as
+    it was, git's own report still reaches the operator, and the condition is
+    still named rather than guessed at. Only "the run stops" is gone, because
+    under a squash-merge policy the conflict is guaranteed on every run and
+    stopping made the driver unusable in such a repository.
+    """
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.repo = _Repo(Path(self._tmp.name))
@@ -159,23 +171,33 @@ class TestAConflictIsStillRefused(unittest.TestCase):
         self.repo.git("checkout", "-q", "main")
         self.repo.commit("shared.txt", "main version")
 
-    def test_it_raises_rather_than_guessing(self):
+    def _run(self) -> str:
+        buf = io.StringIO()
+        with _chdir(self.repo.root):
+            with contextlib.redirect_stdout(buf):
+                loop.ensure_feature_branch({"branch": "feat/conflict"})
+        return buf.getvalue()
+
+    def test_it_reports_rather_than_guessing(self):
+        """The condition is still named; the driver no longer stops on it."""
         self._conflicting()
 
-        with _chdir(self.repo.root):
-            with self.assertRaises(loop.FeatureBranchError) as ctx:
-                loop.ensure_feature_branch({"branch": "feat/conflict"})
+        out = self._run()
 
-        self.assertIn("conflicts", str(ctx.exception))
+        self.assertIn("conflicts", out)
+        self.assertIn("WARNING", out)
 
     def test_the_branch_is_left_exactly_as_it_was(self):
-        """A refusal must not leave a half-merged tree behind."""
+        """Unchanged guarantee: no half-merged tree behind, raise or not.
+
+        This one matters MORE now than it did as a refusal -- the run keeps
+        going, so a leftover conflicted tree would be swept into the next
+        work unit's squash commit.
+        """
         self._conflicting()
         tip = self.repo.git("rev-parse", "feat/conflict").stdout.strip()
 
-        with _chdir(self.repo.root):
-            with self.assertRaises(loop.FeatureBranchError):
-                loop.ensure_feature_branch({"branch": "feat/conflict"})
+        self._run()
 
         self.assertEqual(self.repo.git("rev-parse", "feat/conflict").stdout.strip(), tip)
         self.assertEqual(
@@ -183,15 +205,29 @@ class TestAConflictIsStillRefused(unittest.TestCase):
             1,
             "no merge may be left in progress",
         )
+        self.assertEqual(
+            self.repo.git("status", "--porcelain").stdout, "",
+            "the tree must be clean for the next squash commit",
+        )
 
     def test_the_message_carries_gits_own_report(self):
+        """Unchanged guarantee, now on stdout instead of an exception."""
         self._conflicting()
 
-        with _chdir(self.repo.root):
-            with self.assertRaises(loop.FeatureBranchError) as ctx:
-                loop.ensure_feature_branch({"branch": "feat/conflict"})
+        out = self._run()
 
-        self.assertIn("shared.txt", str(ctx.exception))
+        self.assertIn("shared.txt", out)
+
+    def test_the_driver_ends_on_the_feature_branch_ready_to_work(self):
+        """The point of the change: the run continues instead of halting."""
+        self._conflicting()
+
+        self._run()
+
+        self.assertEqual(
+            self.repo.git("branch", "--show-current").stdout.strip(),
+            "feat/conflict",
+        )
 
 
 if __name__ == "__main__":
