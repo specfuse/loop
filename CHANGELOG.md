@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **CHANGELOG headings named umbrella versions that were never released.** `## [X.Y.Z+umbrella.A.B.C]` was true for ten releases and then silently was not: `0.13.0+umbrella.0.13.0` and `0.14.0+umbrella.0.14.0` both name an umbrella that was never published. `--umbrella-version` was checked for non-emptiness and nothing else, so a fiction and a fact were indistinguishable to the tool. The requirement's rationale -- "a driver version nobody can install is not a release" -- expired at umbrella 0.11.0, when components became hard dependencies and `pipx upgrade specfuse` began re-resolving on its own; the coordinate became a record of what was current, and a record nobody checked. It is now **resolved from PyPI rather than asserted**: omitted, the latest released umbrella is used; passed, it is validated against the index and a version that does not exist is refused before any file is written, naming what does. An unreachable index does not block a release -- it falls back to an explicitly passed value flagged unverified, because refusing to cut a release over a documentation field is a worse failure than the one this fixes -- but "could not look" is kept distinct from "not there", since conflating them is how a check reports a wrong answer instead of no answer. `main()` takes an injectable `fetch`, so the suite acquires no live dependency on the index (#2757)
+
 ## [0.14.0+umbrella.0.14.0] - 2026-08-24
 
 ### Added
