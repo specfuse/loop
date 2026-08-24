@@ -3739,3 +3739,92 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   [meta/agent-live-runs/an-outward-failure-that-reports-success-is-the-worst-shape],
   which is about a projection destroying the verdict it reports: here the report is
   accurate and complete, and nothing consumes it.
+
+- [FEAT-2026-0058/G1-CLOSE/an-exemption-scoped-to-the-wrong-unit-inverts-a-guards-coverage]
+  **A guard's exemption is as load-bearing as the guard, and an exemption scoped to
+  the wrong unit silently inverts coverage — measure a new check's live coverage over
+  the corpus it will guard, not just its red-before fixture.** The non-restatement
+  check was the load-bearing half of its feature by that feature's own ratified
+  decision: *if artifacts may only cite, there is no second copy to drift.* Its
+  legitimate-quotation exemption was correct in intent and was tested — a close WU
+  quoting a decision while citing its ID must not be a false positive — but it was
+  scoped **per whole artifact file**, and the citation pattern it keyed on was the
+  bare token `D3`. So one stray `D3` anywhere exempted an entire document from
+  restatement checking. Measured after the fact over the feature's own six graph
+  artifacts × four decisions: live on 3 of 24 pairs, 12.5%, with `PLAN.md` — which
+  restated two decisions near-verbatim — fully exempt. Every unit test passed, the
+  tree was green, and the exact drift the feature existed to remove was present in
+  its own dogfood, unflagged. Rules. (a) A WU introducing an exemption must state the
+  exemption's **scope unit** — line, paragraph, section, file — as an acceptance
+  criterion, because "exempt legitimate quotation" and "exempt any file containing
+  the token" are different rules that read identically in prose. (b) It must assert
+  **live coverage** — "N of M (subject, rule) pairs are actually checked" — over the
+  real corpus, not only that a synthetic positive fires and a synthetic exempt case
+  does not. A red-before test proves the check *can* fire; only a coverage
+  measurement says how often it *will*.
+
+- [FEAT-2026-0058/G1-CLOSE/pin-the-corpus-size-and-expect-it-to-move-both-ways]
+  **When a criterion's meaning depends on the corpus being non-trivial, assert the
+  corpus size in the test — and write the failure message for shrinkage as well as
+  growth.** A sequencing precondition required an upstream feature's decision prose to
+  be migrated *before* the gate ran; both the PLAN and the gate file spelled out the
+  consequence of skipping it ("the check will find the tree already clean for the
+  wrong reason, and its ERROR-on-a-populated-tree claim becomes unfalsifiable") and
+  then said "Check before arming." Nothing checked. The migration never happened, the
+  upstream feature reached `done` and became permanently exempt as sealed history, and
+  the satisfiability sweep ran over a live corpus of exactly one folder — the one the
+  feature wrote itself. Green, and proving nothing. A follow-up pinned the count as a
+  tripwire, `EXPECTED_IN_SCOPE = 1`. **Then the pin decayed, and caught itself doing
+  it**: closing the feature flipped its PLAN to `done`, the sweep skips `done` as
+  sealed history, and the corpus's only member removed itself — 0 folders, sweep now
+  vacuous, tripwire red on the very commit that closed the feature. Rules. (a) Assert
+  the corpus size (`assertGreaterEqual(len(in_scope), 2)`), not only zero findings: a
+  sweep returning "clean" over an empty or self-authored corpus is indistinguishable
+  from a working check, and that is the one failure a green suite cannot show you.
+  (b) A pin whose only member is the feature that authored it **will** decay the moment
+  that feature closes — write the both-directions response into the assertion message,
+  because a message that says only "if it GREW…" leaves the next reader with a red
+  build and no instruction. (c) Prefer asserting membership over size where the real
+  claim is membership: "no folder other than the authoring feature is in scope" says
+  what the guard is actually for, and survives the corpus emptying. Complements
+  [FEAT-2026-0055/G1-CLOSE] (make the sweep a driver gate, not a self-report) and
+  [FEAT-2026-0053/G1-CLOSE] (do not read "no findings across the corpus" as coverage);
+  this entry is about the corpus being big enough for the sweep to mean anything.
+
+- [FEAT-2026-0058/G1-CLOSE/attempts-lifetime-exceeding-attempts-marks-a-re-armed-unit]
+  **Detection heuristic for the re-arm under-count: any unit whose `attempts_lifetime`
+  exceeds its `attempts` has been re-armed, and every per-cycle aggregate over it is
+  wrong.** The rule itself is already recorded at [FEAT-2026-0053/G2-CLOSE] — sum every
+  field the lifetime is spread across, and reconcile a close's planned-vs-actual from
+  `events.jsonl`, the only surface that never loses a cycle. This is the cheap test for
+  *which* units need that treatment, plus a second instance showing the error does not
+  merely lose magnitude, it inverts sign: a unit escalated `spinning_detected` after
+  three attempts costing $4.95, was re-armed, passed first try at $1.87, and its
+  `task_completed` recorded `cumulative_cost_usd: 1.865657`. The gate ledger therefore
+  read 31% of a $6.00 plan for a unit that had actually spent $6.82 — 114% of plan.
+  Read alone, the ledger turned the feature's largest overrun into its biggest apparent
+  saving. A close that reports the ledger figure must report the event-log figure
+  beside it and say which is which.
+
+- [FEAT-2026-0058/G1-CLOSE/a-close-wus-do-not-touch-must-permit-its-own-binding-obligations]
+  **A close WU's "Do not touch" must explicitly permit the surfaces its own binding
+  close obligations require, or the obligation is dropped silently by a guard that
+  passes on absence.** `close-discipline.md` §3 requires a close to enumerate
+  consumer-visible contract changes *and* append them to `CHANGELOG.md`'s `Unreleased`
+  section, and `close-k` enforces the link between them. But `close-k` only fires when
+  the `## Consumer-visible contract changes` heading is **present** and is not the
+  `n/a` line — so a close that omits the heading passes clean. This close's *Do not
+  touch* read "any surface outside this feature's folder", which excludes
+  `CHANGELOG.md`, leaving exactly three outcomes: violate the scope rule, fail the
+  close, or omit the heading and pass. The third is the one an agent under attempt
+  pressure takes, and it is invisible afterwards — a passing close with no §3 section
+  looks identical to a feature that genuinely had nothing to enumerate. Rules.
+  (a) Authoring: when writing a close WU's *Do not touch*, enumerate the closing
+  surfaces the binding rules require it to write (`RETROSPECTIVE.md`,
+  `LEARNINGS-pending.md` or `.specfuse/LEARNINGS.md`, `CHANGELOG.md`,
+  `.specfuse/roadmap.md`) as explicit exceptions. (b) Reviewing: treat a passing close
+  with **no** §3 heading as unreviewed, not as `n/a` — the `n/a` line is a claim
+  someone made, and absence is not. Sibling of
+  [meta/six-bug-sweep/detecting-a-condition-is-not-handling-it]: there the guard
+  detects and proceeds; here the guard never fires, because the condition it keys on
+  is the thing the omission removed.

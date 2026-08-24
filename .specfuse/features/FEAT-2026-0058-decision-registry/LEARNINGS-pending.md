@@ -32,6 +32,43 @@ mode — this file is where those lessons go instead.
   lives in; "add it to the router" cost a blocked attempt when no router existed yet.
 ```
 
+## Promotion disposition — recorded 2026-08-23
+
+All four entries were judged at PR review for #2695 and promoted to
+`.specfuse/LEARNINGS.md`. Entries are left below rather than deleted, per step 3.
+
+- **Entry 1 (exemption scope unit)** — promoted in full, as
+  `an-exemption-scoped-to-the-wrong-unit-inverts-a-guards-coverage`. No existing
+  entry covered exemption scoping.
+- **Entry 2 (assert the corpus size)** — promoted and **widened**, as
+  `pin-the-corpus-size-and-expect-it-to-move-both-ways`. The staged text said to
+  assert the corpus size. It then proved itself a second time in a direction it
+  had not anticipated: the pin's only member was this feature, so closing the
+  feature emptied the corpus and the tripwire failed on the acceptance commit
+  itself. The promoted entry carries that second instance and adds two rules the
+  staged text did not have — write the failure message for shrinkage as well as
+  growth, and prefer asserting membership over size where membership is the real
+  claim. Cross-referenced to `[FEAT-2026-0055/G1-CLOSE]` and
+  `[FEAT-2026-0053/G1-CLOSE]`, which are adjacent but distinct.
+- **Entry 3 (cost counters reset on re-arm)** — promoted **narrowed**, as
+  `attempts-lifetime-exceeding-attempts-marks-a-re-armed-unit`. The general rule
+  was already in `LEARNINGS.md` at `[FEAT-2026-0053/G2-CLOSE]`, with equivalent
+  evidence, and `LEARNINGS.md` is loaded whole into every planning session and
+  asks for de-duplication. What was genuinely new is kept: the cheap detection
+  test (`attempts_lifetime > attempts` marks a re-armed unit) and a second
+  instance showing the under-count can invert sign rather than merely lose
+  magnitude. The restated general rule was dropped in favour of a pointer.
+- **Entry 4 (close WU *Do not touch*)** — promoted in full, as
+  `a-close-wus-do-not-touch-must-permit-its-own-binding-obligations`. Existing
+  Do-not-touch entries cover bounding a WU's write surface; none covers a close
+  WU's *own binding obligations* being excluded by its boundary, nor the
+  guard-passes-on-absence shape. Cross-referenced to
+  `[meta/six-bug-sweep/detecting-a-condition-is-not-handling-it]` as a sibling.
+
+**Still outstanding, and named by entry 4 itself:** the `close-discipline.md` §3
+`CHANGELOG.md` `Unreleased` append for this feature was never made. Entry 4 is
+the general rule derived from that omission; the omission itself is unrepaired.
+
 ## Entries
 
 <!-- closing work units append below this line -->
