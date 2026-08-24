@@ -246,23 +246,77 @@ class TestBumpVersionReleaseWiring(unittest.TestCase):
             self.assertEqual(
                 (root / "CHANGELOG.md").read_text(), _unreleased_text())
 
-    def test_main_requires_umbrella_version_flag(self):
+    def test_main_validates_the_umbrella_version_before_writing(self):
+        """Superseded by #2757: the flag is optional, the value is checked.
+
+        This pinned "`main` refuses without `--umbrella-version`". The flag was
+        required so a release could not document half of itself — a rationale
+        that expired with umbrella 0.11.0, when components became hard
+        dependencies and the driver started reaching users regardless. What the
+        requirement never did was check the value, so two published headings
+        name umbrella versions that were never released.
+
+        The guarantee is kept and strengthened: `main` still refuses to write a
+        coordinate it cannot stand behind. It just refuses on *falsity* now
+        rather than on absence, and resolves the value itself when omitted.
+
+        `fetch` is injected — resolution does network I/O, and this test drove
+        `main()` straight into PyPI before the seam existed.
+        """
+        released = ("0.11.0", "0.12.0", "0.12.1")
+
+        def fetch():
+            return released
+
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._make_tree(root, "0.2.0")
             real_root = bump_version._REPO_ROOT
             try:
                 bump_version._REPO_ROOT = root
-                self.assertEqual(bump_version.main(["0.9.0"]), 2)
+                # A version that was never released is refused, and nothing
+                # is written -- this is the #2757 defect.
+                before = (root / "pyproject.toml").read_text()
                 self.assertEqual(
-                    bump_version.main(["0.9.0", "--umbrella-version", "1.4.0"]), 0)
+                    bump_version.main(
+                        ["0.9.0", "--umbrella-version", "1.4.0"], fetch=fetch),
+                    2,
+                )
+                self.assertEqual((root / "pyproject.toml").read_text(), before)
+
+                # Omitted resolves to the latest release and succeeds.
+                self.assertEqual(bump_version.main(["0.9.0"], fetch=fetch), 0)
             finally:
                 bump_version._REPO_ROOT = real_root
 
             changelog_text = (root / "CHANGELOG.md").read_text()
+            self.assertIn("umbrella.0.12.1", changelog_text)
             result = parse_changelog(changelog_text)
-            released = [s for s in result.sections if not s.is_unreleased]
-            self.assertEqual(len(released), 1)
+            released_sections = [s for s in result.sections if not s.is_unreleased]
+            self.assertEqual(len(released_sections), 1)
+
+    def test_main_still_accepts_an_explicit_released_version(self):
+        """Pinning stays possible — a release cut against an older umbrella
+        deliberately is a real case, and only fiction is refused."""
+        def fetch():
+            return ("0.11.0", "0.12.0", "0.12.1")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._make_tree(root, "0.2.0")
+            real_root = bump_version._REPO_ROOT
+            try:
+                bump_version._REPO_ROOT = root
+                self.assertEqual(
+                    bump_version.main(
+                        ["0.9.0", "--umbrella-version", "0.11.0"], fetch=fetch),
+                    0,
+                )
+            finally:
+                bump_version._REPO_ROOT = real_root
+
+            self.assertIn(
+                "umbrella.0.11.0", (root / "CHANGELOG.md").read_text())
 
 
 class TestReleaseWiringPortability(unittest.TestCase):
