@@ -144,6 +144,12 @@ class TestTheExemptionIsScopedToTheQuotation(unittest.TestCase):
             f"a trailing citation must stay legitimate; errs={errs}")
 
 
+#: The feature that authored the DECISIONS.md format. A sweep whose only
+#: in-scope member is this folder has never seen producer output from a
+#: session other than the one that wrote the checker.
+AUTHORING_FEATURE = "FEAT-2026-0058-decision-registry"
+
+
 class TestTheSweepCorpusIsPinned(unittest.TestCase):
     """Follow-up 2's other half: the in-scope count asserted, not assumed.
 
@@ -158,12 +164,27 @@ class TestTheSweepCorpusIsPinned(unittest.TestCase):
     the count is pinned, so the moment a second feature adopts a registry
     this test fails and forces someone to confirm the sweep still passes
     against a corpus that can actually falsify it — at which point
-    follow-up 2 is dischargeable and this assertion should be raised to 2.
+    follow-up 2 is dischargeable and this assertion should be raised.
+
+    **The corpus is now empty, and the pin only ever anticipated growth.**
+    It was first measured at 1 — the feature that wrote the format, which was
+    live at the time. Closing that feature flipped its PLAN to `done`, and
+    `_in_scope` skips `done` as sealed history, so the one member removed
+    itself and the count fell to 0. The sweep does not merely fail to
+    falsify now; it runs over nothing and passes vacuously. That makes
+    follow-up 2 sharper rather than resolved: what it needs is unchanged —
+    a second live adopter — but the state it is measured against is 0, not 1.
+
+    The lesson is the pin's own: a corpus assertion whose single member is
+    the feature that authored it decays the moment that feature closes.
+    Pin the count, and expect it to move in both directions.
     """
 
     #: Live (non-`done`, non-`abandoned`) features carrying a DECISIONS.md.
-    #: Measured 2026-08-22. Raise this when a second feature adopts one.
-    EXPECTED_IN_SCOPE = 1
+    #: Measured 2026-08-22 at 1 (the authoring feature); fell to 0 on
+    #: 2026-08-23 when that feature closed and became sealed history.
+    #: Raise this when a feature adopts a registry — see the class docstring.
+    EXPECTED_IN_SCOPE = 0
 
     def _in_scope(self) -> list:
         from tests._loop_loader import REPO_ROOT
@@ -188,17 +209,31 @@ class TestTheSweepCorpusIsPinned(unittest.TestCase):
             f"in-scope corpus changed: {found}. If it GREW, FEAT-2026-0058's "
             f"hedged follow-up 2 may now be dischargeable — confirm "
             f"test_check_runs_clean_over_this_repository still passes with a "
-            f"corpus that can falsify it, then raise EXPECTED_IN_SCOPE.")
+            f"corpus that can falsify it, then raise EXPECTED_IN_SCOPE. If it "
+            f"SHRANK, a feature carrying a DECISIONS.md reached `done` or "
+            f"`abandoned` and is now exempt as sealed history; lower "
+            f"EXPECTED_IN_SCOPE and say so in the follow-up record, because a "
+            f"smaller corpus means the sweep proves correspondingly less.")
 
-    def test_a_single_folder_corpus_cannot_falsify_the_sweep(self):
+    def test_no_third_party_folder_has_entered_the_corpus(self):
         # Records WHY the pin exists, so a future reader does not raise the
-        # number without understanding what it was guarding.
-        if len(self._in_scope()) >= 2:
+        # number without understanding what it was guarding. Follow-up 2 is
+        # not about the count for its own sake — it is about whether the
+        # sweep has ever run over a registry written by a session other than
+        # the one that authored the format. So the claim under test is
+        # membership, not size: every in-scope folder is still the authoring
+        # feature. The moment that stops holding, the sweep can falsify and
+        # follow-up 2 is dischargeable.
+        found = self._in_scope()
+        if len(found) >= 2:
             self.skipTest("corpus grew; follow-up 2 is dischargeable")
-        self.assertEqual(self._in_scope(),
-                         ["FEAT-2026-0058-decision-registry"],
-                         "the only in-scope folder should be the feature that "
-                         "wrote the format")
+        self.assertEqual(
+            [f for f in found if f != AUTHORING_FEATURE], [],
+            f"corpus is {found} — a folder other than the authoring feature "
+            f"is in scope, so the sweep now runs over producer output it did "
+            f"not write. Confirm test_check_runs_clean_over_this_repository "
+            f"still passes, then discharge follow-up 2 and raise "
+            f"EXPECTED_IN_SCOPE.")
 
 
 class TestTheDogfoodIsActuallyCovered(unittest.TestCase):

@@ -508,6 +508,21 @@ accepted open.**
   sweep still passes against a corpus that can falsify it. That commit's own
   message states it does **not** discharge this entry. The condition remains a
   second genuine adopter.
+- **correction, recorded 2026-08-23 — the corpus is 0, not 1.** The record above
+  and #2694 both describe a live in-scope corpus of one folder. That was true
+  while this feature was `active`. Accepting the hedge flipped its `PLAN.md` to
+  `done`, and the sweep skips `done` and `abandoned` features as sealed history,
+  so the corpus's only member removed itself: **the citation sweep now runs over
+  zero folders and passes vacuously.** Caught by the tripwire itself, which
+  failed CI on the acceptance commit — `AssertionError: 0 != 1 : in-scope corpus
+  changed: []`. `EXPECTED_IN_SCOPE` was lowered to `0` and the failure message
+  reworded to handle shrinkage as well as growth, since it had only ever
+  anticipated growth. **This does not change what entry 2 needs** — a second
+  live adopter, unchanged — but it does change what is true today: the
+  ERROR-severity checks guard an empty corpus until one arrives. The pin's own
+  lesson, which staged learning 2 states in the general case: a corpus assertion
+  whose single member is the feature that authored it decays the moment that
+  feature closes.
 
 **Entry 3 — One unsigned override reports as seven errors, six naming the wrong
 repair.** `kind: externally-verifiable-later`. Carried forward as-is; see
