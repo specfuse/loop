@@ -40,7 +40,22 @@ rules:
   bugs:
     preempt: true
     min_severity: low
-    automerge: "off"           # FEAT-2026-0048 owns enforcement; not built yet
+    # FEAT-2026-0048 shipped (roadmap: done) -- enforcement exists and is
+    # live: `bug_lane.evaluate_merge_guardrails` requires test evidence,
+    # a diff within `max_diff_lines`, no judge-path touched, traceable
+    # provenance, green CI, and room under the rolling daily cap.
+    #
+    # Still "off" by operator choice, not for want of a mechanism. The dial
+    # gates the merge only -- `run_bug_lane` invokes headless `/fix-bug` at
+    # every setting, so "off" means a bug-lane PR waits for a human merge,
+    # not that the lane is inert. Flip to "on" to let a PR clearing every
+    # guardrail above merge itself.
+    automerge: "off"
+    # Declared rather than defaulted (#2715). `bug_lane_limits` falls back to
+    # 150/3 when these are absent, so the bounds were real but invisible --
+    # and they are what the dial's blast radius is made of.
+    max_diff_lines: 150
+    max_merges_per_day: 3
     test_paths:                 # accepted at the FEAT-2026-0076 review: measured from
       - tests/                  # the tree and verification.yml gate commands, which agree
   features:
