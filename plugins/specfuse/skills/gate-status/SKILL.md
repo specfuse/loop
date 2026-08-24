@@ -259,9 +259,38 @@ re_arm_count: <N>  latest re-arm reason: "<reason>"  (re-armed at <timestamp>)
 
 ### 5. If nothing is blocked but the gate hasn't finished
 
-Report the ready WUs (those whose `depends_on` are all done and
-status is `pending`). Tell the user the gate would continue if they
-re-ran the loop.
+**First check whether the run was halted for a driver restart.** In
+`events.jsonl` for this feature, a halt is the **last** event being
+`driver_staleness_detected` with `payload.halted: true`, and no
+`attempt_outcome` after it. When that holds, report the halt instead of
+the ready-WU list:
+
+- the work unit whose squash triggered it (`payload.wu_id`) and the
+  driver paths it touched (`payload.driver_paths`);
+- the units that never got dispatched (`payload.remaining_wu_ids`);
+- `payload.resume_command`, printed **verbatim**.
+
+Never reconstruct that command. The driver stamps the one that resumes
+*the build the halt came from*, and in a checkout carrying its own source
+`specfuse` resolves to the installed build instead — so a reconstructed
+`specfuse run --feature <id>` can silently resume against different code
+than the halt was about. That is the defect fixed as #2642; reading the
+stamped value is what keeps this skill from reintroducing it.
+
+This check is necessary because the halt is invisible in the state files
+this skill otherwise reads. It deliberately flips no WU status and leaves
+the gate `open` — the run is suspended, not concluded, so a fresh process
+sees exactly what `ready()` would have handed the dead one. On disk it is
+an active feature with an open gate and pending units, which is
+indistinguishable from a feature nobody has run yet. Without this check
+the paragraph below is not merely unhelpful but wrong: it tells the
+operator the gate *would* continue if they re-ran the loop, when in fact
+the loop already ran, stopped on purpose, and is waiting on precisely that
+re-run.
+
+Otherwise — no halt — report the ready WUs (those whose `depends_on` are
+all done and status is `pending`). Tell the user the gate would continue if
+they re-ran the loop.
 
 ### 6. Emit the RESULT block only for a non-interactive run
 
