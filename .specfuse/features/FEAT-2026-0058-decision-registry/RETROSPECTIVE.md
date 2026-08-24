@@ -449,3 +449,96 @@ directly). Four entries:
 4. A close WU's *Do not touch* must permit the surfaces its own binding close
    obligations require, or the obligation is dropped by a guard that passes on
    absence.
+
+## Hedged verdict accepted
+
+**Accepted verdict:** `partially_met`.
+
+**Recorded:** 2026-08-23T11:54:15Z.
+
+**Operator reason (verbatim):** entry 2 needs a second adopter, not more
+waiting
+
+**Verdict ceiling at acceptance.** All three follow-up entries carry
+`kind: externally-verifiable-later`, so
+`closing_requirements.verdict_ceiling_for_kinds` computes **rework exists**:
+the operator had a real choice between accepting now and staying hedged until
+entry 2's named re-run condition is met. The choice was made with that named
+condition quoted.
+
+### Follow-ups carried forward
+
+Accepting this hedge discharges nothing. The three entries below are carried
+forward verbatim from *§ Hedged-verdict follow-up record* above; this record
+does not alter, close, or re-classify any of them. Two were discharged before
+this acceptance, by operator-directed rework recorded in
+*§ Discharge record — entries 1 and 3 (operator-directed, post-close)*; that
+section, not this one, is the authority on their state.
+
+**Entry 1 — The non-restatement check is inert on any file that cites the
+decision ID anywhere.** `kind: externally-verifiable-later`. Carried forward
+as-is; see *§ Discharge record* for its post-close state.
+
+**Entry 2 — The ERROR-on-a-populated-tree claim rests on a precondition that
+never held.** `kind: externally-verifiable-later`. **Open at acceptance, and
+accepted open.**
+
+- **criterion (verbatim, `WU-02` acceptance criterion 6):** "**The check runs
+  clean over this repository's real tree**, with the FEAT-2026-0050 repair
+  merged (see `GATE-01.md`'s precondition). Asserted by a test that runs it over
+  `.specfuse/features/` and expects zero errors — the satisfiability claim made
+  falsifiable rather than assumed."
+- **why it is unmet:** the test passes, but the clause it is conditioned on is
+  false. FEAT-2026-0050 has no `DECISIONS.md`; the repair never landed, and
+  FEAT-2026-0050 is now `done` and permanently exempt. One folder in 67 is in
+  scope — the one this feature wrote — so a green sweep is unfalsifiable exactly
+  as `GATE-01.md` predicted. Every red-before test is a synthetic
+  `TemporaryDirectory` fixture, so nothing in this feature has been observed
+  firing on real producer output written by a session that was not this one.
+- **re-run condition that would upgrade this to `met`:** a second live
+  (non-`done`, non-`abandoned`) feature adopts a `DECISIONS.md` — FEAT-2026-0011
+  or the next drafted feature — and
+  `python3 -m unittest tests.test_decision_citation_lint.TestCitationIntegrity.test_check_runs_clean_over_this_repository`
+  exits 0 with at least two folders in scope, with the in-scope count asserted
+  rather than assumed.
+- **kind:** `externally-verifiable-later`
+- **state at acceptance:** PR #2694 pinned the citation-sweep corpus size, which
+  converts a silently-unfalsifiable green into a tripwire — the moment a second
+  feature adopts a registry the test fails and forces someone to confirm the
+  sweep still passes against a corpus that can falsify it. That commit's own
+  message states it does **not** discharge this entry. The condition remains a
+  second genuine adopter.
+- **correction, recorded 2026-08-23 — the corpus is 0, not 1.** The record above
+  and #2694 both describe a live in-scope corpus of one folder. That was true
+  while this feature was `active`. Accepting the hedge flipped its `PLAN.md` to
+  `done`, and the sweep skips `done` and `abandoned` features as sealed history,
+  so the corpus's only member removed itself: **the citation sweep now runs over
+  zero folders and passes vacuously.** Caught by the tripwire itself, which
+  failed CI on the acceptance commit — `AssertionError: 0 != 1 : in-scope corpus
+  changed: []`. `EXPECTED_IN_SCOPE` was lowered to `0` and the failure message
+  reworded to handle shrinkage as well as growth, since it had only ever
+  anticipated growth. **This does not change what entry 2 needs** — a second
+  live adopter, unchanged — but it does change what is true today: the
+  ERROR-severity checks guard an empty corpus until one arrives. The pin's own
+  lesson, which staged learning 2 states in the general case: a corpus assertion
+  whose single member is the feature that authored it decays the moment that
+  feature closes.
+
+**Entry 3 — One unsigned override reports as seven errors, six naming the wrong
+repair.** `kind: externally-verifiable-later`. Carried forward as-is; see
+*§ Discharge record* for its post-close state.
+
+### Also outstanding at acceptance, outside the follow-up record
+
+`close-discipline.md` §3's `CHANGELOG.md` `Unreleased` append was **not made**
+and is not one of the three entries above — it is recorded in *§ What the loop
+did NOT verify (gate 1)*, whose own text assigns it to "the operator at PR
+review for this feature, or whoever accepts the hedged verdict". Confirmed
+unmade at acceptance time: `CHANGELOG.md`'s `[Unreleased]` section carries no
+decision-registry entry. `close-k` passes by heading-absence, so nothing
+automatic will catch it. The four classified items are ready to copy from
+*§ Consumer-visible surface added by this feature*; one is behaviour-changing
+for every target project (`specfuse lint` gains two ERROR-severity checks, so a
+feature folder carrying a `DECISIONS.md` can now fail lint and therefore fail
+arming). Surfaced to the operator before acceptance and left to them — the
+acceptance skill's write surface is this record only.
