@@ -44,17 +44,35 @@ parked for a human, across every feature at once — not just the active one.
 ### 1. Sweep local repository state
 
 Read `.specfuse/roadmap.md` and every `.specfuse/features/FEAT-*/` folder. Collect
-four classes of state, purely from files on disk:
+five classes of state, purely from files on disk:
 
-1. **`blocked_human` work units** — any WU file whose frontmatter `status` is
+1. **Runs halted for a driver restart** — read each feature's `events.jsonl`. A
+   feature is halted when its **last** event is `driver_staleness_detected` with
+   `payload.halted: true` and no later `attempt_outcome` follows it.
+2. **`blocked_human` work units** — any WU file whose frontmatter `status` is
    `blocked_human`, in any feature folder, not just the active feature.
-2. **`awaiting_review` gates** — any `GATE-NN.md` whose frontmatter `status` is
+3. **`awaiting_review` gates** — any `GATE-NN.md` whose frontmatter `status` is
    `awaiting_review`.
-3. **`blocked` features** — any roadmap row whose `Status` is `blocked`; read the
+4. **`blocked` features** — any roadmap row whose `Status` is `blocked`; read the
    feature's `**Blocked by.**` detail block to name what it's waiting on.
-4. **`stale` pull requests** — open PRs with no activity past a reasonable
+5. **`stale` pull requests** — open PRs with no activity past a reasonable
    staleness window. This is the one class that cannot be read from
    `.specfuse/` files.
+
+**Why class 1 needs reading the event log at all.** The halt deliberately flips
+no WU status and leaves the gate `open` — the run is suspended, not concluded,
+so a fresh process sees exactly the state `ready()` would have handed the dead
+one. That design is why it shipped with no consumer migration, and it is also
+why a halted feature is indistinguishable from one nobody has run: on disk it is
+an active feature, an open gate, and pending units. The event log is the only
+place the halt is recorded.
+
+**Print `payload.resume_command` verbatim; never reconstruct it.** The driver
+stamps the command that resumes *the build the halt came from*. In a checkout
+carrying its own source, `specfuse` resolves to the installed build instead, so
+a reconstructed `specfuse run --feature <id>` can silently resume against
+different code than the halt was about — the defect fixed as #2642, which this
+skill must not reintroduce from the reading side.
 
 ### 2. Check for silence
 
@@ -91,19 +109,24 @@ top-down without re-sorting mentally.
 
 ## Priority order
 
-1. `blocked_human` work units — an agent already tried and gave up; the loop is
+1. Runs halted for a driver restart — first because it is the cheapest item on
+   the list to clear: the action is re-running one command the driver has
+   already written out for you, and until someone does, a feature that looks
+   merely idle is doing no work at all.
+2. `blocked_human` work units — an agent already tried and gave up; the loop is
    stalled until a human acts.
-2. `awaiting_review` gates — a gate boundary is waiting on the human
+3. `awaiting_review` gates — a gate boundary is waiting on the human
    accept/revise/reject checkpoint.
-3. `blocked` features — a named dependency (an ADR or an upstream feature) is
+4. `blocked` features — a named dependency (an ADR or an upstream feature) is
    unmet; resumable once a human clears it.
-4. `stale` pull requests — green and ready, or silently rotting, either way
+5. `stale` pull requests — green and ready, or silently rotting, either way
    waiting on a human to look.
 
 Needs-human issues from the GitHub queue are interleaved into this same ordering
-by their category label, since each category maps onto one of the four classes
-above (e.g. `blocked-wu` alongside `blocked_human` work units, `gate-review`
-alongside `awaiting_review` gates).
+by their category label, since each category maps onto one of the classes above
+(e.g. `blocked-wu` alongside `blocked_human` work units, `gate-review` alongside
+`awaiting_review` gates). No category label maps onto the halt — it files no
+issue, which is exactly why the local sweep has to catch it.
 
 ## What this skill is not
 
