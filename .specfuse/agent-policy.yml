@@ -12,29 +12,41 @@
 
 version: 1
 
-# Operator's stated sequence as of 2026-08-15, groomed via /groom-backlog and
-# reordered the same day.
+# Operator's stated sequence as of 2026-08-23, groomed via /groom-backlog and
+# accepted the same day. FEAT-2026-0050 and FEAT-2026-0058 dropped: both reached
+# roadmap status `done`, which `validate_agent_policy` had been WARNing about.
 #
-# FEAT-2026-0081 demoted from #2 to #4: its first slice re-runs the next-ID scan
-# inside `/draft-feature` before that skill writes, and FEAT-2026-0050's gate 2
-# adds the answered-questions write path to the same skill. Two in-flight
+# NOTHING IN THIS QUEUE HAS A FEATURE FOLDER. All eight `planned` roadmap rows
+# were checked at grooming; none is drafted. So every entry below currently
+# produces a `drafting-needed` escalation rather than work, and issues #2383 and
+# #2381 -- the only two items `/attention` shows -- are exactly those escalations
+# for 0052 and 0081. That is the state FEAT-2026-0082 exists to end, and its
+# roadmap row measured it on 2026-08-15: four queue entries, four escalations,
+# zero units of work. Unchanged eight days later.
+#
+# 0082 leads because until it lands this ordering barely matters -- the lane
+# escalates on whatever sits at the top. Caveat recorded honestly: 0082 has no
+# folder either, so it needs one human `/draft-feature` session before the lane
+# can advance it.
+#
+# 0081 stays behind the drafting feature, as it was behind 0050. Its old blocker
+# (0050's gate 2 editing `/draft-feature`) is discharged, but 0082 touches the
+# same surface, so the reason is replaced rather than removed: two in-flight
 # features editing one prose surface is how one silently reverts the other's
-# rule, so 0081 is sequenced behind the feature it collides with.
+# rule.
 #
-# 0050 is drafted (folder + armed gate 1) and is the only entry the feature lane
-# can currently advance. 0058 is drafted next as the hedge: if 0050's gate 1
-# escalates, the lane still has work, and 0058 touches lint_plan.py and a
-# per-feature DECISIONS.md -- no overlap with 0050's surfaces.
+# 0052 is the hedge -- lint and gate-baseline surfaces, no overlap with the
+# drafting path, so the lane still has work if 0082 stalls.
 #
-# The remaining entries are still undrafted, so each produces a
-# `drafting-needed` escalation rather than work until 0050 lands. Those
-# escalations are no longer double-counted -- #2384 stopped the triage lane
-# re-classifying them.
+# Deliberately NOT queued: 0074, 0077, 0038, 0043. Preconditions unmet, not low
+# value -- 0077's own roadmap status says it "becomes worth building when a real
+# repository's policy file carries tuned values". Queuing them would manufacture
+# four more `drafting-needed` escalations.
 queue:
-  - FEAT-2026-0050   # async drafting -- drafted, dispatchable
-  - FEAT-2026-0058   # decision registry -- drafted next as the hedge
-  - FEAT-2026-0052   # baseline-delta ratchet
-  - FEAT-2026-0081   # ID collision -- behind 0050 g2, shares /draft-feature
+  - FEAT-2026-0082   # wire async drafting end to end -- unblocks the queue itself
+  - FEAT-2026-0081   # ID collision -- behind 0082, shares /draft-feature
+  - FEAT-2026-0052   # baseline-delta ratchet -- the hedge, non-colliding surface
+  - FEAT-2026-0078   # produces_incremental -- cheapest; reverted impl at 25e6bc5
 
 rules:
   bugs:
