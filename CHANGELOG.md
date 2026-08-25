@@ -32,7 +32,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 - **Nothing stopped an entry being appended to an already-published CHANGELOG section.** Five `fixed` entries were written into `[0.13.0+umbrella.0.13.0]` days after that release was cut, so for a week the published notes described five fixes the tag did not contain while `Unreleased` understated the next release by more than half. `parse_changelog` could not catch it and never could: it validates **shape** -- heading form, the four entry classes, a trace on every entry -- and all five entries were perfectly well-formed. They were in the wrong section, and section membership is not a property of one document; it exists only as a difference between two. `released_section_drift(base, head)` compares each dated section's **set of traces**, and a CI job runs it against the pull request's base. **Adding or removing is refused; editing is not** -- that was the open question at filing, and a byte-level freeze would have forbidden the drift and the legitimate corrections alike, including the live one: `0.13.0+umbrella.0.13.0` and `0.14.0+umbrella.0.14.0` name an umbrella version that was never released (#2757), and fixing those headings edits a dated section without changing what shipped in it. Sections match on the driver version alone so that correction does not read as one release deleted and another added. Replayed against the real history, the check reports the original drift at the commit that introduced it. An unresolvable base -- shallow clone, unfetched ref -- is reported and skipped rather than failed, since a checker that blocks every PR in a fresh clone is claiming a problem it never found (#2727)
 
-## [0.14.0+umbrella.0.14.0] - 2026-08-24
+## [0.14.0+umbrella.0.12.1] - 2026-08-24
 
 ### Added
 
@@ -70,7 +70,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 - **A run halted for a driver restart read as an idle gate, so a stopped feature looked like one nobody had started.** The halt deliberately marks nothing -- it flips no work-unit status and leaves the gate `open`, which is what let it ship with zero consumer migration, and equally what made it invisible: on disk a halted feature is an active feature, an open gate and pending units. `events.jsonl` is the only place it is recorded, so neither `/attention` nor `gate-status` said the useful thing, and `gate-status` said a wrong one -- that the gate *would* continue if the loop were re-run, when the loop had already run and stopped on purpose waiting for exactly that. Both skills now detect the halt (last event `driver_staleness_detected` with `payload.halted: true` and no later `attempt_outcome`) and report the triggering unit, the undispatched units, and the resume command. `/attention` ranks it first, because clearing it costs one command the driver has already written out. The stamped `payload.resume_command` must be printed **verbatim** rather than reconstructed: it resumes the build the halt came from, and in a checkout carrying its own source `specfuse` resolves to the installed build instead -- #2642 from the reading side, and a drift guard asserts both skills say so (#1042)
 
-## [0.13.0+umbrella.0.13.0] - 2026-08-17
+## [0.13.0+umbrella.0.12.1] - 2026-08-17
 
 ### Added
 
