@@ -155,6 +155,11 @@ NON_JUDGE_MODULES = {
     "notify_sla.py": "as notify.py",
     "policy_proposals.py": "drafts policy changes for a human to accept",
     "policy_review.py": "presents proposals; the human decides",
+    "promotion.py": "records which triaged feature issues became roadmap rows "
+        "and reports the backlog awaiting a decision; a human-facing count, "
+        "read by no gate, merge, arm or close verdict. Distinct from "
+        "`triage.py`, which judges: the bug lane's provenance guardrail reads "
+        "ITS marker, and nothing reads this one",
     "replay_spin.py": "read-only diagnostic; re-parses recorded attempt notes "
         "to report what the current parser would have said, and grants no verdict",
     "scaffold.py": "writes scaffold files into a target project",
