@@ -128,6 +128,29 @@ by their category label, since each category maps onto one of the classes above
 `awaiting_review` gates). No category label maps onto the halt — it files no
 issue, which is exactly why the local sweep has to catch it.
 
+### Below the list: the backlog awaiting a roadmap decision
+
+Close with one line from `specfuse.loop.promotion.list_unpromoted` — the open
+`triage:feature` issues carrying no promotion marker:
+
+```
+Backlog awaiting a roadmap decision — 13 triage:feature issues. Oldest: #209, #223, #248.
+```
+
+**A count and the oldest few, never the full list.** This is standing backlog,
+not something parked mid-flight, and rendering thirteen rows above five real
+halts would bury the items that actually stop work. It sits below the priority
+list for the same reason: nothing here is blocking anything.
+
+**Say when the number is unknown.** `list_unpromoted` returns an empty list both
+when nothing is waiting and when `gh` could not be reached, and those mean
+opposite things to a human. Under the same `gh` probe step 3 uses, report
+"backlog not checked — gh unavailable" rather than a confident zero.
+
+**Do not report a promoted issue as backlog.** Promotion is recorded by a marker
+in the issue body, not by closing it — a roadmap row commonly lands long before
+the work does, and the request stays open until the feature ships.
+
 ## What this skill is not
 
 Not a second source of truth: the issue queue and `.specfuse/` state remain
