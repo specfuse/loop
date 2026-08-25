@@ -50,6 +50,25 @@ number could not be parsed is **not** the same as an uncreated one.
 **Do not modify `emit_escalation` itself.** It is shipped and has a live caller
 (`specfuse/agent/run.py:293`). Add a sibling.
 
+**First, check whether the sibling already exists.** FEAT-2026-0082/T01 ships
+`escalation.emit_issue_with_body` — the same shape this WU needs: file an issue
+from a body the caller already rendered, under a caller-supplied label set,
+idempotent on a correlation marker. 0082 is ahead of this feature in the
+`agent-policy.yml` queue, so by the time this unit runs that function may
+already be there.
+
+```
+python3 -c "from specfuse.loop.escalation import emit_issue_with_body" ; echo $?
+```
+
+**Exit 0 — call it.** Render the tracking-issue body, pass it with the
+`waived-baseline` label, and do **not** add `emit_tracking_issue` as a second
+find-then-create path. Adjust the criteria below accordingly and say so in your
+RESULT. **Non-zero — proceed as written below**, adding the sibling; 0082 has not
+landed yet.
+
+Either way `escalation.py` ends with one idempotency implementation, not two.
+
 **The tracking issue is deliberately NOT a `needs-human` escalation.** A waived
 baseline parks nothing — the run proceeds. Labelling it `needs-human` would file
 a *running* feature into the `/attention` skill's blocked-work inbox and
