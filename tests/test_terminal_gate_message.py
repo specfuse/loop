@@ -23,37 +23,53 @@ loop = load_loop()
 
 
 class TestTerminalGateMessage(unittest.TestCase):
-    """`terminal_gate_message` must distinguish three states a bare PLAN.md read cannot."""
+    """`terminal_gate_message` must distinguish four states a bare PLAN.md read
+    cannot. FEAT-2026-0085 narrowed the verdict to `met` / `not_met`, so the
+    deliberate-withholding case this file was written for is now `not_met` and
+    the retired values get a migration branch of their own — but the shape #1416
+    demands is unchanged: never report correct behaviour as an "Inconsistency",
+    and never advise the flip the driver just withheld."""
 
     def _msg(self, verdict):
         return loop.terminal_gate_message(1, verdict)
 
-    # -- the hedged case: withholding the flips is CORRECT ------------------
+    # -- the not_met case: withholding the flips is CORRECT -----------------
 
-    def test_hedged_verdict_is_not_reported_as_an_inconsistency(self):
-        for verdict in ("met_locally", "partially_met"):
-            with self.subTest(verdict=verdict):
-                self.assertNotIn("Inconsistency", self._msg(verdict))
+    def test_not_met_verdict_is_not_reported_as_an_inconsistency(self):
+        self.assertNotIn("Inconsistency", self._msg("not_met"))
 
-    def test_hedged_verdict_does_not_advise_a_manual_flip(self):
+    def test_no_withholding_verdict_advises_a_manual_flip(self):
         # The whole defect. Any wording that tells the operator to set PLAN.md
-        # `done` here is advice to violate the verdict-coupling contract.
-        for verdict in ("met_locally", "partially_met"):
+        # `done` here is advice to violate the verdict-coupling contract —
+        # equally true for a live `not_met` and for a retired value.
+        for verdict in ("not_met", "met_locally", "partially_met"):
             with self.subTest(verdict=verdict):
                 message = self._msg(verdict)
                 self.assertNotIn("active -> done", message)
                 self.assertNotIn("status: done", message)
 
-    def test_hedged_verdict_names_the_verdict_as_the_reason(self):
-        message = self._msg("met_locally")
-        self.assertIn("met_locally", message)
+    def test_withholding_verdict_names_the_verdict_as_the_reason(self):
+        for verdict in ("not_met", "met_locally"):
+            with self.subTest(verdict=verdict):
+                self.assertIn(verdict, self._msg(verdict))
 
-    def test_hedged_verdict_points_at_the_follow_up_record_and_acceptance(self):
-        # The operator's real next step: read what is unmet, then accept it
-        # deliberately through the one skill that records a reason.
-        message = self._msg("partially_met")
-        self.assertIn("Hedged-verdict follow-up record", message)
-        self.assertIn("accept-hedged-close", message)
+    def test_not_met_points_at_the_tracked_follow_ups(self):
+        # The operator's real next step: read the follow-up filed per failed
+        # criterion. A `not_met` close is discharged by doing that work, not
+        # accepted — /accept-hedged-close has no role here and naming it would
+        # re-offer the soft-success route this feature removed.
+        message = self._msg("not_met")
+        self.assertIn("FOLLOW-UPS.md", message)
+        self.assertNotIn("accept-hedged-close", message)
+
+    def test_legacy_verdict_points_at_the_migration_note(self):
+        # Readable, not re-checkable. Sending this operator to a follow-up list
+        # the close never had would be a dead end.
+        for verdict in ("met_locally", "partially_met"):
+            with self.subTest(verdict=verdict):
+                message = self._msg(verdict)
+                self.assertNotIn("Inconsistency", message)
+                self.assertIn("docs/methodology.md", message)
 
     # -- the genuine inconsistency: verdict permits, flips did not fire -----
 
@@ -64,38 +80,32 @@ class TestTerminalGateMessage(unittest.TestCase):
         self.assertIn("Inconsistency", message)
 
     def test_absent_verdict_is_still_an_inconsistency(self):
-        # A terminal gate that closed with no verdict at all is not a hedge —
-        # it is a close that did not do its job, and must not be softened into
+        # A terminal gate that closed with no verdict at all is not a `not_met`
+        # — it is a close that did not do its job, and must not be softened into
         # the reassuring message.
-        for verdict in (None, ""):
+        for verdict in (None, "", "garbage"):
             with self.subTest(verdict=verdict):
                 self.assertIn("Inconsistency", self._msg(verdict))
 
     # -- every branch stays useful -----------------------------------------
 
     def test_every_branch_names_the_gate_number(self):
-        for verdict in ("met", "met_locally", None):
+        for verdict in ("met", "not_met", "met_locally", None):
             with self.subTest(verdict=verdict):
                 self.assertIn("Gate 1", self._msg(verdict))
 
-    def test_reassurance_appears_exactly_for_a_recognised_hedge(self):
-        # There are three states, not two: a hedge is deliberate, a `met` that
-        # did not flip is a defect, and NO usable verdict is also a defect —
-        # `not_met` and an absent verdict must not be softened into "this is
-        # working as intended", because neither has a follow-up record to accept.
-        from specfuse.loop.closing_requirements import HEDGED_VERDICT_VALUES
-
-        for verdict in ("met", "met_locally", "partially_met", "not_met", None, "", "garbage"):
+    def test_reassurance_appears_exactly_for_a_deliberate_withholding(self):
+        # There are three outcomes, not two: `not_met` is deliberate, a `met`
+        # that did not flip is a defect, and NO usable verdict is also a defect
+        # — an absent or unrecognised verdict must not be softened into "this is
+        # working as intended", because neither has a follow-up list to read.
+        # A retired value is its own case: correct behaviour, but the operator's
+        # route is the migration note, so it is not reassured either.
+        for verdict in ("met", "met_locally", "partially_met", "not_met",
+                        None, "", "garbage"):
             with self.subTest(verdict=verdict):
                 reassures = "not a defect" in self._msg(verdict)
-                self.assertEqual(verdict in HEDGED_VERDICT_VALUES, reassures)
-
-    def test_not_met_is_flagged_rather_than_reassured(self):
-        # `not_met` says the feature failed its own criteria. It is not a hedge
-        # to accept, and /accept-hedged-close explicitly refuses it.
-        message = self._msg("not_met")
-        self.assertIn("Inconsistency", message)
-        self.assertNotIn("accept-hedged-close", message)
+                self.assertEqual(verdict == "not_met", reassures)
 
 
 if __name__ == "__main__":

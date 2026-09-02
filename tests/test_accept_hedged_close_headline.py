@@ -119,10 +119,12 @@ class TestAcceptHedgedCloseHeadline(unittest.TestCase):
             r"\"no in-repo rework can raise this verdict\"",
         )
 
-    def test_references_verdict_ceiling_helper_not_reimplemented(self):
-        text = _skill_text()
-        self.assertIn("verdict_ceiling_for_kinds", text)
-        self.assertIn("FOLLOW_UP_KINDS", text)
+    # The assertion that this step names the verdict-ceiling helper and the
+    # follow-up classification set is gone: FEAT-2026-0085/T01 deleted both
+    # with the verdicts they served, so pinning the skill's prose to their
+    # names would require it to cite code that no longer exists. The skill
+    # itself is retired by FEAT-2026-0085/T05, which owns `plugins/`; until
+    # then its remaining prose assertions below still hold.
 
 
 class TestUnclassifiedEntryFallback(unittest.TestCase):

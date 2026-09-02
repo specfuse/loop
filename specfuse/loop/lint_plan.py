@@ -245,7 +245,6 @@ LOAD_BEARING_CLOSE_PATTERNS = (
     re.compile(r"\bself-?report\b", re.IGNORECASE),
     re.compile(r"\bexit\s+codes?\s+read\b", re.IGNORECASE),
     re.compile(r"\bhedged\b", re.IGNORECASE),
-    re.compile(r"\bmet_locally\b|\bpartially_met\b", re.IGNORECASE),
     re.compile(r"\bconsumer-?visible\b", re.IGNORECASE),
     re.compile(r"\bcontract\s+change", re.IGNORECASE),
     re.compile(r"\boracles?\s+re-?run\b", re.IGNORECASE),
@@ -1726,7 +1725,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
                         errs.append(
                             f"ERROR: {wfile}: close-type WU missing or invalid 'verdict' "
                             f"frontmatter (must be one of: "
-                            f"met, met_locally, partially_met, not_met)."
+                            f"{', '.join(sorted(VERDICT_VALUES))})."
                         )
             else:
                 if wu_verdict is not None:

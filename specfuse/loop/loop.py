@@ -74,17 +74,15 @@ from .closing_requirements import (
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
-    FOLLOW_UP_KINDS,
-    HEDGED_RECORD_HEADING,
-    HEDGED_RECORD_HEADING_RE,
-    HEDGED_VERDICT_VALUES,
-    KIND_FIELD_RE,
+    FOLLOW_UPS_FILENAME,
     LEARNINGS_PATH,
     LEARNINGS_PENDING_FILENAME,
+    LEGACY_VERDICT_VALUES,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
     RETROSPECTIVE_FILENAME,
     ROADMAP_PATH,
+    VERDICT_MIGRATION_NOTE,
     VERDICT_VALUES,
     changelog_has_entry_for,
     consumer_visible_section_is_na,
@@ -330,21 +328,24 @@ DONE = "done"
 def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
     """The operator-facing message for a terminal gate whose PLAN.md is not `done`.
 
-    Three states look identical from `PLAN.md` alone, and reporting them the same
+    Four states look identical from `PLAN.md` alone, and reporting them the same
     way is #1416:
 
-    - **the verdict permits the flips** but they did not fire — a genuine defect,
-      and what the original message was written for.
-    - **the verdict is a recognised hedge** (`met_locally` / `partially_met`) —
-      the flips were withheld *because* the close said so. That is the
-      verdict-coupling rule working, and telling the operator to hand-flip
-      `PLAN.md` is advice to violate the contract `fire_terminal_flips` just
-      enforced.
-    - **no usable verdict** — absent, empty, `not_met`, or unrecognised. NOT a
-      deliberate hedge: a close that recorded no verdict did not finish its job,
-      and softening that into the reassuring message would hide it.
+    - **`met`** but the flips did not fire — a genuine defect, and what the
+      original message was written for.
+    - **`not_met`** — the flips were withheld *because* the close said so. That
+      is the verdict-coupling rule working, and telling the operator to
+      hand-flip `PLAN.md` is advice to violate the contract
+      `fire_terminal_flips` just enforced. The next step is the follow-up list,
+      not an acceptance.
+    - **a retired value** (`met_locally` / `partially_met`) — readable, not
+      writable. The close predates FEAT-2026-0085; the operator's route is the
+      migration note, not a hand-flip and not an acceptance skill.
+    - **no usable verdict** — absent, empty, or unrecognised. A close that
+      recorded no verdict did not finish its job, and softening that into a
+      reassuring message would hide it.
 
-    Both the flip predicate and the hedged set are imported rather than
+    Both the flip predicate and the legacy set are imported rather than
     re-derived, so this message can never disagree with the gate that produced
     the state it describes.
     """
@@ -359,27 +360,37 @@ def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
             "RETROSPECTIVE.md / events.jsonl. Likely fix: manually flip PLAN.md "
             "`status: active -> done`, then `/wrap-feature`."
         )
-    if verdict in HEDGED_VERDICT_VALUES:
+    if verdict == "not_met":
         return (
             header + "terminal gate, PLAN.md deliberately left `active`.\n"
-            f"The close recorded verdict `{verdict}`, which does not permit the "
+            "The close recorded verdict `not_met`, which does not permit the "
             "terminal flips, so the gate, the roadmap row and PLAN.md were all "
             "left un-flipped on purpose. This is the verdict-coupling rule "
             "working, not a defect — do NOT hand-flip PLAN.md.\n"
-            f"Next: read the `## {HEDGED_RECORD_HEADING}` in RETROSPECTIVE.md "
-            "for what is unmet and what would upgrade it, then either discharge "
-            "those follow-ups or accept the hedge deliberately with "
-            "`/accept-hedged-close`, which records your reason and fires the "
-            "flips through their one owner."
+            f"Next: read `{FOLLOW_UPS_FILENAME}` in the feature directory for "
+            "the tracked follow-up behind each failed criterion. A `not_met` "
+            "close is not accepted; it is discharged by doing the work those "
+            "follow-ups name and closing the feature again."
+        )
+    if verdict in LEGACY_VERDICT_VALUES:
+        return (
+            header + "terminal gate, PLAN.md deliberately left `active`.\n"
+            f"The close recorded verdict `{verdict}`, a value retired by "
+            "FEAT-2026-0085. The flips were withheld, which is correct — but "
+            "this close predates the binary verdict and cannot be re-checked "
+            "as-is.\n"
+            f"Next: follow {VERDICT_MIGRATION_NOTE} to restate it as `met` or "
+            "`not_met`. Do NOT hand-flip PLAN.md."
         )
     shown = verdict if verdict else "none recorded"
     return (
         header + "terminal gate but PLAN.md not yet `done`.\n"
-        f"Inconsistency: the close recorded verdict `{shown}`, which is neither "
-        "a pass nor a recognised hedge, so the terminal flips were withheld and "
-        "there is no follow-up record to accept. A close that records no usable "
-        "verdict has not finished its job. Inspect RETROSPECTIVE.md / "
-        "events.jsonl before flipping anything by hand."
+        f"Inconsistency: the close recorded verdict `{shown}`, which is not a "
+        f"value the close contract recognises ({sorted(VERDICT_VALUES)}), so "
+        "the terminal flips were withheld and there is no follow-up list to "
+        "read. A close that records no usable verdict has not finished its "
+        "job. Inspect RETROSPECTIVE.md / events.jsonl before flipping anything "
+        "by hand."
     )
 
 
@@ -4513,14 +4524,14 @@ def _legacy_4wu_terminal_close_complete(
 def revert_terminal_surfaces(
     wu: WorkUnit, feature_dir: Path, repo_root: Path,
 ) -> list[Path]:
-    """Revert agent-written terminal surfaces after a hedged close verdict (#195).
+    """Revert agent-written terminal surfaces after a non-`met` close (#195).
 
-    A close WU that passes with a hedged verdict (met_locally / partially_met /
-    not_met) must leave every terminal surface un-flipped, but the agent's own
-    close ceremony may already have written PLAN.md `done` and the roadmap row
-    `done` before the driver read the verdict. Reverting only PLAN.md — the
-    pre-#195 behavior — leaves the two surfaces disagreeing about whether the
-    feature is complete. Revert the same surface set fire_terminal_flips owns:
+    Since FEAT-2026-0085 the only verdict that reaches here is `not_met`: it
+    must leave every terminal surface un-flipped, but the agent's own close
+    ceremony may already have written PLAN.md `done` and the roadmap row `done`
+    before the driver read the verdict. Reverting only PLAN.md — the pre-#195
+    behavior — leaves the two surfaces disagreeing about whether the feature is
+    complete. Revert the same surface set fire_terminal_flips owns:
     PLAN.md status and the roadmap Status cell (the gate file is not flipped
     until the post-loop awaiting_review write, so there is nothing to revert
     there). Returns the modified Paths for one bookkeeping commit.
@@ -4711,8 +4722,9 @@ def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
 
     `fire_terminal_flips` only runs at close-WU outcome time, inside the
     dispatch loop. Once that close WU is `status: done` the driver never
-    re-dispatches it, so a verdict legitimately upgraded post-close (e.g.
-    `met_locally` -> `met` after follow-ups were discharged) is never re-read
+    re-dispatches it, so a verdict legitimately upgraded post-close (`not_met`
+    -> `met` once the tracked follow-ups were discharged, or a close written
+    before FEAT-2026-0085 restated under the migration note) is never re-read
     and the flips never fire. This is a caller, not a second writer: it
     locates the terminal gate's close WU, reads its on-disk verdict, and if
     permitted, calls `fire_terminal_flips` unchanged.
@@ -4756,6 +4768,21 @@ def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
     # fire_terminal_flips re-reads it from wu.file itself regardless, so this
     # is never taken from an in-memory value the auto-close path leaves None.
     disk_verdict = close_wu.verdict
+    if disk_verdict in LEGACY_VERDICT_VALUES:
+        # Readable, not re-checkable. The value predates the binary verdict, so
+        # there is nothing here to upgrade mechanically — reporting it as merely
+        # "does not permit terminal flips" would send an operator looking for a
+        # follow-up list that this close never had.
+        return {
+            "fired": False,
+            "reason": (
+                f"verdict {disk_verdict!r} on {close_wu.wu_id} is a legacy value "
+                f"retired by FEAT-2026-0085; restate it as one of "
+                f"{sorted(VERDICT_VALUES)} per {VERDICT_MIGRATION_NOTE}, then "
+                f"re-run --recheck-verdict"
+            ),
+            "modified": [],
+        }
     if not verdict_permits_terminal_flips(disk_verdict):
         return {
             "fired": False,
@@ -5516,9 +5543,26 @@ def assert_verdict_well_formed(
     attempt (issue #12). Mirrors the re-read at the terminal-flip path
     (FEAT-2026-0015/G2-CLOSE). Updates wu.verdict in-memory so downstream
     checks see the post-squash value.
+
+    This is the surface that makes the verdict binary. It runs at outcome time
+    on the close just dispatched and never on a `done` close, so the standing
+    hedged closes in the corpus are untouched — but a close written from now on
+    cannot record `met_locally` or `partially_met`. A retired value gets its
+    own message: an operator who lands here is mid-migration, and "not in
+    VERDICT_VALUES" would tell them what is wrong and nothing about what to do.
     """
     fm, _ = read_frontmatter(wu.file)
     verdict = fm.get("verdict")
+    if verdict in LEGACY_VERDICT_VALUES:
+        return (
+            False,
+            f"assert_verdict_well_formed: verdict {verdict!r} was retired by "
+            f"FEAT-2026-0085; a close records one of {sorted(VERDICT_VALUES)}. "
+            f"A criterion this close cannot verify is a `not_met` with a "
+            f"tracked follow-up in {FOLLOW_UPS_FILENAME}, not a hedge. To "
+            f"restate a close written before the narrowing, see "
+            f"{VERDICT_MIGRATION_NOTE}",
+        )
     if verdict is None or verdict not in VERDICT_VALUES:
         return (
             False,
@@ -5804,67 +5848,6 @@ def assert_next_gate_drafted_or_terminal(
     )
 
 
-def assert_hedged_followup_kinds_classified(
-    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
-) -> tuple[bool, str]:
-    """(close-j) On a hedged verdict, every §2 follow-up entry has a valid `kind:`.
-
-    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
-    the agent writes `verdict:` during dispatch. Scoped to THIS close's own
-    RETROSPECTIVE.md only — never reads another feature's files, per the
-    satisfiability guarantee in FEAT-2026-0059's PLAN.md: a corpus sweep
-    would be red on arrival because FEAT-2026-0041 and FEAT-2026-0042 hedged
-    before `kind:` existed.
-    """
-    fm, _ = read_frontmatter(wu.file)
-    verdict = fm.get("verdict")
-    if verdict not in HEDGED_VERDICT_VALUES:
-        return True, ""
-    retro = feature_dir / RETROSPECTIVE_FILENAME
-    if not retro.exists():
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: {RETROSPECTIVE_FILENAME} "
-            f"absent — cannot locate the '{HEDGED_RECORD_HEADING}' section",
-        )
-    text = retro.read_text()
-    heading_match = HEDGED_RECORD_HEADING_RE.search(text)
-    if not heading_match:
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: verdict={verdict!r} but no "
-            f"'{HEDGED_RECORD_HEADING}' section in {RETROSPECTIVE_FILENAME}",
-        )
-    start = heading_match.end()
-    next_heading = re.search(r"^## ", text[start:], re.MULTILINE)
-    section = text[start:start + next_heading.start()] if next_heading else text[start:]
-    entries = re.split(r"^### ", section, flags=re.MULTILINE)[1:]
-    if not entries:
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: '{HEDGED_RECORD_HEADING}' "
-            f"section in {RETROSPECTIVE_FILENAME} has no per-entry ('### ') "
-            "records to classify",
-        )
-    for entry in entries:
-        title = entry.splitlines()[0].strip() if entry.strip() else "(untitled entry)"
-        kind_match = KIND_FIELD_RE.search(entry)
-        if not kind_match:
-            return (
-                False,
-                f"assert_hedged_followup_kinds_classified: entry {title!r} in the "
-                f"'{HEDGED_RECORD_HEADING}' section has no **kind:** field",
-            )
-        kind = kind_match.group(1)
-        if kind not in FOLLOW_UP_KINDS:
-            return (
-                False,
-                f"assert_hedged_followup_kinds_classified: entry {title!r} has "
-                f"kind {kind!r}, not one of {sorted(FOLLOW_UP_KINDS)}",
-            )
-    return True, ""
-
-
 def assert_changelog_entry_for_contract_changes(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -5924,7 +5907,6 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_verdict_well_formed,
         assert_cost_analysis_section_when_met,
         assert_failure_class_breakdown_when_failures_present,
-        assert_hedged_followup_kinds_classified,
         assert_changelog_entry_for_contract_changes,
     ],
     "close-intermediate": [
@@ -8295,8 +8277,10 @@ def main() -> int:
                     "from disk and fire the terminal flips (gate/roadmap-row/"
                     "PLAN.md/archive) if it now permits them, without "
                     "re-dispatching the close WU. For a verdict upgraded "
-                    "post-close (e.g. met_locally -> met after follow-ups were "
-                    "discharged). No-op if already done or still hedged.")
+                    "post-close (not_met -> met once the tracked follow-ups "
+                    "were discharged). No-op if already done or still not_met; "
+                    "refuses on a verdict retired by FEAT-2026-0085 and names "
+                    "the migration note.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")

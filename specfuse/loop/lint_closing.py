@@ -164,11 +164,14 @@ def _check_verdict_well_formed(req: creq.Requirement, ctx: ClosingContext):
     verdict = ctx.wfm.get("verdict")
     if verdict is None:
         return False, "verdict frontmatter field is absent"
-    if verdict not in (req.allowed_values or creq.VERDICT_VALUES):
+    legal = req.allowed_values or creq.VERDICT_VALUES
+    if verdict in creq.LEGACY_VERDICT_VALUES:
         return False, (
-            f"verdict {verdict!r} is not one of "
-            f"{sorted(req.allowed_values or creq.VERDICT_VALUES)}"
+            f"verdict {verdict!r} was retired by FEAT-2026-0085; a close "
+            f"records one of {sorted(legal)}. See {creq.VERDICT_MIGRATION_NOTE}"
         )
+    if verdict not in legal:
+        return False, f"verdict {verdict!r} is not one of {sorted(legal)}"
     return True, ""
 
 
@@ -248,53 +251,6 @@ def _check_next_gate_drafted_or_terminal(req: creq.Requirement, ctx: ClosingCont
         f"gate {ctx.gate_num + 1} has no drafted work_units in PLAN.md and "
         f"neither PLAN.md nor roadmap marks done"
     )
-
-
-def _check_hedged_followup_kinds_classified(req: creq.Requirement, ctx: ClosingContext):
-    """Every entry in *this close's* §2 record carries a valid `kind:`.
-
-    Scoped to `ctx.feature_dir`'s own RETROSPECTIVE.md only — never reads any
-    other feature's files, per the satisfiability guarantee in PLAN.md
-    (FEAT-2026-0059/T01): a corpus sweep would be red on arrival because two
-    pre-existing hedged records predate this field.
-    """
-    retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
-    if not retro.exists():
-        return False, (
-            f"{creq.RETROSPECTIVE_FILENAME} absent — cannot locate the "
-            f"'{creq.HEDGED_RECORD_HEADING}' section"
-        )
-    text = retro.read_text()
-    heading_match = creq.HEDGED_RECORD_HEADING_RE.search(text)
-    if not heading_match:
-        return False, (
-            f"verdict={ctx.wfm.get('verdict')!r} but no "
-            f"'{creq.HEDGED_RECORD_HEADING}' section in {creq.RETROSPECTIVE_FILENAME}"
-        )
-    start = heading_match.end()
-    next_heading = re.search(r"^## ", text[start:], re.MULTILINE)
-    section = text[start:start + next_heading.start()] if next_heading else text[start:]
-    entries = re.split(r"^### ", section, flags=re.MULTILINE)[1:]
-    if not entries:
-        return False, (
-            f"'{creq.HEDGED_RECORD_HEADING}' section in {creq.RETROSPECTIVE_FILENAME} "
-            "has no per-entry ('### ') records to classify"
-        )
-    for entry in entries:
-        title = entry.splitlines()[0].strip() if entry.strip() else "(untitled entry)"
-        kind_match = creq.KIND_FIELD_RE.search(entry)
-        if not kind_match:
-            return False, (
-                f"entry {title!r} in the '{creq.HEDGED_RECORD_HEADING}' section "
-                "has no **kind:** field"
-            )
-        kind = kind_match.group(1)
-        if kind not in creq.FOLLOW_UP_KINDS:
-            return False, (
-                f"entry {title!r} has kind {kind!r}, not one of "
-                f"{sorted(creq.FOLLOW_UP_KINDS)}"
-            )
-    return True, ""
 
 
 def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: ClosingContext):
@@ -398,7 +354,6 @@ _CHECKS = {
     "assert_retrospective_gate_section": _check_retrospective_gate_section,
     "assert_gate_review_exists": _check_gate_review_exists,
     "assert_next_gate_drafted_or_terminal": _check_next_gate_drafted_or_terminal,
-    "assert_hedged_followup_kinds_classified": _check_hedged_followup_kinds_classified,
     "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
     "check_criteria_state_well_formed": check_criteria_state_well_formed,
 }
@@ -488,9 +443,6 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
 
         if req.applies_when == "verdict_met":
             if ctx.wfm.get("verdict") != "met":
-                continue
-        elif req.applies_when == "verdict_hedged":
-            if ctx.wfm.get("verdict") not in creq.HEDGED_VERDICT_VALUES:
                 continue
         elif req.applies_when == "failures_present":
             if not ctx.failures_present():

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 8.00
 model: opus
 effort: high
@@ -12,10 +12,10 @@ produces:
   - specfuse/loop/closing_requirements.py
   - specfuse/loop/loop.py
   - tests/test_binary_verdict.py
-duration_seconds: 1206.201
-cost_usd: 6.521841
-input_tokens: 146
-output_tokens: 44935
+duration_seconds: 3261.947
+cost_usd: 13.148708
+input_tokens: 270
+output_tokens: 99951
 re_arm_count: 1
 re_arm_history:
   - timestamp: 2026-09-02T20:17:32+00:00

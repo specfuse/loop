@@ -7,8 +7,15 @@
 Covers:
   (a) fire_terminal_flips with met verdict flips gate, roadmap row, archives.
   (b) fire_terminal_flips is idempotent when gate already passed.
-  (c) run() does NOT call fire_terminal_flips for met_locally verdict.
-  (d) run() reverts PLAN.md→done when close WU has hedged verdict.
+  (c) run() does NOT call fire_terminal_flips for a non-met verdict.
+  (d) run() reverts PLAN.md→done when close WU has a non-met verdict.
+
+FEAT-2026-0085 narrowed the verdict to `met` / `not_met`. The integration
+cases below dispatch a close through `loop.run`, so their verdict has to be one
+`assert_verdict_well_formed` still accepts — they use `not_met`. The direct
+`fire_terminal_flips` / `recheck_terminal_verdict` cases keep exercising the
+retired values on purpose: those are read from disk, and 42 closes carrying one
+are `done` in the corpus.
   (e) wrap-feature SKILL.md no longer lists gate-flip step instructions.
 """
 
@@ -279,12 +286,12 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                         "scaffold"], check=True)
         return fdir
 
-    def test_run_does_not_flip_on_met_locally_verdict(self):
-        """met_locally verdict: GATE-01.md stays awaiting_review, roadmap row stays active."""
+    def test_run_does_not_flip_on_not_met_verdict(self):
+        """not_met verdict: GATE-01.md stays awaiting_review, roadmap row stays active."""
         with integration_workspace() as root:
             os.chdir(root)
             feature_id = "FEAT-2026-9993"
-            fdir = self._write_feature(root, feature_id, close_verdict="met_locally")
+            fdir = self._write_feature(root, feature_id, close_verdict="not_met")
 
             specfuse = root / ".specfuse"
             (specfuse / "roadmap.md").write_text(
@@ -307,18 +314,8 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 # the "nothing generalizes" sentinel so closing-deliverable
                 # assertions pass. Required since the diff-only-touches-wu
                 # bypass was removed (FEAT-2026-0017/G1-CLOSE-attempt-3 fix).
-                # Also write a classified §2 record (FEAT-2026-0059/T01):
-                # met_locally requires the hedged-verdict follow-up record
-                # with a valid `kind:` on every entry.
                 (fdir / "RETROSPECTIVE.md").write_text(
-                    "# Retrospective\n\nNothing generalizes from this gate.\n\n"
-                    "## Hedged-verdict follow-up record (close-discipline §2)\n\n"
-                    "### D1 — stub entry — OPEN\n\n"
-                    "- **The criterion, verbatim:** \"stub\"\n"
-                    "- **Why it is unverifiable in this environment:** stub.\n"
-                    "- **The exact re-run condition that would upgrade the "
-                    "verdict to `met`:** stub.\n"
-                    "- **kind:** `inherent`\n"
+                    "# Retrospective\n\nNothing generalizes from this gate.\n"
                 )
                 return ("", {"input_tokens": 10, "output_tokens": 5, "cost_usd": 0.001})
 
@@ -333,19 +330,19 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
             # Gate must be awaiting_review (normal gate-complete), NOT passed
             gate_fm = _read_frontmatter(fdir / "GATE-01.md")
             self.assertEqual(gate_fm.get("status"), "awaiting_review",
-                             "met_locally verdict must leave gate at awaiting_review")
+                             "not_met verdict must leave gate at awaiting_review")
 
             # Roadmap row must still be active
             roadmap_text = (specfuse / "roadmap.md").read_text()
             self.assertIn(f"| {feature_id} | Test | active |", roadmap_text,
-                          "met_locally verdict must leave roadmap row active")
+                          "not_met verdict must leave roadmap row active")
 
-    def test_run_reverts_plan_status_on_hedged_verdict(self):
-        """Hedged verdict: if close WU body wrote PLAN.md→done, driver reverts to active."""
+    def test_run_reverts_plan_status_on_not_met_verdict(self):
+        """not_met: if close WU body wrote PLAN.md→done, driver reverts to active."""
         with integration_workspace() as root:
             os.chdir(root)
             feature_id = "FEAT-2026-9994"
-            fdir = self._write_feature(root, feature_id, close_verdict="partially_met")
+            fdir = self._write_feature(root, feature_id, close_verdict="not_met")
             plan_path = fdir / "PLAN.md"
 
             def fake_dispatch(wu, failure_note, cost_tracking=True):
@@ -363,15 +360,15 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
 
             plan_fm = _read_frontmatter(plan_path)
             self.assertEqual(plan_fm.get("status"), "active",
-                             "driver must revert PLAN.md to active on hedged verdict")
+                             "driver must revert PLAN.md to active on not_met verdict")
 
-    def test_run_reverts_roadmap_row_on_hedged_verdict(self):
-        """Hedged verdict: if close WU body wrote PLAN.md AND the roadmap row
-        to done, driver reverts BOTH — no split state (#195)."""
+    def test_run_reverts_roadmap_row_on_not_met_verdict(self):
+        """not_met: if close WU body wrote PLAN.md AND the roadmap row to done,
+        driver reverts BOTH — no split state (#195)."""
         with integration_workspace() as root:
             os.chdir(root)
             feature_id = "FEAT-2026-9996"
-            fdir = self._write_feature(root, feature_id, close_verdict="met_locally")
+            fdir = self._write_feature(root, feature_id, close_verdict="not_met")
             plan_path = fdir / "PLAN.md"
 
             specfuse = root / ".specfuse"
@@ -413,11 +410,11 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
 
             plan_fm = _read_frontmatter(plan_path)
             self.assertEqual(plan_fm.get("status"), "active",
-                             "driver must revert PLAN.md to active on hedged verdict")
+                             "driver must revert PLAN.md to active on not_met verdict")
             roadmap_text = roadmap_path.read_text()
             self.assertIn(f"| {feature_id} | Test | active |", roadmap_text,
                           "driver must revert the roadmap row to active on "
-                          "hedged verdict — not leave it done")
+                          "not_met verdict — not leave it done")
 
 
 # --------------------------------------------------------------------------- #
