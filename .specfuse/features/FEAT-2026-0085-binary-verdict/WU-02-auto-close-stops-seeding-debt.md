@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0085/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 4.00
 model: sonnet
@@ -12,6 +12,10 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/closing_requirements.py
   - tests/test_autoclose_stub_states_what_passed.py
+duration_seconds: 471.821
+cost_usd: 1.115372
+input_tokens: 68
+output_tokens: 14451
 ---
 
 # An auto-closed gate states what the driver proved instead of deferring every criterion
