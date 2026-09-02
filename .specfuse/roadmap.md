@@ -959,10 +959,9 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 <a id="feat-2026-0085"></a>
 ## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
 
-**Sequencing.** Run after FEAT-2026-0084 merges: it reshapes `WU.template.md`
-and the draft-feature skill that T05 edits, and raises the single-gate
-threshold this five-unit feature relies on. Rebase this feature's branch onto
-`main` before arming.
+**Sequencing.** After FEAT-2026-0084 (merged 2026-09-02), which reshaped
+`WU.template.md` and the draft-feature skill that T05 edits and raised the
+single-gate threshold this five-unit feature relies on.
 
 **Why.** Across 273 features in 12 repositories, 48% of verdict-bearing
 features ended `met_locally` or `partially_met`; 59 were later flipped to
@@ -988,8 +987,8 @@ hedged closes.
 oracle, rewriting existing hedged closes, removing `--recheck-verdict`, and
 the `narrow` / `broad` per-criterion oracle kinds.
 
-**Status: planned.** Second of the methodology-review features, sequenced
-after FEAT-2026-0084; the judge and the feature oracle follow.
+**Status: active.** Second of the methodology-review features, sequenced
+after FEAT-2026-0084 (merged 2026-09-02); the judge and the feature oracle follow.
 
 ## Notes
 
