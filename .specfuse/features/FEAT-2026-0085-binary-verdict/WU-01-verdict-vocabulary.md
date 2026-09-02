@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0085/T01
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 8.00
 model: opus
@@ -12,6 +12,10 @@ produces:
   - specfuse/loop/closing_requirements.py
   - specfuse/loop/loop.py
   - tests/test_binary_verdict.py
+duration_seconds: 1206.201
+cost_usd: 6.521841
+input_tokens: 146
+output_tokens: 44935
 ---
 
 # The verdict is met or not_met; delete the hedge machinery
