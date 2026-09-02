@@ -42,8 +42,12 @@ degraded "show plan only" mode and refuses to write.
 - **No graph surgery, no file deletion.** WU files stay; gate files
   stay; the feature folder stays. The feature is marked abandoned;
   it is not erased. Audit trail intact.
-- **Roadmap row: status column only.** Do not edit the row's title,
-  ID, or folder column. Do not touch detail sections. (Migration of
+- **Roadmap row: status column, plus the section's status marker.**
+  Do not edit the row's title, ID, or folder column. In the detail
+  section, rewrite only its `**Status: <prior>.**` marker (when it
+  carries one) — `lint_roadmap` holds that marker to the row as an
+  ERROR, and that lint runs in every feature's baseline probe
+  (#3066); leave the rest of the section's prose alone. (Migration of
   the detail section to a roadmap-archive is a separate skill, not
   this one.)
 - **Refuse to abandon a `done` feature.** A feature whose PLAN.md is
@@ -93,10 +97,15 @@ Build the list of file edits this skill will apply:
   planned flip → `passed`. Gates already `passed` are untouched.
 - PLAN.md frontmatter: `status` (`active` / `blocked` / `deferred`) →
   `abandoned`.
-- Roadmap row: status column → `abandoned`. (Detail-section
-  `**Status: planned.**` / `**Status: active.**` lines under the
-  per-feature header are not edited by this skill — those are
-  prose; the table row is the source of truth.)
+- Roadmap row: status column → `abandoned`.
+- Roadmap detail section: its `**Status: planned.**` /
+  `**Status: active.**` / `**Status: blocked.**` /
+  `**Status: deferred.**` marker → `**Status: abandoned.**`, keeping
+  any prose after it on that line. If the section carries no
+  `**Status:**` line, add nothing — an absent marker is not a
+  finding, a stale one is (`lint_roadmap` ERRORs when the marker and
+  the row disagree; `/block-feature`, `/pick-feature`, and
+  `fire_terminal_flips` make the same write).
 
 ### 3. Surface the write plan and ask once
 
@@ -124,6 +133,7 @@ Files that will change:
 
   .specfuse/roadmap.md
     - row status column: active -> abandoned
+    - detail section marker: **Status: active.** -> **Status: abandoned.**
 
 Untouched (already done / passed):
   - WU-03-<slug>.md  (FEAT-YYYY-NNNN/T03, status: done)
