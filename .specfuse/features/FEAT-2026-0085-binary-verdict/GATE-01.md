@@ -1,7 +1,20 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 45.00
+baseline:
+  sha: cbda36fcaf271f211bd23b935570fbf2f7520dcb
+  probed_at: 2026-09-02T18:47:56.712916+00:00
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "test_real_tree_is_clean_on_all_four_invariants"
+    - gate: coverage
+      failure_class: coverage
+      failure_signature: "POST-PASS INVARIANT FAILED — roadmap_row_not_done: roadmap.md absent at .specfuse/roadmap.md"
+    - gate: roadmap-link-gate
+      failure_class: other
+      failure_signature: "ERROR: roadmap.md:991: FEAT-2026-0085's detail section says '**Status: planned.**' but its roadmap r"
 ---
 
 # Gate 1 — a close can only say met or not_met, and every other outcome has an honest home
