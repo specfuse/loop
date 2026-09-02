@@ -1,15 +1,23 @@
 ---
 id: FEAT-2026-0084/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: opus
 effort: high
 oracle_env: macos_local
 auto_close_disabled: true
+verdict: met
 produces:
   - .specfuse/features/FEAT-2026-0084-methodology-diet-week-1/RETROSPECTIVE.md
+gate_set: plannext
+driver_version: 0.14.0
+started_at: 2026-09-02T17:44:04.805533+00:00
+duration_seconds: 1556.206
+cost_usd: 4.995132
+input_tokens: 136
+output_tokens: 40122
 ---
 
 # Gate 1 close — measure the diet, record the numbers, verdict
