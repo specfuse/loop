@@ -109,6 +109,33 @@ class TestGateBaselineReadWrite(unittest.TestCase):
             self.assertEqual(record["sha"], "cafef00d")
             self.assertEqual(record["failing"], failing)
 
+    def test_yaml_significant_signature_round_trips_and_gate_file_still_parses(self):
+        """#2948: a `[`-prefixed signature (the coverage gate's timestamped log
+        line) was written bare, so `_miniyaml` read it as an unclosed flow list
+        and `load_graph` could no longer open the gate file at all."""
+        import tempfile
+        signatures = [
+            "[07:45:37] bug-1 failed after 0s — RuntimeError: boom on bug-1",
+            'ERROR: roadmap.md:99: ref "#feat-2026-0084" does not resolve',
+            "path\\with\\backslashes: and a colon-space",
+            "# looks like a comment",
+            "{status, version} braces first",
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            gf = self._gate_file(Path(td))
+            failing = [
+                {"gate": f"g{i}", "failure_class": "other", "failure_signature": sig}
+                for i, sig in enumerate(signatures)
+            ]
+            loop.write_gate_baseline(gf, "0badf00d", "2026-01-01T00:00:00+00:00", failing)
+            # The whole gate file must still load — this is the call that
+            # crashed the driver, before read_gate_baseline's tolerance applies.
+            fm, _ = loop.read_frontmatter(gf)
+            self.assertEqual(fm["gate"], 1)
+            record = loop.read_gate_baseline(gf)
+            self.assertIsNotNone(record, "a probed block must not read back as absent")
+            self.assertEqual(record["failing"], failing)
+
     def test_missing_sha_treated_as_absent(self):
         import tempfile
         with tempfile.TemporaryDirectory() as td:
