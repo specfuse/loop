@@ -1,6 +1,6 @@
 ---
 name: pick-feature
-description: "Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (in roadmap.md and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, `specfuse run` if gate 1 is detailed). The human picks; the skill executes the pick."
+description: "Read the project's Specfuse roadmap and present 2-3 next-feature candidates as a pick list with hat-based trade-offs. On your explicit pick, flip status from `planned` to `active` (the roadmap row, the row's detail-section `**Status:**` marker, and PLAN frontmatter if it exists) and print the next command (/draft-feature if no folder yet, `specfuse run` if gate 1 is detailed). The human picks; the skill executes the pick."
 ---
 
 <!--
@@ -34,10 +34,13 @@ comparison but cannot accept your pick.
   recommendation; the human picks from the list. A skill that picks
   for you hides the trade-offs that matter.
 - **Modify only the chosen feature's status, only on explicit pick.**
-  Two writes per accepted pick: the roadmap row's status column
-  (`planned` → `active`), and the chosen feature's `PLAN.md`
-  frontmatter (`status: planned` → `status: active`) if a folder
-  already exists. Nothing else.
+  Three writes per accepted pick: the roadmap row's status column
+  (`planned` → `active`), the row's detail section `**Status:**`
+  marker if the section carries one (`lint_roadmap` holds it to the
+  row as an ERROR, so a pick that leaves it saying `planned` halts
+  the feature's first run at the baseline probe — #3053), and the
+  chosen feature's `PLAN.md` frontmatter (`status: planned` →
+  `status: active`) if a folder already exists. Nothing else.
 - **Honor active features.** If a feature is already `active`,
   surface it first and recommend finishing it before pulling a new
   one. Only proceed to the pick list on explicit user override. Do
@@ -168,6 +171,15 @@ When the user picks a candidate by number (or by ID):
 - **Roadmap row.** Edit `.specfuse/roadmap.md`: find the chosen
   feature's row by its `FEAT-YYYY-NNNN` ID and change its status
   column from `planned` to `active`. Leave other rows alone.
+- **Detail-section status marker (if the section has one).** In the
+  same file, find the chosen feature's `## FEAT-YYYY-NNNN — …` detail
+  section and rewrite its `**Status: planned.**` marker to
+  `**Status: active.**`, keeping any prose after it on that line. If
+  the section carries no `**Status:**` line, add nothing — an absent
+  marker is not a finding, a stale one is: `lint_roadmap` ERRORs when
+  the marker disagrees with the row, and that lint runs in the
+  driver's baseline probe (#3053). Same write `/block-feature` makes
+  when it blocks and `fire_terminal_flips` makes at archive time.
 - **PLAN frontmatter (if folder exists).** If
   `.specfuse/features/FEAT-YYYY-NNNN-<slug>/PLAN.md` exists, change
   its frontmatter `status: planned` to `status: active`. If no
@@ -208,7 +220,8 @@ isn't in the expected format and the linter would reject the edit).
 - **Does not pick for you.** It recommends and explains; you choose
   from the list.
 - **Does not modify anything beyond the chosen feature's status.**
-  Two writes per pick: the roadmap row and (if it exists) the PLAN
+  Three writes per pick: the roadmap row, its detail section's
+  `**Status:**` marker (if present), and (if it exists) the PLAN
   frontmatter. Other features, other rows, other files — untouched.
 - **Does not demote the existing active feature.** If one is already
   active and you intentionally start a parallel pick, you decide
