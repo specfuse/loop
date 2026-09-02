@@ -1,7 +1,20 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 cost_budget_usd: 30.00
+baseline:
+  sha: 7f7194e9d64fcb6efe1436c5eac02d9305c15690
+  probed_at: 2026-09-02T11:43:13.132813+00:00
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: test_real_tree_is_clean_on_all_four_invariants
+    - gate: coverage
+      failure_class: coverage
+      failure_signature: [07:45:37] bug-1 failed after 0s — RuntimeError: boom on bug-1
+    - gate: roadmap-link-gate
+      failure_class: other
+      failure_signature: ERROR: roadmap.md:99: ref '#feat-2026-0084' in roadmap.md does not resolve — no anchor 'feat-2026-00
 ---
 
 # Gate 1 — the dispatch context is lighter and unobservable criteria cannot be armed
