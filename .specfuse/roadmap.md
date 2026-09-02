@@ -97,7 +97,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | `.specfuse/features/FEAT-2026-0081-feature-id-collision-prevention/` | [→ detail](#feat-2026-0081) |
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
 | FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
-| FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | planned | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ detail](#feat-2026-0085) |
+| FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | active | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ detail](#feat-2026-0085) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it

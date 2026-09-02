@@ -5,7 +5,7 @@ slug: binary-verdict
 branch: feat/FEAT-2026-0085-binary-verdict
 roadmap_goal: A terminal close records exactly met or not_met; a not_met close leaves one tracked follow-up per failed criterion; a criterion that needs a human becomes a unit the driver halts on before the close; and no auto-closed gate seeds unverified debt into the retrospective — measured as zero met_locally or partially_met verdicts and zero accept-hedged-close invocations on features closed after merge.
 autonomy_default: review
-status: planned
+status: active
 planned_cost_usd: 35.00
 ---
 
