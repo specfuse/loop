@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0085/T01
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 8.00
 model: opus
@@ -16,6 +16,14 @@ duration_seconds: 1206.201
 cost_usd: 6.521841
 input_tokens: 146
 output_tokens: 44935
+re_arm_count: 1
+re_arm_history:
+  - timestamp: 2026-09-02T20:17:32+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 6.521841
+    prior_duration_seconds: 1206.201
+    reason: "AC3 rescoped to Python files, mirror is T05's"
 ---
 
 # The verdict is met or not_met; delete the hedge machinery
