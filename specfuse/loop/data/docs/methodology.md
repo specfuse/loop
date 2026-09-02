@@ -439,7 +439,7 @@ completion.
 
 Closing ceremony cost should scale with feature size. A feature whose
 **planned substantive** WU count (types `implementation`, `qa_authoring`,
-`qa_execution`, `qa_curation`) is **≤ 4** drafts as a **single gate** with
+`qa_execution`, `qa_curation`) is **≤ 8** drafts as a **single gate** with
 a **single terminal `close` WU** — no `close-intermediate`, no `plan-next`.
 This is the proportional shape: small features do not pay multi-WU closing
 overhead sized for large ones.
@@ -457,7 +457,7 @@ reflective session. Ceremony proportionality trades reflection only on
 features that stay small **and** on-plan. The `gate_eval.py` predicate is
 the safety net; this rule does not replace it.
 
-The canonical threshold is **4** (stated here, in `docs/methodology.md`;
+The canonical threshold is **8** (stated here, in `docs/methodology.md`;
 referenced, not re-defined, in `.specfuse/skills/draft-feature/SKILL.md`).
 
 ### Fresh context per dispatch

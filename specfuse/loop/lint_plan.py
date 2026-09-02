@@ -821,6 +821,56 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
             )
 
 
+# Ceremony-proportionality threshold (docs/methodology.md §6): one fact, one
+# home. Referenced, not redefined, in the draft-feature skill.
+GATE_PROPORTIONALITY_THRESHOLD = 8
+GATE_PROPORTIONALITY_SUBSTANTIVE_TYPES = frozenset(
+    {"implementation", "qa_authoring", "qa_execution", "qa_curation"}
+)
+
+
+def lint_gate_proportionality(feature_dir: Path, gates: list) -> None:
+    """WARN when a small feature is split across more than one gate.
+
+    A feature whose planned substantive WU count (types implementation,
+    qa_authoring, qa_execution, qa_curation) is at most
+    GATE_PROPORTIONALITY_THRESHOLD should draft as a single gate
+    (docs/methodology.md §6 "Ceremony proportionality"). WARN-only; never
+    appends to the errors list — an existing feature drafted before this rule
+    should not suddenly fail lint.
+    """
+    substantive_count = 0
+    gates_with_units = 0
+    for gate in gates:
+        units = gate.get("work_units") or []
+        if not units:
+            continue
+        gates_with_units += 1
+        for entry in units:
+            wfile = entry.get("file")
+            if not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            if wfm.get("type") in GATE_PROPORTIONALITY_SUBSTANTIVE_TYPES:
+                substantive_count += 1
+
+    if (
+        gates_with_units > 1
+        and substantive_count <= GATE_PROPORTIONALITY_THRESHOLD
+    ):
+        print(
+            f"WARN: {feature_dir}: planned substantive WU count "
+            f"({substantive_count}) is at most the ceremony-proportionality "
+            f"threshold ({GATE_PROPORTIONALITY_THRESHOLD}) but the plan "
+            f"spans {gates_with_units} gates. See docs/methodology.md §6 "
+            f"\"Ceremony proportionality\" — a feature this small should "
+            f"draft as a single gate with a single terminal `close` WU."
+        )
+
+
 _DNT_CARVEOUT_RE = re.compile(r"(?i)\bexcept\b")
 _DNT_ALLOW_ENUM_RE = re.compile(
     r"(?i)\b(?:files?|paths?)(?:\s+that)?\s+change\b|\badds?\b|\bnew\b"
@@ -1876,6 +1926,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_convergent_wu_wiring(feature_dir, fm, gates))
     check_autoclose_debt_prediction(feature_dir, gates)
     check_produces_satisfiability(feature_dir, gates)
+    lint_gate_proportionality(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))

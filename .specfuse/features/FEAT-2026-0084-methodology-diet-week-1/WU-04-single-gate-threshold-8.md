@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0084/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 model: sonnet
 effort: medium
@@ -12,6 +12,13 @@ produces:
   - docs/methodology.md
   - specfuse/loop/lint_plan.py
   - tests/test_lint_gate_proportionality.py
+gate_set: code
+driver_version: 0.14.0
+started_at: 2026-09-02T17:05:48.716634+00:00
+duration_seconds: 1046.229
+cost_usd: 1.389945
+input_tokens: 112
+output_tokens: 20181
 ---
 
 # Raise the single-gate threshold from 4 to 8 substantive units, and warn when a small feature has more than one gate

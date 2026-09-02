@@ -192,7 +192,7 @@ against files).
 
 Before sketching the gate count, tally planned substantive WUs (types
 `implementation`, `qa_authoring`, `qa_execution`, `qa_curation`).
-When **planned substantive WU count ≤ 4**, draft a **single gate** with a
+When **planned substantive WU count ≤ 8**, draft a **single gate** with a
 **single terminal close** WU (type `close`) — no `close-intermediate`, no `plan-next`.
 The canonical threshold is stated in `docs/methodology.md §6 "Ceremony
 proportionality"` (one fact, one home); reference it, do not redefine it.

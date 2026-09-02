@@ -132,8 +132,12 @@ class TestCloseIntermediateShapes(unittest.TestCase):
 
             self.assertEqual(errs, [],
                              f"2-WU intermediate close must pass lint; errs={errs}")
-            self.assertNotIn("WARN", captured.getvalue(),
-                             "new 2-WU shape must not emit WARN")
+            # Closing-shape WARN specifically must stay silent for this shape.
+            # A separate rule (gate-proportionality, FEAT-2026-0084/T04) does
+            # legitimately WARN here: 2 substantive WUs split across 2 gates
+            # is exactly the small-feature-multi-gate pattern it flags.
+            self.assertNotIn("closing sequence", captured.getvalue(),
+                             "new 2-WU shape must not emit a closing-shape WARN")
 
     def test_new_1wu_terminal_passes_for_multigate_feature(self):
         """`close` on a terminal gate must pass for a multi-gate (3-gate) feature,
