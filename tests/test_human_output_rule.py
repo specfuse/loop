@@ -14,10 +14,14 @@ This module asserts the three places the rule has to reach to have any effect,
 mirroring `test_operator_escalation_rule.py`:
 
 1. it exists in `.specfuse/rules/` and in the packaged seed, byte-identical;
-2. every new project gets it @-imported, via `scaffold._RULES_BLOCK`;
-3. an EXISTING project gains the import on upgrade — the case the sentinel
-   short-circuit used to skip, which would have shipped the rule unread to
-   every project already scaffolded.
+2. it is NOT loaded into every dispatch — FEAT-2026-0084/T01 took it out of
+   `scaffold._RULES_BLOCK`; it binds on skill output, and the skills that
+   produce that output name it themselves;
+3. an EXISTING project has the import RETIRED on upgrade, so a project
+   scaffolded before the block shrank ends on the new set rather than carrying
+   old and new at once. The insert half of that reconciliation still runs and
+   is asserted here too — it is what keeps a genuinely new rule from shipping
+   unread to every project already scaffolded.
 """
 
 from __future__ import annotations
@@ -34,6 +38,19 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _RULE = _REPO_ROOT / ".specfuse" / "rules" / "human-output.md"
 _PACKAGED = _REPO_ROOT / "specfuse" / "loop" / "data" / "rules" / "human-output.md"
 _IMPORT = "@.specfuse/rules/human-output.md"
+_CANONICAL_SKILLS = _REPO_ROOT / "plugins" / "specfuse" / "skills"
+
+# The human-facing skills that must carry the pointer now that the dispatch
+# path does not load the rule. Enumerated, not globbed, for the same reason as
+# in `test_operator_escalation_rule.py`: a new skill should be a conscious
+# decision, and a glob would absolve it.
+_HUMAN_FACING_SKILLS = (
+    "arm-gate",
+    "gate-status",
+    "accept-hedged-close",
+    "attention",
+    "answer-escalation",
+)
 
 # The five rules the file must state. Regexes, not substrings, so the prose can
 # be reworded without the test dictating it.
@@ -84,36 +101,68 @@ class TestRuleShipsAndStaysInSync(unittest.TestCase):
         self.assertIn("specfuse run", text)
 
 
-class TestEveryNewProjectImportsIt(unittest.TestCase):
-    def test_scaffold_seeds_the_import_line(self):
-        self.assertIn(
-            _IMPORT, scaffold._RULES_BLOCK,
-            "scaffold._RULES_BLOCK does not @-import the rule, so a scaffolded "
-            "project ships it unread",
-        )
+class TestItIsNotInTheDispatchPath(unittest.TestCase):
+    """Was: "every new project gets it @-imported".
 
-    def test_this_repo_imports_it_too(self):
-        """Dogfood: the repo that authors the rule must follow it."""
+    Inverted by FEAT-2026-0084/T01. The rule binds on what a human reads, and
+    a dispatched work-unit session writes for the driver — so it was paying
+    648 words of every dispatch to constrain output that dispatch never
+    produces. The rule still ships, and the skills that do write for a human
+    name it, which is what the three assertions below and
+    `TestHumanFacingSkillsPointAtIt` together hold.
+    """
+
+    def test_scaffold_does_not_seed_the_import_line(self):
+        self.assertNotIn(_IMPORT, scaffold._RULES_BLOCK)
+
+    def test_this_repo_does_not_import_it_either(self):
+        """Dogfood: the repo that authors the rule follows its own diet."""
         claude_md = (_REPO_ROOT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
-        self.assertIn(_IMPORT, claude_md)
+        self.assertNotIn(_IMPORT, claude_md)
 
-    def test_fresh_wiring_writes_the_import(self):
+    def test_fresh_wiring_does_not_write_the_import(self):
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
             scaffold.wire_claude(target)
             claude_md = (target / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
-            self.assertIn(_IMPORT, claude_md)
+            self.assertNotIn(_IMPORT, claude_md)
 
 
-class TestExistingProjectsGainTheImport(unittest.TestCase):
-    """The case the sentinel short-circuit used to skip.
+class TestHumanFacingSkillsPointAtIt(unittest.TestCase):
+    """The pointer is now the only path from the rule to a run that reads it."""
+
+    def test_the_skill_list_still_resolves(self):
+        """Vacuity guard: a renamed skill would otherwise assert nothing."""
+        for name in _HUMAN_FACING_SKILLS:
+            with self.subTest(skill=name):
+                self.assertTrue((_CANONICAL_SKILLS / name / "SKILL.md").is_file())
+
+    def test_each_names_the_rule(self):
+        for name in _HUMAN_FACING_SKILLS:
+            with self.subTest(skill=name):
+                text = (_CANONICAL_SKILLS / name / "SKILL.md").read_text(
+                    encoding="utf-8"
+                )
+                self.assertIn(
+                    "human-output.md", text,
+                    f"{name} writes for a human but does not point at the rule "
+                    f"that governs how, and the dispatch path no longer loads it",
+                )
+
+
+class TestExistingProjectsConvergeOnTheCurrentBlock(unittest.TestCase):
+    """Both halves of the reconciliation the sentinel short-circuit used to skip.
 
     `_write_claude_md` returns early when the sentinel is present, which is
-    what stops it clobbering a project's own CLAUDE.md. Before the backfill,
-    that early return also meant a project scaffolded yesterday never learned
-    about a rule added today.
+    what stops it clobbering a project's own CLAUDE.md. That early return also
+    meant a project scaffolded yesterday never learned about a rule added
+    today (the insert half), and — once FEAT-2026-0084/T01 shrank the block —
+    would have kept @-importing rules the block no longer carries, ending up
+    with old set and new at once (the retire half).
     """
 
+    # A project wired against the pre-diet seven-rule block, plus its own
+    # rules-local import and prose.
     _LEGACY = (
         "# Project notes\n"
         "\n"
@@ -126,9 +175,16 @@ class TestExistingProjectsGainTheImport(unittest.TestCase):
         "@.specfuse/rules/security-boundaries.md\n"
         "@.specfuse/rules/verification-discipline.md\n"
         "@.specfuse/rules/operator-escalation.md\n"
+        "@.specfuse/rules/human-output.md\n"
         "@.specfuse/rules-local/house-style.md\n"
         "\n"
         "Trailing project prose.\n"
+    )
+
+    # The same project, minus a rule the current block DOES carry — the input
+    # that still exercises the insert half.
+    _LEGACY_MISSING_A_CURRENT_RULE = _LEGACY.replace(
+        "@.specfuse/rules/security-boundaries.md\n", ""
     )
 
     def _wire(self, text: str) -> str:
@@ -140,18 +196,40 @@ class TestExistingProjectsGainTheImport(unittest.TestCase):
             scaffold.wire_claude(target)
             return (claude_dir / "CLAUDE.md").read_text(encoding="utf-8")
 
-    def test_missing_import_is_backfilled(self):
-        self.assertIn(_IMPORT, self._wire(self._LEGACY))
+    def test_an_old_block_ends_as_the_new_block_once_not_both(self):
+        """The upgrade case: neither a leftover import nor a duplicated one."""
+        result = self._wire(self._LEGACY)
+        rules = [
+            ln.strip() for ln in result.splitlines()
+            if ln.strip().startswith("@.specfuse/rules/")
+        ]
+        self.assertEqual(
+            rules, scaffold._rule_import_lines(),
+            "an upgraded project's rule imports are not exactly the current "
+            "block — a retired rule was left behind, or one was duplicated",
+        )
 
-    def test_backfill_preserves_project_content(self):
+    def test_retired_imports_are_removed(self):
+        result = self._wire(self._LEGACY)
+        for line in scaffold._RETIRED_RULE_IMPORTS:
+            with self.subTest(retired=line):
+                self.assertNotIn(line, result)
+
+    def test_missing_import_is_still_backfilled(self):
+        """The insert half: a rule the block gained must still reach a project."""
+        result = self._wire(self._LEGACY_MISSING_A_CURRENT_RULE)
+        self.assertIn("@.specfuse/rules/security-boundaries.md", result)
+
+    def test_project_content_is_preserved(self):
         result = self._wire(self._LEGACY)
         self.assertIn("Some prose the project wrote itself.", result)
         self.assertIn("Trailing project prose.", result)
         self.assertIn("@.specfuse/rules-local/house-style.md", result)
 
-    def test_backfill_keeps_the_rules_block_contiguous(self):
-        """The new import lands with the other rules, not after the local one."""
-        lines = [ln.strip() for ln in self._wire(self._LEGACY).splitlines()]
+    def test_the_rules_block_stays_contiguous(self):
+        """Reconciliation must not scatter the imports or displace the local one."""
+        lines = [ln.strip() for ln in
+                 self._wire(self._LEGACY_MISSING_A_CURRENT_RULE).splitlines()]
         rules = [i for i, ln in enumerate(lines) if ln.startswith("@.specfuse/rules/")]
         self.assertEqual(
             rules, list(range(min(rules), max(rules) + 1)),
@@ -160,13 +238,13 @@ class TestExistingProjectsGainTheImport(unittest.TestCase):
         local = lines.index("@.specfuse/rules-local/house-style.md")
         self.assertGreater(local, max(rules), "the local import was displaced")
 
-    def test_backfill_is_idempotent(self):
+    def test_reconciliation_is_idempotent(self):
         once = self._wire(self._LEGACY)
         twice = self._wire(once)
         self.assertEqual(once, twice)
-        self.assertEqual(once.count(_IMPORT), 1)
+        self.assertEqual(once.count("@.specfuse/rules/result-contract.md"), 1)
 
-    def test_untouched_when_nothing_is_missing(self):
+    def test_untouched_when_already_current(self):
         current = (
             "## Specfuse binding rules (read before any work-unit dispatch)\n"
             + "".join(ln + "\n" for ln in scaffold._rule_import_lines())

@@ -62,9 +62,11 @@ class TestWiringCore(unittest.TestCase):
 
             # --- .claude/CLAUDE.md ---
             claude_md = (target / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
+            # correlation-ids.md left the include block in FEAT-2026-0084/T01:
+            # the dispatch path is capped at 2,500 words of rules and ID-minting
+            # is reference for the sessions that plan, not for one implementing.
             for rule in (
                 "result-contract.md",
-                "correlation-ids.md",
                 "never-touch.md",
                 "security-boundaries.md",
             ):

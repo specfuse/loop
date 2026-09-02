@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0084/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 3
 planned_cost_usd: 5.00
 model: opus
 effort: high
@@ -11,6 +11,10 @@ produces:
   - .specfuse/rules/result-contract.md
   - .specfuse/rules/correlation-ids.md
   - specfuse/loop/scaffold.py
+duration_seconds: 5214.361
+cost_usd: 16.804983
+input_tokens: 316
+output_tokens: 150114
 ---
 
 # Prune the included rules to 2,500 words and take the two human-facing ones out of the dispatch path

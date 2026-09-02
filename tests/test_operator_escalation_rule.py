@@ -13,11 +13,14 @@ of all closing-WU waste. The guards were in the source the whole time.
 So this module asserts the three places the rule has to reach to have any effect:
 
 1. it exists in `.specfuse/rules/` and in the packaged seed, byte-identical;
-2. every new project gets it @-imported, via `scaffold._RULES_BLOCK`;
+2. it is NOT loaded into every dispatch — FEAT-2026-0084/T01 took it out of
+   `scaffold._RULES_BLOCK`, because it governs what a skill says to a human and
+   an implementing session says nothing to a human;
 3. every skill that halts for a human decision points at it.
 
 The third is the one that would rot silently. A new escalating skill added later
-gets no pointer unless something fails.
+gets no pointer unless something fails. The second is what makes the third load-
+bearing: the rule now reaches a session only through a skill that names it.
 """
 
 from __future__ import annotations
@@ -38,8 +41,11 @@ _VENDORED_SKILLS = _REPO_ROOT / ".specfuse" / "skills"
 # an escalating skill should be a conscious decision to point it at the rule,
 # and a glob would silently absolve a new one.
 _ESCALATING_SKILLS = (
-    "arm-gate",        # accept/revise/reject each drafted WU
-    "gate-status",     # recommends, never decides
+    "arm-gate",             # accept/revise/reject each drafted WU
+    "gate-status",          # recommends, never decides
+    "accept-hedged-close",  # records the operator's own reason
+    "attention",            # the needs-a-human inbox
+    "answer-escalation",    # dispositions one parked issue
     "wrap-feature",    # refuses non-done features
     "unblock-wu",      # requires an operator rationale
     "abandon-feature", # single up-front confirmation
@@ -85,19 +91,29 @@ class TestRuleShipsAndStaysInSync(unittest.TestCase):
                 self.assertRegex(text, pattern, f"the rule does not state {label}")
 
 
-class TestEveryNewProjectImportsIt(unittest.TestCase):
-    def test_scaffold_seeds_the_import_line(self):
-        """Without this, the rule ships to a project and is never loaded."""
-        self.assertIn(
-            "@.specfuse/rules/operator-escalation.md", scaffold._RULES_BLOCK,
-            "scaffold._RULES_BLOCK does not @-import the rule, so a scaffolded "
-            "project ships it unread",
-        )
+class TestItIsNotInTheDispatchPath(unittest.TestCase):
+    """Was: "every new project gets it @-imported".
 
-    def test_this_repo_imports_it_too(self):
-        """Dogfood: the repo that authors the rule must follow it."""
+    Inverted by FEAT-2026-0084/T01. The rule binds on what a skill says to a
+    human; a dispatched work-unit session says nothing to a human, and the
+    seven @-imported rules cost 7,213 words of every dispatch. The rule still
+    ships in `.specfuse/rules/` and is retired from an existing project's
+    CLAUDE.md on upgrade, so no project ends up carrying both blocks.
+    """
+
+    _IMPORT = "@.specfuse/rules/operator-escalation.md"
+
+    def test_scaffold_does_not_seed_the_import_line(self):
+        self.assertNotIn(self._IMPORT, scaffold._RULES_BLOCK)
+
+    def test_this_repo_does_not_import_it_either(self):
+        """Dogfood: the repo that authors the rule follows its own diet."""
         claude_md = (_REPO_ROOT / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
-        self.assertIn("@.specfuse/rules/operator-escalation.md", claude_md)
+        self.assertNotIn(self._IMPORT, claude_md)
+
+    def test_an_existing_project_has_the_import_retired_on_upgrade(self):
+        """Otherwise every already-scaffolded project keeps loading it."""
+        self.assertIn(self._IMPORT, scaffold._RETIRED_RULE_IMPORTS)
 
 
 class TestEscalatingSkillsPointAtIt(unittest.TestCase):

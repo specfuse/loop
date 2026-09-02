@@ -174,9 +174,11 @@ class TestInitFullLayout(unittest.TestCase):
 
     def test_claude_md_rules_block(self):
         text = (self.claude / "CLAUDE.md").read_text(encoding="utf-8")
+        # correlation-ids.md left the include block in FEAT-2026-0084/T01: the
+        # dispatch path is capped at 2,500 words of rules and ID-minting is
+        # reference for the sessions that plan, not for one implementing a WU.
         for rule in (
             "result-contract.md",
-            "correlation-ids.md",
             "never-touch.md",
             "security-boundaries.md",
         ):

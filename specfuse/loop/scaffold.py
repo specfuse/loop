@@ -223,21 +223,37 @@ def init_specfuse(
 # .claude / .gitignore wiring (FEAT-2026-0026/T05)
 # ---------------------------------------------------------------------------
 
+# What a dispatched work-unit session is held to, and nothing else. Capped at
+# 2,500 words of rule text (FEAT-2026-0084/T01): every dispatch pays for this
+# block, and a 7,213-word set was read past rather than read. Every other rule
+# still ships in .specfuse/rules/ and is linked from the three below — the
+# ID-minting and gate-planning references belong to the sessions that do that
+# work, and the two human-facing rules govern what a skill says to a person,
+# which is not what an implementing session does.
 _RULES_BLOCK = (
     "## Specfuse binding rules (read before any work-unit dispatch)\n"
     "@.specfuse/rules/result-contract.md\n"
-    "@.specfuse/rules/correlation-ids.md\n"
     "@.specfuse/rules/never-touch.md\n"
     "@.specfuse/rules/security-boundaries.md\n"
-    "@.specfuse/rules/verification-discipline.md\n"
-    "@.specfuse/rules/operator-escalation.md\n"
-    "@.specfuse/rules/human-output.md\n"
     "<!-- Project-authored rules live in .specfuse/rules-local/ (never touched\n"
     "     by `specfuse upgrade`). Add one @.specfuse/rules-local/<rule>.md line\n"
     "     per rule below. See .specfuse/rules-local/README.md. -->\n"
 )
 
 _RULES_SENTINEL = "@.specfuse/rules/result-contract.md"
+
+# Rule imports the block used to carry and no longer does. An upgrade removes
+# exactly these lines, so a project scaffolded before the block shrank ends on
+# the new set rather than the union of old and new — the mirror of the backfill
+# below, which is what makes `wire_claude` converge on `_RULES_BLOCK` instead of
+# only ever growing. Exact paths only: a project's own rules-local imports, and
+# any rule still in `_RULES_BLOCK`, are never touched.
+_RETIRED_RULE_IMPORTS = (
+    "@.specfuse/rules/correlation-ids.md",
+    "@.specfuse/rules/verification-discipline.md",
+    "@.specfuse/rules/operator-escalation.md",
+    "@.specfuse/rules/human-output.md",
+)
 
 _GITIGNORE_SENTINEL = ".specfuse/.loop.lock"
 
@@ -300,7 +316,7 @@ def _rule_import_lines() -> list[str]:
 
 
 def _backfill_rule_imports(existing: str) -> str:
-    """Add rule imports the scaffold has gained since this file was written.
+    """Reconcile a project's rule imports with `_RULES_BLOCK`.
 
     A project wired before a rule existed keeps the sentinel, so the early
     return below leaves it on the old set — the new rule ships into
@@ -308,24 +324,37 @@ def _backfill_rule_imports(existing: str) -> str:
     binding rule cannot survive. Insert only what is missing, directly after
     the last rule import already present, so the block stays contiguous and
     anything the project added below it (rules-local imports, its own prose)
-    keeps its position. Idempotent: a file already carrying every line is
+    keeps its position.
+
+    Retirement is the same problem in reverse: a rule dropped from the block
+    stays @-imported forever in every already-scaffolded project, so an
+    upgrade would leave it carrying old block *and* new. Lines in
+    `_RETIRED_RULE_IMPORTS` are removed for that reason — nothing else is,
+    and a retired path that is back in `_RULES_BLOCK` is kept.
+
+    Idempotent: a file already carrying every line and no retired one is
     returned unchanged.
     """
-    lines = existing.splitlines(keepends=True)
+    keep = set(_rule_import_lines())
+    retired = {ln for ln in _RETIRED_RULE_IMPORTS if ln not in keep}
+    lines = [
+        ln for ln in existing.splitlines(keepends=True)
+        if ln.strip() not in retired
+    ]
     present = {ln.strip() for ln in lines}
     missing = [ln for ln in _rule_import_lines() if ln not in present]
-    if not missing:
-        return existing
 
     last = max(
         (i for i, ln in enumerate(lines) if ln.strip().startswith("@.specfuse/rules/")),
         default=None,
     )
-    if last is None:  # sentinel matched inside prose, not as an import line
-        return existing
-    if not lines[last].endswith("\n"):
-        lines[last] += "\n"
-    lines[last + 1:last + 1] = [ln + "\n" for ln in missing]
+    # `last is None` means the sentinel matched inside prose rather than as an
+    # import line: there is nowhere to anchor an insert, so leave the additions
+    # out — but any retired line already removed above still stays removed.
+    if missing and last is not None:
+        if not lines[last].endswith("\n"):
+            lines[last] += "\n"
+        lines[last + 1:last + 1] = [ln + "\n" for ln in missing]
     return "".join(lines)
 
 
