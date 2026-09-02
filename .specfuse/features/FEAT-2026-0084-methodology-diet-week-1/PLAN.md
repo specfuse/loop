@@ -5,7 +5,7 @@ slug: methodology-diet-week-1
 branch: feat/FEAT-2026-0084-methodology-diet-week-1
 roadmap_goal: The next three features drafted after merge carry work units of 45 lines or fewer, every acceptance criterion names a check the loop can run, features of up to 8 substantive units draft as one gate, and every dispatch loads at most 2,500 words of binding rules.
 autonomy_default: review
-status: planned
+status: done
 planned_cost_usd: 24.00
 ---
 
