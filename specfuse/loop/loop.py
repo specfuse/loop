@@ -4024,8 +4024,28 @@ def write_gate_baseline(
         for entry in failing:
             lines.append(f"    - gate: {entry['gate']}")
             lines.append(f"      failure_class: {entry['failure_class']}")
-            lines.append(f"      failure_signature: {entry['failure_signature']}")
+            # Free text from a gate's output (#2948): a coverage failure's
+            # signature is a log line like `[07:45:37] bug-1 failed ...`, and
+            # a bare leading `[` reads back as an unclosed flow list, which
+            # makes load_graph unable to open the gate file at all.
+            lines.append(
+                f"      failure_signature: "
+                f"{_yaml_double_quote(str(entry['failure_signature']))}"
+            )
     write_frontmatter_block(gate_file, "baseline", lines)
+
+
+def _yaml_double_quote(text: str) -> str:
+    """Render *text* as the double-quoted scalar `_miniyaml` accepts.
+
+    `_miniyaml` supports exactly two escapes inside `"..."` — `\\\\` and
+    `\\"` — so those are the only two applied; a newline cannot be
+    represented and is collapsed to a space, since a frontmatter scalar is
+    one line by construction.
+    """
+    body = text.replace("\\", "\\\\").replace('"', '\\"')
+    body = body.replace("\r", " ").replace("\n", " ")
+    return f'"{body}"'
 
 
 def gate_baseline_check(
