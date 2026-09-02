@@ -96,6 +96,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
 | FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | `.specfuse/features/FEAT-2026-0081-feature-id-collision-prevention/` | [→ detail](#feat-2026-0081) |
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
+| FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | planned | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ detail](#feat-2026-0084) |
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | planned | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ detail](#feat-2026-0085) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -955,6 +956,34 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
 
+## FEAT-2026-0084 — Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8
+
+**Why.** A 2026-09-01 review of 273 features across 12 repositories found 48%
+of verdict-bearing features end hedged, that the share rose as ceremony
+accreted, and that 72 of 101 hedges trace to acceptance criteria asking the
+loop to observe production, another repository, or a human signature. Every
+dispatch also carries 7,213 words of included rules and a 94-line median work
+unit against a 199-line template.
+
+**Goal.** The next three features drafted after merge carry work units of 45
+lines or fewer, every acceptance criterion names a check the loop can run,
+features of up to 8 substantive units draft as one gate, and every dispatch
+loads at most 2,500 words of binding rules.
+
+**Shape.** Single gate, four substantive units, one terminal close. T01 prunes
+the seven included rules to 2,500 words and moves `operator-escalation.md` and
+`human-output.md` out of the dispatch include block. T02 shrinks
+`WU.template.md` to 70 lines and the authoring skill to 200. T03 adds
+`lint_ac_observable`: an acceptance criterion matching an unobservable phrase
+with no backticked check is ERROR at arm time. T04 raises the single-gate
+threshold to 8 and warns on small multi-gate plans.
+
+**Scope boundary.** Out: the binary verdict and the separate judge, driver
+verification tiers, keep-diff retries, parallel dispatch, replacing the
+retrospective, auto-arm by default, and converting existing feature folders.
+
+**Status: planned.** First of the methodology-review features; the verdict
+change follows it.
 <a id="feat-2026-0085"></a>
 ## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
 
