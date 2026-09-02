@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 30.00
+baseline:
+  sha: e6b835852d758708f23c0097d4a11470fd88fce3
+  probed_at: 2026-09-02T12:39:04.511375+00:00
+  failing: []
 ---
 
 # Gate 1 — the dispatch context is lighter and unobservable criteria cannot be armed
