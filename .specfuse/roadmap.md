@@ -956,6 +956,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
 
+<a id="feat-2026-0084"></a>
 ## FEAT-2026-0084 — Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8
 
 **Why.** A 2026-09-01 review of 273 features across 12 repositories found 48%
