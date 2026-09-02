@@ -64,6 +64,58 @@ needs to know its own dependencies — they are satisfied by the time the unit i
 handed to it. Dependency edges are scheduling metadata, and scheduling belongs to
 the driver/PM, not to the executing session.
 
+### 2.1 WU frontmatter fields — the one home
+
+`WU.template.md` carries the shape; the semantics live here, one line per field,
+so a drafting agent reads a 70-line template instead of 120 lines of field notes
+it mostly does not need. Author-set unless marked driver-owned.
+
+- `id` — task-level correlation ID; must match the PLAN.md graph entry. Pattern:
+  `.specfuse/rules/correlation-ids.md`.
+- `type` — one of the eight in §3; selects the gate set the driver runs
+  (`implementation` → `code`; `retrospective`/`lessons`/`docs` → `doc`;
+  `plan-next`/`close`/`close-intermediate` → `plannext`).
+- `status` — lifecycle position. Authors write `draft` (unarmed) or `pending`
+  (armed); the driver writes `in_progress`, `in_review`, `done`, `blocked_human`.
+- `model` — OPTIONAL. Family alias (`sonnet`/`opus`/`haiku`) or a full
+  `claude-*` ID to pin a release. Absent → the type default in `MODEL_BY_TYPE`.
+- `effort` — OPTIONAL. `low`|`medium`|`high`|`xhigh`|`max` thinking budget.
+  Absent → the type default; `low`/`medium` add a terseness directive.
+- `planned_cost_usd` — OPTIONAL estimate at draft time, compared against actual
+  in the close. Floors for planning WUs: `.specfuse/rules/planning-discipline.md` §5.
+- `generated_surfaces` — OPTIONAL. Generated files this unit's acceptance depends on.
+- `oracle_env` — OPTIONAL. Where the verifying oracle runs: `macos_local`,
+  `linux_docker`, `github_actions_ci`, or an operator-named string.
+- `produces` — OPTIONAL. Path(s) or glob(s) this unit must yield; the driver's
+  presence gate refuses `complete` when one is missing or empty.
+- `produces_driver_helper` — OPTIONAL. Symbol(s) this unit adds to the driver.
+  Lint WARNs when the body mentions driver wiring and the field is absent.
+- `prep` — OPTIONAL. A `verification.yml` set run **before dispatch**, fail-fast:
+  the first non-zero exit halts dispatch, no session runs.
+- `oracles` — OPTIONAL. A `verification.yml` set run before dispatch, capture-all;
+  its output is injected into the session prompt as real repo state.
+- `extra_gates` — OPTIONAL. A `verification.yml` set unioned onto the
+  type-selected gate set **at exit**, ANDed into the same pass/fail verdict.
+- `max_attempts` — OPTIONAL. Attempt ceiling for this unit, overriding the
+  project default and the built-in 3. Below 1, non-integer, or `true` is an error.
+- `iterate_on_failure` — OPTIONAL, default false. Opt in only when the oracle is
+  a convergent whole-tree validator emitting a `FINDINGS: <n>` line: an attempt
+  that lowers findings keeps its tree, one that does not is rolled back, and two
+  non-improving attempts escalate `convergence_plateau`.
+- `auto_close_disabled` — OPTIONAL. Set `true` on a load-bearing close so the
+  auto-close predicate cannot skip it (`.specfuse/rules/close-discipline.md`).
+- `human_only` — OPTIONAL, veto-only: the planner's self-flag on a draft it knows
+  needs a human. Never grants autonomy, only subtracts it.
+- `provenance` — OPTIONAL, veto-only: a string citing the retrospective item or
+  `events.jsonl` event that motivated a unit added beyond the plan baseline.
+- `open_questions` — lives in `GATE-{N+1}-REVIEW.md` frontmatter, not here. A
+  required explicit list; `[]` means nothing blocks, and a **missing field is not
+  an empty list** — it parks the feature under `auto`.
+- Driver-owned, written at dispatch and outcome time (authors leave them absent):
+  `attempts`, `cost_usd`, `input_tokens`, `output_tokens`, `duration_seconds`,
+  `cumulative_*`, `re_arm_count`, `re_arm_history`, `folded_through_re_arm`,
+  `model`/`effort` as resolved, `gate_set`, `driver_version`, `started_at`.
+
 ## 3. Work unit types
 
 Eight types share one state machine; type affects only who handles the unit and
@@ -315,6 +367,46 @@ tests pass, coverage ≥ threshold, zero warnings, lint clean, security scan cle
 A unit that passes its own checks but would fail the real gate has done the wrong
 thing. Keep the loop's `verification.yml` `code` set in lock-step with branch
 protection wherever both exist.
+
+### 5.1 Operator scripts are software, not docs
+
+A unit that ships an **executable artifact for human operators** — a committed
+`.sh` script, an installer helper, a runbook whose body is a sequence an operator
+copy-pastes — is not exercised by a default `code` gate set: no unit test, no
+syntax check, nothing that catches the quirks shell ships with on a fresh
+workstation. The unit passes on "the file exists with these sections" and the
+operator finds the bugs against real systems, post-merge.
+
+Such a unit's acceptance criteria must include all three, each phrased so a gate
+can check it mechanically:
+
+1. **`shellcheck <script>` produces zero warnings**, or every
+   `# shellcheck disable=SCxxxx` carries an inline justification naming the reason.
+2. **`bash -n <script>` parses clean** — catches typos and unterminated
+   constructs a shellcheck pass skips when it cannot parse.
+3. **At least one bats-core test against the happy path**, with every external
+   command (`az`, `kubectl`, `curl`, `gh`, `terraform`, …) replaced by a
+   PATH-shimmed stub. The stubs assert the call shape; the test asserts exit code
+   and observable output. The happy path alone catches the lifecycle bugs
+   (trap-revoke ordering, `set -e` silent abort, premature exit); error-branch
+   coverage is a bonus, not a requirement.
+
+Name the corresponding gate command in the unit's Verification section — usually
+a `code` gate entry like `bash -n scripts/<name>.sh && shellcheck
+scripts/<name>.sh && bats tests/<name>.bats`. If `verification.yml` declares no
+bats gate yet, adding one is the hygiene precursor.
+
+The rule fires on the presence of a committed executable, not on the unit's type:
+a markdown-only runbook, a Terraform module, a Helm chart, or a config file is
+out of scope.
+
+> **Provenance.** An Argo CD session shipped two ~500-LoC bootstrap scripts as
+> docs artifacts; post-merge the operator spent ~3.5hr over 10 patches on
+> portability (`${VAR,,}` does not work on stock macOS bash 3.2), lifecycle
+> (trap-revoke fired before the revoke was needed, a KV read aborted silently
+> under `set -e`), and surface (`az ad sp create` raced with re-runs).
+> `shellcheck` flags the portability issue statically; one bats happy-path test
+> with `az` stubbed catches the rest. ~15min per script at authoring time.
 
 ## 6. The gate cycle
 

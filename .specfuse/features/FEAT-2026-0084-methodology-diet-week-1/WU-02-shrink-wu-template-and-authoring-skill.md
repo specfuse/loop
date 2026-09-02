@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0084/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: opus
 effort: high
@@ -11,6 +11,13 @@ produces:
   - .specfuse/templates/WU.template.md
   - plugins/specfuse/skills/authoring-work-units/SKILL.md
   - tests/test_wu_template_renders_lintable.py
+gate_set: code
+driver_version: 0.14.0
+started_at: 2026-09-02T16:02:49.075290+00:00
+duration_seconds: 2153.807
+cost_usd: 10.692664
+input_tokens: 176
+output_tokens: 91534
 ---
 
 # Shrink the work-unit template to 70 lines and the authoring skill to 200
