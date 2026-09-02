@@ -322,6 +322,84 @@ def detect_oracle_verbs(ac_section_text: str) -> list[str]:
     return found
 
 
+# Unobservable-AC lint (FEAT-2026-0084/T03). 72 of 101 hedged features across
+# 12 repos hedged on criteria of the shape "applied in prod", "consumer repo
+# green", "operator confirms" — bullets the loop has no oracle for and so can
+# only ever pass on trust at close time. Catch it at arm time instead, on the
+# same WARN-then-ERROR escalation shape the oracle_env heuristic above uses.
+_UNOBSERVABLE_PHRASES = [
+    "in prod", "in production", "applied", "apply to", "live cluster",
+    "operator confirms", "operator replies", "human confirms", "real device",
+    "store console", "consumer repo", "post-merge", "after merge",
+]
+_UNOBSERVABLE_PHRASE_RE = re.compile(
+    r"(?i)\b(?:" + "|".join(re.escape(p) for p in _UNOBSERVABLE_PHRASES) + r")\b"
+)
+_AC_BULLET_RE = re.compile(r"^\s*[-*]\s+(.*\S)\s*$")
+_BACKTICK_RE = re.compile(r"`[^`]+`")
+# Escape hatch: an oracle_env the loop can actually run in. Anything else
+# (github_actions_ci, a bespoke label, ...) is treated as an explicit
+# declaration that this criterion is observed elsewhere, not by this loop.
+_OBSERVABLE_ORACLE_ENVS = frozenset({"macos_local", "linux_docker"})
+
+
+def detect_unobservable_ac_bullets(ac_section_text: str) -> list[str]:
+    """Return AC bullets matching an unobservable phrase with no backticked check."""
+    hits = []
+    for line in ac_section_text.splitlines():
+        m = _AC_BULLET_RE.match(line)
+        if not m:
+            continue
+        bullet = m.group(1)
+        if _BACKTICK_RE.search(bullet):
+            continue
+        if _UNOBSERVABLE_PHRASE_RE.search(bullet):
+            hits.append(bullet)
+    return hits
+
+
+def lint_ac_observable(feature_dir: Path) -> list[str]:
+    """Flag AC bullets the loop cannot observe (FEAT-2026-0084/T03).
+
+    ERROR when the owning WU is pending/ready (about to be dispatched), WARN
+    (printed, not returned) when draft, skipped when done or any other
+    status. Escape hatches: `human_only: true`, or `oracle_env` set to
+    anything other than macos_local/linux_docker.
+    """
+    errs: list[str] = []
+    for wfile in sorted(feature_dir.glob("WU-*.md")):
+        try:
+            wfm, wbody = read_frontmatter(wfile)
+        except _miniyaml.MiniYAMLError:
+            continue
+        status = wfm.get("status")
+        if status not in ("draft", "pending", "ready"):
+            continue
+        if wfm.get("human_only") in (True, "true", "True"):
+            continue
+        oracle_env = wfm.get("oracle_env")
+        if oracle_env and oracle_env not in _OBSERVABLE_ORACLE_ENVS:
+            continue
+        bullets = detect_unobservable_ac_bullets(_slice_ac_section(wbody))
+        if not bullets:
+            continue
+        if status in ("pending", "ready"):
+            for bullet in bullets:
+                errs.append(
+                    f"ERROR: {wfile}: acceptance criterion the loop cannot "
+                    f"observe: {bullet!r}"
+                )
+        else:  # draft
+            for bullet in bullets:
+                print(
+                    f"WARN: {wfile}: acceptance criterion the loop cannot "
+                    f"observe: {bullet!r} — see .specfuse/rules/close-discipline.md "
+                    f"and rewrite it now, or declare an escape hatch "
+                    f"(human_only: true / oracle_env)."
+                )
+    return errs
+
+
 def read_frontmatter(path: Path) -> tuple[dict, str]:
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
@@ -1803,6 +1881,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_done_feature_gates(feature_dir, fm))
     errs.extend(check_decision_citations(feature_dir, fm, gates))
     errs.extend(check_decision_override_signoff(feature_dir, fm))
+    errs.extend(lint_ac_observable(feature_dir))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #

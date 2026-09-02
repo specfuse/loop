@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0084/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 model: sonnet
 effort: medium
@@ -12,6 +12,13 @@ produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_ac_observable.py
   - plugins/specfuse/skills/draft-feature/SKILL.md
+gate_set: code
+driver_version: 0.14.0
+started_at: 2026-09-02T16:38:43.109425+00:00
+duration_seconds: 708.153
+cost_usd: 1.052363
+input_tokens: 72
+output_tokens: 19254
 ---
 
 # Lint: an acceptance criterion the loop cannot observe is an ERROR at arm time
