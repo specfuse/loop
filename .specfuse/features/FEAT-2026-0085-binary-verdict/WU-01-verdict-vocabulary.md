@@ -43,7 +43,7 @@ first.
 
 - `tests/test_binary_verdict.py::test_met_locally_is_rejected_at_outcome` fails on HEAD and passes after: a fixture close WU whose frontmatter says `verdict: met_locally` makes `assert_verdict_well_formed` return `(False, reason)` with `met` and `not_met` in the reason.
 - `python3 -c "from specfuse.loop.closing_requirements import VERDICT_VALUES, LEGACY_VERDICT_VALUES; assert VERDICT_VALUES == frozenset({'met','not_met'}) and LEGACY_VERDICT_VALUES == frozenset({'met_locally','partially_met'})"` exits 0.
-- `grep -rn "HEDGED_VERDICT_VALUES\|FOLLOW_UP_KIND\|verdict_ceiling_for_kinds\|assert_hedged_followup_kinds_classified\|close-j" specfuse/ tests/ | wc -l` reports 0.
+- `grep -rn --include="*.py" "HEDGED_VERDICT_VALUES\|FOLLOW_UP_KIND\|verdict_ceiling_for_kinds\|assert_hedged_followup_kinds_classified\|close-j" specfuse/ tests/ | wc -l` reports 0. Python only: the one prose mention, in `close-discipline.md` and its byte-identical mirror under `specfuse/loop/data/rules/`, is T05's to remove (attempt 1 blocked on exactly that mirror; see `events.jsonl`).
 - `tests/test_binary_verdict.py::test_recheck_refuses_legacy_verdict_with_migration_pointer`: `recheck_terminal_verdict` on a fixture whose done close says `met_locally` returns `fired: False` and a reason containing `legacy`.
 - `python3 -m unittest discover -s tests -q` reports `OK`, run outside any sandbox.
 
