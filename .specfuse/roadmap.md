@@ -96,6 +96,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
 | FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | `.specfuse/features/FEAT-2026-0081-feature-id-collision-prevention/` | [→ detail](#feat-2026-0081) |
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
+| FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | planned | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ detail](#feat-2026-0085) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -953,6 +954,41 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
+
+<a id="feat-2026-0085"></a>
+## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
+
+**Sequencing.** Run after FEAT-2026-0084 merges: it reshapes `WU.template.md`
+and the draft-feature skill that T05 edits, and raises the single-gate
+threshold this five-unit feature relies on. Rebase this feature's branch onto
+`main` before arming.
+
+**Why.** Across 273 features in 12 repositories, 48% of verdict-bearing
+features ended `met_locally` or `partially_met`; 59 were later flipped to
+`met` by `/accept-hedged-close` with nothing re-run. 42 hedged on criteria
+the sandbox cannot observe, 30 on a cross-repo dependency or a human
+signature, 9 on auto-close debt the terminal close could not reconcile. No
+surveyed external loop uses partial credit.
+
+**Goal.** A terminal close records exactly `met` or `not_met`; a `not_met`
+close leaves one tracked follow-up per failed criterion; a criterion that
+needs a human becomes a unit the driver halts on before the close; and no
+auto-closed gate seeds unverified debt into the retrospective.
+
+**Shape.** Single gate, five substantive units, one terminal close. T01
+narrows `VERDICT_VALUES` and deletes the hedge-kind machinery. T02 makes the
+auto-close stub state what the driver proved. T03 adds `FOLLOW-UPS.md`, the
+`close-m` guard, and one tracked issue per entry. T04 adds the `type: human`
+unit the driver halts on. T05 rewrites close-discipline §2, removes
+`/accept-hedged-close`, corrects docs, and documents migration for standing
+hedged closes.
+
+**Scope boundary.** Out: the separate judge session, the feature-level
+oracle, rewriting existing hedged closes, removing `--recheck-verdict`, and
+the `narrow` / `broad` per-criterion oracle kinds.
+
+**Status: planned.** Second of the methodology-review features, sequenced
+after FEAT-2026-0084; the judge and the feature oracle follow.
 
 ## Notes
 
