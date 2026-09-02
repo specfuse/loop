@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Prune the included rules to 2,500 words and take the two human-facing ones out of the dispatch path",
+          "id": "FEAT-2026-0084/T01",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Shrink the work-unit template to 70 lines and the authoring skill to 200",
+          "id": "FEAT-2026-0084/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Lint: an acceptance criterion the loop cannot observe is an ERROR at arm time",
+          "id": "FEAT-2026-0084/T03",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Raise the single-gate threshold from 4 to 8 substantive units, and warn when a small feature has more than one gate",
+          "id": "FEAT-2026-0084/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 measure the diet, record the numbers, verdict",
+          "id": "FEAT-2026-0084/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
