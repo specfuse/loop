@@ -26,6 +26,7 @@ import tempfile
 import textwrap
 import unittest
 
+from specfuse.loop import scaffold
 from specfuse.loop.scaffold import (
     ScaffoldDowngradeError,
     init,
@@ -241,9 +242,11 @@ class TestUpgradeClaudeRefreshedIdempotent(unittest.TestCase):
     def test_claude_md_rules_block_present_after_upgrade(self):
         upgrade_specfuse(self.target)
         text = (self.target / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
+        # correlation-ids.md left the include block in FEAT-2026-0084/T01: the
+        # dispatch path is capped at 2,500 words of rules and ID-minting is
+        # reference for the sessions that plan, not for one implementing a WU.
         for rule in (
             "result-contract.md",
-            "correlation-ids.md",
             "never-touch.md",
             "security-boundaries.md",
         ):
@@ -282,6 +285,49 @@ class TestUpgradeClaudeRefreshedIdempotent(unittest.TestCase):
         upgrade_specfuse(self.target)
         text = (self.target / ".claude" / "CLAUDE.md").read_text(encoding="utf-8")
         self.assertEqual(text.count("@.specfuse/rules/result-contract.md"), 1)
+
+    def test_a_pre_diet_block_upgrades_to_the_current_one_once_not_both(self):
+        """FEAT-2026-0084/T01: the block shrank, so upgrade has to subtract.
+
+        `_write_claude_md` returns early on the sentinel to avoid clobbering a
+        project's own CLAUDE.md, and the reconciliation it delegates to only
+        ever added lines. A project scaffolded against the seven-rule block
+        would therefore have kept @-importing every retired rule alongside the
+        three current ones — the old block and the new at the same time, which
+        is the whole cost the diet was removing.
+        """
+        claude_md = self.target / ".claude" / "CLAUDE.md"
+        claude_md.write_text(
+            "# Project notes\n"
+            "\n"
+            "## Specfuse binding rules (read before any work-unit dispatch)\n"
+            "@.specfuse/rules/result-contract.md\n"
+            "@.specfuse/rules/correlation-ids.md\n"
+            "@.specfuse/rules/never-touch.md\n"
+            "@.specfuse/rules/security-boundaries.md\n"
+            "@.specfuse/rules/verification-discipline.md\n"
+            "@.specfuse/rules/operator-escalation.md\n"
+            "@.specfuse/rules/human-output.md\n"
+            "@.specfuse/rules-local/house-style.md\n",
+            encoding="utf-8",
+        )
+        upgrade_specfuse(self.target)
+        text = claude_md.read_text(encoding="utf-8")
+
+        imports = [
+            ln.strip() for ln in text.splitlines()
+            if ln.strip().startswith("@.specfuse/rules/")
+        ]
+        self.assertEqual(
+            imports, scaffold._rule_import_lines(),
+            "an upgraded project carries something other than exactly the "
+            "current block — a retired import survived, or one was duplicated",
+        )
+        self.assertIn(
+            "@.specfuse/rules-local/house-style.md", text,
+            "the project's own rules-local import was removed with the retired "
+            "ones; only the exact retired paths may be subtracted",
+        )
 
 
 class TestUpgradeInstalledWheelResolution(unittest.TestCase):

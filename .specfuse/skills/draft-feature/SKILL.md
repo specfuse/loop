@@ -133,6 +133,11 @@ highest-leverage first:**
   replacement? Cross-feature ordering or dependencies on planned items?
 - **QA** — what makes this hard to verify? Boundary cases that trip the
   gates? Anything needing a real environment the gates can't provide?
+  Which acceptance criteria need something the loop cannot reach itself
+  (prod, a live cluster, a consumer repo, an operator's confirmation)?
+  For each: does it move to a post-merge checklist item, or does the WU
+  it belongs to become `human_only: true` before close (see
+  `lint_ac_observable`, FEAT-2026-0084/T03)?
 - **Reviewer** — the scary part of the change; where the agent needs
   the tightest acceptance criteria to stay honest.
 - **Operator** — how does this ship and roll back? Migration,
@@ -187,7 +192,7 @@ against files).
 
 Before sketching the gate count, tally planned substantive WUs (types
 `implementation`, `qa_authoring`, `qa_execution`, `qa_curation`).
-When **planned substantive WU count ≤ 4**, draft a **single gate** with a
+When **planned substantive WU count ≤ 8**, draft a **single gate** with a
 **single terminal close** WU (type `close`) — no `close-intermediate`, no `plan-next`.
 The canonical threshold is stated in `docs/methodology.md §6 "Ceremony
 proportionality"` (one fact, one home); reference it, do not redefine it.

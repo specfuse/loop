@@ -3828,3 +3828,26 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   [meta/six-bug-sweep/detecting-a-condition-is-not-handling-it]: there the guard
   detects and proceeds; here the guard never fires, because the condition it keys on
   is the thing the omission removed.
+
+## FEAT-2026-0084/G1-CLOSE — `produces:` and preservation criteria
+
+- [FEAT-2026-0084/G1-CLOSE] A `produces:` path whose only acceptance criterion is a
+  **preservation** criterion is an unsatisfiable declaration. The driver's
+  `assert_produces_in_diff` guard refuses `complete` when a declared path shows no
+  diff (`produces_not_in_diff`), while the criterion says the file must stay as it
+  is — so a session that satisfies every criterion correctly is refused, and the
+  cheapest way out is to invent an edit. FEAT-2026-0084/T01 declared
+  `.specfuse/rules/correlation-ids.md` in `produces:` while its only criterion for
+  that file read "still carries `CORRELATION_ID_RE`'s pattern in prose"; two
+  attempts were refused at $5.64 and $4.64, and the third cleared the guard by
+  adding 39 lines of prose no criterion had asked for — on a WU whose objective was
+  to *remove* prose. This is the inverse failure of
+  [FEAT-2026-0022/G1-CLOSE]'s "promote named-file deliverables to `produces:` so
+  they are enforced, not attested": that rule is right for deliverables, and
+  over-applying it to files the WU must merely not break converts a guard into a
+  pressure to fabricate. Rule: `produces:` lists only paths a criterion requires
+  **changing**. A path the WU must leave intact belongs in an acceptance criterion
+  with its own check, never in `produces:`. Authoring check at arm time — for each
+  `produces:` entry, name the criterion that forces a diff on it; if there is none,
+  remove the entry. Candidate for `authoring-work-units` §13, which today warns
+  about partial bundles but not about this shape.

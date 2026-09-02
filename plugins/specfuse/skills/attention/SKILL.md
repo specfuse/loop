@@ -151,6 +151,20 @@ opposite things to a human. Under the same `gh` probe step 3 uses, report
 in the issue body, not by closing it — a roadmap row commonly lands long before
 the work does, and the request stays open until the feature ships.
 
+## How to write the output
+
+Everything this skill prints is read by a person deciding what to pick up next,
+so [`../../rules/human-output.md`](../../rules/human-output.md) governs the
+language and the length: the list first, the derivation only if asked, and
+domain words rather than the status enums the sweep read off disk
+(`blocked_human` is "stopped — needs you"). Where a row is itself a halt waiting
+on a decision, `.specfuse/rules/operator-escalation.md` governs its one-line
+framing — say what stopped and what it needs, not which
+guard fired. The depth behind any single row stays `gate-status`'s to give.
+
+The dispatch path no longer loads either rule (FEAT-2026-0084/T01), so this
+pointer is how they reach a run of this skill.
+
 ## What this skill is not
 
 Not a second source of truth: the issue queue and `.specfuse/` state remain

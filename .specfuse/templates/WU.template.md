@@ -1,199 +1,70 @@
 ---
-id: FEAT-YYYY-NNNN/T01    # FEAT-YYYY-NNNN/TNN for substantive, /G<n>-(RETRO|LESSONS|DOCS|PLAN|CLOSE|CLOSE-INTERMEDIATE) for closing
+id: FEAT-YYYY-NNNN/T01     # /TNN substantive, /G<n>-CLOSE (etc.) closing
 type: implementation       # implementation | retrospective | lessons | docs | plan-next | close | close-intermediate
-# model: <override>        # optional — defaults per MODEL_BY_TYPE[type] in loop.py; aliases: sonnet | opus | haiku
-# effort: <override>       # optional — defaults per EFFORT_BY_TYPE[type] in loop.py; low | medium | high | xhigh | max
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
-# planned_cost_usd: 0.00   # OPTIONAL — estimated USD cost at draft time; see roadmap_goal § Planned-cost capture
-generated_surfaces: []     # OPTIONAL — paths to generated files this unit's acceptance depends on
-# oracle_env: macos_local  # OPTIONAL — environment where this WU's verifying oracle runs; see frontmatter notes
+generated_surfaces: []     # OPTIONAL
+# OPTIONAL, all commented out by default: `model`/`effort` overrides (absent =
+# the type default), `planned_cost_usd`, `oracle_env`, `produces`.
 ---
 
 <!--
-Frontmatter notes (single-repo):
+One line per frontmatter field, including the optional `prep`, `oracles`,
+`extra_gates`, `max_attempts`, `iterate_on_failure`, `produces`,
+`produces_driver_helper`, `human_only`, `provenance` and `auto_close_disabled`
+keys: `docs/methodology.md` §2, their one home. Do not restate them here;
+dependencies live in PLAN.md's `depends_on` graph, not in frontmatter.
 
-AUTHOR-SET FIELDS — fill or override these at draft/arm time:
-- `id` — task-level correlation ID. Pattern in `.specfuse/rules/correlation-ids.md`. Driver and
-  linter both read this; must match the PLAN.md graph entry.
-- `type` — drives which gate set the driver runs (`implementation` → `code`; `retrospective` /
-  `lessons` / `docs` → `doc`; `plan-next` / `close` → `plannext`). Closing shapes: `close`
-  (terminal gate, collapses RETRO+LESSONS+DOCS+verdict), `close-intermediate` (non-terminal,
-  pair with a `plan-next` WU). Legacy four-WU sequence accepted but emits WARN.
-- `status` — lifecycle position. Authors set `pending`; driver writes `in_progress`, `done`,
-  `blocked_human`. `draft` = unarmed (next gate's WUs); flip to `pending` to arm.
-- `model` — OPTIONAL. Claude model alias (`sonnet` | `opus` | `haiku`) or full model ID to pin
-  a release. Absent → type-keyed default in `loop.py`.
-- `effort` — OPTIONAL. Thinking budget for `claude -p`. Levels: `low` | `medium` | `high` |
-  `xhigh` | `max`. Absent → type-keyed default. `low`/`medium` add a terseness directive.
-- `planned_cost_usd` — OPTIONAL. Estimated USD at draft time. Compared against actual in close
-  WU's cost analysis. Lint WARN when absent on active/draft WUs (non-blocking).
-  **Planning-WU cost floor (`.specfuse/rules/planning-discipline.md` §5):** draft
-  `planned_cost_usd` at **$6.00 for `plan-next`**, **$5.00 for `close`**, and **$4.50 for
-  `close-intermediate`** — not the $2–3 that "it's just bookkeeping" suggests. Each sits at
-  roughly the p90 of 158 closing WUs observed across 9 repos (medians: $3.57 / $2.73 /
-  $2.01). Do NOT raise these to absorb a second attempt: a closing-WU retry is a defect to
-  diagnose, not a cost to budget for, and 28% of closing spend is currently burned on
-  attempts the driver refused. A gate `cost_budget_usd` should still be the sum of its WU
-  estimates PLUS one re-attempt of its largest WU — defensive padding for that open defect,
-  since first-attempt success runs 51–74%. See issue #260.
-- `generated_surfaces` — OPTIONAL. Paths to generated files this unit's acceptance depends on.
-- `oracle_env` — OPTIONAL. Environment the verifying oracle runs in: `macos_local`,
-  `linux_docker`, `github_actions_ci`, or an operator-named string. Lint WARN when AC mentions
-  oracle-like verbs but this field is absent.
-- `prep` — OPTIONAL. Name of a `verification.yml` set to run **before dispatch**,
-  fail-fast: the first non-zero exit halts dispatch outright, no session runs. For
-  environment setup whose failure is a setup problem, not a verdict. See
-  `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
-- `iterate_on_failure` — OPTIONAL boolean, default false. Opt in when this unit's oracle
-  is a **convergent whole-tree validator**: one where a failing gate usually means the work
-  is *incomplete* rather than *wrong*. A failed attempt that lowered the validator's
-  reported findings keeps its working tree, so the next attempt continues in place instead
-  of restarting from a clean one. Requires the validator to emit a `FINDINGS: <n>` line —
-  convergence is measured, never guessed — and pairs with an `oracles` set naming that same
-  validator, so each attempt opens with current findings in its prompt. An attempt that does
-  NOT improve is rolled back to the best tree seen, and two non-improving attempts in a row
-  escalate `convergence_plateau`. Leave it off for ordinary units: a genuinely broken tree
-  compounds, which is what the per-attempt reset protects against. See #2650.
-- `max_attempts` — OPTIONAL. Attempt ceiling for THIS unit, overriding the project's
-  `defaults.max_attempts` in `verification.yml` and the built-in 3. Both directions are
-  useful: `1` when the unit's shape is unknown up front, so a failed pass sends it to a
-  human instead of paying twice more to rediscover the same wall; a higher value when the
-  unit iterates against a convergent oracle and each attempt makes measurable progress.
-  A value below 1, a non-integer, or `true` is a configuration error, never a silent
-  fallback to 3. See #2651.
-- `oracles` — OPTIONAL. Name of a `verification.yml` set to run **before dispatch**,
-  capture-all: every entry runs regardless of others' outcome, and its output is
-  injected into the session prompt as real repo state. See
-  `.specfuse/skills/verification/SKILL.md` § Pre-dispatch.
-- `extra_gates` — OPTIONAL. Name of a `verification.yml` set unioned onto the
-  type-selected gate set **at exit**: it ANDs into the same pass/fail verdict as
-  the rest of the `code`/`doc`/`plannext` set. See
-  `.specfuse/skills/verification/SKILL.md` § `oracles` vs `extra_gates`.
-- `produces_driver_helper` — OPTIONAL. Symbol(s) this WU adds or modifies in the driver
-  (`loop.py`, `lint_plan.py`, adjacent scripts). Lint WARN when body mentions driver-wiring
-  keywords but field is absent. See FEAT-2026-0017.
-- `produces` — OPTIONAL. File path(s) this WU must produce; machine-enforced by the driver's
-  presence gate (FEAT-2026-0022). Unified contract: a literal path must exist non-empty; a glob
-  needs ≥1 existing non-empty match — either form satisfies both the presence gate and the
-  in-diff gate. Lint WARN when absent on `implementation` WUs.
-- `human_only` — OPTIONAL, `true`/absent. Veto-only autonomy signal (FEAT-2026-0053): the
-  planner's self-flag on a draft it knows needs a human, e.g. right after writing a defaults
-  flip. Never used to grant more autonomy, only to subtract it.
-- `provenance` — OPTIONAL. Veto-only autonomy signal (FEAT-2026-0053): a string citing the
-  retrospective item or `events.jsonl` failure event that motivated a WU **added** beyond the
-  plan baseline (whether it counts as "added" is the arm predicate's call, not this WU's own).
-- `open_questions` — lives in the gate's `GATE-{N+1}-REVIEW.md` frontmatter, not here. Veto-only
-  autonomy signal (FEAT-2026-0053): a **required explicit list**; `[]` means nothing blocks
-  execution, a **missing field is not an empty list** and parks the feature under `auto`. Lint
-  WARN when absent.
+Closing shapes: `close` on a terminal gate folds RETRO+LESSONS+DOCS+verdict;
+`close-intermediate` is its non-terminal twin and pairs with a `plan-next` WU.
+The legacy four-WU sequence still parses and emits a lint WARN. Planning-WU
+cost floors (`.specfuse/rules/planning-discipline.md` §5): $6.00 `plan-next`,
+$5.00 `close`, $4.50 `close-intermediate`. Do NOT raise these to absorb a
+second attempt: a closing-WU retry is a defect to diagnose, not a cost to
+budget for.
 
-DRIVER-OWNED FIELDS - the driver writes these at outcome time; authors leave them absent:
-<!-- driver-owned: attempts, cost_usd, input_tokens, output_tokens, duration_seconds,
-     cumulative_cost_usd, cumulative_duration_seconds, cumulative_input_tokens,
-     cumulative_output_tokens, re_arm_count, re_arm_history, folded_through_re_arm -->
-<!-- driver-stamped at dispatch (resolved execution metadata, visible in this .md):
-     model, effort (override or type default), gate_set (the verification.yml set
-     that is this WU's exit oracle), driver_version, started_at (UTC ISO). -->
-<!-- `folded_through_re_arm` (FEAT-2026-0067): the `re_arm_count` value already
-     folded into the `cumulative_*` accumulators. On every re-arm the driver folds
-     the prior cycle's cost/duration/token spend into `cumulative_cost_usd`,
-     `cumulative_duration_seconds`, `cumulative_input_tokens`, and
-     `cumulative_output_tokens` — unconditionally, one fold path, including a
-     re-arm whose prior cycle cost nothing. `cumulative_*` is the lifetime
-     accumulator across every re-arm; `re_arm_history[].prior_*` is a pure audit
-     record of what each cycle cost, not a second place the fold might live. -->
-<!-- Full field semantics in docs/methodology.md §2 and events.jsonl outcome payloads. -->
-
-Dependencies live in PLAN.md's `gates[].work_units[].depends_on` graph, not
-here — see `docs/methodology.md` §2 (one fact, one home).
+DRIVER-OWNED FIELDS - written by the driver at dispatch and outcome time; authors
+leave them absent: attempts, cost_usd, input_tokens, output_tokens,
+duration_seconds, cumulative_*, re_arm_count, re_arm_history,
+folded_through_re_arm, model, effort, gate_set, driver_version, started_at.
+On every re-arm the driver folds the prior cycle's spend into the `cumulative_*`
+lifetime accumulators unconditionally, including a re-arm
+whose prior cycle cost nothing; `folded_through_re_arm` records what is folded.
 -->
 
 # <imperative title, e.g. "Add health-check endpoint">
 
-This whole body below the frontmatter is what a fresh `claude -p` session receives.
-Write it so a session with no memory can execute it from this file alone. The five
-sections below are mandatory — the linter rejects a dispatchable WU that is missing
-any. An optional `Objective` line above them is recommended but not enforced.
+Aim for 30-45 lines below: this is the entire prompt a cold, memoryless session
+gets. The five bold sections are mandatory (the linter rejects a dispatchable
+unit missing any); `Objective` is recommended, not enforced.
 
 **Objective.** One sentence: what this unit produces.
 
-**Context.** What this is part of, the correlation ID, and the specs/files that
-ground it. Enough for a cold session to orient. Reference the binding rules in
-`.specfuse/rules/` (`result-contract.md`, `never-touch.md`,
-`security-boundaries.md`, `correlation-ids.md`) and the verification skill rather
-than restating them.
+**Context.** The correlation ID, what this is part of, and the specs/files that
+ground it. Reference `.specfuse/rules/` and `/authoring-work-units` rather than
+restating them; a restated rule drifts from its source.
 
-**Acceptance criteria.** Explicit, testable statements of done. Prefer assertion-shaped,
-machine-checkable criteria — each AC phrased so a single grep, command, or test can
-judge it true or false. Avoid compound criteria ("X and also Y"); split them so a single
-failure attributes to a single line. For `implementation` WUs that introduce new behavior,
-the first criterion names a scoped test (`tests/<path>::<test_name>` or runner-equivalent
-nodeid) that **fails on HEAD before this WU runs**, and a later criterion asserts the
-same test **passes after the WU's edits**. The red→green proof is the loop's
-cheapest hollow-pass guard; see `/authoring-work-units` §12 for the contract and
-the carve-outs (refactor, migration, pure-data → explicit `Red-test exempt:
-<reason>` line in the WU body).
+**Acceptance criteria.** Two to five bullets, each pairing a statement of done
+with the one command, grep, or test nodeid that judges it true or false. No
+compound criteria. For an `implementation` unit introducing new behavior, one
+bullet names a scoped test that fails on HEAD and passes after this unit's edits
+(`/authoring-work-units` §12; write `Red-test exempt: <reason>` when carved out).
 
-**Flag-scope table** (REQUIRED only when this WU introduces, gates on, or flips a
-behavior flag; omit otherwise — see `.specfuse/rules/planning-discipline.md` §3). Every
-code path the flag is claimed to affect, marked gated / not gated, with a one-line why.
-The arming review checks the feature's headline claim ("the flip retires X") against
-this table; a claim the table does not support is a scope mismatch that surfaces as a
-defect gates later.
+**Do not touch.** Only the deltas from `.specfuse/rules/never-touch.md`: the
+sibling-WU files in this gate and the repo-specific paths this unit might brush
+against. Generated dirs, secrets, `.git/` and "the driver owns all git" bind there.
 
-| Code path | Gated by flag? | Why |
-|---|---|---|
-| `<path/method>` | yes / no | <one line> |
+**Verification.** The gate set the driver runs for this `type` (for `implementation`,
+the `code` set in `.specfuse/verification.yml`) plus any unit-specific command,
+including a symbol-existence check per new importable symbol (`/authoring-work-units` §9).
 
-**Close obligations** (REQUIRED only for `close` / `close-intermediate` WUs; omit
-otherwise — see `.specfuse/rules/close-discipline.md`).
+**Escalation triggers.** One or two conditions that stop the session with
+`status: blocked` instead of pushing through: a spec ambiguity, a `never-touch.md`
+boundary, a missing dependency, a required symbol still absent from the files you
+edited. Blocked is a respectable outcome (`result-contract.md`).
 
-> Run `specfuse lint --closing` and confirm it exits 0 before this WU reports
-> `complete` — see `.specfuse/rules/close-discipline.md` §4.
-
-The close's acceptance criteria must cover:
-
-1. **Oracles re-run fresh** (§1): every oracle the feature's criteria name,
-   full command(s), exit codes read directly — never a producing WU's
-   self-report; regenerate into a clean dir before asserting on generated
-   artifacts.
-2. **Hedged follow-up record** (§2): on `met_locally`, a named record per
-   unmet criterion — criterion, why unverifiable here, exact re-run condition
-   that upgrades it to `met`, and a `kind:` (one of `acceptance-discharged`,
-   `externally-verifiable-later`, `routed-finding`, `inherent`) written as
-   `- **kind:** \`<value>\``. `specfuse lint --closing` refuses a hedged close
-   whose record has an entry with no `kind:` or an unrecognised one.
-3. **Consumer-visible contract changes** (§3): enumerate every addition /
-   removal / rename across the feature's producing WUs and block on human
-   acknowledgment, or write exactly `n/a — no consumer-visible contract
-   change`.
-4. **Per-criterion state** (§5): if a `GATE-NN-CRITERIA.md` artifact exists for
-   this gate, `kind` and `state` per entry are written by this close, never
-   inferred — see `.specfuse/rules/close-discipline.md` §5.
-
-A close whose criteria include any of these is load-bearing — set
-`auto_close_disabled: true` in this WU's frontmatter so the auto-close
-predicate cannot skip it.
-
-**Do not touch.** Generated directories (`_generated/`, `gen-src/`, or the repo's
-declared equivalent), files owned by other work units in this gate, secrets,
-`.git/`. The driver owns all git operations — you edit files only. See
-`.specfuse/rules/never-touch.md` for the full list.
-
-**Verification.** The gates that must pass. For `implementation` units these are
-the `code` gates in `.specfuse/verification.yml` (tests, coverage ≥ 90%, zero
-warnings, lint, security scan). Name anything unit-specific in addition — including
-explicit symbol-existence checks for any new functions or constants this WU
-introduces (e.g. `python3 -c "from module import new_function"`). The code gate
-passes when no tests assert a symbol exists and cannot detect its absence; these
-checks fill that gap. See `.specfuse/skills/verification/SKILL.md` for how to run
-and interpret them.
-
-**Escalation triggers.** Conditions under which you stop and emit `status: blocked`
-in the RESULT block rather than pushing through (spec ambiguity, a required
-modification of generated code, a missing dependency, a credential the unit
-should not be reading). For `implementation` units introducing new symbols, include
-a completeness trigger: "If [required_function / required_file] is absent from the
-files you edited, emit `status: blocked` — do not claim complete." Blocked is a
-respectable outcome — `result-contract.md` rule 4.
+<!-- Conditional sections, omitted unless they apply. A unit that introduces,
+gates on, or flips a behavior flag adds a flag-scope table: every affected code
+path, gated / not gated, one line of why (`planning-discipline.md` §3). A `close`
+/ `close-intermediate` unit adds close obligations (`close-discipline.md` §§1-5),
+exits 0 on `specfuse lint --closing`, and sets `auto_close_disabled: true`. -->

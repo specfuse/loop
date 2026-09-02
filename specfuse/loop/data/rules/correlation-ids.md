@@ -128,6 +128,35 @@ for `YYYY` exists yet, start at `0001`. Padding is always four digits: `0001`,
 `0042`, `1234`. Year rollover does not continue the previous year's counter — each
 year starts fresh at `0001`.
 
+**Land the reservation on the trunk before doing any work under it.** The scan
+above — and `/roadmap-add`'s wider four-source version, which reads the roadmap
+table, `PLAN.md` files, retrospectives, and GitHub issue/PR titles — sees only
+what has already merged. **None of those sources can see an ordinal claimed on
+someone else's unmerged branch.** A feature whose ID lives on a long-running
+branch is invisible to every allocator, so the next drafter is *told* the ordinal
+is free and takes it in good faith. The collision surfaces at merge, after both
+sides have spent commits on it.
+
+So the moment an ordinal is chosen, open a **standalone branch whose only change
+is the reservation** — the `planned` roadmap row plus its detail section, exactly
+what `/roadmap-add` writes — and merge it immediately. It touches one file, it
+conflicts with nothing, and it needs no feature work to exist first. Then branch
+the actual feature from the trunk.
+
+Do not fold the reservation into the feature branch, and do not defer it until
+the feature is ready to review. The reservation's whole value is being on the
+trunk during the window when the feature is *not* finished — which is exactly
+when a competing drafter runs the scan.
+
+This is not theoretical, and it is not only a race between simultaneous drafts.
+An ordinal reserved only on its own feature branch has collided with the trunk
+*twice over on a single feature*: first against a row added while the branch was
+open, then — after that row was renumbered out of the way — against real work
+that had meanwhile taken the renumbered ordinal, forcing a second renumber. Each
+round cost a conflict resolution in the middle of an unrelated merge, and commit
+trailers are immutable, so the branch with history always wins and the *other*
+feature pays.
+
 **Task-level.** Within a feature, substantive units start at `T01` and increment by
 one. Padding is always two digits, which caps a feature at `T99`; that ceiling is
 unlikely to bind, and if it does, raise an escalation rather than invent a new
@@ -186,6 +215,16 @@ any downstream tooling filter and join on these IDs; a typo breaks the thread.
 - **Duplicate ordinal.** If you are about to mint an ID that already exists, you
   have read the feature stale. Re-read `PLAN.md` and pick the next unused ordinal.
   Never overwrite an existing WU file or graph entry to claim its ID.
+- **Ordinal claimed only on an unmerged branch.** The mirror image of a duplicate
+  ordinal, and the harder one: *you* read the feature stale through no fault of
+  your own, because the claim was never on the trunk to read. Resolve it on cost
+  asymmetry rather than seniority — whichever side has real history (WU files,
+  commit trailers, a closed-issue trail) keeps the ID, and the side that is still
+  a bare `planned` row renumbers, since trailers cannot be rewritten but a roadmap
+  row can. Renumber to a genuinely free ordinal computed *at that moment*, not to
+  one noted earlier in the merge: an ordinal that was free when the conflict
+  opened may have been taken by the time you resolve it. Then land the reservation
+  per the rule above so it cannot recur.
 - **Year drift.** An ID whose `YYYY` does not match the year the feature was
   created is syntactically valid but semantically wrong. The year in the ID is the
   year of creation, not of any subsequent work. Do not "refresh" the year when a
