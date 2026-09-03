@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0085/T02
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 4.00
 model: sonnet
@@ -17,6 +17,14 @@ duration_seconds: 471.821
 cost_usd: 1.115372
 input_tokens: 68
 output_tokens: 14451
+re_arm_count: 1
+re_arm_history:
+  - timestamp: 2026-09-03T02:00:59+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 1.115372
+    prior_duration_seconds: 471.821
+    reason: "spec widened to include the lint reader"
 ---
 
 # An auto-closed gate states what the driver proved instead of deferring every criterion
