@@ -40,5 +40,7 @@ before reporting `complete`.
 **Verification.** The `plannext` gate set plus the oracles above.
 
 **Escalation triggers.** Emit `status: blocked` if `GATE-01.md`'s behaviours
-pass on fixtures but `grep` still finds hedged vocabulary in `specfuse/` or
-`plugins/`: prose and mechanism disagree, and the close cannot pick one.
+pass on fixtures but `grep` still finds hedged vocabulary in `plugins/`,
+`.specfuse/rules`, `.specfuse/templates`, or `.specfuse/skills`, or anywhere in
+`specfuse/` outside the legacy-tolerance surface `GATE-01.md` names: prose and
+mechanism disagree, and the close cannot pick one.

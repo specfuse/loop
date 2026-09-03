@@ -1,7 +1,7 @@
 ---
 gate: 1
-status: awaiting_review
-cost_budget_usd: 45.00
+status: open
+cost_budget_usd: 60.00
 baseline:
   sha: 65b4c74fa188b5ab3d702f607f9d049413dc2f99
   probed_at: 2026-09-03T11:34:02.704748+00:00
@@ -28,7 +28,7 @@ Stated as behaviours the close can demonstrate on fixtures, not as five units:
   prints the six-part operator brief, and after the operator marks it `done`
   with `evidence:`, the driver proceeds to the next unit; a `done` human unit
   without evidence is a lint ERROR.
-- `grep -rl "met_locally\|partially_met"` over `specfuse/ plugins/ .specfuse/rules .specfuse/templates tests/` names zero files, and over `docs/` names only the migration section.
+- `grep -rl "met_locally\|partially_met"` over `.specfuse/rules .specfuse/templates .specfuse/skills plugins/` names zero files; over `specfuse/` and `tests/` it names only the legacy-tolerance surface T01 built on purpose — `LEGACY_VERDICT_VALUES` in `closing_requirements.py`, comments in `loop.py` about retired values, the tests that cover reading a legacy close, and the vendored mirror of the migration note under `specfuse/loop/data/docs/`; over `docs/` it names only the "Migrating a hedged close" section. Any other hit is a stale reference and fails this gate.
 - The full suite is green and `specfuse lint` over every feature folder reports the same ERROR count as before this gate.
 
 If all five units are `done` and any behaviour above cannot be demonstrated,
