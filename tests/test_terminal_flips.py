@@ -317,6 +317,13 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 (fdir / "RETROSPECTIVE.md").write_text(
                     "# Retrospective\n\nNothing generalizes from this gate.\n"
                 )
+                # verdict=not_met requires FOLLOW-UPS.md (close-m,
+                # FEAT-2026-0085/T03) — one tracked follow-up per failed
+                # criterion.
+                (fdir / "FOLLOW-UPS.md").write_text(
+                    "# Follow-ups\n\n### criterion one\n\n"
+                    "**Evidence.** stub — n/a\n\n**Re-run when.** stub\n"
+                )
                 return ("", {"input_tokens": 10, "output_tokens": 5, "cost_usd": 0.001})
 
             def fake_verify(wu, feature_dir, cfg=None):
@@ -390,6 +397,10 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 # for us, passing this test without the revert path running.
                 (fdir / "RETROSPECTIVE.md").write_text(
                     "# Retrospective\n\nNothing generalizes from this gate.\n"
+                )
+                (fdir / "FOLLOW-UPS.md").write_text(
+                    "# Follow-ups\n\n### criterion one\n\n"
+                    "**Evidence.** stub — n/a\n\n**Re-run when.** stub\n"
                 )
                 # Simulate agent close ceremony flipping BOTH surfaces to done
                 loop.write_frontmatter_field(plan_path, "status", "done")

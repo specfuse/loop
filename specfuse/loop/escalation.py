@@ -313,6 +313,90 @@ def emit_escalation(
     return number or CREATED_NUMBER_UNKNOWN
 
 
+def _find_existing_issue_by_label(
+    runner: Callable, repo: Optional[str], label: str, correlation_id: str,
+) -> Optional[str]:
+    """Search for an open issue carrying *label* whose title names *correlation_id*.
+
+    Generic counterpart to `_find_existing_issue`, which is hard-wired to
+    `NEEDS_HUMAN_LABEL` and searches the body for `emit_escalation`'s HTML
+    marker. This one is used by `emit_issue_with_body`, whose body is a
+    caller-owned deliverable (a follow-up entry, verbatim) rather than
+    something this module renders — so the correlation id lives in the
+    title instead, and the body stays byte-for-byte the caller's own text.
+    """
+    argv = [
+        "gh", "issue", "list",
+        "--label", label,
+        "--state", "open",
+        "--search", f'"{correlation_id}"',
+        "--json", "number,title",
+    ]
+    if repo:
+        argv[2:2] = ["--repo", repo]
+    result = runner(argv, check=False)
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return None
+    try:
+        issues = json.loads(result.stdout)
+    except ValueError:
+        return None
+    for issue in issues:
+        if correlation_id in issue.get("title", ""):
+            return str(issue["number"])
+    return None
+
+
+def emit_issue_with_body(
+    correlation_id: str,
+    *,
+    title: str,
+    body: str,
+    labels: list[str],
+    repo: Optional[str] = None,
+    assignee: str = DEFAULT_ASSIGNEE,
+    runner: Optional[Callable] = None,
+) -> str:
+    """File (or find) one GitHub issue carrying a caller-rendered body verbatim.
+
+    Unlike `emit_escalation`, this does not render the six-part escalation
+    shape or embed a correlation marker in the body — *body* reaches
+    `gh issue create --body` untouched, byte-for-byte. Idempotency instead
+    keys off *title*, which callers are expected to make correlation_id
+    -bearing (see `issue_title`): a second call for the same correlation_id
+    finds the existing open issue (via `_find_existing_issue_by_label`,
+    scoped to ``labels[0]``) and returns its number instead of filing a
+    duplicate.
+
+    Best-effort like `emit_escalation`: a raising or non-zero-exit runner
+    returns `""` rather than propagating, so a filing failure never takes
+    down the caller.
+    """
+    runner = runner if runner is not None else _default_runner
+
+    if labels:
+        existing = _find_existing_issue_by_label(runner, repo, labels[0], correlation_id)
+        if existing is not None:
+            return existing
+
+    argv = ["gh", "issue", "create", "--title", title, "--body", body]
+    if repo:
+        argv += ["--repo", repo]
+    for label in labels:
+        argv += ["--label", label]
+    if assignee and assignee.strip():
+        argv += ["--assignee", assignee.strip()]
+
+    try:
+        result = runner(argv, check=False)
+    except Exception:  # noqa: BLE001 - a raising runner must not end the run
+        return ""
+    if getattr(result, "returncode", 1) != 0:
+        return ""
+    number = _extract_issue_number(getattr(result, "stdout", "") or "")
+    return number or CREATED_NUMBER_UNKNOWN
+
+
 def _issue_carries_marker(
     runner: Callable, repo: str, issue_number: int, correlation_id: str
 ) -> bool:

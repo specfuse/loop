@@ -16,7 +16,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
-from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
+from specfuse.loop import (
+    bug_lane, closing_requirements, escalation, gh_features, notify_sla, triage,
+)
 from specfuse.monitor import autofix_state, issues
 
 
@@ -70,6 +72,23 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="0e8a16",
         description="A pull request is green and waiting on a merge decision",
         consumer="escalation.py",
+    ),
+    # FEAT-2026-0085/T03: a not_met close's FOLLOW-UPS.md entries and a met
+    # close's PLAN.md "Post-merge checklist" each file as their own issue,
+    # not as needs-human (nothing here needs a human decision to unblock the
+    # loop -- it is discharge-later tracking, so `gh issue create --label`
+    # would 422 without these two entries).
+    LabelSpec(
+        name=closing_requirements.FOLLOW_UP_LABEL,
+        colour="0052cc",
+        description="A tracked follow-up from a not_met close's FOLLOW-UPS.md",
+        consumer="loop/loop.py (file_followup_issues)",
+    ),
+    LabelSpec(
+        name=closing_requirements.POST_MERGE_LABEL,
+        colour="5319e7",
+        description="A met close's PLAN.md Post-merge checklist, tracked post-merge",
+        consumer="loop/loop.py (file_followup_issues)",
     ),
     # The harvester's findings carry their own label rather than reusing
     # `needs-human`: they are failure artifacts, not operator escalations, and a

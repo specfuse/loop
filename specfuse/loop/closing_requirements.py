@@ -52,6 +52,43 @@ RETROSPECTIVE_FILENAME = "RETROSPECTIVE.md"
 #: and the messages that point at it cannot drift apart. FEAT-2026-0085/T03
 #: creates the artifact and the requirement that a `not_met` close carry it.
 FOLLOW_UPS_FILENAME = "FOLLOW-UPS.md"
+FOLLOW_UP_ENTRY_RE = re.compile(r"^### ", re.MULTILINE)
+
+#: `## Post-merge checklist` — the optional PLAN.md section a `met` close
+#: files as one `specfuse:post-merge` issue (FEAT-2026-0085/T03).
+POST_MERGE_CHECKLIST_HEADING = "Post-merge checklist"
+POST_MERGE_CHECKLIST_HEADING_RE = re.compile(
+    rf"^##+ {re.escape(POST_MERGE_CHECKLIST_HEADING)}\b.*$", re.MULTILINE,
+)
+
+FOLLOW_UP_LABEL = "specfuse:follow-up"
+POST_MERGE_LABEL = "specfuse:post-merge"
+
+
+def parse_followup_entries(text: str) -> list[str]:
+    """Split `FOLLOW-UPS.md` into its `### `-headed entry bodies, in order.
+
+    Each returned entry is the exact text a follow-up issue's body carries —
+    heading through the next `### ` (or end of file), whitespace-trimmed.
+    Text before the first `### ` (a title, an intro line) is discarded.
+    """
+    matches = list(FOLLOW_UP_ENTRY_RE.finditer(text))
+    entries = []
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        entries.append(text[m.start():end].strip("\n") + "\n")
+    return entries
+
+
+def find_post_merge_checklist_section(plan_body: str) -> str | None:
+    """Body text of PLAN.md's `## Post-merge checklist` section, or None."""
+    m = POST_MERGE_CHECKLIST_HEADING_RE.search(plan_body)
+    if not m:
+        return None
+    start = m.end()
+    next_heading = re.search(r"^##+\s", plan_body[start:], re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(plan_body)
+    return plan_body[start:end].strip("\n") + "\n"
 LEARNINGS_PATH = ".specfuse/LEARNINGS.md"
 LEARNINGS_PENDING_FILENAME = "LEARNINGS-pending.md"
 ROADMAP_PATH = ".specfuse/roadmap.md"
@@ -278,6 +315,17 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             file=RETROSPECTIVE_FILENAME,
             enforced_by="assert_changelog_entry_for_contract_changes",
+        ),
+        Requirement(
+            id="close-m", wu_type="close", phase="pre-squash",
+            description=(
+                f"When verdict is not_met, {FOLLOW_UPS_FILENAME} exists in "
+                "the feature dir with at least one '### ' entry — one "
+                "tracked follow-up per failed criterion"
+            ),
+            file=FOLLOW_UPS_FILENAME,
+            applies_when="verdict_not_met",
+            enforced_by="assert_followups_recorded",
         ),
         Requirement(
             id="close-l", wu_type="close", phase="pre-squash",

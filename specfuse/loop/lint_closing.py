@@ -288,6 +288,17 @@ def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: Clos
     )
 
 
+def _check_followups_recorded(req: creq.Requirement, ctx: ClosingContext):
+    if ctx.wfm.get("verdict") != "not_met":
+        return None
+    path = ctx.feature_dir / creq.FOLLOW_UPS_FILENAME
+    if not path.exists():
+        return False, f"verdict=not_met but {creq.FOLLOW_UPS_FILENAME} absent from feature dir"
+    if not creq.parse_followup_entries(path.read_text()):
+        return False, f"verdict=not_met but {creq.FOLLOW_UPS_FILENAME} has no '### ' entry"
+    return True, ""
+
+
 def check_criteria_state_well_formed(req: creq.Requirement, ctx: ClosingContext) -> list[str]:
     """One finding per untrustworthy entry in `GATE-NN-CRITERIA.md`, or none.
 
@@ -356,6 +367,7 @@ _CHECKS = {
     "assert_next_gate_drafted_or_terminal": _check_next_gate_drafted_or_terminal,
     "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
     "check_criteria_state_well_formed": check_criteria_state_well_formed,
+    "assert_followups_recorded": _check_followups_recorded,
 }
 
 
@@ -443,6 +455,9 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
 
         if req.applies_when == "verdict_met":
             if ctx.wfm.get("verdict") != "met":
+                continue
+        elif req.applies_when == "verdict_not_met":
+            if ctx.wfm.get("verdict") != "not_met":
                 continue
         elif req.applies_when == "failures_present":
             if not ctx.failures_present():

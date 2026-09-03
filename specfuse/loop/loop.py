@@ -71,12 +71,14 @@ from .closing_requirements import (
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
+    FOLLOW_UP_LABEL,
     FOLLOW_UPS_FILENAME,
     LEARNINGS_PATH,
     LEARNINGS_PENDING_FILENAME,
     LEGACY_VERDICT_VALUES,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
+    POST_MERGE_LABEL,
     RETROSPECTIVE_FILENAME,
     ROADMAP_PATH,
     VERDICT_MIGRATION_NOTE,
@@ -84,10 +86,13 @@ from .closing_requirements import (
     changelog_has_entry_for,
     consumer_visible_section_is_na,
     find_consumer_visible_section,
+    find_post_merge_checklist_section,
     gate_review_filename,
     gate_section_heading_re,
     learnings_staging_is_required,
+    parse_followup_entries,
 )
+from .escalation import emit_issue_with_body, issue_title
 from .gate_eval import (
     evaluate_auto_close,
     AutoCloseDecision,
@@ -5499,6 +5504,97 @@ def assert_cost_analysis_section_when_met(
     )
 
 
+def assert_followups_recorded(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-m) When verdict=='not_met', FOLLOW-UPS.md exists with >=1 entry.
+
+    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
+    the agent writes `verdict:` during dispatch and `wu.verdict` from
+    `load_wu` is stale. A hedge used to let a close skip stating what it
+    could not verify; FOLLOW-UPS.md is where that now goes instead — one
+    `### `-headed entry per failed criterion.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict")
+    if verdict != "not_met":
+        return True, ""
+    path = feature_dir / FOLLOW_UPS_FILENAME
+    if not path.exists():
+        return (
+            False,
+            f"assert_followups_recorded: verdict=not_met but "
+            f"{FOLLOW_UPS_FILENAME} absent from feature dir",
+        )
+    if not parse_followup_entries(path.read_text()):
+        return (
+            False,
+            f"assert_followups_recorded: verdict=not_met but "
+            f"{FOLLOW_UPS_FILENAME} has no '### ' entry",
+        )
+    return True, ""
+
+
+def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dict:
+    """File one tracked GitHub issue per FOLLOW-UPS.md entry, after a close's squash.
+
+    Runs for both verdicts: on `not_met`, one `FOLLOW_UP_LABEL` issue per
+    `### `-headed entry in FOLLOW-UPS.md; on `met`, one `POST_MERGE_LABEL`
+    issue for PLAN.md's optional `## Post-merge checklist` section, if
+    present. Idempotent per entry — a title carrying the entry's
+    correlation id lets a second call find the issue `emit_issue_with_body`
+    already filed instead of duplicating it.
+
+    `gh` absent or every call failing leaves FOLLOW-UPS.md itself as the
+    record (this never deletes or rewrites it) and still emits one
+    `followups_recorded` event naming how many entries filed vs. did not.
+    Best-effort throughout: a filing failure is counted in `unfiled`, never
+    raised.
+    """
+    plan_path = feature_dir / "PLAN.md"
+    plan_fm, plan_body = read_frontmatter(plan_path)
+    feature_id = plan_fm.get("feature_id") or feature_dir.name.split("-", 2)[0]
+
+    entries: list[tuple[str, str, str]] = []  # (correlation_id, body, label)
+    followups_path = feature_dir / FOLLOW_UPS_FILENAME
+    if followups_path.exists():
+        for i, entry in enumerate(parse_followup_entries(followups_path.read_text()), start=1):
+            entries.append((f"{feature_id}-followup-{i}", entry, FOLLOW_UP_LABEL))
+
+    if plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done":
+        section = find_post_merge_checklist_section(plan_body)
+        if section:
+            entries.append((f"{feature_id}-post-merge-checklist", section, POST_MERGE_LABEL))
+
+    filed = 0
+    unfiled = 0
+    filed_issues: list[str] = []
+    for correlation_id, body, label in entries:
+        title = issue_title(correlation_id, body)
+        number = emit_issue_with_body(
+            correlation_id,
+            title=title,
+            body=body,
+            labels=[label],
+            runner=runner,
+        )
+        if number:
+            filed += 1
+            filed_issues.append(number)
+        else:
+            unfiled += 1
+
+    events_path = feature_dir / "events.jsonl"
+    flush_events(events_path, [build_event(
+        "followups_recorded", feature_id, {
+            "filed": filed,
+            "unfiled": unfiled,
+            "issue_numbers": filed_issues,
+        },
+    )])
+    return {"filed": filed, "unfiled": unfiled, "issue_numbers": filed_issues}
+
+
 _NO_FAILURES_SENTINEL = NO_FAILURES_SENTINEL
 
 
@@ -5808,6 +5904,7 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_cost_analysis_section_when_met,
         assert_failure_class_breakdown_when_failures_present,
         assert_changelog_entry_for_contract_changes,
+        assert_followups_recorded,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,
@@ -7713,6 +7810,16 @@ def run(
             )
             if rc:
                 return rc
+        # FEAT-2026-0085/T03: file one tracked issue per FOLLOW-UPS.md entry
+        # (not_met) or per PLAN.md Post-merge checklist (met), after the
+        # terminal flips above have already run. Best-effort — a filing
+        # failure must never take down a close that otherwise passed; the
+        # artifact on disk (FOLLOW-UPS.md) remains the record either way.
+        if close_wu_for_terminal is not None or _terminal_auto_closed_wu is not None:
+            try:
+                file_followup_issues(feature_dir, REPO_ROOT)
+            except Exception as exc:  # noqa: BLE001 - never blocks the driver
+                logging.debug("file_followup_issues raised: %s", exc)
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()
             and read_frontmatter(feature_dir / ref["file"])[0].get("type") == "close"
