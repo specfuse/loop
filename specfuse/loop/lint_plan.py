@@ -46,7 +46,7 @@ from .loop import VERDICT_VALUES
 FM = re.compile(r"^---\s*$")
 REQUIRED_FEATURE_KEYS = {"feature_id", "title", "branch", "roadmap_goal", "status"}
 VALID_TYPES = {"implementation", "retrospective", "lessons", "docs", "plan-next", "close",
-               "close-intermediate"}
+               "close-intermediate", "human"}
 VALID_STATUS = {"draft", "pending", "ready", "in_progress", "in_review", "done",
                 "blocked_human", "abandoned"}
 # Feature (PLAN.md) and gate status vocabularies the DRIVER branches on. Kept
@@ -114,7 +114,21 @@ CORRELATION_ID_RE = re.compile(
 # template but not hard-required here.
 REQUIRED_SECTIONS = ["Context", "Acceptance criteria", "Do not touch",
                      "Verification", "Escalation triggers"]
+# A `human` unit (FEAT-2026-0085/T04) is never dispatched, so three of the five
+# have nothing to say: there is no agent to bound with 'Do not touch', no gate
+# set the driver runs for 'Verification', and no attempt that could trip an
+# 'Escalation trigger' — the unit IS the escalation. What is left is what the
+# operator reads at the halt: what to do, why, and what counts as done.
+# 'Objective' is required here (and only here) because the operator brief the
+# driver prints uses it as "what decision is needed".
+HUMAN_REQUIRED_SECTIONS = ["Objective", "Context", "Acceptance criteria"]
 SECTION_CHECK_STATUSES = {"draft", "pending", "ready"}
+
+
+def required_sections_for(wu_type: str) -> list:
+    """The mandatory prompt sections for a work-unit type."""
+    return (HUMAN_REQUIRED_SECTIONS if wu_type == "human"
+            else REQUIRED_SECTIONS)
 
 # Oracle-env lint (FEAT-2026-0015/T05).
 _ORACLE_EXEMPT_TYPES = frozenset({"lessons", "docs", "retrospective"})
@@ -1634,12 +1648,27 @@ def _lint_impl(feature_dir: Path) -> list[str]:
                 )
             types_in_order.append(wfm.get("type"))
 
-            # Dispatchable WUs must have the five mandatory prompt sections.
+            # Dispatchable WUs must have the five mandatory prompt sections
+            # (three, for the never-dispatched `human` type).
             if wfm.get("status") in SECTION_CHECK_STATUSES:
-                for sec in REQUIRED_SECTIONS:
+                for sec in required_sections_for(wfm.get("type")):
                     if not re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody):
                         errs.append(f"{wfile}: {wfm.get('status')} WU missing "
                                     f"section '{sec}'")
+
+            # A `done` human unit must carry the operator's own record of what
+            # they did (FEAT-2026-0085/T04). Without it the unit is a `done`
+            # nobody can check: no session ran, no gate set was executed, and
+            # the close has nothing to quote — exactly the unverifiable
+            # "someone handled it" this type exists to replace.
+            if wfm.get("type") == "human" and wfm.get("status") == "done":
+                if not str(wfm.get("evidence", "") or "").strip():
+                    errs.append(
+                        f"ERROR: {wfile}: `done` human WU has no non-empty "
+                        f"'evidence' frontmatter — record what was actually "
+                        f"done (who was asked, what was signed, where the "
+                        f"reply is) so the close can quote it."
+                    )
 
             # Verdict frontmatter validation.
             wu_verdict = wfm.get("verdict")
@@ -1990,8 +2019,8 @@ def lint_plan_next_draft(feature_dir: Path, just_closed_gate: int) -> list[str]:
                 f"{sorted(VALID_TYPES)}"
             )
 
-        # Five mandatory sections: presence + non-empty content.
-        for sec in REQUIRED_SECTIONS:
+        # Five mandatory sections (three for `human`): presence + non-empty content.
+        for sec in required_sections_for(wu_type):
             if not re.search(rf"(?mi)^(?:#+\s*|\**){re.escape(sec)}", wbody):
                 warns.append(f"{wfile}: draft WU missing section '{sec}'")
                 continue

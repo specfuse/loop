@@ -92,7 +92,11 @@ from .closing_requirements import (
     learnings_staging_is_required,
     parse_followup_entries,
 )
-from .escalation import emit_issue_with_body, issue_title
+from .escalation import (
+    _PART_HEADINGS as ESCALATION_PART_HEADINGS,
+    emit_issue_with_body,
+    issue_title,
+)
 from .gate_eval import (
     evaluate_auto_close,
     AutoCloseDecision,
@@ -320,6 +324,15 @@ GATES_FOR_TYPE = {
 }
 
 
+# The work-unit type the driver never dispatches (FEAT-2026-0085/T04). A step
+# only a person can perform — reply, click, sign, run something interactively.
+# Deliberately absent from MODEL_BY_TYPE, EFFORT_BY_TYPE and GATES_FOR_TYPE
+# above: there is no model to pick and no gate set to run, because no session
+# is ever spawned. Sixteen features in the corpus performed such a step
+# out-of-band and recorded it afterwards as a softened verdict; a `human` unit
+# records it BEFORE the close, as evidence the close can quote.
+HUMAN_WU_TYPE = "human"
+
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
 # writes the next gate's WUs as drafts, and a human must arm them first.
 DISPATCHABLE = {"pending", "ready"}
@@ -458,6 +471,13 @@ class WorkUnit:
     # broken tree compounds, which is what the per-attempt reset protects
     # against (bugs #71/#74).
     iterate_on_failure: bool = False
+    # OPTIONAL operator-written record of a step the driver cannot perform
+    # (FEAT-2026-0085/T04). Only meaningful on a `human` unit: the operator
+    # does the thing, writes what they did here, and flips the unit to `done`.
+    # `lint_plan` makes a `done` human unit without it an ERROR, and the close
+    # quotes it — so the step is on the record before the verdict is written
+    # instead of softening the verdict after the fact.
+    evidence: str = ""
 
 
 @dataclass
@@ -928,6 +948,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         oracles=oracles,
         max_attempts=max_attempts,
         iterate_on_failure=iterate_on_failure,
+        evidence=str(fm.get("evidence", "") or "").strip(),
     )
 
 
@@ -2429,6 +2450,148 @@ def _halt_for_driver_restart(
     )
     print(f"\n{message}")
     return EXIT_DRIVER_RESTART_REQUIRED
+
+
+# Sanctioned name for the human-step halt (FEAT-2026-0085/T04). Sibling of
+# HALT_REASON_DRIVER_RESTART above, and — unlike it — a `blocked_human`
+# escalation, because the run is not resumable by restarting a process: a
+# person has to do something first. Exit code stays 1 (the driver's existing
+# "work unit needs human attention" code); a `human` unit is that condition
+# by construction, not a new one.
+HALT_REASON_HUMAN_STEP = "human_step_required"
+
+
+def format_human_unit_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> str:
+    """Render the six-part operator brief for a `human` work unit.
+
+    Shape is `.specfuse/rules/operator-escalation.md`'s six parts, in order,
+    under that rule's own heading strings — imported from `escalation.py`
+    rather than restated, so the printed brief and the escalation-issue body
+    can never disagree about what the six parts are called.
+
+    Every part is answerable without inventing text. Parts 2 and 3 come from
+    the unit's own sections (its title and its **Objective**, which is what a
+    human unit's objective *is*: the decision or action only a person can
+    take). Part 1 is run state. Part 4 names this mechanism. Parts 5 and 6 are
+    this halt's fixed remediation vocabulary — do the step and record it,
+    abandon the unit, or stop — not a judgement about this particular unit.
+    """
+    objective = _wu_sections.slice_wu_section(wu.body, "Objective").strip()
+    if not objective:
+        # `lint_plan` requires Objective on a dispatchable human unit, so this
+        # is the un-linted-fixture path. Fall back to the title rather than
+        # printing an empty part: a brief missing a part is worse than a terse
+        # one, and the title is still the unit's own words.
+        objective = wu.title
+    criteria = _wu_sections.slice_acceptance_criteria(wu.body).strip()
+    done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+
+    lines = [
+        f"HUMAN STEP REQUIRED — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is open. Work units finished so far: {done_list}. "
+        f"Nothing has been dispatched for {wu.wu_id} — the driver stopped in "
+        f"front of it.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        f"{wu.wu_id} is a work unit only a person can perform — a reply, a "
+        f"click, a signature, something run interactively. It is on the plan "
+        f"so the step is recorded before the gate closes, instead of being "
+        f"done out-of-band and explained away in the verdict afterwards.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        objective,
+        "",
+        f"Work units still waiting behind it: {remaining}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        "Nothing failed. Work units of this type are never dispatched: there "
+        "is no model and no verification gate set for a step performed "
+        "outside this machine, so the driver has nothing it could run and "
+        "nothing it could check.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        "1. **Do the step, then record it** — perform the action, then run "
+        "`/unblock-wu --done --evidence \"<what you did>\"` on this unit. "
+        "Pros: the run resumes where it stopped and the close quotes your "
+        "evidence, so the record says what actually happened. Cons: the run "
+        "is stopped until you get to it.",
+        "2. **Abandon the unit** — run `/unblock-wu` and choose abandon. "
+        "Pros: the rest of the gate proceeds without waiting on you. Cons: "
+        "anything depending on this unit is stranded, and any acceptance "
+        "criterion that needed the step closes unmet.",
+        "3. **Do nothing** — leave it. Pros: no decision needed now. Cons: "
+        "every re-run stops at this same point, so the gate cannot finish.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        "Option 1. The step is on the plan because the gate's outcome depends "
+        "on it; abandoning it buys progress by removing the thing that was "
+        "being verified.",
+    ]
+    if criteria:
+        lines += ["", "What counts as done, from the unit itself:", criteria]
+    lines += [
+        "",
+        f"Resume after recording your evidence:\n  {resume_command}",
+        "",
+        "More on request: the unit's full text, the gate's event log.",
+    ]
+    return "\n".join(lines)
+
+
+def halt_for_human_unit(
+    wu: "WorkUnit",
+    backend: "Backend",
+    gate_number: int,
+    feature_id: str,
+    events_path: Path,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> int:
+    """Run-loop brake: stop in front of a `human` work unit (FEAT-2026-0085/T04).
+
+    Sibling of `_halt_for_driver_restart` at the same `for wu in pending`
+    seam, with one deliberate difference: this one DOES flip the unit's
+    status, to `blocked_human`. The driver-restart halt suspends a run a fresh
+    process will pick up unchanged; this one is waiting on a person, and
+    `blocked_human` is the status the operator surfaces (`/attention`,
+    `/gate-status`, `/unblock-wu`) already read. The emitted
+    `human_escalation` also disables auto-close for the gate — a gate carrying
+    an unperformed human step must not close itself — which is why
+    `evaluate_auto_close` needs no change.
+
+    `attempts` is left at 0 on purpose: nothing was attempted. The unit costs
+    nothing and, once the operator marks it `done` with `evidence:`, it enters
+    the done-set the same way any finished unit does.
+    """
+    message = format_human_unit_brief(
+        wu, gate_number, done_wu_ids, remaining_wu_ids, resume_command)
+    backend.set_wu(wu, "status", "blocked_human")
+    flush_events(events_path, [build_event(
+        "human_escalation", wu.wu_id, {
+            "reason": HALT_REASON_HUMAN_STEP,
+            "gate": gate_number,
+            "wu_type": HUMAN_WU_TYPE,
+            "remaining_wu_ids": remaining_wu_ids,
+            "resume_command": resume_command,
+            "message": message,
+        })])
+    commit_bookkeeping(
+        [wu.file, events_path],
+        f"chore(loop): gate {gate_number} halted for human step "
+        f"({wu.wu_id})\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return 1
 
 
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
@@ -6655,6 +6818,28 @@ def run(
                             resume_command=resume_command_for(feature_id),
                         )
 
+                # Human-step halt (FEAT-2026-0085/T04): the one work-unit type
+                # the driver never dispatches. Sits at the same pre-dispatch
+                # seam as the budget and driver-restart brakes, and ahead of
+                # every dispatch path below — the property this type exists to
+                # guarantee is that no session is ever spawned for it, so the
+                # check has to precede the branch that would spawn one. Skipped
+                # in dry_run, which dispatches nothing anyway.
+                if not dry_run and wu.type == HUMAN_WU_TYPE:
+                    return halt_for_human_unit(
+                        wu=wu,
+                        backend=backend,
+                        gate_number=gate.number,
+                        feature_id=feature_id,
+                        events_path=events_path,
+                        done_wu_ids=sorted(done_ids),
+                        remaining_wu_ids=[
+                            w.wu_id for w in units
+                            if w.wu_id != wu.wu_id
+                            and w.status not in (DONE, "abandoned")],
+                        resume_command=resume_command_for(feature_id),
+                    )
+
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 # Summary line: the WU's title, so the log says WHAT is being
@@ -6663,7 +6848,12 @@ def run(
                 if wu.title and wu.title != wu.wu_id:
                     print(f"   ↳ {wu.title}")
                 if dry_run:
-                    print("   (dry run — would dispatch)")
+                    # A `human` unit would never be dispatched, so saying it
+                    # "would dispatch" misreports the very thing a dry run is
+                    # for — confirming what the next real run does.
+                    print("   (dry run — human step, would halt)"
+                          if wu.type == HUMAN_WU_TYPE
+                          else "   (dry run — would dispatch)")
                     wu.status = DONE
                     done_ids.add(wu.wu_id)
                     continue
@@ -7696,6 +7886,21 @@ def run(
         # ran. Refuse instead: "nothing left ready" and "the gate finished"
         # are different states and must not print the same message.
         stranded = [u for u in units if u.status not in (DONE, "abandoned")]
+        # A `human` unit already halted on in an earlier run sits at
+        # `blocked_human` (FEAT-2026-0085/T04), which `ready()` never returns,
+        # so the frontier goes empty and it lands here. Its cause is known and
+        # is not an abandoned dependency — re-print its brief rather than send
+        # the operator to inspect a dependency graph that is fine.
+        awaiting_human = [u for u in stranded
+                          if u.type == HUMAN_WU_TYPE and u.status == "blocked_human"]
+        if awaiting_human and not dry_run:
+            for _hwu in awaiting_human:
+                print("\n" + format_human_unit_brief(
+                    _hwu, gate.number, sorted(done_ids),
+                    [u.wu_id for u in stranded if u.wu_id != _hwu.wu_id],
+                    resume_command_for(feature_id),
+                ))
+            return 1
         if stranded:
             stranded_ids = ", ".join(u.wu_id for u in stranded)
             print(
