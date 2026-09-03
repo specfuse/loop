@@ -48,3 +48,9 @@ AGENTS.md
 .specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-prs.json
 .specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-redacted/
 .specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/
+
+# Operator-private analyses (methodology reviews, cross-repo mining) kept
+# next to the code they describe. Never committed: they name other projects
+# and this repository is public. The squash commit stages everything
+# untracked, so the ignore is what keeps them out of a work unit's commit.
+reviews/
