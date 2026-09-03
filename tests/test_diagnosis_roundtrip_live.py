@@ -26,14 +26,23 @@ import unittest
 from pathlib import Path
 
 from specfuse.monitor.diagnosis import Diagnosis, parse, render
+from tests._live import live_target
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+#: The scratch repository named by SPECFUSE_LIVE_REPO; set in setUpClass (#3223).
+REPO: str | None = None
 _MARKER_TITLE_TAG = "[FEAT-2026-0041/T04]"
 
 
 def _run(*args: str, input_text: str | None = None) -> subprocess.CompletedProcess:
+    argv = ["gh", *args]
+    if args and args[0] == "issue":
+        # Never the current checkout: every issue call names the scratch
+        # repository the operator opted into (#3223).
+        assert REPO, "live test ran without SPECFUSE_LIVE_REPO"
+        argv += ["--repo", REPO]
     return subprocess.run(
-        ["gh", *args],
+        argv,
         cwd=REPO_ROOT,
         input=input_text,
         capture_output=True,
@@ -64,9 +73,11 @@ class TestDiagnosisRoundtripLive(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        ready, reason = _gh_ready()
+        global REPO
+        ready, reason, repo = live_target(gh_ready=_gh_ready)
         if not ready:
             raise unittest.SkipTest(f"gh live round-trip skipped: {reason}")
+        REPO = repo
 
     def tearDown(self) -> None:
         if self.scratch_issue_number is not None:
