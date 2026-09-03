@@ -1212,6 +1212,19 @@ _SUREFIRE_FAILING_TEST_RE = re.compile(
     r"^\[ERROR\]\s+([A-Z]\w*(?:Test|Tests|IT)\w*\.\w+)", re.MULTILINE,
 )
 
+#: Logger chatter that is identical across runs and therefore can never be a
+#: failure signature (#3222): SLF4J/Logback `[thread] LEVEL logger - msg` and
+#: Maven `[LEVEL] msg`, for the non-error levels.
+_LOG_NOISE_RE = re.compile(
+    r"^\[(?:[\w.-]+\]\s+(?:TRACE|DEBUG|INFO|WARN|WARNING)\b|(?:TRACE|DEBUG|INFO|WARNING)\])",
+)
+
+#: A line that names a failure, preferred over the first non-noise line.
+_FAILURE_KEYWORD_RE = re.compile(
+    r"^\[ERROR\]|\bFAIL(?:ED|URE)?\b|\bERROR\b|\bException\b|^Traceback\b"
+    r"|\bAssertionError\b|\berror:|^not ok\b",
+)
+
 
 def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     """Extract (failure_class, failure_signature) from gate runner stdout.
@@ -1265,6 +1278,7 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         if sm:
             sig = sm.group(1)
             return failure_class, sig if sig else "unknown"
+    candidates: list[str] = []
     for line in after_lines:
         stripped = line.strip()
         # Skip non-informative lines (bare fences, whitespace, pure ANSI):
@@ -1279,8 +1293,37 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         # because these gates never matched the marker at all.
         if stripped.startswith("$ "):
             continue
-        return failure_class, stripped[:100]
+        # A logger's INFO/DEBUG line is the same in every run (#3222): under
+        # any SLF4J/Logback or Maven default the first line after the marker
+        # is `[main] INFO …` or `[INFO] …`, so keying off it collapsed
+        # distinct failures onto one signature and asked the operator to
+        # "reproduce" a log line at re-arm.
+        if _LOG_NOISE_RE.match(stripped):
+            continue
+        candidates.append(stripped)
+    # Prefer the first line that names a failure over the first line that
+    # merely is not noise: the error usually comes after the chatter.
+    for stripped in candidates:
+        if _FAILURE_KEYWORD_RE.search(stripped):
+            return failure_class, _truncate_signature(stripped)
+    if candidates:
+        return failure_class, _truncate_signature(candidates[0])
     return failure_class, NO_SIGNATURE
+
+
+def _truncate_signature(line: str, limit: int = 100) -> str:
+    """Bound a signature line without erasing what distinguishes it (#3222).
+
+    A plain head cut kept only the constant prefix of a long line — every
+    Maven `[ERROR] Failed to execute goal <plugin> on project <name>: …`
+    truncated to the same 100 characters — so distinct failures collapsed
+    into one signature. Keep the head and the tail; the tail is where the
+    message is.
+    """
+    if len(line) <= limit:
+        return line
+    head = limit - 40
+    return line[:head] + "…" + line[-(limit - head - 1):]
 
 
 def detect_spinning_signature_repeat(
