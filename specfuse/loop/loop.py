@@ -564,15 +564,62 @@ def write_frontmatter_field(path: Path, key: str, value) -> None:
     while j < len(lines) and not FM.match(lines[j]):
         j += 1
     block = lines[1:j]
+    rendered = _render_frontmatter_scalar(value)
     pat = re.compile(rf"^{re.escape(key)}:")
     for idx, line in enumerate(block):
         if pat.match(line):
-            block[idx] = f"{key}: {value}"
+            block[idx] = f"{key}: {rendered}"
             break
     else:
-        block.append(f"{key}: {value}")
+        block.append(f"{key}: {rendered}")
     new = ["---", *block, "---", *lines[j + 1 :]]
     path.write_text("\n".join(new) + "\n")
+
+
+#: A bare scalar starting with one of these is YAML syntax, not text, to
+#: `_miniyaml` (and to PyYAML): flow list, flow mapping, quotes, comment,
+#: anchor/alias, tag, block scalar, directive, reserved.
+_YAML_SIGNIFICANT_START = tuple('[{"\'#&*!|>%@`')
+
+
+def _render_frontmatter_scalar(value) -> str:
+    """Render one frontmatter value so `read_frontmatter` reads back what was
+    written (#3085).
+
+    The writer carries two kinds of value. Most are YAML the driver means
+    literally — `attempts: 0`, `auto_close: true`, `auto_close_reasons: []`,
+    a status word, a timestamp — and those stay bare. The rest are free
+    text sourced from captured process output: an escalation's
+    `failure_signature` is the first line of a failing gate's output, which
+    under any SLF4J/Maven default starts with `[main] INFO …`, and a bare
+    leading `[` reads back as an unclosed flow list that makes the whole
+    feature unloadable. Such a string is double-quoted with the two escapes
+    `_miniyaml` supports (see `_yaml_double_quote`).
+
+    A string is quoted when a bare rendering would be misread: it starts
+    with a YAML-significant character (unless it is a complete flow list
+    like `[]`, which callers write on purpose), contains `: ` or ` #`
+    (mapping / comment separators mid-line), or has leading or trailing
+    whitespace. Everything else — including numbers, booleans and the empty
+    string, which callers rely on reading back as their YAML types or as
+    absent — is written exactly as before.
+    """
+    if not isinstance(value, str):
+        return str(value)
+    text = value
+    if text == "":
+        return text
+    if text.startswith("[") and text.endswith("]"):
+        return text  # a deliberate flow list, e.g. `auto_close_reasons: []`
+    needs_quote = (
+        text.startswith(_YAML_SIGNIFICANT_START)
+        or ": " in text
+        or " #" in text
+        or text != text.strip()
+        or "\n" in text
+        or "\r" in text
+    )
+    return _yaml_double_quote(text) if needs_quote else text
 
 
 def write_frontmatter_block(path: Path, key: str, block_lines: list[str]) -> None:
