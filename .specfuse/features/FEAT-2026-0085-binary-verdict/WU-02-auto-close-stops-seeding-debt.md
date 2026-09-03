@@ -11,6 +11,7 @@ produces_driver_helper: write_stub_retrospective_terminal
 produces:
   - specfuse/loop/loop.py
   - specfuse/loop/closing_requirements.py
+  - specfuse/loop/lint_plan.py
   - tests/test_autoclose_stub_states_what_passed.py
 duration_seconds: 471.821
 cost_usd: 1.115372
@@ -38,13 +39,21 @@ verified, and the stub should say so. Replace the enumeration with three
 lines: which units passed, which gate set each ran, and the cost line the
 predicate already computes. Delete the marker regex, `close-g`, the assertion,
 the precreate branch, `DEFERRAL_HEADING_TEXT`, and `_DEBT_CRITERIA_CAP`.
+**Fifth reader, found by attempt 2's honest block:**
+`lint_plan.py:check_autoclose_debt_prediction` WARNs when a terminal close
+body never mentions a predecessor's debt marker; with the marker gone it can
+never fire. Delete it and its registration too. Test files that read the
+marker or the heading, to rewrite (not delete) alongside the two named
+below: `tests/test_closing_guard_prediction.py`,
+`tests/test_loop_post_pass_invariant.py`, `tests/test_lint_boundary_extraction.py`,
+`tests/test_dispatch_skeleton.py`, `tests/test_lifecycle_integration.py`.
 `stamp_gate_auto_close_note` keeps its cost and predicate lines and drops the
 pointer to the deferred list. Red test first.
 
 **Acceptance criteria.**
 
 - `tests/test_autoclose_stub_states_what_passed.py::test_terminal_stub_has_no_deferred_lines` fails on HEAD and passes after: an auto-closed fixture's `RETROSPECTIVE.md` contains no `deferred:` line, no `specfuse:autoclose-debt` marker, and one line per substantive unit naming its gate set.
-- `grep -rn "autoclose-debt\|DEFERRAL_HEADING\|build_autoclose_debt_enumeration\|assert_autoclose_debt_reconciled\|close-g\b" specfuse/ | wc -l` reports 0.
+- `grep -rn --include="*.py" "autoclose-debt\|DEFERRAL_HEADING\|build_autoclose_debt_enumeration\|assert_autoclose_debt_reconciled\|check_autoclose_debt_prediction\|close-g\b" specfuse/ | wc -l` reports 0.
 - `tests/test_autoclose_stub_states_what_passed.py::test_terminal_close_after_autoclosed_gate_needs_no_deferral_section`: a terminal close on a fixture with an auto-closed gate 1 passes `assert_closing_deliverables` and `verify_post_pass_invariants` with a retrospective carrying no "What the loop did NOT verify" heading.
 - `tests/test_autoclose_deferral_visibility.py` and `tests/test_autoclose_gate_note.py` are rewritten to the new stub, not deleted.
 - `python3 -m unittest discover -s tests -q` reports `OK`.
@@ -57,5 +66,5 @@ in `gate_eval.py` (the predicate is unchanged); `escalation.py` (T03); `.specfus
 commands above.
 
 **Escalation triggers.** Emit `status: blocked` if any consumer other than the
-four functions named above reads the debt marker; name it rather than leaving
+five functions named above reads the debt marker; name it rather than leaving
 a dangling reader.
