@@ -98,6 +98,14 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
 | FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
+| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | planned | — | [→ detail](#feat-2026-0100) |
+| FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | planned | — | [→ detail](#feat-2026-0101) |
+| FEAT-2026-0102 | Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash | planned | — | [→ detail](#feat-2026-0102) |
+| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
+| FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | planned | — | [→ detail](#feat-2026-0104) |
+| FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
+| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
+| FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -955,6 +963,94 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
+
+<a id="feat-2026-0100"></a>
+## FEAT-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
+
+**Why.** The close unit is the same kind of session that did the work, and it writes the retrospective, the cost analysis, and the verdict in one sitting. Every surveyed external loop moves the verdict to a fresh evaluator or a deterministic check, because a model grading its own work skews positive. FEAT-2026-0085 made the verdict binary; nothing yet makes the grader independent.
+
+**Goal.** A short, fresh session receives only the diff, the acceptance criteria, the gate output, and the feature oracle's output, and returns `met` or `not_met` with one line per failed criterion. The close unit writes the retrospective after that verdict exists and cannot change it. Auto-arm of later gates becomes the default once this judge stands between the work and the flip.
+
+**Benefits.** Removes the incentive for a close to argue its own case; makes auto-armed gates trustworthy; costs under a dollar per feature.
+
+**Status: planned.**
+
+<a id="feat-2026-0101"></a>
+## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
+
+**Why.** Per-unit gates verify units; nothing forces the feature to work end to end. FEAT-2026-0050 shipped seven green units connected to nothing and needed FEAT-2026-0082 to wire them; nine hedged features across the corpus were green on fixtures and never given a real ride. Anthropic's harness, tracer bullets, and spec-kit all make the user-visible behaviour the thing that flips green.
+
+**Goal.** Every PLAN.md declares one `feature_oracle` command that exercises the user-visible outcome. The first implementation unit is the tracer bullet that makes it runnable (stubs allowed only there); every later unit's verification and the close re-run it; the gate's definition of done is the oracle, never a list of units. `/draft-feature` refuses a plan without one.
+
+**Benefits.** Ends hollow passes at the feature level; shortens features because later units become deepening rather than assembly; gives the judge (separate judge session) a binary signal to read.
+
+**Status: planned.**
+
+<a id="feat-2026-0102"></a>
+## FEAT-2026-0102 — Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash
+
+**Why.** Each attempt re-runs the full 15-gate suite (coverage re-runs the tests, six bats suites) for 5-7 minutes on top of 4-6 minutes of agent work; every driver restart re-probes the baseline for another 5-7 minutes because the probe is keyed on the HEAD sha that every bookkeeping commit moves; a unit that edits the driver halts the run for a restart. Half of a median attempt is the driver's own verification.
+
+**Goal.** Per attempt: the unit's declared tests, tests touching changed files, lint, and the feature oracle. Once per gate before the close: the full suite with coverage, bats, leak-scan, security. The baseline probe is cached by tree hash, not HEAD sha. The driver runs from an installed copy so a unit editing `specfuse/loop/` does not halt the run.
+
+**Benefits.** Attempt duration roughly halves; a three-attempt retry stops costing 18 minutes of duplicate gate runs; self-hosting features stop paying a restart per unit.
+
+**Status: planned.**
+
+<a id="feat-2026-0103"></a>
+## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
+
+**Why.** 323 attempts across the corpus, roughly $830 and 42 hours, failed on driver bookkeeping guards (`files_changed_mismatch`, `deliverable_missing`, `produces_not_in_diff`, `no_deliverable_files`) rather than on correctness, and every one was hard-reset and re-dispatched from scratch with only a truncated failure note. The agent never sees its own rejected diff.
+
+**Goal.** When a bookkeeping guard fires, the working tree is kept and a short repair turn is dispatched with the guard's exact complaint and the retained diff. `iterate_on_failure` defaults on. Purely clerical cases (a `produces:` path that exists but was not listed; a RESULT block naming an untouched file; a declared deletion, #3119) are auto-repaired without a dispatch.
+
+**Benefits.** Recovers most of the 10% of spend lost to guards; halves the retry tail; stops training agents to under-declare.
+
+**Status: planned.**
+
+<a id="feat-2026-0104"></a>
+## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
+
+**Why.** Retrying the same 100-line unit three times with the same context is the pattern the field warns against; FEAT-2026-0082/T04 took six dispatches and two carve-outs, and iac FEAT-2026-0039 spent $2.82 re-deriving a precondition its plan had already predicted. Spinning is a unit-shape problem, not a retry-count problem.
+
+**Goal.** After two failed attempts on a unit, the driver dispatches a planning turn that splits or re-scopes the unit (and may add a hygiene unit) rather than re-running the same prompt. After any `blocked_human`, the escalation brief offers a re-plan of the remaining gate as the default option.
+
+**Benefits.** Turns spinning into progress; fewer human escalations; the plan stays disposable rather than sacred.
+
+**Status: planned.**
+
+<a id="feat-2026-0105"></a>
+## FEAT-2026-0105 — Parallel dispatch of the ready frontier
+
+**Why.** Dispatch is strictly serial: `ready()` computes the frontier of units whose dependencies are met and then walks it one at a time (`loop.py` comment: "sequential v1; the frontier is independent, fan-out later"). Most gates have two to four independent units waiting on each other for no reason. The C-compiler write-up ran 16 agents with lock files.
+
+**Goal.** Independent units in a gate run concurrently, one git worktree per unit, squashed in dependency order, with shared verification runs deduplicated. The single `.loop.lock` becomes per-unit claims.
+
+**Benefits.** Agent time per gate drops toward the longest unit rather than the sum; the only change that bends the active-time curve for large features.
+
+**Status: planned.**
+
+<a id="feat-2026-0106"></a>
+## FEAT-2026-0106 — Progress lines and a bounded LEARNINGS: retrospectives become optional
+
+**Why.** 713 close, close-intermediate, plan-next, and legacy ceremony units cost 39% of all spend and 28% of agent hours. `LEARNINGS.md` holds 220-361 entries per repo, is loaded whole into planning, and is read by no implementation dispatch. External loops keep per-iteration notes to a few lines and prune.
+
+**Goal.** Each unit appends 1-3 lines to `PROGRESS.md` in the feature folder (what surprised it, what the next unit should know). The terminal close writes a retrospective only on `not_met` or on request. `LEARNINGS.md` is capped at 40 entries via `/learnings-curate`; anything durable is promoted into a rule or a lint where it changes behaviour.
+
+**Benefits.** Roughly a third of feature cost and agent time removed; the lessons that matter survive as enforced checks rather than a list nobody reads at dispatch time.
+
+**Status: planned.**
+
+<a id="feat-2026-0107"></a>
+## FEAT-2026-0107 — Single-session mode for small features
+
+**Why.** Small single-gate features already cost about 35 minutes and $9, most of it fixed per-unit overhead: a cold `claude -p` start, the full gate suite, a squash, and a driver restart per unit. Interactive prompting wins for a three-unit feature and will keep winning while every unit pays that tax.
+
+**Goal.** For features of up to three units, one session works the PLAN as a checklist (one unit per iteration, Ralph style); the driver verifies once with the feature oracle and the full gate set at the end; the only human touchpoints are the plan and the PR. Correlation ids, the squash commit, and the event log are kept.
+
+**Benefits.** Small features finish in the time of one prompt; the full loop is reserved for features that need decomposition.
+
+**Status: planned.**
 
 ## Notes
 
