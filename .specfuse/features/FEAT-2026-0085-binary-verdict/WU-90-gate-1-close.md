@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: opus
 effort: high
@@ -10,6 +10,14 @@ oracle_env: macos_local
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0085-binary-verdict/RETROSPECTIVE.md
+gate_set: plannext
+driver_version: 0.14.0
+started_at: 2026-09-03T12:12:02.296221+00:00
+verdict: met
+duration_seconds: 2667.007
+cost_usd: 9.624482
+input_tokens: 176
+output_tokens: 74601
 ---
 
 # Gate 1 close — demonstrate the five behaviours, record the counts, verdict
@@ -40,5 +48,7 @@ before reporting `complete`.
 **Verification.** The `plannext` gate set plus the oracles above.
 
 **Escalation triggers.** Emit `status: blocked` if `GATE-01.md`'s behaviours
-pass on fixtures but `grep` still finds hedged vocabulary in `specfuse/` or
-`plugins/`: prose and mechanism disagree, and the close cannot pick one.
+pass on fixtures but `grep` still finds hedged vocabulary in `plugins/`,
+`.specfuse/rules`, `.specfuse/templates`, or `.specfuse/skills`, or anywhere in
+`specfuse/` outside the legacy-tolerance surface `GATE-01.md` names: prose and
+mechanism disagree, and the close cannot pick one.

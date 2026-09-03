@@ -199,12 +199,12 @@ class TestProhibitionScoping(unittest.TestCase):
                     "adds one function and one call, and changes no existing "
                     "finding."
                 ),
-                "produces": "check_autoclose_debt_prediction",
+                "produces": "check_new_prediction",
             }])
             out, errs = _lint_stdout(feat)
         self.assertEqual([], [e for e in errs if "produces path" in e])
         self.assertIn("WARN", out)
-        self.assertIn("check_autoclose_debt_prediction", out)
+        self.assertIn("check_new_prediction", out)
 
     def test_existing_qualifier_second_shape_does_not_error(self):
         """A second 'existing' shape drawn from the same retrospective

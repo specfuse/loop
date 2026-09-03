@@ -24,9 +24,71 @@ from typing import Optional
 # Shared literal values — the single spelling every guard body imports        #
 # --------------------------------------------------------------------------- #
 
-VERDICT_VALUES = frozenset({"met", "met_locally", "partially_met", "not_met"})
+#: The verdict a close may record. Binary since FEAT-2026-0085: across 273
+#: features, 48% of verdict-bearing closes hedged, and 59 of those were later
+#: flipped to `met` with nothing re-run. What a hedge used to carry now has
+#: three honest channels instead — a `not_met` close with a tracked follow-up
+#: per failed criterion, a `human` work unit for a step a human must perform,
+#: and an auto-close stub that states what the gates proved.
+VERDICT_VALUES = frozenset({"met", "not_met"})
+
+#: The two values FEAT-2026-0085 retired. They stay *readable*: 42 closes are
+#: `status: done` carrying one, and `load_wu` / `recheck_terminal_verdict`
+#: must parse them rather than crash. They are not *writable* —
+#: `assert_verdict_well_formed` rejects them on a close dispatched now, and
+#: `VERDICT_VALUES` deliberately does not contain them, so no guard that reads
+#: the legal set can accept one by accident.
+LEGACY_VERDICT_VALUES = frozenset({"met_locally", "partially_met"})
+
+#: Where an operator holding a standing hedged close goes. Named in every
+#: refusal that reports a legacy value, because "not in VERDICT_VALUES" alone
+#: tells them what is wrong and nothing about what to do.
+VERDICT_MIGRATION_NOTE = "docs/methodology.md § Migrating a hedged close"
 
 RETROSPECTIVE_FILENAME = "RETROSPECTIVE.md"
+
+#: Where a `not_met` close records one tracked follow-up per failed criterion.
+#: Named here — the single-spelling home every guard imports — so the artifact
+#: and the messages that point at it cannot drift apart. FEAT-2026-0085/T03
+#: creates the artifact and the requirement that a `not_met` close carry it.
+FOLLOW_UPS_FILENAME = "FOLLOW-UPS.md"
+FOLLOW_UP_ENTRY_RE = re.compile(r"^### ", re.MULTILINE)
+
+#: `## Post-merge checklist` — the optional PLAN.md section a `met` close
+#: files as one `specfuse:post-merge` issue (FEAT-2026-0085/T03).
+POST_MERGE_CHECKLIST_HEADING = "Post-merge checklist"
+POST_MERGE_CHECKLIST_HEADING_RE = re.compile(
+    rf"^##+ {re.escape(POST_MERGE_CHECKLIST_HEADING)}\b.*$", re.MULTILINE,
+)
+
+FOLLOW_UP_LABEL = "specfuse:follow-up"
+POST_MERGE_LABEL = "specfuse:post-merge"
+
+
+def parse_followup_entries(text: str) -> list[str]:
+    """Split `FOLLOW-UPS.md` into its `### `-headed entry bodies, in order.
+
+    Each returned entry is the exact text a follow-up issue's body carries —
+    heading through the next `### ` (or end of file), whitespace-trimmed.
+    Text before the first `### ` (a title, an intro line) is discarded.
+    """
+    matches = list(FOLLOW_UP_ENTRY_RE.finditer(text))
+    entries = []
+    for i, m in enumerate(matches):
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        entries.append(text[m.start():end].strip("\n") + "\n")
+    return entries
+
+
+def find_post_merge_checklist_section(plan_body: str) -> str | None:
+    """Body text of PLAN.md's `## Post-merge checklist` section, or None."""
+    m = POST_MERGE_CHECKLIST_HEADING_RE.search(plan_body)
+    if not m:
+        return None
+    start = m.end()
+    next_heading = re.search(r"^##+\s", plan_body[start:], re.MULTILINE)
+    end = start + next_heading.start() if next_heading else len(plan_body)
+    return plan_body[start:end].strip("\n") + "\n"
 LEARNINGS_PATH = ".specfuse/LEARNINGS.md"
 LEARNINGS_PENDING_FILENAME = "LEARNINGS-pending.md"
 ROADMAP_PATH = ".specfuse/roadmap.md"
@@ -86,12 +148,6 @@ def gate_review_filename(next_gate: int) -> str:
     return GATE_REVIEW_FILENAME_TEMPLATE.format(next_gate=next_gate)
 
 
-DEFERRAL_HEADING_TEXT = "What the loop did NOT verify"
-DEFERRAL_HEADING_RE = re.compile(rf"(?m)^#{{1,3}}\s*{re.escape(DEFERRAL_HEADING_TEXT)}.*$")
-
-AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
-
-
 # --------------------------------------------------------------------------- #
 # §3 contract-change enumeration -> CHANGELOG.md linkage (FEAT-2026-0064/T02) #
 # --------------------------------------------------------------------------- #
@@ -143,52 +199,6 @@ def changelog_has_entry_for(unreleased_entries, feature_id: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-# Hedged-verdict follow-up `kind:` contract (FEAT-2026-0059/T01)              #
-# --------------------------------------------------------------------------- #
-
-#: The four classifications a close-discipline.md §2 follow-up entry may
-#: carry, and what each means for the verdict ceiling. `inherent` is not in
-#: the roadmap row's original three — see PLAN.md for why it was added.
-FOLLOW_UP_KIND_MEANINGS: dict[str, str] = {
-    "acceptance-discharged": "needs a human signature; accepting IS the discharge",
-    "externally-verifiable-later": (
-        "needs a real run or environment; upgradeable at the named condition"
-    ),
-    "routed-finding": "now owned elsewhere; tracked on another surface",
-    "inherent": "not assertable, ever",
-}
-
-FOLLOW_UP_KINDS: frozenset[str] = frozenset(FOLLOW_UP_KIND_MEANINGS)
-
-#: Verdicts that require a §2 follow-up record at all (close-discipline §2).
-HEDGED_VERDICT_VALUES: frozenset[str] = frozenset({"met_locally", "partially_met"})
-
-HEDGED_RECORD_HEADING = "Hedged-verdict follow-up record"
-HEDGED_RECORD_HEADING_RE = re.compile(
-    rf"^##+ {re.escape(HEDGED_RECORD_HEADING)}\b.*$", re.MULTILINE,
-)
-
-#: Matches a per-entry `- **kind:** `<value>`` line inside a §2 record.
-KIND_FIELD_RE = re.compile(r"\*\*kind:\*\*\s*`([a-zA-Z0-9-]+)`")
-
-REWORK_EXISTS = "rework exists"
-NO_IN_REPO_REWORK = "no in-repo rework can raise this verdict"
-
-
-def verdict_ceiling_for_kinds(kinds) -> str:
-    """The verdict ceiling implied by a hedged close's set of follow-up kinds.
-
-    Mechanical, not a judgment call: if any entry is
-    `externally-verifiable-later`, a real re-run condition exists and the
-    operator has a choice. Otherwise `met` is unreachable by any in-repo
-    work — the empty set (no entries at all) also lands here.
-    """
-    if any(kind == "externally-verifiable-later" for kind in kinds):
-        return REWORK_EXISTS
-    return NO_IN_REPO_REWORK
-
-
-# --------------------------------------------------------------------------- #
 # Requirement records                                                         #
 # --------------------------------------------------------------------------- #
 
@@ -198,8 +208,8 @@ class Requirement:
     """One closing-artifact requirement, as data.
 
     ``applies_when`` names the condition under which the requirement fires:
-    ``always``, ``verdict_met``, ``verdict_hedged``, ``failures_present``,
-    ``autoclose_debt_marker``, or ``criteria_artifact_present`` (the gate's
+    ``always``, ``verdict_met``, ``failures_present``, or
+    ``criteria_artifact_present`` (the gate's
     ``GATE-NN-CRITERIA.md`` exists). ``phase`` is ``pre-squash`` (checked by
     ``assert_closing_deliverables`` right after the WU's own squash) or
     ``post-pass`` (checked by ``verify_post_pass_invariants`` after the
@@ -270,16 +280,6 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             enforced_by="assert_failure_class_breakdown_when_failures_present",
         ),
         Requirement(
-            id="close-g", wu_type="close", phase="post-pass",
-            description=(
-                "Predecessor auto-close debt markers are named in the terminal "
-                f"close's '{DEFERRAL_HEADING_TEXT}' section"
-            ),
-            file=RETROSPECTIVE_FILENAME,
-            applies_when="autoclose_debt_marker",
-            enforced_by="assert_autoclose_debt_reconciled",
-        ),
-        Requirement(
             id="close-h", wu_type="close", phase="post-pass",
             description=(
                 "Terminal gate status, roadmap row, and roadmap-archive anchor "
@@ -298,17 +298,12 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             file=LEARNINGS_PATH,
             enforced_by="assert_learnings_staged_under_auto",
         ),
-        Requirement(
-            id="close-j", wu_type="close", phase="pre-squash",
-            description=(
-                "On a hedged verdict, every entry in the "
-                f"'{HEDGED_RECORD_HEADING}' section carries a valid `kind:` "
-                f"field ({', '.join(sorted(FOLLOW_UP_KINDS))})"
-            ),
-            file=RETROSPECTIVE_FILENAME,
-            applies_when="verdict_hedged",
-            enforced_by="assert_hedged_followup_kinds_classified",
-        ),
+        # The requirement ID between close-i and close-k is deliberately
+        # unused. It required a per-entry classification on the hedged-verdict
+        # follow-up record, and FEAT-2026-0085 retired the verdicts that record
+        # served. The ID is not reused: it appears in event logs and
+        # retrospectives written before the narrowing, and rebinding it would
+        # make that history say something it never said.
         Requirement(
             id="close-k", wu_type="close", phase="pre-squash",
             description=(
@@ -320,6 +315,17 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             file=RETROSPECTIVE_FILENAME,
             enforced_by="assert_changelog_entry_for_contract_changes",
+        ),
+        Requirement(
+            id="close-m", wu_type="close", phase="pre-squash",
+            description=(
+                f"When verdict is not_met, {FOLLOW_UPS_FILENAME} exists in "
+                "the feature dir with at least one '### ' entry — one "
+                "tracked follow-up per failed criterion"
+            ),
+            file=FOLLOW_UPS_FILENAME,
+            applies_when="verdict_not_met",
+            enforced_by="assert_followups_recorded",
         ),
         Requirement(
             id="close-l", wu_type="close", phase="pre-squash",

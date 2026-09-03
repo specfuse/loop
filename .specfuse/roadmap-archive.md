@@ -43,6 +43,40 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0085"></a>
+## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
+
+**Sequencing.** After FEAT-2026-0084 (merged 2026-09-02), which reshaped
+`WU.template.md` and the draft-feature skill that T05 edits and raised the
+single-gate threshold this five-unit feature relies on.
+
+**Why.** Across 273 features in 12 repositories, 48% of verdict-bearing
+features ended `met_locally` or `partially_met`; 59 were later flipped to
+`met` by `/accept-hedged-close` with nothing re-run. 42 hedged on criteria
+the sandbox cannot observe, 30 on a cross-repo dependency or a human
+signature, 9 on auto-close debt the terminal close could not reconcile. No
+surveyed external loop uses partial credit.
+
+**Goal.** A terminal close records exactly `met` or `not_met`; a `not_met`
+close leaves one tracked follow-up per failed criterion; a criterion that
+needs a human becomes a unit the driver halts on before the close; and no
+auto-closed gate seeds unverified debt into the retrospective.
+
+**Shape.** Single gate, five substantive units, one terminal close. T01
+narrows `VERDICT_VALUES` and deletes the hedge-kind machinery. T02 makes the
+auto-close stub state what the driver proved. T03 adds `FOLLOW-UPS.md`, the
+`close-m` guard, and one tracked issue per entry. T04 adds the `type: human`
+unit the driver halts on. T05 rewrites close-discipline §2, removes
+`/accept-hedged-close`, corrects docs, and documents migration for standing
+hedged closes.
+
+**Scope boundary.** Out: the separate judge session, the feature-level
+oracle, rewriting existing hedged closes, removing `--recheck-verdict`, and
+the `narrow` / `broad` per-criterion oracle kinds.
+
+**Status: done.** Second of the methodology-review features, sequenced
+after FEAT-2026-0084 (merged 2026-09-02); the judge and the feature oracle follow.
+
 <a id="feat-2026-0084"></a>
 ## FEAT-2026-0084 — Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8
 

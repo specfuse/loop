@@ -146,11 +146,12 @@ class TestVerdictPermitsTerminalFlips(unittest.TestCase):
 
     def test_verdict_permits_terminal_flips_only_for_met(self):
         f = loop.verdict_permits_terminal_flips
-        # The four enum values
+        # The two enum values, plus the two FEAT-2026-0085 retired: a legacy
+        # value on disk must still be read as withholding, never as permitting.
         self.assertTrue(f("met"))
+        self.assertFalse(f("not_met"))
         self.assertFalse(f("met_locally"))
         self.assertFalse(f("partially_met"))
-        self.assertFalse(f("not_met"))
         # Edge cases
         self.assertFalse(f(None))
         self.assertFalse(f(""))
@@ -165,6 +166,8 @@ class TestVerdictPermitsTerminalFlips(unittest.TestCase):
 class TestLoadWUVerdictParsing(unittest.TestCase):
 
     def test_load_wu_parses_verdict_for_close_type(self):
+        # Deliberately a retired value: 42 closes are `done` on disk carrying
+        # one, and `load_wu` must keep parsing them (FEAT-2026-0085).
         ref = {"id": "FEAT-2026-9998/G1-CLOSE", "file": "WU-90-close.md", "depends_on": []}
         with tempfile.TemporaryDirectory() as tmpdir:
             _write_wu_file(
@@ -218,7 +221,7 @@ class TestLintVerdictValidation(unittest.TestCase):
                 f"errors must name the verdict problem; errs={errs}",
             )
             self.assertIn(
-                "met, met_locally, partially_met, not_met",
+                "met, not_met",
                 verdict_errs[0],
                 f"error must list allowed values; err={verdict_errs[0]!r}",
             )

@@ -118,13 +118,24 @@ it mostly does not need. Author-set unless marked driver-owned.
 
 ## 3. Work unit types
 
-Eight types share one state machine; type affects only who handles the unit and
+Nine types share one state machine; type affects only who handles the unit and
 what its prompt contains.
 
 Substantive:
 - `implementation` — code.
 - `qa_authoring` / `qa_execution` / `qa_curation` — test-plan authoring,
   execution, and regression-suite curation.
+
+Performed by a person (FEAT-2026-0085):
+- `human` — a step no agent can take: reply on an issue, sign something, click
+  through a console, run something interactively. The driver never dispatches
+  it; when it is ready the driver prints the operator brief and halts. The
+  operator performs the step and marks it `done` with `evidence:`
+  (`/unblock-wu <WU-ID> --done --evidence "<what you did>"`), and the run
+  resumes; a `done` `human` unit with no `evidence` is a lint ERROR. It has no
+  model and no gate set, and needs only Objective, Context, and Acceptance
+  criteria. Place it *before* the close that depends on it, so the human step
+  is recorded as work rather than softened into the verdict afterwards.
 
 Closing sequence — every gate ends with **one** of three forms:
 
@@ -207,42 +218,48 @@ WU's** frontmatter. The predicate keys on the implementation WUs' cost and
 plan-conformance and cannot see what a close verifies, so a substantive close
 must be marked must-run or its verification is silently skipped (#189).
 
-**Hedged verdicts leave a trail** — a close that ends `met_locally` (everything
-locally verifiable passed; something structurally could not be verified here)
-leaves every terminal surface un-flipped (driver >= 0.3.21: gate
-`awaiting_review`, roadmap row `active`, PLAN.md `active`) AND must produce a
-follow-up record — in the gate review or `RETROSPECTIVE.md` — naming each
-unmet criterion, why it was unverifiable in this environment, the exact
-re-run condition that would upgrade the verdict to `met`, and (FEAT-2026-0059)
-a `kind:` classifying *why* it is unmet: `acceptance-discharged`,
-`externally-verifiable-later`, `routed-finding`, or `inherent`. The verdict
-ceiling follows mechanically from the set of kinds present — any
-`externally-verifiable-later` entry means rework exists; otherwise `met` is
-unreachable by any in-repo work — so `/accept-hedged-close` can answer "why
-isn't this `met`?" before the operator asks. `kind` is written by the close
-WU, which has the context; a reader never infers it from prose. Without the
-record, `met_locally` is a dead end; with it, the feature is resumable by
-anyone. See `.specfuse/rules/close-discipline.md` §2 for the record's shape
-and the other close-time obligations (fresh oracle re-runs,
-consumer-visible-change enumeration).
+**The verdict is binary** (FEAT-2026-0085) — a close records `met` or
+`not_met`, and nothing in between. Across 273 features in 12 repositories, 48%
+of verdict-bearing closes ended on one of the two soft-success verdicts this
+release retired, and 59 of those were later flipped to `met` by an acceptance
+skill with nothing re-run: the hedge had become a polite synonym for "unknown".
+A `not_met` close leaves every terminal surface un-flipped (gate
+`awaiting_review`, roadmap row `active`, PLAN.md `active`) and must write
+`FOLLOW-UPS.md` in the feature folder — one `### `-headed entry per failed
+criterion, carrying the criterion verbatim, the evidence (the command run and
+its exit code or output line), and the re-run condition that would satisfy it.
+`close-m` refuses a `not_met` close whose `FOLLOW-UPS.md` is absent or empty,
+pre-squash and via `specfuse lint --closing`.
 
-**Exiting a hedged verdict** (FEAT-2026-0070) — a hedge left the feature with no
-supported path to `done`, because `fire_terminal_flips` runs at close-WU-*outcome*
-time and the driver never re-dispatches a `done` close WU. Two surfaces now close
-that gap, and **neither writes terminal state itself** — both route through the
-one owner:
+**What a hedge used to carry now has three honest channels.** Of 101 hedged
+features, 42 hedged because a criterion asked the loop to observe production,
+16 because a human had to sign or act, and 9 because auto-closed gates had
+seeded every criterion into the retrospective as debt the terminal close could
+not reconcile. So: a criterion that needs a person is a `type: human` work unit
+placed before the close; a criterion that can only be observed in production is
+a `## Post-merge checklist` line in `PLAN.md`, never an acceptance criterion;
+and work that simply did not get done is `not_met` plus a follow-up entry. See
+`.specfuse/rules/close-discipline.md` §2 for the close-time obligations.
 
-- `specfuse run --recheck-verdict <FEATURE_ID>` re-reads the terminal close WU's
-  verdict from disk and fires the flips if it now permits them, without
-  re-dispatching the WU. Use it when follow-ups were genuinely discharged and the
-  verdict was honestly upgraded to `met`. It is a no-op (exit `0`, printing why)
-  when the feature is already `done` or the verdict is still hedged.
-- `/accept-hedged-close` is the operator path for a hedge that is the ceiling **by
-  construction** — the criterion's oracle lives outside the repo and no amount of
-  gate work will close it. It surfaces the §2 follow-up record, requires a one-line
-  reason and explicit acknowledgment of the standing follow-ups, writes an
-  acceptance record, and then invokes `--recheck-verdict`. It carries the
-  follow-ups forward; it does not discharge them.
+**Unfinished work becomes tracked issues, not prose.** After a `not_met`
+close's squash, `file_followup_issues` files one GitHub issue per
+`FOLLOW-UPS.md` entry under `specfuse:follow-up`, carrying the entry body
+verbatim and idempotent per entry; on a `met` close it files the optional
+`## Post-merge checklist` section as one `specfuse:post-merge` issue. `gh`
+absent or failing leaves `FOLLOW-UPS.md` itself as the record — the driver
+never deletes or rewrites it — and emits one `followups_recorded` event naming
+the `filed` and `unfiled` counts.
+
+**Re-firing the flips out of band** (FEAT-2026-0070) — `fire_terminal_flips`
+runs at close-WU-*outcome* time and the driver never re-dispatches a `done`
+close WU, so a verdict corrected after the fact needs an entry point.
+`specfuse run --recheck-verdict <FEATURE_ID>` re-reads the terminal close WU's
+verdict from disk and fires the flips if it now permits them, without
+re-dispatching the WU. It **does not write terminal state itself** — it routes
+through the one owner. It is a no-op (exit `0`, printing why) when the feature
+is already `done` or the verdict on disk does not permit the flips. This is
+also the path a migrated legacy close takes; see
+[Migrating a hedged close](#migrating-a-hedged-close).
 
 **The row flips from any non-`done` status** (FEAT-2026-0070) — the terminal
 roadmap-row flip previously fired only on `active → done`, so an `autonomy: auto`
@@ -560,3 +577,59 @@ when and how these get created.
 Everything above those rows — the unit hierarchy, ownership split, WU contract,
 verification-as-oracle, the gate cycle, plan-next, LEARNINGS, and autonomy — is
 shared and means the same thing on both surfaces.
+
+## Migrating a hedged close
+
+FEAT-2026-0085 retired the two soft-success verdicts, `met_locally` and
+`partially_met`. They stay **readable**: 42 closes across the corpus are
+`status: done` carrying one, `load_wu` and `recheck_terminal_verdict` parse
+them rather than crash, and `lint_plan` validates `verdict` only on a non-`done`
+close — so a standing hedged close reports no new error and needs no urgent
+action. They are not **writable**: `assert_verdict_well_formed` rejects them on
+any close dispatched from now on, and `recheck_terminal_verdict` refuses the
+terminal flips on one, naming this section in the refusal.
+
+`/accept-hedged-close` no longer exists. There is no path that softens a verdict
+to get past `/wrap-feature`'s refusal; migrate the close instead.
+
+Pick one of two routes per standing hedged close. Find them with:
+
+```bash
+grep -l "^verdict: met_locally\|^verdict: partially_met" .specfuse/features/*/WU-9*.md
+```
+
+**Route A — discharge, then record `met`.** Use this when the old follow-up
+record's re-run condition is reachable today, or when it was an
+`acceptance-discharged` entry that a signature was always going to settle. Run
+the re-run condition and read the exit code. If it passes, edit the close WU's
+`verdict:` to `met`, then:
+
+```bash
+specfuse run --recheck-verdict <FEATURE_ID>
+```
+
+That re-reads the verdict from disk and fires the terminal flips through their
+one owner — gate `passed`, roadmap row `done`, PLAN.md `done`, auto-archive.
+It never writes those surfaces itself, and it does not re-dispatch the close.
+
+**Route B — record `not_met` and track what is left.** Use this when the work is
+genuinely unfinished. Edit the close WU's `verdict:` to `not_met`, then write
+`FOLLOW-UPS.md` in the feature folder from the old `## Hedged-verdict follow-up
+record` — one `### `-headed entry per unmet criterion, carrying the criterion
+verbatim, the evidence, and the re-run condition. Then re-arm the unit that
+failed (`/unblock-wu <WU-ID>`) so the loop can finish it, or leave the close
+`not_met` and let the driver file the follow-up issues on its next pass.
+
+Translating the old `kind:` values, which no longer exist:
+
+| Old `kind:` | Where it goes now |
+|---|---|
+| `acceptance-discharged` | a `type: human` unit placed before the close (route A after it is `done` with `evidence:`) |
+| `externally-verifiable-later` | a `## Post-merge checklist` line in `PLAN.md` if it needs production; otherwise a `FOLLOW-UPS.md` entry |
+| `routed-finding` | already tracked elsewhere — link that issue from the `FOLLOW-UPS.md` entry |
+| `inherent` | not assertable, ever: it was never a legitimate acceptance criterion. Delete it from the criteria and say so in the retrospective |
+
+**Do not rewrite the history.** Existing `RETROSPECTIVE.md` files keep their
+`## Hedged-verdict follow-up record` sections as written — they are the record
+of what was true at the time. Migration edits the close WU's `verdict:` and adds
+`FOLLOW-UPS.md`; it does not revise past retrospectives.

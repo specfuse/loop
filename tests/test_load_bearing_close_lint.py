@@ -65,8 +65,11 @@ class TestVerificationPhrasingSignal(unittest.TestCase):
         self.assertTrue(detect_load_bearing_close(ac, "FEAT-2026-9001-x"))
 
     def test_hedged_verdict_record_is_load_bearing(self):
-        ac = ("On met_locally, write a named record per unmet criterion with a "
-              "kind: field.")
+        # FEAT-2026-0085 dropped the `met_locally|partially_met` pattern with
+        # the verdicts it named. The `hedged` phrase match stays and is what
+        # carries this class — a close asked to record per-criterion outcomes
+        # is load-bearing however the criterion spells the verdict.
+        ac = ("On a hedged close, write a named record per unmet criterion.")
         self.assertTrue(detect_load_bearing_close(ac, "FEAT-2026-9001-x"))
 
     def test_consumer_visible_contract_enumeration_is_load_bearing(self):

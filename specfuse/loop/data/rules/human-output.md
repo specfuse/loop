@@ -48,8 +48,9 @@ enums are storage, not vocabulary. Say what they mean:
 |---|---|
 | `blocked_human` | stopped — needs you |
 | `awaiting_review` | waiting for your review |
-| `met_locally` / `partially_met` | goal met, but not proven beyond this repo / partly met |
 | `not_met` | goal not met |
+| `FOLLOW-UPS.md` | what it could not finish, one tracked issue each |
+| `type: human` unit | a step waiting on a person |
 | `failure_class`, `failure_signature` | why it failed, and the error it failed on |
 | `attempt_outcome` | what happened on each try |
 | `re_arm_count` | times this was retried after a stop |

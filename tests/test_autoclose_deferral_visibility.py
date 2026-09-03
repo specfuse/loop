@@ -1,11 +1,11 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-# Issue #157: the auto-close path marks a close/close-intermediate WU done
-# without dispatching its body, so the mandatory "What the loop did NOT verify"
-# deferral list is never written. The auto-close stub writers must instead emit
-# an explicit deferral-visibility section so the gap is surfaced (direction 2),
-# not silently omitted — for BOTH the intermediate and terminal stubs.
+# FEAT-2026-0070/T06 shipped auto-close stubs that enumerated every
+# acceptance criterion as deferred debt for a downstream close to reconcile.
+# FEAT-2026-0085/T02 replaced that enumeration with a pass summary: the stub
+# now states what the driver's gates actually proved (which units passed, on
+# which gate set) instead of listing every criterion as unverified.
 
 import tempfile
 import unittest
@@ -28,7 +28,7 @@ def _decision(gate: int) -> AutoCloseDecision:
     )
 
 
-class TestAutoCloseDeferralVisibility(unittest.TestCase):
+class TestAutoCloseStubHasNoDeferralSection(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.fd = Path(self._tmp.name)
@@ -39,21 +39,19 @@ class TestAutoCloseDeferralVisibility(unittest.TestCase):
     def _retro(self) -> str:
         return (self.fd / "RETROSPECTIVE.md").read_text()
 
-    def test_intermediate_stub_flags_deferred_verification_gap(self):
-        """The intermediate auto-close stub emits a 'What the loop did NOT
-        verify' section pointing reconciliation at the next gate's close."""
+    def test_intermediate_stub_has_no_deferral_heading(self):
         loop.append_stub_retrospective_intermediate(self.fd, 1, _decision(1))
         retro = self._retro()
-        self.assertIn("## What the loop did NOT verify", retro)
-        self.assertIn("Gate 2's close", retro)  # next-gate reconciliation
+        self.assertNotIn("What the loop did NOT verify", retro)
+        self.assertNotIn("deferred:", retro)
+        self.assertNotIn("specfuse:autoclose-debt", retro)
 
-    def test_terminal_stub_flags_deferred_verification_gap(self):
-        """The terminal auto-close stub emits a 'What the loop did NOT verify'
-        section pointing reconciliation at the operator (no downstream gate)."""
+    def test_terminal_stub_has_no_deferral_heading(self):
         loop.write_stub_retrospective_terminal(self.fd, 2, _decision(2))
         retro = self._retro()
-        self.assertIn("## What the loop did NOT verify", retro)
-        self.assertIn("operator", retro.lower())
+        self.assertNotIn("What the loop did NOT verify", retro)
+        self.assertNotIn("deferred:", retro)
+        self.assertNotIn("specfuse:autoclose-debt", retro)
 
     def test_intermediate_stub_still_records_cost_and_gate_heading(self):
         """Existing stub content is preserved (cost, gate heading)."""
@@ -101,8 +99,8 @@ def _write_wu(fd: Path, spec: dict) -> None:
     )
 
 
-class TestAutoCloseDebtEnumeration(unittest.TestCase):
-    """FEAT-2026-0070/T06 — the enumeration builder and its wiring into both
+class TestAutoClosePassSummary(unittest.TestCase):
+    """FEAT-2026-0085/T02 — the pass-summary builder and its wiring into both
     auto-close stub writers."""
 
     def setUp(self):
@@ -120,6 +118,7 @@ class TestAutoCloseDebtEnumeration(unittest.TestCase):
             {
                 "sub_id": "T01",
                 "file": "WU-01-alpha.md",
+                "type": "implementation",
                 "criteria": [
                     "Greppable criterion ALPHA-ONE must hold.",
                     "Greppable criterion ALPHA-TWO must hold.",
@@ -128,6 +127,7 @@ class TestAutoCloseDebtEnumeration(unittest.TestCase):
             {
                 "sub_id": "T02",
                 "file": "WU-02-beta.md",
+                "type": "docs",
                 "criteria": [
                     "Greppable criterion BETA-ONE must hold.",
                 ],
@@ -138,32 +138,32 @@ class TestAutoCloseDebtEnumeration(unittest.TestCase):
             _write_wu(self.fd, spec)
         return specs
 
-    def test_intermediate_stub_enumerates_each_substantive_wu_criteria(self):
+    def test_intermediate_stub_names_each_substantive_wu_and_gate_set(self):
         self._two_wu_gate()
         loop.append_stub_retrospective_intermediate(self.fd, 1, _decision(1))
         retro = self._retro()
         self.assertIn("FEAT-TEST-0001/T01", retro)
         self.assertIn("FEAT-TEST-0001/T02", retro)
-        self.assertIn("Greppable criterion ALPHA-ONE must hold.", retro)
-        self.assertIn("Greppable criterion ALPHA-TWO must hold.", retro)
-        self.assertIn("Greppable criterion BETA-ONE must hold.", retro)
+        self.assertIn("`code`", retro)
+        self.assertIn("`doc`", retro)
+        self.assertNotIn("Greppable criterion", retro)
 
-    def test_terminal_stub_enumerates_each_substantive_wu_criteria(self):
+    def test_terminal_stub_names_each_substantive_wu_and_gate_set(self):
         self._two_wu_gate()
         loop.write_stub_retrospective_terminal(self.fd, 1, _decision(1))
         retro = self._retro()
         self.assertIn("FEAT-TEST-0001/T01", retro)
-        self.assertIn("Greppable criterion BETA-ONE must hold.", retro)
+        self.assertIn("FEAT-TEST-0001/T02", retro)
+        self.assertIn("`code`", retro)
+        self.assertIn("`doc`", retro)
 
-    def test_enumeration_carries_machine_readable_marker(self):
+    def test_summary_names_the_wu_file(self):
         self._two_wu_gate()
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
-        self.assertTrue(block.startswith("<!-- specfuse:autoclose-debt gate=1 "))
-        self.assertIn("wus=T01,T02", block)
-        self.assertIn("criteria=3", block)
-        self.assertIn("predicate=v1", block)
+        block = loop.build_autoclose_pass_summary(self.fd, 1)
+        self.assertIn("WU-01-alpha.md", block)
+        self.assertIn("WU-02-beta.md", block)
 
-    def test_non_substantive_wus_absent_from_enumeration(self):
+    def test_non_substantive_wus_absent_from_summary(self):
         specs = self._two_wu_gate()
         specs.append({
             "sub_id": "G1-CLOSE-INTERMEDIATE",
@@ -180,51 +180,19 @@ class TestAutoCloseDebtEnumeration(unittest.TestCase):
         _write_plan(self.fd, 1, specs)
         for spec in specs[2:]:
             _write_wu(self.fd, spec)
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
+        block = loop.build_autoclose_pass_summary(self.fd, 1)
         self.assertNotIn("close-intermediate", block)
-        self.assertNotIn("ZZZZ", block)
-        self.assertNotIn("YYYY", block)
+        self.assertNotIn("plan-next", block)
 
-    def test_missing_wu_file_degrades_to_not_parseable_line(self):
+    def test_missing_wu_file_absent_from_summary(self):
         _write_plan(self.fd, 1, [
             {"sub_id": "T01", "file": "WU-01-missing.md", "criteria": []},
         ])
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
-        self.assertIn("deferred: <criteria not parseable>", block)
-        self.assertIn("WU-01-missing.md", block)
-
-    def test_wu_with_no_acceptance_criteria_section_degrades(self):
-        spec = {"sub_id": "T01", "file": "WU-01-no-ac.md", "criteria": []}
-        _write_plan(self.fd, 1, [spec])
-        (self.fd / spec["file"]).write_text(
-            "---\nid: FEAT-TEST-0001/T01\ntype: implementation\nstatus: done\n---\n\n"
-            "# T01\n\nNo acceptance criteria section here at all.\n"
-        )
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
-        self.assertIn("deferred: <criteria not parseable>", block)
-
-    def test_over_40_criteria_lists_first_40_and_announces_the_rest(self):
-        criteria = [f"Criterion number {i}." for i in range(1, 46)]
-        specs = [{"sub_id": "T01", "file": "WU-01-many.md", "criteria": criteria}]
-        _write_plan(self.fd, 1, specs)
-        for spec in specs:
-            _write_wu(self.fd, spec)
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
-        self.assertEqual(block.count("deferred:"), 40)
-        self.assertIn("… 5 further criteria not listed; read the WU files", block)
-
-    def test_long_criterion_truncated_at_200_chars(self):
-        long_text = "X" * 250
-        specs = [{"sub_id": "T01", "file": "WU-01-long.md", "criteria": [long_text]}]
-        _write_plan(self.fd, 1, specs)
-        for spec in specs:
-            _write_wu(self.fd, spec)
-        block = loop.build_autoclose_debt_enumeration(self.fd, 1)
-        self.assertIn("X" * 200 + "…", block)
-        self.assertNotIn("X" * 201, block)
+        block = loop.build_autoclose_pass_summary(self.fd, 1)
+        self.assertEqual(block, "")
 
     def test_symbol_exists(self):
-        self.assertTrue(callable(loop.build_autoclose_debt_enumeration))
+        self.assertTrue(callable(loop.build_autoclose_pass_summary))
 
     def test_terminal_stub_idempotent_on_second_call(self):
         """FEAT-2026-0070/T06 AC12 — the terminal writer must skip when the
@@ -237,7 +205,7 @@ class TestAutoCloseDebtEnumeration(unittest.TestCase):
         second = self._retro()
         self.assertEqual(first, second)
         self.assertEqual(second.count("## Gate 1 — auto-closed"), 1)
-        self.assertEqual(second.count("Greppable criterion ALPHA-ONE"), 1)
+        self.assertEqual(second.count("FEAT-TEST-0001/T01"), 1)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 6.00
 model: sonnet
 effort: medium
@@ -13,6 +13,10 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/escalation.py
   - tests/test_followups_artifact.py
+duration_seconds: 2659.389
+cost_usd: 6.816027
+input_tokens: 362
+output_tokens: 90025
 ---
 
 # A not_met close writes FOLLOW-UPS.md, and the driver files one tracked issue per entry

@@ -212,9 +212,10 @@ class TestSkeletonPrecreation(unittest.TestCase):
             if retro.exists():
                 self.assertNotIn("### Failure-class breakdown", retro.read_text())
 
-    def test_deferral_heading_precreated_when_autoclose_debt_marker_present(self):
-        """'## What the loop did NOT verify' is pre-created on a terminal close
-        dispatch when an earlier gate's auto-close stub left a debt marker."""
+    def test_no_deferral_heading_precreated_after_predecessor_autoclose(self):
+        """FEAT-2026-0085/T02: dispatch pre-creation no longer seeds a
+        'What the loop did NOT verify' heading — an auto-closed predecessor
+        gate's stub carries a pass summary, not debt to reconcile downstream."""
         with tempfile.TemporaryDirectory() as tmp:
             fdir = Path(tmp)
             _write_plan(fdir, (
@@ -224,8 +225,8 @@ class TestSkeletonPrecreation(unittest.TestCase):
                 "        depends_on: []\n"
             ))
             (fdir / "RETROSPECTIVE.md").write_text(
-                "<!-- specfuse:autoclose-debt gate=1 wus=T01 criteria=1 "
-                "predicate=v1 -->\n\nGate 1 auto-closed on-plan.\n"
+                "## Gate 1 — auto-closed (predicate=v1)\n\n"
+                "Gate 1 auto-closed on-plan.\n"
             )
             wu = _make_wu("FEAT-9999/G2-CLOSE", "close")
 
@@ -236,8 +237,7 @@ class TestSkeletonPrecreation(unittest.TestCase):
             )
 
             retro_text = (fdir / "RETROSPECTIVE.md").read_text()
-            self.assertIn("## What the loop did NOT verify", retro_text)
-            self.assertIn("gate 1", retro_text.lower())
+            self.assertNotIn("What the loop did NOT verify", retro_text)
 
     def test_no_placeholder_verdict_ever_written(self):
         """Pre-creation never introduces a `verdict:` frontmatter field."""

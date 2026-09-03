@@ -64,40 +64,43 @@ from . import criteria_state
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
-    AUTOCLOSE_DEBT_MARKER_RE,
     CHANGELOG_PATH,
     CONSUMER_VISIBLE_HEADING,
     COST_ANALYSIS_HEADING,
     COST_ANALYSIS_HEADING_RE,
-    DEFERRAL_HEADING_RE,
-    DEFERRAL_HEADING_TEXT,
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
-    FOLLOW_UP_KINDS,
-    HEDGED_RECORD_HEADING,
-    HEDGED_RECORD_HEADING_RE,
-    HEDGED_VERDICT_VALUES,
-    KIND_FIELD_RE,
+    FOLLOW_UP_LABEL,
+    FOLLOW_UPS_FILENAME,
     LEARNINGS_PATH,
     LEARNINGS_PENDING_FILENAME,
+    LEGACY_VERDICT_VALUES,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
+    POST_MERGE_LABEL,
     RETROSPECTIVE_FILENAME,
     ROADMAP_PATH,
+    VERDICT_MIGRATION_NOTE,
     VERDICT_VALUES,
     changelog_has_entry_for,
     consumer_visible_section_is_na,
     find_consumer_visible_section,
+    find_post_merge_checklist_section,
     gate_review_filename,
     gate_section_heading_re,
     learnings_staging_is_required,
+    parse_followup_entries,
+)
+from .escalation import (
+    _PART_HEADINGS as ESCALATION_PART_HEADINGS,
+    emit_issue_with_body,
+    issue_title,
 )
 from .gate_eval import (
     evaluate_auto_close,
     AutoCloseDecision,
     NON_SUBSTANTIVE_TYPES,
-    PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
@@ -321,6 +324,15 @@ GATES_FOR_TYPE = {
 }
 
 
+# The work-unit type the driver never dispatches (FEAT-2026-0085/T04). A step
+# only a person can perform — reply, click, sign, run something interactively.
+# Deliberately absent from MODEL_BY_TYPE, EFFORT_BY_TYPE and GATES_FOR_TYPE
+# above: there is no model to pick and no gate set to run, because no session
+# is ever spawned. Sixteen features in the corpus performed such a step
+# out-of-band and recorded it afterwards as a softened verdict; a `human` unit
+# records it BEFORE the close, as evidence the close can quote.
+HUMAN_WU_TYPE = "human"
+
 # Statuses the driver will dispatch. `draft` is excluded on purpose: plan-next
 # writes the next gate's WUs as drafts, and a human must arm them first.
 DISPATCHABLE = {"pending", "ready"}
@@ -330,21 +342,24 @@ DONE = "done"
 def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
     """The operator-facing message for a terminal gate whose PLAN.md is not `done`.
 
-    Three states look identical from `PLAN.md` alone, and reporting them the same
+    Four states look identical from `PLAN.md` alone, and reporting them the same
     way is #1416:
 
-    - **the verdict permits the flips** but they did not fire — a genuine defect,
-      and what the original message was written for.
-    - **the verdict is a recognised hedge** (`met_locally` / `partially_met`) —
-      the flips were withheld *because* the close said so. That is the
-      verdict-coupling rule working, and telling the operator to hand-flip
-      `PLAN.md` is advice to violate the contract `fire_terminal_flips` just
-      enforced.
-    - **no usable verdict** — absent, empty, `not_met`, or unrecognised. NOT a
-      deliberate hedge: a close that recorded no verdict did not finish its job,
-      and softening that into the reassuring message would hide it.
+    - **`met`** but the flips did not fire — a genuine defect, and what the
+      original message was written for.
+    - **`not_met`** — the flips were withheld *because* the close said so. That
+      is the verdict-coupling rule working, and telling the operator to
+      hand-flip `PLAN.md` is advice to violate the contract
+      `fire_terminal_flips` just enforced. The next step is the follow-up list,
+      not an acceptance.
+    - **a retired value** (`met_locally` / `partially_met`) — readable, not
+      writable. The close predates FEAT-2026-0085; the operator's route is the
+      migration note, not a hand-flip and not an acceptance skill.
+    - **no usable verdict** — absent, empty, or unrecognised. A close that
+      recorded no verdict did not finish its job, and softening that into a
+      reassuring message would hide it.
 
-    Both the flip predicate and the hedged set are imported rather than
+    Both the flip predicate and the legacy set are imported rather than
     re-derived, so this message can never disagree with the gate that produced
     the state it describes.
     """
@@ -359,27 +374,37 @@ def terminal_gate_message(gate_number: int, verdict: str | None) -> str:
             "RETROSPECTIVE.md / events.jsonl. Likely fix: manually flip PLAN.md "
             "`status: active -> done`, then `/wrap-feature`."
         )
-    if verdict in HEDGED_VERDICT_VALUES:
+    if verdict == "not_met":
         return (
             header + "terminal gate, PLAN.md deliberately left `active`.\n"
-            f"The close recorded verdict `{verdict}`, which does not permit the "
+            "The close recorded verdict `not_met`, which does not permit the "
             "terminal flips, so the gate, the roadmap row and PLAN.md were all "
             "left un-flipped on purpose. This is the verdict-coupling rule "
             "working, not a defect — do NOT hand-flip PLAN.md.\n"
-            f"Next: read the `## {HEDGED_RECORD_HEADING}` in RETROSPECTIVE.md "
-            "for what is unmet and what would upgrade it, then either discharge "
-            "those follow-ups or accept the hedge deliberately with "
-            "`/accept-hedged-close`, which records your reason and fires the "
-            "flips through their one owner."
+            f"Next: read `{FOLLOW_UPS_FILENAME}` in the feature directory for "
+            "the tracked follow-up behind each failed criterion. A `not_met` "
+            "close is not accepted; it is discharged by doing the work those "
+            "follow-ups name and closing the feature again."
+        )
+    if verdict in LEGACY_VERDICT_VALUES:
+        return (
+            header + "terminal gate, PLAN.md deliberately left `active`.\n"
+            f"The close recorded verdict `{verdict}`, a value retired by "
+            "FEAT-2026-0085. The flips were withheld, which is correct — but "
+            "this close predates the binary verdict and cannot be re-checked "
+            "as-is.\n"
+            f"Next: follow {VERDICT_MIGRATION_NOTE} to restate it as `met` or "
+            "`not_met`. Do NOT hand-flip PLAN.md."
         )
     shown = verdict if verdict else "none recorded"
     return (
         header + "terminal gate but PLAN.md not yet `done`.\n"
-        f"Inconsistency: the close recorded verdict `{shown}`, which is neither "
-        "a pass nor a recognised hedge, so the terminal flips were withheld and "
-        "there is no follow-up record to accept. A close that records no usable "
-        "verdict has not finished its job. Inspect RETROSPECTIVE.md / "
-        "events.jsonl before flipping anything by hand."
+        f"Inconsistency: the close recorded verdict `{shown}`, which is not a "
+        f"value the close contract recognises ({sorted(VERDICT_VALUES)}), so "
+        "the terminal flips were withheld and there is no follow-up list to "
+        "read. A close that records no usable verdict has not finished its "
+        "job. Inspect RETROSPECTIVE.md / events.jsonl before flipping anything "
+        "by hand."
     )
 
 
@@ -446,6 +471,13 @@ class WorkUnit:
     # broken tree compounds, which is what the per-attempt reset protects
     # against (bugs #71/#74).
     iterate_on_failure: bool = False
+    # OPTIONAL operator-written record of a step the driver cannot perform
+    # (FEAT-2026-0085/T04). Only meaningful on a `human` unit: the operator
+    # does the thing, writes what they did here, and flips the unit to `done`.
+    # `lint_plan` makes a `done` human unit without it an ERROR, and the close
+    # quotes it — so the step is on the record before the verdict is written
+    # instead of softening the verdict after the fact.
+    evidence: str = ""
 
 
 @dataclass
@@ -916,6 +948,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         oracles=oracles,
         max_attempts=max_attempts,
         iterate_on_failure=iterate_on_failure,
+        evidence=str(fm.get("evidence", "") or "").strip(),
     )
 
 
@@ -2419,6 +2452,148 @@ def _halt_for_driver_restart(
     return EXIT_DRIVER_RESTART_REQUIRED
 
 
+# Sanctioned name for the human-step halt (FEAT-2026-0085/T04). Sibling of
+# HALT_REASON_DRIVER_RESTART above, and — unlike it — a `blocked_human`
+# escalation, because the run is not resumable by restarting a process: a
+# person has to do something first. Exit code stays 1 (the driver's existing
+# "work unit needs human attention" code); a `human` unit is that condition
+# by construction, not a new one.
+HALT_REASON_HUMAN_STEP = "human_step_required"
+
+
+def format_human_unit_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> str:
+    """Render the six-part operator brief for a `human` work unit.
+
+    Shape is `.specfuse/rules/operator-escalation.md`'s six parts, in order,
+    under that rule's own heading strings — imported from `escalation.py`
+    rather than restated, so the printed brief and the escalation-issue body
+    can never disagree about what the six parts are called.
+
+    Every part is answerable without inventing text. Parts 2 and 3 come from
+    the unit's own sections (its title and its **Objective**, which is what a
+    human unit's objective *is*: the decision or action only a person can
+    take). Part 1 is run state. Part 4 names this mechanism. Parts 5 and 6 are
+    this halt's fixed remediation vocabulary — do the step and record it,
+    abandon the unit, or stop — not a judgement about this particular unit.
+    """
+    objective = _wu_sections.slice_wu_section(wu.body, "Objective").strip()
+    if not objective:
+        # `lint_plan` requires Objective on a dispatchable human unit, so this
+        # is the un-linted-fixture path. Fall back to the title rather than
+        # printing an empty part: a brief missing a part is worse than a terse
+        # one, and the title is still the unit's own words.
+        objective = wu.title
+    criteria = _wu_sections.slice_acceptance_criteria(wu.body).strip()
+    done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+
+    lines = [
+        f"HUMAN STEP REQUIRED — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is open. Work units finished so far: {done_list}. "
+        f"Nothing has been dispatched for {wu.wu_id} — the driver stopped in "
+        f"front of it.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        f"{wu.wu_id} is a work unit only a person can perform — a reply, a "
+        f"click, a signature, something run interactively. It is on the plan "
+        f"so the step is recorded before the gate closes, instead of being "
+        f"done out-of-band and explained away in the verdict afterwards.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        objective,
+        "",
+        f"Work units still waiting behind it: {remaining}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        "Nothing failed. Work units of this type are never dispatched: there "
+        "is no model and no verification gate set for a step performed "
+        "outside this machine, so the driver has nothing it could run and "
+        "nothing it could check.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        "1. **Do the step, then record it** — perform the action, then run "
+        "`/unblock-wu --done --evidence \"<what you did>\"` on this unit. "
+        "Pros: the run resumes where it stopped and the close quotes your "
+        "evidence, so the record says what actually happened. Cons: the run "
+        "is stopped until you get to it.",
+        "2. **Abandon the unit** — run `/unblock-wu` and choose abandon. "
+        "Pros: the rest of the gate proceeds without waiting on you. Cons: "
+        "anything depending on this unit is stranded, and any acceptance "
+        "criterion that needed the step closes unmet.",
+        "3. **Do nothing** — leave it. Pros: no decision needed now. Cons: "
+        "every re-run stops at this same point, so the gate cannot finish.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        "Option 1. The step is on the plan because the gate's outcome depends "
+        "on it; abandoning it buys progress by removing the thing that was "
+        "being verified.",
+    ]
+    if criteria:
+        lines += ["", "What counts as done, from the unit itself:", criteria]
+    lines += [
+        "",
+        f"Resume after recording your evidence:\n  {resume_command}",
+        "",
+        "More on request: the unit's full text, the gate's event log.",
+    ]
+    return "\n".join(lines)
+
+
+def halt_for_human_unit(
+    wu: "WorkUnit",
+    backend: "Backend",
+    gate_number: int,
+    feature_id: str,
+    events_path: Path,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    resume_command: str,
+) -> int:
+    """Run-loop brake: stop in front of a `human` work unit (FEAT-2026-0085/T04).
+
+    Sibling of `_halt_for_driver_restart` at the same `for wu in pending`
+    seam, with one deliberate difference: this one DOES flip the unit's
+    status, to `blocked_human`. The driver-restart halt suspends a run a fresh
+    process will pick up unchanged; this one is waiting on a person, and
+    `blocked_human` is the status the operator surfaces (`/attention`,
+    `/gate-status`, `/unblock-wu`) already read. The emitted
+    `human_escalation` also disables auto-close for the gate — a gate carrying
+    an unperformed human step must not close itself — which is why
+    `evaluate_auto_close` needs no change.
+
+    `attempts` is left at 0 on purpose: nothing was attempted. The unit costs
+    nothing and, once the operator marks it `done` with `evidence:`, it enters
+    the done-set the same way any finished unit does.
+    """
+    message = format_human_unit_brief(
+        wu, gate_number, done_wu_ids, remaining_wu_ids, resume_command)
+    backend.set_wu(wu, "status", "blocked_human")
+    flush_events(events_path, [build_event(
+        "human_escalation", wu.wu_id, {
+            "reason": HALT_REASON_HUMAN_STEP,
+            "gate": gate_number,
+            "wu_type": HUMAN_WU_TYPE,
+            "remaining_wu_ids": remaining_wu_ids,
+            "resume_command": resume_command,
+            "message": message,
+        })])
+    commit_bookkeeping(
+        [wu.file, events_path],
+        f"chore(loop): gate {gate_number} halted for human step "
+        f"({wu.wu_id})\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return 1
+
+
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
     """Run-loop predicate: sibling of `_should_halt_for_budget`, evaluated
     AFTER a work unit's outcome resolves rather than before the next dispatch.
@@ -3025,7 +3200,7 @@ def _precreate_gate_review_stub(feature_dir: Path, gate_n: int) -> None:
 
 
 def _precreate_retrospective_stub(wu: WorkUnit, feature_dir: Path, gate_n: int) -> None:
-    """(close-intermediate-a / close-f / close-intermediate-d / close-g shapes)
+    """(close-intermediate-a / close-f / close-intermediate-d shapes)
     Append stub sections to RETROSPECTIVE.md for every requirement derivable
     from on-disk state at dispatch time. Never writes a `verdict:` value —
     that field stays owned by assert_verdict_well_formed at outcome time.
@@ -3049,22 +3224,6 @@ def _precreate_retrospective_stub(wu: WorkUnit, feature_dir: Path, gate_n: int) 
         feature_dir, gate_n, exclude_correlation_id=wu.wu_id)
     if failure_summary != _NO_FAILURES_SENTINEL and not FAILURE_CLASS_HEADING_RE.search(existing_text):
         sections.append(failure_summary)
-
-    if wu.type == "close":
-        _, gates = load_graph(feature_dir)
-        terminal_gate_number = gates[-1].number if gates else gate_n
-        predecessor_gates = sorted({
-            int(m.group(1))
-            for m in AUTOCLOSE_DEBT_MARKER_RE.finditer(existing_text)
-            if int(m.group(1)) < terminal_gate_number
-        })
-        if predecessor_gates and not DEFERRAL_HEADING_RE.search(existing_text):
-            names = ", ".join(f"gate {g}" for g in predecessor_gates)
-            sections.append(
-                f"## {DEFERRAL_HEADING_TEXT}\n\n"
-                "<!-- specfuse:skeleton-stub agent-completable -->\n"
-                f"Name and reconcile predecessor auto-close debt for: {names}.\n"
-            )
 
     if not sections:
         return
@@ -4513,14 +4672,14 @@ def _legacy_4wu_terminal_close_complete(
 def revert_terminal_surfaces(
     wu: WorkUnit, feature_dir: Path, repo_root: Path,
 ) -> list[Path]:
-    """Revert agent-written terminal surfaces after a hedged close verdict (#195).
+    """Revert agent-written terminal surfaces after a non-`met` close (#195).
 
-    A close WU that passes with a hedged verdict (met_locally / partially_met /
-    not_met) must leave every terminal surface un-flipped, but the agent's own
-    close ceremony may already have written PLAN.md `done` and the roadmap row
-    `done` before the driver read the verdict. Reverting only PLAN.md — the
-    pre-#195 behavior — leaves the two surfaces disagreeing about whether the
-    feature is complete. Revert the same surface set fire_terminal_flips owns:
+    Since FEAT-2026-0085 the only verdict that reaches here is `not_met`: it
+    must leave every terminal surface un-flipped, but the agent's own close
+    ceremony may already have written PLAN.md `done` and the roadmap row `done`
+    before the driver read the verdict. Reverting only PLAN.md — the pre-#195
+    behavior — leaves the two surfaces disagreeing about whether the feature is
+    complete. Revert the same surface set fire_terminal_flips owns:
     PLAN.md status and the roadmap Status cell (the gate file is not flipped
     until the post-loop awaiting_review write, so there is nothing to revert
     there). Returns the modified Paths for one bookkeeping commit.
@@ -4711,8 +4870,9 @@ def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
 
     `fire_terminal_flips` only runs at close-WU outcome time, inside the
     dispatch loop. Once that close WU is `status: done` the driver never
-    re-dispatches it, so a verdict legitimately upgraded post-close (e.g.
-    `met_locally` -> `met` after follow-ups were discharged) is never re-read
+    re-dispatches it, so a verdict legitimately upgraded post-close (`not_met`
+    -> `met` once the tracked follow-ups were discharged, or a close written
+    before FEAT-2026-0085 restated under the migration note) is never re-read
     and the flips never fire. This is a caller, not a second writer: it
     locates the terminal gate's close WU, reads its on-disk verdict, and if
     permitted, calls `fire_terminal_flips` unchanged.
@@ -4756,6 +4916,21 @@ def recheck_terminal_verdict(feature_dir: Path, repo_root: Path) -> dict:
     # fire_terminal_flips re-reads it from wu.file itself regardless, so this
     # is never taken from an in-memory value the auto-close path leaves None.
     disk_verdict = close_wu.verdict
+    if disk_verdict in LEGACY_VERDICT_VALUES:
+        # Readable, not re-checkable. The value predates the binary verdict, so
+        # there is nothing here to upgrade mechanically — reporting it as merely
+        # "does not permit terminal flips" would send an operator looking for a
+        # follow-up list that this close never had.
+        return {
+            "fired": False,
+            "reason": (
+                f"verdict {disk_verdict!r} on {close_wu.wu_id} is a legacy value "
+                f"retired by FEAT-2026-0085; restate it as one of "
+                f"{sorted(VERDICT_VALUES)} per {VERDICT_MIGRATION_NOTE}, then "
+                f"re-run --recheck-verdict"
+            ),
+            "modified": [],
+        }
     if not verdict_permits_terminal_flips(disk_verdict):
         return {
             "fired": False,
@@ -4845,15 +5020,6 @@ def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
 
 
 _DEBT_AC_ITEM_RE = re.compile(r"(?m)^\s*\d+\.\s+(.*)$")
-_DEBT_CRITERION_MAX_LEN = 200
-_DEBT_CRITERIA_CAP = 40
-
-
-def _truncate_debt_criterion(text: str) -> str:
-    text = text.strip()
-    if len(text) > _DEBT_CRITERION_MAX_LEN:
-        return text[:_DEBT_CRITERION_MAX_LEN] + "…"
-    return text
 
 
 @dataclass(frozen=True)
@@ -4864,7 +5030,7 @@ class WUCriteria:
     `criteria` may still be empty if the body has no parseable AC list),
     `"missing"` (WU file absent), `"unparseable"` (frontmatter read failed),
     or `"skipped"` (non-substantive `wu.type`, per `NON_SUBSTANTIVE_TYPES`).
-    `sub_id` is set only for `"ok"`.
+    `sub_id` and `wu_type` are set only for `"ok"`.
     """
 
     wu_id: str
@@ -4872,13 +5038,14 @@ class WUCriteria:
     sub_id: str | None
     criteria: list[str]
     status: str
+    wu_type: str | None = None
 
 
 def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]:
     """Walk a gate's WU refs and extract each substantive WU's ordered
     acceptance-criterion strings, from disk, in ref order.
 
-    Shared by `build_autoclose_debt_enumeration` and
+    Shared by `build_autoclose_pass_summary` and
     `_precreate_criteria_state_stub` — one parser for "what are this gate's
     acceptance criteria" so the two surfaces cannot silently disagree.
     """
@@ -4912,81 +5079,31 @@ def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]
         sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
         ac_text = _wu_sections.slice_acceptance_criteria(body)
         criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
-        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok"))
+        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok", wu_type))
     return results
 
 
-def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
-    """Return the deferred-verification worklist for an auto-closed gate.
+def build_autoclose_pass_summary(feature_dir: Path, gate_number: int) -> str:
+    """Return one line per substantive unit naming the gate set its final
+    attempt passed — what `evaluate_auto_close` actually proved, not a list
+    of every acceptance criterion it did not individually re-check.
 
     Reads the gate's WU list from `PLAN.md`'s graph and each WU's frontmatter
-    and body **from disk** (FEAT-2026-0070/T06) — the auto-close path never
-    has a `WorkUnit` loaded for the WUs it enumerates, same constraint as
-    `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
-    call: this only reads files the driver has already located.
+    **from disk** — the auto-close path never has a `WorkUnit` loaded for the
+    WUs it summarizes, same constraint as `recheck_terminal_verdict`. No
+    agent dispatch, no subprocess, no model call: this only reads files the
+    driver has already located.
     """
-    sub_ids: list[str] = []
-    entries: list[str] = []
-    total_criteria = 0
-
+    lines: list[str] = []
     for wc in extract_wu_criteria(feature_dir, gate_number):
-        if wc.status == "skipped":
+        if wc.status != "ok":
             continue
-        if wc.status == "missing":
-            entries.append(
-                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
-                f"  - deferred: <criteria not parseable> (file not found)"
-            )
-            continue
-        if wc.status == "unparseable":
-            entries.append(
-                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
-                f"  - deferred: <criteria not parseable> ({wc.ref_file})"
-            )
-            continue
-
-        sub_ids.append(wc.sub_id)
-        lines = [f"- **{wc.wu_id}** (`{wc.ref_file}`)"]
-        if not wc.criteria:
-            lines.append(f"  - deferred: <criteria not parseable> ({wc.ref_file})")
-        else:
-            total_criteria += len(wc.criteria)
-            for criterion in wc.criteria:
-                lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
-        entries.append("\n".join(lines))
-
-    # AC7: no silent cap — list the first 40 criteria total, announce the rest.
-    rendered: list[str] = []
-    emitted = 0
-    truncated_at = None
-    for entry in entries:
-        entry_lines = entry.split("\n")
-        header = entry_lines[0]
-        deferred_lines = entry_lines[1:]
-        kept: list[str] = []
-        for dl in deferred_lines:
-            if emitted >= _DEBT_CRITERIA_CAP:
-                truncated_at = True
-                break
-            kept.append(dl)
-            emitted += 1
-        if kept:
-            rendered.append("\n".join([header] + kept))
-        elif not deferred_lines:
-            rendered.append(header)
-        if truncated_at:
-            break
-
-    remaining = total_criteria - emitted
-    if truncated_at and remaining > 0:
-        rendered.append(f"- … {remaining} further criteria not listed; read the WU files")
-
-    marker = (
-        f"<!-- specfuse:autoclose-debt gate={gate_number} "
-        f"wus={','.join(sub_ids)} criteria={total_criteria} "
-        f"predicate={_GATE_PREDICATE_VERSION} -->"
-    )
-    return marker + "\n\n" + "\n".join(rendered)
+        gate_set = GATES_FOR_TYPE.get(wc.wu_type, wc.wu_type)
+        lines.append(
+            f"- **{wc.wu_id}** (`{wc.ref_file}`): final attempt passed the "
+            f"`{gate_set}` gate set"
+        )
+    return "\n".join(lines)
 
 
 def stamp_gate_auto_close_note(
@@ -5000,9 +5117,8 @@ def stamp_gate_auto_close_note(
     gate actually pass, and on what evidence?" Before this, that file read
     `status: passed` and said nothing else: `passed` looked identical whether a
     close agent verified the definition of done or the predicate skipped it. The
-    honest signal existed — the `specfuse:autoclose-debt` marker, the
-    RETROSPECTIVE section, `auto_close: true` on the close WU — but every piece
-    of it lived in a different file.
+    honest signal existed — the RETROSPECTIVE section and `auto_close: true` on
+    the close WU — but every piece of it lived in a different file.
 
     Mirrors what `write_stub_retrospective_terminal` already computes into the
     file a reviewer actually opens, and names where the per-criterion deferred
@@ -5033,11 +5149,7 @@ def stamp_gate_auto_close_note(
         f"predicate={decision.predicate_version}). The close ceremony "
         f"**did not run**.\n\n"
         f"- gate_total_cost: ${total_cost:.2f} of {budget_str}\n"
-        f"- reasons: {decision.reasons} (auto=True)\n\n"
-        f"The per-criterion deferred-verification list was **not** enumerated. "
-        f"Before treating this gate as fully verified, read `RETROSPECTIVE.md` "
-        f"§ \"What the loop did NOT verify\" and the "
-        f"`specfuse:autoclose-debt` marker it carries.\n"
+        f"- reasons: {decision.reasons} (auto=True)\n"
     )
     with gate_file.open("a") as fh:
         fh.write(note if text.endswith("\n") else "\n" + note)
@@ -5072,23 +5184,15 @@ def write_stub_retrospective_terminal(
     section = (
         f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
         f"On-plan close; full retrospective ceremony skipped per\n"
-        f"`evaluate_auto_close`.\n\n"
+        f"`evaluate_auto_close`. An auto-close fires only when every\n"
+        f"substantive unit's final attempt passed the driver's gates — that is\n"
+        f"what was verified:\n\n"
+        f"{build_autoclose_pass_summary(feature_dir, gate_number)}\n\n"
         f"- feature_id: {decision.feature_id}\n"
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n\n"
-        # issue #157: terminal auto-close skips the close body AND has no
-        # downstream gate to catch the gap — the operator is the last line.
-        f"## What the loop did NOT verify (gate {gate_number})\n\n"
-        f"This terminal gate auto-closed on-plan; the full close ceremony did not\n"
-        f"run, so the per-criterion deferred-verification list was **not**\n"
-        f"enumerated, and there is no downstream gate to reconcile it. Before\n"
-        f"treating the feature as fully verified, the operator MUST confirm every\n"
-        f"acceptance criterion was actually verified in-loop (not only by artifact\n"
-        f"shape). Any AC deferred to a post-merge or real-system step must be\n"
-        f"recorded and completed now.\n\n"
-        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
+        f"- reasons: [] (auto=True)\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -5237,24 +5341,15 @@ def append_stub_retrospective_intermediate(
         f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
         f"On-plan intermediate close; full close-intermediate ceremony\n"
         f"skipped per `evaluate_auto_close`. `plan-next` WU dispatched\n"
-        f"to draft gate {gate_number + 1}.\n\n"
+        f"to draft gate {gate_number + 1}. An auto-close fires only when every\n"
+        f"substantive unit's final attempt passed the driver's gates — that is\n"
+        f"what was verified:\n\n"
+        f"{build_autoclose_pass_summary(feature_dir, gate_number)}\n\n"
         f"- feature_id: {decision.feature_id}\n"
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n\n"
-        # issue #157: the auto-close path skips the close-intermediate body, so
-        # the per-criterion deferred-verification list is never enumerated. Emit
-        # an explicit marker rather than silently omitting it — the predicate
-        # cannot reason over ACs, so it flags the gap for downstream reconciliation.
-        f"## What the loop did NOT verify (gate {gate_number})\n\n"
-        f"This gate auto-closed on-plan; the full close-intermediate ceremony did\n"
-        f"not run, so the per-criterion deferred-verification list was **not**\n"
-        f"enumerated. Any acceptance criterion whose verification is deferred\n"
-        f"(loop-sandbox limit, cross-repo coordination, real-system access) is\n"
-        f"unrecorded here. Gate {gate_number + 1}'s close MUST reconcile these\n"
-        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n\n"
-        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
+        f"- reasons: [] (auto=True)\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -5516,9 +5611,26 @@ def assert_verdict_well_formed(
     attempt (issue #12). Mirrors the re-read at the terminal-flip path
     (FEAT-2026-0015/G2-CLOSE). Updates wu.verdict in-memory so downstream
     checks see the post-squash value.
+
+    This is the surface that makes the verdict binary. It runs at outcome time
+    on the close just dispatched and never on a `done` close, so the standing
+    hedged closes in the corpus are untouched — but a close written from now on
+    cannot record `met_locally` or `partially_met`. A retired value gets its
+    own message: an operator who lands here is mid-migration, and "not in
+    VERDICT_VALUES" would tell them what is wrong and nothing about what to do.
     """
     fm, _ = read_frontmatter(wu.file)
     verdict = fm.get("verdict")
+    if verdict in LEGACY_VERDICT_VALUES:
+        return (
+            False,
+            f"assert_verdict_well_formed: verdict {verdict!r} was retired by "
+            f"FEAT-2026-0085; a close records one of {sorted(VERDICT_VALUES)}. "
+            f"A criterion this close cannot verify is a `not_met` with a "
+            f"tracked follow-up in {FOLLOW_UPS_FILENAME}, not a hedge. To "
+            f"restate a close written before the narrowing, see "
+            f"{VERDICT_MIGRATION_NOTE}",
+        )
     if verdict is None or verdict not in VERDICT_VALUES:
         return (
             False,
@@ -5553,6 +5665,97 @@ def assert_cost_analysis_section_when_met(
         f"assert_cost_analysis_section_when_met: verdict=met but "
         f"'## {COST_ANALYSIS_HEADING}' section absent from {RETROSPECTIVE_FILENAME}",
     )
+
+
+def assert_followups_recorded(
+    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
+) -> tuple[bool, str]:
+    """(close-m) When verdict=='not_met', FOLLOW-UPS.md exists with >=1 entry.
+
+    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
+    the agent writes `verdict:` during dispatch and `wu.verdict` from
+    `load_wu` is stale. A hedge used to let a close skip stating what it
+    could not verify; FOLLOW-UPS.md is where that now goes instead — one
+    `### `-headed entry per failed criterion.
+    """
+    fm, _ = read_frontmatter(wu.file)
+    verdict = fm.get("verdict")
+    if verdict != "not_met":
+        return True, ""
+    path = feature_dir / FOLLOW_UPS_FILENAME
+    if not path.exists():
+        return (
+            False,
+            f"assert_followups_recorded: verdict=not_met but "
+            f"{FOLLOW_UPS_FILENAME} absent from feature dir",
+        )
+    if not parse_followup_entries(path.read_text()):
+        return (
+            False,
+            f"assert_followups_recorded: verdict=not_met but "
+            f"{FOLLOW_UPS_FILENAME} has no '### ' entry",
+        )
+    return True, ""
+
+
+def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dict:
+    """File one tracked GitHub issue per FOLLOW-UPS.md entry, after a close's squash.
+
+    Runs for both verdicts: on `not_met`, one `FOLLOW_UP_LABEL` issue per
+    `### `-headed entry in FOLLOW-UPS.md; on `met`, one `POST_MERGE_LABEL`
+    issue for PLAN.md's optional `## Post-merge checklist` section, if
+    present. Idempotent per entry — a title carrying the entry's
+    correlation id lets a second call find the issue `emit_issue_with_body`
+    already filed instead of duplicating it.
+
+    `gh` absent or every call failing leaves FOLLOW-UPS.md itself as the
+    record (this never deletes or rewrites it) and still emits one
+    `followups_recorded` event naming how many entries filed vs. did not.
+    Best-effort throughout: a filing failure is counted in `unfiled`, never
+    raised.
+    """
+    plan_path = feature_dir / "PLAN.md"
+    plan_fm, plan_body = read_frontmatter(plan_path)
+    feature_id = plan_fm.get("feature_id") or feature_dir.name.split("-", 2)[0]
+
+    entries: list[tuple[str, str, str]] = []  # (correlation_id, body, label)
+    followups_path = feature_dir / FOLLOW_UPS_FILENAME
+    if followups_path.exists():
+        for i, entry in enumerate(parse_followup_entries(followups_path.read_text()), start=1):
+            entries.append((f"{feature_id}-followup-{i}", entry, FOLLOW_UP_LABEL))
+
+    if plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done":
+        section = find_post_merge_checklist_section(plan_body)
+        if section:
+            entries.append((f"{feature_id}-post-merge-checklist", section, POST_MERGE_LABEL))
+
+    filed = 0
+    unfiled = 0
+    filed_issues: list[str] = []
+    for correlation_id, body, label in entries:
+        title = issue_title(correlation_id, body)
+        number = emit_issue_with_body(
+            correlation_id,
+            title=title,
+            body=body,
+            labels=[label],
+            runner=runner,
+        )
+        if number:
+            filed += 1
+            filed_issues.append(number)
+        else:
+            unfiled += 1
+
+    events_path = feature_dir / "events.jsonl"
+    flush_events(events_path, [build_event(
+        "followups_recorded", feature_id, {
+            "filed": filed,
+            "unfiled": unfiled,
+            "issue_numbers": filed_issues,
+        },
+    )])
+    return {"filed": filed, "unfiled": unfiled, "issue_numbers": filed_issues}
 
 
 _NO_FAILURES_SENTINEL = NO_FAILURES_SENTINEL
@@ -5804,67 +6007,6 @@ def assert_next_gate_drafted_or_terminal(
     )
 
 
-def assert_hedged_followup_kinds_classified(
-    wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
-) -> tuple[bool, str]:
-    """(close-j) On a hedged verdict, every §2 follow-up entry has a valid `kind:`.
-
-    Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
-    the agent writes `verdict:` during dispatch. Scoped to THIS close's own
-    RETROSPECTIVE.md only — never reads another feature's files, per the
-    satisfiability guarantee in FEAT-2026-0059's PLAN.md: a corpus sweep
-    would be red on arrival because FEAT-2026-0041 and FEAT-2026-0042 hedged
-    before `kind:` existed.
-    """
-    fm, _ = read_frontmatter(wu.file)
-    verdict = fm.get("verdict")
-    if verdict not in HEDGED_VERDICT_VALUES:
-        return True, ""
-    retro = feature_dir / RETROSPECTIVE_FILENAME
-    if not retro.exists():
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: {RETROSPECTIVE_FILENAME} "
-            f"absent — cannot locate the '{HEDGED_RECORD_HEADING}' section",
-        )
-    text = retro.read_text()
-    heading_match = HEDGED_RECORD_HEADING_RE.search(text)
-    if not heading_match:
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: verdict={verdict!r} but no "
-            f"'{HEDGED_RECORD_HEADING}' section in {RETROSPECTIVE_FILENAME}",
-        )
-    start = heading_match.end()
-    next_heading = re.search(r"^## ", text[start:], re.MULTILINE)
-    section = text[start:start + next_heading.start()] if next_heading else text[start:]
-    entries = re.split(r"^### ", section, flags=re.MULTILINE)[1:]
-    if not entries:
-        return (
-            False,
-            f"assert_hedged_followup_kinds_classified: '{HEDGED_RECORD_HEADING}' "
-            f"section in {RETROSPECTIVE_FILENAME} has no per-entry ('### ') "
-            "records to classify",
-        )
-    for entry in entries:
-        title = entry.splitlines()[0].strip() if entry.strip() else "(untitled entry)"
-        kind_match = KIND_FIELD_RE.search(entry)
-        if not kind_match:
-            return (
-                False,
-                f"assert_hedged_followup_kinds_classified: entry {title!r} in the "
-                f"'{HEDGED_RECORD_HEADING}' section has no **kind:** field",
-            )
-        kind = kind_match.group(1)
-        if kind not in FOLLOW_UP_KINDS:
-            return (
-                False,
-                f"assert_hedged_followup_kinds_classified: entry {title!r} has "
-                f"kind {kind!r}, not one of {sorted(FOLLOW_UP_KINDS)}",
-            )
-    return True, ""
-
-
 def assert_changelog_entry_for_contract_changes(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -5924,8 +6066,8 @@ CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
         assert_verdict_well_formed,
         assert_cost_analysis_section_when_met,
         assert_failure_class_breakdown_when_failures_present,
-        assert_hedged_followup_kinds_classified,
         assert_changelog_entry_for_contract_changes,
+        assert_followups_recorded,
     ],
     "close-intermediate": [
         assert_retrospective_gate_section,
@@ -6304,94 +6446,6 @@ def assert_terminal_flips_fired(
     return True, ""
 
 
-_AUTOCLOSE_DEBT_MARKER_RE = AUTOCLOSE_DEBT_MARKER_RE
-_DEFERRAL_HEADING_RE = DEFERRAL_HEADING_RE
-
-
-def _terminal_deferral_section(retro_text: str) -> str:
-    """Return the text under the LAST `What the loop did NOT verify` heading.
-
-    A gate that auto-closed earlier already wrote its own such section (via
-    `build_autoclose_debt_enumeration`); the terminal close writes its own,
-    appended after. The last occurrence is the terminal close's own record.
-    """
-    matches = list(_DEFERRAL_HEADING_RE.finditer(retro_text))
-    if not matches:
-        return ""
-    last = matches[-1]
-    nl = retro_text.find("\n", last.end())
-    after = retro_text[nl + 1:] if nl != -1 else ""
-    em = re.search(r"(?m)^#{1,3}\s", after)
-    return after[:em.start()] if em else after
-
-
-def assert_autoclose_debt_reconciled(
-    wu: WorkUnit,
-    feature_dir: Path,
-    repo_root: Path,
-    head_before: str,
-) -> tuple[bool, str]:
-    """(close-g) A marked predecessor auto-close debt must be named in the
-    terminal close's `## What the loop did NOT verify` section.
-
-    Marker-gated (FEAT-2026-0070/T07): only gates whose auto-close stub
-    carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker are
-    considered. No historical retrospective in this repo has one, so this
-    fires on zero of the 11 features that have auto-closed a gate
-    (`GATE-02-REVIEW.md` § Satisfiability) — the unmarked-predicate form
-    fires on 6 of them and is unsatisfiable by `planning-discipline.md` §2.
-
-    Short-circuits `(True, "")` when:
-      - the terminal close WU itself is `auto_close: true` — no session ran,
-        so there is no one to hold responsible and T06's terminal stub is
-        already the record;
-      - `RETROSPECTIVE.md` carries no debt marker for a gate earlier than the
-        terminal gate (a marker for the terminal gate itself is not a
-        predecessor and is ignored).
-
-    Otherwise, every predecessor gate a marker names must appear as
-    `gate N` in the terminal close's own deferral section (the last
-    `What the loop did NOT verify` heading in the file); an unmentioned gate
-    returns `(False, reason)` with `autoclose_debt_unreconciled` in the
-    reason.
-    """
-    fm, _ = read_frontmatter(wu.file)
-    if fm.get("auto_close") in (True, "true", "True"):
-        return True, ""
-
-    retro_path = feature_dir / RETROSPECTIVE_FILENAME
-    if not retro_path.exists():
-        return True, ""
-    retro_text = retro_path.read_text()
-
-    _, gates = load_graph(feature_dir)
-    if not gates:
-        return True, ""
-    terminal_gate_number = gates[-1].number
-
-    predecessor_gates = sorted({
-        int(m.group(1))
-        for m in _AUTOCLOSE_DEBT_MARKER_RE.finditer(retro_text)
-        if int(m.group(1)) < terminal_gate_number
-    })
-    if not predecessor_gates:
-        return True, ""
-
-    deferral_section = _terminal_deferral_section(retro_text)
-    unmentioned = [
-        g for g in predecessor_gates
-        if not re.search(rf"\bgate\s+{g}\b", deferral_section, re.IGNORECASE)
-    ]
-    if unmentioned:
-        return False, (
-            "autoclose_debt_unreconciled: gate(s) "
-            f"{', '.join(str(g) for g in unmentioned)} carry an unreconciled "
-            f"auto-close debt marker not named in the terminal close's "
-            f"'## What the loop did NOT verify' section"
-        )
-    return True, ""
-
-
 def assert_learnings_staged_under_auto(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -6430,7 +6484,6 @@ def assert_learnings_staged_under_auto(
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
     "close": [
         assert_terminal_flips_fired,
-        assert_autoclose_debt_reconciled,
         assert_learnings_staged_under_auto,
     ],
     "close-intermediate": [assert_learnings_staged_under_auto],
@@ -6765,6 +6818,28 @@ def run(
                             resume_command=resume_command_for(feature_id),
                         )
 
+                # Human-step halt (FEAT-2026-0085/T04): the one work-unit type
+                # the driver never dispatches. Sits at the same pre-dispatch
+                # seam as the budget and driver-restart brakes, and ahead of
+                # every dispatch path below — the property this type exists to
+                # guarantee is that no session is ever spawned for it, so the
+                # check has to precede the branch that would spawn one. Skipped
+                # in dry_run, which dispatches nothing anyway.
+                if not dry_run and wu.type == HUMAN_WU_TYPE:
+                    return halt_for_human_unit(
+                        wu=wu,
+                        backend=backend,
+                        gate_number=gate.number,
+                        feature_id=feature_id,
+                        events_path=events_path,
+                        done_wu_ids=sorted(done_ids),
+                        remaining_wu_ids=[
+                            w.wu_id for w in units
+                            if w.wu_id != wu.wu_id
+                            and w.status not in (DONE, "abandoned")],
+                        resume_command=resume_command_for(feature_id),
+                    )
+
                 print(f"\n[{time.strftime('%H:%M:%S')}] -- {wu.wu_id} "
                       f"[{wu.type}] model={wu.model} effort={wu.effort}")
                 # Summary line: the WU's title, so the log says WHAT is being
@@ -6773,7 +6848,12 @@ def run(
                 if wu.title and wu.title != wu.wu_id:
                     print(f"   ↳ {wu.title}")
                 if dry_run:
-                    print("   (dry run — would dispatch)")
+                    # A `human` unit would never be dispatched, so saying it
+                    # "would dispatch" misreports the very thing a dry run is
+                    # for — confirming what the next real run does.
+                    print("   (dry run — human step, would halt)"
+                          if wu.type == HUMAN_WU_TYPE
+                          else "   (dry run — would dispatch)")
                     wu.status = DONE
                     done_ids.add(wu.wu_id)
                     continue
@@ -7806,6 +7886,21 @@ def run(
         # ran. Refuse instead: "nothing left ready" and "the gate finished"
         # are different states and must not print the same message.
         stranded = [u for u in units if u.status not in (DONE, "abandoned")]
+        # A `human` unit already halted on in an earlier run sits at
+        # `blocked_human` (FEAT-2026-0085/T04), which `ready()` never returns,
+        # so the frontier goes empty and it lands here. Its cause is known and
+        # is not an abandoned dependency — re-print its brief rather than send
+        # the operator to inspect a dependency graph that is fine.
+        awaiting_human = [u for u in stranded
+                          if u.type == HUMAN_WU_TYPE and u.status == "blocked_human"]
+        if awaiting_human and not dry_run:
+            for _hwu in awaiting_human:
+                print("\n" + format_human_unit_brief(
+                    _hwu, gate.number, sorted(done_ids),
+                    [u.wu_id for u in stranded if u.wu_id != _hwu.wu_id],
+                    resume_command_for(feature_id),
+                ))
+            return 1
         if stranded:
             stranded_ids = ", ".join(u.wu_id for u in stranded)
             print(
@@ -7920,6 +8015,16 @@ def run(
             )
             if rc:
                 return rc
+        # FEAT-2026-0085/T03: file one tracked issue per FOLLOW-UPS.md entry
+        # (not_met) or per PLAN.md Post-merge checklist (met), after the
+        # terminal flips above have already run. Best-effort — a filing
+        # failure must never take down a close that otherwise passed; the
+        # artifact on disk (FOLLOW-UPS.md) remains the record either way.
+        if close_wu_for_terminal is not None or _terminal_auto_closed_wu is not None:
+            try:
+                file_followup_issues(feature_dir, REPO_ROOT)
+            except Exception as exc:  # noqa: BLE001 - never blocks the driver
+                logging.debug("file_followup_issues raised: %s", exc)
         used_combined_close = any(
             (feature_dir / ref["file"]).is_file()
             and read_frontmatter(feature_dir / ref["file"])[0].get("type") == "close"
@@ -8295,8 +8400,10 @@ def main() -> int:
                     "from disk and fire the terminal flips (gate/roadmap-row/"
                     "PLAN.md/archive) if it now permits them, without "
                     "re-dispatching the close WU. For a verdict upgraded "
-                    "post-close (e.g. met_locally -> met after follow-ups were "
-                    "discharged). No-op if already done or still hedged.")
+                    "post-close (not_met -> met once the tracked follow-ups "
+                    "were discharged). No-op if already done or still not_met; "
+                    "refuses on a verdict retired by FEAT-2026-0085 and names "
+                    "the migration note.")
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")

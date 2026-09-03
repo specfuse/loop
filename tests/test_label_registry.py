@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unittest
 
-from specfuse.loop import bug_lane, escalation, gh_features, notify_sla, triage
+from specfuse.loop import bug_lane, closing_requirements, escalation, gh_features, notify_sla, triage
 from specfuse.monitor import autofix_state, issues
 from specfuse.loop.labels import LABEL_REGISTRY
 
@@ -27,11 +27,15 @@ class TestLabelRegistry(unittest.TestCase):
         # REASON_* constants that this registry never declared, so
         # provision_labels created none of them and every declining path
         # failed against a real repository.
+        # The twenty-second and twenty-third are FEAT-2026-0085/T03's
+        # follow-up and post-merge-checklist labels — a not_met close's
+        # tracked follow-ups and a met close's Post-merge checklist file as
+        # their own issues, distinct from needs-human.
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 21)
+        self.assertEqual(len(LABEL_REGISTRY), 23)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -61,6 +65,7 @@ class TestLabelRegistry(unittest.TestCase):
             }
             | {notify_sla.PARKED_LABEL}
             | set(bug_lane.DECLINE_LABELS.values())
+            | {closing_requirements.FOLLOW_UP_LABEL, closing_requirements.POST_MERGE_LABEL}
         )
         actual = {entry.name for entry in LABEL_REGISTRY}
         self.assertEqual(actual, expected)

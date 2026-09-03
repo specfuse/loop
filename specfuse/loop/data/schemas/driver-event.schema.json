@@ -14,7 +14,8 @@
     "unsandboxed_dispatch",
     "gate_auto_armed",
     "re_arm_rejected",
-    "driver_staleness_detected"
+    "driver_staleness_detected",
+    "followups_recorded"
   ],
   "correlation_id": {
     "closing_names": [

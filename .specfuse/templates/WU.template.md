@@ -1,6 +1,6 @@
 ---
 id: FEAT-YYYY-NNNN/T01     # /TNN substantive, /G<n>-CLOSE (etc.) closing
-type: implementation       # implementation | retrospective | lessons | docs | plan-next | close | close-intermediate
+type: implementation       # implementation | human | retrospective | lessons | docs | plan-next | close | close-intermediate
 status: pending            # draft | pending | ready | in_progress | in_review | done | blocked_human
 attempts: 0
 generated_surfaces: []     # OPTIONAL
@@ -66,5 +66,5 @@ edited. Blocked is a respectable outcome (`result-contract.md`).
 <!-- Conditional sections, omitted unless they apply. A unit that introduces,
 gates on, or flips a behavior flag adds a flag-scope table: every affected code
 path, gated / not gated, one line of why (`planning-discipline.md` §3). A `close`
-/ `close-intermediate` unit adds close obligations (`close-discipline.md` §§1-5),
-exits 0 on `specfuse lint --closing`, and sets `auto_close_disabled: true`. -->
+/ `close-intermediate` unit adds close obligations (`close-discipline.md` §§1-5 —
+the verdict is binary; a `not_met` close writes `FOLLOW-UPS.md`), exits 0 on `specfuse lint --closing`, and sets `auto_close_disabled: true`. -->

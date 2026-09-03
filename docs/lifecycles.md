@@ -25,8 +25,8 @@ guarantees, and different human checkpoints:
 **The one rule that explains all the checkpoints.** The loop automates
 execution, not judgment. Every place it stops is a place where proceeding would
 mean guessing at something only you can decide — which feature matters, whether
-a drafted work unit is right, whether a hedged verdict is acceptable. It halts
-rather than guesses, and it says why.
+a drafted work unit is right, a step only a person can perform. It halts rather
+than guesses, and it says why.
 
 ---
 
@@ -81,13 +81,13 @@ flowchart TD
     WU2 --> WU
     WU -->|blocked_human| BLK["halt &rarr; /gate-status<br/>then /unblock-wu"]
     BLK --> RUN
+    WU -->|type: human| HUM["halt &rarr; you perform the step<br/>/unblock-wu --done --evidence"]
+    HUM --> RUN
     WU -->|all done| CLOSE["close WU dispatches<br/><i>retro + lessons + docs + verdict</i>"]
 
     CLOSE --> V{"verdict"}
     V -->|met| FLIP["fire_terminal_flips:<br/>gate passed, PLAN done,<br/>roadmap done, archived"]
-    V -->|met_locally<br/>partially_met| HEDGE["flips withheld<br/>/accept-hedged-close"]
-    V -->|not_met| REWORK["rework &mdash; not an acceptance case"]
-    HEDGE --> FLIP
+    V -->|not_met| REWORK["flips withheld &mdash; FOLLOW-UPS.md<br/>one tracked issue per failed criterion"]
     FLIP --> W["/wrap-feature<br/><i>push, PR, CI</i>"]
     W --> MERGE["merge + promote<br/>LEARNINGS-pending entries"]
 ```
@@ -105,18 +105,19 @@ missing credential. The driver halts and files an escalation rather than
 burning attempts. Run `/gate-status` for the diagnosis, fix the cause, then
 `/unblock-wu` to re-arm.
 
-**A hedged verdict.** A close that passes with `met_locally` leaves the gate,
-`PLAN.md`, and the roadmap row deliberately un-flipped. That is the
-verdict-coupling rule working: some criteria have oracles outside the repo —
-a live API round-trip, a deploy — and no amount of in-loop work closes them.
-Either discharge the named follow-up, or accept the hedge with
-`/accept-hedged-close`, which records your reason and carries the open items
-forward.
+**A step only you can perform.** A `type: human` work unit — reply on an issue,
+sign something, click through a console, run an interactive command — is never
+dispatched. The driver prints the operator brief and halts. Do the step, then
+`/unblock-wu <WU-ID> --done --evidence "<what you did>"`, and the run resumes;
+the close quotes that evidence. Such a unit is placed *before* the close on
+purpose, so the human step is recorded as work rather than softened into the
+verdict after the fact.
 
-> **Discharging beats accepting when the condition is reachable.** A follow-up
-> whose re-run condition you can satisfy today gives you a `met` verdict on
-> evidence instead of a signature. Read the follow-up record before reaching for
-> the acceptance skill.
+> **A criterion the loop cannot verify is not a verdict problem.** If it needs a
+> person, it is a `type: human` unit. If it can only be seen in production, it is
+> a `## Post-merge checklist` line in `PLAN.md`, filed as a tracked issue at
+> close. If it simply did not get done, the close records `not_met` and writes
+> `FOLLOW-UPS.md`. None of the three is a softened verdict.
 
 **A budget ceiling.** `GATE-NN.md`'s optional `cost_budget_usd` halts the gate
 between work units once cumulative spend reaches it. Raising it is a deliberate

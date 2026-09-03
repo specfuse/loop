@@ -83,7 +83,9 @@ It also owns every terminal flip (gate → `passed`, roadmap row → `done`, PLA
 *after* its close WU is already `done`, re-fire them with
 `specfuse run --recheck-verdict <FEATURE_ID>`: it re-reads the terminal close WU's
 verdict from disk and flips only if it now permits, printing why when it does not.
-Safe to run on an already-`done` or still-hedged feature — it writes nothing.
+Safe to run on a feature whose verdict does not permit the flips — it writes
+nothing. This is also how a migrated legacy hedged close gets its flips: edit
+the verdict to `met` or `not_met`, then re-fire.
 
 ### 4. Arm — the human checkpoint at each gate
 
@@ -121,21 +123,11 @@ Safe to run on an already-`done` or still-hedged feature — it writes nothing.
 
 ### 6. Wrap — finish a done feature
 
-- **`/accept-hedged-close`** — the path out of `/wrap-feature`'s refusal. A close
-  that legitimately ends `verdict: met_locally` (or `partially_met`) leaves every
-  terminal surface un-flipped by design, and for some features that hedge is the
-  ceiling *by construction* — the criterion's oracle lives outside the repo. This
-  skill quotes the standing follow-up record, requires a one-line reason and
-  explicit acknowledgment of every open item, writes an acceptance record into
-  `RETROSPECTIVE.md`, and then fires the flips through the driver's
-  `--recheck-verdict` primitive. It carries the follow-ups forward — accepting a
-  hedge is shipping with known-open items, not closing them. Refuses on `met`
-  (nothing to accept), on `not_met`, and on a close WU that isn't `done`. It never
-  writes PLAN.md's status, a gate's status, or the roadmap row.
 - **`/wrap-feature`** — after the terminal gate is `done`, push the feature
   branch, open a PR, optionally watch CI, and point at the next pick. Refuses if
-  PLAN.md isn't `done` yet — run `/accept-hedged-close` first if the block is a
-  standing hedged verdict.
+  PLAN.md isn't `done` yet. There is no skill that softens a verdict to get past
+  that refusal: a close either records `met`, or records `not_met` and leaves
+  `FOLLOW-UPS.md` behind for the loop to file as tracked issues.
 - **`/roadmap-archive`** — move a done or abandoned feature's detail section from
   `roadmap.md` to `roadmap-archive.md`, leaving a back-link.
 

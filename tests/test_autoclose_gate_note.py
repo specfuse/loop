@@ -9,11 +9,10 @@ When `evaluate_auto_close` closes a gate, `GATE-NN.md` reads `status: passed`
 and nothing in it distinguishes *"verified and passed"* from *"the predicate
 skipped the ceremony."*
 
-The honest signal exists — the `specfuse:autoclose-debt` marker and the
-auto-close section in `RETROSPECTIVE.md`, plus `auto_close: true` on the close
-WU's frontmatter — but every piece of it is in a **different file** from the one
-a reviewer opens at the arm-gate checkpoint to answer *"did this gate actually
-pass, and on what evidence?"*
+The honest signal exists — the auto-close section in `RETROSPECTIVE.md`, plus
+`auto_close: true` on the close WU's frontmatter — but every piece of it is in
+a **different file** from the one a reviewer opens at the arm-gate checkpoint
+to answer *"did this gate actually pass, and on what evidence?"*
 
 Verified still reproducing before this was written: FEAT-2026-0021 auto-closed,
 and its `GATE-01.md` carries `status: passed`, a Definition of done, and an
@@ -100,15 +99,16 @@ class TestGateAutoCloseNote(unittest.TestCase):
             stamp_gate_auto_close_note(Path(tmp), 1, _decision(budget=None))
             self.assertIn("<unset>", g.read_text())
 
-    def test_it_points_at_where_the_deferred_list_actually_lives(self):
-        # The whole complaint is that the evidence is in another file. The note
-        # must name that file rather than merely asserting the gap.
+    def test_it_no_longer_points_at_a_deferred_list(self):
+        # FEAT-2026-0085/T02: the auto-close stub states what passed instead
+        # of enumerating deferred debt, so the note has nothing to point at
+        # any more — it keeps its cost and predicate lines only.
         with tempfile.TemporaryDirectory() as tmp:
             g = self._gate(Path(tmp))
             stamp_gate_auto_close_note(Path(tmp), 1, _decision())
             text = g.read_text()
-            self.assertIn("RETROSPECTIVE.md", text)
-            self.assertIn("specfuse:autoclose-debt", text)
+            self.assertNotIn("specfuse:autoclose-debt", text)
+            self.assertNotIn("deferred", text)
 
     def test_the_existing_gate_content_is_preserved(self):
         with tempfile.TemporaryDirectory() as tmp:

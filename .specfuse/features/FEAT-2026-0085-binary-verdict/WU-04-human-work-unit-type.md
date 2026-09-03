@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 model: opus
 effort: high
@@ -13,6 +13,13 @@ produces:
   - specfuse/loop/lint_plan.py
   - plugins/specfuse/skills/unblock-wu/SKILL.md
   - tests/test_human_work_unit.py
+gate_set: code
+driver_version: 0.14.0
+started_at: 2026-09-03T10:53:37.987519+00:00
+duration_seconds: 1713.68
+cost_usd: 11.092705
+input_tokens: 266
+output_tokens: 53713
 ---
 
 # A `type: human` work unit the driver halts on, so a human step is recorded before the close

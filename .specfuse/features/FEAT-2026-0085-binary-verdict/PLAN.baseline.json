@@ -1,0 +1,45 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The verdict is met or not_met; delete the hedge machinery",
+          "id": "FEAT-2026-0085/T01",
+          "planned_cost_usd": 8.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "An auto-closed gate states what the driver proved instead of deferring every criterion",
+          "id": "FEAT-2026-0085/T02",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A not_met close writes FOLLOW-UPS.md, and the driver files one tracked issue per entry",
+          "id": "FEAT-2026-0085/T03",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A `type: human` work unit the driver halts on, so a human step is recorded before the close",
+          "id": "FEAT-2026-0085/T04",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Rewrite close-discipline for a binary verdict, remove the acceptance skill, document migration",
+          "id": "FEAT-2026-0085/T05",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 demonstrate the five behaviours, record the counts, verdict",
+          "id": "FEAT-2026-0085/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

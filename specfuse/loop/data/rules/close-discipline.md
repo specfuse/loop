@@ -34,53 +34,39 @@ output directory before asserting — stale output satisfies any assertion.
 > catches the composite: all WUs individually green while the feature-level
 > oracle fails.
 
-## 2. Hedged-verdict follow-up record
+## 2. The verdict is binary; unfinished work is tracked, not hedged
 
-On `met_locally` or `partially_met`, the close must produce a named record —
-in the gate review or `RETROSPECTIVE.md`, under a `## Hedged-verdict
-follow-up record` heading, one `### `-titled entry per unmet criterion —
-with:
+The verdict a close records is `met` or `not_met` — there is no partial
+credit. On `not_met` the close writes `FOLLOW-UPS.md` in the feature folder,
+one `### `-headed entry per failed criterion carrying the criterion verbatim,
+the evidence (the command run and its exit code or output line), and the
+re-run condition that would satisfy it; after the close passes, the driver
+files one tracked `specfuse:follow-up` issue per entry and writes the issue
+number back. A criterion that needs a person to reply, sign, click, or run
+something interactively is a `type: human` work unit placed *before* the
+close — the driver halts on it, the operator marks it `done` with
+`evidence:`, and the close quotes that evidence — and a criterion that can
+only be observed in production is a `## Post-merge checklist` line in
+`PLAN.md`, filed as one `specfuse:post-merge` issue at close, never an
+acceptance criterion.
 
-- the criterion, verbatim;
-- why it is unverifiable in this environment;
-- the exact re-run condition that would upgrade the verdict to `met`;
-- a `kind:`, one of the four below.
+`close-m` is the guard: a `not_met` close whose `FOLLOW-UPS.md` is absent or
+carries no `### ` entry is refused as `closing_deliverable_missing`, pre-squash
+and by `specfuse lint --closing`. `gh` being absent or failing leaves the file
+itself as the record; the driver never deletes or rewrites it.
 
-The driver (>= 0.3.21) already guarantees the surfaces stay un-flipped on a
-hedged verdict (gate `awaiting_review`, roadmap `active`, PLAN `active`);
-this record is the other half: without it, `met_locally` is a dead end —
-no artifact says what would make it `met`, and the honest hedged verdict
-degrades into a polite synonym for "unknown".
-
-### The four `kind`s
-
-Each entry's `kind:` classifies *why* the criterion is unmet, and follows
-mechanically into a verdict-ceiling contribution — whether any in-repo work
-could ever raise this verdict to `met`:
-
-| `kind` | meaning | can a re-run upgrade it? |
-| --- | --- | --- |
-| `acceptance-discharged` | needs a human signature; accepting IS the discharge | no — but accepting the verdict *is* the discharge |
-| `externally-verifiable-later` | needs a real run or environment; upgradeable at the named condition | **yes**, at the named re-run condition |
-| `routed-finding` | now owned elsewhere; tracked on another surface | no — tracked on another surface |
-| `inherent` | not assertable, ever | **never** |
-
-The ceiling follows mechanically from the set of kinds present: if **any**
-entry is `externally-verifiable-later`, rework exists and the operator has a
-real choice between accepting now and waiting for that condition. If none
-is, `met` is unreachable by any in-repo work — the only question is whether
-to accept the hedge as final. `closing_requirements.verdict_ceiling_for_kinds`
-is the one place this rule is computed; a consumer reads the answer rather
-than re-deriving it.
-
-**`kind` is written by the close WU, never inferred by a reader.** The close
-has the context — it just tried to meet the criterion and knows why it
-didn't. A reader (human or skill) sees only the prose after the fact and
-would be guessing; a confident guess on an ambiguous entry is worse than an
-unclassified one. `specfuse lint --closing` refuses a hedged close whose
-record — the one belonging to the WU currently under lint — has an entry
-with no `kind:` or an unrecognised one; it does not read any other feature's
-retrospective.
+> **Provenance (FEAT-2026-0085).** Across 273 features in 12 repositories, 48%
+> of verdict-bearing closes ended on one of the two soft-success verdicts this
+> feature retired, and 59 of those were later flipped to `met` by an
+> acceptance skill with nothing re-run. Of 101 hedged features, 42 hedged
+> because a criterion asked the loop to observe production, 16 because a human
+> had to sign or act, and 9 because auto-closed gates had seeded every
+> criterion into the retrospective as debt the terminal close could not
+> reconcile — the three cases the three channels above now carry honestly.
+> Only about 13 carried information a hedge is for, and no surveyed external
+> loop uses partial credit. The retired values stay *readable* on disk;
+> `docs/methodology.md` § Migrating a hedged close says what to do with a
+> standing hedged close.
 
 ## 3. Consumer-visible contract changes enumerated, human-acknowledged
 

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 8.00
 model: opus
 effort: high
@@ -12,6 +12,18 @@ produces:
   - specfuse/loop/closing_requirements.py
   - specfuse/loop/loop.py
   - tests/test_binary_verdict.py
+duration_seconds: 3261.947
+cost_usd: 13.148708
+input_tokens: 270
+output_tokens: 99951
+re_arm_count: 1
+re_arm_history:
+  - timestamp: 2026-09-02T20:17:32+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 6.521841
+    prior_duration_seconds: 1206.201
+    reason: "AC3 rescoped to Python files, mirror is T05's"
 ---
 
 # The verdict is met or not_met; delete the hedge machinery
@@ -39,7 +51,7 @@ first.
 
 - `tests/test_binary_verdict.py::test_met_locally_is_rejected_at_outcome` fails on HEAD and passes after: a fixture close WU whose frontmatter says `verdict: met_locally` makes `assert_verdict_well_formed` return `(False, reason)` with `met` and `not_met` in the reason.
 - `python3 -c "from specfuse.loop.closing_requirements import VERDICT_VALUES, LEGACY_VERDICT_VALUES; assert VERDICT_VALUES == frozenset({'met','not_met'}) and LEGACY_VERDICT_VALUES == frozenset({'met_locally','partially_met'})"` exits 0.
-- `grep -rn "HEDGED_VERDICT_VALUES\|FOLLOW_UP_KIND\|verdict_ceiling_for_kinds\|assert_hedged_followup_kinds_classified\|close-j" specfuse/ tests/ | wc -l` reports 0.
+- `grep -rn --include="*.py" "HEDGED_VERDICT_VALUES\|FOLLOW_UP_KIND\|verdict_ceiling_for_kinds\|assert_hedged_followup_kinds_classified\|close-j" specfuse/ tests/ | wc -l` reports 0. Python only: the one prose mention, in `close-discipline.md` and its byte-identical mirror under `specfuse/loop/data/rules/`, is T05's to remove (attempt 1 blocked on exactly that mirror; see `events.jsonl`).
 - `tests/test_binary_verdict.py::test_recheck_refuses_legacy_verdict_with_migration_pointer`: `recheck_terminal_verdict` on a fixture whose done close says `met_locally` returns `fired: False` and a reason containing `legacy`.
 - `python3 -m unittest discover -s tests -q` reports `OK`, run outside any sandbox.
 

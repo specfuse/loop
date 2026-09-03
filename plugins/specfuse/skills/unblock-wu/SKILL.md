@@ -1,6 +1,6 @@
 ---
 name: unblock-wu
-description: "Re-arm one or more `blocked_human` work units after a fix (credentials, spec ambiguity, missing dep, etc.) so the loop driver retries them. Flips each WU `status: blocked_human` \u2192 `pending` and `attempts: 0`; if the WU's gate is `awaiting_review` (driver left it stuck after the block), flips the gate back to `open`. Per-WU propose-and-confirm. Prints the resume command."
+description: "Re-arm one or more `blocked_human` work units after a fix (credentials, spec ambiguity, missing dep, etc.) so the loop driver retries them. Flips each WU `status: blocked_human` \u2192 `pending` and `attempts: 0`; if the WU's gate is `awaiting_review` (driver left it stuck after the block), flips the gate back to `open`. Also records a completed `type: human` step with `--done --evidence \"<text>\"`. Per-WU propose-and-confirm. Prints the resume command."
 ---
 
 <!--
@@ -42,6 +42,15 @@ WUs and stop" mode.
 - **`attempts: 0` is mandatory.** Without the reset, the next failure
   trips the spinning escalation immediately because the prior
   `MAX_ATTEMPTS` block-paths already incremented the counter.
+- **A `type: human` unit is never re-armed.** It is not retryable —
+  no session was ever dispatched and none ever will be. Its decision
+  vocabulary is done / abandon / skip, and `done` requires
+  `evidence:`. See "Recording a completed human step" below.
+- **The evidence text is the operator's, verbatim.** Never draft it,
+  never summarise it, never fill it in from the WU body. It is the
+  record of what a person actually did; an agent that writes it has
+  removed the signature it was collecting
+  (`.specfuse/rules/operator-escalation.md`).
 
 ## When to invoke
 
@@ -55,6 +64,10 @@ Gate N halted: M work unit(s) need human attention.
 
 — or any time a WU file under the active feature sits at `status:
 blocked_human` and you've fixed the cause.
+
+Also when `specfuse run` printed a `HUMAN STEP REQUIRED` brief and you
+have since performed the step — that is the `--done --evidence` path
+below, not a re-arm.
 
 If no blocked WU exists, the skill stops with a hint (probably you
 wanted `/arm-gate` for a gate-boundary draft, or `/gate-status` for
@@ -225,6 +238,54 @@ Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
   `re_arm_history` and does NOT increment `re_arm_count` — skip is
   not a re-arm.
 
+### 3b. Recording a completed human step (`--done --evidence`)
+
+A `type: human` work unit is the one the driver never dispatches: it
+names a step only a person can perform — reply, click, sign, run
+something interactively. The driver stops in front of it, prints the
+`HUMAN STEP REQUIRED` brief, and flips it to `blocked_human` with
+`attempts: 0`. You perform the step; this skill records it.
+
+**Headless form.** `/unblock-wu --done --evidence "<text>"` — valid
+only when exactly one `human` unit is at `blocked_human` under the
+active feature (otherwise name it: `/unblock-wu FEAT-YYYY-NNNN/TNN
+--done --evidence "<text>"`). Refuse `--done` on any unit whose
+`type` is not `human`, and refuse it with an empty or
+whitespace-only `--evidence`; both are errors, not prompts to
+improvise a value.
+
+**Interactive form.** For each `human` unit at `blocked_human`, print
+the unit's Objective and Acceptance criteria, then ask:
+
+```
+Done (d) / Abandon (a) / Skip (s) — FEAT-YYYY-NNNN/TNN ?
+  objective: <...>
+  what counts as done: <...>
+  evidence (required for d — what you actually did, one or more lines):
+```
+
+- **Done** — write ONE frontmatter change setting `status: done` and
+  `evidence: "<the operator's text, unchanged>"`. Leave `attempts` at
+  `0`: nothing was attempted by an agent, and the driver's per-attempt
+  accounting has no entry to make. Do NOT write `re_arm_count` or
+  `re_arm_history` — this is not a re-arm. Empty evidence re-prompts
+  the same unit with:
+
+  ```
+  evidence required — describe what you did, or choose s/a
+  ```
+
+  Evidence should be checkable by someone else later: where the reply
+  is, who signed, which run was executed. "done" is not evidence.
+- **Abandon** — same as §3's abandon. The gate closes without the
+  step, and any acceptance criterion that depended on it closes unmet.
+- **Skip** — leave it at `blocked_human`. The driver stops at the same
+  point on the next run and re-prints the brief.
+
+The lint gate backs this up: a `human` unit at `status: done` with no
+non-empty `evidence` is an ERROR (`specfuse lint <feature-dir>`), so a
+`done` written without it does not survive the next structural check.
+
 ### 4. Reopen the gate (if needed)
 
 After per-WU decisions, look at each gate that had a re-armed WU:
@@ -233,7 +294,9 @@ After per-WU decisions, look at each gate that had a re-armed WU:
   during the block path), flip it back to `status: open`. Without
   this flip, the driver's closing-sequence dispatch logic still
   thinks the gate is closing and may behave unpredictably.
-- If `status: open` already, leave alone.
+- If `status: open` already, leave alone. The human-step halt leaves
+  the gate `open`, so a `--done` recording normally needs no flip
+  here — check anyway; another block may have flipped it.
 
 ### 5. Print the resume command
 
@@ -280,6 +343,15 @@ Never author the operator's own justification. Where a field records *why a huma
 decided something*, that text comes from them.
 
 ## Version
+
+**v0.3.** Adds the `type: human` path (FEAT-2026-0085/T04): a work
+unit the driver never dispatches, halted on with the `HUMAN STEP
+REQUIRED` brief and recorded afterwards via `--done --evidence
+"<text>"` (§3b). Its decision vocabulary is done / abandon / skip —
+never re-arm, since there was no attempt to retry — and `done`
+requires non-empty `evidence` the operator writes themselves.
+`attempts` stays `0`; `re_arm_count` and `re_arm_history` are not
+touched.
 
 **v0.2.** Mandatory rationale on `r` and `u` re-arm choices: empty
 or whitespace-only input is rejected with `re-arm rationale required
