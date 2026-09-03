@@ -86,6 +86,29 @@ class TestVerifyFilesChanged(unittest.TestCase):
             ["nonexistent.py"],
         )
 
+    def test_deleted_tracked_file_is_a_real_change(self):
+        # #3119: a unit whose job includes deleting a file, and which
+        # honestly declares that file, must not lose the attempt. The path
+        # is absent on disk but was tracked at head_before, so `git diff
+        # head_before -- path` reports a deletion — a real diff to commit.
+        (self.root / "a.py").unlink()
+        result = {"files_changed": ["a.py"]}
+        self.assertEqual(loop.verify_files_changed(result, self.head), [])
+
+    def test_deleted_tracked_file_alongside_untouched_path(self):
+        (self.root / "a.py").unlink()
+        result = {"files_changed": ["a.py", "b.py"]}
+        self.assertEqual(loop.verify_files_changed(result, self.head), ["b.py"])
+
+    def test_path_absent_at_head_before_and_now_is_still_reported(self):
+        # The hollow-pass shape the guard exists for is unchanged: a path
+        # that never existed is not a deletion.
+        result = {"files_changed": ["never/existed.py"]}
+        self.assertEqual(
+            loop.verify_files_changed(result, self.head),
+            ["never/existed.py"],
+        )
+
     def test_files_changed_absent_returns_empty_opt_out(self):
         # AC 4: absence MUST opt out, not into the guard.
         self.assertEqual(loop.verify_files_changed({}, self.head), [])

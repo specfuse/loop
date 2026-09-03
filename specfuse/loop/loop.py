@@ -3489,7 +3489,8 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
     The RESULT-block contract lets the agent declare which paths its work
     touched. This guard, run before squash_commit, checks each claimed path
     actually differs from HEAD's pre-attempt SHA. A path that does not exist
-    on disk is reported as "unchanged" — it cannot have a diff to commit.
+    on disk is reported as "unchanged" unless it was tracked at head_before —
+    then its absence is a deletion, which is a diff to commit (#3119).
 
     Returns an empty list when all claimed paths show real diffs, OR when
     `files_changed` is absent / empty (the opt-out: pre-existing WUs and the
@@ -3507,7 +3508,17 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
     for raw in paths:
         path = str(raw)
         if not Path(path).exists():
-            unchanged.append(path)
+            # Absent on disk is two different facts (#3119): a path that was
+            # tracked at head_before and is gone now is a deletion — a real
+            # diff to commit, and a unit whose job includes removing a file
+            # must be able to declare it honestly. A path tracked at neither
+            # point is the hollow-pass shape this guard exists for.
+            tracked_before = subprocess.run(
+                ["git", "cat-file", "-e", f"{head_before}:{path}"],
+                capture_output=True, check=False,
+            ).returncode == 0
+            if not tracked_before:
+                unchanged.append(path)
             continue
         rc = subprocess.run(
             ["git", "diff", "--quiet", head_before, "--", path],
