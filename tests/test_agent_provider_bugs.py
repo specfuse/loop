@@ -126,6 +126,35 @@ class TestBugsProviderExecute(unittest.TestCase):
         self.assertEqual(outcome.status, STATUS_ESCALATED)
         self.assertIn("diff_too_large", outcome.detail)
 
+    def test_pr_not_found_escalation_does_not_claim_a_pr_exists(self):
+        # #3180: `pr_not_found` means the lookup failed, not that a PR was
+        # declined. The generic declined text said "opened the PR … fixes
+        # this issue but was declined" and offered "merge the PR by hand"
+        # with nothing to link — self-contradictory to the operator.
+        provider = BugsProvider(repo="o/r", runner=_recording_runner([]))
+        item = ActionItem(item_id="bug-1399", kind=KIND_BUG)
+
+        with patch(
+            "specfuse.agent.providers.bugs.run_bug_lane",
+            return_value=BugLaneResult(
+                outcome=OUTCOME_DECLINED, reason="pr_not_found", pr_number=None
+            ),
+        ):
+            outcome = provider.execute(item)
+
+        self.assertEqual(outcome.status, STATUS_ESCALATED)
+        esc = outcome.escalation
+        text = " ".join(
+            [esc.done_so_far, esc.issue_summary, esc.decision_needed, esc.why_not_auto]
+            + [opt[0] for opt in esc.options]
+        )
+        self.assertNotIn("opened the PR", text)
+        self.assertNotIn("fixes this issue but was declined", text)
+        self.assertNotIn("merge the PR by hand", text)
+        self.assertIn("no PR", text)
+        self.assertIn("fix/issue-1399", text)  # where to look for the branch
+        self.assertIn("pr_not_found", outcome.detail)
+
     def test_execute_maps_refused_to_escalated_with_detail(self):
         provider = BugsProvider(repo="o/r", runner=_recording_runner([]))
         item = ActionItem(item_id="bug-3", kind=KIND_BUG)

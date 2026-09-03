@@ -30,6 +30,7 @@ from specfuse.loop.bug_lane_run import (
     OUTCOME_DECLINED,
     OUTCOME_MERGED,
     OUTCOME_REFUSED,
+    REASON_PR_NOT_FOUND,
     pr_closes_issue,
     run_bug_lane,
 )
@@ -198,6 +199,66 @@ def _fix_bug_stopped_payload(
             "usually means the fix is feature-scoped, which points at "
             "promoting rather than forcing a bug-sized fix. Re-running the "
             "lane unchanged will reach the same outcome."
+        ),
+        category="blocked-wu",
+    )
+
+
+def _pr_not_found_payload(issue_number: int) -> EscalationPayload:
+    """`pr_not_found` is a lookup failure, not a guardrail decline (#3180).
+
+    `/fix-bug` reported `completed`, so a branch and very likely a PR exist,
+    but the lane could not find a PR whose body closes this issue. The
+    generic declined text asserted the PR existed, fixed the issue, and was
+    refused, then offered "merge it by hand" with nothing to link. Say what
+    is actually known and where to look.
+    """
+    branch_hint = f"fix/issue-{issue_number}-*"
+    return EscalationPayload(
+        target_issue=issue_number,
+        done_so_far=(
+            "Headless `/fix-bug` reported `completed` for this issue, but the "
+            "bug lane found no open PR whose body closes it, so no guardrail "
+            "was evaluated and nothing was merged."
+        ),
+        issue_summary=(
+            "The bug lane has no PR number for this issue -- `pr_not_found`. "
+            f"Look for a pushed branch named `{branch_hint}` and a PR opened "
+            "from it; if one exists, its body does not reference this issue "
+            "the way the lane matches on (`closes #<n>`)."
+        ),
+        decision_needed=(
+            "Whether the fix exists on a branch or PR that needs linking to "
+            "this issue, or whether `/fix-bug`'s report was wrong and the fix "
+            "must be redone."
+        ),
+        why_not_auto=(
+            "The lane merges only a PR it can find and evaluate. Without a "
+            "PR number it can neither run the guardrails nor merge, and it "
+            "will not guess which open PR belongs to this issue."
+        ),
+        options=[
+            (
+                f"Find the branch `{branch_hint}` or its PR and add "
+                f"`Closes #{issue_number}` to the PR body, then re-run the lane",
+                "recovers the completed work; the guardrails then evaluate it",
+                "costs a lookup",
+            ),
+            (
+                "Fix it by hand",
+                "unblocks the issue directly",
+                "discards whatever `/fix-bug` produced",
+            ),
+            (
+                "Re-run the lane",
+                "cheap if the lookup failed on GitHub read-after-write lag",
+                "repeats the fix session if the PR really was never opened",
+            ),
+        ],
+        recommendation=(
+            f"Check `git branch -r --list 'origin/{branch_hint}'` first: a "
+            "branch with commits means the work exists and only the PR link "
+            "is missing. Re-run the lane only if there is no branch."
         ),
         category="blocked-wu",
     )
@@ -382,6 +443,10 @@ class BugsProvider:
                 )
         elif result.outcome == OUTCOME_AUTOMERGE_OFF:
             escalation = _automerge_off_payload(issue_number, result.pr_number)
+        elif result.reason == REASON_PR_NOT_FOUND:
+            # A lookup failure, not a decline: no PR number exists to point
+            # the operator at, so the declined wording would lie (#3180).
+            escalation = _pr_not_found_payload(issue_number)
         else:
             assert result.outcome == OUTCOME_DECLINED
             escalation = _declined_payload(

@@ -100,6 +100,10 @@ _CI_UNKNOWN = "unknown"
 _CI_PENDING = "__pending__"
 
 _REASON_PR_NOT_FOUND = "pr_not_found"
+#: Public spelling for consumers that must render this reason differently
+#: from a guardrail decline (#3180): it means the lookup failed, not that a
+#: PR was evaluated and refused.
+REASON_PR_NOT_FOUND = _REASON_PR_NOT_FOUND
 
 _DEFAULT_WORKING_DIR = "."
 
