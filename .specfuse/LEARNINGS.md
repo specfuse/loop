@@ -3851,3 +3851,29 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `produces:` entry, name the criterion that forces a diff on it; if there is none,
   remove the entry. Candidate for `authoring-work-units` §13, which today warns
   about partial bundles but not about this shape.
+
+## FEAT-2026-0085/G1-CLOSE — grep-shaped criteria and vendored mirrors
+
+- [FEAT-2026-0085/G1-CLOSE] **A "zero matches under `<path>`" acceptance criterion
+  must be scoped to the paths the WU is authorized to edit, and in a repo with a
+  byte-synced vendored mirror the canonical file and its mirror are one editable
+  unit that belongs to one WU.** T01's AC3 required zero `met_locally|partially_met`
+  matches under `specfuse/`; the last match was
+  `specfuse/loop/data/rules/close-discipline.md`, the shipped mirror of
+  `.specfuse/rules/close-discipline.md`, which T01's *Do not touch* reserved for T05.
+  `tests/test_scaffold_data_in_sync.py` byte-matches the two trees, so the mirror
+  cannot be edited alone — satisfying AC3 required editing the file the WU was
+  forbidden to touch, and every escape (edit it anyway, leave the suite red, weaken
+  the criterion) is a rule violation. The agent correctly emitted `blocked`; the
+  attempt still cost $6.52 and a re-arm. T02 hit the same shape 90 minutes later for
+  $1.12 across two attempts: its grep criterion was repo-wide while its authorized
+  touch-set was four named functions, and `lint_plan.py`'s reader of the same marker
+  was neither named in the four nor listed as untouchable. Rule, at arming time: for
+  every criterion phrased as a repo-wide grep, intersect the grep's path set with the
+  WU's authorized touch-set and write the intersection into the criterion; each
+  remaining hit must be named explicitly as another WU's or as a legacy-tolerance
+  surface the criterion tolerates. Corollary: never split a canonical file and its
+  vendored mirror across two WUs of the same gate. Distinct from
+  [meta/first-live-use]'s "scope criteria to the feature's own footprint", which
+  bounds a criterion against the *repo*; this one bounds it against the *sibling WU*,
+  and the sibling boundary is the one a single-gate serial chain makes easy to miss.
