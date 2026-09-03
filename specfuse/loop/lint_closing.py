@@ -447,10 +447,6 @@ def lint_closing(feature_dir: Path) -> tuple[list[str], list[str]]:
         elif req.applies_when == "failures_present":
             if not ctx.failures_present():
                 continue
-        elif req.applies_when == "autoclose_debt_marker":
-            # No pre-squash requirement currently carries this condition
-            # (close-g is post-pass); nothing to evaluate here.
-            continue
         elif req.applies_when == "criteria_artifact_present":
             if ctx.gate_num is None:
                 continue

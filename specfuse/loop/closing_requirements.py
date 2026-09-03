@@ -111,12 +111,6 @@ def gate_review_filename(next_gate: int) -> str:
     return GATE_REVIEW_FILENAME_TEMPLATE.format(next_gate=next_gate)
 
 
-DEFERRAL_HEADING_TEXT = "What the loop did NOT verify"
-DEFERRAL_HEADING_RE = re.compile(rf"(?m)^#{{1,3}}\s*{re.escape(DEFERRAL_HEADING_TEXT)}.*$")
-
-AUTOCLOSE_DEBT_MARKER_RE = re.compile(r"<!--\s*specfuse:autoclose-debt\s+gate=(\d+)")
-
-
 # --------------------------------------------------------------------------- #
 # §3 contract-change enumeration -> CHANGELOG.md linkage (FEAT-2026-0064/T02) #
 # --------------------------------------------------------------------------- #
@@ -177,8 +171,8 @@ class Requirement:
     """One closing-artifact requirement, as data.
 
     ``applies_when`` names the condition under which the requirement fires:
-    ``always``, ``verdict_met``, ``failures_present``,
-    ``autoclose_debt_marker``, or ``criteria_artifact_present`` (the gate's
+    ``always``, ``verdict_met``, ``failures_present``, or
+    ``criteria_artifact_present`` (the gate's
     ``GATE-NN-CRITERIA.md`` exists). ``phase`` is ``pre-squash`` (checked by
     ``assert_closing_deliverables`` right after the WU's own squash) or
     ``post-pass`` (checked by ``verify_post_pass_invariants`` after the
@@ -247,16 +241,6 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             heading_level=FAILURE_CLASS_HEADING_LEVEL,
             applies_when="failures_present",
             enforced_by="assert_failure_class_breakdown_when_failures_present",
-        ),
-        Requirement(
-            id="close-g", wu_type="close", phase="post-pass",
-            description=(
-                "Predecessor auto-close debt markers are named in the terminal "
-                f"close's '{DEFERRAL_HEADING_TEXT}' section"
-            ),
-            file=RETROSPECTIVE_FILENAME,
-            applies_when="autoclose_debt_marker",
-            enforced_by="assert_autoclose_debt_reconciled",
         ),
         Requirement(
             id="close-h", wu_type="close", phase="post-pass",

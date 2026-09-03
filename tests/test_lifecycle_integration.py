@@ -360,7 +360,6 @@ class LifecycleIntegrationTest(unittest.TestCase):
                 "an auto-closed gate must record the skip in the file a "
                 "reviewer opens, not only in RETROSPECTIVE.md")
             self.assertIn("did not run", gate_text)
-            self.assertIn("specfuse:autoclose-debt", gate_text)
 
     def test_dispatched_close_lifecycle_terminal_invariant(self):
         """AC3: with auto-close disabled, the feature closes via a dispatched

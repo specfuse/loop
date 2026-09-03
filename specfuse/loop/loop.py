@@ -64,13 +64,10 @@ from . import criteria_state
 from . import scaffold as _scaffold
 from .changelog import ENTRY_CLASSES, parse_changelog
 from .closing_requirements import (
-    AUTOCLOSE_DEBT_MARKER_RE,
     CHANGELOG_PATH,
     CONSUMER_VISIBLE_HEADING,
     COST_ANALYSIS_HEADING,
     COST_ANALYSIS_HEADING_RE,
-    DEFERRAL_HEADING_RE,
-    DEFERRAL_HEADING_TEXT,
     DOCS_PREFIX,
     FAILURE_CLASS_HEADING_MARKDOWN,
     FAILURE_CLASS_HEADING_RE,
@@ -95,7 +92,6 @@ from .gate_eval import (
     evaluate_auto_close,
     AutoCloseDecision,
     NON_SUBSTANTIVE_TYPES,
-    PREDICATE_VERSION as _GATE_PREDICATE_VERSION,
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
@@ -3036,7 +3032,7 @@ def _precreate_gate_review_stub(feature_dir: Path, gate_n: int) -> None:
 
 
 def _precreate_retrospective_stub(wu: WorkUnit, feature_dir: Path, gate_n: int) -> None:
-    """(close-intermediate-a / close-f / close-intermediate-d / close-g shapes)
+    """(close-intermediate-a / close-f / close-intermediate-d shapes)
     Append stub sections to RETROSPECTIVE.md for every requirement derivable
     from on-disk state at dispatch time. Never writes a `verdict:` value —
     that field stays owned by assert_verdict_well_formed at outcome time.
@@ -3060,22 +3056,6 @@ def _precreate_retrospective_stub(wu: WorkUnit, feature_dir: Path, gate_n: int) 
         feature_dir, gate_n, exclude_correlation_id=wu.wu_id)
     if failure_summary != _NO_FAILURES_SENTINEL and not FAILURE_CLASS_HEADING_RE.search(existing_text):
         sections.append(failure_summary)
-
-    if wu.type == "close":
-        _, gates = load_graph(feature_dir)
-        terminal_gate_number = gates[-1].number if gates else gate_n
-        predecessor_gates = sorted({
-            int(m.group(1))
-            for m in AUTOCLOSE_DEBT_MARKER_RE.finditer(existing_text)
-            if int(m.group(1)) < terminal_gate_number
-        })
-        if predecessor_gates and not DEFERRAL_HEADING_RE.search(existing_text):
-            names = ", ".join(f"gate {g}" for g in predecessor_gates)
-            sections.append(
-                f"## {DEFERRAL_HEADING_TEXT}\n\n"
-                "<!-- specfuse:skeleton-stub agent-completable -->\n"
-                f"Name and reconcile predecessor auto-close debt for: {names}.\n"
-            )
 
     if not sections:
         return
@@ -4872,15 +4852,6 @@ def _close_wu_disables_auto_close(close_wu: "WorkUnit | None") -> bool:
 
 
 _DEBT_AC_ITEM_RE = re.compile(r"(?m)^\s*\d+\.\s+(.*)$")
-_DEBT_CRITERION_MAX_LEN = 200
-_DEBT_CRITERIA_CAP = 40
-
-
-def _truncate_debt_criterion(text: str) -> str:
-    text = text.strip()
-    if len(text) > _DEBT_CRITERION_MAX_LEN:
-        return text[:_DEBT_CRITERION_MAX_LEN] + "…"
-    return text
 
 
 @dataclass(frozen=True)
@@ -4891,7 +4862,7 @@ class WUCriteria:
     `criteria` may still be empty if the body has no parseable AC list),
     `"missing"` (WU file absent), `"unparseable"` (frontmatter read failed),
     or `"skipped"` (non-substantive `wu.type`, per `NON_SUBSTANTIVE_TYPES`).
-    `sub_id` is set only for `"ok"`.
+    `sub_id` and `wu_type` are set only for `"ok"`.
     """
 
     wu_id: str
@@ -4899,13 +4870,14 @@ class WUCriteria:
     sub_id: str | None
     criteria: list[str]
     status: str
+    wu_type: str | None = None
 
 
 def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]:
     """Walk a gate's WU refs and extract each substantive WU's ordered
     acceptance-criterion strings, from disk, in ref order.
 
-    Shared by `build_autoclose_debt_enumeration` and
+    Shared by `build_autoclose_pass_summary` and
     `_precreate_criteria_state_stub` — one parser for "what are this gate's
     acceptance criteria" so the two surfaces cannot silently disagree.
     """
@@ -4939,81 +4911,31 @@ def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]
         sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
         ac_text = _wu_sections.slice_acceptance_criteria(body)
         criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
-        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok"))
+        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok", wu_type))
     return results
 
 
-def build_autoclose_debt_enumeration(feature_dir: Path, gate_number: int) -> str:
-    """Return the deferred-verification worklist for an auto-closed gate.
+def build_autoclose_pass_summary(feature_dir: Path, gate_number: int) -> str:
+    """Return one line per substantive unit naming the gate set its final
+    attempt passed — what `evaluate_auto_close` actually proved, not a list
+    of every acceptance criterion it did not individually re-check.
 
     Reads the gate's WU list from `PLAN.md`'s graph and each WU's frontmatter
-    and body **from disk** (FEAT-2026-0070/T06) — the auto-close path never
-    has a `WorkUnit` loaded for the WUs it enumerates, same constraint as
-    `recheck_terminal_verdict`. No agent dispatch, no subprocess, no model
-    call: this only reads files the driver has already located.
+    **from disk** — the auto-close path never has a `WorkUnit` loaded for the
+    WUs it summarizes, same constraint as `recheck_terminal_verdict`. No
+    agent dispatch, no subprocess, no model call: this only reads files the
+    driver has already located.
     """
-    sub_ids: list[str] = []
-    entries: list[str] = []
-    total_criteria = 0
-
+    lines: list[str] = []
     for wc in extract_wu_criteria(feature_dir, gate_number):
-        if wc.status == "skipped":
+        if wc.status != "ok":
             continue
-        if wc.status == "missing":
-            entries.append(
-                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
-                f"  - deferred: <criteria not parseable> (file not found)"
-            )
-            continue
-        if wc.status == "unparseable":
-            entries.append(
-                f"- **{wc.wu_id}** (`{wc.ref_file}`)\n"
-                f"  - deferred: <criteria not parseable> ({wc.ref_file})"
-            )
-            continue
-
-        sub_ids.append(wc.sub_id)
-        lines = [f"- **{wc.wu_id}** (`{wc.ref_file}`)"]
-        if not wc.criteria:
-            lines.append(f"  - deferred: <criteria not parseable> ({wc.ref_file})")
-        else:
-            total_criteria += len(wc.criteria)
-            for criterion in wc.criteria:
-                lines.append(f"  - deferred: {_truncate_debt_criterion(criterion)}")
-        entries.append("\n".join(lines))
-
-    # AC7: no silent cap — list the first 40 criteria total, announce the rest.
-    rendered: list[str] = []
-    emitted = 0
-    truncated_at = None
-    for entry in entries:
-        entry_lines = entry.split("\n")
-        header = entry_lines[0]
-        deferred_lines = entry_lines[1:]
-        kept: list[str] = []
-        for dl in deferred_lines:
-            if emitted >= _DEBT_CRITERIA_CAP:
-                truncated_at = True
-                break
-            kept.append(dl)
-            emitted += 1
-        if kept:
-            rendered.append("\n".join([header] + kept))
-        elif not deferred_lines:
-            rendered.append(header)
-        if truncated_at:
-            break
-
-    remaining = total_criteria - emitted
-    if truncated_at and remaining > 0:
-        rendered.append(f"- … {remaining} further criteria not listed; read the WU files")
-
-    marker = (
-        f"<!-- specfuse:autoclose-debt gate={gate_number} "
-        f"wus={','.join(sub_ids)} criteria={total_criteria} "
-        f"predicate={_GATE_PREDICATE_VERSION} -->"
-    )
-    return marker + "\n\n" + "\n".join(rendered)
+        gate_set = GATES_FOR_TYPE.get(wc.wu_type, wc.wu_type)
+        lines.append(
+            f"- **{wc.wu_id}** (`{wc.ref_file}`): final attempt passed the "
+            f"`{gate_set}` gate set"
+        )
+    return "\n".join(lines)
 
 
 def stamp_gate_auto_close_note(
@@ -5027,9 +4949,8 @@ def stamp_gate_auto_close_note(
     gate actually pass, and on what evidence?" Before this, that file read
     `status: passed` and said nothing else: `passed` looked identical whether a
     close agent verified the definition of done or the predicate skipped it. The
-    honest signal existed — the `specfuse:autoclose-debt` marker, the
-    RETROSPECTIVE section, `auto_close: true` on the close WU — but every piece
-    of it lived in a different file.
+    honest signal existed — the RETROSPECTIVE section and `auto_close: true` on
+    the close WU — but every piece of it lived in a different file.
 
     Mirrors what `write_stub_retrospective_terminal` already computes into the
     file a reviewer actually opens, and names where the per-criterion deferred
@@ -5060,11 +4981,7 @@ def stamp_gate_auto_close_note(
         f"predicate={decision.predicate_version}). The close ceremony "
         f"**did not run**.\n\n"
         f"- gate_total_cost: ${total_cost:.2f} of {budget_str}\n"
-        f"- reasons: {decision.reasons} (auto=True)\n\n"
-        f"The per-criterion deferred-verification list was **not** enumerated. "
-        f"Before treating this gate as fully verified, read `RETROSPECTIVE.md` "
-        f"§ \"What the loop did NOT verify\" and the "
-        f"`specfuse:autoclose-debt` marker it carries.\n"
+        f"- reasons: {decision.reasons} (auto=True)\n"
     )
     with gate_file.open("a") as fh:
         fh.write(note if text.endswith("\n") else "\n" + note)
@@ -5099,23 +5016,15 @@ def write_stub_retrospective_terminal(
     section = (
         f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
         f"On-plan close; full retrospective ceremony skipped per\n"
-        f"`evaluate_auto_close`.\n\n"
+        f"`evaluate_auto_close`. An auto-close fires only when every\n"
+        f"substantive unit's final attempt passed the driver's gates — that is\n"
+        f"what was verified:\n\n"
+        f"{build_autoclose_pass_summary(feature_dir, gate_number)}\n\n"
         f"- feature_id: {decision.feature_id}\n"
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n\n"
-        # issue #157: terminal auto-close skips the close body AND has no
-        # downstream gate to catch the gap — the operator is the last line.
-        f"## What the loop did NOT verify (gate {gate_number})\n\n"
-        f"This terminal gate auto-closed on-plan; the full close ceremony did not\n"
-        f"run, so the per-criterion deferred-verification list was **not**\n"
-        f"enumerated, and there is no downstream gate to reconcile it. Before\n"
-        f"treating the feature as fully verified, the operator MUST confirm every\n"
-        f"acceptance criterion was actually verified in-loop (not only by artifact\n"
-        f"shape). Any AC deferred to a post-merge or real-system step must be\n"
-        f"recorded and completed now.\n\n"
-        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
+        f"- reasons: [] (auto=True)\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -5264,24 +5173,15 @@ def append_stub_retrospective_intermediate(
         f"## Gate {gate_number} — auto-closed (predicate=v1)\n\n"
         f"On-plan intermediate close; full close-intermediate ceremony\n"
         f"skipped per `evaluate_auto_close`. `plan-next` WU dispatched\n"
-        f"to draft gate {gate_number + 1}.\n\n"
+        f"to draft gate {gate_number + 1}. An auto-close fires only when every\n"
+        f"substantive unit's final attempt passed the driver's gates — that is\n"
+        f"what was verified:\n\n"
+        f"{build_autoclose_pass_summary(feature_dir, gate_number)}\n\n"
         f"- feature_id: {decision.feature_id}\n"
         f"- predicate_version: {decision.predicate_version}\n"
         f"- gate_total_cost: ${total_cost:.2f}\n"
         f"- gate_budget: {budget_str}\n"
-        f"- reasons: [] (auto=True)\n\n"
-        # issue #157: the auto-close path skips the close-intermediate body, so
-        # the per-criterion deferred-verification list is never enumerated. Emit
-        # an explicit marker rather than silently omitting it — the predicate
-        # cannot reason over ACs, so it flags the gap for downstream reconciliation.
-        f"## What the loop did NOT verify (gate {gate_number})\n\n"
-        f"This gate auto-closed on-plan; the full close-intermediate ceremony did\n"
-        f"not run, so the per-criterion deferred-verification list was **not**\n"
-        f"enumerated. Any acceptance criterion whose verification is deferred\n"
-        f"(loop-sandbox limit, cross-repo coordination, real-system access) is\n"
-        f"unrecorded here. Gate {gate_number + 1}'s close MUST reconcile these\n"
-        f"before the feature's terminal verdict — auto-close cannot enumerate them.\n\n"
-        f"{build_autoclose_debt_enumeration(feature_dir, gate_number)}\n"
+        f"- reasons: [] (auto=True)\n"
     )
     if retro.exists():
         with retro.open("a") as fh:
@@ -6286,94 +6186,6 @@ def assert_terminal_flips_fired(
     return True, ""
 
 
-_AUTOCLOSE_DEBT_MARKER_RE = AUTOCLOSE_DEBT_MARKER_RE
-_DEFERRAL_HEADING_RE = DEFERRAL_HEADING_RE
-
-
-def _terminal_deferral_section(retro_text: str) -> str:
-    """Return the text under the LAST `What the loop did NOT verify` heading.
-
-    A gate that auto-closed earlier already wrote its own such section (via
-    `build_autoclose_debt_enumeration`); the terminal close writes its own,
-    appended after. The last occurrence is the terminal close's own record.
-    """
-    matches = list(_DEFERRAL_HEADING_RE.finditer(retro_text))
-    if not matches:
-        return ""
-    last = matches[-1]
-    nl = retro_text.find("\n", last.end())
-    after = retro_text[nl + 1:] if nl != -1 else ""
-    em = re.search(r"(?m)^#{1,3}\s", after)
-    return after[:em.start()] if em else after
-
-
-def assert_autoclose_debt_reconciled(
-    wu: WorkUnit,
-    feature_dir: Path,
-    repo_root: Path,
-    head_before: str,
-) -> tuple[bool, str]:
-    """(close-g) A marked predecessor auto-close debt must be named in the
-    terminal close's `## What the loop did NOT verify` section.
-
-    Marker-gated (FEAT-2026-0070/T07): only gates whose auto-close stub
-    carries T06's `<!-- specfuse:autoclose-debt gate=N ... -->` marker are
-    considered. No historical retrospective in this repo has one, so this
-    fires on zero of the 11 features that have auto-closed a gate
-    (`GATE-02-REVIEW.md` § Satisfiability) — the unmarked-predicate form
-    fires on 6 of them and is unsatisfiable by `planning-discipline.md` §2.
-
-    Short-circuits `(True, "")` when:
-      - the terminal close WU itself is `auto_close: true` — no session ran,
-        so there is no one to hold responsible and T06's terminal stub is
-        already the record;
-      - `RETROSPECTIVE.md` carries no debt marker for a gate earlier than the
-        terminal gate (a marker for the terminal gate itself is not a
-        predecessor and is ignored).
-
-    Otherwise, every predecessor gate a marker names must appear as
-    `gate N` in the terminal close's own deferral section (the last
-    `What the loop did NOT verify` heading in the file); an unmentioned gate
-    returns `(False, reason)` with `autoclose_debt_unreconciled` in the
-    reason.
-    """
-    fm, _ = read_frontmatter(wu.file)
-    if fm.get("auto_close") in (True, "true", "True"):
-        return True, ""
-
-    retro_path = feature_dir / RETROSPECTIVE_FILENAME
-    if not retro_path.exists():
-        return True, ""
-    retro_text = retro_path.read_text()
-
-    _, gates = load_graph(feature_dir)
-    if not gates:
-        return True, ""
-    terminal_gate_number = gates[-1].number
-
-    predecessor_gates = sorted({
-        int(m.group(1))
-        for m in _AUTOCLOSE_DEBT_MARKER_RE.finditer(retro_text)
-        if int(m.group(1)) < terminal_gate_number
-    })
-    if not predecessor_gates:
-        return True, ""
-
-    deferral_section = _terminal_deferral_section(retro_text)
-    unmentioned = [
-        g for g in predecessor_gates
-        if not re.search(rf"\bgate\s+{g}\b", deferral_section, re.IGNORECASE)
-    ]
-    if unmentioned:
-        return False, (
-            "autoclose_debt_unreconciled: gate(s) "
-            f"{', '.join(str(g) for g in unmentioned)} carry an unreconciled "
-            f"auto-close debt marker not named in the terminal close's "
-            f"'## What the loop did NOT verify' section"
-        )
-    return True, ""
-
-
 def assert_learnings_staged_under_auto(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
@@ -6412,7 +6224,6 @@ def assert_learnings_staged_under_auto(
 POST_PASS_INVARIANTS_BY_TYPE: dict[str, list] = {
     "close": [
         assert_terminal_flips_fired,
-        assert_autoclose_debt_reconciled,
         assert_learnings_staged_under_auto,
     ],
     "close-intermediate": [assert_learnings_staged_under_auto],
