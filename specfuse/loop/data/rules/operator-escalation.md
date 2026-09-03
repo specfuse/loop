@@ -112,7 +112,7 @@ success is the failure this section prevents.
 ## What "plain English" means
 
 - **No unexplained jargon on first use.** Write "the list of criteria nobody
-  actually verified", then name it. `met_locally`, `closing_deliverable_missing`,
+  actually verified", then name it. `not_met`, `closing_deliverable_missing`,
   and `assert_gate_review_exists` mean nothing to someone deciding whether to
   ship.
 - **Name what a thing *does*, not what it is called.** "The command that refuses

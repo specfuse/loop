@@ -43,7 +43,6 @@ _VENDORED_SKILLS = _REPO_ROOT / ".specfuse" / "skills"
 _ESCALATING_SKILLS = (
     "arm-gate",             # accept/revise/reject each drafted WU
     "gate-status",          # recommends, never decides
-    "accept-hedged-close",  # records the operator's own reason
     "attention",            # the needs-a-human inbox
     "answer-escalation",    # dispositions one parked issue
     "wrap-feature",    # refuses non-done features

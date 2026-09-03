@@ -75,10 +75,24 @@ arm the next one), or `passed`.
 broken and nothing is lost; it needs a decision. `/gate-status` explains what
 happened, `/unblock-wu` re-arms it once you have fixed the cause.
 
-**A close verdict** is `met` (the goal was achieved and shown), `met_locally`
-(achieved here, but not proven beyond this repository), `partially_met`, or
-`not_met`. The middle two are **hedged**: the feature is held short of finished
-on purpose until you accept the gap, with `/accept-hedged-close`.
+**A close verdict** is `met` (the goal was achieved and shown) or `not_met`.
+There is no partial credit. A `not_met` close writes `FOLLOW-UPS.md` — one
+entry per criterion it could not meet — and the loop files one tracked issue
+per entry, so what is unfinished is visible as work rather than softened into
+the verdict.
+
+**`FOLLOW-UPS.md`** — the record a `not_met` close leaves behind: per failed
+criterion, the criterion itself, the evidence, and what would satisfy it.
+
+**A `type: human` work unit** — a step only a person can perform (reply, sign,
+click, run something interactively). The loop halts on it rather than
+dispatching it; you do the step, mark it `done` with `evidence:`, and the run
+resumes. It goes *before* the close, so the human step is recorded rather than
+hedged after the fact.
+
+**`## Post-merge checklist`** — an optional `PLAN.md` section for anything only
+observable in production. It is filed as one tracked issue at close; it is
+never an acceptance criterion.
 
 ## Terms that look like jargon because they are
 

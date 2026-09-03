@@ -47,7 +47,6 @@ _CANONICAL_SKILLS = _REPO_ROOT / "plugins" / "specfuse" / "skills"
 _HUMAN_FACING_SKILLS = (
     "arm-gate",
     "gate-status",
-    "accept-hedged-close",
     "attention",
     "answer-escalation",
 )
@@ -85,7 +84,7 @@ class TestRuleShipsAndStaysInSync(unittest.TestCase):
     def test_rule_carries_the_translation_table(self):
         """Rule 3 is unactionable without concrete substitutions."""
         text = _RULE.read_text(encoding="utf-8")
-        for key in ("blocked_human", "awaiting_review", "met_locally", "failure_class"):
+        for key in ("blocked_human", "awaiting_review", "not_met", "failure_class"):
             with self.subTest(key=key):
                 self.assertIn(key, text, f"{key} has no plain-English rendering")
 

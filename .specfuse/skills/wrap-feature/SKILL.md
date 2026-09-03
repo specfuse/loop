@@ -103,8 +103,12 @@ this.
 - Confirm the terminal gate is `passed` and the roadmap row is `done`.
   These are set driver-side by `fire_terminal_flips` when the close WU
   passes with `verdict: met`. If either is still `awaiting_review` /
-  `active`, the close WU likely ran with a hedged verdict — surface
-  this and stop; do not attempt manual reconciliation here.
+  `active`, the close WU likely recorded `verdict: not_met` (or a retired
+  verdict from before FEAT-2026-0085) — surface this and stop; do not attempt
+  manual reconciliation here. Point the operator at `FOLLOW-UPS.md` for a
+  `not_met` close, or at `docs/methodology.md` § Migrating a hedged close for a
+  retired verdict. There is no skill that accepts a verdict to get past this
+  refusal.
 - Detect close path: run
   `grep -qE '^## Gate [0-9]+ — auto-closed \(predicate=v[0-9]+\)'`
   on RETROSPECTIVE.md. Match → auto-closed; no match → full ceremony.

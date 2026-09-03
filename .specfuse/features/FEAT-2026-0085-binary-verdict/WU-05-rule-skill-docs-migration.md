@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0085/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 model: opus
 effort: high
@@ -11,6 +11,13 @@ produces:
   - .specfuse/rules/close-discipline.md
   - docs/methodology.md
   - CHANGELOG.md
+gate_set: code
+driver_version: 0.14.0
+started_at: 2026-09-03T11:39:21.314924+00:00
+duration_seconds: 1377.634
+cost_usd: 7.326092
+input_tokens: 198
+output_tokens: 46871
 ---
 
 # Rewrite close-discipline for a binary verdict, remove the acceptance skill, document migration

@@ -373,7 +373,8 @@ briefing, not only the six parts — a halted feature is feature scope, so the
 operator needs the business picture (why we picked it, whether it is still on
 track to deliver, sunk cost against estimate-to-finish, continue / re-scope /
 abandon) with the blocked-unit diagnosis as one part of it rather than the whole
-answer. Same operator request as `/accept-hedged-close` v0.2.
+answer. Same operator request the acceptance skill carried before
+FEAT-2026-0085 removed it.
 
 **v0.2.** Added budget-brake fields to §2: `cost_budget_usd` in GATE
 files and the `gate_budget_exceeded` escalation event in `events.jsonl`

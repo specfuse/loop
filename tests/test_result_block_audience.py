@@ -36,7 +36,6 @@ _SKILL_DIRS = (
 # about who reads its output, and a glob would absolve it silently.
 _CONDITIONAL = (
     "abandon-feature",
-    "accept-hedged-close",
     "adopt-feature",
     "arm-gate",
     "block-feature",
