@@ -1362,6 +1362,7 @@ def detect_deterministic_refusal_repeat(
     summary: "str | None",
     prior_summary: "str | None",
     files_touched: "list[str] | None",
+    prior_files_touched: "list[str] | None" = None,
 ) -> bool:
     """Return True iff a guard refusal repeated on a provably untouched tree (#597).
 
@@ -1380,7 +1381,10 @@ def detect_deterministic_refusal_repeat(
       nothing so the next run has no new input.
 
     Identical summary ALONE is deliberately not enough: a work unit can fail
-    the same guard twice while making real progress toward passing it.
+    the same guard twice while making real progress toward passing it. An
+    identical summary with an identical non-empty ``files_touched`` set is
+    not progress either (#1415): the attempt reproduced the prior one, and
+    when ``prior_files_touched`` is supplied that fires too.
 
     Returns False when there is no prior refusal to compare, and when either
     summary is blank — a non-informative summary collapses distinct refusals
@@ -1393,13 +1397,20 @@ def detect_deterministic_refusal_repeat(
     """
     if prior_summary is None or summary is None:
         return False
-    if files_touched:
-        return False
     current = summary.strip()
     prior = prior_summary.strip()
     if not current or not prior:
         return False
-    return current == prior
+    if current != prior:
+        return False
+    if not files_touched:
+        return True
+    # #1415: the tree was touched, but identically to the prior attempt — the
+    # same declared subset written, the same path missing. That is a
+    # reproduction, not progress, and the next session would buy nothing.
+    if prior_files_touched is not None and sorted(files_touched) == sorted(prior_files_touched):
+        return True
+    return False
 
 
 def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
@@ -7183,7 +7194,8 @@ def run(
                     # session that would buy nothing is never paid for.
                     if len(refusal_history) >= 2 and detect_deterministic_refusal_repeat(
                             refusal_history[-1][0], refusal_history[-2][0],
-                            refusal_history[-1][1]):
+                            refusal_history[-1][1],
+                            prior_files_touched=refusal_history[-2][1]):
                         _rsum = refusal_history[-1][0]
                         note_paths = persist_attempt_notes(
                             work_dir, wu.wu_id, attempt_notes)
@@ -7492,7 +7504,10 @@ def run(
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
                             attempt_notes.append((attempt, _deliv_note))
-                            failure_note = deliv_summary
+                            # #1415: hand the next attempt the present/absent
+                            # split and what was actually written, not the
+                            # one-line summary a human already sees.
+                            failure_note = _deliv_note
                             print(
                                 f"   DELIVERABLE MISSING attempt "
                                 f"{attempt}/{wu_max_attempts} — {deliv_summary}"
