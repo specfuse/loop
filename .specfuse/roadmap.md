@@ -106,7 +106,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
-| FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | planned | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ detail](#feat-2026-0108) |
+| FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | active | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ detail](#feat-2026-0108) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1081,7 +1081,7 @@ timeout. T04 `ci_pending` reason and label. T05 the PR number carried from
 WU driver's own loop, guardrail semantics beyond naming the pending state,
 #3222 and #3223.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 

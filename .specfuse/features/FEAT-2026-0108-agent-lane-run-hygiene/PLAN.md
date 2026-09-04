@@ -5,7 +5,7 @@ slug: agent-lane-run-hygiene
 branch: feat/FEAT-2026-0108-agent-lane-run-hygiene
 roadmap_goal: An unattended `specfuse agent` run never attributes one item's edits to another, never loses a finished fix to a session that ended while a gate command ran, never reports a pending CI run as red or a found PR as missing, and records the tokens each item spent so `max_tokens_per_run` can fire.
 autonomy_default: review
-status: planned
+status: active
 planned_cost_usd: 37.00
 ---
 
