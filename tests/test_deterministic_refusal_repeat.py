@@ -40,6 +40,7 @@ from tests._loop_loader import load_loop
 
 load_loop()
 
+import specfuse.loop.loop as loop_module  # noqa: E402  (after sys.path setup above)
 from specfuse.loop.loop import (  # noqa: E402  (after sys.path setup above)
     detect_deterministic_refusal_repeat,
 )
@@ -71,6 +72,38 @@ class TestDetectDeterministicRefusalRepeat(unittest.TestCase):
         self.assertFalse(
             detect_deterministic_refusal_repeat(
                 _SUMMARY, _SUMMARY, ["specfuse/loop/loop.py"]))
+
+    def test_identical_summary_and_identical_touched_set_short_circuits(self):
+        # #1415: attempts 1 and 2 each wrote the same one of two declared
+        # deliverables and were refused for the same missing path. That is
+        # not progress — the second attempt reproduced the first exactly —
+        # and the third attempt is a full-price session that buys nothing.
+        self.assertTrue(
+            detect_deterministic_refusal_repeat(
+                _SUMMARY, _SUMMARY, ["src/a.py"], prior_files_touched=["src/a.py"]))
+
+    def test_identical_summary_but_different_touched_set_does_not(self):
+        # Same wall, different work: the agent wrote something new, so the
+        # next attempt has new input. Order of paths is not a difference.
+        self.assertFalse(
+            detect_deterministic_refusal_repeat(
+                _SUMMARY, _SUMMARY, ["src/a.py", "src/b.py"], prior_files_touched=["src/a.py"]))
+        self.assertTrue(
+            detect_deterministic_refusal_repeat(
+                _SUMMARY, _SUMMARY, ["src/b.py", "src/a.py"],
+                prior_files_touched=["src/a.py", "src/b.py"]))
+
+    def test_deliverable_missing_retry_carries_the_present_absent_split(self):
+        # #1415: the retry prompt used to repeat the one-line guard summary a
+        # human already sees. The attempt note composed before the reset
+        # (#1412) says which declared deliverables landed and which did not;
+        # that is what the next attempt is handed.
+        import inspect
+        src = inspect.getsource(loop_module.run)
+        branch = src[src.index('"deliverable_missing",'):]
+        branch = branch[:branch.index("continue")]
+        self.assertIn("failure_note = _deliv_note", branch)
+        self.assertNotIn("failure_note = deliv_summary", branch)
 
     def test_different_summary_does_not_short_circuit(self):
         self.assertFalse(
