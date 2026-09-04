@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.15.0+umbrella.0.12.1] - 2026-09-04
+
 ### Added
 
 - **`specfuse lint` refuses an acceptance criterion the loop cannot observe, and warns when a small feature over-ceremonies itself.** A review of 273 features found 72 of 101 hedged verdicts traced to a criterion asking the loop to observe production, another repository, or a human signature — something no oracle it can run will ever reach. `lint_ac_observable` now ERRORs on an acceptance-criteria bullet that matches an unobservable phrase and carries no backticked command, path, or test id, with two escape hatches for a criterion that is honestly unobservable *here*: `oracle_env:` naming a non-local environment, or `human_only: true`. **Satisfiable on the populated corpus before it shipped at ERROR**, not asserted in prose — the sweep over all 73 existing feature folders reports zero, because `done` units are skipped as sealed history and a correct criterion already names its check in backticks. Alongside it, `lint_gate_proportionality` WARNs when a plan of at most `GATE_PROPORTIONALITY_THRESHOLD` substantive units spans more than one gate; **WARN, not ERROR**, because gate partition is an authoring judgement and a gate red for ceremony gets ignored, which is how ceremony accreted in the first place. Both rules join the existing corpus-wide lint sweep rather than adding a gate (FEAT-2026-0084)
