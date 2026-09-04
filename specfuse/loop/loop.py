@@ -3069,6 +3069,62 @@ def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
     )
 
 
+def gate_driver_edits_from_events(feature_dir: Path, gate_number: int) -> list:
+    """Driver edits recorded for *gate_number* by earlier driver processes (#1039).
+
+    `driver_edits` is per-process, and a driver-editing unit that is not the
+    gate's last halts the run (FEAT-2026-0075/T05) — so the process that
+    reaches gate completion is a fresh one whose list is empty, and the
+    gate-end summary and event T03 built could fire only when the editing
+    unit happened to be last. The halt already writes a durable
+    `driver_staleness_detected` event with `halted: true`, `wu_id` and
+    `driver_paths` for the gate; read those back so the summary at
+    completion names every edit the gate made, whichever process made it.
+
+    Returns `[(wu_id, driver_paths), ...]` in event order, one entry per
+    unit. Never raises: a missing or unreadable events file yields `[]`.
+    """
+    events_path = feature_dir / "events.jsonl"
+    if not events_path.exists():
+        return []
+    edits: list = []
+    seen: set = set()
+    try:
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            if event.get("event_type") != "driver_staleness_detected":
+                continue
+            payload = event.get("payload") or {}
+            if not payload.get("halted") or payload.get("gate") != gate_number:
+                continue
+            wu_id = payload.get("wu_id")
+            paths = payload.get("driver_paths") or []
+            if isinstance(wu_id, str) and wu_id not in seen:
+                seen.add(wu_id)
+                edits.append((wu_id, list(paths)))
+    except OSError:
+        return []
+    return edits
+
+
+def merge_gate_driver_edits(process_edits: list, recorded_edits: list) -> list:
+    """Union of this process's edits and the ones earlier processes recorded,
+    recorded first (they happened first), deduplicated by unit id."""
+    merged: list = []
+    seen: set = set()
+    for wu_id, paths in [*recorded_edits, *process_edits]:
+        if wu_id in seen:
+            continue
+        seen.add(wu_id)
+        merged.append((wu_id, list(paths)))
+    return merged
+
+
 def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
     """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
 
@@ -8046,18 +8102,29 @@ def run(
         # Independent of T02's immediate warning at the squash site — this is
         # the gate-end half, printed before the gate flips to awaiting_review.
         staleness_gate_events: list = []
-        if driver_edits:
-            _first_edit_idx = dispatch_order.index(driver_edits[0][0])
-            _dispatched_after = dispatch_order[_first_edit_idx + 1:]
+        # #1039: `driver_edits` is this process's list; a gate that halted for
+        # a restart reaches completion in a fresh process with an empty one.
+        # The halt events carry what the earlier process saw.
+        _gate_edits = merge_gate_driver_edits(
+            driver_edits, gate_driver_edits_from_events(feature_dir, gate.number))
+        if _gate_edits:
+            # Units this process dispatched after its OWN first edit executed
+            # the pre-edit module; units dispatched by a fresh process after
+            # a halt did not, so only this process's edits define the cut.
+            if driver_edits and driver_edits[0][0] in dispatch_order:
+                _first_edit_idx = dispatch_order.index(driver_edits[0][0])
+                _dispatched_after = dispatch_order[_first_edit_idx + 1:]
+            else:
+                _dispatched_after = []
             _staleness_summary = format_driver_staleness_summary(
-                driver_edits, _dispatched_after)
+                _gate_edits, _dispatched_after)
             if _staleness_summary:
                 print(f"\n{_staleness_summary}")
                 staleness_gate_events.append(build_event(
                     "driver_staleness_detected", feature_id, {
                         "gate": gate.number,
                         "edits": [{"wu_id": wu_id, "driver_paths": paths}
-                                  for wu_id, paths in driver_edits],
+                                  for wu_id, paths in _gate_edits],
                         "dispatched_after": _dispatched_after,
                     }))
 

@@ -183,6 +183,60 @@ class TestDriverStalenessGateSummarySeam(unittest.TestCase):
                           payload["edits"][0]["driver_paths"])
             self.assertEqual(payload["dispatched_after"], [])
 
+    def test_restarted_gate_still_summarises_the_edit_from_the_halt_event(self):
+        """#1039: T01 edits the driver with T02 still pending, so the first
+        process halts (FEAT-2026-0075/T05). The process that reaches gate
+        completion is a fresh one whose `driver_edits` is empty — before this
+        fix the summary and event could not fire on exactly the gate shape the
+        halt makes correct. The halt's own `driver_staleness_detected` event
+        carries the edit; completion reads it back."""
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _write_chained_feature(
+                root, "FEAT-2026-9203", "restarted-gate",
+                "feat/restarted-gate", ["T01", "T02"])
+
+            def fake_dispatch(wu, fn, ct=True):
+                short = wu.wu_id.split("/")[-1]
+                if short == "T01":
+                    Path("specfuse/loop").mkdir(parents=True, exist_ok=True)
+                    Path("specfuse/loop/loop.py").write_text("# pretend driver edit\n")
+                    return ("```result\nstatus: complete\n"
+                            "files_changed:\n  - specfuse/loop/loop.py\n```\n")
+                Path("src").mkdir(exist_ok=True)
+                path = Path("src") / f"{short.lower()}.py"
+                path.write_text(f"# {short}\n")
+                return (f"```result\nstatus: complete\n"
+                        f"files_changed:\n  - {path.as_posix()}\n```\n")
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+
+            first = io.StringIO()
+            with contextlib.redirect_stdout(first):
+                rc1 = loop.run(None, dry_run=False)
+            self.assertEqual(rc1, loop.EXIT_DRIVER_RESTART_REQUIRED)
+
+            # "Restart": a second run() is a fresh process as far as
+            # `driver_edits` is concerned — it is a local of run().
+            second = io.StringIO()
+            with contextlib.redirect_stdout(second):
+                rc2 = loop.run(None, dry_run=False)
+            self.assertNotEqual(rc2, loop.EXIT_DRIVER_RESTART_REQUIRED)
+            output = second.getvalue()
+            self.assertIn("STALE DRIVER PROCESS (gate summary):", output)
+            self.assertIn("FEAT-2026-9203/T01", output)
+
+            events = _read_events(fdir)
+            gate_end = [e for e in events
+                        if e["event_type"] == "driver_staleness_detected"
+                        and "edits" in e["payload"]]
+            self.assertEqual(len(gate_end), 1)
+            payload = gate_end[0]["payload"]
+            self.assertEqual([e["wu_id"] for e in payload["edits"]], ["FEAT-2026-9203/T01"])
+            # T02 ran in the fresh process on the post-edit module: not affected.
+            self.assertEqual(payload["dispatched_after"], [])
+
     def test_no_driver_edit_no_summary_no_event(self):
         """A gate with no driver-editing unit produces no summary and no
         event, asserted through the same gate-completion harness."""
