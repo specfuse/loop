@@ -130,11 +130,16 @@ class EscalationPayload:
 class ActionOutcome:
     """What a provider's `execute()` reports for one item.
 
-    `spend` is whatever unit the provider counts as tokens; it defaults to
-    zero so a provider that reports nothing leaves the run's total spend at
-    zero. `escalation`, when set on a `STATUS_ESCALATED` outcome, is
-    recorded — on `target_issue` when the payload names one, otherwise as a
-    fresh needs-human issue via `emit_escalation`."""
+    `spend` is real tokens, not a proxy — a provider that dispatches a
+    headless `claude` session reports it through
+    `specfuse.agent.invoke.usage_spend(invoke_result.usage)`
+    (FEAT-2026-0108/T01): input plus output tokens, cache reads excluded, so
+    it lines up with the driver's own cost line. It defaults to zero so a
+    provider that dispatches nothing, or whose session reported no usage
+    envelope, leaves the run's total spend untouched. `escalation`, when set
+    on a `STATUS_ESCALATED` outcome, is recorded — on `target_issue` when the
+    payload names one, otherwise as a fresh needs-human issue via
+    `emit_escalation`."""
 
     status: str
     detail: str = ""

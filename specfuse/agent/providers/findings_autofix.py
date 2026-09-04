@@ -233,8 +233,9 @@ class FindingsAutofixProvider:
                     status=STATUS_ESCALATED,
                     detail=result.reason,
                     escalation=_autofix_failed_payload(number, result.reason),
+                    spend=result.spend,
                 )
-            return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason)
+            return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason, spend=result.spend)
 
         if result.decision == ROUTE_TO_HUMAN:
             escalation = EscalationPayload(

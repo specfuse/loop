@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 6.00
 model: sonnet
 effort: medium
@@ -12,6 +12,10 @@ produces:
   - specfuse/agent/invoke.py
   - specfuse/agent/run.py
   - tests/test_agent_invoke_usage.py
+duration_seconds: 2924.833
+cost_usd: 7.807955
+input_tokens: 428
+output_tokens: 88701
 ---
 
 # One shared invoker returns the usage envelope; every provider reports what it spent

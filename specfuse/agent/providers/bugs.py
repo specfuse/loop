@@ -425,7 +425,13 @@ class BugsProvider:
         )
 
         if result.outcome == OUTCOME_MERGED:
-            return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason or "")
+            # `run_bug_lane` (`specfuse/loop/bug_lane_run.py`, T04's file) does
+            # not surface the headless `/fix-bug` session's usage envelope on
+            # `BugLaneResult` -- reporting the bug lane's real spend needs a
+            # change there, out of this WU's reach (`specfuse/loop/` is
+            # off-limits except what T01 declares). Explicit `spend=0` rather
+            # than a value this module cannot actually measure.
+            return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason or "", spend=0)
 
         detail = result.reason if result.reason is not None else result.outcome
 

@@ -36,6 +36,7 @@ from specfuse.agent.run import (
     EscalationPayload,
     _default_runner,
 )
+from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.agent.state import AgentSnapshot
 from specfuse.agent.triage_invoke import build_invocation, classify_result
 from specfuse.loop.escalation import CATEGORY_LABELS
@@ -249,14 +250,16 @@ class TriageProvider:
             )
 
         argv, prompt = build_invocation(number, title, body, self._repo, self._working_dir)
-        result = self._runner(argv + [prompt], check=False)
-        classification = classify_result(getattr(result, "stdout", "") or "")
+        invoked = run_claude(argv, prompt, runner=self._runner)
+        spend = usage_spend(invoked.usage)
+        classification = classify_result(invoked.text)
 
         if classification is None:
             return ActionOutcome(
                 status=STATUS_ESCALATED,
                 detail=f"issue #{number}: classification session produced no usable marker",
                 escalation=_no_marker_payload(number),
+                spend=spend,
             )
 
         category, confidence = classification
@@ -267,6 +270,7 @@ class TriageProvider:
                     f"issue #{number}: classifier named category {category!r}, "
                     f"not one of {CATEGORIES!r}"
                 ),
+                spend=spend,
                 escalation=EscalationPayload(
                     target_issue=number,
                     done_so_far=(
@@ -313,7 +317,7 @@ class TriageProvider:
         row_result = results[0]
 
         if row_result.get("skipped"):
-            return ActionOutcome(status=STATUS_COMPLETED, detail="already triaged")
+            return ActionOutcome(status=STATUS_COMPLETED, detail="already triaged", spend=spend)
 
         if not row_result.get("marker_written"):
             return ActionOutcome(
@@ -325,11 +329,13 @@ class TriageProvider:
                 escalation=_marker_write_failed_payload(
                     number, row_result.get("marker_error", "unknown error")
                 ),
+                spend=spend,
             )
 
         return ActionOutcome(
             status=STATUS_COMPLETED,
             detail=f"issue #{number} triaged as {row_result.get('category')}",
+            spend=spend,
         )
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:
