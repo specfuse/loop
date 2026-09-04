@@ -40,7 +40,6 @@ from .closing_requirements import (
     gate_review_filename,
     learnings_staging_is_required,
 )
-from .criteria_state import CRITERIA_FILENAME_RE
 from .loop import VERDICT_VALUES
 
 FM = re.compile(r"^---\s*$")
@@ -1430,6 +1429,40 @@ def check_decision_override_signoff(feature_dir: Path, plan_fm: dict) -> list[st
     return errs
 
 
+def _gate_files_from_plan(feature_dir: Path) -> list[Path]:
+    """The gate files a feature actually has: the ones its PLAN graph names.
+
+    A filename glob with a denylist of known artifacts (`-REVIEW`,
+    `-CRITERIA`) reads every *new* artifact starting with `GATE-` as a gate
+    by construction — a unit's own deliverable named
+    `GATE-03-CONSUMER-VALIDATION.md` failed lint the moment its feature went
+    `done` (#2907). The PLAN graph's `file:` entries are the one home for
+    which files are gates; anything else in the folder is not one, whatever
+    it is called. A PLAN with no readable graph yields no gate files, so the
+    caller reports nothing rather than guessing.
+    """
+    plan = feature_dir / "PLAN.md"
+    if not plan.exists():
+        return []
+    try:
+        _, body = read_frontmatter(plan)
+        graph = _find_task_graph_block(body)
+    except Exception:  # noqa: BLE001 - an unparseable PLAN is another check's finding
+        return []
+    if not graph:
+        return []
+    files: list[Path] = []
+    for gate in graph.get("gates", []) or []:
+        if not isinstance(gate, dict):
+            continue
+        name = gate.get("file")
+        if isinstance(name, str) and name:
+            path = feature_dir / name
+            if path.exists():
+                files.append(path)
+    return files
+
+
 def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     """A `status: done` feature must have every gate `status: passed` (#287).
 
@@ -1439,22 +1472,17 @@ def check_done_feature_gates(feature_dir: Path, plan_fm: dict) -> list[str]:
     Excluded features (DONE_FEATURE_GATE_EXCLUSIONS) are ones where that gap
     is correct, not drift — see the reasons recorded there.
 
-    GATE-NN-REVIEW.md artifacts carry no `status` frontmatter and are not
-    gate files, so they're skipped by name. GATE-NN-CRITERIA.md (FEAT-2026-0056)
-    is skipped for the same reason and matched through `CRITERIA_FILENAME_RE`
-    rather than a fresh literal — that pattern is the artifact basename's one
-    home, and this is its fifth reader.
+    Gate files are the ones the PLAN graph names (`_gate_files_from_plan`,
+    #2907). `GATE-NN-REVIEW.md`, `GATE-NN-CRITERIA.md`, and any unit
+    deliverable that happens to start with `GATE-` are not in the graph and
+    are therefore not read as gates.
     """
     if plan_fm.get("status") != "done":
         return []
     if feature_dir.name in DONE_FEATURE_GATE_EXCLUSIONS:
         return []
     errs: list[str] = []
-    for gate_path in sorted(feature_dir.glob("GATE-*.md")):
-        if gate_path.stem.endswith("-REVIEW"):
-            continue
-        if CRITERIA_FILENAME_RE.fullmatch(gate_path.name):
-            continue
+    for gate_path in _gate_files_from_plan(feature_dir):
         gfm, _ = read_frontmatter(gate_path)
         gstatus = gfm.get("status")
         if gstatus != "passed":
