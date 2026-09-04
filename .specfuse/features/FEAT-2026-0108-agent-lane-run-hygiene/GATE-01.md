@@ -2,6 +2,10 @@
 gate: 1
 status: open
 cost_budget_usd: 50.00
+baseline:
+  sha: 3bb1cd4e6402742b4add585f986bc4b44ced39d3
+  probed_at: 2026-09-04T11:13:41.693456+00:00
+  failing: []
 ---
 
 # Gate 1 — an unattended agent run isolates, waits, reports, and counts correctly
