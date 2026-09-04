@@ -108,6 +108,30 @@ class TestDoneFeatureGates(unittest.TestCase):
             f"CRITERIA artifact should never be treated as a gate file; errs={errs}",
         )
 
+    def test_work_unit_deliverable_named_gate_something_is_not_a_gate(self):
+        """#2907: a unit's own deliverable, `GATE-03-CONSUMER-VALIDATION.md`,
+        matched the `GATE-*.md` glob, carried no frontmatter, and failed the
+        lint the moment the feature went `done`. Gate files are the ones the
+        PLAN graph names, not everything that starts with `GATE-`."""
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_feature(Path(tmp), "done", "passed")
+            (feat / "GATE-03-CONSUMER-VALIDATION.md").write_text(
+                "# Consumer validation evidence\n\nProbed 3 consumers; all green.\n"
+            )
+            errs = lint_plan.lint(feat)
+        self.assertFalse(
+            any("GATE-03-CONSUMER-VALIDATION.md" in e for e in errs),
+            f"a deliverable is not a gate file; errs={errs}",
+        )
+
+    def test_gate_named_in_plan_but_missing_status_is_still_reported(self):
+        # The allowlist must not weaken the check: a real gate that the PLAN
+        # names and that is not `passed` is still an error on a done feature.
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_feature(Path(tmp), "done", "open")
+            errs = lint_plan.lint(feat)
+        self.assertTrue(any("GATE-01.md" in e and "not 'passed'" in e for e in errs), errs)
+
     def test_excluded_feature_is_not_reported(self):
         errs = lint_plan.check_done_feature_gates(
             FEATURES_DIR / "FEAT-2026-0001-health-endpoint", {"status": "done"}
