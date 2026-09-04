@@ -1261,7 +1261,12 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     # identical across distinct failing-test sets.
     _SIG_PATTERNS: dict[str, list[re.Pattern[str]]] = {
         "tests": [
-            re.compile(r"^FAIL: (test_\S+)", re.MULTILINE),
+            # `FAIL: <name>` for any name, not only `test_*` (#2885): a
+            # project that post-processes surefire output into
+            # `FAIL: <class>.<method> <<< FAILURE!` lines was missed by the
+            # `test_` anchor, and the signature fell to a passing per-class
+            # `[INFO] Tests run: … Failures: 0` line instead.
+            re.compile(r"^FAIL: (\S+)", re.MULTILINE),
             _SUREFIRE_FAILING_TEST_RE,
         ],
         "lint": [re.compile(r"\b([A-Z]\d{3,4})\b")],
