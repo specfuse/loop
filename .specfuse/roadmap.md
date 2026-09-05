@@ -98,7 +98,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
 | FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
-| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | planned | — | [→ detail](#feat-2026-0100) |
+| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | active | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ detail](#feat-2026-0100) |
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | planned | — | [→ detail](#feat-2026-0101) |
 | FEAT-2026-0102 | Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash | planned | — | [→ detail](#feat-2026-0102) |
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
@@ -974,7 +974,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Benefits.** Removes the incentive for a close to argue its own case; makes auto-armed gates trustworthy; costs under a dollar per feature.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0101"></a>
 ## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
