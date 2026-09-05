@@ -114,8 +114,10 @@ class _FakeGhRunner:
     for idempotency: title-substring search over issues this runner itself
     created. `fail` makes every call return a non-zero exit."""
 
-    def __init__(self, fail: bool = False):
+    def __init__(self, fail: bool = False, label_fail: bool = False):
         self.fail = fail
+        self.label_fail = label_fail
+        self.label_calls: list[list[str]] = []
         self.create_calls: list[list[str]] = []
         self.list_calls: list[list[str]] = []
         self._issues: list[dict] = []
@@ -124,6 +126,11 @@ class _FakeGhRunner:
     def __call__(self, argv: list, check: bool = False):
         if self.fail:
             return SimpleNamespace(returncode=1, stdout="", stderr="gh: not authenticated")
+        if argv[:3] == ["gh", "label", "create"]:
+            self.label_calls.append(argv)
+            if self.label_fail:
+                return SimpleNamespace(returncode=1, stdout="", stderr="label create failed")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         if argv[:3] == ["gh", "issue", "list"]:
             self.list_calls.append(argv)
             term = argv[argv.index("--search") + 1].strip('"')
@@ -197,3 +204,43 @@ class TestGhFailureKeepsFileAndRecordsEvent(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLabelsAreEnsuredBeforeFiling(unittest.TestCase):
+    """#3244: the two labels are registered but nothing provisioned them, so
+    the first `gh issue create --label specfuse:follow-up` would 422."""
+
+    def test_follow_up_label_is_created_before_the_first_issue(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            _write_plan(feature_dir)
+            (feature_dir / "FOLLOW-UPS.md").write_text(_FOLLOW_UPS_TWO_ENTRIES)
+            runner = _FakeGhRunner()
+            result = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            self.assertEqual(result["filed"], 2)
+            names = [argv[3] for argv in runner.label_calls]
+            self.assertEqual(names, ["specfuse:follow-up"], "one ensure per distinct label")
+            self.assertIn("--force", runner.label_calls[0])
+            self.assertIn("--color", runner.label_calls[0])
+            self.assertIn("--description", runner.label_calls[0])
+            # ensured before any issue was created
+            self.assertLess(0, len(runner.create_calls))
+
+    def test_label_create_failure_is_reported_not_raised(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            _write_plan(feature_dir)
+            (feature_dir / "FOLLOW-UPS.md").write_text(_FOLLOW_UPS_TWO_ENTRIES)
+            runner = _FakeGhRunner(label_fail=True)
+            result = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            # Filing still attempted; the fake accepts creates regardless.
+            self.assertEqual(result["filed"], 2)
+            self.assertEqual(result.get("labels_unensured"), ["specfuse:follow-up"])
+
+    def test_no_entries_means_no_label_calls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            _write_plan(feature_dir)
+            runner = _FakeGhRunner()
+            loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            self.assertEqual(runner.label_calls, [])
