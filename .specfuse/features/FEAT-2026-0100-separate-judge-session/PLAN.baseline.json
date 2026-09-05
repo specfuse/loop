@@ -1,0 +1,45 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "The judge module: evidence bundle in, verdict out, nothing else",
+          "id": "FEAT-2026-0100/T01",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The driver dispatches the judge after the close's guards and honours only a lowered verdict",
+          "id": "FEAT-2026-0100/T02",
+          "planned_cost_usd": 7.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The judge's spend is the close's spend",
+          "id": "FEAT-2026-0100/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The rules say who writes the verdict, and a drafted feature defaults to `auto`",
+          "id": "FEAT-2026-0100/T04",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Lint: a close that is told its verdict in advance is refused at arm time",
+          "id": "FEAT-2026-0100/T05",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 demonstrate the judge on fixtures, measure, and let the judge decide",
+          "id": "FEAT-2026-0100/G1-CLOSE",
+          "planned_cost_usd": 6.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
