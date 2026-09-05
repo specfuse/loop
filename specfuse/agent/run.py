@@ -21,16 +21,24 @@ position (the "priority is policy, not intelligence" principle this WU's
 spec names). A provider whose `execute()` raises is parked the same way; the
 run continues rather than ending.
 
-The loop never touches git. It calls `provider.execute()` and
-`provider.reconcile()` and nothing else — the `runner` it holds is used only
-to build the T02 snapshot's read-only `gh ... list` calls, and is never
-handed to a provider. There is no code path here that can commit, branch, or
-merge.
+The loop's own `runner` never touches git. It is used only to build the T02
+snapshot's read-only `gh ... list` calls, and is never handed to a provider —
+`tests/test_agent_run.py` asserts every call it sees is a non-mutating `gh`
+one. What the loop calls on a provider is `execute()` and `reconcile()` and
+nothing else.
+
+With `isolate_items=True` the loop does bracket each item with
+`specfuse.agent.worktree.item_worktree`, which adds a worktree, may commit
+that worktree's leftovers, and removes it again (FEAT-2026-0108/T02). Those
+calls are that module's, through its own subprocess runner, on a tree no
+provider shares — the property the invariant above protects, that a provider
+cannot be handed a git transport by the conductor, is untouched by it.
 """
 
 from __future__ import annotations
 
 import argparse
+import inspect
 import subprocess
 import sys
 import time
@@ -61,6 +69,12 @@ DEFAULT_AGENT_LOCK_NAME = ".agent.lock"
 
 STATUS_COMPLETED = "completed"
 STATUS_ESCALATED = "escalated"
+
+#: The run refused to start: per-item isolation was asked for and the tree it
+#: would branch every item from already carries someone else's edits
+#: (FEAT-2026-0108/T02). Not one of `budget.py`'s stop reasons -- nothing was
+#: budgeted, because nothing was dispatched.
+STOP_DIRTY_TREE = "dirty_tree"
 
 KIND_BUG = "bug"
 KIND_FEATURE = "feature"
@@ -203,6 +217,11 @@ class RunSummary:
     elapsed_minutes: float
     tokens_spent: int = 0
     escalations: tuple = ()
+    #: `wip/<item_id>` refs holding work an item finished but never committed
+    #: (FEAT-2026-0108/T02). Named here because the alternative -- the state
+    #: #3179 reported -- is a finished fix whose only trace is a console line
+    #: about a branch belonging to a different issue.
+    wip_refs: tuple = ()
 
 
 def _resolve_bugs_preempt(policy_path: Optional[str]) -> bool:
@@ -404,6 +423,141 @@ def _select_next(
     return ("escalate", item, reason)
 
 
+def _accepts_working_dir(func: Callable) -> bool:
+    """Whether *func* will take a `working_dir=` keyword.
+
+    Providers predate per-item isolation and there are six of them, so the
+    directory is offered rather than imposed: a provider that declares the
+    parameter (or `**kwargs`) is handed its tree, and one that does not keeps
+    the signature its own tests already cover.
+    """
+    try:
+        params = inspect.signature(func).parameters
+    except (TypeError, ValueError):  # a C callable, or an unreadable signature
+        return False
+    if "working_dir" in params:
+        return True
+    return any(
+        param.kind is inspect.Parameter.VAR_KEYWORD for param in params.values()
+    )
+
+
+def _call_execute(
+    provider: ActionProvider,
+    item: ActionItem,
+    working_dir: Optional[str],
+    report: Callable[[str], None],
+    unisolated: set,
+):
+    """Execute one item, handing the provider its working directory.
+
+    Three ways in, in order of directness: an `execute(item, working_dir=)`
+    parameter; the `_working_dir` attribute the four dispatching providers
+    already hold and pass down to `build_invocation` (restored afterwards, so
+    a provider is never left pointing at a directory that no longer exists);
+    or neither, in which case the item runs where the run does and the
+    operator is told once per provider rather than once per item.
+    """
+    if working_dir is None:
+        return provider.execute(item)
+
+    if _accepts_working_dir(provider.execute):
+        return provider.execute(item, working_dir=working_dir)
+
+    if hasattr(provider, "_working_dir"):
+        previous = provider._working_dir
+        provider._working_dir = working_dir
+        try:
+            return provider.execute(item)
+        finally:
+            provider._working_dir = previous
+
+    name = type(provider).__name__
+    if name not in unisolated:
+        unisolated.add(name)
+        report(
+            f"{name} takes no working directory — its items run in the "
+            f"repository root, not in a tree of their own"
+        )
+    return provider.execute(item)
+
+
+def _execute_item(
+    provider: ActionProvider,
+    item: ActionItem,
+    *,
+    base: Optional[str],
+    report: Callable[[str], None],
+    unisolated: set,
+):
+    """Run one item and return `(outcome, failure, tree)`.
+
+    Exactly one of *outcome* and *failure* is set; *tree* is the
+    `worktree.ItemWorktree` the item ran in, or `None` when isolation is off
+    or the tree could not be created. The failure is returned rather than
+    raised so the caller's park-and-continue path stays the single place that
+    decides what a failed item costs the run.
+
+    **The tree is retired even when `execute` raises.** That is the whole
+    point: a session that died half-way is exactly the one whose edits would
+    otherwise be inherited by the next item, and it is retired through the
+    same path as a clean one, so its work still ends up on a `wip/` ref that
+    names it.
+    """
+    if base is None:
+        try:
+            return (_call_execute(provider, item, None, report, unisolated), None, None)
+        except Exception as exc:  # noqa: BLE001 - parked by the caller
+            return (None, exc, None)
+
+    tree = None
+    outcome = None
+    failure = None
+    try:
+        with worktree.item_worktree(item.item_id, base, report=report) as tree:
+            try:
+                outcome = _call_execute(
+                    provider, item, tree.working_dir, report, unisolated
+                )
+            except Exception as exc:  # noqa: BLE001 - parked by the caller
+                failure = exc
+    except Exception as exc:  # noqa: BLE001 - the tree itself could not be made
+        failure = exc
+    return (outcome, failure, tree)
+
+
+def _refuse_dirty_tree(reason: str, report: Callable[[str], None]) -> RunSummary:
+    """The summary a run returns when it declines to dispatch anything.
+
+    Zero attempted, zero completed, and the reason where both a human and the
+    summary's own reader will find it. Refusing is the conservative direction:
+    branching every item off a base that already carries edits is how one
+    item's work gets attributed to another (#3179), and the operator can clear
+    the tree in a second once they know which paths are in the way.
+    """
+    report(f"run refused to start — {reason}")
+    return RunSummary(
+        items_attempted=0,
+        items_completed=0,
+        items_escalated=1,
+        stop_reason=STOP_DIRTY_TREE,
+        elapsed_minutes=0.0,
+        tokens_spent=0,
+        escalations=(Escalation(item_id="run", reason=reason),),
+    )
+
+
+def _dirty_tree_reason(paths) -> str:
+    shown = ", ".join(paths[:10])
+    if len(paths) > 10:
+        shown += f", and {len(paths) - 10} more"
+    return (
+        f"the working tree has uncommitted changes ({shown}), and every item "
+        f"would be branched from it. Commit, stash or discard them, then "
+        f"re-run."
+    )
+
+
 def run_agent(
     *,
     specfuse_dir: Path = DEFAULT_SPECFUSE_DIR,
@@ -418,6 +572,7 @@ def run_agent(
     max_items: Optional[int] = None,
     pause_marker: Optional[Path] = None,
     reporter: Optional[Callable[[str], None]] = None,
+    isolate_items: bool = False,
 ) -> RunSummary:
     """Run the select-execute-reconcile loop to completion and return the
     summary. Raises `AgentLockHeldError` if another agent already holds
@@ -425,7 +580,17 @@ def run_agent(
 
     *reporter* receives one progress line per event as the run happens;
     `None` means print them, and passing a collector silences stdout. Tests
-    pass a list's `append`."""
+    pass a list's `append`.
+
+    *isolate_items* gives every item its own `git worktree` on its own
+    `agent/<item_id>` branch, all cut from the commit HEAD names when the run
+    starts (FEAT-2026-0108/T02). It is off by default because it is a
+    statement about the process's own checkout: a caller that injects
+    providers into a tree it does not own — every test here does — must not
+    have branches created under it as a side effect of calling this function.
+    `main()`, which *is* the operator's process boundary, turns it on. With it
+    on, a dirty starting tree refuses to dispatch at all: see
+    `_refuse_dirty_tree`."""
     report = reporter if reporter is not None else _default_reporter
     lock_path = Path(specfuse_dir) / DEFAULT_AGENT_LOCK_NAME
     try:
@@ -435,6 +600,27 @@ def run_agent(
 
     try:
         report(f"run started — repo {repo}")
+
+        base_commit = None
+        if isolate_items:
+            paths = worktree.dirty_paths()
+            if paths is None:
+                return _refuse_dirty_tree(
+                    "the working tree's status could not be read, so no item "
+                    "can be given a tree of its own",
+                    report,
+                )
+            if paths:
+                return _refuse_dirty_tree(_dirty_tree_reason(paths), report)
+            base_commit = worktree.head_commit()
+            if base_commit is None:
+                return _refuse_dirty_tree(
+                    "HEAD could not be resolved, so there is no commit to "
+                    "branch this run's items from",
+                    report,
+                )
+            report(f"per-item worktrees on — every item branches from {base_commit[:12]}")
+
         snapshot = gather_snapshot(
             runner,
             repo,
@@ -467,8 +653,10 @@ def run_agent(
 
         items_completed = 0
         escalations = []
+        wip_refs = []
         handled_ids = set()
         disabled_providers: set = set()
+        unisolated_providers: set = set()
         stop_reason = STOP_DRAINED
 
         def _provider_failed_to_advertise(provider, exc) -> None:
@@ -521,15 +709,26 @@ def run_agent(
 
             item_started = clock()
 
-            try:
-                outcome = provider.execute(item)
-            except Exception as exc:  # noqa: BLE001 - a provider failure parks, never aborts the run
+            outcome, failure, tree = _execute_item(
+                provider,
+                item,
+                base=base_commit,
+                report=report,
+                unisolated=unisolated_providers,
+            )
+            if tree is not None and tree.wip_ref:
+                wip_refs.append(tree.wip_ref)
+            if failure is not None:
+                # A provider failure parks its item; it never aborts the run.
                 escalations.append(
-                    Escalation(item_id=item.item_id, reason=f"{type(exc).__name__}: {exc}")
+                    Escalation(
+                        item_id=item.item_id,
+                        reason=f"{type(failure).__name__}: {failure}",
+                    )
                 )
                 report(
                     f"{item.item_id} failed after {_took(clock, item_started)} — "
-                    f"{type(exc).__name__}: {exc}"
+                    f"{type(failure).__name__}: {failure}"
                 )
                 continue
 
@@ -591,6 +790,7 @@ def run_agent(
             elapsed_minutes=budget.elapsed_minutes,
             tokens_spent=budget.tokens_spent,
             escalations=tuple(escalations),
+            wip_refs=tuple(wip_refs),
         )
     finally:
         lock_fd.close()
@@ -608,6 +808,10 @@ def _format_summary(summary: RunSummary) -> str:
     ]
     for escalation in summary.escalations:
         lines.append(f"    escalated: {escalation.item_id} — {escalation.reason}")
+    for ref in summary.wip_refs:
+        lines.append(
+            f"    uncommitted work committed on: {ref} (git show {ref})"
+        )
     return "\n".join(lines)
 
 
@@ -743,6 +947,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_minutes=args.max_minutes,
             max_tokens=args.max_tokens,
             max_items=args.max_items,
+            isolate_items=True,
             providers=default_providers(
                 repo=repo,
                 policy_path=args.policy,
