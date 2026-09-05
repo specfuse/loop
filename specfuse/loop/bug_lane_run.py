@@ -72,6 +72,7 @@ __all__ = (
     "add_guardrail_label",
     "pr_closes_issue",
     "unpushed_work_for_issue",
+    "extract_pr_number",
 )
 
 # This WU's own correlation ID. Retained as the lane's public identity (it is
@@ -160,6 +161,13 @@ class BugLaneResult:
 #: first observation, not an exceptional one.
 CI_WAIT_SECONDS = 600
 CI_POLL_SECONDS = 15
+
+#: How long to wait before the one retry of `_find_pr_for_issue` when the
+#: RESULT block carried no `pr_number:` (#3180). Short: the fallback list
+#: read is not the search index (#1984 already fixed that), only a plain
+#: `gh pr list` a moment after the PR opened -- one short wait covers that
+#: gap without paying `CI_WAIT_SECONDS`-scale patience for it.
+PR_LOOKUP_RETRY_SECONDS = 5
 
 
 #: The `--json` fields this module reads. `gh pr checks` has NO `conclusion`
@@ -344,6 +352,33 @@ def pr_closes_issue(body: str, issue_number: int) -> bool:
     a PR" cannot disagree about what the linkage is.
     """
     return re.search(_CLOSES_RE.format(number=issue_number), body or "", re.IGNORECASE) is not None
+
+
+#: `/fix-bug` headless mode's own RESULT block, when it opened a PR, carries
+#: `pr_number:` alongside `status:`/`summary:` (SKILL.md Headless mode).
+#: Matched line-anchored so a PR number mentioned in prose elsewhere in the
+#: session output is never mistaken for the field.
+_PR_NUMBER_RE = re.compile(r"(?m)^\s*pr_number:\s*(\d+)\s*$")
+
+
+def extract_pr_number(session_output: str) -> Optional[int]:
+    """The PR number `/fix-bug` itself reported opening, or `None`.
+
+    Three items in the 2026-09-02 run escalated `pr_not_found` for PRs that
+    existed (#3180): `_find_pr_for_issue` re-discovers the PR from a list
+    read moments after `/fix-bug` opens it, and that read can lose the race.
+    The session already knows the number it opened -- step 7 captures the
+    URL -- so `run_bug_lane` prefers this and only falls back to the list
+    when the RESULT block carried none.
+
+    `None` on empty, missing, or malformed input; never a guess.
+    """
+    if not session_output:
+        return None
+    match = _PR_NUMBER_RE.search(session_output)
+    if match is None:
+        return None
+    return int(match.group(1))
 
 
 def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Optional[int]:
@@ -581,6 +616,7 @@ def run_bug_lane(
     ci_sleep: Callable = time.sleep,
     ci_clock: Callable = time.monotonic,
     ci_deadline_seconds: Optional[float] = None,
+    pr_lookup_sleep: Callable = time.sleep,
 ) -> BugLaneResult:
     """Run the bug lane for one issue: fix, PR, guarded merge.
 
@@ -611,7 +647,15 @@ def run_bug_lane(
             stop_rationale=extract_stop_rationale(session_output),
         )
 
-    pr_number = _find_pr_for_issue(runner, repo, issue_number)
+    # The session's own account first (#3180) -- it never re-discovers what it
+    # already knows it opened. The list is a fallback, retried once after a
+    # short wait, only when the RESULT block carried no `pr_number:`.
+    pr_number = extract_pr_number(session_output)
+    if pr_number is None:
+        pr_number = _find_pr_for_issue(runner, repo, issue_number)
+    if pr_number is None:
+        pr_lookup_sleep(PR_LOOKUP_RETRY_SECONDS)
+        pr_number = _find_pr_for_issue(runner, repo, issue_number)
     if pr_number is None:
         return BugLaneResult(outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND, pr_number=None)
 

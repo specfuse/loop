@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ produces:
   - specfuse/loop/bug_lane_run.py
   - plugins/specfuse/skills/fix-bug/SKILL.md
   - tests/test_bug_lane_pr_number_carried.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T11:40:19.685775+00:00
+duration_seconds: 1817.139
+cost_usd: 1.967828
+input_tokens: 122
+output_tokens: 27345
 ---
 
 # The lane evaluates the PR `/fix-bug` opened, not one it re-discovers

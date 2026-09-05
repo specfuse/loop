@@ -318,7 +318,12 @@ ends in exactly one of these):
   verified red on unchanged code, fix applied, all gates green, the Step
   6.5 diff self-check found no Step 2 indicator against the actual diff,
   one commit, branch pushed, PR opened. Same definition of done as the
-  interactive `status: complete` in Step 9.
+  interactive `status: complete` in Step 9. The RESULT block also carries
+  `pr_number: <n>` — the number of the PR just opened in Step 7 — so a
+  caller evaluating that PR reads the one this run actually opened instead
+  of re-discovering it from a list read moments later, which can lose the
+  race against object-creation lag (#1984, #3180). This field is skill-local
+  and optional; it is not part of `result-contract.md`'s format.
 
 **The rule (binding, explicit — not implied by the method above).** A
 headless run never asks a question, never waits for input, and never

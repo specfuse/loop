@@ -241,7 +241,10 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(
+            runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0,
+            policy_path=_dump(_AGENT_POLICY_ON), pr_lookup_sleep=lambda _seconds: None,
+        )
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
 
@@ -252,7 +255,10 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(
+            runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0,
+            policy_path=_dump(_AGENT_POLICY_ON), pr_lookup_sleep=lambda _seconds: None,
+        )
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
 
@@ -453,7 +459,10 @@ class TestRunBugLane(unittest.TestCase):
             return None
 
         runner = _StubRunner(override=override)
-        result = run_bug_lane(runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0, policy_path=_dump(_AGENT_POLICY_ON))
+        result = run_bug_lane(
+            runner, _REPO, _ISSUE_NUMBER, ci_deadline_seconds=0,
+            policy_path=_dump(_AGENT_POLICY_ON), pr_lookup_sleep=lambda _seconds: None,
+        )
 
         self.assertEqual(result.outcome, OUTCOME_DECLINED)
         self.assertIsNone(result.pr_number)
