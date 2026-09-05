@@ -94,6 +94,7 @@ JUDGE_MODULES = tuple(
         "arm_sweep.py",          # evaluates the arm predicate over a corpus
         "arm_txn.py",            # performs the arm the verdict authorises
         "gate_eval.py",          # the auto-close verdict
+        "judge.py",              # builds the evidence a close verdict is judged on and parses that verdict back
         "bug_lane.py",           # the merge-guardrail verdict
         "bug_lane_run.py",       # holds the single `gh pr merge` call site
         "bug_lane_state.py",     # the rolling merge cap a guardrail reads

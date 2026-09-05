@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: opus
 effort: high
@@ -11,6 +11,13 @@ produces_driver_helper: build_judge_bundle, parse_judge_result
 produces:
   - specfuse/loop/judge.py
   - tests/test_judge_module.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T22:03:00.694052+00:00
+duration_seconds: 2285.992
+cost_usd: 2.872492
+input_tokens: 56
+output_tokens: 33115
 ---
 
 # The judge module: evidence bundle in, verdict out, nothing else
