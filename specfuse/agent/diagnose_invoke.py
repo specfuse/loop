@@ -21,6 +21,7 @@ included. It never returns a rendered body built from a defaulted field.
 
 from __future__ import annotations
 
+from specfuse.agent.invoke import build_claude_argv
 from specfuse.monitor.diagnose_cli import AnalysisParseError, render_headless
 from specfuse.monitor.diagnosis import FIX_SCOPES
 
@@ -43,7 +44,7 @@ def build_invocation(
     """Build argv and prompt text for a headless finding-analysis session
     against one `monitoring-finding` issue. Returns a `(argv, prompt)`
     tuple; runs nothing."""
-    argv = ["claude", "-p", "--model", model, "--effort", effort]
+    argv = build_claude_argv(model, effort)
     prompt = (
         f"Repository: {repo}\n"
         f"Working directory: {working_dir}\n"

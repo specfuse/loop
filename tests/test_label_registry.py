@@ -31,11 +31,14 @@ class TestLabelRegistry(unittest.TestCase):
         # follow-up and post-merge-checklist labels — a not_met close's
         # tracked follow-ups and a met close's Post-merge checklist file as
         # their own issues, distinct from needs-human.
+        # The twenty-fourth is FEAT-2026-0108/T04's ci-pending label (#3177):
+        # a pending-at-deadline CI run declines as its own reason rather than
+        # being folded into ci-not-green.
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 23)
+        self.assertEqual(len(LABEL_REGISTRY), 24)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:

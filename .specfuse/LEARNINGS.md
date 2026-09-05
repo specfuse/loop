@@ -3877,3 +3877,32 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   [meta/first-live-use]'s "scope criteria to the feature's own footprint", which
   bounds a criterion against the *repo*; this one bounds it against the *sibling WU*,
   and the sibling boundary is the one a single-gate serial chain makes easy to miss.
+
+## FEAT-2026-0108/G1-CLOSE — a criterion that injects the value it should compute
+
+- [FEAT-2026-0108/G1-CLOSE] **When a gate behaviour spans a producer and a
+  renderer split across two work units, at least one unit's acceptance criterion
+  must exercise the seam end to end and name the producer call — never a
+  constructed intermediate value.** T05 owned reading a PR number out of a
+  session's RESULT block; T06 owned rendering it into an escalation. Both passed
+  first try, neither hollow-passed, and the behaviour the gate named does not
+  exist: no unit owned putting the value on the producer's *escalating* return,
+  because T05's criteria covered only the completed path and T06's criteria
+  specified the injection — "`outcome=could_not_proceed, pr_number=1532` yields a
+  payload containing `PR #1532`". A criterion that hands the renderer the value
+  the producer is supposed to compute cannot fail when the producer never
+  computes it, so the close's own fixture demonstration was the first thing in
+  the feature able to see the gap. T06's *Objective* did name the missing work in
+  prose; prose in an objective is not verified by anything. Arming-time check,
+  one sentence: for every criterion that **constructs** an input another unit in
+  the same gate is supposed to produce, name the producing unit and confirm some
+  criterion somewhere exercises that production. Distinct from
+  `[FEAT-2026-0085/G1-CLOSE]`, which bounds a criterion's *path scope* against a
+  sibling WU's authorized touch-set; this one bounds a criterion's *data flow*
+  against a sibling WU's output, and a serial single-gate chain makes it easy to
+  miss because every unit is green in order. **Validated on the same feature:**
+  the gap was closed by one hygiene work unit (`FEAT-2026-0108/T05H`, a one-line
+  change plus a red-first test through the producer, $0.91) authored from the
+  close's own `not_met` finding, and the close's second attempt re-ran the same
+  fixture demonstration to exit 0. The rule's cost if applied at arming time is
+  one sentence per criterion; its cost when missed was a close re-attempt.

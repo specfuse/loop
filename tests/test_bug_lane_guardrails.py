@@ -12,6 +12,7 @@ from specfuse.loop import arm_eval, bug_lane
 from specfuse.loop.bug_lane import (
     MergeDecision,
     REASON_CI_NOT_GREEN,
+    REASON_CI_PENDING,
     REASON_DAILY_CAP_REACHED,
     REASON_DIFF_TOO_LARGE,
     REASON_ELIGIBLE,
@@ -75,12 +76,20 @@ class TestGuardrailCiGreen(unittest.TestCase):
         decision = evaluate_merge_guardrails(**_base_kwargs(ci_conclusion="failure"))
         self.assertEqual(decision, MergeDecision(False, REASON_CI_NOT_GREEN))
 
-    def test_ci_conclusions_pending_failure_empty_none_decline(self) -> None:
-        for bad in ("pending", "failure", "", None):
+    def test_ci_conclusions_failure_empty_none_decline(self) -> None:
+        for bad in ("failure", "", None):
             with self.subTest(bad=bad):
                 decision = evaluate_merge_guardrails(**_base_kwargs(ci_conclusion=bad))
                 self.assertFalse(decision.eligible)
                 self.assertEqual(decision.reason, REASON_CI_NOT_GREEN)
+
+    def test_ci_conclusion_pending_declines_ci_pending_not_ci_not_green(self) -> None:
+        """Pending is "wait", not "red" (#3177, FEAT-2026-0108/T04): folding it
+        into REASON_CI_NOT_GREEN produced seven escalations that said a build
+        was red when it was only still queued."""
+        decision = evaluate_merge_guardrails(**_base_kwargs(ci_conclusion="pending"))
+        self.assertFalse(decision.eligible)
+        self.assertEqual(decision.reason, REASON_CI_PENDING)
 
     def test_only_success_passes_ci_guardrail(self) -> None:
         decision = evaluate_merge_guardrails(**_base_kwargs(ci_conclusion="success"))

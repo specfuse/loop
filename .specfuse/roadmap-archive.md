@@ -43,6 +43,36 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0108"></a>
+## FEAT-2026-0108 — Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting
+
+**Why.** The 2026-09-02 unattended `specfuse agent` run over the generator
+repository attempted 78 items, merged 2, and escalated 72. Most escalations
+were the lane failing at running, not the agent failing at bugs: twenty
+finished fixes lost to a session that ended while a backgrounded gate
+command ran (#3178), seven green PRs declined `ci_not_green` seconds after
+opening (#3177), three `pr_not_found` for PRs that existed (#3180), one
+complete fix left as uncommitted edits on another issue's branch (#3179),
+and `tokens spent: 0` on every run so the token budget can never fire (#3183).
+
+**Goal.** An unattended run never attributes one item's edits to another,
+never loses a finished fix to a session that ended while a gate command ran,
+never reports a pending CI run as red or a found PR as missing, and records
+the tokens each item spent so `max_tokens_per_run` can fire.
+
+**Shape.** Single gate, six units, one load-bearing close. T01 shared
+invoker with the usage envelope and `spend` on every outcome. T02 one
+worktree per item with `wip/<item>` refs for uncommitted work. T03
+foreground gates in headless `/fix-bug` and a policy-sized invocation
+timeout. T04 `ci_pending` reason and label. T05 the PR number carried from
+`/fix-bug`'s RESULT block. T06 escalations that read run state.
+
+**Scope boundary.** Out: parallel items (FEAT-2026-0105 owns fan-out), the
+WU driver's own loop, guardrail semantics beyond naming the pending state,
+#3222 and #3223.
+
+**Status: done.**
+
 <a id="feat-2026-0085"></a>
 ## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
 

@@ -39,6 +39,7 @@ import sys
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Optional, Protocol
 
+from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.monitor.autofix import FIRE, decide
 from specfuse.monitor.autofix_state import AUTOFIX_FAILED_LABEL, GitHubAutofixState, record_attempt
 
@@ -88,6 +89,10 @@ class AutofixRunResult:
     decision: str
     reason: str
     outcome: Optional[str]
+    #: Tokens the fired session reported (input + output, cache reads
+    #: excluded), `0` whenever nothing fired or the session reported no
+    #: usage envelope (FEAT-2026-0108/T01).
+    spend: int = 0
 
 
 def _extract_fingerprint(body: str) -> str:
@@ -148,8 +153,9 @@ def _invoke_and_classify(
     invoker: Invoker,
     repo: str,
     issue_number: int,
-) -> str:
-    """Build, run, and classify one headless `fix-bug` session.
+) -> tuple[str, int]:
+    """Build, run, and classify one headless `fix-bug` session. Returns
+    `(outcome, spend)`.
 
     Called only after `record_attempt` has already happened -- see
     `run_autofix`'s FIRE branch. Recording first means a session killed
@@ -157,8 +163,8 @@ def _invoke_and_classify(
     risk the same fingerprint firing again on retry.
     """
     argv, prompt = invoker.build_invocation(issue_number, repo, _DEFAULT_WORKING_DIR)
-    result = runner(argv + [prompt], check=False)
-    return invoker.classify_outcome(getattr(result, "stdout", "") or "")
+    invoked = run_claude(argv, prompt, runner=runner)
+    return invoker.classify_outcome(invoked.text), usage_spend(invoked.usage)
 
 
 def run_autofix(
@@ -197,12 +203,14 @@ def run_autofix(
         return AutofixRunResult(decision=decision.decision, reason=decision.reason, outcome=None)
 
     record_attempt(runner, repo, fingerprint)
-    outcome = _invoke_and_classify(runner, invoker, repo, finding_issue_number)
+    outcome, spend = _invoke_and_classify(runner, invoker, repo, finding_issue_number)
 
     if outcome in _FAILING_OUTCOMES:
         _apply_failed_label(runner, repo, finding_issue_number)
 
-    return AutofixRunResult(decision=decision.decision, reason=decision.reason, outcome=outcome)
+    return AutofixRunResult(
+        decision=decision.decision, reason=decision.reason, outcome=outcome, spend=spend
+    )
 
 
 def main(argv: Optional[list[str]] = None) -> int:

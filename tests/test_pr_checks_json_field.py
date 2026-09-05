@@ -155,9 +155,10 @@ class TestReadabilityEdgesFromRealGhBehaviour(unittest.TestCase):
 
     def test_no_checks_registered_yet_waits_then_gives_up(self):
         """An empty row list on a fresh PR is pending, not unreadable — but it
-        must still be bounded."""
+        must still be bounded. Reports the public `"pending"` at the deadline
+        (#3177/FEAT-2026-0108/T04), not `"unknown"`."""
         empty = SimpleNamespace(returncode=0, stdout="[]", stderr="")
-        self.assertEqual(_conclude(_Runner([empty]), deadline_seconds=30), "unknown")
+        self.assertEqual(_conclude(_Runner([empty]), deadline_seconds=30), "pending")
 
     def test_raising_runner_is_unknown(self):
         class _Boom:

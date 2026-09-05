@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from specfuse.agent.invoke import build_claude_argv
 from specfuse.loop.triage import CATEGORIES, parse_marker
 
 _DEFAULT_WORKING_DIR = "."
@@ -38,7 +39,7 @@ def build_invocation(
     """Build argv and prompt text for a headless triage-classification
     session against one issue. Returns a `(argv, prompt)` tuple; runs
     nothing."""
-    argv = ["claude", "-p", "--model", model, "--effort", effort]
+    argv = build_claude_argv(model, effort)
     prompt = (
         f"Repository: {repo}\n"
         f"Working directory: {working_dir}\n"

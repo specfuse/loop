@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 7.00
 model: opus
 effort: high
@@ -12,6 +12,13 @@ produces:
   - specfuse/agent/worktree.py
   - specfuse/agent/run.py
   - tests/test_agent_item_worktree.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T02:21:00.575903+00:00
+duration_seconds: 1841.104
+cost_usd: 4.212496
+input_tokens: 76
+output_tokens: 48520
 ---
 
 # One working tree per item, and nothing anonymous left behind

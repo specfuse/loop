@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from specfuse.loop.agent_policy import (
+    bug_lane_ci_wait_seconds,
     bug_lane_limits,
     resolve_bug_automerge,
 )
@@ -71,6 +72,7 @@ __all__ = (
     "add_guardrail_label",
     "pr_closes_issue",
     "unpushed_work_for_issue",
+    "extract_pr_number",
 )
 
 # This WU's own correlation ID. Retained as the lane's public identity (it is
@@ -159,6 +161,13 @@ class BugLaneResult:
 #: first observation, not an exceptional one.
 CI_WAIT_SECONDS = 600
 CI_POLL_SECONDS = 15
+
+#: How long to wait before the one retry of `_find_pr_for_issue` when the
+#: RESULT block carried no `pr_number:` (#3180). Short: the fallback list
+#: read is not the search index (#1984 already fixed that), only a plain
+#: `gh pr list` a moment after the PR opened -- one short wait covers that
+#: gap without paying `CI_WAIT_SECONDS`-scale patience for it.
+PR_LOOKUP_RETRY_SECONDS = 5
 
 
 #: The `--json` fields this module reads. `gh pr checks` has NO `conclusion`
@@ -257,13 +266,12 @@ def pr_ci_conclusion(
     PR still costs exactly one call -- the wait is paid only when there is
     something to wait for.
 
-    A pending-at-deadline result is still reported as `_CI_UNKNOWN` rather
-    than a distinct reason. When this landed, the argument was that a new
-    reason needs a new label and an unprovisioned label was fatal here --
-    #1785 has since fixed that half, so the objection is now only that a
-    ninth guardrail label is a contract change owing its own issue, not that
-    it would break the lane. Splitting the pending case out is safe whenever
-    someone wants it.
+    A pending-at-deadline result is reported as the public string `"pending"`
+    (FEAT-2026-0108/T04, #3177) rather than folded into `_CI_UNKNOWN`. Seven
+    escalations on 2026-09-02 said `ci_not_green` about a build that was
+    still queued and went green minutes later -- `evaluate_merge_guardrails`
+    now declines that case as `REASON_CI_PENDING`, a distinct reason with its
+    own label, so the escalation reads "retry" rather than "red".
     """
     started = clock()
     while True:
@@ -271,7 +279,7 @@ def pr_ci_conclusion(
         if conclusion != _CI_PENDING:
             return conclusion
         if clock() - started >= deadline_seconds:
-            return _CI_UNKNOWN
+            return "pending"
         sleep(poll_seconds)
 
 
@@ -344,6 +352,33 @@ def pr_closes_issue(body: str, issue_number: int) -> bool:
     a PR" cannot disagree about what the linkage is.
     """
     return re.search(_CLOSES_RE.format(number=issue_number), body or "", re.IGNORECASE) is not None
+
+
+#: `/fix-bug` headless mode's own RESULT block, when it opened a PR, carries
+#: `pr_number:` alongside `status:`/`summary:` (SKILL.md Headless mode).
+#: Matched line-anchored so a PR number mentioned in prose elsewhere in the
+#: session output is never mistaken for the field.
+_PR_NUMBER_RE = re.compile(r"(?m)^\s*pr_number:\s*(\d+)\s*$")
+
+
+def extract_pr_number(session_output: str) -> Optional[int]:
+    """The PR number `/fix-bug` itself reported opening, or `None`.
+
+    Three items in the 2026-09-02 run escalated `pr_not_found` for PRs that
+    existed (#3180): `_find_pr_for_issue` re-discovers the PR from a list
+    read moments after `/fix-bug` opens it, and that read can lose the race.
+    The session already knows the number it opened -- step 7 captures the
+    URL -- so `run_bug_lane` prefers this and only falls back to the list
+    when the RESULT block carried none.
+
+    `None` on empty, missing, or malformed input; never a guess.
+    """
+    if not session_output:
+        return None
+    match = _PR_NUMBER_RE.search(session_output)
+    if match is None:
+        return None
+    return int(match.group(1))
 
 
 def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Optional[int]:
@@ -580,7 +615,8 @@ def run_bug_lane(
     now: Optional[float] = None,
     ci_sleep: Callable = time.sleep,
     ci_clock: Callable = time.monotonic,
-    ci_deadline_seconds: float = CI_WAIT_SECONDS,
+    ci_deadline_seconds: Optional[float] = None,
+    pr_lookup_sleep: Callable = time.sleep,
 ) -> BugLaneResult:
     """Run the bug lane for one issue: fix, PR, guarded merge.
 
@@ -606,12 +642,20 @@ def run_bug_lane(
         return BugLaneResult(
             outcome=outcome,
             reason=None,
-            pr_number=None,
+            pr_number=extract_pr_number(session_output),
             unpushed_work=unpushed_work_for_issue(runner, issue_number),
             stop_rationale=extract_stop_rationale(session_output),
         )
 
-    pr_number = _find_pr_for_issue(runner, repo, issue_number)
+    # The session's own account first (#3180) -- it never re-discovers what it
+    # already knows it opened. The list is a fallback, retried once after a
+    # short wait, only when the RESULT block carried no `pr_number:`.
+    pr_number = extract_pr_number(session_output)
+    if pr_number is None:
+        pr_number = _find_pr_for_issue(runner, repo, issue_number)
+    if pr_number is None:
+        pr_lookup_sleep(PR_LOOKUP_RETRY_SECONDS)
+        pr_number = _find_pr_for_issue(runner, repo, issue_number)
     if pr_number is None:
         return BugLaneResult(outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND, pr_number=None)
 
@@ -639,9 +683,14 @@ def run_bug_lane(
             ),
         )
 
+    deadline_seconds = (
+        ci_deadline_seconds
+        if ci_deadline_seconds is not None
+        else bug_lane_ci_wait_seconds(policy_path)
+    )
     ci_conclusion = pr_ci_conclusion(
         runner, repo, pr_number,
-        sleep=ci_sleep, clock=ci_clock, deadline_seconds=ci_deadline_seconds,
+        sleep=ci_sleep, clock=ci_clock, deadline_seconds=deadline_seconds,
     )
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)
 

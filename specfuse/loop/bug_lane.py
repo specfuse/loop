@@ -33,6 +33,13 @@ from specfuse.loop.arm_eval import JUDGE_PATHS
 
 REASON_NO_TEST_EVIDENCE = "no_test_evidence"
 REASON_CI_NOT_GREEN = "ci_not_green"
+#: Checks were still pending when `pr_ci_conclusion`'s deadline expired
+#: (FEAT-2026-0108/T04, #3177). Distinct from `REASON_CI_NOT_GREEN`: a
+#: pending run is not red, it just has not finished, and seven escalations
+#: on 2026-09-02 said "not green" about builds that went green minutes
+#: later and were merged by hand. The label tells a human to retry, not to
+#: go read a failing log that does not exist.
+REASON_CI_PENDING = "ci_pending"
 REASON_DIFF_TOO_LARGE = "diff_too_large"
 REASON_JUDGE_PATH_TOUCHED = "judge_path_touched"
 REASON_UNTRACEABLE = "untraceable_provenance"
@@ -58,6 +65,7 @@ DECLINE_LABELS = {
     REASON_UNTRACEABLE: "bug-lane:untraceable-provenance",
     REASON_DAILY_CAP_REACHED: "bug-lane:daily-cap-reached",
     REASON_UNREADABLE_INPUT: "bug-lane:unreadable-input",
+    REASON_CI_PENDING: "bug-lane:ci-pending",
 }
 
 PROVENANCE_KINDS = ("triaged_issue", "diagnosed_finding")
@@ -170,6 +178,13 @@ def evaluate_merge_guardrails(
 
     if not _has_test_evidence(changed, test_paths):
         return _decline(REASON_NO_TEST_EVIDENCE)
+
+    # Checked ahead of the generic not-green case: "pending" is the one
+    # non-success conclusion that means "wait", not "red". Everything else
+    # non-success (including `_CI_UNKNOWN`, the fail-closed spelling for an
+    # unreadable read) still falls through to REASON_CI_NOT_GREEN below.
+    if ci_conclusion == "pending":
+        return _decline(REASON_CI_PENDING)
 
     if ci_conclusion != "success":
         return _decline(REASON_CI_NOT_GREEN)

@@ -28,6 +28,7 @@ from typing import Any, Callable, Optional, Sequence
 from specfuse.agent import driver_command as driver_command_module
 from specfuse.agent import driver_invoke, queue_read, state
 from specfuse.agent import drafting_answers, drafting_invoke
+from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.agent.run import (
     KIND_FEATURE,
     STATUS_COMPLETED,
@@ -230,10 +231,11 @@ class FeatureProvider:
             )
 
         argv, prompt = drafting_invoke.build_invocation(feature_id, gate_result)
-        self._runner(argv + [prompt], check=False)
+        invoked = run_claude(argv, prompt, runner=self._runner)
         return ActionOutcome(
             status=STATUS_COMPLETED,
             detail=f"{feature_id}: drafting session dispatched",
+            spend=usage_spend(invoked.usage),
         )
 
     def _advance(self, feature_id: str) -> ActionOutcome:

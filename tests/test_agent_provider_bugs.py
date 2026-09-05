@@ -247,6 +247,10 @@ class TestBugsProvider(unittest.TestCase):
         self.assertIn("BugsProvider", [type(p).__name__ for p in providers])
 
     def test_execute_passes_injected_runner_through_without_git_mutation(self):
+        # `execute` wraps the injected runner (FEAT-2026-0108/T03, to scope a
+        # timeout to the headless `claude` dispatch only) rather than handing
+        # it to `run_bug_lane` unwrapped -- so this asserts the wrapper still
+        # delegates every call to the injected runner, not object identity.
         calls = []
         runner = _recording_runner(calls)
         provider = BugsProvider(repo="o/r", runner=runner)
@@ -256,6 +260,7 @@ class TestBugsProvider(unittest.TestCase):
 
         def fake_run_bug_lane(passed_runner, repo, issue_number, **kwargs):
             captured["runner"] = passed_runner
+            passed_runner(["gh", "issue", "view", "3"], check=False)
             return BugLaneResult(outcome=OUTCOME_MERGED, reason="eligible", pr_number=5)
 
         with patch(
@@ -263,8 +268,37 @@ class TestBugsProvider(unittest.TestCase):
         ):
             provider.execute(item)
 
-        self.assertIs(captured["runner"], runner)
+        self.assertIsNot(captured["runner"], runner)
+        self.assertEqual(calls, [["gh", "issue", "view", "3"]])
         self.assertFalse(any(call[:1] == ["git"] for call in calls))
+
+
+class TestBugsProviderTimeout(unittest.TestCase):
+    """FEAT-2026-0108/T03: a `/fix-bug` session that outruns the item
+    timeout escalates `could_not_proceed` naming how long it ran, instead of
+    the exception propagating out of `execute` and parking the item with no
+    usable detail."""
+
+    def test_timed_out_item_escalates_with_elapsed_time(self):
+        provider = BugsProvider(repo="o/r", runner=_recording_runner([]))
+        item = ActionItem(item_id="bug-42", kind=KIND_BUG)
+
+        import subprocess
+
+        with patch(
+            "specfuse.agent.providers.bugs.run_bug_lane",
+            side_effect=subprocess.TimeoutExpired(cmd=["claude", "-p"], timeout=2700),
+        ):
+            with patch(
+                "specfuse.agent.providers.bugs.time.monotonic", side_effect=[100.0, 137.0]
+            ):
+                outcome = provider.execute(item)
+
+        self.assertEqual(outcome.status, STATUS_ESCALATED)
+        self.assertIn("could_not_proceed", outcome.detail)
+        self.assertIn("37s", outcome.detail)
+        self.assertIsNotNone(outcome.escalation)
+        self.assertIn("timeout", outcome.escalation.issue_summary.lower())
 
 
 if __name__ == "__main__":

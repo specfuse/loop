@@ -24,6 +24,7 @@ rather than restating `.specfuse/rules/result-contract.md`'s shape here.
 from __future__ import annotations
 
 from specfuse.agent.drafting_answers import AnswerGateResult, OUTCOME_FALLBACK
+from specfuse.agent.invoke import build_claude_argv
 from specfuse.loop.loop import parse_result_block
 
 __all__ = ("DraftingInvokeError", "build_invocation", "read_result")
@@ -58,7 +59,7 @@ def build_invocation(
             "not draft from a partial answer set"
         )
 
-    argv = ["claude", "-p", "--model", model, "--effort", effort]
+    argv = build_claude_argv(model, effort)
 
     answer_lines = "\n".join(
         f"- {question_id}: {answer}"

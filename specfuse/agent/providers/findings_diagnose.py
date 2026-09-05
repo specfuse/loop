@@ -35,6 +35,7 @@ import json
 from typing import Any, Callable, Sequence
 
 from specfuse.agent.diagnose_invoke import AnalysisParseError, build_invocation, read_result
+from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.agent.monitoring_read import (
     component_diagnose_dial,
     component_for_finding,
@@ -199,16 +200,17 @@ class FindingsDiagnoseProvider:
         body = row["body"]
 
         argv, prompt = build_invocation(number, title, body, self._repo, self._working_dir)
-        result = self._runner(argv + [prompt], check=False)
-        raw_result = getattr(result, "stdout", "") or ""
+        invoked = run_claude(argv, prompt, runner=self._runner)
+        spend = usage_spend(invoked.usage)
 
         try:
-            rendered = read_result(raw_result)
+            rendered = read_result(invoked.text)
         except AnalysisParseError as exc:
             return ActionOutcome(
                 status=STATUS_ESCALATED,
                 detail=f"issue #{number}: {exc}",
                 escalation=_unparseable_diagnosis_payload(number, str(exc)),
+                spend=spend,
             )
 
         self._runner(
@@ -222,6 +224,7 @@ class FindingsDiagnoseProvider:
         return ActionOutcome(
             status=STATUS_COMPLETED,
             detail=f"issue #{number} diagnosed",
+            spend=spend,
         )
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:

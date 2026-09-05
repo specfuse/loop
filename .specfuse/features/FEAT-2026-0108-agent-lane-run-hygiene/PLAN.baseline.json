@@ -1,0 +1,51 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "One shared invoker returns the usage envelope; every provider reports what it spent",
+          "id": "FEAT-2026-0108/T01",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "One working tree per item, and nothing anonymous left behind",
+          "id": "FEAT-2026-0108/T02",
+          "planned_cost_usd": 7.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate commands run in the foreground, and the invocation has a real timeout",
+          "id": "FEAT-2026-0108/T03",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A pending CI run is declined as `ci_pending`, never as `ci_not_green`",
+          "id": "FEAT-2026-0108/T04",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The lane evaluates the PR `/fix-bug` opened, not one it re-discovers",
+          "id": "FEAT-2026-0108/T05",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "An escalation says what the run actually left behind",
+          "id": "FEAT-2026-0108/T06",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 demonstrate the six behaviours on fixtures, verdict",
+          "id": "FEAT-2026-0108/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

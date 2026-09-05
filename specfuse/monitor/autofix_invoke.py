@@ -15,8 +15,13 @@ Public contract:
   anything it cannot classify.
 
 This module runs nothing itself: no process spawn, no network, no `gh`, no
-`claude` launch. The caller (`specfuse/monitor/autofix_run.py`, T05) is the
-only place that executes the argv this module builds.
+`claude` launch, and no import of its own -- `test_subject_runs_nothing_itself`
+holds this file to zero top-level `import`/`from` lines, so its argv is
+spelled out inline rather than built through
+`specfuse.agent.invoke.build_claude_argv` the way the other three invoke
+sites do (FEAT-2026-0108/T01's escalation note). The caller
+(`specfuse/monitor/autofix_run.py`, T05) is the only place that executes the
+argv this module builds.
 """
 
 OUTCOMES = ("refused", "could_not_proceed", "completed")
@@ -36,7 +41,12 @@ def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="me
     dispatch shape (`claude -p` with an explicit model and effort); the prompt
     is meant to be piped to the session on stdin, not appended to argv.
     """
-    argv = ["claude", "-p", "--model", model, "--effort", effort]
+    argv = [
+        "claude",
+        "-p",
+        "--model", model,
+        "--effort", effort,
+    ]
     prompt = (
         f"/fix-bug {issue_number}\n\n"
         f"Repository: {repo}\n"

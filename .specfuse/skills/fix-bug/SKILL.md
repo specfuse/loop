@@ -289,6 +289,17 @@ headless` (vs. the default interactive invocation) and every point above that
 would otherwise halt for a human resolves to one of three named, closed
 outcomes instead.
 
+**Step 6's gate commands run in the foreground (binding, headless-only).** A
+headless session dispatches Step 6's gate commands inline and waits on their
+own exit code, in the same turn — never handed off as an unwaited process the
+skill expects a later completion signal for. A headless run's turn ends when
+the run itself ends; twenty of 72 escalations in the 2026-09-02 unattended run
+were finished fixes lost because the session ended mid-wait for a gate that
+was, from the runner's point of view, still going. If the runner enforces a
+wall-clock limit on the whole invocation, a foreground gate run that exceeds
+it surfaces as this skill's own `could_not_proceed` (Step 6's row in the
+mapping table below) — never as a silent stop with no recorded outcome.
+
 **The closed outcome set** (no fourth outcome exists; a headless run always
 ends in exactly one of these):
 
@@ -307,7 +318,12 @@ ends in exactly one of these):
   verified red on unchanged code, fix applied, all gates green, the Step
   6.5 diff self-check found no Step 2 indicator against the actual diff,
   one commit, branch pushed, PR opened. Same definition of done as the
-  interactive `status: complete` in Step 9.
+  interactive `status: complete` in Step 9. The RESULT block also carries
+  `pr_number: <n>` — the number of the PR just opened in Step 7 — so a
+  caller evaluating that PR reads the one this run actually opened instead
+  of re-discovering it from a list read moments later, which can lose the
+  race against object-creation lag (#1984, #3180). This field is skill-local
+  and optional; it is not part of `result-contract.md`'s format.
 
 **The rule (binding, explicit — not implied by the method above).** A
 headless run never asks a question, never waits for input, and never

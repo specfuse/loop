@@ -213,6 +213,12 @@ class AnsweredEscalationProvider:
         return ActionOutcome(
             status=STATUS_COMPLETED,
             detail=f"issue #{number} answer acknowledged: option {row['option_number']}",
+            # This provider never dispatches a `claude` session -- it only
+            # posts an acknowledgment comment -- so there is never usage to
+            # report. Explicit rather than the implicit `spend=0` default,
+            # so a reader auditing every provider that could spend tokens
+            # can see this one considered it and found nothing to report.
+            spend=0,
         )
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:
