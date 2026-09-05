@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T05H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ provenance: "G1-CLOSE attempt 1, RETROSPECTIVE.md § Verdict and FOLLOW-UPS.md e
 produces:
   - specfuse/loop/bug_lane_run.py
   - tests/test_bug_lane_stopped_outcome_pr_number.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T15:51:09.737352+00:00
+duration_seconds: 1104.54
+cost_usd: 0.911953
+input_tokens: 78
+output_tokens: 8932
 ---
 
 # Hygiene: a stopped `/fix-bug` outcome still carries the PR it opened

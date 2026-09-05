@@ -642,7 +642,7 @@ def run_bug_lane(
         return BugLaneResult(
             outcome=outcome,
             reason=None,
-            pr_number=None,
+            pr_number=extract_pr_number(session_output),
             unpushed_work=unpushed_work_for_issue(runner, issue_number),
             stop_rationale=extract_stop_rationale(session_output),
         )
