@@ -3900,4 +3900,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `[FEAT-2026-0085/G1-CLOSE]`, which bounds a criterion's *path scope* against a
   sibling WU's authorized touch-set; this one bounds a criterion's *data flow*
   against a sibling WU's output, and a serial single-gate chain makes it easy to
-  miss because every unit is green in order.
+  miss because every unit is green in order. **Validated on the same feature:**
+  the gap was closed by one hygiene work unit (`FEAT-2026-0108/T05H`, a one-line
+  change plus a red-first test through the producer, $0.91) authored from the
+  close's own `not_met` finding, and the close's second attempt re-ran the same
+  fixture demonstration to exit 0. The rule's cost if applied at arming time is
+  one sentence per criterion; its cost when missed was a close re-attempt.

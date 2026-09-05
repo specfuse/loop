@@ -1,15 +1,23 @@
 ---
 id: FEAT-2026-0108/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: opus
 effort: high
 oracle_env: macos_local
+verdict: met
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/RETROSPECTIVE.md
+gate_set: plannext
+driver_version: 0.15.0
+started_at: 2026-09-05T16:14:43.423761+00:00
+duration_seconds: 1391.032
+cost_usd: 4.004812
+input_tokens: 96
+output_tokens: 33479
 ---
 
 # Gate 1 close — demonstrate the six behaviours on fixtures, verdict
