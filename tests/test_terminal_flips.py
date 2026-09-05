@@ -286,6 +286,48 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                         "scaffold"], check=True)
         return fdir
 
+    def test_run_files_followups_after_a_not_met_close(self):
+        """#3243: the filing step ran only when the close was `met`, so a
+        `not_met` close's FOLLOW-UPS.md entries never became issues — the
+        verdict FEAT-2026-0085/T03 built the step for."""
+        with integration_workspace() as root:
+            os.chdir(root)
+            feature_id = "FEAT-2026-9994"
+            fdir = self._write_feature(root, feature_id, close_verdict="not_met")
+            specfuse = root / ".specfuse"
+            (specfuse / "roadmap.md").write_text(
+                f"---\nproject: test\n---\n\n# Roadmap\n\n"
+                f"| Feature ID | Title | Status | Folder | Detail |\n"
+                f"|------------|-------|--------|--------|--------|\n"
+                f"| {feature_id} | Test | active | — | — |\n\n"
+                f"## {feature_id} — Test\n\nContent.\n"
+            )
+            (specfuse / "roadmap-archive.md").write_text(
+                "---\nproject: test\n---\n\n# Archived\n\n"
+                "<!-- Archived sections appended below -->\n"
+            )
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "roadmap"], check=True)
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                (fdir / "RETROSPECTIVE.md").write_text(
+                    "# Retrospective\n\nNothing generalizes from this gate.\n")
+                (fdir / "FOLLOW-UPS.md").write_text(
+                    "# Follow-ups\n\n### criterion one\n\n"
+                    "**Evidence.** stub — n/a\n\n**Re-run when.** stub\n")
+                return ("", {"input_tokens": 10, "output_tokens": 5, "cost_usd": 0.001})
+
+            filed: list = []
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", lambda wu, feature_dir, cfg=None: (True, "(stub pass)"))
+            self._patch("file_followup_issues",
+                        lambda feature_dir, repo_root, runner=None: filed.append(feature_dir) or {})
+
+            loop.run(None, dry_run=False)
+
+            self.assertEqual(len(filed), 1, "a not_met close must reach the filing step once")
+            self.assertEqual(Path(filed[0]).name, fdir.name)
+
     def test_run_does_not_flip_on_not_met_verdict(self):
         """not_met verdict: GATE-01.md stays awaiting_review, roadmap row stays active."""
         with integration_workspace() as root:

@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A `not_met` close never filed its `FOLLOW-UPS.md` entries.** The driver's post-gate call to `file_followup_issues` was gated on the variable set only when a close's verdict permitted terminal flips, so it ran on `met` and never on `not_met`, the verdict FEAT-2026-0085/T03 built the filing step for. FEAT-2026-0108's terminal close recorded `not_met` with one follow-up entry and no issue was filed. The gate now keys on any close that completed with a well-formed verdict (#3243)
+
 ## [0.15.0+umbrella.0.12.1] - 2026-09-04
 
 ### Added

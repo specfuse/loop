@@ -6884,6 +6884,7 @@ def run(
         driver_edits: list[tuple[str, list[str]]] = []
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
+        close_wu_completed = None  # any close with a well-formed verdict (#3243)
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
 
         # Pre-flight baseline gate probe (FEAT-2026-0051/T01) — one run of the
@@ -7690,6 +7691,7 @@ def run(
                             # None; terminal flips skipped silently.
                             wu_fm_post, _ = read_frontmatter(wu.file)
                             wu.verdict = wu_fm_post.get("verdict") or None
+                            close_wu_completed = wu
                             if verdict_permits_terminal_flips(wu.verdict):
                                 close_wu_for_terminal = wu
                             else:
@@ -8208,7 +8210,9 @@ def run(
         # terminal flips above have already run. Best-effort — a filing
         # failure must never take down a close that otherwise passed; the
         # artifact on disk (FOLLOW-UPS.md) remains the record either way.
-        if close_wu_for_terminal is not None or _terminal_auto_closed_wu is not None:
+        # Gated on ANY completed close, not only a `met` one (#3243): a not_met
+        # close is the verdict FOLLOW-UPS.md exists for.
+        if close_wu_completed is not None or _terminal_auto_closed_wu is not None:
             try:
                 file_followup_issues(feature_dir, REPO_ROOT)
             except Exception as exc:  # noqa: BLE001 - never blocks the driver
