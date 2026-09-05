@@ -106,7 +106,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
-| FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | active | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ detail](#feat-2026-0108) |
+| FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1052,36 +1052,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Benefits.** Small features finish in the time of one prompt; the full loop is reserved for features that need decomposition.
 
 **Status: planned.**
-
-<a id="feat-2026-0108"></a>
-## FEAT-2026-0108 — Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting
-
-**Why.** The 2026-09-02 unattended `specfuse agent` run over the generator
-repository attempted 78 items, merged 2, and escalated 72. Most escalations
-were the lane failing at running, not the agent failing at bugs: twenty
-finished fixes lost to a session that ended while a backgrounded gate
-command ran (#3178), seven green PRs declined `ci_not_green` seconds after
-opening (#3177), three `pr_not_found` for PRs that existed (#3180), one
-complete fix left as uncommitted edits on another issue's branch (#3179),
-and `tokens spent: 0` on every run so the token budget can never fire (#3183).
-
-**Goal.** An unattended run never attributes one item's edits to another,
-never loses a finished fix to a session that ended while a gate command ran,
-never reports a pending CI run as red or a found PR as missing, and records
-the tokens each item spent so `max_tokens_per_run` can fire.
-
-**Shape.** Single gate, six units, one load-bearing close. T01 shared
-invoker with the usage envelope and `spend` on every outcome. T02 one
-worktree per item with `wip/<item>` refs for uncommitted work. T03
-foreground gates in headless `/fix-bug` and a policy-sized invocation
-timeout. T04 `ci_pending` reason and label. T05 the PR number carried from
-`/fix-bug`'s RESULT block. T06 escalations that read run state.
-
-**Scope boundary.** Out: parallel items (FEAT-2026-0105 owns fan-out), the
-WU driver's own loop, guardrail semantics beyond naming the pending state,
-#3222 and #3223.
-
-**Status: active.**
 
 ## Notes
 
