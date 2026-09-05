@@ -189,6 +189,15 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         description="Bug-lane auto-merge declined: a guardrail input could not be read",
         consumer="loop/bug_lane_run.py",
     ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_CI_PENDING],
+        colour="fbca04",
+        description=(
+            "Bug-lane auto-merge declined: CI was still pending at the "
+            "deadline; re-run the lane once it concludes"
+        ),
+        consumer="loop/bug_lane_run.py",
+    ),
 )
 
 

@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 from specfuse.loop.agent_policy import (
+    bug_lane_ci_wait_seconds,
     bug_lane_limits,
     resolve_bug_automerge,
 )
@@ -257,13 +258,12 @@ def pr_ci_conclusion(
     PR still costs exactly one call -- the wait is paid only when there is
     something to wait for.
 
-    A pending-at-deadline result is still reported as `_CI_UNKNOWN` rather
-    than a distinct reason. When this landed, the argument was that a new
-    reason needs a new label and an unprovisioned label was fatal here --
-    #1785 has since fixed that half, so the objection is now only that a
-    ninth guardrail label is a contract change owing its own issue, not that
-    it would break the lane. Splitting the pending case out is safe whenever
-    someone wants it.
+    A pending-at-deadline result is reported as the public string `"pending"`
+    (FEAT-2026-0108/T04, #3177) rather than folded into `_CI_UNKNOWN`. Seven
+    escalations on 2026-09-02 said `ci_not_green` about a build that was
+    still queued and went green minutes later -- `evaluate_merge_guardrails`
+    now declines that case as `REASON_CI_PENDING`, a distinct reason with its
+    own label, so the escalation reads "retry" rather than "red".
     """
     started = clock()
     while True:
@@ -271,7 +271,7 @@ def pr_ci_conclusion(
         if conclusion != _CI_PENDING:
             return conclusion
         if clock() - started >= deadline_seconds:
-            return _CI_UNKNOWN
+            return "pending"
         sleep(poll_seconds)
 
 
@@ -580,7 +580,7 @@ def run_bug_lane(
     now: Optional[float] = None,
     ci_sleep: Callable = time.sleep,
     ci_clock: Callable = time.monotonic,
-    ci_deadline_seconds: float = CI_WAIT_SECONDS,
+    ci_deadline_seconds: Optional[float] = None,
 ) -> BugLaneResult:
     """Run the bug lane for one issue: fix, PR, guarded merge.
 
@@ -639,9 +639,14 @@ def run_bug_lane(
             ),
         )
 
+    deadline_seconds = (
+        ci_deadline_seconds
+        if ci_deadline_seconds is not None
+        else bug_lane_ci_wait_seconds(policy_path)
+    )
     ci_conclusion = pr_ci_conclusion(
         runner, repo, pr_number,
-        sleep=ci_sleep, clock=ci_clock, deadline_seconds=ci_deadline_seconds,
+        sleep=ci_sleep, clock=ci_clock, deadline_seconds=deadline_seconds,
     )
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)
 

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: sonnet
 effort: medium
@@ -13,6 +13,13 @@ produces:
   - specfuse/loop/bug_lane_run.py
   - specfuse/loop/labels.py
   - tests/test_bug_lane_ci_pending.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T03:10:55.648211+00:00
+duration_seconds: 1051.261
+cost_usd: 2.569569
+input_tokens: 150
+output_tokens: 31457
 ---
 
 # A pending CI run is declined as `ci_pending`, never as `ci_not_green`

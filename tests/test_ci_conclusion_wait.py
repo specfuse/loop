@@ -117,14 +117,17 @@ class TestWaitsForTerminalConclusion(unittest.TestCase):
         self.assertEqual(runner.calls, 1)
 
     def test_never_pending_stops_at_the_deadline(self):
-        """Bounded: checks that never settle must not hang the lane."""
+        """Bounded: checks that never settle must not hang the lane. Reports
+        the public `"pending"` (#3177/FEAT-2026-0108/T04), not `"unknown"` --
+        a pending-at-deadline build is not unreadable, it just has not
+        finished."""
         clock = _FakeClock()
         runner = _ScriptedRunner([_rows("", "")])
         result = pr_ci_conclusion(
             runner, "acme/widget", 1,
             sleep=_sleeper(clock), clock=clock, deadline_seconds=30,
         )
-        self.assertEqual(result, "unknown")
+        self.assertEqual(result, "pending")
         self.assertLessEqual(clock.now, 60, "waited well past the deadline")
 
 
@@ -150,10 +153,12 @@ class TestFailClosedContractPreserved(unittest.TestCase):
             "unknown",
         )
 
-    def test_empty_row_list_is_unknown(self):
+    def test_empty_row_list_at_deadline_is_pending(self):
+        """No check registered yet is pending, not unreadable (#3177) -- at a
+        zero deadline it is reported immediately rather than waited out."""
         self.assertEqual(
             self._once(SimpleNamespace(returncode=0, stdout="[]", stderr="")),
-            "unknown",
+            "pending",
         )
 
     def test_mixed_terminal_conclusions_is_not_success(self):

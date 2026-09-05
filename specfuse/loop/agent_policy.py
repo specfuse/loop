@@ -40,6 +40,7 @@ __all__ = (
     "resolve_triage_auto",
     "resolve_bug_automerge",
     "bug_lane_limits",
+    "bug_lane_ci_wait_seconds",
     "validate_agent_policy",
     "main",
     "SEVERITY_VALUES",
@@ -81,6 +82,11 @@ DEFAULT_MAX_MERGES_PER_DAY = 3
 # bug_lane until it made the guardrail unsatisfiable — and therefore the whole
 # lane inert — on any repository laying tests out differently.
 DEFAULT_TEST_PATHS = ("tests/",)
+#: `bug_lane_run.CI_WAIT_SECONDS`'s policy-facing spelling (FEAT-2026-0108/T04).
+#: Minutes, not seconds, because that is the unit an operator reasons in --
+#: "our CI takes 8 minutes" -- and `budgets` is where run-shaped time limits
+#: already live (`max_tokens_per_run` et al.).
+DEFAULT_CI_WAIT_MINUTES = 10
 
 
 def load_policy(path: str | Path | None = None) -> dict:
@@ -209,6 +215,31 @@ def bug_lane_limits(path: str | Path | None = None) -> dict:
         limits["test_paths"] = list(test_paths)
 
     return limits
+
+
+def bug_lane_ci_wait_seconds(path: str | Path | None = None) -> int:
+    """Resolve `budgets.ci_wait_minutes` as seconds for `pr_ci_conclusion`'s
+    deadline (FEAT-2026-0108/T04).
+
+    Returns `DEFAULT_CI_WAIT_MINUTES * 60` when the policy file is absent, the
+    key is absent, or the value is not a positive int -- a malformed override
+    must not shrink the wait to zero and turn every fresh PR's guaranteed
+    first-read pending into an immediate `ci_pending` decline.
+    """
+    minutes = DEFAULT_CI_WAIT_MINUTES
+
+    try:
+        policy = load_policy(path)
+    except FileNotFoundError:
+        return minutes * 60
+
+    budgets = policy.get("budgets") if isinstance(policy, dict) else None
+    if isinstance(budgets, dict):
+        value = budgets.get("ci_wait_minutes")
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            minutes = value
+
+    return minutes * 60
 
 
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:

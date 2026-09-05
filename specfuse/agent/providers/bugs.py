@@ -27,6 +27,8 @@ from specfuse.agent.run import (
     _default_runner,
 )
 from specfuse.agent.state import AgentSnapshot
+from specfuse.loop.agent_policy import bug_lane_ci_wait_seconds
+from specfuse.loop.bug_lane import REASON_CI_PENDING
 from specfuse.loop.bug_lane_run import (
     OUTCOME_AUTOMERGE_OFF,
     OUTCOME_COULD_NOT_PROCEED,
@@ -399,6 +401,61 @@ def _declined_payload(
     )
 
 
+def _ci_pending_payload(
+    issue_number: int, pr_number: Optional[int], wait_minutes: int
+) -> EscalationPayload:
+    """`ci_pending` is a "wait and retry" verdict, not a red build (#3177).
+
+    The generic `_declined_payload` text says "declined by the merge
+    guardrails" and recommends a by-hand review -- correct for a real
+    guardrail failure, misleading for a build that simply had not finished.
+    Seven escalations on 2026-09-02 read that generic text about a PR that
+    went green minutes later and was merged by hand.
+    """
+    ref = _pr_ref(pr_number)
+    return EscalationPayload(
+        target_issue=issue_number,
+        done_so_far=(
+            f"The bug lane fixed this issue and opened {ref}, but its CI had "
+            f"not concluded after {wait_minutes} minutes; re-run the lane."
+        ),
+        issue_summary=(
+            f"{ref} fixes this issue. Its checks were still pending when the "
+            f"bug lane's wait ran out, so no guardrail verdict was reached -- "
+            f"CI had not concluded after {wait_minutes} minutes; re-run the "
+            f"lane."
+        ),
+        decision_needed=f"Whether to re-run the lane against {ref} once CI concludes.",
+        why_not_auto=(
+            f"CI had not concluded after {wait_minutes} minutes; re-run the "
+            f"lane. This is not a guardrail failure -- the PR may already be "
+            f"green."
+        ),
+        options=[
+            (
+                "Re-run the lane once CI finishes",
+                "the usual, unattended path once checks conclude",
+                "costs another lane run",
+            ),
+            (
+                f"Check {ref}'s CI status and merge by hand if green",
+                "unblocks immediately without waiting for a retry",
+                "costs a human's time",
+            ),
+            (
+                "Leave the PR open",
+                "no immediate cost",
+                "the fix sits unmerged until someone retries",
+            ),
+        ],
+        recommendation=(
+            f"Check {ref}'s CI status; if it has since concluded, re-run the "
+            f"lane rather than merging by hand."
+        ),
+        category="blocked-wu",
+    )
+
+
 def _timed_out_payload(issue_number: int, elapsed_seconds: float) -> EscalationPayload:
     """The headless `/fix-bug` session ran past the item timeout.
 
@@ -547,6 +604,12 @@ class BugsProvider:
             # A lookup failure, not a decline: no PR number exists to point
             # the operator at, so the declined wording would lie (#3180).
             escalation = _pr_not_found_payload(issue_number)
+        elif result.reason == REASON_CI_PENDING:
+            # "Retry", not "red" (#3177): the generic declined text below
+            # would say the merge guardrails declined this PR, which is not
+            # what happened -- CI simply had not concluded yet.
+            wait_minutes = bug_lane_ci_wait_seconds(self._policy_path) // 60
+            escalation = _ci_pending_payload(issue_number, result.pr_number, wait_minutes)
         else:
             assert result.outcome == OUTCOME_DECLINED
             escalation = _declined_payload(
