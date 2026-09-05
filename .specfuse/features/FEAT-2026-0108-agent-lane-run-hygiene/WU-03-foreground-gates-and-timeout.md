@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ produces:
   - specfuse/agent/invoke.py
   - plugins/specfuse/skills/fix-bug/SKILL.md
   - tests/test_agent_invoke_timeout.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T02:51:42.156097+00:00
+duration_seconds: 1153.193
+cost_usd: 2.720229
+input_tokens: 160
+output_tokens: 36705
 ---
 
 # Gate commands run in the foreground, and the invocation has a real timeout

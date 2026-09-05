@@ -289,6 +289,17 @@ headless` (vs. the default interactive invocation) and every point above that
 would otherwise halt for a human resolves to one of three named, closed
 outcomes instead.
 
+**Step 6's gate commands run in the foreground (binding, headless-only).** A
+headless session dispatches Step 6's gate commands inline and waits on their
+own exit code, in the same turn — never handed off as an unwaited process the
+skill expects a later completion signal for. A headless run's turn ends when
+the run itself ends; twenty of 72 escalations in the 2026-09-02 unattended run
+were finished fixes lost because the session ended mid-wait for a gate that
+was, from the runner's point of view, still going. If the runner enforces a
+wall-clock limit on the whole invocation, a foreground gate run that exceeds
+it surfaces as this skill's own `could_not_proceed` (Step 6's row in the
+mapping table below) — never as a silent stop with no recorded outcome.
+
 **The closed outcome set** (no fourth outcome exists; a headless run always
 ends in exactly one of these):
 

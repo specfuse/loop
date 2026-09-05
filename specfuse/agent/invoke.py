@@ -14,26 +14,53 @@ reports the returned usage as `ActionOutcome.spend` (via `usage_spend`).
 A CLI that returns non-JSON output -- an older CLI, or `cost_tracking: false`
 -- never raises here: `run_claude` falls back to treating the raw stdout as
 the session's text, with `usage=None`.
+
+`run_claude` also never raises when the runner enforces a wall-clock timeout
+and the session runs past it (FEAT-2026-0108/T03): a `subprocess.TimeoutExpired`
+from *runner* is caught and reported as `InvokeResult.timed_out=True`, with
+whatever the process had already written to stdout intact as `text` -- a
+timed-out item is a normal, reportable outcome (like a non-JSON stdout), not a
+crash a caller must guard against. `resolve_item_timeout_seconds` reads
+`budgets.item_timeout_minutes` from `.specfuse/agent-policy.yml` (default 45
+minutes) through `specfuse.loop.agent_policy.load_policy` -- reused read-only,
+never edited, per this WU's Do-not-touch on `specfuse/loop/`.
 """
 
 from __future__ import annotations
 
 import json
+import subprocess
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
-__all__ = ("InvokeResult", "build_claude_argv", "run_claude", "usage_spend")
+from specfuse.loop import agent_policy
+
+__all__ = (
+    "InvokeResult",
+    "build_claude_argv",
+    "run_claude",
+    "usage_spend",
+    "resolve_item_timeout_seconds",
+    "DEFAULT_ITEM_TIMEOUT_MINUTES",
+)
+
+#: Default `budgets.item_timeout_minutes`, applied when the policy file is
+#: absent, unreadable, or omits the key.
+DEFAULT_ITEM_TIMEOUT_MINUTES = 45
 
 
 @dataclass(frozen=True)
 class InvokeResult:
     """One headless session's result text, usage block, and process return
     code. `usage` is `None` whenever the CLI's output could not be read as
-    the JSON envelope."""
+    the JSON envelope. `timed_out` is `True` only when *runner* raised
+    `subprocess.TimeoutExpired`; `text` still carries whatever output was
+    captured before the timeout fired."""
 
     text: str
     usage: Optional[dict]
     returncode: int
+    timed_out: bool = False
 
 
 def build_claude_argv(model: str = "sonnet", effort: str = "medium") -> list:
@@ -99,24 +126,66 @@ def run_claude(
     prompt: str,
     *,
     runner: Callable,
-    timeout: Optional[float] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> InvokeResult:
     """Run one headless `claude` session and return its usage envelope.
 
     Appends `--output-format json` to *argv*, then the prompt itself, and
     calls *runner* the same way every invoke site already did directly --
     `runner(full_argv, check=False)` -- so an injected runner across the
-    codebase needs no new keyword to keep working. *timeout*, when given, is
-    forwarded to *runner* as a keyword; omitted entirely otherwise, so
-    existing test doubles that accept only `(argv, check=False)` are
-    unaffected.
+    codebase needs no new keyword to keep working. *timeout_seconds*, when
+    given, is forwarded to *runner* as its `timeout` keyword; omitted
+    entirely otherwise, so existing test doubles that accept only `(argv,
+    check=False)` are unaffected.
+
+    A *runner* that raises `subprocess.TimeoutExpired` -- the real runner,
+    once it forwards `timeout` to `subprocess.run`, does exactly this once
+    the session outruns the deadline -- is caught here, never propagated:
+    the return is `InvokeResult(timed_out=True, ...)` with whatever text the
+    process had already written to stdout, `usage=None` (a timed-out session
+    never printed its closing JSON envelope), and `returncode=-1`.
     """
     full_argv = list(argv) + ["--output-format", "json", prompt]
     kwargs = {"check": False}
-    if timeout is not None:
-        kwargs["timeout"] = timeout
-    result = runner(full_argv, **kwargs)
+    if timeout_seconds is not None:
+        kwargs["timeout"] = timeout_seconds
+    try:
+        result = runner(full_argv, **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        captured = exc.stdout if exc.stdout is not None else (exc.output or "")
+        if isinstance(captured, bytes):
+            captured = captured.decode("utf-8", errors="replace")
+        return InvokeResult(text=captured, usage=None, returncode=-1, timed_out=True)
     raw = getattr(result, "stdout", "") or ""
     returncode = getattr(result, "returncode", 0)
     text, usage = _parse_envelope(raw)
-    return InvokeResult(text=text, usage=usage, returncode=returncode)
+    return InvokeResult(text=text, usage=usage, returncode=returncode, timed_out=False)
+
+
+def resolve_item_timeout_seconds(path: Optional[object] = None) -> float:
+    """Resolve `budgets.item_timeout_minutes` from the agent policy file.
+
+    Returns the default (`DEFAULT_ITEM_TIMEOUT_MINUTES` minutes, as seconds)
+    when the policy file is absent, `budgets` is absent or not a mapping, the
+    key is absent, or the value is not a positive number -- the same
+    safe-default shape as `agent_policy.resolve_bug_automerge` and its
+    siblings. Uses `agent_policy.load_policy` read-only; this module does not
+    edit `specfuse/loop/agent_policy.py` (off-limits, FEAT-2026-0108/T03's
+    Do-not-touch) to add this key to its required-fields lint.
+    """
+    default_seconds = float(DEFAULT_ITEM_TIMEOUT_MINUTES * 60)
+    try:
+        policy = agent_policy.load_policy(path)
+    except FileNotFoundError:
+        return default_seconds
+
+    budgets = policy.get("budgets") if isinstance(policy, dict) else None
+    if not isinstance(budgets, dict):
+        return default_seconds
+
+    minutes = budgets.get("item_timeout_minutes")
+    if isinstance(minutes, bool) or not isinstance(minutes, (int, float)):
+        return default_seconds
+    if minutes <= 0:
+        return default_seconds
+    return float(minutes) * 60

@@ -12,8 +12,11 @@ consumed here unmodified.
 
 from __future__ import annotations
 
+import subprocess
+import time
 from typing import Any, Callable, Optional, Sequence
 
+from specfuse.agent.invoke import resolve_item_timeout_seconds
 from specfuse.agent.run import (
     KIND_BUG,
     STATUS_COMPLETED,
@@ -51,6 +54,26 @@ _FIX_BUG_STOPPED_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
 #: triaged `bug` and became a candidate on the next run -- the lane trying to
 #: "fix" its own "PR was declined by the merge guardrails" report.
 _HUMAN_OWNED_LABELS = frozenset({NEEDS_HUMAN_LABEL, "blocked-wu"})
+
+def _bounded_runner(runner: Callable, timeout_seconds: float) -> Callable:
+    """Wrap *runner* so the headless `claude` dispatch inside `run_bug_lane`
+    (`specfuse.loop.bug_lane_run:595`, off-limits to this WU) gets a real
+    wall-clock timeout without editing that module.
+
+    Applies *timeout_seconds* only to the one call whose argv starts with
+    `claude` -- `run_bug_lane` reuses this same runner for every `gh` read
+    and write along the way, and those must not inherit an item-scale
+    deadline meant for one long-running session.
+    """
+
+    def wrapped(argv, check: bool = False):
+        kwargs = {"check": check}
+        if argv and argv[0] == "claude":
+            kwargs["timeout"] = timeout_seconds
+        return runner(argv, **kwargs)
+
+    return wrapped
+
 
 def _has_open_pr(snapshot: AgentSnapshot, issue_number: int) -> bool:
     """Whether an open PR already cites `closes #issue_number`.
@@ -376,6 +399,63 @@ def _declined_payload(
     )
 
 
+def _timed_out_payload(issue_number: int, elapsed_seconds: float) -> EscalationPayload:
+    """The headless `/fix-bug` session ran past the item timeout.
+
+    Distinct from `_fix_bug_stopped_payload`: that one reports what the
+    session itself said before stopping; this one fires when the session
+    never got the chance to say anything, because the runner cut it off
+    (FEAT-2026-0108/T03, #3178) rather than the skill reaching its own
+    `could_not_proceed`.
+    """
+    elapsed = f"{elapsed_seconds:.0f}s"
+    return EscalationPayload(
+        target_issue=issue_number,
+        done_so_far=(
+            f"Headless `/fix-bug` was dispatched against this issue and ran "
+            f"for {elapsed} without finishing -- the run's own timeout ended "
+            f"the session before it reported an outcome."
+        ),
+        issue_summary=(
+            f"The bug lane's `could_not_proceed`: the `/fix-bug` session "
+            f"exceeded its `budgets.item_timeout_minutes` deadline "
+            f"({elapsed} elapsed) with no recorded outcome."
+        ),
+        decision_needed=(
+            "Whether the fix was likely close to done (raise the timeout and "
+            "re-run) or the issue needs a human to work it directly."
+        ),
+        why_not_auto=(
+            "A session that outran its deadline may have left partial, "
+            "uncommitted work on its own branch or none at all -- the lane "
+            "has no way to tell which without a human looking."
+        ),
+        options=[
+            (
+                "Raise `budgets.item_timeout_minutes` and re-run the lane",
+                "cheap if the fix was genuinely close to finishing",
+                "wastes another full timeout if the issue was never bug-sized",
+            ),
+            (
+                "Fix it by hand",
+                "unblocks the issue directly",
+                "costs a human's time",
+            ),
+            (
+                "Re-run the lane unchanged",
+                "cheap if the timeout was a one-off (e.g. a slow CI runner)",
+                "repeats the same timeout if the fix itself is what's slow",
+            ),
+        ],
+        recommendation=(
+            "Check for a local branch named for this issue before deciding "
+            "anything else -- a session that timed out mid-gate-run may have "
+            "already committed a working fix."
+        ),
+        category="blocked-wu",
+    )
+
+
 class BugsProvider:
     """`ActionProvider` over the bug lane."""
 
@@ -415,14 +495,28 @@ class BugsProvider:
 
     def execute(self, item: ActionItem) -> ActionOutcome:
         issue_number = int(item.item_id[len(_ITEM_ID_PREFIX) :])
-        result = run_bug_lane(
-            self._runner,
-            self._repo,
-            issue_number,
-            working_dir=self._working_dir,
-            policy_path=self._policy_path,
-            now=self._now,
-        )
+        timeout_seconds = resolve_item_timeout_seconds(self._policy_path)
+        started = time.monotonic()
+        try:
+            result = run_bug_lane(
+                _bounded_runner(self._runner, timeout_seconds),
+                self._repo,
+                issue_number,
+                working_dir=self._working_dir,
+                policy_path=self._policy_path,
+                now=self._now,
+            )
+        except subprocess.TimeoutExpired:
+            elapsed = time.monotonic() - started
+            return ActionOutcome(
+                status=STATUS_ESCALATED,
+                detail=(
+                    f"could_not_proceed: headless /fix-bug session timed out "
+                    f"after {elapsed:.0f}s"
+                ),
+                escalation=_timed_out_payload(issue_number, elapsed),
+                spend=0,
+            )
 
         if result.outcome == OUTCOME_MERGED:
             # `run_bug_lane` (`specfuse/loop/bug_lane_run.py`, T04's file) does

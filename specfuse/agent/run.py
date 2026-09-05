@@ -242,8 +242,16 @@ def _resolve_bugs_preempt(policy_path: Optional[str]) -> bool:
     return bugs.get("preempt") is True
 
 
-def _default_runner(argv: list, check: bool = False):
-    return subprocess.run(argv, check=check, capture_output=True, text=True)
+def _default_runner(argv: list, check: bool = False, timeout: Optional[float] = None):
+    """The real subprocess runner. Forwards *timeout* to `subprocess.run`
+    (FEAT-2026-0108/T03) so a caller that bounds one call's wall-clock time --
+    `BugsProvider.execute`'s headless `/fix-bug` dispatch, the one call this
+    exists for -- gets a real `subprocess.TimeoutExpired` when the process
+    outruns it, rather than the session's own turn or wall limit being the
+    only thing that ever ends it (#3178)."""
+    return subprocess.run(
+        argv, check=check, capture_output=True, text=True, timeout=timeout
+    )
 
 
 def _default_reporter(message: str) -> None:
