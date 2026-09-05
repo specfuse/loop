@@ -172,6 +172,97 @@ def _abandoned_work_payload(
     )
 
 
+def _stopped_with_open_pr_payload(
+    issue_number: int, outcome: str, pr_number: int, rationale: str = ""
+) -> EscalationPayload:
+    """The session stopped, but it had already opened a PR (#3178).
+
+    Item #1481 in the 2026-09-02 run opened PR #1532 and then reported
+    `could_not_proceed` -- `_fix_bug_stopped_payload`'s "the bug lane never
+    reached a guardrail or merge decision on this path" was false for it: a
+    PR existed, ready for the guardrails a re-run (or a human) can still
+    evaluate. Naming and linking that PR is the whole point of this payload.
+    """
+    ref = _pr_ref(pr_number)
+    return EscalationPayload(
+        target_issue=issue_number,
+        done_so_far=(
+            f"Headless `/fix-bug` ran against this issue, opened {ref}, and "
+            f"then reported `{outcome}` before the bug lane evaluated it."
+            f"{_rationale_block(rationale)}"
+        ),
+        issue_summary=(
+            f"The bug lane stopped on this issue (`{outcome}`), but {ref} "
+            f"already exists and fixes it -- the stop happened after the PR "
+            f"was opened and before any guardrail ran."
+        ),
+        decision_needed=f"Whether to re-run the lane against {ref} or review it by hand.",
+        why_not_auto=(
+            f"`/fix-bug` reported `{outcome}` before the bug lane could "
+            f"evaluate {ref}'s guardrails, so nothing merged it."
+        ),
+        options=[
+            (
+                f"Re-run the lane against {ref}",
+                "the guardrails evaluate it and merge if eligible",
+                "costs another lane run",
+            ),
+            (
+                f"Review and merge {ref} by hand",
+                "unblocks immediately without waiting for a retry",
+                "costs a human's time",
+            ),
+            (
+                "Close the PR and fix by hand",
+                "right call if the fix turned out to be wrong",
+                "discards work that may be correct",
+            ),
+        ],
+        recommendation=(
+            f"Check {ref} before doing anything else -- it may already be a "
+            f"complete fix that only needs the guardrails run against it."
+        ),
+        category="blocked-wu",
+    )
+
+
+def _wip_ref_for_item(runner: Callable, item_id: str) -> Optional[tuple]:
+    """`(ref, commit_count)` for a `wip/<item_id>` ref left by a prior run's
+    per-item worktree (FEAT-2026-0108/T02), else `None`.
+
+    A dirty tree an item's session leaves behind is committed under
+    `wip/<item_id>` rather than discarded (`specfuse.agent.worktree`) -- a
+    ref this module never created and never mutates, only reads once a
+    stopped outcome has neither a PR nor a named fix branch to point at.
+    Same shape as `unpushed_work_for_issue`, whose named-branch glob does not
+    match this run's own naming convention.
+    """
+    ref = f"wip/{item_id}"
+    try:
+        listed = runner(
+            ["git", "branch", "--list", ref, "--format=%(refname:short)"],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a reporting aid must never break the lane
+        return None
+    if getattr(listed, "returncode", 1) != 0:
+        return None
+    if not (getattr(listed, "stdout", "") or "").strip():
+        return None
+    try:
+        log = runner(
+            ["git", "log", ref, "--not", "--remotes", "--format=%H"], check=False
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if getattr(log, "returncode", 1) != 0:
+        return None
+    commits = [line for line in (getattr(log, "stdout", "") or "").split() if line]
+    if not commits:
+        return None
+    return (ref, len(commits))
+
+
 def _rationale_block(rationale: str) -> str:
     """The session's own words, quoted, or a statement that it gave none."""
     if not rationale:
@@ -587,7 +678,13 @@ class BugsProvider:
         detail = result.reason if result.reason is not None else result.outcome
 
         if result.outcome in _FIX_BUG_STOPPED_OUTCOMES:
-            if result.unpushed_work:
+            if result.pr_number:
+                escalation = _stopped_with_open_pr_payload(
+                    issue_number, result.outcome, result.pr_number,
+                    result.stop_rationale,
+                )
+                detail = f"{detail} — PR #{result.pr_number} already open"
+            elif result.unpushed_work:
                 branch, commits = result.unpushed_work
                 escalation = _abandoned_work_payload(
                     issue_number, result.outcome, branch, commits,
@@ -595,9 +692,18 @@ class BugsProvider:
                 )
                 detail = f"{detail} — {commits} committed on `{branch}`, unpushed"
             else:
-                escalation = _fix_bug_stopped_payload(
-                    issue_number, result.outcome, result.stop_rationale
-                )
+                wip = _wip_ref_for_item(self._runner, item.item_id)
+                if wip is not None:
+                    wip_ref, commits = wip
+                    escalation = _abandoned_work_payload(
+                        issue_number, result.outcome, wip_ref, commits,
+                        result.stop_rationale,
+                    )
+                    detail = f"{detail} — {commits} committed on `{wip_ref}`, unpushed"
+                else:
+                    escalation = _fix_bug_stopped_payload(
+                        issue_number, result.outcome, result.stop_rationale
+                    )
         elif result.outcome == OUTCOME_AUTOMERGE_OFF:
             escalation = _automerge_off_payload(issue_number, result.pr_number)
         elif result.reason == REASON_PR_NOT_FOUND:

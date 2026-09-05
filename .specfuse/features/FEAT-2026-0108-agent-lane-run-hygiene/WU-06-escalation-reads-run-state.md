@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0108/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 model: sonnet
 effort: medium
@@ -10,6 +10,13 @@ oracle_env: macos_local
 produces:
   - specfuse/agent/providers/bugs.py
   - tests/test_agent_escalation_run_state.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-05T12:19:08.173439+00:00
+duration_seconds: 1131.283
+cost_usd: 1.59248
+input_tokens: 80
+output_tokens: 34580
 ---
 
 # An escalation says what the run actually left behind
