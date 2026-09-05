@@ -5905,6 +5905,14 @@ def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dic
     filed = 0
     unfiled = 0
     filed_issues: list[str] = []
+    # #3244: the labels are registered in `labels.LABEL_REGISTRY` but a
+    # repository provisioned before they were added does not have them, and
+    # `gh issue create --label` 422s on a missing label. Ensure each distinct
+    # label this call will use, once, idempotently (`--force` updates rather
+    # than fails when it exists). A failure here is recorded, never raised —
+    # the create below then fails on its own and counts as `unfiled`.
+    labels_unensured = _ensure_labels_exist(
+        sorted({label for _, _, label in entries}), runner=runner)
     for correlation_id, body, label in entries:
         title = issue_title(correlation_id, body)
         number = emit_issue_with_body(
@@ -5928,7 +5936,36 @@ def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dic
             "issue_numbers": filed_issues,
         },
     )])
-    return {"filed": filed, "unfiled": unfiled, "issue_numbers": filed_issues}
+    return {"filed": filed, "unfiled": unfiled, "issue_numbers": filed_issues,
+            "labels_unensured": labels_unensured}
+
+
+def _ensure_labels_exist(names: list, *, runner=None) -> list:
+    """Create (or refresh) each label in *names* from `labels.LABEL_REGISTRY`
+    through *runner* (#3244). Returns the names whose create call failed.
+
+    Uses `gh label create <name> --color --description --force`: idempotent,
+    and it never raises — this runs on the close path, where a label problem
+    must not take down a close that otherwise passed.
+    """
+    from .escalation import _default_runner as _gh_runner
+    from .labels import LABEL_REGISTRY  # local: labels imports loop's siblings, not loop
+    run = runner if runner is not None else _gh_runner
+    specs = {spec.name: spec for spec in LABEL_REGISTRY}
+    failed: list = []
+    for name in names:
+        spec = specs.get(name)
+        argv = ["gh", "label", "create", name, "--force"]
+        if spec is not None:
+            argv += ["--color", spec.colour, "--description", spec.description]
+        try:
+            result = run(argv, check=False)
+        except Exception:  # noqa: BLE001 - never blocks the close path
+            failed.append(name)
+            continue
+        if getattr(result, "returncode", 1) != 0:
+            failed.append(name)
+    return failed
 
 
 _NO_FAILURES_SENTINEL = NO_FAILURES_SENTINEL

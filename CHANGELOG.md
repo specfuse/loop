@@ -28,6 +28,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ### Fixed
 
+- **Follow-up and post-merge issue filing assumed labels nobody had provisioned.** `specfuse:follow-up` and `specfuse:post-merge` are in `labels.LABEL_REGISTRY` (FEAT-2026-0085/T03) but a repository provisioned before they were added does not have them — this one did not — and `gh issue create --label` fails on a missing label, so every entry would have counted as `unfiled`. `file_followup_issues` now ensures each distinct label it is about to use with `gh label create --force` through the same runner before filing; a label failure is recorded in the result's `labels_unensured` and never raised (#3244)
 - **A `not_met` close never filed its `FOLLOW-UPS.md` entries.** The driver's post-gate call to `file_followup_issues` was gated on the variable set only when a close's verdict permitted terminal flips, so it ran on `met` and never on `not_met`, the verdict FEAT-2026-0085/T03 built the filing step for. FEAT-2026-0108's terminal close recorded `not_met` with one follow-up entry and no issue was filed. The gate now keys on any close that completed with a well-formed verdict (#3243)
 
 ## [0.15.0+umbrella.0.12.1] - 2026-09-04
