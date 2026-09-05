@@ -1,23 +1,15 @@
 ---
 id: FEAT-2026-0108/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 5.00
 model: opus
 effort: high
 oracle_env: macos_local
-verdict: not_met
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/RETROSPECTIVE.md
-gate_set: plannext
-driver_version: 0.15.0
-started_at: 2026-09-05T12:37:59.772469+00:00
-duration_seconds: 2158.937
-cost_usd: 11.814895
-input_tokens: 216
-output_tokens: 67143
 ---
 
 # Gate 1 close — demonstrate the six behaviours on fixtures, verdict
@@ -26,7 +18,11 @@ output_tokens: 67143
 `GATE-01.md`'s definition of done on fixtures with an injected runner, in this
 session, and write `met` or `not_met`.
 
-**Context.** Depends on T01-T06. Binding: `.specfuse/rules/close-discipline.md`.
+**Context.** Depends on T01-T06 and T05H. **This is the close's second
+attempt**: attempt 1 (2026-09-05) recorded `not_met` on the sixth behaviour and
+T05H was authored from its finding. `RETROSPECTIVE.md` from attempt 1 is in
+this folder: rewrite its `## Measurements` and `## Verdict` sections in place
+and re-run all six demonstrations; do not append a second copy of either. Binding: `.specfuse/rules/close-discipline.md`.
 The driver owns the terminal `PLAN.md status` flip. Baseline numbers are in
 `PLAN.md` § Notes. On `not_met`, write `FOLLOW-UPS.md` with one entry per
 failed criterion. The unattended run against a real repository is the

@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0108-agent-lane-run-hygiene
 roadmap_goal: An unattended `specfuse agent` run never attributes one item's edits to another, never loses a finished fix to a session that ended while a gate command ran, never reports a pending CI run as red or a found PR as missing, and records the tokens each item spent so `max_tokens_per_run` can fire.
 autonomy_default: review
 status: active
-planned_cost_usd: 37.00
+planned_cost_usd: 40.00
 ---
 
 # Plan: Agent lane run hygiene
@@ -125,6 +125,11 @@ gates:
       - id: FEAT-2026-0108/T06
         file: WU-06-escalation-reads-run-state.md
         depends_on: [FEAT-2026-0108/T02, FEAT-2026-0108/T05]
+      # --- hygiene precursor to the close's re-run, authored after the close's
+      # first attempt recorded not_met on one criterion (see WU-05H body) ---
+      - id: FEAT-2026-0108/T05H
+        file: WU-05H-escalating-outcomes-carry-pr-number.md
+        depends_on: [FEAT-2026-0108/T05, FEAT-2026-0108/T06]
       # --- terminal gate: single close WU ---
       - id: FEAT-2026-0108/G1-CLOSE
         file: WU-90-gate-1-close.md
@@ -134,6 +139,7 @@ gates:
           - FEAT-2026-0108/T03
           - FEAT-2026-0108/T04
           - FEAT-2026-0108/T05
+          - FEAT-2026-0108/T05H
           - FEAT-2026-0108/T06
 ```
 
