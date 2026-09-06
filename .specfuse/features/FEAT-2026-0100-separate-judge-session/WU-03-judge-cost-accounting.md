@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 model: sonnet
 effort: medium
@@ -14,10 +14,10 @@ produces:
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: test_doc_set_missing_for_retrospective_fails
-duration_seconds: 1774.894
-cost_usd: 2.420138
-input_tokens: 168
-output_tokens: 34538
+duration_seconds: 840.755
+cost_usd: 1.24158
+input_tokens: 16
+output_tokens: 1755
 re_arm_count: 1
 re_arm_override: true
 re_arm_history:
@@ -27,6 +27,15 @@ re_arm_history:
     prior_cost_usd: 2.420138
     prior_duration_seconds: 1774.894
     reason: "root cause found in test isolation, not the code"
+cumulative_cost_usd: 2.420138
+cumulative_duration_seconds: 1774.894
+cumulative_input_tokens: 168
+cumulative_output_tokens: 34538
+cumulative_attempts: 0
+folded_through_re_arm: 1
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T12:51:37.293780+00:00
 ---
 
 # The judge's spend is the close's spend

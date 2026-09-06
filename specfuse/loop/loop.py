@@ -2310,6 +2310,28 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
 
 
+def fold_judge_usage(attempt_usage: dict, judge_envelope: dict | None) -> dict:
+    """Fold a judge session's usage into a close attempt's usage, in place.
+
+    `judge_envelope` is the `judged` event payload `judge_close` returns;
+    its `usage` key is populated only when the judge's session parsed a
+    `--output-format json` envelope with cost/token fields (`judge_close`
+    sets it from `run_judge_session`'s return, the same shape `dispatch`
+    produces). Absent or non-dict `usage` — no envelope, a plain-text judge
+    reply, a disabled/skipped judge — leaves `attempt_usage` untouched, so
+    the judge's spend only ever adds to the close's, never invents it.
+    """
+    usage = (judge_envelope or {}).get("usage")
+    if not isinstance(usage, dict):
+        return attempt_usage
+    attempt_usage["cost_usd"] = (
+        attempt_usage.get("cost_usd", 0.0) + float(usage.get("cost_usd", 0.0)))
+    for key in ("input_tokens", "output_tokens",
+                "cache_read_input_tokens", "cache_creation_input_tokens"):
+        attempt_usage[key] = attempt_usage.get(key, 0) + int(usage.get(key, 0))
+    return attempt_usage
+
+
 def detect_rearm_dispatch(wu: WorkUnit) -> bool:
     """Return True when wu is a re-arm dispatch whose prior cycle has not yet
     been folded into the cumulative accumulators.
@@ -8110,6 +8132,13 @@ def run(
                                                    f"{type(_exc).__name__}: {_exc}"),
                                     }
                                     print(f"   JUDGE ERROR — {_judged['reason']}")
+                                _judge_usage = _judged.get("usage")
+                                if isinstance(_judge_usage, dict):
+                                    _judged["judge_cost_usd"] = round(
+                                        float(_judge_usage.get("cost_usd", 0.0)), 6)
+                                    fold_judge_usage(attempts_usage[-1], _judged)
+                                    fold_judge_usage(cum_usage, _judged)
+                                    write_cost_to_wu(backend, wu, cum_usage)
                                 wu_events.append(build_event(
                                     "judged", wu.wu_id, _judged))
                             # Re-read frontmatter post-squash: the agent writes
