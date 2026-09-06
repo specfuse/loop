@@ -15,9 +15,9 @@ gate_set: plannext
 driver_version: 0.15.0
 started_at: 2026-09-06T13:31:27.751849+00:00
 duration_seconds: 2954.222
-cost_usd: 8.095623
-input_tokens: 172
-output_tokens: 64261
+cost_usd: 8.315684
+input_tokens: 184
+output_tokens: 67162
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide
