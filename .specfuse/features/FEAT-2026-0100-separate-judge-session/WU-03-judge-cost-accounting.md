@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0100/T03
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.00
 model: sonnet
@@ -11,6 +11,13 @@ produces_driver_helper: fold_judge_usage
 produces:
   - specfuse/loop/loop.py
   - tests/test_judge_cost.py
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: test_doc_set_missing_for_retrospective_fails
+duration_seconds: 1774.894
+cost_usd: 2.420138
+input_tokens: 168
+output_tokens: 34538
 ---
 
 # The judge's spend is the close's spend
