@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ produces_driver_helper: lint_close_verdict_not_predecided
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_close_verdict_not_predecided.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T02:04:33.464526+00:00
+duration_seconds: 883.66
+cost_usd: 0.994319
+input_tokens: 64
+output_tokens: 13641
 ---
 
 # Lint: a close that is told its verdict in advance is refused at arm time
