@@ -94,8 +94,10 @@ write a specific verdict (`verdict: met`, "the verdict is hedged", "record
 already in its intended final state?** Zero: a correctly drafted close names
 what to measure and never names the verdict. The sweep over this repository's
 corpus is part of T05's acceptance; `done` closes are skipped as sealed
-history, so FEAT-2026-0082's pre-decided hedge, which is `done`, does not fire
-it.
+history. (Correction after the close's first attempt: FEAT-2026-0082's close
+on `main` was `pending`, not `done`, and its pre-decided hedge did fire the
+rule; the operator rewrote those sentences on 2026-09-06 and the sweep now
+reports zero.)
 
 The judge itself flips no severity. It can only lower a verdict, and the driver
 records both verdicts in the `judged` event, so a judge that is wrong is
