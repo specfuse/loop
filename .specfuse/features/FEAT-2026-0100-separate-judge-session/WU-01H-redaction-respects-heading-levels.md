@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T01H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ provenance: "G1-CLOSE attempt 1 (2026-09-06), FOLLOW-UPS.md entry 3 and the judg
 produces:
   - specfuse/loop/judge.py
   - tests/test_judge_module.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T15:57:03.734752+00:00
+duration_seconds: 1474.697
+cost_usd: 0.680552
+input_tokens: 66
+output_tokens: 7495
 ---
 
 # Hygiene: a redacted section stays redacted through its own subsections

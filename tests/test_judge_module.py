@@ -226,6 +226,84 @@ class TestRedaction(unittest.TestCase):
         text = "## Measurements\n\n| coverage | 94% |\n"
         self.assertEqual(strip_forbidden_sections(text), text)
 
+    def test_forbidden_section_with_subheadings_is_fully_stripped(self):
+        text = (
+            "## Verdict\n"
+            "\n"
+            "verdict: met — I am satisfied.\n"
+            "\n"
+            "### Why I am confident\n"
+            "\n"
+            "I checked every criterion myself.\n"
+            "\n"
+            "## Retrospective\n"
+            "\n"
+            "### What went well\n"
+            "\n"
+            "This close went smoothly.\n"
+            "\n"
+            "### What I would change\n"
+            "\n"
+            "Nothing, honestly.\n"
+            "\n"
+            "## Cost analysis\n"
+            "\n"
+            "| planned | actual |\n"
+        )
+        stripped = strip_forbidden_sections(text)
+        for line in (
+            "verdict: met",
+            "I am satisfied",
+            "Why I am confident",
+            "checked every criterion",
+            "What went well",
+            "went smoothly",
+            "What I would change",
+            "Nothing, honestly",
+        ):
+            self.assertNotIn(line, stripped)
+        self.assertIn("## Cost analysis", stripped)
+        self.assertIn("| planned | actual |", stripped)
+
+    def test_forbidden_section_in_diff_hunk_form_is_fully_stripped(self):
+        text = (
+            "+## Verdict\n"
+            "+\n"
+            "+verdict: met — I am satisfied.\n"
+            "+\n"
+            "+### Why I am confident\n"
+            "+\n"
+            "+I checked every criterion myself.\n"
+            "+\n"
+            "+## Retrospective\n"
+            "+\n"
+            "+### What went well\n"
+            "+\n"
+            "+This close went smoothly.\n"
+            "+\n"
+            "+### What I would change\n"
+            "+\n"
+            "+Nothing, honestly.\n"
+            "+\n"
+            "+## Cost analysis\n"
+            "+\n"
+            "+| planned | actual |\n"
+        )
+        stripped = strip_forbidden_sections(text)
+        for line in (
+            "verdict: met",
+            "I am satisfied",
+            "Why I am confident",
+            "checked every criterion",
+            "What went well",
+            "went smoothly",
+            "What I would change",
+            "Nothing, honestly",
+        ):
+            self.assertNotIn(line, stripped)
+        self.assertIn("## Cost analysis", stripped)
+        self.assertIn("| planned | actual |", stripped)
+
 
 class TestPrompt(unittest.TestCase):
 

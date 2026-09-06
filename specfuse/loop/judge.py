@@ -143,15 +143,20 @@ def strip_forbidden_sections(text: str) -> str:
     """
     out: list[str] = []
     skipping = False
+    skip_level = 0
     for line in text.splitlines():
         m = _HEADING_LINE_RE.match(line)
         if m:
-            if _heading_first_word(m.group(2)) in FORBIDDEN_SECTION_TITLES:
-                if not skipping:
-                    out.append(REDACTION_MARKER)
+            level = len(m.group(1))
+            if skipping and level <= skip_level:
+                skipping = False
+            if not skipping and _heading_first_word(m.group(2)) in FORBIDDEN_SECTION_TITLES:
+                out.append(REDACTION_MARKER)
                 skipping = True
+                skip_level = level
                 continue
-            skipping = False
+            if skipping:
+                continue
         elif skipping and _DIFF_BOUNDARY_RE.match(line):
             skipping = False
         if not skipping:
