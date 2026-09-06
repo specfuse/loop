@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 5.00
 model: opus
 effort: high
@@ -12,6 +12,10 @@ produces:
   - .specfuse/templates/PLAN.template.md
   - docs/methodology.md
   - plugins/specfuse/skills/draft-feature/SKILL.md
+duration_seconds: 2129.131
+cost_usd: 8.030763
+input_tokens: 214
+output_tokens: 55716
 ---
 
 # The rules say who writes the verdict, and a drafted feature defaults to `auto`

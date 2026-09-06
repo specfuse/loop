@@ -4,7 +4,10 @@ title: <short feature title>
 slug: <feature-slug>
 branch: feat/FEAT-YYYY-NNNN-<feature-slug>
 roadmap_goal: <one line copied from the roadmap — the north star this feature serves; plan-next anchors every drafted gate to this and flags if a retrospective implies it should change>
-autonomy_default: review        # auto | review | supervised
+autonomy_default: auto          # auto | review | supervised — auto is the recommended
+                                # default: a fresh judge session, not the close, writes
+                                # the terminal verdict. Tighten to review when a feature's
+                                # criteria cannot be judged from evidence (methodology §9).
 status: active                  # active | blocked | deferred | done | abandoned
                                 # deferred = parked pending an external decision/dependency; resumable, non-dispatchable
 # planned_cost_usd: 0.00        # OPTIONAL — sum of WU planned costs; lint warns when missing or when delta from WU sum > 10%

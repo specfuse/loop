@@ -241,6 +241,58 @@ a `## Post-merge checklist` line in `PLAN.md`, never an acceptance criterion;
 and work that simply did not get done is `not_met` plus a follow-up entry. See
 `.specfuse/rules/close-discipline.md` §2 for the close-time obligations.
 
+### The judge writes the verdict (FEAT-2026-0100)
+
+A binary verdict is only worth what its author's independence is worth, and
+until this feature the close wrote its own — the same kind of session that did
+the work, reading its own retrospective while deciding whether the work was
+done. Every surveyed loop that holds up moves that decision elsewhere, for the
+plain reason that models skew positive on their own output.
+
+So on a **terminal** gate the driver dispatches a **judge**: a short, fresh
+session (`judge.py`, dispatched from `judge_close` in `loop.py`) that runs
+*after* the close's closing-deliverable guards — never judging a structurally
+incomplete close — and *before* the driver re-reads `verdict:` for the flips.
+Both readings therefore go through the one field every downstream consumer
+already reads; the flips, the `FOLLOW-UPS.md` filing, and `gate-status` needed
+no change.
+
+**What the judge reads** is evidence and nothing else: the gate's
+`## Definition of done`, the `GATE-NN-CRITERIA.md` per-criterion state (via the
+shipped `criteria_state` parser), the gate's diff from the gate-start SHA, and
+the close's `## Measurements` section. **What it never reads** is the close's
+opinion of its own work — any `Verdict` or `Retrospective` section is stripped
+out of every evidence string before the prompt is rendered, including when it
+arrives inside a diff hunk. A judge that reads "verdict: met — every criterion
+holds" before deciding is the same session grading itself with extra steps.
+
+**It can lower a verdict and never raise one.** On `not_met` over a close's
+`met`, the driver rewrites the close WU's `verdict:`, appends the judge's
+per-criterion findings verbatim to `FOLLOW-UPS.md` (appending, never
+overwriting the close's own entries), and fires no terminal flips. On `met`
+over a close's `not_met` the disagreement is recorded and *not* acted on: a
+second opinion must not overrule the session that actually ran the oracles and
+found them red. A judge that times out, cannot be run, or returns unreadable
+output leaves the close's verdict standing — the judge is a check, not a
+dependency, and a defect in its path fails open, loudly.
+
+**The `judged` event** is written for every terminal close, including the ones
+where no judge ran, so "the judge never fired" is an auditable record rather
+than a silence. It carries the gate number, `close_verdict`, `judge_verdict`,
+the `verdict` that stands, `lowered`, `disagreed`, the finding count, the diff
+base and its source, the session's usage, and a one-line `reason` on every
+path that skipped or failed. Reading `close_verdict` against `judge_verdict`
+across features is how the judge itself is evaluated: one that never disagrees
+is not reading, and one that is usually wrong needs a better evidence bundle.
+
+**`judge_disabled: true`** in `PLAN.md` frontmatter opts a feature out. It is
+for the narrow case where a feature's criteria genuinely cannot be judged from
+the evidence above — a criterion whose only proof is something the bundle
+cannot carry. It is not an escape hatch for a close expected to be
+inconvenient; a criterion a judge cannot evaluate from evidence is usually a
+criterion that needs rewriting, a `type: human` WU, or a post-merge checklist
+line.
+
 **Unfinished work becomes tracked issues, not prose.** After a `not_met`
 close's squash, `file_followup_issues` files one GitHub issue per
 `FOLLOW-UPS.md` entry under `specfuse:follow-up`, carrying the entry body
@@ -552,6 +604,24 @@ human checkpoints on an `auto` feature are exactly: any escalation during the
 gate, the PR review, and the merge. Auto-arm advances a feature toward the
 *next* gate's execution; it never auto-merges — the merge gate stays human
 until the QA loop is trusted.
+
+**`auto` is the recommended default (FEAT-2026-0100).** `PLAN.template.md`
+carries `autonomy_default: auto`, and `/draft-feature` recommends it unless
+the feature gives a reason to tighten. The reason it can be recommended is the
+judge in §3, not a change to the mechanism above: **the arm predicate is
+untouched** — the same eight stop classes, the same `would_arm`, the same
+single flip site. What changed is what an armed gate is armed *on*. Before the
+judge, an `auto` feature let the session that did the work write the verdict
+that advanced the feature; now a fresh evaluator that never sees that session's
+prose writes it, and can only lower it. The `judge_editing` stop class still
+vetoes any gate that edited the loop's own driver, so a feature that changes
+the machinery keeps its human checkpoint regardless of this default.
+
+Tighten to `review` when the judge cannot do its job — a feature whose criteria
+are not judgeable from the evidence bundle (see `judge_disabled` in §3), or one
+whose blast radius makes a wrong arm expensive to undo. That is a decision to
+make deliberately, per feature, with a reason recorded; it is no longer the
+posture every feature starts from by default.
 
 An auto-arm is exactly one commit. Before that commit is written, the driver
 tags the pre-arm `HEAD` as `pre-arm/<feature-id>/gate-<N>`, so an arm crash

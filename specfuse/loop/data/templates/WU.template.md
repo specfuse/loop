@@ -67,4 +67,4 @@ edited. Blocked is a respectable outcome (`result-contract.md`).
 gates on, or flips a behavior flag adds a flag-scope table: every affected code
 path, gated / not gated, one line of why (`planning-discipline.md` §3). A `close`
 / `close-intermediate` unit adds close obligations (`close-discipline.md` §§1-5 —
-the verdict is binary; a `not_met` close writes `FOLLOW-UPS.md`), exits 0 on `specfuse lint --closing`, and sets `auto_close_disabled: true`. -->
+the verdict is binary; a `not_met` close writes `FOLLOW-UPS.md`; say what to measure, never what verdict to write — on a terminal gate the judge writes it), exits 0 on `specfuse lint --closing`, and sets `auto_close_disabled: true`. -->
