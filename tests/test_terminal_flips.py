@@ -254,6 +254,21 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
         self._patches.append((name, getattr(loop, name)))
         setattr(loop, name, replacement)
 
+    def _stub_judge(self) -> None:
+        """Neutralize the judge session every terminal close now dispatches.
+
+        FEAT-2026-0100/T02 added a second `claude -p` spawn to the close path,
+        so a case that patches `dispatch` alone would run a real judge here.
+        `met` is the neutral answer — a judge can lower a verdict and never
+        raise one, so an agreeing judge leaves every assertion below measuring
+        exactly what it measured before the judge existed.
+        """
+        self._patch(
+            "run_judge_session",
+            lambda prompt, *, timeout=None: (
+                "```result\nverdict: met\n```", None),
+        )
+
     def _write_feature(
         self,
         root: Path,
@@ -319,6 +334,7 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
 
             filed: list = []
             self._patch("dispatch", fake_dispatch)
+            self._stub_judge()
             self._patch("verify", lambda wu, feature_dir, cfg=None: (True, "(stub pass)"))
             self._patch("file_followup_issues",
                         lambda feature_dir, repo_root, runner=None: filed.append(feature_dir) or {})
@@ -372,6 +388,7 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 return True, "(stub pass)"
 
             self._patch("dispatch", fake_dispatch)
+            self._stub_judge()
             self._patch("verify", fake_verify)
 
             loop.run(None, dry_run=False)
@@ -403,6 +420,7 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 return True, "(stub pass)"
 
             self._patch("dispatch", fake_dispatch)
+            self._stub_judge()
             self._patch("verify", fake_verify)
 
             loop.run(None, dry_run=False)
@@ -457,6 +475,7 @@ class TestRunTerminalFlipIntegration(unittest.TestCase):
                 return True, "(stub pass)"
 
             self._patch("dispatch", fake_dispatch)
+            self._stub_judge()
             self._patch("verify", fake_verify)
 
             loop.run(None, dry_run=False)

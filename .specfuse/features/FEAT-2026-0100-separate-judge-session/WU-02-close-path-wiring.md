@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 7.00
 model: opus
 effort: high
@@ -11,6 +11,13 @@ produces_driver_helper: judge_close
 produces:
   - specfuse/loop/loop.py
   - tests/test_judge_close_path.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T00:09:14.444616+00:00
+duration_seconds: 2480.602
+cost_usd: 8.729707
+input_tokens: 176
+output_tokens: 61946
 ---
 
 # The driver dispatches the judge after the close's guards and honours only a lowered verdict

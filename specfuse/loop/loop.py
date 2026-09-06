@@ -102,6 +102,12 @@ from .gate_eval import (
     AutoCloseDecision,
     NON_SUBSTANTIVE_TYPES,
 )
+from .judge import (
+    JUDGE_MAX_EVIDENCE_CHARS,
+    build_judge_bundle,
+    parse_judge_result,
+    render_judge_prompt,
+)
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .cost import wu_lifetime_cost_usd
@@ -6292,6 +6298,338 @@ def assert_changelog_entry_for_contract_changes(
     )
 
 
+# --------------------------------------------------------------------------- #
+# The judge (FEAT-2026-0100/T02)                                              #
+# --------------------------------------------------------------------------- #
+#
+# A terminal close's `verdict:` is written by the same kind of session that did
+# the work, reading its own retrospective while it decides. The judge is a
+# second, shorter session that sees evidence only — the gate's definition of
+# done, the per-criterion state, the gate's diff, the close's measurements —
+# and answers the same binary question. It runs after the closing-deliverable
+# guards (so it never judges a close that is structurally incomplete) and
+# before the verdict is re-read for the terminal flips (so a lowered verdict
+# reaches every downstream reader through the field they already read).
+#
+# It can only LOWER. `not_met` over `met` rewrites the field and files
+# FOLLOW-UPS.md from the judge's own findings; `met` over `not_met` changes
+# nothing and is recorded as a disagreement. Everything else — a timeout, an
+# unparseable answer, an undeterminable diff range, a defect in this code —
+# fails open: the close's verdict stands and the event says why. A judge that
+# could veto a finished gate by crashing would be a worse failure mode than
+# the self-grading it replaces.
+
+#: The judge is a fresh reader of a bounded bundle, not an implementer: a
+#: mid-tier model at medium effort is the shape that gets a second opinion
+#: without paying close-session prices for it.
+JUDGE_MODEL = "sonnet"
+JUDGE_EFFORT = "medium"
+
+#: Wall clock for one judge session. Generous enough to re-run a gate's
+#: oracles, short enough that a hung session cannot strand a finished close.
+JUDGE_TIMEOUT_SECONDS = 15 * 60
+
+#: PLAN.md frontmatter escape hatch. One reader (this module), no behaviour
+#: beyond skipping the dispatch — see GATE-01's arming discipline on why it is
+#: deliberately not a flag.
+JUDGE_DISABLED_KEY = "judge_disabled"
+
+#: What FOLLOW-UPS.md carries when a judge lowers a verdict but records no
+#: `### ` finding. `not_met` obliges the artifact to hold at least one entry
+#: (close-m); inventing a criterion the judge never named would be worse than
+#: saying plainly that it named none.
+JUDGE_NO_FINDINGS_ENTRY = (
+    "### the judge lowered this verdict without recording a finding\n\n"
+    "The judge session answered `not_met` but wrote no `### ` finding, so "
+    "there is nothing here in its words. Read the `judged` event's raw output "
+    "before re-arming this gate."
+)
+
+
+def build_judge_cmd() -> list[str]:
+    """The argv for a judge dispatch — `dispatch`'s builder, judge's settings.
+
+    Deliberately the same `CLAUDE_CMD` template, the same `{model}`/`{effort}`
+    substitution and the same `resolve_claude_cmd` Windows resolution the work
+    dispatch uses, so the judge cannot drift into a differently-invoked CLI.
+    Only the model, the effort, and the absence of a WU are different.
+    """
+    cmd = [p.replace("{model}", JUDGE_MODEL).replace("{effort}", JUDGE_EFFORT)
+           for p in CLAUDE_CMD]
+    return resolve_claude_cmd(cmd) + ["--output-format", "json"]
+
+
+def run_judge_session(
+    prompt: str, *, timeout: float = JUDGE_TIMEOUT_SECONDS,
+) -> tuple[str, dict | None]:
+    """Run one judge session and return (result_text, usage_or_None).
+
+    The seam the tests inject at: `judge_close` looks this name up on the
+    module at call time, so patching it swaps the whole subprocess for a
+    fixture without touching the close path's logic. `subprocess.TimeoutExpired`
+    is left to propagate — `judge_close` owns what a timeout means.
+    """
+    proc = subprocess.run(
+        build_judge_cmd(), input=prompt, capture_output=True, text=True,
+        check=False, timeout=timeout,
+    )
+    return parse_claude_json_output(proc.stdout or "")
+
+
+def resolve_gate_start_sha(
+    gate_file: Path, feature_dir: Path,
+) -> tuple[str | None, str]:
+    """Return (sha, description) for the commit a gate's work started from.
+
+    First choice is the gate file's own `baseline.sha` — the driver wrote it at
+    gate entry, before any unit was dispatched, which is exactly the boundary
+    the judge's diff wants. Fallback is the merge-base of HEAD with the
+    feature's integration branch, for a gate whose baseline probe was skipped
+    (`--no-baseline-probe`) or predates FEAT-2026-0051.
+
+    Returns `(None, reason)` when neither resolves. Never guesses a range: a
+    judge reading the diff of an arbitrary commit is reading someone else's
+    work.
+    """
+    gate_file = Path(gate_file)
+    if gate_file.is_file():
+        try:
+            baseline = read_gate_baseline(gate_file)
+        except Exception as exc:  # noqa: BLE001 - unreadable gate frontmatter
+            baseline = None
+            logging.debug("resolve_gate_start_sha: %s unreadable: %s",
+                          gate_file, exc)
+        if baseline and baseline.get("sha"):
+            return str(baseline["sha"]), f"{gate_file.name} baseline.sha"
+
+    plan_path = Path(feature_dir) / "PLAN.md"
+    feat_fm: dict = {}
+    if plan_path.is_file():
+        try:
+            feat_fm, _ = read_frontmatter(plan_path)
+        except Exception as exc:  # noqa: BLE001 - PLAN.md is not the judge's job
+            logging.debug("resolve_gate_start_sha: PLAN.md unreadable: %s", exc)
+    base = resolve_base(feat_fm)
+    if base:
+        proc = subprocess.run(
+            ["git", "merge-base", base, "HEAD"],
+            capture_output=True, text=True, check=False,
+        )
+        sha = (proc.stdout or "").strip()
+        if proc.returncode == 0 and sha:
+            return sha, f"merge-base of HEAD with {base}"
+
+    return None, (
+        f"could not determine the gate's start sha: {gate_file.name} carries "
+        f"no `baseline.sha` and no merge-base with the integration branch "
+        f"resolved"
+    )
+
+
+def capture_gate_diff(
+    start_sha: str, max_chars: int = JUDGE_MAX_EVIDENCE_CHARS,
+) -> str:
+    """`git diff <start_sha>..HEAD`, `--stat` in full and the body capped.
+
+    The stat is the one part of a diff that is always worth its bytes — it
+    says what the gate touched even when the body has to be elided — so it is
+    never truncated and the body's budget is what remains. The body is capped
+    with `truncate_failure_note`, the same head+marker+tail treatment (and the
+    same 8,000-character limit) every other captured-output surface uses, so
+    the bundle builder's own cap finds nothing left to cut.
+    """
+    rng = f"{start_sha}..HEAD"
+    stat = subprocess.run(["git", "diff", "--stat", rng],
+                          capture_output=True, text=True, check=False)
+    body = subprocess.run(["git", "diff", rng],
+                          capture_output=True, text=True, check=False)
+    stat_text = (stat.stdout or "").strip()
+    body_text = body.stdout or ""
+    budget = max(0, max_chars - len(stat_text) - 2)
+    parts = [p for p in (stat_text,
+                         truncate_failure_note(body_text, max_chars=budget)) if p]
+    return "\n\n".join(parts)
+
+
+def write_judge_followups(
+    feature_dir: Path, gate_number: int, findings: list,
+) -> Path:
+    """Write the judge's findings into FOLLOW-UPS.md, one `### ` entry each.
+
+    The judge's words, verbatim — this reformats nothing, because a finding
+    rewritten by the driver is no longer the judge's. Appends when the close
+    already filed entries of its own rather than overwriting them: a lowered
+    verdict adds reasons the gate is not done, it does not retract the ones
+    already recorded.
+    """
+    path = Path(feature_dir) / FOLLOW_UPS_FILENAME
+    blocks = [f.text.strip() for f in findings if f.text.strip()]
+    if not blocks:
+        blocks = [JUDGE_NO_FINDINGS_ENTRY]
+    existing = path.read_text() if path.exists() else ""
+    if existing.strip():
+        text = existing.rstrip("\n") + "\n\n" + "\n\n".join(blocks) + "\n"
+    else:
+        text = (
+            f"# Follow-ups\n\n"
+            f"Filed by the judge for gate {gate_number}. Each entry is the "
+            f"judge's own words.\n\n"
+            + "\n\n".join(blocks) + "\n"
+        )
+    path.write_text(text)
+    return path
+
+
+def _judge_disabled(plan_fm: dict) -> bool:
+    """True when PLAN.md frontmatter opts this feature out of the judge."""
+    value = plan_fm.get(JUDGE_DISABLED_KEY)
+    if isinstance(value, bool):
+        return value
+    return isinstance(value, str) and value.strip().lower() == "true"
+
+
+def _gate_identity(wu: "WorkUnit", feature_dir: Path, gate) -> tuple[int, Path]:
+    """(gate_number, gate_file) for a close, from the GateNode or its WU id.
+
+    The GateNode is what the driver passes; the id fallback (`.../G1-CLOSE`)
+    keeps `judge_close` callable against a bare feature dir, which is how the
+    module-level tests and any future re-judge entry point reach it.
+    """
+    if gate is not None:
+        return gate.number, Path(gate.file)
+    m = re.search(r"/G(\d+)-", wu.wu_id or "")
+    number = int(m.group(1)) if m else 1
+    return number, Path(feature_dir) / f"GATE-{number:02d}.md"
+
+
+def judge_close(
+    wu: "WorkUnit",
+    feature_dir: Path,
+    repo_root: Path,
+    *,
+    gate=None,
+    runner=None,
+) -> dict:
+    """Dispatch the judge for a terminal close and honour only a lowered verdict.
+
+    Returns the `judged` event's payload — always, for every outcome, including
+    the ones where no judge ran. The caller wraps it in `build_event`; nothing
+    here writes to the event log, so a judge that never fired is still one
+    auditable record saying why.
+
+    Side effects, and only these: on `not_met` over `met`, the close WU's
+    `verdict:` field is rewritten, FOLLOW-UPS.md gains the judge's findings,
+    and both are committed as bookkeeping (post-squash writes do not survive a
+    later reset otherwise). Every other path touches no file.
+
+    `repo_root` is accepted for signature parity with the closing guards this
+    runs beside; everything the judge reads is inside *feature_dir* or in git.
+    """
+    feature_dir = Path(feature_dir)
+    gate_number, gate_file = _gate_identity(wu, feature_dir, gate)
+
+    plan_path = feature_dir / "PLAN.md"
+    plan_fm: dict = {}
+    if plan_path.is_file():
+        plan_fm, _ = read_frontmatter(plan_path)
+
+    # The verdict as the close left it on disk — not `wu.verdict`, which
+    # `load_wu` populated before dispatch (the same staleness every closing
+    # assertion re-reads around).
+    close_fm, _ = read_frontmatter(wu.file)
+    close_verdict = close_fm.get("verdict") or None
+
+    payload: dict = {
+        "gate": gate_number,
+        "close_verdict": close_verdict,
+        "judge_verdict": None,
+        "verdict": close_verdict,
+        "lowered": False,
+        "disagreed": False,
+        "findings": 0,
+        "reason": None,
+    }
+
+    if _judge_disabled(plan_fm):
+        payload["reason"] = (
+            f"{JUDGE_DISABLED_KEY}: true in PLAN.md frontmatter — no judge ran"
+        )
+        print(f"   JUDGE SKIPPED — {payload['reason']}")
+        return payload
+
+    start_sha, sha_source = resolve_gate_start_sha(gate_file, feature_dir)
+    if not start_sha:
+        payload["reason"] = sha_source
+        print(f"   JUDGE SKIPPED — {sha_source}")
+        return payload
+    payload["diff_base"] = start_sha
+    payload["diff_base_source"] = sha_source
+
+    bundle = build_judge_bundle(
+        feature_dir, gate_number, diff_text=capture_gate_diff(start_sha),
+    )
+    prompt = render_judge_prompt(bundle)
+
+    print(f"   JUDGE — dispatching {JUDGE_MODEL}/{JUDGE_EFFORT} on gate "
+          f"{gate_number} (diff from {sha_source})")
+    run = runner or run_judge_session
+    try:
+        raw, usage = run(prompt, timeout=JUDGE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        payload["reason"] = (
+            f"the judge session timed out after {JUDGE_TIMEOUT_SECONDS}s"
+        )
+        print(f"   JUDGE TIMEOUT — {payload['reason']}; the close's verdict "
+              f"({close_verdict}) stands")
+        return payload
+    except OSError as exc:
+        payload["reason"] = f"the judge session could not be run: {exc}"
+        print(f"   JUDGE UNAVAILABLE — {payload['reason']}; the close's "
+              f"verdict ({close_verdict}) stands")
+        return payload
+    if usage:
+        payload["usage"] = usage
+
+    result = parse_judge_result(raw)
+    payload["judge_verdict"] = result.verdict
+    if result.verdict is None:
+        payload["reason"] = result.reason or "the judge returned no verdict"
+        print(f"   JUDGE UNREADABLE — {payload['reason']}; the close's "
+              f"verdict ({close_verdict}) stands")
+        return payload
+
+    payload["findings"] = len(result.findings)
+    payload["disagreed"] = result.verdict != close_verdict
+
+    if result.verdict == "not_met" and close_verdict != "not_met":
+        write_frontmatter_field(wu.file, "verdict", "not_met")
+        followups = write_judge_followups(
+            feature_dir, gate_number, result.findings)
+        payload["lowered"] = True
+        payload["verdict"] = "not_met"
+        commit_bookkeeping(
+            [wu.file, followups],
+            f"chore(loop): {wu.wu_id} judge lowered verdict to not_met"
+            f"\n\nFeature: {wu.wu_id}",
+        )
+        print(f"   JUDGE LOWERED — close said {close_verdict}, judge says "
+              f"not_met ({payload['findings']} finding(s)) — "
+              f"{FOLLOW_UPS_FILENAME} filed, no terminal flips")
+        return payload
+
+    if payload["disagreed"]:
+        # `met` over `not_met`. Recorded, never acted on: a judge that could
+        # raise a verdict would let a second opinion overrule the session that
+        # actually ran the oracles and found them red.
+        print(f"   JUDGE DISAGREED — judge says met, close said "
+              f"{close_verdict}; a judge may lower a verdict, never raise "
+              f"one, so {close_verdict} stands")
+        return payload
+
+    print(f"   JUDGE AGREED — {result.verdict}")
+    return payload
+
+
 CLOSING_ASSERTIONS_BY_TYPE: dict[str, list] = {
     "close": [
         assert_retrospective_exists,
@@ -7741,6 +8079,39 @@ def run(
                                 )
                                 continue
                         if wu.type == "close":
+                            # The judge (FEAT-2026-0100/T02) runs HERE: after
+                            # the closing-deliverable guards above (so it never
+                            # judges a structurally incomplete close) and
+                            # before the re-read below (so a lowered verdict
+                            # reaches the flips, FOLLOW-UPS filing and
+                            # gate-status through the one field they all read).
+                            # Terminal closes only — an intermediate gate keeps
+                            # its ceremony until its next-gate plan is itself
+                            # judged.
+                            if gate is gates[-1]:
+                                try:
+                                    _judged = judge_close(
+                                        wu, feature_dir, REPO_ROOT, gate=gate,
+                                    )
+                                except Exception as _exc:  # noqa: BLE001
+                                    # A defect in the judge path must not veto
+                                    # a close that already passed every gate.
+                                    # Fail open, loudly, with the exception in
+                                    # the event rather than swallowed.
+                                    _judged = {
+                                        "gate": gate.number,
+                                        "close_verdict": wu.verdict,
+                                        "judge_verdict": None,
+                                        "verdict": wu.verdict,
+                                        "lowered": False,
+                                        "disagreed": False,
+                                        "findings": 0,
+                                        "reason": (f"judge_close raised: "
+                                                   f"{type(_exc).__name__}: {_exc}"),
+                                    }
+                                    print(f"   JUDGE ERROR — {_judged['reason']}")
+                                wu_events.append(build_event(
+                                    "judged", wu.wu_id, _judged))
                             # Re-read frontmatter post-squash: the agent writes
                             # `verdict:` to the WU file DURING dispatch, but
                             # `wu.verdict` was populated by `load_wu` BEFORE
