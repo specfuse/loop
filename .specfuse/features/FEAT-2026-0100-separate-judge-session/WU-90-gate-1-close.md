@@ -1,15 +1,23 @@
 ---
 id: FEAT-2026-0100/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 model: opus
 effort: high
 oracle_env: macos_local
+verdict: not_met
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0100-separate-judge-session/RETROSPECTIVE.md
+gate_set: plannext
+driver_version: 0.15.0
+started_at: 2026-09-06T13:31:27.751849+00:00
+duration_seconds: 2954.222
+cost_usd: 8.095623
+input_tokens: 172
+output_tokens: 64261
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide

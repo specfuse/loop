@@ -3906,3 +3906,29 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   close's own `not_met` finding, and the close's second attempt re-ran the same
   fixture demonstration to exit 0. The rule's cost if applied at arming time is
   one sentence per criterion; its cost when missed was a close re-attempt.
+
+## FEAT-2026-0100/G1-CLOSE — a satisfiability answer that was reasoned about instead of run
+
+- [FEAT-2026-0100/G1-CLOSE] **When a plan's § Escalation-predicate
+  satisfiability answer rests on a claim about the existing corpus, that claim is
+  a command with an output: run it at drafting time and paste the output.** A
+  plan that reasons its way to "zero" is asserting a measurement it never took.
+  `PLAN.md` answered §2's mandatory question — what does the new ERROR-level rule
+  report on inputs already in their intended final state? — with "FEAT-2026-0082's
+  pre-decided hedge, which is `done`, does not fire it." That close WU is
+  `status: pending`, `attempts: 0`, so it fires; a one-line `git show` or one
+  sweep would have settled it, and the terminal close's fresh re-run of the same
+  oracle was the first thing in the feature able to see it. The failure is not
+  that the claim was wrong — plans are allowed to be wrong — but that it was
+  *checkable and unchecked*, and that being unchecked let it survive two further
+  surfaces built to catch exactly this: `GATE-01.md` § Arming discipline asked
+  in writing for the sweep and its `## Reflection notes` stayed the unedited
+  placeholder, and T05 carried the sweep as an acceptance criterion with a
+  matching `blocked` escalation trigger and still reported `done` at one attempt.
+  Drafting-time check, mechanical: for every §2 answer containing a count, a
+  "zero", or a named existing artifact, the section must show the command and its
+  output, not a sentence about them. Distinct from
+  `[FEAT-2026-0108/G1-CLOSE]`, which bounds a criterion's *data flow* against a
+  sibling WU's output; this one bounds a *plan section's* claim against the
+  repository it claims something about, and it is easy to miss precisely because
+  §2 reads as reasoning rather than as measurement.
