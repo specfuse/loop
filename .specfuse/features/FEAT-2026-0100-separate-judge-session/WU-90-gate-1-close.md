@@ -1,23 +1,15 @@
 ---
 id: FEAT-2026-0100/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 6.00
 model: opus
 effort: high
 oracle_env: macos_local
-verdict: not_met
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0100-separate-judge-session/RETROSPECTIVE.md
-gate_set: plannext
-driver_version: 0.15.0
-started_at: 2026-09-06T13:31:27.751849+00:00
-duration_seconds: 2954.222
-cost_usd: 8.315684
-input_tokens: 184
-output_tokens: 67162
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide
@@ -27,7 +19,13 @@ in `GATE-01.md`'s definition of done on fixtures with an injected runner, in
 this session, and record the measurements. This close is itself judged by
 the mechanism it ships; measure, do not decide.
 
-**Context.** Depends on T01-T05. Binding: `.specfuse/rules/close-discipline.md`
+**Context.** Depends on T01-T05, T01H and T02H. **This is the close's second
+attempt**: attempt 1 (2026-09-06) recorded `not_met` on three criteria; T01H
+and T02H were authored from two of them and the third (FEAT-2026-0082's stale
+close body) was fixed by the operator. `RETROSPECTIVE.md` from attempt 1 is in
+this folder: rewrite its `## Measurements` and `## Verdict` sections in place
+and re-run all eight demonstrations plus the corpus sweep; do not append a
+second copy of either section. Binding: `.specfuse/rules/close-discipline.md`
 as T04 rewrote it. The driver owns the terminal `PLAN.md status` flip and,
 from T02 on, dispatches the judge after this close's squash; the verdict
 field is written by the driver from the judge's result. Baseline numbers are

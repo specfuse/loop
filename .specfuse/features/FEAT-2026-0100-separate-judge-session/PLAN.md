@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0100-separate-judge-session
 roadmap_goal: The verdict on every terminal close is written by a fresh session that sees only evidence — the gate's definition of done, per-criterion state, the gate's diff, the close's measurements, and the oracles it may re-run — never by the session that did the work; a judge can lower a verdict and never raise one; and with that judge in place, auto-arm becomes the default a drafted feature recommends.
 autonomy_default: review
 status: active
-planned_cost_usd: 29.00
+planned_cost_usd: 36.00
 ---
 
 # Plan: Separate judge session
@@ -123,6 +123,14 @@ gates:
       - id: FEAT-2026-0100/T05
         file: WU-05-lint-no-predecided-verdict.md
         depends_on: [FEAT-2026-0100/T04]
+      # --- hygiene precursors to the close's re-run, authored from the close's
+      # first attempt (not_met on three criteria; see each WU body) ---
+      - id: FEAT-2026-0100/T01H
+        file: WU-01H-redaction-respects-heading-levels.md
+        depends_on: [FEAT-2026-0100/T05]
+      - id: FEAT-2026-0100/T02H
+        file: WU-02H-judge-diffs-from-gate-entry.md
+        depends_on: [FEAT-2026-0100/T01H]
       # --- terminal gate: single close WU ---
       - id: FEAT-2026-0100/G1-CLOSE
         file: WU-90-gate-1-close.md
@@ -132,6 +140,8 @@ gates:
           - FEAT-2026-0100/T03
           - FEAT-2026-0100/T04
           - FEAT-2026-0100/T05
+          - FEAT-2026-0100/T01H
+          - FEAT-2026-0100/T02H
 ```
 
 ## Post-merge checklist
