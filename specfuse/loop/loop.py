@@ -4360,7 +4360,13 @@ def read_gate_baseline(gate_file: Path) -> dict | None:
         failing = []
     if not isinstance(failing, list):
         return None
-    return {"sha": sha, "probed_at": baseline.get("probed_at"), "failing": failing}
+    entry_sha = baseline.get("entry_sha")
+    if not isinstance(entry_sha, str) or not entry_sha:
+        entry_sha = None
+    return {
+        "sha": sha, "probed_at": baseline.get("probed_at"), "failing": failing,
+        "entry_sha": entry_sha,
+    }
 
 
 def write_gate_baseline(
@@ -4375,8 +4381,20 @@ def write_gate_baseline(
     An empty `failing` is written as `failing: []` (inline empty flow list),
     never an omitted key — `read_gate_baseline` depends on this to tell "probed
     green" from "never probed."
+
+    `entry_sha` records the sha of the gate's first probe (FEAT-2026-0100/T02H)
+    — the judge's diff range needs the gate-entry commit, not the sha of
+    whichever probe happens to run last across a halt-and-resume. Read here
+    rather than threaded through every caller: the first probe (no existing
+    baseline) sets `entry_sha` to `sha`; every later probe carries the prior
+    `entry_sha` forward untouched.
     """
-    lines = ["baseline:", f"  sha: {sha}", f"  probed_at: {probed_at}"]
+    existing = read_gate_baseline(gate_file)
+    entry_sha = (existing or {}).get("entry_sha") or sha
+    lines = [
+        "baseline:", f"  sha: {sha}", f"  probed_at: {probed_at}",
+        f"  entry_sha: {entry_sha}",
+    ]
     if not failing:
         lines.append("  failing: []")
     else:
@@ -6403,17 +6421,19 @@ def resolve_gate_start_sha(
 ) -> tuple[str | None, str]:
     """Return (sha, description) for the commit a gate's work started from.
 
-    First choice is the gate file's own `baseline.sha` — the driver wrote it at
-    gate entry, before any unit was dispatched, which is exactly the boundary
-    the judge's diff wants. Fallback is the merge-base of HEAD with the
-    feature's integration branch, for a gate whose baseline probe was skipped
-    (`--no-baseline-probe`) or predates FEAT-2026-0051.
+    First choice is the gate file's own `baseline.entry_sha` — the sha
+    recorded at the gate's first probe, which survives a driver-restart halt
+    that re-probes and rewrites `baseline.sha` (FEAT-2026-0100/T02H). Next is
+    the merge-base of HEAD with the feature's integration branch. Last resort
+    is `baseline.sha` itself, for a legacy baseline block written before
+    `entry_sha` existed and whose merge-base does not resolve.
 
-    Returns `(None, reason)` when neither resolves. Never guesses a range: a
+    Returns `(None, reason)` when nothing resolves. Never guesses a range: a
     judge reading the diff of an arbitrary commit is reading someone else's
     work.
     """
     gate_file = Path(gate_file)
+    baseline = None
     if gate_file.is_file():
         try:
             baseline = read_gate_baseline(gate_file)
@@ -6421,8 +6441,8 @@ def resolve_gate_start_sha(
             baseline = None
             logging.debug("resolve_gate_start_sha: %s unreadable: %s",
                           gate_file, exc)
-        if baseline and baseline.get("sha"):
-            return str(baseline["sha"]), f"{gate_file.name} baseline.sha"
+        if baseline and baseline.get("entry_sha"):
+            return str(baseline["entry_sha"]), f"{gate_file.name} baseline.entry_sha"
 
     plan_path = Path(feature_dir) / "PLAN.md"
     feat_fm: dict = {}
@@ -6440,6 +6460,9 @@ def resolve_gate_start_sha(
         sha = (proc.stdout or "").strip()
         if proc.returncode == 0 and sha:
             return sha, f"merge-base of HEAD with {base}"
+
+    if baseline and baseline.get("sha"):
+        return str(baseline["sha"]), f"{gate_file.name} baseline.sha"
 
     return None, (
         f"could not determine the gate's start sha: {gate_file.name} carries "

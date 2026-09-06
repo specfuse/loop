@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T02H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ provenance: "G1-CLOSE attempt 1 (2026-09-06), FOLLOW-UPS.md entry 2: the judged 
 produces:
   - specfuse/loop/loop.py
   - tests/test_judge_close_path.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T16:32:13.482391+00:00
+duration_seconds: 1147.336
+cost_usd: 0.811421
+input_tokens: 64
+output_tokens: 18268
 ---
 
 # Hygiene: the judge diffs from gate entry, not from the latest baseline probe

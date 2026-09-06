@@ -481,7 +481,7 @@ class TestGateStartSha(unittest.TestCase):
     def tearDown(self):
         os.chdir(self._cwd)
 
-    def test_gate_baseline_sha_wins(self):
+    def test_gate_baseline_entry_sha_wins(self):
         with integration_workspace() as root:
             os.chdir(root)
             fdir = root / ".specfuse/features/FEAT-2026-9810-test"
@@ -491,11 +491,12 @@ class TestGateStartSha(unittest.TestCase):
                 "---\ngate: 1\nstatus: open\nbaseline:\n"
                 "  sha: 0123456789abcdef0123456789abcdef01234567\n"
                 "  probed_at: 2026-09-05T00:00:00+00:00\n"
+                "  entry_sha: 0123456789abcdef0123456789abcdef01234567\n"
                 "  failing: []\n---\n\n# Gate 1\n"
             )
             sha, source = loop.resolve_gate_start_sha(gate, fdir)
             self.assertEqual(sha, "0123456789abcdef0123456789abcdef01234567")
-            self.assertIn("baseline.sha", source)
+            self.assertIn("baseline.entry_sha", source)
 
     def test_merge_base_fallback_when_no_baseline_block(self):
         with integration_workspace() as root:
@@ -535,6 +536,75 @@ class TestGateStartSha(unittest.TestCase):
             self.assertIsNone(sha)
             self.assertIn("baseline.sha", reason)
             self.assertIn("merge-base", reason)
+
+    def test_judge_diff_base_survives_a_reprobe(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = root / ".specfuse/features/FEAT-2026-9813-test"
+            fdir.mkdir(parents=True)
+            gate = fdir / "GATE-01.md"
+            gate.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+
+            loop.write_gate_baseline(
+                gate, "1111111111111111111111111111111111111aaa",
+                "2026-09-05T00:00:00+00:00", [],
+            )
+            loop.write_gate_baseline(
+                gate, "2222222222222222222222222222222222222bbb",
+                "2026-09-05T01:00:00+00:00", [],
+            )
+
+            sha, source = loop.resolve_gate_start_sha(gate, fdir)
+            self.assertEqual(sha, "1111111111111111111111111111111111111aaa")
+            self.assertIn("baseline.entry_sha", source)
+
+    def test_entry_sha_is_written_once(self):
+        with integration_workspace() as root:
+            fdir = root / ".specfuse/features/FEAT-2026-9814-test"
+            fdir.mkdir(parents=True)
+            gate = fdir / "GATE-01.md"
+            gate.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+
+            loop.write_gate_baseline(
+                gate, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+                "2026-09-05T00:00:00+00:00", [],
+            )
+            first = loop.read_gate_baseline(gate)
+            loop.write_gate_baseline(
+                gate, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2",
+                "2026-09-05T01:00:00+00:00", [],
+            )
+            second = loop.read_gate_baseline(gate)
+
+            self.assertEqual(first["entry_sha"], second["entry_sha"])
+            self.assertEqual(second["sha"], "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb2")
+            self.assertNotEqual(second["sha"], second["entry_sha"])
+
+    def test_legacy_baseline_without_entry_sha_falls_back_to_merge_base(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = root / ".specfuse/features/FEAT-2026-9815-test"
+            fdir.mkdir(parents=True)
+            (fdir / "PLAN.md").write_text(
+                "---\nfeature_id: FEAT-2026-9815\ntitle: T\nslug: t\n"
+                "branch: feat/t\nroadmap_goal: t\nstatus: active\nbase: main\n"
+                "---\n\n# Plan\n"
+            )
+            gate = fdir / "GATE-01.md"
+            gate.write_text(
+                "---\ngate: 1\nstatus: open\nbaseline:\n"
+                "  sha: 0123456789abcdef0123456789abcdef01234567\n"
+                "  probed_at: 2026-09-05T00:00:00+00:00\n"
+                "  failing: []\n---\n\n# Gate 1\n"
+            )
+            expected = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "main"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+
+            sha, source = loop.resolve_gate_start_sha(gate, fdir)
+            self.assertEqual(sha, expected)
+            self.assertIn("merge-base", source)
 
 
 class TestCaptureGateDiff(unittest.TestCase):
