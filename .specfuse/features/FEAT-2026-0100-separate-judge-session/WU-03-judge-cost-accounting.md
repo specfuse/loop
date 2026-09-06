@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0100/T03
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 model: sonnet
@@ -18,6 +18,15 @@ duration_seconds: 1774.894
 cost_usd: 2.420138
 input_tokens: 168
 output_tokens: 34538
+re_arm_count: 1
+re_arm_override: true
+re_arm_history:
+  - timestamp: 2026-09-06T12:44:41+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 2.420138
+    prior_duration_seconds: 1774.894
+    reason: "root cause found in test isolation, not the code"
 ---
 
 # The judge's spend is the close's spend
