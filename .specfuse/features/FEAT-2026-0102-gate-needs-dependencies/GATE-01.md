@@ -1,6 +1,11 @@
 ---
 gate: 1
 status: open
+baseline:
+  sha: ad59ccaba8595a2ba362d6c22fad3038fc82d98c
+  probed_at: 2026-09-07T18:42:27.967100+00:00
+  entry_sha: ad59ccaba8595a2ba362d6c22fad3038fc82d98c
+  failing: []
 ---
 
 # Gate 1 — the suite runs once per pass, and the two gates still report distinct failures
