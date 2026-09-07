@@ -11,7 +11,7 @@ auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0100-separate-judge-session/RETROSPECTIVE.md
 gate_set: plannext
-verdict: met
+verdict: not_met
 driver_version: 0.15.0
 started_at: 2026-09-07T15:07:51.602502+00:00
 duration_seconds: 1737.061
