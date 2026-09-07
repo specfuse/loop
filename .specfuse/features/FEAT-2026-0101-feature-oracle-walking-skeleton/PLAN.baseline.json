@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Tracer bullet \u2014 declare a gate's `feature_oracle`, read it, run it in `verify()`",
+          "id": "FEAT-2026-0101/T01",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The close re-runs the gate's oracle and records its verdict",
+          "id": "FEAT-2026-0101/T02",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Refuse a gate that declares no oracle \u2014 ERROR when active, WARN otherwise",
+          "id": "FEAT-2026-0101/T03",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Make the oracle the drafted default across the authoring surfaces",
+          "id": "FEAT-2026-0101/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 audit that the oracle is wired, not merely defined",
+          "id": "FEAT-2026-0101/G1-CLOSE",
+          "planned_cost_usd": 8.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
