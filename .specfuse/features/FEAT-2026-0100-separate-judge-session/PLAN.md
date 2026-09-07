@@ -5,7 +5,7 @@ slug: separate-judge-session
 branch: feat/FEAT-2026-0100-separate-judge-session
 roadmap_goal: The verdict on every terminal close is written by a fresh session that sees only evidence — the gate's definition of done, per-criterion state, the gate's diff, the close's measurements, and the oracles it may re-run — never by the session that did the work; a judge can lower a verdict and never raise one; and with that judge in place, auto-arm becomes the default a drafted feature recommends.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 40.00
 ---
 
