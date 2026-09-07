@@ -109,9 +109,16 @@ fail here — at the human's review point — not three gates later mid-dispatch
 
 ## The stale-artifact trap (a verification.yml authoring rule)
 
-Gate commands declared in `.specfuse/verification.yml` **should be self-contained**.
-Avoid `--no-build`, `--no-restore`, or any equivalent "skip-build" flag that makes
-a gate command silently run against whatever binaries are already on disk.
+A gate command declared in `.specfuse/verification.yml` **must be
+self-contained unless it declares `needs:`**, in which case the runner
+guarantees the named dependency ran, clean, in this same invocation — so the
+declaring gate may reuse artifacts that dependency just produced. That
+guarantee is per-invocation and never cached across attempts: it holds only
+for the dependency run that just happened in this pass, never for artifacts
+left over from a prior attempt or a prior process. Outside of a declared
+`needs:` edge, avoid `--no-build`, `--no-restore`, or any equivalent
+"skip-build" flag that makes a gate command silently run against whatever
+binaries are already on disk.
 
 The failure mode this guidance prevents is the **stale-artifact trap**: a gate
 that embeds `--no-build` runs against pre-existing `bin/`, `obj/`, or
@@ -120,13 +127,19 @@ a fresh checkout, after new test files have been added, after a symbol rename. A
 `tests` gate using `--no-build` against stale artifacts can pass while new tests
 are never actually executed, or fail for reasons unrelated to the change under
 test. Either outcome corrodes the trust model the gate set exists to uphold.
+`needs:` closes this gap without reopening the trap: the runner orders the set
+topologically and skips a dependent whose dependency failed, so a dependent can
+only ever reuse a dependency's artifacts from a run that is known to have
+succeeded, this pass.
 
 The driver runs gate commands directly and is intentionally dumb about stacks — it
 does not run a per-stack pre-build step. The mitigation is in the
 `verification.yml` author's hands: declare gates that build/restore as part of
 their own invocation (e.g. `dotnet test` without `--no-build`, `pytest` without a
-separate `pip install` step) so the gate is correct regardless of what artifacts
-the disk already holds.
+separate `pip install` step), or declare `needs:` on a gate that legitimately
+reuses another gate's output (e.g. a `coverage` gate that only reports over data
+a `needs: [tests]` dependency's `coverage run` just produced), so the gate is
+correct regardless of what artifacts the disk already holds.
 
 If a stack genuinely requires a build step before tests are runnable, fold it into
 the `tests` gate's command (e.g. `dotnet build && dotnet test --no-build` as a

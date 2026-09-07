@@ -100,13 +100,14 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
 | FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | planned | — | [→ detail](#feat-2026-0101) |
-| FEAT-2026-0102 | Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash | planned | — | [→ detail](#feat-2026-0102) |
+| FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | planned | — | [→ detail](#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
+| FEAT-2026-0109 | Tiered verification and a cached baseline probe | planned | — | [→ detail](#feat-2026-0109) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -976,17 +977,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.**
 
-<a id="feat-2026-0102"></a>
-## FEAT-2026-0102 — Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash
-
-**Why.** Each attempt re-runs the full 15-gate suite (coverage re-runs the tests, six bats suites) for 5-7 minutes on top of 4-6 minutes of agent work; every driver restart re-probes the baseline for another 5-7 minutes because the probe is keyed on the HEAD sha that every bookkeeping commit moves; a unit that edits the driver halts the run for a restart. Half of a median attempt is the driver's own verification.
-
-**Goal.** Per attempt: the unit's declared tests, tests touching changed files, lint, and the feature oracle. Once per gate before the close: the full suite with coverage, bats, leak-scan, security. The baseline probe is cached by tree hash, not HEAD sha. The driver runs from an installed copy so a unit editing `specfuse/loop/` does not halt the run.
-
-**Benefits.** Attempt duration roughly halves; a three-attempt retry stops costing 18 minutes of duplicate gate runs; self-hosting features stop paying a restart per unit.
-
-**Status: planned.**
-
 <a id="feat-2026-0103"></a>
 ## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
 
@@ -1039,6 +1029,19 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Goal.** For features of up to three units, one session works the PLAN as a checklist (one unit per iteration, Ralph style); the driver verifies once with the feature oracle and the full gate set at the end; the only human touchpoints are the plan and the PR. Correlation ids, the squash commit, and the event log are kept.
 
 **Benefits.** Small features finish in the time of one prompt; the full loop is reserved for features that need decomposition.
+
+**Status: planned.**
+
+<a id="feat-2026-0109"></a>
+## FEAT-2026-0109 — Tiered verification and a cached baseline probe
+
+**Why.** Split out of FEAT-2026-0102 when that feature was rescoped to the `needs:` gate-dependency mechanism alone. The remainder of the original framing still holds: every attempt re-runs the full gate suite on top of the agent's own work; every driver restart re-probes the baseline because the probe is keyed on the HEAD sha that every bookkeeping commit moves; and a unit that edits the driver halts the run for a restart. FEAT-2026-0102 removes the duplicated suite execution inside a pass, but not the per-attempt cost of running the whole set, and not the re-probe.
+
+**Goal.** Per attempt: the unit's declared tests, tests touching changed files, lint, and the feature oracle. Once per gate before the close: the full suite with coverage, bats, leak-scan, security. The baseline probe is cached by tree hash, not HEAD sha. The driver runs from an installed copy so a unit editing `specfuse/loop/` does not halt the run.
+
+**Benefits.** Attempt duration drops further on top of FEAT-2026-0102's saving; self-hosting features stop paying a restart per unit; a resume at an unchanged tree pays nothing to re-probe.
+
+**Depends on.** FEAT-2026-0101 — the per-attempt tier lists the feature oracle among its cheap gates, and that oracle does not exist until 0101 lands. FEAT-2026-0102 should land first so the per-gate tier is not re-deriving work `needs:` already deduplicates. The installed-copy driver is a packaging migration in its own right; [FEAT-2026-0019/G1] applies to it directly and argues for landing it atomically rather than as one unit among several.
 
 **Status: planned.**
 

@@ -1861,8 +1861,25 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a gate whose dispatch wall-clock was 1783s of billed agent time that is 6.6%, paid once.
   General rule: when sizing a brake, compare CPU-seconds against BILLED agent time, not
   against other CPU-seconds — and expect probe cost to be dominated by whichever gates
-  duplicate each other's work, which is a `verification.yml` authoring concern rather than a
-  driver one.
+  duplicate each other's work.
+  **AMENDED IN PLACE by [FEAT-2026-0102/G1-CLOSE]** — the measurement above stands; the
+  conclusion this entry originally drew from it does not. It read "which is a
+  `verification.yml` authoring concern rather than a driver one", and that was wrong. The
+  duplication was not an authoring mistake anyone could have avoided: the gate-set contract
+  required each gate command to be self-contained (so stale artifacts could not make a gate
+  falsely pass) and offered no third option between paying for the duplicate run and
+  dropping that guarantee — merging `tests` and `coverage` collapses two `failure_class`
+  values that `spinning_signature_repeat` and `learnings-suggest` both key on, and dropping
+  `clean` reintroduces exactly the false pass the rule forbids. **The fix was in the
+  driver.** A gate declaring `needs: [<gate>]` moves the staleness guarantee from a
+  per-command convention to a runner invariant — enforced once, instead of re-asserted in
+  every command string — and the dependent is skipped, never passed, when its dependency
+  fails. Measured on this repo, same tree, one session, changing only the two gate
+  declarations: the `code` set fell from 320.2s to 173.4s (−45.8%) and the `coverage` gate
+  from 147.6s to 0.5s (−99.7%). Generalize the corrected form: when a contract offers only
+  two options and both give something up, the gap is in the contract, and adding the third
+  option belongs to whoever owns the contract's enforcement — not to every author who has to
+  live inside it.
 
 - [FEAT-2026-0051/G1-CLOSE; FEAT-2026-0053/G1-CLOSE; FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]
   **Python loads the driver once at process start, so a work unit's edit to `loop.py` is dead
@@ -3932,3 +3949,25 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   sibling WU's output; this one bounds a *plan section's* claim against the
   repository it claims something about, and it is easy to miss precisely because
   §2 reads as reasoning rather than as measurement.
+
+## FEAT-2026-0102/G1-CLOSE — a stored baseline decays against the set it was measured on
+
+- [FEAT-2026-0102/G1-CLOSE] **A recorded measurement that a later feature will use as an
+  acceptance threshold must carry the SHAPE it was measured on, and the criterion built on
+  it must compare before-vs-after on one tree rather than against the stored absolute.**
+  `[FEAT-2026-0051/G1-CLOSE]` recorded "118s on this repo's nine `code` gates" precisely so
+  the next feature would not re-derive it, which was right and saved real work. But
+  FEAT-2026-0102's acceptance criterion — "materially below the 118s baseline" — turned out
+  to be unsatisfiable by any correct implementation: fifty features later the `code` set
+  declares sixteen gates instead of nine and the `tests` gate ALONE costs 148.5s, more than
+  the entire nine-gate set did when the number was taken. The feature's real result was a
+  45.8% cut (320.2s → 173.4s, both measured in one session on one tree with only the two
+  gate declarations differing), and a close reading the criterion literally would have
+  blocked on a number that had decayed rather than on work that had failed. Two rules fall
+  out. When RECORDING: store the ratio and the shape (gate count, suite size, the per-gate
+  breakdown), not just the total — a bare total is a fact about a tree that no longer
+  exists. When AUTHORING a criterion against a stored number: cite it for its ratio and its
+  shape, and re-measure the absolute yourself, before and after, in the closing session. A
+  threshold criterion pinned to an absolute from another era is the same defect class as an
+  unsatisfiable escalation predicate (`planning-discipline.md` §2) — it just takes months to
+  become one.

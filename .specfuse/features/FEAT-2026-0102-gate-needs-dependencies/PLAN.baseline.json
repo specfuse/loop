@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Order the gate set by `needs:` and skip a gate whose dependency failed",
+          "id": "FEAT-2026-0102/T01",
+          "planned_cost_usd": 8.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Emit gates in dependency order so CI and the driver cannot disagree",
+          "id": "FEAT-2026-0102/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Flip this repo onto `needs:`, measure it, and reword the authoring rule",
+          "id": "FEAT-2026-0102/T03",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 demonstrate `needs:`, measure the saving, revise the lesson it falsifies",
+          "id": "FEAT-2026-0102/G1-CLOSE",
+          "planned_cost_usd": 10.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

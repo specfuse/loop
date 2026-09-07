@@ -14,9 +14,13 @@
 # features that week. A declared-but-unrun gate is worse than an absent one,
 # because the declaration reads as coverage.
 #
-# AUTHORING RULE: gate commands are self-contained. No `--no-build`,
-# `--no-restore`, or any "skip-build" flag — see
-# .specfuse/skills/verification/SKILL.md "the stale-artifact trap."
+# AUTHORING RULE: a gate command is self-contained unless it declares
+# `needs:`, in which case the runner guarantees the named dependency ran,
+# clean, in this same invocation — see .specfuse/skills/verification/SKILL.md
+# "the stale-artifact trap." That guarantee is per-invocation and never
+# cached across attempts, so `needs:` never licenses a `--no-build`/
+# `--no-restore`/"skip-build" flag on the DEPENDENCY's own command; it only
+# licenses a DEPENDENT reusing artifacts the dependency just produced.
 
 code:
   - name: tests
@@ -25,7 +29,9 @@ code:
     # Declared here rather than added by the CI runner: the runner derives its
     # commands from this file (#592), so a flag it needs belongs in the
     # declaration, not in a wrapper that would reintroduce the drift.
-    command: "python3 -m unittest discover -s tests -v -b"
+    # Runs under `coverage run` so the `coverage` gate below can reuse this
+    # run's data (`needs: [tests]`) instead of re-executing the suite.
+    command: "coverage run --source=specfuse -m unittest discover -s tests -v -b"
 
   - name: lint
     command: "ruff check specfuse .specfuse/scripts tests scripts"
@@ -39,9 +45,11 @@ code:
     command: "bandit -r specfuse .specfuse/scripts -ll"
 
   - name: coverage
-    # --fail-under=90 matches the methodology default. Measure the canonical
-    # package (specfuse/), not the .specfuse/scripts/ shims.
-    command: "coverage run --source=specfuse -m unittest discover -s tests && coverage report --fail-under=90"
+    needs: [tests]
+    # --fail-under=90 matches the methodology default. The `tests` gate above
+    # already ran the suite under `coverage run`; this gate only reports over
+    # the `.coverage` data it produced, so the suite executes once per pass.
+    command: "coverage report --fail-under=90"
 
   - name: leak-scan
     # FEAT-2026-0020/T16 leak-prevention guard, CI surface. Denylist
