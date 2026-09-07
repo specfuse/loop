@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T01H2
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ provenance: "G1-CLOSE attempt 2 (2026-09-06), the judge's second finding: slice_
 produces:
   - specfuse/loop/_wu_sections.py
   - tests/test_judge_module.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-07T11:58:37.542763+00:00
+duration_seconds: 1248.121
+cost_usd: 0.523182
+input_tokens: 48
+output_tokens: 7097
 ---
 
 # Hygiene: slicing a `##` section ends at the next `##`, not at its own `###` children

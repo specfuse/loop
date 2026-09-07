@@ -187,6 +187,35 @@ class TestBundle(unittest.TestCase):
         # the code half of the same diff survives the redaction
         self.assertIn("+def render_judge_prompt", prompt)
 
+    def test_measurements_section_with_child_headings_is_captured_whole(self):
+        retro = (
+            "# Retrospective — FEAT-9999-0001\n"
+            "\n"
+            "## Measurements\n"
+            "\n"
+            "| measurement | value |\n"
+            "| --- | --- |\n"
+            "| lint ERROR count | 0 |\n"
+            "\n"
+            "### Failure-class breakdown\n"
+            "\n"
+            "| class | count |\n"
+            "| --- | --- |\n"
+            "| timeout | 2 |\n"
+            "\n"
+            "## Retrospective\n"
+            "\n"
+            "The work went smoothly.\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            d = _feature_dir(tmp)
+            bundle = build_judge_bundle(d, 1, diff_text="", measurements=retro)
+        self.assertIn("lint ERROR count", bundle.measurements)
+        self.assertIn("### Failure-class breakdown", bundle.measurements)
+        self.assertIn("timeout", bundle.measurements)
+        self.assertNotIn("## Retrospective", bundle.measurements)
+        self.assertNotIn("The work went smoothly", bundle.measurements)
+
     def test_oversized_diff_is_truncated_to_the_failure_note_cap(self):
         big = "\n".join(f"+line {i}" for i in range(4000))
         self.assertGreater(len(big), JUDGE_MAX_EVIDENCE_CHARS)
