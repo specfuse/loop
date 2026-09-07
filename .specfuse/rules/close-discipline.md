@@ -34,10 +34,31 @@ output directory before asserting — stale output satisfies any assertion.
 > catches the composite: all WUs individually green while the feature-level
 > oracle fails.
 
+**You measure; the judge concludes (FEAT-2026-0100).** Re-running the oracles
+is your job and it does not change. Deciding what their exit codes *mean* for
+the feature is not: on a terminal gate the driver dispatches a separate judge
+session once your close has passed its deliverable guards, and that session
+writes the verdict the flips read. It is given the gate's definition of done,
+the per-criterion state, the gate's diff, and your `## Measurements` section —
+and deliberately not your `## Verdict` or `## Retrospective`, which are
+stripped from its evidence before it sees them. It may lower `met` to
+`not_met`; it may never raise a `not_met`. So write the measurements, in full,
+with commands and exit codes, and treat your own `verdict:` as advisory: a
+close that argues for its conclusion instead of evidencing it has given the
+judge nothing to read.
+
+**A close work unit's body must not name the verdict it expects.** "Record
+`verdict: met` once the suite is green" pre-decides the one question the judge
+exists to answer independently, and a session told what to conclude will
+conclude it — the reason the judge is a fresh session in the first place. A
+close body names what to measure and what evidence counts, never what value to
+write. Naming the verdict in the body is a drafting defect, not a shortcut.
+
 ## 2. The verdict is binary; unfinished work is tracked, not hedged
 
 The verdict a close records is `met` or `not_met` — there is no partial
-credit. On `not_met` the close writes `FOLLOW-UPS.md` in the feature folder,
+credit, and on a terminal gate §1's judge is what settles which of the two
+stands. On `not_met` the close writes `FOLLOW-UPS.md` in the feature folder,
 one `### `-headed entry per failed criterion carrying the criterion verbatim,
 the evidence (the command run and its exit code or output line), and the
 re-run condition that would satisfy it; after the close passes, the driver

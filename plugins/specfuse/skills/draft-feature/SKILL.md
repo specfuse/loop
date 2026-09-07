@@ -147,6 +147,30 @@ Also cover, once, the universal framing trio: the **roadmap_goal** (one
 sentence), **autonomy** (`auto` / `review` / `supervised`), and the
 **scope boundary** (what's explicitly OUT).
 
+**The autonomy decision — recommend `auto` (FEAT-2026-0100).** This is a
+decision question, so present it in the shape below, and make the
+recommendation `auto` unless this feature gives a concrete reason to
+tighten. The reason `auto` wins by default is the judge: on a terminal
+gate the verdict that advances the feature is written by a fresh session
+that sees only evidence — the definition of done, the per-criterion
+state, the gate's diff, and the close's measurements — never the close's
+own retrospective, and it can lower a verdict but never raise one. That
+is what makes an auto-armed close trustworthy; without it, `auto` let
+the session that did the work grade the work. Say so in the
+recommendation line rather than asserting `auto` bare. Recommend
+`review` instead when a wrong arm is expensive to undo, or when the
+feature edits the loop's own driver (the `judge_editing` stop class will
+veto the arm anyway, so `review` just makes that honest up front).
+
+**Ask about `judge_disabled` only when a criterion needs it.** Do not put
+it in the interview by default. Raise it as a question only when one of
+this feature's acceptance criteria genuinely cannot be judged from that
+evidence bundle — and when it comes up, the first move is to fix the
+criterion, not the flag: a criterion a judge cannot evaluate from
+evidence is usually one that should become a `type: human` WU before the
+close, or a post-merge checklist line. `judge_disabled: true` in
+`PLAN.md` frontmatter is the last resort, and it needs a recorded reason.
+
 **Two kinds of question — ask them differently. This is the crux of the
 interview.**
 

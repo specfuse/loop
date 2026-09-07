@@ -47,7 +47,8 @@ verdict.** It is the difference between this close and the one it repairs.
   reaches a drafted folder without an interactive session."* Answer it with
   T04's recorded legs — issue number, reply, folder path, and the `events.jsonl`
   lines showing a completed drafting dispatch rather than an escalation. If any
-  leg is missing, the answer is **no**, and the verdict is hedged.
+  leg is missing, record the answer as **no** with the missing leg named; the
+  judge decides what that means for the gate.
 - **The claim this close is forbidden to make.** 0050's second carried-forward
   follow-up — *"one real operator reply... fed to `parse_reply_answers`"* —
   **stays open**. T04's reply was scripted. Record that in those words and record
@@ -91,8 +92,8 @@ verdict.** It is the difference between this close and the one it repairs.
   that matters; anyone with tooling reading the old escalation shape is affected.
 - **Artifact cleanup:** name every issue, comment, branch and folder T04 left on
   the repository, so they can be cleaned up rather than mistaken for real work.
-- On a hedged outcome, record the follow-up per close-discipline §2 with a
-  `kind:` per unmet criterion.
+- For every criterion that did not hold, write one `FOLLOW-UPS.md` entry per
+  close-discipline §2: the criterion verbatim, the evidence, the re-run condition.
 
 **Do not touch.** Source and test files (T01–T04 own those); `ROUND-TRIP.md`
 (T04's record — quote it, do not edit it); `.git/`, secrets. This WU writes only

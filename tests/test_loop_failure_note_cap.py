@@ -30,6 +30,15 @@ class TestTruncateFailureNote(unittest.TestCase):
         self.assertRegex(result, r"\.\.\. \[\d+ lines / \d+ chars elided\] \.\.\.")
         self.assertNotIn("```", result)
 
+    def test_result_never_exceeds_max_chars(self):
+        """The elision marker is inside the budget, not on top of it (#3257 CI)."""
+        line = "y" * 37
+        note = "\n".join([line] * 400)
+        for max_chars in range(60, 2000, 3):
+            result = truncate_failure_note(note, max_lines=999, max_chars=max_chars)
+            self.assertLessEqual(len(result), max_chars, f"max_chars={max_chars}")
+            self.assertIn("elided", result)
+
 
 if __name__ == "__main__":
     unittest.main()

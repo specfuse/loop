@@ -412,6 +412,89 @@ def lint_ac_observable(feature_dir: Path) -> list[str]:
     return errs
 
 
+# Predecided-verdict lint (FEAT-2026-0100/T05): once a judge writes the
+# verdict in its own session, a close WU body that tells the session what
+# verdict to write makes that separate-session write meaningless — the
+# session need only echo phrasing already sitting in its own prompt. Same
+# WARN(draft)/ERROR(pending,ready)/skip(done) escalation shape
+# lint_ac_observable above uses. Patterns are literal phrasings observed in
+# the field (FEAT-2026-0082's close body: "The verdict is hedged, and this is
+# the finding it exists to record") plus the retired hedge vocabulary
+# (`met_locally`, `partially_met`, `hedged verdict`). A sentence describing
+# WHO decides the verdict ("the judge writes the verdict") is not a match —
+# none of these patterns fire on "writes"/"decide".
+_PREDECIDED_VERDICT_PATTERNS = [
+    re.compile(r"verdict\s*:\s*met\b", re.IGNORECASE),
+    re.compile(r"verdict\s*:\s*not_met\b", re.IGNORECASE),
+    re.compile(r"\bverdict\s+is\s+met\b", re.IGNORECASE),
+    re.compile(r"\brecord\s+met\b", re.IGNORECASE),
+    re.compile(r"\bthe\s+verdict\s+is\b", re.IGNORECASE),
+    re.compile(r"\bwrite\s+met\b", re.IGNORECASE),
+    re.compile(r"\bwrite\s+not_met\b", re.IGNORECASE),
+    re.compile(r"\bmet_locally\b", re.IGNORECASE),
+    re.compile(r"\bpartially_met\b", re.IGNORECASE),
+    re.compile(r"\bhedged\s+verdict\b", re.IGNORECASE),
+]
+_CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
+
+
+def _strip_code_fences(text: str) -> str:
+    """Remove fenced code blocks so a matched phrase inside example code
+    (documentation, lint fixtures) does not count."""
+    return _CODE_FENCE_RE.sub("", text)
+
+
+def detect_predecided_verdict_phrases(body_outside_fences: str) -> list[str]:
+    """Return matched predecided-verdict phrases found in body_outside_fences."""
+    found = []
+    for pat in _PREDECIDED_VERDICT_PATTERNS:
+        m = pat.search(body_outside_fences)
+        if m:
+            found.append(m.group(0))
+    return found
+
+
+def lint_close_verdict_not_predecided(feature_dir: Path) -> list[str]:
+    """Flag a `close` WU body that instructs the session which verdict to write.
+
+    ERROR when the owning WU is pending/ready (about to be dispatched), WARN
+    (printed, not returned) when draft, skipped when done or any other
+    status — the same escalation shape lint_ac_observable uses. Matches only
+    outside fenced code blocks.
+    """
+    errs: list[str] = []
+    for wfile in sorted(feature_dir.glob("WU-*.md")):
+        try:
+            wfm, wbody = read_frontmatter(wfile)
+        except _miniyaml.MiniYAMLError:
+            continue
+        if wfm.get("type") != "close":
+            continue
+        status = wfm.get("status")
+        if status not in ("draft", "pending", "ready"):
+            continue
+        phrases = detect_predecided_verdict_phrases(_strip_code_fences(wbody))
+        if not phrases:
+            continue
+        if status in ("pending", "ready"):
+            for phrase in phrases:
+                errs.append(
+                    f"ERROR: {wfile}: close WU body names a predecided "
+                    f"verdict: {phrase!r} — the judge writes the verdict in "
+                    f"its own session; see PLAN.md § Escalation-predicate "
+                    f"satisfiability."
+                )
+        else:  # draft
+            for phrase in phrases:
+                print(
+                    f"WARN: {wfile}: close WU body names a predecided "
+                    f"verdict: {phrase!r} — rewrite before arming so the "
+                    f"judge's verdict isn't predetermined by the close body. "
+                    f"See PLAN.md § Escalation-predicate satisfiability."
+                )
+    return errs
+
+
 def read_frontmatter(path: Path) -> tuple[dict, str]:
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
@@ -1925,6 +2008,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_decision_citations(feature_dir, fm, gates))
     errs.extend(check_decision_override_signoff(feature_dir, fm))
     errs.extend(lint_ac_observable(feature_dir))
+    errs.extend(lint_close_verdict_not_predecided(feature_dir))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #

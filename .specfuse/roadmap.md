@@ -98,7 +98,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
 | FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
-| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | planned | — | [→ detail](#feat-2026-0100) |
+| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | planned | — | [→ detail](#feat-2026-0101) |
 | FEAT-2026-0102 | Tiered verification: cheap gates per attempt, full suite once per gate, baseline cached by tree hash | planned | — | [→ detail](#feat-2026-0102) |
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
@@ -964,17 +964,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
-
-<a id="feat-2026-0100"></a>
-## FEAT-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
-
-**Why.** The close unit is the same kind of session that did the work, and it writes the retrospective, the cost analysis, and the verdict in one sitting. Every surveyed external loop moves the verdict to a fresh evaluator or a deterministic check, because a model grading its own work skews positive. FEAT-2026-0085 made the verdict binary; nothing yet makes the grader independent.
-
-**Goal.** A short, fresh session receives only the diff, the acceptance criteria, the gate output, and the feature oracle's output, and returns `met` or `not_met` with one line per failed criterion. The close unit writes the retrospective after that verdict exists and cannot change it. Auto-arm of later gates becomes the default once this judge stands between the work and the flip.
-
-**Benefits.** Removes the incentive for a close to argue its own case; makes auto-armed gates trustworthy; costs under a dollar per feature.
-
-**Status: planned.**
 
 <a id="feat-2026-0101"></a>
 ## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check

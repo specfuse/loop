@@ -1,0 +1,81 @@
+---
+id: FEAT-2026-0100/T03
+type: implementation
+status: done
+attempts: 1
+planned_cost_usd: 3.00
+model: sonnet
+effort: medium
+oracle_env: macos_local
+produces_driver_helper: fold_judge_usage
+produces:
+  - specfuse/loop/loop.py
+  - tests/test_judge_cost.py
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: test_doc_set_missing_for_retrospective_fails
+duration_seconds: 840.755
+cost_usd: 1.24158
+input_tokens: 16
+output_tokens: 1755
+re_arm_count: 1
+re_arm_override: true
+re_arm_history:
+  - timestamp: 2026-09-06T12:44:41+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 2.420138
+    prior_duration_seconds: 1774.894
+    reason: "root cause found in test isolation, not the code"
+cumulative_cost_usd: 2.420138
+cumulative_duration_seconds: 1774.894
+cumulative_input_tokens: 168
+cumulative_output_tokens: 34538
+cumulative_attempts: 0
+folded_through_re_arm: 1
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-06T12:51:37.293780+00:00
+---
+
+# The judge's spend is the close's spend
+
+**Objective.** Fold the judge session's usage envelope into the close WU's
+`cost_usd`, `input_tokens`, `output_tokens` and into the close's
+`attempt_outcome` event, so cost analysis, the auto-close predicate, and
+`/gate-status` see what the verdict actually cost.
+
+**Context.** FEAT-2026-0100/T03; read `PLAN.md`. `judge_close` (T02) returns
+the JSON envelope the CLI prints under `--output-format json`; `loop.py`
+already harvests `cost_usd`, `input_tokens`, `output_tokens`,
+`cache_read_input_tokens`, `cache_creation_input_tokens` from a dispatch
+(the block near the `dispatch` parse). Add `fold_judge_usage(attempt_usage, judge_envelope)` and apply it to the close
+attempt's usage before `write_cost_to_wu` and before the `attempt_outcome`
+event is emitted, and add `judge_cost_usd` to the `judged` event so the two
+are separable later. Red test first.
+
+**Test hygiene, learned from this unit's first two attempts.** Both spun on the
+same six failures in `tests/test_verify_empty_gate_set.py` (`verify()` returning
+True everywhere) with a `loop.py` diff that never touched `verify`: the new test
+module replaced `loop.verify` / `loop.dispatch` and never restored them, so the
+stub leaked into every module that ran after it. Patch through a `setUp` /
+`tearDown` restore exactly as `tests/test_terminal_flips.py`'s `_patch` does,
+or `unittest.mock.patch.object` as a context manager; never assign
+`loop.verify` or `loop.dispatch` at module or class scope. Run
+`python3 -m unittest tests.test_judge_cost tests.test_verify_empty_gate_set`
+together before reporting.
+
+**Acceptance criteria.**
+
+- `tests/test_judge_cost.py::test_close_cost_includes_judge_usage` fails on HEAD and passes after: an injected judge envelope with `cost_usd: 0.42` makes the close WU's frontmatter `cost_usd` and its `attempt_outcome` payload each larger by 0.42 than the same run with the judge disabled.
+- `::test_judged_event_carries_judge_cost`: `judge_cost_usd: 0.42` on the `judged` event.
+- `::test_judge_without_envelope_adds_nothing`: a runner returning plain text leaves the close's cost unchanged.
+- `python3 -m unittest discover -s tests -q` reports `OK`.
+
+**Do not touch.** `judge.py` (T01); the judge's decision logic (T02); rules,
+templates (T04); `lint_plan.py` (T05); `.git/`, secrets.
+
+**Verification.** The `code` gates in `.specfuse/verification.yml`.
+
+**Escalation triggers.** Emit `status: blocked` if folding the cost changes
+`evaluate_auto_close`'s reading of an existing fixture; name the test.

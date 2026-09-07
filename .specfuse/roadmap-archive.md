@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0100"></a>
+## FEAT-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
+
+**Why.** The close unit is the same kind of session that did the work, and it writes the retrospective, the cost analysis, and the verdict in one sitting. Every surveyed external loop moves the verdict to a fresh evaluator or a deterministic check, because a model grading its own work skews positive. FEAT-2026-0085 made the verdict binary; nothing yet makes the grader independent.
+
+**Goal.** A short, fresh session receives only the diff, the acceptance criteria, the gate output, and the feature oracle's output, and returns `met` or `not_met` with one line per failed criterion. The close unit writes the retrospective after that verdict exists and cannot change it. Auto-arm of later gates becomes the default once this judge stands between the work and the flip.
+
+**Benefits.** Removes the incentive for a close to argue its own case; makes auto-armed gates trustworthy; costs under a dollar per feature.
+
+**Status: done.**
+
 <a id="feat-2026-0108"></a>
 ## FEAT-2026-0108 — Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting
 

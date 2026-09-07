@@ -284,6 +284,18 @@ class LifecycleIntegrationTest(unittest.TestCase):
     def _stub_agent(self):
         self._patch("dispatch", _fake_dispatch)
         self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+        # `run()` dispatches a SECOND session on every terminal close — the
+        # judge (FEAT-2026-0100/T02). Stubbing `dispatch` alone leaves that one
+        # spawning a real `claude -p`, which is both slow and non-deterministic
+        # (a live judge answering `not_met` withholds the terminal flips this
+        # class asserts). An agreeing `met` judge is the neutral stub: a judge
+        # can only ever lower a verdict, so agreement leaves the lifecycle
+        # exactly as it behaved before the judge existed.
+        self._patch(
+            "run_judge_session",
+            lambda prompt, *, timeout=None: (
+                "```result\nverdict: met\n```", None),
+        )
 
     def _assert_terminal_invariant(self, root: Path, feature_dir: Path,
                                    feature_id: str):
