@@ -4371,6 +4371,7 @@ def read_gate_baseline(gate_file: Path) -> dict | None:
 
 def write_gate_baseline(
     gate_file: Path, sha: str, probed_at: str, failing: list[dict],
+    feature_dir: "Path | None" = None,
 ) -> None:
     """Persist a probe result into the gate file's `baseline:` frontmatter
     block (FEAT-2026-0051/T02), via `write_frontmatter_block` — the same
@@ -4385,16 +4386,33 @@ def write_gate_baseline(
     `entry_sha` records the sha of the gate's first probe (FEAT-2026-0100/T02H)
     — the judge's diff range needs the gate-entry commit, not the sha of
     whichever probe happens to run last across a halt-and-resume. Read here
-    rather than threaded through every caller: the first probe (no existing
-    baseline) sets `entry_sha` to `sha`; every later probe carries the prior
-    `entry_sha` forward untouched.
+    rather than threaded through every caller: a gate with no prior baseline
+    at all is its own first probe, so `entry_sha` is set to `sha`; a gate that
+    already carries a baseline but no `entry_sha` predates the field, so this
+    "first sighting" is really a mid-gate re-probe — `entry_sha` is seeded
+    from the merge-base of HEAD with the feature's integration branch instead
+    (FEAT-2026-0100/T02H2), via `_feature_integration_merge_base`, so the
+    judge's diff range doesn't shift to whatever commit happened to trigger
+    the re-probe. Every later probe carries the prior `entry_sha` forward
+    untouched. When *feature_dir* is omitted, or the merge-base can't be
+    computed, `entry_sha` is left unset for this write so
+    `resolve_gate_start_sha`'s own fallback chain (`baseline.sha`) applies.
     """
     existing = read_gate_baseline(gate_file)
-    entry_sha = (existing or {}).get("entry_sha") or sha
+    entry_sha: "str | None"
+    if existing is None:
+        entry_sha = sha
+    elif existing.get("entry_sha"):
+        entry_sha = existing["entry_sha"]
+    elif feature_dir is not None:
+        _, entry_sha = _feature_integration_merge_base(feature_dir)
+    else:
+        entry_sha = None
     lines = [
         "baseline:", f"  sha: {sha}", f"  probed_at: {probed_at}",
-        f"  entry_sha: {entry_sha}",
     ]
+    if entry_sha:
+        lines.append(f"  entry_sha: {entry_sha}")
     if not failing:
         lines.append("  failing: []")
     else:
@@ -4447,7 +4465,7 @@ def gate_baseline_check(
     if probed_at is None:
         probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
     failing = probe_baseline(feature_dir, cfg)
-    write_gate_baseline(gate_file, head_sha, probed_at, failing)
+    write_gate_baseline(gate_file, head_sha, probed_at, failing, feature_dir)
     return failing, True
 
 
@@ -6416,6 +6434,37 @@ def run_judge_session(
     return parse_claude_json_output(proc.stdout or "")
 
 
+def _feature_integration_merge_base(
+    feature_dir: Path,
+) -> "tuple[str | None, str | None]":
+    """`(base, merge_base_sha)` of HEAD with *feature_dir*'s integration
+    branch, or `(base, None)` / `(None, None)` when either step fails.
+
+    Shared by `resolve_gate_start_sha` (fallback when no `entry_sha`) and
+    `write_gate_baseline` (seeding `entry_sha` for a legacy baseline block
+    written before that field existed) so the `git merge-base` call and its
+    PLAN.md-reading preamble exist in exactly one place.
+    """
+    plan_path = Path(feature_dir) / "PLAN.md"
+    feat_fm: dict = {}
+    if plan_path.is_file():
+        try:
+            feat_fm, _ = read_frontmatter(plan_path)
+        except Exception as exc:  # noqa: BLE001 - PLAN.md is not the judge's job
+            logging.debug("_feature_integration_merge_base: PLAN.md unreadable: %s", exc)
+    base = resolve_base(feat_fm)
+    if not base:
+        return None, None
+    proc = subprocess.run(
+        ["git", "merge-base", base, "HEAD"],
+        capture_output=True, text=True, check=False,
+    )
+    sha = (proc.stdout or "").strip()
+    if proc.returncode == 0 and sha:
+        return base, sha
+    return base, None
+
+
 def resolve_gate_start_sha(
     gate_file: Path, feature_dir: Path,
 ) -> tuple[str | None, str]:
@@ -6444,22 +6493,9 @@ def resolve_gate_start_sha(
         if baseline and baseline.get("entry_sha"):
             return str(baseline["entry_sha"]), f"{gate_file.name} baseline.entry_sha"
 
-    plan_path = Path(feature_dir) / "PLAN.md"
-    feat_fm: dict = {}
-    if plan_path.is_file():
-        try:
-            feat_fm, _ = read_frontmatter(plan_path)
-        except Exception as exc:  # noqa: BLE001 - PLAN.md is not the judge's job
-            logging.debug("resolve_gate_start_sha: PLAN.md unreadable: %s", exc)
-    base = resolve_base(feat_fm)
-    if base:
-        proc = subprocess.run(
-            ["git", "merge-base", base, "HEAD"],
-            capture_output=True, text=True, check=False,
-        )
-        sha = (proc.stdout or "").strip()
-        if proc.returncode == 0 and sha:
-            return sha, f"merge-base of HEAD with {base}"
+    base, sha = _feature_integration_merge_base(feature_dir)
+    if sha:
+        return sha, f"merge-base of HEAD with {base}"
 
     if baseline and baseline.get("sha"):
         return str(baseline["sha"]), f"{gate_file.name} baseline.sha"

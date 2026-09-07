@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/T02H2
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 model: sonnet
 effort: medium
@@ -11,6 +11,13 @@ provenance: "G1-CLOSE attempt 2 (2026-09-06), the judge's first finding: entry_s
 produces:
   - specfuse/loop/loop.py
   - tests/test_judge_close_path.py
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-07T12:28:27.349849+00:00
+duration_seconds: 1045.967
+cost_usd: 0.800274
+input_tokens: 2
+output_tokens: 28
 ---
 
 # Hygiene: a gate whose baseline predates `entry_sha` seeds it from the merge-base
