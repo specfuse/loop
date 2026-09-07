@@ -5871,6 +5871,27 @@ def assert_followups_recorded(
     return True, ""
 
 
+def followup_correlation_id(feature_id: str, entry: str) -> str:
+    """Correlation id for one FOLLOW-UPS.md entry: `<feature>-followup-<hash>`.
+
+    The hash is the first 10 hex digits of sha256 over the entry's heading
+    line, whitespace-collapsed and case-folded (#3253). A positional id
+    (`-followup-1`) matched a later attempt's different finding to the first
+    attempt's issue, so the judge's findings were "found" and never filed.
+    Heading-only, not body, so an entry whose evidence text changes between
+    attempts still deduplicates against the issue already open for it.
+    """
+    import hashlib
+    heading = ""
+    for line in entry.splitlines():
+        if line.strip():
+            heading = line.strip().lstrip("#").strip()
+            break
+    key = " ".join(heading.split()).casefold()
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
+    return f"{feature_id}-followup-{digest}"
+
+
 def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dict:
     """File one tracked GitHub issue per FOLLOW-UPS.md entry, after a close's squash.
 
@@ -5894,8 +5915,11 @@ def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dic
     entries: list[tuple[str, str, str]] = []  # (correlation_id, body, label)
     followups_path = feature_dir / FOLLOW_UPS_FILENAME
     if followups_path.exists():
-        for i, entry in enumerate(parse_followup_entries(followups_path.read_text()), start=1):
-            entries.append((f"{feature_id}-followup-{i}", entry, FOLLOW_UP_LABEL))
+        for entry in parse_followup_entries(followups_path.read_text()):
+            # #3253: keyed by the entry's heading, not its position, so a
+            # later close attempt's new finding files a new issue and a
+            # repeated finding still finds the one already filed.
+            entries.append((followup_correlation_id(feature_id, entry), entry, FOLLOW_UP_LABEL))
 
     if plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done":
         section = find_post_merge_checklist_section(plan_body)

@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A later close attempt's follow-ups were matched to the previous attempt's issues and never filed.** `file_followup_issues` keyed each `FOLLOW-UPS.md` entry by its position (`<feature>-followup-1`), and the emitter deduplicates on that marker, so attempt 2's new findings "found" attempt 1's issues whatever they said; on FEAT-2026-0100 the judge's two findings were never filed while #3250 and #3251 kept attempt 1's text. The id is now a short hash of the entry's heading, so a repeated finding still deduplicates and a new one files a new issue (#3253)
+
 ### Added
 
 - **A pending CI run is declined as `ci_pending`, not as a red build.** The bug lane polls a freshly-opened PR's checks for up to `CI_WAIT_SECONDS`, and a run still queued at that deadline used to fall through to `ci_not_green` — seven items in one unattended run were declined that way and all seven went green minutes later and were merged by hand. `REASON_CI_PENDING` is now its own declining reason, ahead of the generic non-success check, with `bug-lane:ci-pending` registered in `labels.py` and an escalation that says the run had not concluded after N minutes and a re-run of the lane is the response. It is still a decline and still fails closed: a queued PR never merges. A concluded run reports `success` or `ci_not_green` and never this reason, so the guardrail's zero-issues predicate stays reachable (FEAT-2026-0108)

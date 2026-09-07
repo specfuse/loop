@@ -244,3 +244,53 @@ class TestLabelsAreEnsuredBeforeFiling(unittest.TestCase):
             runner = _FakeGhRunner()
             loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
             self.assertEqual(runner.label_calls, [])
+
+
+_FOLLOW_UPS_ATTEMPT_TWO = """\
+# Follow-ups
+
+### Criterion two: coverage stays >= 90%
+
+**Evidence.** `coverage report` — 88%, one branch still uncovered
+
+**Re-run when.** parser.py's last branch gains a test
+
+### Criterion three: the judge's diff covers the gate
+
+**Evidence.** `git log 7e02525..HEAD` — 4 commits of 34
+
+**Re-run when.** entry_sha is seeded from the merge-base
+"""
+
+
+class TestFollowupIdsAreByContentNotPosition(unittest.TestCase):
+    """#3253: positional ids matched a later attempt's new findings to the
+    previous attempt's issues, so the judge's findings were never filed."""
+
+    def test_second_attempt_files_new_findings_and_dedupes_repeated_ones(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            _write_plan(feature_dir)
+            runner = _FakeGhRunner()
+            (feature_dir / "FOLLOW-UPS.md").write_text(_FOLLOW_UPS_TWO_ENTRIES)
+            first = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            self.assertEqual(first["filed"], 2)
+            self.assertEqual(len(runner.create_calls), 2)
+
+            (feature_dir / "FOLLOW-UPS.md").write_text(_FOLLOW_UPS_ATTEMPT_TWO)
+            second = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            # "Criterion two" repeats -> found, not re-created; "Criterion three" is new.
+            self.assertEqual(second["filed"], 2)
+            self.assertEqual(len(runner.create_calls), 3, "exactly one new issue")
+            titles = [argv[argv.index("--title") + 1] for argv in runner.create_calls]
+            self.assertTrue(any("Criterion three" in t for t in titles), titles)
+            self.assertEqual(sum("Criterion two" in t for t in titles), 1)
+
+    def test_correlation_id_is_stable_for_the_same_heading_and_distinct_otherwise(self):
+        a = loop.followup_correlation_id("FEAT-2026-0100", "### Criterion two: coverage stays >= 90%\n\nbody")
+        b = loop.followup_correlation_id("FEAT-2026-0100", "### Criterion two: coverage stays >= 90%\n\ndifferent body")
+        c = loop.followup_correlation_id("FEAT-2026-0100", "### Criterion three: the judge's diff covers the gate\n")
+        self.assertEqual(a, b)
+        self.assertNotEqual(a, c)
+        self.assertTrue(a.startswith("FEAT-2026-0100-followup-"))
+        self.assertRegex(a, r"-followup-[0-9a-f]{10}$")
