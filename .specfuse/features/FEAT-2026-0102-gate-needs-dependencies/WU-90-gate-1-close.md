@@ -1,13 +1,23 @@
 ---
 id: FEAT-2026-0102/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 10.00
 oracle_env: macos_local
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0102-gate-needs-dependencies/RETROSPECTIVE.md
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.15.0
+verdict: met
+started_at: 2026-09-07T20:13:56.994165+00:00
+duration_seconds: 1671.98
+cost_usd: 7.733794
+input_tokens: 162
+output_tokens: 59375
 ---
 
 # Gate 1 close — demonstrate `needs:`, measure the saving, revise the lesson it falsifies

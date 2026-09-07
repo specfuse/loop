@@ -8,7 +8,8 @@
 # Keep the `code` set in lock-step with your GitHub branch-protection checks — if
 # they drift, an agent can pass locally and still be unmergeable.
 #
-# AUTHORING RULE: gate commands SHOULD be self-contained. Avoid `--no-build`,
+# AUTHORING RULE: a gate command must be self-contained UNLESS it declares
+# `needs:` (see below). Outside a declared `needs:` edge, avoid `--no-build`,
 # `--no-restore`, or any equivalent "skip-build" flag — those make the gate run
 # against whatever binaries are on disk, and stale artifacts can make a gate pass
 # falsely. If a build step is genuinely required before tests are runnable, fold
@@ -37,10 +38,34 @@
 # a mechanical gate and the driver spins retries on the identical failure until
 # the attempt budget is exhausted. Leave it off for project-global gates
 # (leak-scan, hygiene checks) that an individual WU has no reason to name.
+
+# PER-GATE `needs: [<gate>]` (optional, default none). Declares that this gate
+# depends on another gate in the SAME set. The driver runs the set in dependency
+# order and a gate whose dependency FAILED is reported SKIP — never run, never
+# counted as a pass — so a failure is still attributed to the gate that caused
+# it and `failure_class` stays distinguishable per gate. Because the runner
+# guarantees the named dependency ran, clean, in this same invocation, the
+# declaring gate MAY reuse artifacts that dependency just produced: the
+# `coverage` gate below reports over the `.coverage` data `tests` wrote instead
+# of re-executing the suite. That guarantee is per-invocation and is never
+# cached across attempts, so `needs:` never licenses a `--no-build` /
+# `--no-restore` / "skip-build" flag on the DEPENDENCY's own command — it only
+# licenses a DEPENDENT reusing what the dependency just produced. An
+# unresolvable `needs:` target and a dependency cycle are both refused as
+# CONFIGURATION ERRORs before any gate runs, never as a silent skip or a silent
+# pass. `scripts/smoke-test.sh` and CI derive the same order from this file, so
+# they cannot disagree with the driver about whether a prerequisite ran
+# (FEAT-2026-0102).
 code:
   - name: tests
-    command: "pytest -q"
+    # Run the suite UNDER `coverage run` so the `coverage` gate below can reuse
+    # this run's data rather than executing the suite a second time.
+    command: "coverage run -m pytest -q"
   - name: coverage
+    needs: [tests]
+    # Only reports; `tests` produced the data, and the runner guarantees it ran
+    # clean in this same invocation. Without `needs:` this command would report
+    # over whatever `.coverage` file happened to be on disk.
     command: "coverage report --fail-under=90"
   - name: warnings
     command: "python3 -W error -c 'pass'"    # replace with your build's -Werror equivalent
