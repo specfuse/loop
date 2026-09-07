@@ -15,9 +15,9 @@ verdict: not_met
 driver_version: 0.15.0
 started_at: 2026-09-07T15:07:51.602502+00:00
 duration_seconds: 1737.061
-cost_usd: 10.366111
-input_tokens: 232
-output_tokens: 69504
+cost_usd: 10.966355
+input_tokens: 280
+output_tokens: 79028
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide
