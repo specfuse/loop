@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0102/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
   - .specfuse/verification.yml
   - plugins/specfuse/skills/verification/SKILL.md
   - .specfuse/skills/verification/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-07T20:00:26.670829+00:00
+duration_seconds: 810.135
+cost_usd: 1.447758
+input_tokens: 122
+output_tokens: 16340
 ---
 
 # Flip this repo onto `needs:`, measure it, and reword the authoring rule
