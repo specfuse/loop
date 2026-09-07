@@ -696,6 +696,48 @@ class TestCaptureGateDiff(unittest.TestCase):
             self.assertLessEqual(len(diff), loop.JUDGE_MAX_EVIDENCE_CHARS,
                                  "the whole capture stays inside the bundle's cap")
 
+    def test_capture_never_exceeds_its_cap_at_any_budget(self):
+        """The elision marker must not push the capture past `max_chars`.
+
+        PR #3257's CI run: 8,028 chars against the 8,000 cap. Whether the
+        overshoot shows depends on where diff-line boundaries fall against
+        the budget, which differs between git versions, so sweep budgets
+        rather than trust one environment's boundary.
+        """
+        with integration_workspace() as root:
+            os.chdir(root)
+            start = subprocess.run(
+                ["git", "-C", str(root), "rev-parse", "HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+            big = root / "big.txt"
+            big.write_text("".join(f"line {i} padding padding padding\n"
+                                   for i in range(2000)))
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "big"],
+                           check=True)
+
+            stat_len = len(subprocess.run(
+                ["git", "-C", str(root), "diff", "--stat", f"{start}..HEAD"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip())
+
+            overshoots = []
+            for cap in range(stat_len + 60, stat_len + 1200, 7):
+                diff = loop.capture_gate_diff(start, max_chars=cap)
+                if len(diff) > cap:
+                    overshoots.append((cap, len(diff)))
+                self.assertIn("elided", diff, f"cap {cap} did not truncate")
+            self.assertEqual(overshoots, [],
+                             "every capture stays inside the cap it was given")
+
+            # A cap smaller than the stat itself: the stat takes the cap.
+            for cap in (stat_len // 2, stat_len - 1, stat_len + 1):
+                diff = loop.capture_gate_diff(start, max_chars=cap)
+                self.assertLessEqual(len(diff), cap, f"cap {cap} overshot")
+                self.assertNotIn("diff --git", diff,
+                                 "no body when the stat consumes the cap")
+
 
 class TestWriteJudgeFollowups(unittest.TestCase):
 

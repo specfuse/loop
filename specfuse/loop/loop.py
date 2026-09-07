@@ -3313,7 +3313,12 @@ def truncate_failure_note(note: str, max_lines: int = 200,
     line_budget = min(max_lines, n - 1)
     head_count = line_budget // 2
     tail_count = line_budget - head_count
-    half_char_budget = max_chars // 2
+    # The marker counts against the budget too: the widest it can get is
+    # with every line and every char elided, so reserve that much up front
+    # and the result never exceeds `max_chars` (PR #3257's CI run: 8,028
+    # chars against an 8,000 cap, the marker's length past the halves).
+    marker_reserve = len(f"\n... [{n} lines / {len(note)} chars elided] ...\n")
+    half_char_budget = max(0, max_chars - marker_reserve) // 2
     while head_count > 0 and sum(len(ln) + 1 for ln in lines[:head_count]) > half_char_budget:
         head_count -= 1
     while tail_count > 0 and sum(len(ln) + 1 for ln in lines[n - tail_count:]) > half_char_budget:
@@ -6526,9 +6531,14 @@ def capture_gate_diff(
                           capture_output=True, text=True, check=False)
     stat_text = (stat.stdout or "").strip()
     body_text = body.stdout or ""
+    if len(stat_text) > max_chars:
+        # A stat wider than the whole cap (thousands of files) is the one
+        # case it cannot stay whole; it takes the cap and the body goes.
+        stat_text = truncate_failure_note(stat_text, max_lines=10**9,
+                                          max_chars=max_chars)
     budget = max(0, max_chars - len(stat_text) - 2)
-    parts = [p for p in (stat_text,
-                         truncate_failure_note(body_text, max_chars=budget)) if p]
+    body_capped = truncate_failure_note(body_text, max_chars=budget) if budget else ""
+    parts = [p for p in (stat_text, body_capped) if p]
     return "\n\n".join(parts)
 
 
