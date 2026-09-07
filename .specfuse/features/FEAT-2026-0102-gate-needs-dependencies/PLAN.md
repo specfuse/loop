@@ -5,7 +5,7 @@ slug: gate-needs-dependencies
 branch: feat/FEAT-2026-0102-gate-needs-dependencies
 roadmap_goal: A gate set is a dependency graph rather than a flat list — a gate declaring `needs: [tests]` runs after its dependency, may reuse its artifacts, and is skipped when it fails — so a test-derived coverage gate stops re-executing the suite, while `failure_class` and `failure_signature` stay distinguishable per gate.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 29.00
 ---
 

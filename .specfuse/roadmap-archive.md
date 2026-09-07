@@ -43,6 +43,19 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0102"></a>
+## FEAT-2026-0102 — Gate dependencies: a gate declares `needs:` so shared work runs once per pass
+
+**Why.** A gate set is a list of independent shell commands, and the loop gives an author no way to say "this gate's work is already done by that one." Where the `coverage` gate is "run the suite, then report coverage", the suite runs twice per pass. Measured here at gate entry: 118s across the `code` set, 93% of it duplicated test execution ([FEAT-2026-0051/G1-CLOSE]). Measured on `specfuse-generator` (4303 Java tests): 5:10 of an ~11-minute pass, paid again on every retry. This is not a misconfiguration — it falls out of the gate-set contract and the sound authoring rule that gate commands be self-contained, so every project with a test-derived coverage gate has it. Filed as specfuse/specfuse#162, downstream instance clabonte/generator#1713.
+
+**Goal.** A gate may declare `needs: [<gate>]`. The runner orders the set topologically, skips a gate whose dependency failed (never passes it), and treats an unresolvable target or a cycle as a configuration error. A declaring gate may reuse its dependency's artifacts because the runner guarantees the dependency ran, clean, in the same invocation — moving the staleness discipline from a per-command convention to a runner invariant. `gate_commands.py` emits the same order so CI and the driver cannot disagree. `failure_class` and `failure_signature` stay distinguishable per gate, which is what spinning detection and `learnings-suggest` key on.
+
+**Benefits.** Removes the duplicate suite execution from every gate pass and every baseline probe, in this repo and in every target project with the same gate shape, without merging two gates into one failure class or dropping the stale-artifact guarantee.
+
+**Scope boundary.** Deliberately NOT in scope: tiered per-attempt vs per-gate gate sets, caching the baseline probe by tree hash, and running the driver from an installed copy — all FEAT-2026-0109. Also out: parallel gate execution (foreclosed by artifact reuse) and per-tool output parsing (`emits: [tests, coverage]`), which would make the driver toolchain-aware.
+
+**Status: done.**
+
 <a id="feat-2026-0100"></a>
 ## FEAT-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
 
