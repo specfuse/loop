@@ -26,6 +26,45 @@ from pathlib import Path
 _SET_RE = re.compile(r"^([a-z_][a-z0-9_]*):\s*$", re.M)
 _NAME_RE = re.compile(r"^  - name:\s*(\S+)\s*$", re.M)
 _COMMAND_RE = re.compile(r'^\s+command:\s*"(.*?)"\s*$', re.M | re.S)
+_NEEDS_RE = re.compile(r"^\s+needs:\s*\[(.*?)\]\s*$", re.M)
+
+
+def _order_gates(gates: list[dict]) -> list[dict]:
+    """Stable topological sort by `needs:`, mirroring `loop.order_gate_set`
+    (FEAT-2026-0102/T01) so the two never disagree about the same file.
+
+    Reimplemented rather than imported: importing `loop.py` here would pull
+    in `_miniyaml`, the third-party-parser-shaped dependency this module's
+    docstring records as deliberately avoided on a path CI depends on.
+    """
+    by_name = {gate["name"]: gate for gate in gates}
+    for gate in gates:
+        for dep in gate["needs"]:
+            if dep not in by_name:
+                raise ValueError(
+                    f"gate {gate['name']!r} declares `needs: [{dep}]` but no "
+                    f"{dep!r} gate is configured in this set"
+                )
+
+    ordered: list[dict] = []
+    placed: set[str] = set()
+    visiting: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in placed:
+            return
+        if name in visiting:
+            raise ValueError(f"`needs` cycle detected involving gate {name!r}")
+        visiting.add(name)
+        for dep in by_name[name]["needs"]:
+            visit(dep)
+        visiting.discard(name)
+        placed.add(name)
+        ordered.append(by_name[name])
+
+    for gate in gates:
+        visit(gate["name"])
+    return ordered
 
 
 def _set_block(text: str, set_name: str) -> str:
@@ -42,25 +81,35 @@ def _set_block(text: str, set_name: str) -> str:
 def iter_code_gates(
     verification_yml: "Path | str", set_name: str = "code"
 ) -> list[tuple[str, str]]:
-    """Yield `(name, command)` for every gate in *set_name*, in declared order.
+    """Yield `(name, command)` for every gate in *set_name*, dependency-ordered.
 
-    Order is preserved because gate order is a real signal: the cheap,
-    fast-failing gates are declared first so a broken build reports in seconds
-    rather than after the full suite.
+    Declared order is preserved among gates with no `needs:` edge between
+    them, because gate order is a real signal: the cheap, fast-failing gates
+    are declared first so a broken build reports in seconds rather than after
+    the full suite. A gate declaring `needs: [<gate>]` (FEAT-2026-0102/T02)
+    is moved after its dependency, matching the order `loop._run_gate_set`
+    executes — the two must never disagree about the same file.
     """
     text = Path(verification_yml).read_text(encoding="utf-8")
     block = _set_block(text, set_name)
     if not block:
         return []
 
-    gates: list[tuple[str, str]] = []
+    gates: list[dict] = []
     entries = re.split(r"^  - name:\s*", block, flags=re.M)[1:]
     for entry in entries:
         name = entry.split("\n", 1)[0].strip()
         m = _COMMAND_RE.search(entry)
         command = m.group(1).strip() if m else ""
-        gates.append((name, command))
-    return gates
+        n = _NEEDS_RE.search(entry)
+        needs = (
+            [dep.strip() for dep in n.group(1).split(",") if dep.strip()]
+            if n
+            else []
+        )
+        gates.append({"name": name, "command": command, "needs": needs})
+
+    return [(g["name"], g["command"]) for g in _order_gates(gates)]
 
 
 def code_gate_names(

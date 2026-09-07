@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0102/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/gate_commands.py
   - tests/test_gate_commands_needs.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-07T19:18:49.349019+00:00
+duration_seconds: 1424.34
+cost_usd: 0.80871
+input_tokens: 58
+output_tokens: 12359
 ---
 
 # Emit gates in dependency order so CI and the driver cannot disagree
