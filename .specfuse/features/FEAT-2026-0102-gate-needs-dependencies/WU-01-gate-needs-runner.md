@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0102/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
 oracle_env: macos_local
 produces_driver_helper: order_gate_set
 produces:
   - specfuse/loop/loop.py
   - tests/test_loop_gate_needs.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.15.0
+started_at: 2026-09-07T18:48:28.968837+00:00
+duration_seconds: 1058.307
+cost_usd: 1.053505
+input_tokens: 86
+output_tokens: 13531
 ---
 
 # Order the gate set by `needs:` and skip a gate whose dependency failed

@@ -4022,6 +4022,47 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     return tail + [_NO_VERDICT_NOTE]
 
 
+def order_gate_set(gate_set: list) -> list:
+    """Order *gate_set* so a gate declaring `needs: [<gate>]` runs after its
+    dependency (FEAT-2026-0102/T01), preserving declared relative order among
+    gates with no edge between them (a stable topological sort).
+
+    Raises ValueError, never returns a partial order, when a gate names a
+    `needs` target absent from the set or the set contains a `needs` cycle —
+    both are configuration errors the caller turns into the same
+    "CONFIGURATION ERROR" shape used for an unknown `extra_gates` name.
+    """
+    by_name = {gate["name"]: gate for gate in gate_set}
+    for gate in gate_set:
+        for dep in gate.get("needs") or []:
+            if dep not in by_name:
+                raise ValueError(
+                    f"gate {gate['name']!r} declares `needs: [{dep}]` but no "
+                    f"{dep!r} gate is configured in this set"
+                )
+    ordered: list = []
+    placed: set[str] = set()
+    visiting: set[str] = set()
+
+    def visit(name: str) -> None:
+        if name in placed:
+            return
+        if name in visiting:
+            raise ValueError(
+                f"`needs` cycle detected involving gate {name!r}"
+            )
+        visiting.add(name)
+        for dep in by_name[name].get("needs") or []:
+            visit(dep)
+        visiting.discard(name)
+        placed.add(name)
+        ordered.append(by_name[name])
+
+    for gate in gate_set:
+        visit(gate["name"])
+    return ordered
+
+
 def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
@@ -4031,9 +4072,30 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
     can run the `code` set independent of any work unit without duplicating the
     subprocess hang defenses (stdin=DEVNULL, process-group kill on timeout) —
     those stay exactly as they were, just in one place both callers share.
+
+    A gate may declare `needs: [<gate>]` (FEAT-2026-0102/T01): the set runs in
+    dependency order (`order_gate_set`, called by both `verify()` and
+    `probe_baseline()` before this function so the CONFIGURATION ERROR path is
+    shared) and a gate whose dependency failed is skipped — `ok=False`, never
+    run, reported as `SKIP` rather than `FAIL` so `parse_gate_failure_signature`
+    still attributes the attempt to the dependency that actually failed.
     """
     results = []
+    failed_names: set[str] = set()
     for gate in gate_set:
+        needs = gate.get("needs") or []
+        failed_dep = next((dep for dep in needs if dep in failed_names), None)
+        if failed_dep is not None:
+            failed_names.add(gate["name"])
+            results.append({
+                "name": gate["name"],
+                "ok": False,
+                "report": (
+                    f"### {gate['name']}: SKIP — dependency "
+                    f"'{failed_dep}' failed"
+                ),
+            })
+            continue
         command = gate["command"].replace("{feature_dir}", str(feature_dir))
         command = normalize_interpreter(command)
         # shell=True is intentional: gate commands are authored by the user in
@@ -4064,6 +4126,7 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
             # platforms.
             bash = resolve_bash()
             if not bash:
+                failed_names.add(gate["name"])
                 results.append({
                     "name": gate["name"],
                     "ok": False,
@@ -4115,6 +4178,8 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
                 f"(process group) — a hang (test reading stdin, infinite loop, "
                 f"or a wedged subprocess)."
             ]
+        if not ok:
+            failed_names.add(gate["name"])
         results.append({
             "name": gate["name"],
             "ok": ok,
@@ -4167,6 +4232,13 @@ def verify(wu: WorkUnit, feature_dir: Path,
                 continue
             seen_names.add(gate["name"])
             gate_set.append(gate)
+    try:
+        gate_set = order_gate_set(gate_set)
+    except ValueError as exc:
+        return False, (
+            f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
+            f"This is not a work-unit failure — fix verification.yml and re-run."
+        )
     gate_results = _run_gate_set(gate_set, feature_dir)
     ok_all = all(g["ok"] for g in gate_results)
     return ok_all, "\n\n".join(g["report"] for g in gate_results)
@@ -4184,6 +4256,18 @@ def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
     if cfg is None:
         cfg = load_verification()
     gate_set = cfg.get("code") or []
+    try:
+        gate_set = order_gate_set(gate_set)
+    except ValueError as exc:
+        return [{
+            "gate": "configuration",
+            "failure_class": "configuration_error",
+            "failure_signature": (
+                f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
+                f"This is not a work-unit failure — fix verification.yml and "
+                f"re-run."
+            ),
+        }]
     gate_results = _run_gate_set(gate_set, feature_dir)
     failing = []
     for g in gate_results:
