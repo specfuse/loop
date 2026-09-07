@@ -15,9 +15,9 @@ driver_version: 0.15.0
 verdict: met
 started_at: 2026-09-07T20:13:56.994165+00:00
 duration_seconds: 1671.98
-cost_usd: 7.733794
-input_tokens: 162
-output_tokens: 59375
+cost_usd: 7.96144
+input_tokens: 176
+output_tokens: 60486
 ---
 
 # Gate 1 close — demonstrate `needs:`, measure the saving, revise the lesson it falsifies
