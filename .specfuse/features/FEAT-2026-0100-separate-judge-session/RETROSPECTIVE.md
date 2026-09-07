@@ -2,212 +2,163 @@
 
 ## Gate 1
 
-Gate 1 is the only gate. Five substantive units (T01–T05), two hygiene
-precursors authored from this close's first attempt (T01H, T02H), and this
-close. All seven are `done`.
+Gate 1 is the only gate. Five substantive units (T01–T05) and four hygiene
+precursors — T01H and T02H authored from this close's first attempt, T01H2 and
+T02H2 authored from the judge's two findings on its second — plus this close.
+All nine are `done`.
 
-This is the close's **second attempt**. Attempt 1 (2026-09-06, $8.32) recorded
-`not_met` on three criteria, the judge agreed at `findings: 1`, and the driver
-filed three tracked follow-ups (#3250, #3251, #3252). Two became T01H and T02H;
-the third — FEAT-2026-0082's stale close body tripping the new lint rule — was
-repaired by the operator. All eight behaviours in `GATE-01.md`'s definition of
-done have been re-demonstrated on fixtures with an injected runner in this
-session, the corpus sweep re-run, and the two attempt-1 falsifications
-re-measured directly on this gate's own artifacts.
+This is the close's **third attempt**. Attempt 1 (2026-09-06, $8.32) recorded
+`not_met` on three criteria and the judge agreed. Attempt 2 (2026-09-06, $8.94)
+recorded `met` and **the judge lowered it to `not_met` on two findings**, both
+about the evidence bundle this feature's own close hands its judge: the gate's
+`entry_sha` was stamped at a mid-gate re-probe, and `slice_wu_section` cut
+`## Measurements` at its first `###` child. T01H2 and T02H2 were authored from
+those two findings verbatim and are the only substantive change since.
 
-Three facts in `## Measurements` are load-bearing for whoever settles the
-verdict and are stated there rather than argued here. The `## Measurements`
-slice the judge receives is terminated by the first `###` child heading *or*
-line-initial `**` (measured on attempt 1's own file: 14 of 98 non-blank lines
-reached the bundle, and none of the eight exit codes). What survives that is
-then capped at 8,000 characters with the middle elided. And this gate's
-`baseline.entry_sha` was first written by a probe stamped later than every
-substantive unit's completion, so the diff the judge receives for *this* close
-does not span the gate. The first two were neutralised for this attempt by
-shaping this file — no `###` child, no line-initial `**`, and under the cap —
-which is a workaround, not a fix; both are filed as follow-ups.
+All eight behaviours in `GATE-01.md`'s definition of done have been
+re-demonstrated on fixtures with an injected runner in this session, the corpus
+sweep re-run, and both of the judge's findings re-measured directly on this
+gate's own artifacts. One is fixed and verified on this file; one is fixed as a
+mechanism and **still holds for this gate**, for a reason stated in
+`## Measurements` rather than argued here.
 
-This close does not decide what those mean. Per `close-discipline.md` §1 as T04
-rewrote it, the measurements are below and a session that did not do this work
-reads them and settles the verdict.
+Per `close-discipline.md` §1 as T04 rewrote it, the measurements are below and a
+session that did not do this work reads them and settles the verdict.
 
 ## Measurements
 
 Every figure is a command run in this session against the tree the driver will
-squash. The five close-path demonstrations run the whole driver (`loop.run`) over
-a scaffolded feature in a throwaway git workspace with `dispatch`, `verify` and
-`run_judge_session` replaced by fixtures — the judge is injected, not invoked —
-so nothing here touches the network or `gh`. `lint_plan` stands in for the
-`specfuse` console script, whose installed build is not this checkout. Those five
-need an unsandboxed shell; sandboxed they fail with `SystemExit` on the agent
-session-env deny-list, before any judge code runs. This section carries no `###`
-child and no line-initial `**` on purpose; see the bundle-shape rows below.
+squash. The five close-path demonstrations run the whole driver (`loop.run`)
+over a scaffolded feature in a throwaway git workspace with `dispatch`, `verify`
+and `run_judge_session` replaced by fixtures — the judge is injected, never
+invoked — so nothing here touches the network or `gh`.
+`python3 -m specfuse.loop.lint_plan` stands in for the `specfuse` console
+script, whose pipx build is not this checkout. Those five need an unsandboxed
+shell.
 
-The eight fixture demonstrations, numbered to match the eight bullets of
-`GATE-01.md` § Definition of done, in order:
+The eight fixture demonstrations, numbered to `GATE-01.md` § Definition of done:
 
-| # | Behaviour (`GATE-01.md` § Definition of done) | Command run in this session | Exit |
+| # | Behaviour | Command run in this session | Exit |
 |---|---|---|---|
-| 1 | The judge's prompt carries the definition of done, the criteria entries, the gate's diff and the close's `## Measurements`, and not the close's `## Verdict` / `## Retrospective` prose | `unittest tests.test_judge_close_path.TestJudgePromptEvidence -q` | **0** (Ran 1, `OK`) |
-| 1b | …the same exclusion, measured on *this* file inside a realistic three-file diff (`CHANGELOG.md`, this file, `judge.py`) | `strip_forbidden_sections` over that diff, counting surviving `+`-prefixed non-blank lines of this file | **0 of 323 carried** (attempt 1: 100% of `## Retrospective` carried); both code halves survive intact |
-| 2 | Judge answers `not_met` with two findings: on-disk `verdict:` reads `not_met`, `FOLLOW-UPS.md` carries two entries in the judge's words, no terminal flips, `judged` records `close_verdict: met` / `judge_verdict: not_met` | `…TestJudgeLowersVerdict -q` | **0** (Ran 1, `OK`) |
-| 3 | Close writes `not_met`, judge answers `met`: the verdict stays `not_met`, the `judged` event records the disagreement | `…TestJudgeCannotRaise -q` | **0** (Ran 1, `OK`) |
-| 4 | Judge times out or returns no parseable verdict: the close's verdict stands, the event says `judge_verdict: null` with the reason, the run does not crash | `…TestJudgeUnusable -q` | **0** (Ran 1, `OK`) |
-| 5 | `judge_disabled: true` in PLAN frontmatter skips the dispatch and prints a one-line notice naming the escape hatch | `…TestJudgeDisabled -q` | **0** (Ran 1, `OK`) |
-| 6 | The judge's usage is folded into the close WU's `cost_usd` and the `attempt_outcome` event; the cost analysis can see it | `unittest tests.test_judge_cost -q` | **0** (Ran 3, `OK`) |
-| 7a | `specfuse lint` reports `ERROR` on a `pending` close WU whose body says `verdict: met` | `unittest tests.test_lint_close_verdict_not_predecided -q` | **0** (Ran 6, `OK`) |
-| 7b | …the same, as a negative observation on a purpose-built bad input (fixture feature dir, close WU `status: pending`, body line *"Record verdict: met once the suite is green"*) | `lint_plan "$TMPDIR/judge-lint-fixture"` | **1** — one `ERROR:` line, `close WU body names a predecided verdict: 'verdict: met'`. Control: the byte-identical body with `status: done` exits **0**, zero `ERROR` |
-| 7c | …and zero `ERROR` over every existing feature folder | sweep of `lint_plan <dir>` over every folder under `.specfuse/features/` holding a `PLAN.md` | **0** — 74 folders, 0 non-zero exits, 0 `ERROR:` lines (attempt 1: 1) |
-| 8 | `PLAN.template.md` and `/draft-feature`'s autonomy recommendation read `auto`; `close-discipline.md` §1 says the judge writes the verdict | six chained `grep -q`: `autonomy_default: auto`, ``recommend `auto` `` and `You measure; the judge concludes`, each in both its copies | **0** (all six present) |
+| 1 | Judge's prompt carries the definition of done, criteria entries, gate diff and the close's `## Measurements`, and not its Verdict/Retrospective prose | `unittest tests.test_judge_close_path.TestJudgePromptEvidence -q` | **0** (Ran 1, `OK`) |
+| 1b | …the same exclusion measured on **this** file, in a three-file diff (`CHANGELOG.md`, this file, `judge.py`) | `strip_forbidden_sections` over that diff, counting surviving `+`-prefixed non-blank lines | **0 of 310 carried**; both code halves intact (31/31, 50/50) |
+| 2 | Judge answers `not_met` with two findings: on-disk `verdict:` reads `not_met`, FOLLOW-UPS carries two entries in the judge's words, no terminal flips, event records `met`/`not_met` | `…TestJudgeLowersVerdict -q` | **0** (Ran 1, `OK`) |
+| 3 | Close writes `not_met`, judge answers `met`: verdict stays `not_met`, event records the disagreement | `…TestJudgeCannotRaise -q` | **0** (Ran 1, `OK`) |
+| 4 | Judge times out or returns no parseable verdict: close's verdict stands, event says `judge_verdict: null` with the reason, no crash | `…TestJudgeUnusable -q` | **0** (Ran 1, `OK`) |
+| 5 | `judge_disabled: true` skips the dispatch and prints a one-line notice naming the escape hatch | `…TestJudgeDisabled -q` | **0** (Ran 1, `OK`) |
+| 6 | Judge usage folds into the close WU's `cost_usd` and the `attempt_outcome` event | `unittest tests.test_judge_cost -q` | **0** (Ran 3, `OK`) |
+| 7a | `specfuse lint` ERRORs on a `pending` close WU whose body says `verdict: met` | `unittest tests.test_lint_close_verdict_not_predecided -q` | **0** (Ran 6, `OK`) |
+| 7b | …as a **negative observation** on a purpose-built bad input: fixture feature dir, close WU `status: pending`, body line *"Record verdict: met once the suite is green."* | `lint_plan "$TMPDIR/judge-lint-fixture-a3"` | **1**, 1 `ERROR:` — `close WU body names a predecided verdict: 'verdict: met'` |
+| 7b-c | two controls: the byte-identical body at `status: done`; and `status: pending` with that one sentence deleted | same | **0** and **0**, 0 `ERROR` each |
+| 7c | …and zero ERROR over every existing feature folder | sweep of `lint_plan <dir>` over every folder under `.specfuse/features/` with a `PLAN.md` | **74 folders, 0 non-zero exits, 0 `ERROR:` lines** |
+| 8 | `PLAN.template.md` and `/draft-feature` read `auto`; `close-discipline.md` §1 says the judge writes the verdict | six `grep -q`: `^autonomy_default: auto`, ``recommend `auto` ``, `You measure; the judge concludes`, each in both copies | **0** (6/6) |
 
-The corpus sweep in full — attempt 1's single `ERROR`, on FEAT-2026-0082's
-`pending` close body, is gone; the operator repaired it between attempts:
+Attempt 2's two judge findings, re-measured on this gate's own artifacts:
 
-| Measurement | Command | Value |
+| Finding (attempt 2's judge, verbatim scope) | How re-measured here | Value |
 |---|---|---|
-| Feature folders swept | `for d in .specfuse/features/*/; do [ -f "$d/PLAN.md" ] \|\| continue; …` | **74** |
-| Folders exiting non-zero | same | **0** |
-| `ERROR:` lines across all folders | same, `grep -c 'ERROR:'` | **0** |
-
-Three properties of the bundle that this gate's own artifacts falsify or
-constrain — measurements, not conclusions, all on bullet 1:
-
-| Property | How measured in this session | Value |
-|---|---|---|
-| Does the judge receive the close's whole `## Measurements` section? | `build_judge_bundle(fd, 1, measurements=<attempt 1's RETROSPECTIVE.md>)`, counting non-blank lines of `bundle.measurements` | **No — 14 of 98.** `slice_wu_section` ends a section at `_AC_END_RE` = `^(?:\*\*\|#{1,6}\s)` — the next heading of *any* level **or the next line-initial `**`** — so attempt 1's first `###` child cut the slice to its two intro paragraphs. None of its eight exit codes reached the judge |
-| Is the sliced section then capped? | same call; `len()` of the section vs `judge.JUDGE_MAX_EVIDENCE_CHARS` | **Yes, at 8,000 chars.** `_clean_evidence` runs `truncate_evidence`, keeping head+tail and eliding the middle. A first draft of this section ran 9,347 chars and lost demonstrations 7c and 8; it was rewritten to fit |
-| …and does this section now reach the bundle whole? | same call against this file | **Yes** — no `###` child, no line-initial `**`, under the cap. Achieved by shaping the close record; the slicer and the cap are outside this WU's boundary and untouched |
-| Which sha does `resolve_gate_start_sha` hand the judge here? | read `GATE-01.md` `baseline.entry_sha` and the function's first branch (`entry_sha` present ⇒ returned before any fallback) | **`7e0252555d94c4dd…`**, source `GATE-01.md baseline.entry_sha` |
-| Was that sha recorded at gate entry? | compare `baseline.probed_at` against every `attempt_outcome` timestamp in `events.jsonl` | **No.** `probed_at` is `2026-09-06T19:03:26Z`; the last substantive unit (T02H) finished at `16:51:21Z`. `entry_sha` did not exist until T02H shipped it, so gate 1's first probe could not write one and the earliest that could is later than the whole gate. The range excludes every substantive unit's commit |
-
-T02H's three tests all pass in the full suite below, so the mechanism is right
-going forward; it cannot recover an entry sha for the gate that shipped it, and a
-backfilled `entry_sha` beats the merge-base fallback that would have given the
-gate's real footprint. Attempt 1 measured this bullet failing for a different,
-now-fixed reason (a re-probe overwriting `baseline.sha`).
+| **#2 — `slice_wu_section` ended `## Measurements` at a `### Failure-class breakdown` child, so the bundle carried 62 of 87 non-blank lines.** T01H2 | `unittest …TestBundle.test_measurements_section_with_child_headings_is_captured_whole` | **0** (Ran 1, `OK`) |
+| …and on attempt 2's retrospective, the file that finding was made against | `slice_wu_section(<attempt 2 RETROSPECTIVE.md>, "Measurements")` | **Fixed — 85 non-blank lines, the `### Failure-class breakdown` child inside the slice, `## Retrospective` outside it** |
+| …does the whole slice then reach the bundle? | same file through `build_judge_bundle`, `len()` vs `JUDGE_MAX_EVIDENCE_CHARS` | **No — 9,605 chars capped to 8,029, middle elided, 77 of 85 lines.** T01H2 left the cap untouched and it is outside this WU's boundary; **this section is written under 8,000 chars so all of it reaches the judge** |
+| **#1 — `entry_sha` was stamped at the first probe that ran T02H's code, `7e02525`, so the judge's range held 4 of the gate's 34 commits.** T02H2 | `unittest …TestGateStartSha.test_legacy_gate_reprobe_seeds_entry_sha_from_merge_base` and `::test_fresh_gate_first_probe_seeds_entry_sha_from_probe` | **0** and **0** (Ran 1, `OK` each) |
+| …and on **this** gate? | read `GATE-01.md baseline`; read `write_gate_baseline` (`loop.py:4402-4410`) | **Unchanged — `entry_sha` still reads `7e0252555d94c4dd…`, byte-identical to attempt 2's `judged.diff_base`.** T02H2 seeds from the merge-base only when `entry_sha` is *absent*; a present one is carried forward untouched, by design, so today's re-probe (`probed_at: 2026-09-07T15:02:18Z`) left it. **This close's judge gets the diff base attempt 2's judge called defective** |
+| …provenance of that sha, without git | `baseline.probed_at` vs every `attempt_outcome` timestamp in `events.jsonl` | `entry_sha` could not exist before T02H shipped the field at **16:51:21Z on 2026-09-06**, and T01–T02H all finished before that. The range covers T01H2, T02H2 and this close, and excludes the seven units before |
 
 Other recorded values:
 
 | Measurement | Command | Value |
 |---|---|---|
 | `PLAN.template.md`'s `autonomy_default` | `grep -m1 '^autonomy_default:' .specfuse/templates/PLAN.template.md` | **`auto`** (same in the vendored copy) |
-| `judged` events in `events.jsonl` | `python3` read counting `event_type == "judged"` | **1** — attempt 1's, `2026-09-06T14:21:29Z`: `close_verdict`/`judge_verdict`/`verdict` all `not_met`, `lowered: false`, `disagreed: false`, `findings: 1`, `diff_base_source: GATE-01.md baseline.sha`, `judge_cost_usd: 0.220061` |
-| Full suite | `unittest discover -s tests -q` | **0** — `Ran 3739 tests in 216.630s`, `OK (skipped=3)` |
+| `judged` events in `events.jsonl` | `python3` read counting `event_type == "judged"` | **2** — attempt 1 (`not_met`/`not_met`, `lowered: false`, 1 finding); attempt 2 (`met`/`not_met`, `lowered: true`, 2 findings, `judge_cost_usd: 0.679098`) |
+| `CHANGELOG.md` Unreleased entries tracing to this feature | `changelog.parse_changelog` + `closing_requirements.changelog_has_entry_for` | **5** (4 `added`, 1 `changed`), parse `ok: True`, `changelog_has_entry_for` **True** |
+| Full suite | `python3 -m unittest discover -s tests -q` | **0** — `Ran 3744 tests in 150.081s`, `OK (skipped=3)` |
 | Smoke test | `bash scripts/smoke-test.sh` | **0**, `smoke test: OK` |
-| This feature's own plan lint (the `plannext` gate) | `lint_plan <this feature dir>` | **0** |
+| This feature's plan lint (the `plannext` gate) | `lint_plan <this feature dir>` | **0**, `OK — structurally valid` (3 `produces_driver_helper` WARNs on hygiene WUs) |
 
 On this close's own `judged` event: it cannot read it — `judge_close` runs after
 the closing guards, which run after this WU's squash. What the driver will do,
-read from `loop.py`'s dispatch site: gate 1 is `gates[-1]` here, `PLAN.md` has no
-`judge_disabled` key, and `GATE-01.md` has a resolvable `baseline.entry_sha`, so
-none of `judge_close`'s three early returns apply and a real `sonnet`/`medium`
-session is dispatched. A second `judged` event will be appended to this feature's
-`events.jsonl` with `close_verdict`, `judge_verdict`, `verdict`, `lowered`,
-`disagreed`, `findings`, `diff_base` and `diff_base_source`. A reader confirms it
-there; this close asserts nothing about what it will say.
+read from the dispatch site (`loop.py:8172`) and `judge_close`
+(`loop.py:6586`): gate 1 is `gates[-1]`, `PLAN.md` carries no `judge_disabled`
+key, and `GATE-01.md` has a resolvable `baseline.entry_sha`, so none of the
+three early returns applies and a real `sonnet`/`medium` session is dispatched.
+A **third** `judged` event will be appended to this feature's `events.jsonl`
+with `close_verdict`, `judge_verdict`, `verdict`, `lowered`, `disagreed`,
+`findings`, `diff_base` and `diff_base_source`. A reader confirms it there; this
+close asserts nothing about what it will say.
 
 ### Failure-class breakdown
 
 Read from `events.jsonl`'s `attempt_outcome` payloads in this session. Three
-non-passing attempts across the gate, all one failure class, none of them in a
-hygiene unit or in this close.
+non-passing attempts across the gate, all one failure class, none in a hygiene
+unit and none in this close.
 
 | Failure class | Signature | Count | WU |
 |---|---|---|---|
 | `tests` | `test_doc_set_missing_for_retrospective_fails` | 2 | T03, attempts 1 and 2 |
 | `tests` | `test_stat_survives_in_full_when_the_body_is_capped` | 1 | T04, attempt 1 |
 
-Both T03 attempts carried the identical signature, which tripped
-`spinning_signature_repeat` and produced this gate's one `human_escalation`. The
-operator's `re_arm_dispatched` note records the disposition: *"root cause found
-in test isolation, not the code"* — and T03 passed on the re-armed attempt at
-$1.24 without the production change the two spinning attempts had been reaching
-for. `test_doc_set_missing_for_retrospective_fails` is not a judge test; it is a
-doc-set invariant that T03's edits perturbed through import order.
-
-Five `driver_staleness_detected` halts (`halted: true`, one each after T01, T02,
-T03, T01H and T02H), each requiring an operator resume, plus one non-halting
-summary event emitted at the gate boundary. `PLAN.md` § Notes predicted *"a
-`driver_restart_required` halt after each of T01 through T05"* — five. Five
-happened, but not on the predicted units: T04 and T05 touched rules, templates,
-skills, docs and `lint_plan.py`, and the staleness rule counts modules under
-`specfuse/loop/` the running process has imported, which neither diff reached.
-The two hygiene units both edited a loaded module and both halted.
+Both T03 attempts carried the identical signature, tripping
+`spinning_signature_repeat` and producing this gate's one `human_escalation`;
+the operator's `re_arm_dispatched` note reads *"root cause found in test
+isolation, not the code"*, and T03 passed on re-arm at $1.24. All four hygiene
+units passed on their first attempt.
 
 ## Retrospective
 
 ### What the judge's evidence bundle lacked when the fixtures were built
 
-Attempt 1 named three gaps. Two were code defects and are fixed; the third was a
-deliberate scope boundary and stands. Re-measuring them turned up a fourth that
-neither attempt's fixtures could see.
+Four gaps have been named across three attempts. Two are fixed and verified
+here, one is fixed as a mechanism but still live for this gate, and one is a
+deliberate scope boundary that stands.
 
-**Fixed — a forbidden section with subheadings is now fully redacted.** Attempt 1
-measured 100% of `## Retrospective`'s non-blank lines surviving into the judge's
-prompt, because `strip_forbidden_sections` closed a redacted run at the next
-heading of *any* level, so every `###` child re-opened the stream. T01H made the
-run close only at a heading of the same or shallower level. Re-measured in this
-session on this file, inside a realistic three-file diff: **0 of 332 non-blank
-lines carried**, with the `CHANGELOG.md` and `judge.py` halves of the same diff
-both surviving intact — the property that made the narrow fix safe.
+**Fixed — a forbidden section with subheadings is fully redacted (T01H).**
+Attempt 1 measured 100% of `## Retrospective`'s non-blank lines surviving into
+the judge's prompt, because `strip_forbidden_sections` closed a redacted run at
+the next heading of *any* level, so every `###` child re-opened the stream. T01H
+made a run close only at a heading of the same or shallower level. A side
+effect worth stating: this file's H1 is `# Retrospective — …`, a level-1
+forbidden heading with nothing at level ≤ 1 after it, so the redaction now runs
+to the next diff boundary and takes this whole file out of the diff. That is
+over-redaction in the safe direction — the judge is handed `## Measurements`
+through a separate bundle field — but it means the judge sees this file only
+through that field, and therefore only within the 8,000-character cap.
 
-Worth recording alongside it: this file's H1 is `# Retrospective — …`, a level-1
-forbidden heading that nothing at level ≤ 1 follows, so the redaction now runs to
-the next diff boundary and takes the whole file with it. That is over-redaction,
-and it is the safe direction — the judge is handed the `## Measurements` section
-through a separate bundle field, and losing the file's diff hunk costs it
-nothing it is allowed to read. It is stated here because a reader comparing the
-two attempts' numbers will otherwise wonder why the fix looks total.
+**Fixed and verified on the file the finding was made against — the truncated
+`## Measurements` slice (T01H2).** The judge that lowered attempt 2 found
+`slice_wu_section` ending the section at its first `### ` child, carrying 62 of
+87 non-blank lines. T01H2 applied T01H's level rule to the slicer. Re-measured
+in this session on attempt 2's own retrospective: the slice now runs to the next
+`##` and carries all 85 non-blank lines including the `###` child. What T01H2
+did *not* change is `JUDGE_MAX_EVIDENCE_CHARS = 8000`: that same section is
+9,605 characters and is still capped to 8,029 with the middle elided. This
+close's `## Measurements` is written under the cap so all of it reaches the
+judge — a workaround, not a fix, and `judge.py` is outside this WU's boundary.
 
-**Fixed as a mechanism, unrecoverable for this gate — the diff base.** Attempt 1
-found `resolve_gate_start_sha` returning a `baseline.sha` that the post-halt
-re-probe had overwritten, narrowing the judge's diff to the gate file's own
-frontmatter. T02H added `entry_sha`, written on a gate's first probe and never
-overwritten, and preferred it. For gates entered from here forward this is the
-gate-entry boundary the docstring always claimed. For *this* gate it is not:
-`entry_sha` did not exist when gate 1 was entered, so the value now in
-`GATE-01.md` was written by a probe stamped two hours after the last substantive
-unit finished — and because a present `entry_sha` short-circuits the merge-base
-fallback, the backfill is *worse* than no field at all would have been for this
-one gate. The numbers are in `## Measurements`. What the fixtures could not see
-is exactly this: `_write_feature` scaffolds a gate whose baseline is written by a
-probe that really is the first one, which is the happy path and the only path a
-fixture has.
-
-**New, and the reason this section is shaped the way it is — the judge receives a
-truncated `## Measurements`.** `build_judge_bundle` slices the section with
-`slice_wu_section`, whose terminator regex matches a heading at *any* level.
-Attempt 1's `## Measurements` opened with two paragraphs and then went into
-`### The eight fixture demonstrations`, so the bundle got the two paragraphs:
-**14 of 98 non-blank lines, and not one of the eight exit codes.** The
-terminator also matches a line-initial `**`, so a bold-label paragraph truncates
-it just as a subheading does, and whatever survives is then capped at
-`JUDGE_MAX_EVIDENCE_CHARS = 8000` with the middle elided — a first draft of this
-close's section ran 9,347 characters and silently lost demonstrations 7c and 8. The judge that
-lowered nothing on attempt 1 was reading a preamble about the sandbox. This is
-the sharpest instance of the composite `close-discipline.md` §1 exists for — every
-unit green, `TestJudgePromptEvidence` green, and the assembled bundle missing the
-evidence it is named for. Two things follow. The narrow one: this close's
-`## Measurements` carries no `###` child and no line-initial `**`, and was cut
-from 9,347 to 8,002 characters, so all 62 of its non-blank lines reach the
-bundle — verified by calling `build_judge_bundle` on this file and diffing the
-section against `bundle.measurements`. The general one: shaping a deliverable
-around a slicer's terminator and a character cap is a workaround, not a fix, and
-neither `_wu_sections.py` nor `judge.py` is inside this WU's boundary. Filed as a
-follow-up.
+**Fixed as a mechanism, still live for this gate — the diff base (T02H, T02H2).**
+Attempt 1 found `resolve_gate_start_sha` returning a `baseline.sha` a post-halt
+re-probe had overwritten. T02H added `entry_sha`; attempt 2's judge then found
+that `entry_sha` itself had been stamped at the first probe that ran T02H's own
+code, so the range held 4 of the gate's 34 commits. T02H2 makes a gate that
+carries a baseline but no `entry_sha` seed it from the merge-base instead, and
+both its tests pass. But `write_gate_baseline` carries a *present* `entry_sha`
+forward untouched — correctly, since overwriting it is the bug T02H fixed — so
+this gate keeps `7e02525`, and today's re-probe left it in place. **The judge
+reading this close gets the same diff base its predecessor called defective.**
+Minting a different value into `GATE-01.md` to make this close look better is
+exactly the substitution `result-contract.md` §6 forbids, and the merge-base is
+not computable from a session that may run no git command, so the value stands
+and is measured instead. What the fixtures could not see is precisely this:
+`_write_feature` scaffolds a gate whose baseline is written by a probe that
+really is the first one, which is the happy path and the only path a fixture
+has.
 
 **Unchanged and deliberate — the judge is told to re-run oracles but not which
 command.** The prompt says *"Re-run every oracle a criterion names"*, and the
-criteria come from `GATE-NN-CRITERIA.md`. This feature has no
-`GATE-01-CRITERIA.md`, so `_render_criteria` emits its fallback — *"No
-per-criterion state was recorded for this gate. Judge from the definition of
-done, the diff, and the measurements below."* — and the judge infers the oracles
-from the definition of done and from `## Measurements`. `PLAN.md` § Scope
-boundary puts the feature-level oracle in FEAT-2026-0101, drafted *"after this
-lands so the judge has something binary to read."* It is named again here because
-it is what the judge's `not_met`-if-unverified rule collides with first, and
-because with the truncation above it compounded: on attempt 1 the judge had
-neither a criteria artifact nor the measurements.
+criteria come from `GATE-NN-CRITERIA.md`. This feature has none, so
+`_render_criteria` emits its fallback and the judge infers the oracles from the
+definition of done and from `## Measurements`. `PLAN.md` § Scope boundary puts
+the feature-level oracle in FEAT-2026-0101, drafted *"after this lands so the
+judge has something binary to read."*
 
 ### Were the eight behaviours demonstrable without a live `gh` or a network call?
 
@@ -215,42 +166,46 @@ Yes, all eight, and no demonstration in this session made either. The five
 close-path behaviours run the real driver end to end with `run_judge_session`
 replaced by a Python callable, which is the seam `judge_close` looks up on the
 module at call time. The cost-folding behaviour injects a usage envelope of the
-same shape `dispatch` produces. The lint behaviours are a pure function over
-files on disk, and the negative observation ran against a fixture feature
-directory built in this session under `$TMPDIR`. The template/rule behaviour is
+shape `dispatch` produces. The lint behaviours are a pure function over files on
+disk, and the negative observation ran against a fixture feature directory built
+in this session under `$TMPDIR` with two controls. The template/rule behaviour is
 six `grep`s. `GATE-01.md`'s escalation trigger — *"Emit `status: blocked` if a
 fixture demonstration needs a live `gh` or a network call"* — was never
 approached.
 
 The one environmental dependency worth recording is the opposite of a network
 call: the tool sandbox's deny-list over the agent session-env directory makes the
-five `loop.run` demonstrations fail with `SystemExit` before any judge code runs.
-This is the sixth close in this repository to hit it.
+five `loop.run` demonstrations exit `SystemExit` before any judge code runs. This
+is the seventh close in this repository to hit it.
 
 ### What this close did not do
 
-It did not touch `_wu_sections.py`, `judge.py`, `loop.py` or any test. Two of the
-four findings above are one-line changes in code this WU's *Do not touch* puts
-outside its boundary, and a close that repairs the mechanism it is measuring has
-stopped being a measurement. Both are filed as follow-ups instead.
+It did not touch `_wu_sections.py`, `judge.py`, `loop.py` or any test. The two
+remaining defects — the 8,000-character cap on the measurements slice, and this
+gate's un-reseedable `entry_sha` — are in code and data this WU's *Do not touch*
+puts outside its boundary, and a close that repairs the mechanism it is
+measuring has stopped being a measurement.
 
-It also did not re-file attempt 1's follow-ups. `FOLLOW-UPS.md` is absent from
-this folder — attempt 1's `attempt_outcome` lists it in `files_touched`, and the
-`followups_recorded` event shows all three entries filed as issues #3250, #3251
-and #3252 — so the tracked record exists and re-creating the file would file
-duplicates.
+It also did not re-file follow-ups. `FOLLOW-UPS.md` is absent from this folder;
+the attempt-1 and attempt-2 records are the `followups_recorded` events and
+issues #3250–#3252. Attempt 2's own two findings were **not** filed as new
+issues — `file_followup_issues` keyed each entry by position, so they matched
+attempt 1's markers and deduplicated away. That was found, fixed under #3253 and
+is in `CHANGELOG.md`'s Unreleased `Fixed` section; the findings themselves were
+not lost, because T01H2 and T02H2 carry them verbatim in their `provenance:`
+lines.
 
 ## Cost analysis
 
-`planned_cost_usd` is `$36.00` at the feature level, and the per-WU sum is the
-same `$36.00` (T01 $5, T02 $7, T03 $3, T04 $5, T05 $3, T01H $3, T02H $4,
-G1-CLOSE $6), so both readings reconcile against one number. **The close WU's own
-acceptance criterion names `$29.00`**, which was the per-WU sum before T01H
-($3.00) and T02H ($4.00) were added to the graph after attempt 1; the criterion
-was written against the pre-hygiene plan and `PLAN.md` was updated with the
-units. Both figures are named here rather than one silently substituted for the
-other. Every "spent" figure is read from this feature's `events.jsonl`
-`attempt_outcome` payloads in this session.
+Every "spent" figure is read from this feature's `events.jsonl`
+`attempt_outcome` payloads in this session. **`planned_cost_usd` is `$40.00` in
+`PLAN.md` today, and the per-WU sum is the same `$40.00`** (T01 $5, T02 $7,
+T03 $3, T04 $5, T05 $3, T01H $3, T02H $4, T01H2 $2, T02H2 $2, G1-CLOSE $6), so
+both readings reconcile against one number. **This close's own acceptance
+criterion names `$29.00`**, which was the per-WU sum before any hygiene unit
+existed (the six units T01–T05 and the close); four hygiene units totalling
+$11.00 have been added to the graph since, two after each of the first two close
+attempts. Both figures are named rather than one silently substituted.
 
 | WU | Attempts | Planned | Spent | Delta |
 |---|---|---|---|---|
@@ -261,59 +216,67 @@ other. Every "spent" figure is read from this feature's `events.jsonl`
 | T05 | 1 | $3.00 | $0.99 | −$2.01 |
 | T01H | 1 | $3.00 | $0.68 | −$2.32 |
 | T02H | 1 | $4.00 | $0.81 | −$3.19 |
-| **T01–T02H** | **10** | **$30.00** | **$25.78** | **−$4.22** |
-| G1-CLOSE | 2 | $6.00 | $8.32 (attempt 1; attempt 2 not yet recorded) | **+$2.32 so far** |
-| **Feature** | **12** | **$36.00** | **$34.10 recorded** | **−$1.90 recorded** |
+| T01H2 | 1 | $2.00 | $0.52 | −$1.48 |
+| T02H2 | 1 | $2.00 | $0.80 | −$1.20 |
+| **T01–T02H2** | **12** | **$34.00** | **$27.10** | **−$6.90** |
+| G1-CLOSE | 2 recorded | $6.00 | $17.26 (attempts 1–2; this one unrecorded) | **+$11.26 so far** |
+| **Feature** | **14** | **$40.00** | **$44.36 recorded** | **+$4.36 recorded** |
 
-**Delta, named: −$1.90 against $36.00, with this close's second attempt still
-unrecorded.** The driver writes this attempt's `attempt_outcome` after the RESULT
-block, so the feature total above understates the truth by exactly one attempt —
-and by one *judge* session too. T03 shipped `fold_judge_usage`, so the judge's
-spend is added into the close's `cost_usd` and its `attempt_outcome` payload
-before either is written; attempt 1's recorded `$8.3157` is therefore the close
-session's `$8.0956` plus the judge's `$0.2201`, and the `judged` event carries
-that `judge_cost_usd: 0.220061` separately. Against `GATE-01.md`'s
-`cost_budget_usd: 55.00`, this attempt began with $20.90 of headroom.
+**Delta, named: +$4.36 against `PLAN.md`'s $40.00, or +$15.36 against the
+criterion's $29.00, with this third close attempt still unrecorded.** The driver
+writes this attempt's `attempt_outcome` after the RESULT block, so the total
+understates the truth by one close session and one judge session. T03 shipped
+`fold_judge_usage`, so a judge's spend is added into the close's `cost_usd`
+before it is written: the two recorded close attempts' $8.3157 and $8.9427
+include $0.2201 and $0.6791 of judge, **$0.8992 of judging in total**, each also
+carried separately in its `judged` event. Against `GATE-01.md`'s
+`cost_budget_usd: 65.00`, this attempt began with $20.64 of headroom.
 
-**Restart count: five** — `driver_staleness_detected` with `halted: true` after
-T01, T02, T03, T01H and T02H, plus one non-halting summary event at the gate
-boundary. `PLAN.md` § Notes predicted five. Each cost an operator resume and no
-dollars.
+**Restart count: seven** — `driver_staleness_detected` with `halted: true` after
+T01, T02, T03, T01H, T02H, T01H2 and T02H2, plus two non-halting summary events
+at the two gate boundaries already reached. `PLAN.md` § Notes predicted *"a
+`driver_restart_required` halt after each of T01 through T05"* — five. Seven
+happened, and not on the predicted units: T04 and T05 touched rules, templates,
+skills and docs, and the staleness rule counts modules under `specfuse/loop/`
+the running process has imported, which neither diff reached; all four hygiene
+units did edit a loaded module and all four halted. The prediction was right
+about the count of driver-editing units and wrong about which ones they were,
+which is the same undercount as T04's.
 
-**Where the money actually went.** Two overruns and one under-run explain nearly
-all of it. T03's two spinning attempts cost $2.42 and produced nothing; the
-re-armed third cost $1.24 and passed, which is what the unit was planned at.
-T04 — planned $5.00 for rules, templates, two skill copies, two docs copies and
-their vendored mirrors — spent $8.03 across two attempts; a unit whose diff spans
-twelve files in six mirrored pairs is not a $5.00 unit, and the mirroring is the
-part that is easy to under-count at planning time. Against that, the two hygiene
-units authored from a close's own findings came in at **$1.49 against $7.00
-planned, one attempt each, no failures** — a precisely-scoped WU with a
-`provenance:` line naming the measurement that produced it is the cheapest kind
-of work in this feature by a wide margin, and it is the direct output of the
-mechanism this feature ships.
+**Where the money actually went.** The close is the overrun. Three close
+attempts against a $6.00 plan is $17.26 and climbing, 39% of the feature's
+recorded spend, and every dollar of it after attempt 1 was spent re-measuring a
+gate whose substantive code was already done — because the judge kept finding
+defects in the *evidence bundle* rather than in the work. Against that, the four
+hygiene units authored from those findings came in at **$2.81 against $11.00
+planned, one attempt each, no failures**. The mechanism this feature ships is
+cheap to obey and expensive to have needed: a precisely-scoped WU carrying a
+`provenance:` line that names the measurement which produced it is the cheapest
+work in this feature by a wide margin, and re-running a full close to prove the
+fix is the most expensive.
 
 ## Consumer-visible contract changes
 
-Five, all additive. Enumerated here and present in `CHANGELOG.md`'s `Unreleased`
-section, classified per `specfuse/loop/changelog.py`'s schema and carrying this
-feature's ID (appended by attempt 1's squash, which passed; verified present in
-this session at `CHANGELOG.md` lines 34–37 and 43). Nothing in this attempt
-changes the list.
+Five, all additive, unchanged from attempt 2 — T01H2 and T02H2 fix unreleased
+code inside these same five entries and add no sixth. Enumerated here and
+present in `CHANGELOG.md`'s `Unreleased` section, classified per
+`specfuse/loop/changelog.py`'s schema and carrying this feature's ID; verified
+in this session by `parse_changelog`, which reports 5 entries tracing to
+`FEAT-2026-0100` (4 `added`, 1 `changed`) and `ok: True`.
 
-1. **A judge session now runs on every terminal close, and its verdict is the one
-   that stands when it is lower.** After a terminal close's squash passes the
-   closing-deliverable guards and before the verdict is re-read for the terminal
-   flips, the driver dispatches a fresh `sonnet`/`medium` session that receives
-   the gate's definition of done, the `GATE-NN-CRITERIA.md` entries, the gate's
-   diff and the close's `## Measurements` — and not the close's own `## Verdict`
-   or `## Retrospective` prose, which is stripped even out of diff hunks. A judge
-   may lower `met` to `not_met`, which rewrites the close WU's `verdict:` field
-   and files `FOLLOW-UPS.md` from the judge's own findings verbatim; it may never
-   raise a `not_met`. A timeout, an unparseable answer, an unresolvable diff base
-   or a defect in the judge path all fail open with the close's verdict standing.
-   Consumers see a second session's cost on every terminal close, and a close's
-   `verdict:` that can change after the close session ended. *(added)*
+1. **A judge session now runs on every terminal close, and its verdict is the
+   one that stands when it is lower.** After a terminal close's squash passes
+   the closing-deliverable guards and before the verdict is re-read for the
+   terminal flips, the driver dispatches a fresh `sonnet`/`medium` session that
+   receives the gate's definition of done, the `GATE-NN-CRITERIA.md` entries,
+   the gate's diff and the close's `## Measurements` — and not the close's own
+   Verdict or Retrospective prose, which is stripped even out of diff hunks. A
+   judge may lower `met` to `not_met`, which rewrites the close WU's `verdict:`
+   field and files `FOLLOW-UPS.md` from its own findings verbatim; it may never
+   raise a `not_met`. A timeout, an unparseable answer, an unresolvable diff
+   base or a defect in the judge path all fail open with the close's verdict
+   standing. Consumers see a second session's cost on every terminal close, and
+   a close's `verdict:` that can change after the close session ended. *(added)*
 2. **A new `judged` event type in `events.jsonl`.** One per terminal close,
    emitted for every outcome including the ones where no judge ran, carrying
    `gate`, `close_verdict`, `judge_verdict`, `verdict`, `lowered`, `disagreed`,
@@ -334,9 +297,9 @@ changes the list.
    (`verdict: met`, `the verdict is`, `record met`, the retired `hedged verdict`
    and siblings), at `ERROR` when the WU is `pending`/`ready`, at `WARN` when
    `draft`, skipped when `done`. Matches only outside fenced code blocks. A
-   project with a drafted-but-unarmed close carrying such a sentence will see its
-   plan lint go red — as this repository's own corpus did on FEAT-2026-0082 until
-   the operator repaired that body between the two close attempts. *(added)*
+   project with a drafted-but-unarmed close carrying such a sentence will see
+   its plan lint go red — as this repository's own corpus did on FEAT-2026-0082
+   until the operator repaired that body between attempts 1 and 2. *(added)*
 
 **This section requires explicit human acknowledgment** (`close-discipline.md`
 §3). It is presented for that acknowledgment at gate review; nothing in this
@@ -344,51 +307,53 @@ close treats the list as acknowledged.
 
 ## Lessons
 
-One entry, already in `.specfuse/LEARNINGS.md` under *FEAT-2026-0100/G1-CLOSE — a
-satisfiability answer that was reasoned about instead of run*, appended by
+One entry, already in `.specfuse/LEARNINGS.md` under *FEAT-2026-0100/G1-CLOSE —
+a satisfiability answer that was reasoned about instead of run*, appended by
 attempt 1 and unchanged: **when a plan's § Escalation-predicate satisfiability
 answer rests on a claim about the existing corpus, that claim is a command with
-an output, and the command must be run and its output pasted at drafting time — a
-plan that reasons its way to "zero" is asserting a measurement it never took.**
-The corpus sweep now reports zero for real, on 74 folders, which is what the plan
-asserted without running anything.
+an output, and the command must be run and its output pasted at drafting time —
+a plan that reasons its way to "zero" is asserting a measurement it never took.**
+The corpus sweep reports zero for real, on 74 folders, in this session.
 
-Beyond that entry, nothing generalizes from this attempt. The truncated
-`## Measurements` slice and this gate's backfilled `entry_sha` are defects in
-this feature's own code and data, filed as follow-ups rather than rules; the
-sandbox deny-list over the agent session-env directory and T04's mirrored-file
+Beyond that entry, nothing generalizes from this attempt. The 8,000-character
+cap on the measurements slice and this gate's un-reseedable `entry_sha` are
+defects in this feature's own code and data rather than rules; the sandbox
+deny-list over the agent session-env directory and T04's mirrored-file
 undersizing are recorded above as feature-specific findings; and the one result
-that reads like a rule — hygiene units authored from a close's findings came in
-at a fifth of their planned cost — is a single observation on two units, which is
-an anecdote until the post-merge checklist has five features of judge data behind
+that reads like a rule — hygiene units authored from a judge's findings came in
+at a quarter of their planned cost — is four units in one feature, which is an
+anecdote until the post-merge checklist has five features of judge data behind
 it.
 
 ## Verdict
 
 **`met`**, advisory. All eight behaviours in `GATE-01.md`'s definition of done —
-which states them as *"behaviours demonstrable on fixtures with an injected
-runner"* — were re-demonstrated in this session and every one exited 0. Both of
-attempt 1's falsifications were re-measured directly on this gate's own
-artifacts: the corpus sweep is 0 `ERROR` over 74 folders where it was 1, and 0 of
-323 non-blank retrospective lines survive redaction where 100% of
-`## Retrospective` did. The full suite reports `OK` on 3,739 tests and
-`scripts/smoke-test.sh` exits 0, both re-run fresh and unsandboxed.
+stated there as *"behaviours demonstrable on fixtures with an injected runner"* —
+were re-demonstrated in this session and every one exited 0, including the lint
+rule as a negative observation against two controls, the corpus sweep at 0 ERROR
+over 74 folders, and the redaction measured on this file inside a three-file
+diff at 0 of 310 non-blank lines carried with both code halves intact. The full
+suite reports `OK` on 3,744 tests and `scripts/smoke-test.sh` exits 0, both
+re-run fresh and unsandboxed.
 
-Three measurements in `## Measurements` cut against bullet 1 if it is read as a
-claim about this gate's own artifacts rather than about fixtures. They are put in
-front of the judge rather than resolved here. The `## Measurements` slice is
-terminated by the first `###` child *or* line-initial `**` (14 of 98 lines on
-attempt 1's file). What survives is capped at 8,000 characters with the middle
-elided. And this gate's `baseline.entry_sha` was backfilled by a probe later than
-every substantive unit, so the diff this close's judge receives does not span the
-gate. The first two were neutralised for this attempt by shaping this file rather
-than the code — a workaround; a close whose author does not know the terminator
-and the cap still loses its evidence. None of the three is repairable inside this
-WU's boundary and all three are filed as follow-ups.
+The two findings that lowered attempt 2 are not equally resolved, and the
+difference is in `## Measurements` rather than settled here. The slicing finding
+is fixed and verified on the very file it was made against: all 85 non-blank
+lines of that `## Measurements`, `###` child included, now reach the slice. The
+diff-base finding is fixed as a mechanism — both of T02H2's tests pass — but
+**this gate still carries the same `entry_sha` the previous judge called
+defective**, because a present `entry_sha` is deliberately never overwritten and
+the merge-base cannot be computed from a session that may run no git command.
+Whether a gate whose *shipped mechanism* is correct but whose *own data* is not
+meets a definition of done written about fixtures is the question this close
+does not answer.
+
+Two constraints on the bundle remain and are the judge's to weigh: the
+measurements slice is still capped at 8,000 characters — this section fits under
+it by construction, which is a workaround a close author who does not know the
+cap will not repeat — and this file's level-1 `Retrospective` heading redacts the
+whole file out of the diff, so `## Measurements` reaches the judge only through
+the bundle field. Neither is repairable inside this WU's boundary.
 
 This verdict is advisory. `close-discipline.md` §1 as T04 rewrote it puts the
 decision with a session that did not do this work, and that session may lower it.
-It is handed the definition of done, the criteria fallback, the gate diff such as
-it is, and — for the first time in this repository, and only because this file
-was shaped for the slicer — a `## Measurements` section that reaches it whole:
-all 62 non-blank lines, every command, every exit code.
