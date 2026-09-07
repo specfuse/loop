@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0101/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 2.50
 oracle_env: macos_local
@@ -10,6 +10,10 @@ produces:
   - specfuse/loop/lint_closing.py
   - .specfuse/rules/close-discipline.md
   - tests/test_close_records_feature_oracle.py
+duration_seconds: 2953.024
+cost_usd: 3.957437
+input_tokens: 258
+output_tokens: 54605
 ---
 
 # The close re-runs the gate's oracle and records its verdict
