@@ -15,9 +15,9 @@ verdict: met
 driver_version: 0.15.0
 started_at: 2026-09-07T16:07:31.805704+00:00
 duration_seconds: 1983.479
-cost_usd: 6.551026
-input_tokens: 170
-output_tokens: 53811
+cost_usd: 6.912435
+input_tokens: 198
+output_tokens: 57085
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide
