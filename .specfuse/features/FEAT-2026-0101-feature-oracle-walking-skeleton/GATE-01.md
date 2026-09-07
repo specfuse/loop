@@ -2,6 +2,11 @@
 gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_feature_oracle_e2e -q"
+baseline:
+  sha: df61e150605ea1949fb065a01d44cbd8ca7713e4
+  probed_at: 2026-09-07T22:20:28.751695+00:00
+  entry_sha: df61e150605ea1949fb065a01d44cbd8ca7713e4
+  failing: []
 ---
 
 # Gate 1 — a gate's definition of done is an executable oracle the driver runs
