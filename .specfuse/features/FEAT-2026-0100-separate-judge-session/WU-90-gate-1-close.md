@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0100/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 6.00
 model: opus
 effort: high
@@ -10,14 +10,6 @@ oracle_env: macos_local
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0100-separate-judge-session/RETROSPECTIVE.md
-gate_set: plannext
-verdict: not_met
-driver_version: 0.15.0
-started_at: 2026-09-06T19:16:12.578880+00:00
-duration_seconds: 2457.26
-cost_usd: 8.942709
-input_tokens: 230
-output_tokens: 86388
 ---
 
 # Gate 1 close — demonstrate the judge on fixtures, measure, and let the judge decide
@@ -27,10 +19,11 @@ in `GATE-01.md`'s definition of done on fixtures with an injected runner, in
 this session, and record the measurements. This close is itself judged by
 the mechanism it ships; measure, do not decide.
 
-**Context.** Depends on T01-T05, T01H and T02H. **This is the close's second
-attempt**: attempt 1 (2026-09-06) recorded `not_met` on three criteria; T01H
-and T02H were authored from two of them and the third (FEAT-2026-0082's stale
-close body) was fixed by the operator. `RETROSPECTIVE.md` from attempt 1 is in
+**Context.** Depends on T01-T05, T01H and T02H. **This is the close's third
+attempt**: attempt 1 recorded `not_met` on three criteria (T01H, T02H, and an
+operator fix); on attempt 2 the close wrote `met` and the judge lowered it to
+`not_met` on two evidence-bundle defects, from which T01H2 and T02H2 were
+authored. Measure; the judge decides. `RETROSPECTIVE.md` from attempt 1 is in
 this folder: rewrite its `## Measurements` and `## Verdict` sections in place
 and re-run all eight demonstrations plus the corpus sweep; do not append a
 second copy of either section. Binding: `.specfuse/rules/close-discipline.md`
