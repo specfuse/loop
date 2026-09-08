@@ -4203,6 +4203,551 @@ def _run_gate_set(
     return results
 
 
+def resolve_gate_tiers(gate_set: list, tier: str) -> list:
+    """Filter *gate_set* to the entries that run in *tier* (FEAT-2026-0109/T04).
+
+    *tier* is `"narrow"` (per attempt) or `"broad"` (once per gate, T06's own
+    unfiltered code path — this function is never called for it today, but the
+    `"broad"` branch is here so the meaning of the annotation is defined in one
+    place). An entry declaring no `tier` key runs in BOTH tiers — the
+    absent-key default that keeps a `verification.yml` with no tier
+    declarations anywhere byte-identical to today (`GATE-02.md`). Opting a
+    gate OUT of the narrow (per-attempt) run is an explicit `tier: broad`
+    declaration; nothing is ever silently demoted out of the per-attempt run
+    by omission.
+    """
+    if tier == "broad":
+        return list(gate_set)
+    return [gate for gate in gate_set if gate.get("tier", "narrow") != "broad"]
+
+
+def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bool, list[dict]]:
+    """Run the full `code` gate set once, independent of any single attempt
+    (FEAT-2026-0109/T06's once-per-gate broad tier).
+
+    Uses `resolve_gate_tiers(gate_set, "broad")` — the unfiltered set T04 left
+    this branch defined for — so every gate configured for `code` runs here,
+    including the `tier: broad` gates the per-attempt `verify()` never runs
+    and the plain gates that already ran (narrowed) on every attempt. This is
+    the safety net for both: a `tier: broad` gate gets its only run here, and
+    an untiered gate gets one full-set run to catch anything T05's changed-file
+    narrowing let through.
+
+    Returns `(ok, failing)` in `probe_baseline`'s shape — a
+    CONFIGURATION ERROR (unknown `needs:` target, no `code` gates at all) is
+    reported as a single synthetic failing entry rather than raised, so the
+    caller's halt path is the same for "a gate failed" and "verification.yml
+    is broken" — both are equally not-a-work-unit's-fault.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    gate_set = cfg.get("code") or []
+    if not gate_set:
+        return False, [{
+            "gate": "configuration",
+            "failure_class": "configuration_error",
+            "failure_signature": (
+                "CONFIGURATION ERROR: no 'code' gates configured in "
+                ".specfuse/verification.yml. This is not a work-unit failure "
+                "— fix verification.yml and re-run."
+            ),
+        }]
+    try:
+        gate_set = order_gate_set(gate_set)
+    except ValueError as exc:
+        return False, [{
+            "gate": "configuration",
+            "failure_class": "configuration_error",
+            "failure_signature": (
+                f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
+                f"This is not a work-unit failure — fix verification.yml and "
+                f"re-run."
+            ),
+        }]
+    gate_set = resolve_gate_tiers(gate_set, "broad")
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    failing = []
+    for g in gate_results:
+        if g["ok"]:
+            continue
+        failure_class, failure_signature = parse_gate_failure_signature(g["report"])
+        failing.append({
+            "gate": g["name"], "failure_class": failure_class,
+            "failure_signature": failure_signature,
+        })
+    return not failing, failing
+
+
+def read_gate_broad_run(gate_file: Path) -> "dict | None":
+    """Return the gate's persisted once-per-gate broad-run record, or None if
+    absent, malformed, or the frontmatter fails to parse (FEAT-2026-0109/T06).
+
+    Mirrors `read_gate_baseline`'s degrade-to-None shape: a record missing
+    `tree` or `ok`, or holding the wrong type for either, is treated as "never
+    run" so the caller re-runs rather than trusting a half-written block.
+    """
+    try:
+        fm, _ = read_frontmatter(gate_file)
+    except _miniyaml.MiniYAMLError:
+        return None
+    block = fm.get("broad_run")
+    if not isinstance(block, dict):
+        return None
+    tree = block.get("tree")
+    if not isinstance(tree, str) or not tree:
+        return None
+    ok = block.get("ok")
+    if not isinstance(ok, bool):
+        return None
+    failing = block.get("failing")
+    if failing is None:
+        failing = []
+    if not isinstance(failing, list):
+        return None
+    return {"tree": tree, "ran_at": block.get("ran_at"), "ok": ok, "failing": failing}
+
+
+def write_gate_broad_run(
+    gate_file: Path, tree: str, ran_at: str, ok: bool, failing: list[dict],
+) -> None:
+    """Persist a once-per-gate broad-run result into the gate file's
+    `broad_run:` frontmatter block (FEAT-2026-0109/T06), via
+    `write_frontmatter_block` — the same no-reflow writer `write_gate_baseline`
+    uses, so a gate file's `feature_oracle` and `baseline:` lines survive this
+    write byte-identical.
+    """
+    lines = [
+        "broad_run:", f"  tree: {tree}", f"  ran_at: {ran_at}",
+        f"  ok: {'true' if ok else 'false'}",
+    ]
+    if not failing:
+        lines.append("  failing: []")
+    else:
+        lines.append("  failing:")
+        for entry in failing:
+            lines.append(f"    - gate: {entry['gate']}")
+            lines.append(f"      failure_class: {entry['failure_class']}")
+            lines.append(
+                f"      failure_signature: "
+                f"{_yaml_double_quote(str(entry['failure_signature']))}"
+            )
+    write_frontmatter_block(gate_file, "broad_run", lines)
+
+
+def gate_broad_run_check(
+    gate_file: Path, feature_dir: Path, cfg: dict,
+) -> tuple[bool, list[dict], bool]:
+    """Run the once-per-gate broad set unless it already ran at this tree
+    (FEAT-2026-0109/T06).
+
+    Tree-keyed the same way `gate_baseline_check` is: a bookkeeping commit (a
+    driver restart's "halted for driver restart" commit, an auto-close's
+    RETROSPECTIVE update) changes `HEAD` but never the tracked-source tree
+    `_current_tree_hash` reads, so resuming into the same gate after a restart
+    finds the prior record and skips re-running. A tree with no prior record,
+    or one that has moved, always re-runs and persists the fresh result.
+
+    Returns `(ok, failing, ran)` — `ran` is False on a skip (nothing new to
+    commit) and True when this call actually executed the gate set.
+    """
+    tree = _current_tree_hash()
+    existing = read_gate_broad_run(gate_file)
+    if existing is not None and tree is not None and existing["tree"] == tree:
+        return existing["ok"], existing["failing"], False
+    ok, failing = run_gate_broad_set(feature_dir, cfg)
+    ran_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    write_gate_broad_run(gate_file, tree or "", ran_at, ok, failing)
+    return ok, failing, True
+
+
+def _test_module_name(path: str) -> str:
+    """Convert a `tests/...` file path to its dotted unittest module name."""
+    module = path[:-3] if path.endswith(".py") else path
+    return module.replace("/", ".").replace("\\", ".")
+
+
+def select_narrow_test_modules(wu: WorkUnit) -> "list[str] | None":
+    """This unit's own declared test paths (FEAT-2026-0109/T04) — the entries
+    of its `produces:` list that live under `tests/`, as dotted unittest
+    module names. Returns None, never `[]`, when the selection is empty, so
+    the caller's fail-safe fallback (`GATE-02.md`: "fail safe, never open")
+    always has an unambiguous trigger.
+
+    This is the cheap, author-declared half of "tests touching changed
+    files" — T05 unions in the changed-file half. Until T05 lands, a unit
+    whose `produces:` names no test path selects nothing here, which
+    `resolve_narrow_command` falls back to the gate's full command for, not
+    an empty run.
+    """
+    modules = [
+        _test_module_name(p) for p in wu.produces
+        if p.startswith("tests/") or p.startswith("tests\\")
+    ]
+    return modules or None
+
+
+# --------------------------------------------------------------------------- #
+# FEAT-2026-0109/T05 — "tests touching changed files": a measured map, not a
+# guessed one. `GATE-02-REVIEW.md` § "Tests touching changed files" records
+# why line-granularity coverage contexts were chosen over an import-graph or
+# path-convention rule: this repo's `specfuse/loop/loop.py` is one ~9k-line
+# module that most test modules import, so anything coarser than "which
+# lines did a test actually execute" cannot narrow it.
+# --------------------------------------------------------------------------- #
+
+#: Where the changed-file test map is persisted (FEAT-2026-0109/T05). Not
+#: committed — it is derived from a coverage run, like `.coverage` itself
+#: (already gitignored) — and never written by an attempt, only by the
+#: once-per-gate broad run (T06), so `reset_preserving_events`'s untracked
+#: sweep (which only deletes paths that appeared SINCE the WU's pre-dispatch
+#: snapshot) never touches a copy that predates the WU it is consulted from.
+CHANGED_FILE_TEST_MAP_PATH = Path(".specfuse-changed-file-test-map.json")
+
+#: The `coverage run --source=` root the map is built from (matches
+#: `.specfuse/verification.yml`'s `tests` gate). Changed paths outside this
+#: prefix (test files, docs, config) are a different question T04's declared-
+#: test selection already answers — feeding them to the map would report a
+#: false "unmapped path" on every attempt that merely adds a test file.
+CHANGED_FILE_TEST_MAP_SOURCE_PREFIX = "specfuse/"
+
+#: The directory `coverage run ... -m unittest discover -s tests` (the
+#: `tests` gate's broad command) passes to `-s`. `discover -s tests` with no
+#: `-t` makes `tests` its own top-level dir, so dynamic-context test ids come
+#: back as bare module names (`test_foo.Class.method`), not dotted from the
+#: repo root — but the narrow tier invokes `python3 -m unittest
+#: {selected_test_modules}` FROM the repo root, which needs the `tests.`
+#: prefix `_test_module_name` already puts on declared paths. This constant
+#: is what `_coverage_context_module` reattaches.
+CHANGED_FILE_TEST_MAP_TEST_ROOT = "tests"
+
+
+def _coverage_context_module(
+    context: str, test_root: str = CHANGED_FILE_TEST_MAP_TEST_ROOT,
+) -> "str | None":
+    """Convert a `dynamic_context = "test_function"` context (a unittest test
+    id) to its dotted MODULE name, reattaching *test_root* — the same
+    granularity `_test_module_name` already selects at, and the same dotted
+    form it produces (FEAT-2026-0109/T05).
+
+    Returns None for a context that is not a test id: the empty string
+    coverage.py records for lines executed outside any test (e.g. at import
+    time), or any name with too few dotted segments to carry a `Class.method`
+    suffix.
+    """
+    if not context:
+        return None
+    parts = context.split(".")
+    if len(parts) < 3:
+        return None
+    module = ".".join(parts[:-2])
+    if test_root and not module.startswith(f"{test_root}."):
+        module = f"{test_root}.{module}"
+    return module
+
+
+def build_changed_file_test_map(
+    coverage_data_path: str = ".coverage",
+    test_root: str = CHANGED_FILE_TEST_MAP_TEST_ROOT,
+) -> dict:
+    """Build the changed-file -> test-module map from a coverage run recorded
+    with `dynamic_context = "test_function"` (FEAT-2026-0109/T05).
+
+    Reads the coverage.py SQLite data at *coverage_data_path* through the
+    `coverage` package's own reader — the same data the `coverage` gate
+    already reports over, so this asks nothing new of the broad run beyond
+    turning on dynamic contexts. For every measured file, records which test
+    modules' contexts executed which lines.
+
+    Stamped with `git rev-parse HEAD` and T02's `_current_tree_hash()` at
+    build time, read from the process's own working directory (the repo
+    root the broad run executes in, not *coverage_data_path*'s location) —
+    `is_map_stale` uses `sha` to test ancestry against the tree consulting
+    the map later.
+
+    `coverage` is a dev-only dependency (`pyproject.toml`'s `dev` extra), so
+    the import is deferred to this call rather than module load time — a
+    production install with no dev extras must still be able to import this
+    module.
+    """
+    import coverage
+
+    data = coverage.CoverageData(basename=coverage_data_path)
+    data.read()
+    base_dir = Path(coverage_data_path).resolve().parent
+    files: dict = {}
+    for file_path in data.measured_files():
+        try:
+            rel = str(Path(file_path).resolve().relative_to(base_dir))
+        except ValueError:
+            rel = file_path
+        rel = rel.replace("\\", "/")
+        contexts_by_line = data.contexts_by_lineno(file_path)
+        line_modules: dict = {}
+        for lineno, contexts in contexts_by_line.items():
+            modules = sorted({
+                module for c in contexts
+                if (module := _coverage_context_module(c, test_root)) is not None
+            })
+            if modules:
+                line_modules[str(lineno)] = modules
+        if line_modules:
+            files[rel] = line_modules
+    sha_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False,
+    )
+    return {
+        "sha": sha_result.stdout.strip() or None,
+        "tree": _current_tree_hash(),
+        "files": files,
+    }
+
+
+def write_changed_file_test_map(path: "Path | None" = None,
+                                 coverage_data_path: str = ".coverage") -> None:
+    """Build and persist the changed-file test map to *path* (default
+    `CHANGED_FILE_TEST_MAP_PATH`) (FEAT-2026-0109/T05). Called once per gate,
+    after the broad run's `coverage run` has produced fresh contexts —
+    never by an attempt (see `CHANGED_FILE_TEST_MAP_PATH`'s docstring).
+    """
+    target = path or CHANGED_FILE_TEST_MAP_PATH
+    target.write_text(json.dumps(build_changed_file_test_map(coverage_data_path)))
+
+
+def read_changed_file_test_map(path: "Path | None" = None) -> "dict | None":
+    """Read the persisted changed-file test map, or None if absent,
+    unparseable, or malformed (FEAT-2026-0109/T05) — mirrors
+    `read_gate_baseline`'s "never raise, treat as never-built" shape. A
+    corrupt or missing map must fail toward the selector's fallback, not
+    crash the driver mid-attempt.
+    """
+    target = path or CHANGED_FILE_TEST_MAP_PATH
+    if not target.is_file():
+        return None
+    try:
+        data = json.loads(target.read_text())
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("files"), dict):
+        return None
+    return data
+
+
+def is_map_stale(map_data: dict) -> bool:
+    """True if *map_data* was not built at an ancestor of the current tree
+    (FEAT-2026-0109/T05) — its recorded `sha` fails `git merge-base
+    --is-ancestor <sha> HEAD`, so its line -> test associations describe a
+    tree the current one did not grow from and cannot be trusted. A missing,
+    non-string `sha`, or one git cannot resolve at all, is treated as stale —
+    fail toward refusing an unverifiable record, never toward trusting one.
+    """
+    sha = map_data.get("sha")
+    if not isinstance(sha, str) or not sha:
+        return True
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+        capture_output=True, check=False,
+    )
+    return result.returncode != 0
+
+
+def select_tests_for_changed_files(
+    changed_lines_by_path: "dict[str, list[int] | None]",
+    map_path: "Path | None" = None,
+) -> "list[str] | None":
+    """The changed-file half of "tests touching changed files"
+    (FEAT-2026-0109/T05) — the test modules whose contexts executed the
+    changed lines of *changed_lines_by_path* (path -> changed line numbers,
+    or `None` to mean "treat every mapped line of this path as changed",
+    e.g. when precise line numbers were not available), read from the map a
+    real coverage run with `dynamic_context` produced.
+
+    Returns None — "unresolvable" — for every fail-safe trigger
+    `GATE-02.md` names: no map on disk, a stale map (`is_map_stale`), or any
+    changed path absent from the map (a brand-new source file is exactly
+    this case, and the map — built before the file existed — cannot cover
+    it). The caller's fallback then runs the gate's full command; this
+    function never returns an answer narrower than that.
+
+    An empty *changed_lines_by_path* resolves to `[]`, distinct from None
+    ("could not resolve") — a WU that changed nothing under the coverage
+    source root has nothing for this half to add, which is not a failure.
+    """
+    if not changed_lines_by_path:
+        return []
+    map_data = read_changed_file_test_map(map_path)
+    if map_data is None or is_map_stale(map_data):
+        return None
+    files = map_data["files"]
+    modules: set = set()
+    for path, changed_lines in changed_lines_by_path.items():
+        entry = files.get(path.replace("\\", "/"))
+        if entry is None:
+            return None
+        lines = changed_lines if changed_lines is not None else [
+            int(n) for n in entry
+        ]
+        touched = {m for lineno in lines for m in entry.get(str(lineno), [])}
+        if not touched:
+            # every changed line is unmapped for this path — same fail-safe
+            # trigger as the path being absent entirely.
+            return None
+        modules.update(touched)
+    return sorted(modules)
+
+
+#: Whether the changed-file half of the per-attempt selection participates
+#: (FEAT-2026-0109/T05). **Default OFF, on measured evidence.** Gate 2's close
+#: measured the half forcing a full-command fallback on 2 of 3 tiered attempts,
+#: because the source->test map it needs was never built: every unit in that
+#: gate edited `specfuse/loop/loop.py`, which resolves to no test module, so
+#: `select_tests_for_changed_files` returned None and took the whole selection
+#: with it. Realised effect on that gate was **+38.4s (+5.7%) — the tier cost
+#: more than it saved**. With this half off, the declared-tests rule alone
+#: measured **-43.4%** on the same attempts, and the mechanism itself is sound:
+#: the narrow tier ran 5.3-10.2s against 169.4s, matching the 6s prediction.
+#:
+#: T05's code and tests are deliberately kept, not deleted — the capability is
+#: correct and stays exercised (its tests set this flag). What is missing is
+#: the map, which is its own design problem and is tracked as gate 2's review
+#: question Q4. Flip this to True in the same change that lands the map.
+CHANGED_FILE_SELECTION_ENABLED = False
+
+
+def resolve_narrow_test_selection(
+    wu: WorkUnit,
+    changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
+    map_path: "Path | None" = None,
+) -> "list[str] | None":
+    """The full per-attempt test selection (FEAT-2026-0109/T05): the union of
+    the unit's own declared test paths (T04's `select_narrow_test_modules`)
+    and whatever `select_tests_for_changed_files` resolves for
+    *changed_lines_by_path*. "The map may add, never subtract"
+    (`GATE-02.md`) — but an unresolvable changed-file half is not silently
+    dropped either: it forces the same fallback an empty selection does,
+    because a changed source file this feature cannot vouch for is exactly
+    the case the fail-safe design exists to catch, not one to run narrower
+    for.
+
+    Returns None exactly when the caller must fall back to the gate's full
+    command: nothing resolved at all, or the changed-file half was
+    unresolvable while there was something for it to resolve.
+    """
+    declared = select_narrow_test_modules(wu) or []
+    if not CHANGED_FILE_SELECTION_ENABLED:
+        # Declared-tests only. Not a silent narrowing: an empty `declared`
+        # still returns None, so the caller runs the gate's full command.
+        return declared or None
+    if not changed_lines_by_path:
+        return declared or None
+    changed = select_tests_for_changed_files(changed_lines_by_path, map_path)
+    if changed is None:
+        return None
+    union = sorted(set(declared) | set(changed))
+    return union or None
+
+
+def _diff_hunk_new_lines(diff_output: str) -> list[int]:
+    """Line numbers a unified diff's hunks add or modify in the NEW file
+    version (FEAT-2026-0109/T05), parsed from `@@ -a,b +c,d @@` headers. A
+    pure-deletion hunk (new-side count 0) contributes nothing — there is no
+    new line left to attribute a broken test to.
+    """
+    lines: list[int] = []
+    for line in diff_output.splitlines():
+        if not line.startswith("@@"):
+            continue
+        m = re.search(r"\+(\d+)(?:,(\d+))?", line)
+        if not m:
+            continue
+        start = int(m.group(1))
+        count = int(m.group(2)) if m.group(2) is not None else 1
+        if count == 0:
+            continue
+        lines.extend(range(start, start + count))
+    return lines
+
+
+def attempt_changed_source_lines(
+    source_prefix: str = CHANGED_FILE_TEST_MAP_SOURCE_PREFIX,
+) -> "dict[str, list[int] | None]":
+    """This attempt's changed lines under *source_prefix*
+    (FEAT-2026-0109/T05) — the input `select_tests_for_changed_files` needs,
+    computed from the working tree's diff against HEAD.
+
+    HEAD is the pre-attempt commit for the whole of `verify()`'s call: the
+    dispatched agent only edits files, never commits
+    (`result-contract.md` Rule 1), so this is exactly the diff the attempt
+    just produced. A path new to the working tree (untracked) maps to
+    `None` — there is no HEAD version to diff against — which
+    `select_tests_for_changed_files` resolves by treating every mapped line
+    as changed, or (the common case for a genuinely new file) by finding no
+    entry for the path at all and reporting unresolvable.
+
+    Best-effort: any git failure (not a repo, git absent, or — in several
+    existing unit tests — `subprocess.Popen` itself patched out for the
+    duration of a `verify()` call that stubs the gate command) degrades to
+    `{}`, the same as "nothing changed", rather than raising. This function
+    only ever narrows what a WU's own tests already declare; it must never
+    be the thing that crashes verification.
+    """
+    try:
+        tracked = [
+            line for line in subprocess.run(
+                ["git", "diff", "--name-only", "HEAD"],
+                capture_output=True, text=True, check=False,
+            ).stdout.splitlines() if line
+        ]
+        untracked = [
+            line for line in subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                capture_output=True, text=True, check=False,
+            ).stdout.splitlines() if line
+        ]
+        untracked_set = set(untracked)
+        result: "dict[str, list[int] | None]" = {}
+        for path in sorted(set(tracked) | untracked_set):
+            if not path.startswith(source_prefix):
+                continue
+            if path in untracked_set:
+                result[path] = None
+                continue
+            diff = subprocess.run(
+                ["git", "diff", "-U0", "HEAD", "--", path],
+                capture_output=True, text=True, check=False,
+            )
+            result[path] = _diff_hunk_new_lines(diff.stdout)
+        return result
+    except Exception:  # noqa: BLE001 - best-effort; see docstring
+        return {}
+
+
+def resolve_narrow_command(
+    gate: dict, wu: WorkUnit,
+    changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
+) -> str:
+    """The command to run for *gate* in the per-attempt (narrow) tier
+    (FEAT-2026-0109/T04, changed-file half added by T05).
+
+    Most gates declare one `command` and it runs unchanged in both tiers. A
+    gate may additionally declare `narrow_command` — a template carrying the
+    `{selected_test_modules}` placeholder — to run a cheaper, unit-scoped
+    command per attempt while `command` still runs whole in the once-per-gate
+    broad run (`GATE-02.md`: "one gate entry with two commands, not two
+    entries"). *changed_lines_by_path* is the changed-file half
+    (`resolve_narrow_test_selection`) — omitted or empty, this is byte-
+    identical to T04's declared-tests-only behaviour. An empty or
+    unresolvable final selection falls back to the gate's full `command` —
+    fail safe, never open.
+    """
+    narrow_command = gate.get("narrow_command")
+    if not narrow_command:
+        return gate["command"]
+    modules = resolve_narrow_test_selection(wu, changed_lines_by_path)
+    if not modules:
+        return gate["command"]
+    return narrow_command.replace("{selected_test_modules}", " ".join(modules))
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None,
            gate_file: "Path | None" = None) -> tuple[bool, str]:
@@ -4222,6 +4767,15 @@ def verify(wu: WorkUnit, feature_dir: Path,
     byte-identical to before this key existed. A declared oracle that is empty,
     whitespace-only, or not a string is a CONFIGURATION ERROR — same shape as an
     unknown `extra_gates` name — refused before any gate runs.
+
+    Every existing call site of `verify()` is a per-attempt verification (the
+    once-per-gate broad run is T06's own code path, not this function), so
+    this narrows unconditionally to the `"narrow"` tier (FEAT-2026-0109/T04):
+    a gate declaring `tier: broad` does not run here, and the `tests` gate (or
+    any gate declaring `narrow_command`) runs its unit-scoped command instead
+    of its full one when the WU's `produces:` selects at least one test path.
+    The `feature_oracle` append below is untiered — it runs on every attempt
+    regardless, by FEAT-2026-0101's contract.
     """
     if cfg is None:
         cfg = load_verification()
@@ -4263,6 +4817,29 @@ def verify(wu: WorkUnit, feature_dir: Path,
             f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
             f"This is not a work-unit failure — fix verification.yml and re-run."
         )
+    # Per-attempt tier (FEAT-2026-0109/T04). Narrowing happens after
+    # order_gate_set (so a `needs:` edge still resolves against the full,
+    # unfiltered set) and before the feature_oracle append (so the oracle
+    # stays untiered). Dropping a `needs` target here is safe: the target is
+    # only ever a `tier: broad` gate a `tier: broad` dependent also lost.
+    # `changed_lines_by_path` (FEAT-2026-0109/T05) is this attempt's own
+    # diff against HEAD, scoped to the coverage source root — resolved once
+    # here rather than per gate, since every narrow_command gate shares it,
+    # and only when some gate actually declares narrow_command: shelling
+    # git for a gate set that has nothing to do with the result is both
+    # wasted work and, in tests that assert zero subprocess calls before a
+    # config-error return (`test_bash_routing.py`'s
+    # TestNoBashFoundFailsLoud), an observable side effect this feature owes
+    # no one.
+    narrow_gate_set = resolve_gate_tiers(gate_set, "narrow")
+    changed_lines_by_path = (
+        attempt_changed_source_lines()
+        if any(g.get("narrow_command") for g in narrow_gate_set) else {}
+    )
+    gate_set = [
+        {**gate, "command": resolve_narrow_command(gate, wu, changed_lines_by_path)}
+        for gate in narrow_gate_set
+    ]
     if gate_file is not None:
         oracle_command = read_gate_feature_oracle(Path(gate_file))
         if oracle_command is not None:
@@ -4478,6 +5055,55 @@ def format_preexisting_gate_failure(
         "There is no way to proceed past this halt in this version. A "
         "waiver that lets a feature continue against a red baseline is "
         "future work tracked as FEAT-2026-0052; it does not exist yet."
+    )
+    return "\n".join(lines)
+
+
+def format_broad_run_failure(
+    gate_number: int, failing_gates: list[dict], tree: str,
+) -> str:
+    """Render the once-per-gate broad-run halt (FEAT-2026-0109/T06) — a
+    distinct reason from `format_preexisting_gate_failure`'s, though the same
+    shape: an operator reading it must be able to tell "the narrow per-attempt
+    tier let something through" apart from "a gate was already broken at gate
+    entry."
+
+    Names the failing gate command(s) and the tree they were measured on, and
+    states plainly that no work unit is at fault: every unit in this gate
+    already passed its own per-attempt verification before this once-per-gate
+    run found the failure.
+    """
+    lines = [
+        f"Gate {gate_number} is blocked: the full `code` gate set failed on "
+        f"the once-per-gate broad run this gate's closing sequence requires "
+        f"before it may dispatch (FEAT-2026-0109/T06).",
+        "",
+        f"Tree measured: {tree}",
+        "",
+        "Failing check(s):",
+    ]
+    for g in failing_gates:
+        lines.append(
+            f"  - {g['gate']}: {g['failure_class']} "
+            f"(signature: {g['failure_signature']})"
+        )
+    lines.append("")
+    lines.append(
+        "No work unit's attempt count was charged for this: every unit in "
+        "this gate already passed its own per-attempt verification. The "
+        "per-attempt narrow tier (FEAT-2026-0109/T04, T05) scopes checks to "
+        "changed files as a speed optimization — this full-set run is the "
+        "safety net that catches what that narrowing missed."
+    )
+    lines.append("")
+    lines.append("What to do next:")
+    lines.append(
+        "  1. Reproduce the failing check(s) above locally and fix them on "
+        "this branch."
+    )
+    lines.append(
+        "  2. Re-run the driver — the closing sequence dispatches once the "
+        "broad run is clean at the current tree."
     )
     return "\n".join(lines)
 
@@ -4731,7 +5357,9 @@ def attribute_failure_to_baseline(
     dedup this needs — a second failing unit at the same *head_sha* (the
     common case: nothing landed between the two failures) finds the record
     `gate_baseline_check` wrote for the first and does not re-probe, which is
-    what bounds attribution to at most once per gate. `wu_id` names the unit
+    what bounds attribution to at most once per tree state per gate: a unit
+    failing against a tree a landed change has since moved past legitimately
+    re-probes (FEAT-2026-0109/T07). `wu_id` names the unit
     whose failure triggered this probe; when a probe actually runs, it is
     carried into the persisted record's `source` field as
     `attributed:<wu_id>` (FEAT-2026-0109/T03), so a later reader of
@@ -7783,6 +8411,62 @@ def run(
                     wu.status = DONE
                     done_ids.add(wu.wu_id)
                     continue
+
+                # Once-per-gate broad run (FEAT-2026-0109/T06): gates before
+                # dispatching this gate's first closing-type unit — a
+                # `close`/`close-intermediate`, whether it goes on to the
+                # auto-close branches below or the ordinary session-dispatch
+                # path — so the full `code` set is measured against the tree
+                # the gate is about to be judged on, not an earlier one and
+                # not one written after the close. Tree-keyed dedup lives in
+                # `gate_broad_run_check`, so a resumed gate at an unchanged
+                # tree (e.g. after a driver-restart halt) does not re-pay it.
+                if not dry_run and wu.type in ("close", "close-intermediate"):
+                    _broad_ok, _broad_failing, _broad_ran = gate_broad_run_check(
+                        gate.file, feature_dir, cfg)
+                    _broad_tree = _current_tree_hash() or "unresolvable"
+                    _broad_events = []
+                    if _broad_ran:
+                        # Emitted once per actual run (never on a dedup skip)
+                        # regardless of outcome — the per-probe record,
+                        # mirroring baseline_attribution's own "emit on fresh
+                        # probe" shape (T01).
+                        _broad_events.append(build_event(
+                            "broad_run_result", feature_id, {
+                                "gate": gate.number,
+                                "tree": _broad_tree,
+                                "ok": _broad_ok,
+                                "failing": _broad_failing,
+                            }))
+                    if not _broad_ok:
+                        backend.set_gate(gate, "awaiting_review")
+                        escalation_message = format_broad_run_failure(
+                            gate.number, _broad_failing, _broad_tree)
+                        _broad_events.append(build_event(
+                            "human_escalation", feature_id, {
+                                "reason": "broad_run_gate_failure",
+                                "gate": gate.number,
+                                "failing_gates": _broad_failing,
+                                "message": escalation_message,
+                                "tree": _broad_tree,
+                            }))
+                        _broad_events.append(build_arm_predicate_event(
+                            feature_dir, feature_id, gate.number))
+                        flush_events(events_path, _broad_events)
+                        commit_bookkeeping(
+                            [gate.file, events_path],
+                            f"chore(loop): gate {gate.number} broad run "
+                            f"failed — awaiting_review\n\nFeature: {feature_id}",
+                        )
+                        print(f"\n{escalation_message}")
+                        return 1
+                    elif _broad_ran:
+                        flush_events(events_path, _broad_events)
+                        commit_bookkeeping(
+                            [gate.file, events_path],
+                            f"chore(loop): gate {gate.number} broad run "
+                            f"clean\n\nFeature: {feature_id}",
+                        )
 
                 # FEAT-2026-0018/T05 — intermediate auto-close branch
                 if wu.type == "close-intermediate" and not _override_active:

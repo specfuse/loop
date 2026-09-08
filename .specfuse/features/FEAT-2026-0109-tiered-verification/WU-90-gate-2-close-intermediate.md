@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 auto_close_disabled: true
@@ -11,6 +11,12 @@ produces:
 model: opus
 effort: high
 gate_set: plannext
+driver_version: 0.16.0
+started_at: 2026-09-08T17:45:06.269565+00:00
+duration_seconds: 2185.845
+cost_usd: 6.660571
+input_tokens: 122
+output_tokens: 57903
 ---
 
 # Gate 2 close — measure what the narrow tier saved, and what it let through

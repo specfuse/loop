@@ -145,11 +145,17 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Scaffolded so lint reads gate 1 as non-terminal. G2's plan-next
-      # inserts gate 3's substantive units above this entry.
+      # ONE substantive unit, deliberately. [FEAT-2026-0019/G1]: a feature
+      # migrating the harness the driver itself runs cannot be split into
+      # separately-gated units — each piece's exit oracle is the surface
+      # being migrated. Drafted by G2-PLAN; see GATE-03-REVIEW.md.
+      - id: FEAT-2026-0109/T08
+        file: WU-08-installed-copy-driver.md
+        depends_on: []
+      # --- closing sequence: terminal close (last gate) ---
       - id: FEAT-2026-0109/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []
+        depends_on: [FEAT-2026-0109/T08]
 ```
 
 ## Notes
@@ -161,8 +167,9 @@ gates:
 - **The cost gate 1 accepts, stated plainly.** When the tree really is
   pre-broken, one agent dispatch is burned discovering it — roughly $1–4 and
   15–25 minutes — and that agent may thrash on a failure it did not cause.
-  Bounded to one dispatch per gate because the retroactive probe fires on the
-  first failure, and the driver's hard reset discards the thrash. Against
+  Bounded to one dispatch per tree state per gate because the retroactive
+  probe fires on the first failure against that tree, and the driver's hard
+  reset discards the thrash. Against
   ~3 minutes × every entry and restart, at the failure rates measured, the
   trade is clearly right — but it is a trade, not a free win.
 - **Why gate 2 waits for gate 1's `plan-next`.** The per-attempt tier needs a

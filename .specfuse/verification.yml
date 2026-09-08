@@ -21,6 +21,19 @@
 # cached across attempts, so `needs:` never licenses a `--no-build`/
 # `--no-restore`/"skip-build" flag on the DEPENDENCY's own command; it only
 # licenses a DEPENDENT reusing artifacts the dependency just produced.
+#
+# PER-GATE `tier: broad` (optional, FEAT-2026-0109/T04). A per-attempt
+# verification runs only the gates in the `code:` list that do NOT declare
+# `tier: broad`; the once-per-gate broad run runs all of them, tiered or not.
+# ABSENT KEY MEANS "RUNS IN BOTH TIERS" — this is the load-bearing default: a
+# gate added below with no `tier:` line runs per attempt exactly as it does
+# today, so a `verification.yml` carrying no `tier:` key anywhere behaves
+# byte-identically to a driver that predates this feature. Opting a gate OUT
+# of the per-attempt run is therefore always an explicit declaration, never
+# a silent demotion. A gate may separately declare `narrow_command` — see the
+# `tests` gate below — to run a cheaper command per attempt while `command`
+# still runs whole in the broad run; that is orthogonal to `tier` and most
+# gates need only one or the other, not both.
 
 code:
   - name: tests
@@ -32,6 +45,14 @@ code:
     # Runs under `coverage run` so the `coverage` gate below can reuse this
     # run's data (`needs: [tests]`) instead of re-executing the suite.
     command: "coverage run --source=specfuse -m unittest discover -s tests -v -b"
+    # PER-ATTEMPT NARROWING (FEAT-2026-0109/T04, `narrow_command`, optional):
+    # the command a per-attempt verification runs INSTEAD of `command` above,
+    # with `{selected_test_modules}` substituted for the dispatched unit's own
+    # declared test paths (its `produces:` entries under tests/, as dotted
+    # module names). `command` still runs whole, under `coverage run`, in the
+    # once-per-gate broad run. An empty selection (no `produces:` path under
+    # tests/) falls back to the full `command` above — fail safe, never open.
+    narrow_command: "python3 -m unittest {selected_test_modules} -v -b"
 
   - name: lint
     command: "ruff check specfuse .specfuse/scripts tests scripts"
@@ -42,6 +63,9 @@ code:
     # narrow `# nosec B602` and a reason — gate commands are user-authored
     # config that requires shell parsing by design. The driver code lives in
     # the specfuse/ package (FEAT-2026-0019); .specfuse/scripts/ holds shims.
+    # tier: broad (FEAT-2026-0109/T04) — once per gate, not per attempt; see
+    # the `tier` key comment near the top of the `code:` list below `tests`.
+    tier: broad
     command: "bandit -r specfuse .specfuse/scripts -ll"
 
   - name: coverage
@@ -49,6 +73,10 @@ code:
     # --fail-under=90 matches the methodology default. The `tests` gate above
     # already ran the suite under `coverage run`; this gate only reports over
     # the `.coverage` data it produced, so the suite executes once per pass.
+    # tier: broad — `needs: [tests]` only has to resolve when both gates run
+    # in the same invocation, i.e. the once-per-gate broad run; per attempt,
+    # `tests` runs its narrow_command and `coverage` does not run at all.
+    tier: broad
     command: "coverage report --fail-under=90"
 
   - name: leak-scan
@@ -56,6 +84,8 @@ code:
     # (gitignored literals) + gitleaks secrets over all tracked files. The
     # pre-commit hook (.specfuse/hooks/pre-commit) runs the full structural
     # scan on the staged diff; this gate is the can't-bypass backstop.
+    # tier: broad (FEAT-2026-0109/T04) — once per gate, not per attempt.
+    tier: broad
     command: "python3 .specfuse/scripts/leak_scan.py --all"
 
   - name: agent-policy-example-lint
@@ -108,26 +138,32 @@ code:
 
   - name: leak-scan-hook
     # §11 operator-script gate: the pre-commit hook's bats happy-path.
+    # tier: broad (FEAT-2026-0109/T04) — once per gate, not per attempt.
+    tier: broad
     command: "bats tests/leak_scan_hook.bats"
 
   - name: sync-scaffold-bats
     # §11 operator-script gate: sync-scaffold.sh happy-path via bats.
     # The drift-guard test (test_scaffold_data_in_sync.py) runs under 'tests'.
+    tier: broad
     command: "bats tests/sync_scaffold.bats"
 
   - name: sync-scaffold-symlinks-bats
     # §11 operator-script gate: sync-scaffold.sh's .claude/skills discovery-link
     # step (#284) happy-path via bats. The forward-completeness invariant
     # (test_skill_discovery_links.py) runs under 'tests'.
+    tier: broad
     command: "bats tests/sync_scaffold_symlinks.bats"
 
   - name: init-sh-shim-bats
     # §11 operator-script gate: init.sh thin-shim happy-path + absent-CLI error.
+    tier: broad
     command: "bats tests/init_sh_shim.bats"
 
   - name: init-skills-bats
     # Guards the #56 source-repo skill layout (real dir in .specfuse + forward
     # discovery symlink in .claude). Was silently red + un-run before #121.
+    tier: broad
     command: "bats tests/init_skills_idempotent.bats"
 
   - name: hookspath-conflict-bats
@@ -136,6 +172,7 @@ code:
     # install order. Was ungated until #257 reconciled tests/*.bats against
     # this list; it was green throughout, which is precisely why nobody
     # noticed nothing was running it.
+    tier: broad
     command: "bats tests/hookspath_conflict.bats"
 
   # Every tests/*.bats suite is gated above — the list is reconciled, not

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T05
 type: implementation
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: select_tests_for_changed_files
@@ -13,6 +13,12 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T16:20:07.197386+00:00
+duration_seconds: 2357.803
+cost_usd: 4.281658
+input_tokens: 174
+output_tokens: 78261
 ---
 
 # "Tests touching changed files" — a measured map, not a guessed one

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T04
 type: implementation
-status: draft
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: resolve_gate_tiers
@@ -14,6 +14,12 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T15:56:02.620379+00:00
+duration_seconds: 1375.405
+cost_usd: 3.379605
+input_tokens: 146
+output_tokens: 52870
 ---
 
 # Tracer bullet — a per-attempt tier that runs the narrow gates and only those
@@ -96,6 +102,19 @@ entry's own `command` is not (`never-touch.md`, "A note on verification.yml").
 Mirror any new key into `specfuse/loop/data/verification.yml.example` in the
 same pass, with a comment saying what the absent key means; a config key that
 ships without an example is a key nobody discovers.
+
+**Flag-scope table (`planning-discipline.md` §3).** `tier:` gates which gates
+run, so every path that resolves a gate list is either deliberately gated by it
+or deliberately not. Added at arm time; if implementation shows a row is wrong,
+say so in the RESULT rather than silently widening the flag.
+
+| Code path | Gated by `tier:`? | Why |
+|---|---|---|
+| `verify()`'s per-attempt gate list | **Yes** | The point of the unit: a per-attempt run executes the narrow tier only. |
+| The once-per-gate broad run | No — T06 owns it | T04 may leave it stubbed; a tier-aware broad run that dropped gates would be the silent-coverage-loss failure this feature must not cause. |
+| `probe_baseline` / `attribute_failure_to_baseline` | **No** | Attribution answers "was this tree already red", which is a question about the full `code` set. Narrowing it would make a pre-existing failure invisible to the mechanism gate 1 built to find it. |
+| `gate_commands.iter_code_gates` (CI + `smoke-test.sh`, #592) | **No** | CI derives its list from `code:` and must keep running every gate. This is why the tier is an annotation on one list rather than a `code-narrow:`/`code-broad:` split. |
+| The gate's `feature_oracle` append | **No** | The oracle runs on every attempt by FEAT-2026-0101's contract; tiering it would remove the end-to-end signal the per-attempt tier depends on. |
 
 **Acceptance criteria.**
 
