@@ -4054,3 +4054,39 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   only by their unit tests. When a gate pairs a "stop doing X" unit with a "make X better"
   unit, the second one's evidence lives in the first one's exception path; say so in the gate
   document up front, rather than discovering it in `## What the loop did NOT verify` at close.
+
+- [FEAT-2026-0109/G2-CLOSE-INTERMEDIATE] **A helper with no caller passes every test it has,
+  and a fail-safe that fires on every attempt is a regression wearing a safety jacket — when
+  two units split one mechanism across a "do not touch" boundary, the wiring between them is
+  nobody's acceptance criterion.** Gate 2 split verification into a narrow per-attempt tier
+  and a once-per-gate broad backstop. Every definition-of-done bullet is demonstrated green,
+  and the gate as actually run cost **38.4s more** wall clock than the same gate with no tier
+  at all (716.0s over 4 attempts plus one broad run, against a 677.6s counterfactual at
+  169.4s × 4). The declared-tests half works: 5.3s–10.2s per attempt against 169.4s, which
+  would have been −66.9% in steady state. The changed-file half cancelled it. Its selector,
+  builder, staleness check and all five acceptance-criterion tests are green, but
+  `write_changed_file_test_map` has exactly one occurrence in the repository — its own `def`
+  line. Nothing calls it, no map is ever built, and because an unresolvable changed-file half
+  forces the **full** command rather than degrading to the declared set, 6.9s per attempt
+  became 172.9s on 2 of the 3 tiered attempts, on top of +13.9s per broad run and a 27×
+  larger coverage data file for a map nothing reads. The seam is where it went wrong: the
+  producing unit's body said the map "must be written by the broad run" and its **Do not
+  touch** list said "the broad-run bookkeeping"; the consuming unit landed 21 minutes later
+  saying "the selector is untouched". Both obeyed their boundaries exactly, and the one edit
+  that had to cross belonged to neither. The gate's own `feature_oracle` could not catch it
+  either — it asserts on which *gates* execute per attempt, which the selector does not
+  change, rather than on whether an attempt ran less than the whole suite, which is what the
+  feature is for. Three generalizable moves. **(a)** A unit adding a producer/consumer pair
+  needs one acceptance criterion asserting the producer is *reachable from the real entry
+  point*; `grep -c '<producer_name>'` returning 1 is the cheapest version and would have
+  caught this in the producing unit's own close. **(b)** A fail-safe fallback's criteria must
+  state its expected *firing rate* in production, not only that it fires correctly —
+  "falls back when the map is missing" is satisfied identically by a mechanism that falls
+  back once and one that falls back always, and only the rate distinguishes a safety net
+  from a bypass. **(c)** For each pair of units in a gate whose bodies name each other in
+  **Do not touch**, ask at review time what edit sits between them and which unit's criteria
+  would go red if it never happened. Corollary on the safety half, sharper than gate 1's
+  version of the same point: broad runs that went red on narrow-tier-passed work was **0**,
+  but only one attempt in the gate genuinely narrowed, so that zero is the absence of an
+  opportunity rather than evidence of safety — count the *narrowed* attempts, not the
+  attempts, before reading a zero as reassurance.
