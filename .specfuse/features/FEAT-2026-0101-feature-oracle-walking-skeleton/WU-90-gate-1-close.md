@@ -10,9 +10,9 @@ verdict: met
 produces:
   - .specfuse/features/FEAT-2026-0101-feature-oracle-walking-skeleton/RETROSPECTIVE.md
 duration_seconds: 1732.443
-cost_usd: 8.770697
-input_tokens: 200
-output_tokens: 72009
+cost_usd: 9.18899
+input_tokens: 234
+output_tokens: 77723
 re_arm_count: 1
 re_arm_history:
   -
