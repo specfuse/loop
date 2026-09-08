@@ -12,7 +12,7 @@ model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.16.0
-verdict: met
+verdict: not_met
 started_at: 2026-09-08T00:56:38.785925+00:00
 duration_seconds: 942.257
 cost_usd: 8.939306
