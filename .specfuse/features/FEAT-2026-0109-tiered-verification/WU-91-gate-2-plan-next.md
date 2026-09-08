@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/G2-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
@@ -12,6 +12,12 @@ produces:
 model: opus
 effort: high
 gate_set: plannext
+driver_version: 0.16.0
+started_at: 2026-09-08T18:21:32.247314+00:00
+duration_seconds: 796.703
+cost_usd: 6.348524
+input_tokens: 120
+output_tokens: 58053
 ---
 
 # Draft gate 3 — the installed-copy driver, as one unit — and its own oracle
