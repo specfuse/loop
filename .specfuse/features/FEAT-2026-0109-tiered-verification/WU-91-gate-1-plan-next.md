@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0109/G1-PLAN
 type: plan-next
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 oracle_env: macos_local
@@ -14,7 +14,7 @@ duration_seconds: 378.256
 cost_usd: 2.193218
 input_tokens: 34
 output_tokens: 27350
-re_arm_count: 1
+re_arm_count: 2
 re_arm_history:
   -
     timestamp: 2026-09-08T13:54:45+00:00
@@ -23,6 +23,13 @@ re_arm_history:
     prior_cost_usd: 3.093962
     prior_duration_seconds: 450.221
     reason: "fix WU-91, plan-next never told to write the task graph"
+  -
+    timestamp: 2026-09-08T14:09:03+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 2.193218
+    prior_duration_seconds: 378.256
+    reason: "go with option 2, close the differing-sha gap"
 ---
 
 # Draft gate 2 — the per-attempt tier — and its own oracle
@@ -44,6 +51,31 @@ the units, and state in the review summary **how gate 2's oracle advances
 gate 1's**, per the `plan-next` obligation FEAT-2026-0101/T04 added. Nothing
 can decide mechanically whether one shell command is a stronger proof than
 another; that judgement is yours to write down.
+
+**§ Operator decision — answered, proceed.** The previous attempt blocked
+correctly: gate 1's retrospective records that attribution fired **zero** times,
+so the failure path that makes narrowing safe is covered by T01's tests and by
+no live run. The operator has answered that question and chosen to proceed
+**with the gap closed** — gate 2 is drafted, and it carries one extra unit for
+the differing-sha gap below. Do not re-litigate this; it is decided.
+
+**The gap that extra unit must close.** Gate 1's `GATE-01.md` claims
+"Attribution runs at most once per gate", but the implementation — the
+tree/sha dedup in `gate_baseline_check` — actually guarantees *at most once per
+tree state per gate*. Two units failing at **different** shas, separated by a
+landed unit, would legitimately re-probe. The covering test
+(`AttributionDedup.test_attribution_runs_at_most_once_per_gate`) exercises the
+same-sha case only; the differing-sha case has no test anywhere.
+
+This matters now because gate 2's per-attempt narrowing makes multi-unit failure
+within one gate more likely — the exact condition under which the two readings
+diverge. The unit you draft must **decide which side moves**: either the claim
+is reworded to "once per tree state per gate", matching what the mechanism does
+and what is arguably correct (a genuinely different tree deserves a fresh
+measurement), or the mechanism is changed to hold the stronger bound. Whichever
+you choose, the differing-sha case gets a test. Say which you chose and why in
+`GATE-02-REVIEW.md` — the retrospective explicitly deferred this decision to
+you, and picking silently would waste that deferral.
 
 **The open design question gate 1 was sequenced to inform.** "Tests touching
 changed files" needs a concrete rule — import graph, path convention, a
@@ -83,6 +115,7 @@ to confirm the entries are actually there.
 - Each drafted unit carries the five mandatory sections and a `planned_cost_usd`; `specfuse lint .specfuse/features/FEAT-2026-0109-tiered-verification` reports zero ERROR.
 - `GATE-02-REVIEW.md` carries the decisions and their rationale, an explicit "if you check only three things, check these" list, a roadmap-anchor check against `PLAN.md`'s `roadmap_goal`, and open questions each mapped to the draft WU it affects.
 - The review summary states how gate 2's `feature_oracle` advances gate 1's, and names the chosen rule for "tests touching changed files" with the alternatives considered.
+- **Gate 2 includes one unit closing the differing-sha gap**, drafted like any other: it states which side moved (the `GATE-01.md` wording, or `gate_baseline_check`'s bound), and its acceptance requires a test covering two units failing at **different** shas within one gate — the case that has no test today. `GATE-02-REVIEW.md` records which side was chosen and why.
 - The drafted units are left `draft` — arming is the human's act.
 
 **Do not touch.** Source, tests, rules, templates; gate 1's WUs or its
@@ -92,9 +125,15 @@ entries only — edit that one list and nothing else in the file.
 
 **Verification.** The `plannext` gate set.
 
-**Escalation triggers.** Emit `status: blocked` if gate 1's retrospective shows
-attribution never fired — the per-attempt tier's safety rests on the failure
-path working, and drafting a tier that narrows what runs per attempt on top of
-an unexercised failure path is a decision for an operator, not a drafting
-judgement.
+**Escalation triggers.** Emit `status: blocked` if the differing-sha decision
+below cannot be made from gate 1's code and retrospective alone — if answering
+"does the wording move or does the mechanism move" needs a behavioural change
+outside `gate_baseline_check`, that is a design decision for an operator, not a
+drafting judgement. Also block if drafting gate 2 would require editing gate 1's
+completed units.
+
+**Do NOT block again on "attribution never fired."** That trigger fired on the
+previous attempt and has been answered — see § Operator decision above. The
+condition still holds and is expected to; it is no longer a reason to withhold
+drafting.
 </content>
