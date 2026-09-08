@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0101/T02
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 oracle_env: macos_local
@@ -14,6 +14,15 @@ duration_seconds: 2953.024
 cost_usd: 3.957437
 input_tokens: 258
 output_tokens: 54605
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-09-08T00:17:27+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 3.957437
+    prior_duration_seconds: 2953.024
+    reason: "both hidden constraints now written into the WU, retry from clean slate"
 ---
 
 # The close re-runs the gate's oracle and records its verdict
