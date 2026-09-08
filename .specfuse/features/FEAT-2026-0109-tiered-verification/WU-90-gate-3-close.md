@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0109/G3-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 8.00
 oracle_env: macos_local
