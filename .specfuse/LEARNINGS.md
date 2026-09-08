@@ -4032,3 +4032,25 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   needed two, because a judge may lower `met` to `not_met` — a structural possibility for
   every judged gate. Do not pad estimates for it; padding feeds `evaluate_auto_close`'s
   per-WU ratio checks and makes gates auto-close that should not.
+
+- [FEAT-2026-0109/G1-CLOSE-INTERMEDIATE] **A gate whose feature is "stop doing X when
+  nothing is wrong" measures its saving on the common path and its safety nowhere — count
+  the rare path's firings as a first-class measurement and report a zero as a zero.** Gate 1
+  made the driver's baseline probe lazy. Measured on one tree, the `code`-set wall clock on a
+  green gate entry went 169.4s (16 of 16 gates, `failing: []`) to 0.0s (0 of 16) — a 100%
+  reduction by construction, worth 8.5 minutes realised across the gate's three driver
+  restarts. Attribution, the safety mechanism the whole trade rests on, fired **zero** times:
+  all three units passed on attempt 1, so no failure ever reached the retroactive-probe call
+  site, and the accepted cost (`PLAN.md`: one dispatch burned on a pre-broken tree, $1–4) was
+  never paid either. That is the expected shape — a feature betting failures are rare,
+  validated on a run with no failures — and it is exactly why a large saving must not be
+  allowed to imply the whole trade was observed. The drafting-time corollary is sharper and
+  cost real evidence here: **a unit that hardens the path its sibling unit removes from the
+  common case gets no production exercise in its own gate.** T02 (key the record on the tree
+  hash) and T03 (record the probe's provenance) both act on the probe that *still* runs;
+  T01 deleted the only probe a green gate has. The live `GATE-01.md` record consequently sat
+  in its legacy pre-T02/T03 shape — no `tree:`, no `source:` — through all three restarts, so
+  the entire measured saving is attributable to T01 alone and both siblings were exercised
+  only by their unit tests. When a gate pairs a "stop doing X" unit with a "make X better"
+  unit, the second one's evidence lives in the first one's exception path; say so in the gate
+  document up front, rather than discovering it in `## What the loop did NOT verify` at close.

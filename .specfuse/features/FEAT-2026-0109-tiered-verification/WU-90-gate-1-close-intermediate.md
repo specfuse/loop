@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0109/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 oracle_env: macos_local
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0109-tiered-verification/RETROSPECTIVE.md
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.16.0
+started_at: 2026-09-08T12:40:57.906724+00:00
+duration_seconds: 942.355
+cost_usd: 3.114668
+input_tokens: 76
+output_tokens: 31050
 ---
 
 # Gate 1 close — measure what the lazy probe actually saved, and what it cost
