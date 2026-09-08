@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0109/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/loop.py
   - tests/test_baseline_tree_hash_key.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T12:05:20.072422+00:00
+duration_seconds: 1394.493
+cost_usd: 1.599761
+input_tokens: 94
+output_tokens: 33566
 ---
 
 # Key the baseline record on the tree hash, not the HEAD sha

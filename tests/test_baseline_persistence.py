@@ -204,6 +204,10 @@ class TestGateBaselineCheck(unittest.TestCase):
                               "entries against an unchanged sha")
 
     def test_moved_sha_reprobes(self):
+        """A moved key re-probes. Reuse is keyed on the tree hash
+        (FEAT-2026-0109/T02), not the sha, so the tree is faked here to move
+        alongside the sha — real-repo behaviour (sha moves, tree doesn't) is
+        covered by tests/test_baseline_tree_hash_key.py."""
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             gf = self._gate_file(Path(td))
@@ -213,8 +217,12 @@ class TestGateBaselineCheck(unittest.TestCase):
                 probe_calls.append(1)
                 return []
 
+            import itertools
+            trees = itertools.cycle(["tree-one", "tree-two"])
             orig = loop.probe_baseline
+            orig_tree = loop._current_tree_hash
             loop.probe_baseline = counting_probe
+            loop._current_tree_hash = lambda: next(trees)
             try:
                 cfg = {"code": []}
                 loop.gate_baseline_check(gf, Path(td), cfg, "sha-one",
@@ -223,6 +231,7 @@ class TestGateBaselineCheck(unittest.TestCase):
                                           probed_at="t2")
             finally:
                 loop.probe_baseline = orig
+                loop._current_tree_hash = orig_tree
 
             self.assertEqual(len(probe_calls), 2,
                               "a changed sha must run the probe a second time")

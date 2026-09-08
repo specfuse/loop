@@ -4512,10 +4512,49 @@ def read_gate_baseline(gate_file: Path) -> dict | None:
     entry_sha = baseline.get("entry_sha")
     if not isinstance(entry_sha, str) or not entry_sha:
         entry_sha = None
+    tree = baseline.get("tree")
+    if not isinstance(tree, str) or not tree:
+        tree = None
     return {
         "sha": sha, "probed_at": baseline.get("probed_at"), "failing": failing,
-        "entry_sha": entry_sha,
+        "entry_sha": entry_sha, "tree": tree,
     }
+
+
+def _current_tree_hash() -> "str | None":
+    """Return a key for HEAD's tree, excluding `.specfuse/` (FEAT-2026-0109/T02).
+
+    `git rev-parse HEAD^{tree}` is the underlying primitive — preferred over
+    `git write-tree`, which requires a clean index and would couple the
+    record to staging state rather than to committed content — but the raw
+    root tree object also covers `.specfuse/`, the driver's own bookkeeping
+    directory (gate frontmatter, `events.jsonl`). A bookkeeping commit
+    ("baseline probed clean", "halted for driver restart") writes there on
+    every gate entry, so keying on the raw root tree would still invalidate
+    the record on exactly the commits this unit exists to survive. Built
+    instead from `git ls-tree HEAD`'s top-level object IDs (still git's own
+    hashes, not file content read by hand) with the `.specfuse` entry
+    dropped, so only the tracked code and test content this record's probe
+    actually covers can invalidate it. Returns None when HEAD is not
+    resolvable (e.g. no commits yet) so callers degrade to the sha-only
+    comparison rather than raising.
+    """
+    result = subprocess.run(
+        ["git", "ls-tree", "HEAD"], capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        return None
+    object_ids = []
+    for line in result.stdout.splitlines():
+        meta, _, name = line.partition("\t")
+        if name == ".specfuse":
+            continue
+        parts = meta.split()
+        if len(parts) == 3:
+            object_ids.append(parts[2])
+    if not object_ids:
+        return None
+    return ":".join(sorted(object_ids))
 
 
 def read_gate_feature_oracle(gate_file: Path) -> "str | None":
@@ -4568,6 +4607,12 @@ def write_gate_baseline(
     untouched. When *feature_dir* is omitted, or the merge-base can't be
     computed, `entry_sha` is left unset for this write so
     `resolve_gate_start_sha`'s own fallback chain (`baseline.sha`) applies.
+
+    `tree` (FEAT-2026-0109/T02) is `HEAD^{tree}` at write time, alongside the
+    existing `sha` — a bookkeeping commit that changes no tracked file
+    content moves `sha` but not `tree`, so `gate_baseline_check` can keep
+    reusing the record across it. `sha` stays in the record regardless: it is
+    what a human reads to locate the commit. Omitted when not resolvable.
     """
     existing = read_gate_baseline(gate_file)
     entry_sha: "str | None"
@@ -4579,9 +4624,12 @@ def write_gate_baseline(
         _, entry_sha = _feature_integration_merge_base(feature_dir)
     else:
         entry_sha = None
+    tree = _current_tree_hash()
     lines = [
         "baseline:", f"  sha: {sha}", f"  probed_at: {probed_at}",
     ]
+    if tree:
+        lines.append(f"  tree: {tree}")
     if entry_sha:
         lines.append(f"  entry_sha: {entry_sha}")
     if not failing:
@@ -4622,17 +4670,24 @@ def gate_baseline_check(
     """Resolve this gate entry's failing-gate set, re-probing only when the
     tree has moved (FEAT-2026-0051/T02's re-probe policy).
 
-    Skips `probe_baseline` when the gate's recorded `baseline.sha` already
-    equals `head_sha` — nothing else invalidates the record in v1. Any other
-    case (no record, or a different sha) re-probes and persists the new
-    result via `write_gate_baseline`. Returns `(failing_gates, freshly_probed)`
-    — the caller uses the second element to decide whether a bookkeeping
-    commit is needed for this entry (a skip writes nothing, so nothing to
-    commit).
+    Skips `probe_baseline` when the gate's recorded `baseline.tree` already
+    equals the current `HEAD^{tree}` (FEAT-2026-0109/T02) — a bookkeeping
+    commit changes `head_sha` but not the tree, so the record stays valid
+    across it. A record written before this field existed carries no `tree`
+    and falls back to the old `baseline.sha == head_sha` comparison, honoured
+    on its original terms rather than discarded. Any other case (no record,
+    or a moved key) re-probes and persists the new result via
+    `write_gate_baseline`. Returns `(failing_gates, freshly_probed)` — the
+    caller uses the second element to decide whether a bookkeeping commit is
+    needed for this entry (a skip writes nothing, so nothing to commit).
     """
     baseline = read_gate_baseline(gate_file)
-    if baseline is not None and baseline["sha"] == head_sha:
-        return baseline["failing"], False
+    if baseline is not None:
+        if baseline["tree"] is not None:
+            if baseline["tree"] == _current_tree_hash():
+                return baseline["failing"], False
+        elif baseline["sha"] == head_sha:
+            return baseline["failing"], False
     if probed_at is None:
         probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
     failing = probe_baseline(feature_dir, cfg)
