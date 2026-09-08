@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0109/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 oracle_env: macos_local
 produces:
   - specfuse/loop/loop.py
   - tests/test_baseline_provenance.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T12:28:57.455221+00:00
+duration_seconds: 667.532
+cost_usd: 0.78003
+input_tokens: 58
+output_tokens: 12252
 ---
 
 # Record how the baseline was determined, not just what it said

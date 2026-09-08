@@ -4515,9 +4515,12 @@ def read_gate_baseline(gate_file: Path) -> dict | None:
     tree = baseline.get("tree")
     if not isinstance(tree, str) or not tree:
         tree = None
+    source = baseline.get("source")
+    if not isinstance(source, str) or not source:
+        source = None
     return {
         "sha": sha, "probed_at": baseline.get("probed_at"), "failing": failing,
-        "entry_sha": entry_sha, "tree": tree,
+        "entry_sha": entry_sha, "tree": tree, "source": source,
     }
 
 
@@ -4581,7 +4584,7 @@ def read_gate_feature_oracle(gate_file: Path) -> "str | None":
 
 def write_gate_baseline(
     gate_file: Path, sha: str, probed_at: str, failing: list[dict],
-    feature_dir: "Path | None" = None,
+    feature_dir: "Path | None" = None, source: "str | None" = None,
 ) -> None:
     """Persist a probe result into the gate file's `baseline:` frontmatter
     block (FEAT-2026-0051/T02), via `write_frontmatter_block` — the same
@@ -4613,6 +4616,15 @@ def write_gate_baseline(
     content moves `sha` but not `tree`, so `gate_baseline_check` can keep
     reusing the record across it. `sha` stays in the record regardless: it is
     what a human reads to locate the commit. Omitted when not resolvable.
+
+    `source` (FEAT-2026-0109/T03) records how this probe was reached — e.g.
+    `entry_probe` for the gate-entry path, or `attributed:<wu_id>` for
+    `attribute_failure_to_baseline`'s retroactive path — so a later reader of
+    `failing: [...]` can tell which. A plain scalar, not a nested block, so
+    it survives `write_frontmatter_block`'s no-reflow write untouched by the
+    rest of the record's shape. Omitted when the caller passes None, which
+    keeps a legacy write (or a caller that hasn't been taught its source
+    yet) parseable as "unknown" rather than fabricating one.
     """
     existing = read_gate_baseline(gate_file)
     entry_sha: "str | None"
@@ -4632,6 +4644,8 @@ def write_gate_baseline(
         lines.append(f"  tree: {tree}")
     if entry_sha:
         lines.append(f"  entry_sha: {entry_sha}")
+    if source:
+        lines.append(f"  source: {source}")
     if not failing:
         lines.append("  failing: []")
     else:
@@ -4665,7 +4679,7 @@ def _yaml_double_quote(text: str) -> str:
 
 def gate_baseline_check(
     gate_file: Path, feature_dir: Path, cfg: dict, head_sha: str,
-    probed_at: str | None = None,
+    probed_at: str | None = None, source: str = "entry_probe",
 ) -> tuple[list[dict], bool]:
     """Resolve this gate entry's failing-gate set, re-probing only when the
     tree has moved (FEAT-2026-0051/T02's re-probe policy).
@@ -4680,6 +4694,13 @@ def gate_baseline_check(
     `write_gate_baseline`. Returns `(failing_gates, freshly_probed)` — the
     caller uses the second element to decide whether a bookkeeping commit is
     needed for this entry (a skip writes nothing, so nothing to commit).
+
+    `source` (FEAT-2026-0109/T03) is threaded straight into
+    `write_gate_baseline` when a probe actually runs — it names how this
+    call was reached (the gate-entry path's own default, or
+    `attribute_failure_to_baseline`'s `attributed:<wu_id>`) so the persisted
+    record carries that provenance. Unused on a skip, since a skip writes
+    nothing.
     """
     baseline = read_gate_baseline(gate_file)
     if baseline is not None:
@@ -4691,7 +4712,8 @@ def gate_baseline_check(
     if probed_at is None:
         probed_at = dt.datetime.now(dt.timezone.utc).isoformat()
     failing = probe_baseline(feature_dir, cfg)
-    write_gate_baseline(gate_file, head_sha, probed_at, failing, feature_dir)
+    write_gate_baseline(
+        gate_file, head_sha, probed_at, failing, feature_dir, source=source)
     return failing, True
 
 
@@ -4709,14 +4731,16 @@ def attribute_failure_to_baseline(
     dedup this needs — a second failing unit at the same *head_sha* (the
     common case: nothing landed between the two failures) finds the record
     `gate_baseline_check` wrote for the first and does not re-probe, which is
-    what bounds attribution to at most once per gate. `wu_id` is accepted
-    for the caller's own bookkeeping (which unit's failure triggered this
-    probe); the record's shape is whatever `write_gate_baseline` already
-    writes today — provenance distinguishing this path from a gate-entry
-    probe is FEAT-2026-0109/T03's job, not this one's.
+    what bounds attribution to at most once per gate. `wu_id` names the unit
+    whose failure triggered this probe; when a probe actually runs, it is
+    carried into the persisted record's `source` field as
+    `attributed:<wu_id>` (FEAT-2026-0109/T03), so a later reader of
+    `failing: [...]` can tell this record came from attribution after a
+    specific unit failed, not from the gate-entry path.
     """
-    del wu_id  # not yet persisted into the record — see docstring
-    return gate_baseline_check(gate_file, feature_dir, cfg, head_sha, probed_at)
+    return gate_baseline_check(
+        gate_file, feature_dir, cfg, head_sha, probed_at,
+        source=f"attributed:{wu_id}")
 
 
 def baseline_probe_enabled(no_baseline_probe: bool, cfg: dict | None = None) -> bool:
