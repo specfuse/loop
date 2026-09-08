@@ -4221,6 +4221,145 @@ def resolve_gate_tiers(gate_set: list, tier: str) -> list:
     return [gate for gate in gate_set if gate.get("tier", "narrow") != "broad"]
 
 
+def run_gate_broad_set(feature_dir: Path, cfg: "dict | None" = None) -> tuple[bool, list[dict]]:
+    """Run the full `code` gate set once, independent of any single attempt
+    (FEAT-2026-0109/T06's once-per-gate broad tier).
+
+    Uses `resolve_gate_tiers(gate_set, "broad")` — the unfiltered set T04 left
+    this branch defined for — so every gate configured for `code` runs here,
+    including the `tier: broad` gates the per-attempt `verify()` never runs
+    and the plain gates that already ran (narrowed) on every attempt. This is
+    the safety net for both: a `tier: broad` gate gets its only run here, and
+    an untiered gate gets one full-set run to catch anything T05's changed-file
+    narrowing let through.
+
+    Returns `(ok, failing)` in `probe_baseline`'s shape — a
+    CONFIGURATION ERROR (unknown `needs:` target, no `code` gates at all) is
+    reported as a single synthetic failing entry rather than raised, so the
+    caller's halt path is the same for "a gate failed" and "verification.yml
+    is broken" — both are equally not-a-work-unit's-fault.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    gate_set = cfg.get("code") or []
+    if not gate_set:
+        return False, [{
+            "gate": "configuration",
+            "failure_class": "configuration_error",
+            "failure_signature": (
+                "CONFIGURATION ERROR: no 'code' gates configured in "
+                ".specfuse/verification.yml. This is not a work-unit failure "
+                "— fix verification.yml and re-run."
+            ),
+        }]
+    try:
+        gate_set = order_gate_set(gate_set)
+    except ValueError as exc:
+        return False, [{
+            "gate": "configuration",
+            "failure_class": "configuration_error",
+            "failure_signature": (
+                f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
+                f"This is not a work-unit failure — fix verification.yml and "
+                f"re-run."
+            ),
+        }]
+    gate_set = resolve_gate_tiers(gate_set, "broad")
+    gate_results = _run_gate_set(gate_set, feature_dir)
+    failing = []
+    for g in gate_results:
+        if g["ok"]:
+            continue
+        failure_class, failure_signature = parse_gate_failure_signature(g["report"])
+        failing.append({
+            "gate": g["name"], "failure_class": failure_class,
+            "failure_signature": failure_signature,
+        })
+    return not failing, failing
+
+
+def read_gate_broad_run(gate_file: Path) -> "dict | None":
+    """Return the gate's persisted once-per-gate broad-run record, or None if
+    absent, malformed, or the frontmatter fails to parse (FEAT-2026-0109/T06).
+
+    Mirrors `read_gate_baseline`'s degrade-to-None shape: a record missing
+    `tree` or `ok`, or holding the wrong type for either, is treated as "never
+    run" so the caller re-runs rather than trusting a half-written block.
+    """
+    try:
+        fm, _ = read_frontmatter(gate_file)
+    except _miniyaml.MiniYAMLError:
+        return None
+    block = fm.get("broad_run")
+    if not isinstance(block, dict):
+        return None
+    tree = block.get("tree")
+    if not isinstance(tree, str) or not tree:
+        return None
+    ok = block.get("ok")
+    if not isinstance(ok, bool):
+        return None
+    failing = block.get("failing")
+    if failing is None:
+        failing = []
+    if not isinstance(failing, list):
+        return None
+    return {"tree": tree, "ran_at": block.get("ran_at"), "ok": ok, "failing": failing}
+
+
+def write_gate_broad_run(
+    gate_file: Path, tree: str, ran_at: str, ok: bool, failing: list[dict],
+) -> None:
+    """Persist a once-per-gate broad-run result into the gate file's
+    `broad_run:` frontmatter block (FEAT-2026-0109/T06), via
+    `write_frontmatter_block` — the same no-reflow writer `write_gate_baseline`
+    uses, so a gate file's `feature_oracle` and `baseline:` lines survive this
+    write byte-identical.
+    """
+    lines = [
+        "broad_run:", f"  tree: {tree}", f"  ran_at: {ran_at}",
+        f"  ok: {'true' if ok else 'false'}",
+    ]
+    if not failing:
+        lines.append("  failing: []")
+    else:
+        lines.append("  failing:")
+        for entry in failing:
+            lines.append(f"    - gate: {entry['gate']}")
+            lines.append(f"      failure_class: {entry['failure_class']}")
+            lines.append(
+                f"      failure_signature: "
+                f"{_yaml_double_quote(str(entry['failure_signature']))}"
+            )
+    write_frontmatter_block(gate_file, "broad_run", lines)
+
+
+def gate_broad_run_check(
+    gate_file: Path, feature_dir: Path, cfg: dict,
+) -> tuple[bool, list[dict], bool]:
+    """Run the once-per-gate broad set unless it already ran at this tree
+    (FEAT-2026-0109/T06).
+
+    Tree-keyed the same way `gate_baseline_check` is: a bookkeeping commit (a
+    driver restart's "halted for driver restart" commit, an auto-close's
+    RETROSPECTIVE update) changes `HEAD` but never the tracked-source tree
+    `_current_tree_hash` reads, so resuming into the same gate after a restart
+    finds the prior record and skips re-running. A tree with no prior record,
+    or one that has moved, always re-runs and persists the fresh result.
+
+    Returns `(ok, failing, ran)` — `ran` is False on a skip (nothing new to
+    commit) and True when this call actually executed the gate set.
+    """
+    tree = _current_tree_hash()
+    existing = read_gate_broad_run(gate_file)
+    if existing is not None and tree is not None and existing["tree"] == tree:
+        return existing["ok"], existing["failing"], False
+    ok, failing = run_gate_broad_set(feature_dir, cfg)
+    ran_at = dt.datetime.now(dt.timezone.utc).isoformat()
+    write_gate_broad_run(gate_file, tree or "", ran_at, ok, failing)
+    return ok, failing, True
+
+
 def _test_module_name(path: str) -> str:
     """Convert a `tests/...` file path to its dotted unittest module name."""
     module = path[:-3] if path.endswith(".py") else path
@@ -4894,6 +5033,55 @@ def format_preexisting_gate_failure(
         "There is no way to proceed past this halt in this version. A "
         "waiver that lets a feature continue against a red baseline is "
         "future work tracked as FEAT-2026-0052; it does not exist yet."
+    )
+    return "\n".join(lines)
+
+
+def format_broad_run_failure(
+    gate_number: int, failing_gates: list[dict], tree: str,
+) -> str:
+    """Render the once-per-gate broad-run halt (FEAT-2026-0109/T06) — a
+    distinct reason from `format_preexisting_gate_failure`'s, though the same
+    shape: an operator reading it must be able to tell "the narrow per-attempt
+    tier let something through" apart from "a gate was already broken at gate
+    entry."
+
+    Names the failing gate command(s) and the tree they were measured on, and
+    states plainly that no work unit is at fault: every unit in this gate
+    already passed its own per-attempt verification before this once-per-gate
+    run found the failure.
+    """
+    lines = [
+        f"Gate {gate_number} is blocked: the full `code` gate set failed on "
+        f"the once-per-gate broad run this gate's closing sequence requires "
+        f"before it may dispatch (FEAT-2026-0109/T06).",
+        "",
+        f"Tree measured: {tree}",
+        "",
+        "Failing check(s):",
+    ]
+    for g in failing_gates:
+        lines.append(
+            f"  - {g['gate']}: {g['failure_class']} "
+            f"(signature: {g['failure_signature']})"
+        )
+    lines.append("")
+    lines.append(
+        "No work unit's attempt count was charged for this: every unit in "
+        "this gate already passed its own per-attempt verification. The "
+        "per-attempt narrow tier (FEAT-2026-0109/T04, T05) scopes checks to "
+        "changed files as a speed optimization — this full-set run is the "
+        "safety net that catches what that narrowing missed."
+    )
+    lines.append("")
+    lines.append("What to do next:")
+    lines.append(
+        "  1. Reproduce the failing check(s) above locally and fix them on "
+        "this branch."
+    )
+    lines.append(
+        "  2. Re-run the driver — the closing sequence dispatches once the "
+        "broad run is clean at the current tree."
     )
     return "\n".join(lines)
 
@@ -8199,6 +8387,62 @@ def run(
                     wu.status = DONE
                     done_ids.add(wu.wu_id)
                     continue
+
+                # Once-per-gate broad run (FEAT-2026-0109/T06): gates before
+                # dispatching this gate's first closing-type unit — a
+                # `close`/`close-intermediate`, whether it goes on to the
+                # auto-close branches below or the ordinary session-dispatch
+                # path — so the full `code` set is measured against the tree
+                # the gate is about to be judged on, not an earlier one and
+                # not one written after the close. Tree-keyed dedup lives in
+                # `gate_broad_run_check`, so a resumed gate at an unchanged
+                # tree (e.g. after a driver-restart halt) does not re-pay it.
+                if not dry_run and wu.type in ("close", "close-intermediate"):
+                    _broad_ok, _broad_failing, _broad_ran = gate_broad_run_check(
+                        gate.file, feature_dir, cfg)
+                    _broad_tree = _current_tree_hash() or "unresolvable"
+                    _broad_events = []
+                    if _broad_ran:
+                        # Emitted once per actual run (never on a dedup skip)
+                        # regardless of outcome — the per-probe record,
+                        # mirroring baseline_attribution's own "emit on fresh
+                        # probe" shape (T01).
+                        _broad_events.append(build_event(
+                            "broad_run_result", feature_id, {
+                                "gate": gate.number,
+                                "tree": _broad_tree,
+                                "ok": _broad_ok,
+                                "failing": _broad_failing,
+                            }))
+                    if not _broad_ok:
+                        backend.set_gate(gate, "awaiting_review")
+                        escalation_message = format_broad_run_failure(
+                            gate.number, _broad_failing, _broad_tree)
+                        _broad_events.append(build_event(
+                            "human_escalation", feature_id, {
+                                "reason": "broad_run_gate_failure",
+                                "gate": gate.number,
+                                "failing_gates": _broad_failing,
+                                "message": escalation_message,
+                                "tree": _broad_tree,
+                            }))
+                        _broad_events.append(build_arm_predicate_event(
+                            feature_dir, feature_id, gate.number))
+                        flush_events(events_path, _broad_events)
+                        commit_bookkeeping(
+                            [gate.file, events_path],
+                            f"chore(loop): gate {gate.number} broad run "
+                            f"failed — awaiting_review\n\nFeature: {feature_id}",
+                        )
+                        print(f"\n{escalation_message}")
+                        return 1
+                    elif _broad_ran:
+                        flush_events(events_path, _broad_events)
+                        commit_bookkeeping(
+                            [gate.file, events_path],
+                            f"chore(loop): gate {gate.number} broad run "
+                            f"clean\n\nFeature: {feature_id}",
+                        )
 
                 # FEAT-2026-0018/T05 — intermediate auto-close branch
                 if wu.type == "close-intermediate" and not _override_active:

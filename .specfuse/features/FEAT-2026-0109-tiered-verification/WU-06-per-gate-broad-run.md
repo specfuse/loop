@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces_driver_helper: ensure_gate_broad_run
@@ -13,6 +13,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T17:08:04.353054+00:00
+duration_seconds: 1250.977
+cost_usd: 2.258197
+input_tokens: 104
+output_tokens: 44693
 ---
 
 # The broad set runs once per gate, before the close, and red halts the gate
