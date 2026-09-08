@@ -16,7 +16,8 @@
     "re_arm_rejected",
     "driver_staleness_detected",
     "followups_recorded",
-    "judged"
+    "judged",
+    "baseline_attribution"
   ],
   "correlation_id": {
     "closing_names": [

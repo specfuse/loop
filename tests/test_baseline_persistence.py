@@ -204,6 +204,10 @@ class TestGateBaselineCheck(unittest.TestCase):
                               "entries against an unchanged sha")
 
     def test_moved_sha_reprobes(self):
+        """A moved key re-probes. Reuse is keyed on the tree hash
+        (FEAT-2026-0109/T02), not the sha, so the tree is faked here to move
+        alongside the sha — real-repo behaviour (sha moves, tree doesn't) is
+        covered by tests/test_baseline_tree_hash_key.py."""
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             gf = self._gate_file(Path(td))
@@ -213,8 +217,12 @@ class TestGateBaselineCheck(unittest.TestCase):
                 probe_calls.append(1)
                 return []
 
+            import itertools
+            trees = itertools.cycle(["tree-one", "tree-two"])
             orig = loop.probe_baseline
+            orig_tree = loop._current_tree_hash
             loop.probe_baseline = counting_probe
+            loop._current_tree_hash = lambda: next(trees)
             try:
                 cfg = {"code": []}
                 loop.gate_baseline_check(gf, Path(td), cfg, "sha-one",
@@ -223,6 +231,7 @@ class TestGateBaselineCheck(unittest.TestCase):
                                           probed_at="t2")
             finally:
                 loop.probe_baseline = orig
+                loop._current_tree_hash = orig_tree
 
             self.assertEqual(len(probe_calls), 2,
                               "a changed sha must run the probe a second time")
@@ -359,32 +368,12 @@ gates:
                         "scaffold fixture"], check=True)
         return fdir
 
-    def test_green_baseline_is_written_and_committed_alongside_gate_file(self):
-        with integration_workspace() as root:
-            os.chdir(root)
-            fdir = self._scaffold(root, "FEAT-2026-8901", "green-persist",
-                                   "feat/green-persist")
-
-            def fake_dispatch(wu, failure_note, cost_tracking=True):
-                write_stub_deliverable(wu)
-                return "```result\nstatus: complete\n```\n"
-
-            self._patch("dispatch", fake_dispatch)
-            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
-            self._patch("probe_baseline", lambda feature_dir, cfg=None: [])
-
-            loop.run(None, dry_run=False)
-
-            gate_text = (fdir / "GATE-01.md").read_text()
-            self.assertIn("baseline:", gate_text)
-            self.assertIn("failing: []", gate_text)
-
-            status = subprocess.run(
-                ["git", "-C", str(root), "status", "--porcelain"],
-                capture_output=True, text=True, check=True,
-            ).stdout
-            self.assertNotIn("GATE-01.md", status,
-                              "baseline write must be committed, not left dirty")
+    # test_green_baseline_is_written_and_committed_alongside_gate_file retired
+    # (FEAT-2026-0109/T01): the driver no longer probes at gate entry, so a
+    # fully-green run (nothing ever fails) never calls probe_baseline and
+    # writes no baseline block at all — that absence is the point of the lazy
+    # design, not a regression. Attribution's own write-and-commit behaviour
+    # is covered by tests/test_lazy_baseline_e2e.py.
 
     def test_no_baseline_probe_flag_skips_probe_entirely(self):
         with integration_workspace() as root:
