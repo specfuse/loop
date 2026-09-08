@@ -1,18 +1,28 @@
 ---
 id: FEAT-2026-0109/G1-PLAN
 type: plan-next
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
   - .specfuse/features/FEAT-2026-0109-tiered-verification/GATE-02-REVIEW.md
   - .specfuse/features/FEAT-2026-0109-tiered-verification/GATE-02.md
+  - .specfuse/features/FEAT-2026-0109-tiered-verification/PLAN.md
 escalation_reason: deterministic_refusal_repeat
 duration_seconds: 450.221
 cost_usd: 3.093962
 input_tokens: 62
 output_tokens: 30356
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-09-08T13:54:45+00:00
+    prior_status: blocked_human
+    prior_attempts: 0
+    prior_cost_usd: 3.093962
+    prior_duration_seconds: 450.221
+    reason: "fix WU-91, plan-next never told to write the task graph"
 ---
 
 # Draft gate 2 — the per-attempt tier — and its own oracle
@@ -48,8 +58,27 @@ decomposed into separately-gated units, and the last attempt cost $5.63 and 49
 minutes of thrash. Gate 2's own `plan-next` drafts it, with the same atomicity
 constraint restated there.
 
+**Drafting a gate means editing `PLAN.md`'s task graph, not only writing files
+— read this before starting.** Two earlier attempts wrote `GATE-02.md` and were
+refused by the same deterministic guard, which is why this unit escalated
+`deterministic_refusal_repeat`:
+
+```
+assert_next_gate_drafted_or_terminal: gate 2 has no drafted work_units in
+PLAN.md and neither PLAN.md nor roadmap marks done
+```
+
+The guard reads **`PLAN.md`'s `gates:` graph**, where gate 2 currently has
+`work_units: []`. Creating `WU-*.md` files and a `GATE-02.md` does not satisfy
+it and never will. `PLAN.md` is in this unit's `produces:` for that reason:
+insert one graph entry per drafted unit — `id`, `file`, `depends_on` — under
+gate 2, matching the shape gate 1's entries already have, and leave gate 3's
+entry untouched. Do this **before** reporting, and re-read the graph afterwards
+to confirm the entries are actually there.
+
 **Acceptance criteria.**
 
+- **The guard's own precondition, checked directly:** `PLAN.md`'s gate 2 entry has a non-empty `work_units` list, one entry per drafted unit, each naming a `file` that exists on disk. This is what `assert_next_gate_drafted_or_terminal` reads; two attempts failed it.
 - `GATE-02.md` carries a definition of done, substantive work units drafted at `status: draft`, and a non-empty `feature_oracle` — `grep -n "feature_oracle" GATE-02.md` returns it.
 - Each drafted unit carries the five mandatory sections and a `planned_cost_usd`; `specfuse lint .specfuse/features/FEAT-2026-0109-tiered-verification` reports zero ERROR.
 - `GATE-02-REVIEW.md` carries the decisions and their rationale, an explicit "if you check only three things, check these" list, a roadmap-anchor check against `PLAN.md`'s `roadmap_goal`, and open questions each mapped to the draft WU it affects.
@@ -57,7 +86,9 @@ constraint restated there.
 - The drafted units are left `draft` — arming is the human's act.
 
 **Do not touch.** Source, tests, rules, templates; gate 1's WUs or its
-`RETROSPECTIVE.md`; `GATE-03.md`; `.git/`, secrets.
+`RETROSPECTIVE.md`; `GATE-03.md` and gate 3's entry in the task graph;
+`.git/`, secrets. **`PLAN.md` is explicitly IN scope** for gate 2's graph
+entries only — edit that one list and nothing else in the file.
 
 **Verification.** The `plannext` gate set.
 
