@@ -1,23 +1,26 @@
 ---
 id: FEAT-2026-0101/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 8.00
 oracle_env: macos_local
 auto_close_disabled: true
 produces:
   - .specfuse/features/FEAT-2026-0101-feature-oracle-walking-skeleton/RETROSPECTIVE.md
-model: opus
-effort: high
-gate_set: plannext
-driver_version: 0.16.0
-verdict: not_met
-started_at: 2026-09-08T00:56:38.785925+00:00
 duration_seconds: 942.257
-cost_usd: 8.939306
-input_tokens: 208
-output_tokens: 62788
+cost_usd: 9.448288
+input_tokens: 250
+output_tokens: 69723
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-09-08T01:54:14+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 9.448288
+    prior_duration_seconds: 942.257
+    reason: "judge lowered to not_met on issue #3260; T05 added to fix oracle attribution and the gate's definition of done narrowed to run-time detection"
 ---
 
 # Gate 1 close — audit that the oracle is wired, not merely defined
@@ -27,10 +30,27 @@ output_tokens: 62788
 guard-wiring audit this kind of feature owes, and record the measurements.
 Measure; a separate judge session reads the evidence and decides.
 
-**Context.** Depends on T01-T04. Binding:
+**Context.** Depends on T01-T05. Binding:
 `.specfuse/rules/close-discipline.md` as T02 sharpened it. The driver owns the
 terminal `PLAN.md` and roadmap flips. Run `specfuse lint --closing` before
 reporting `complete`.
+
+**This is the close's second attempt.** Attempt 1 recorded `met`; the judge
+lowered it to `not_met` and filed issue #3260 — an oracle naming a command the
+shell cannot run was reported as an ordinary gate `FAIL` rather than a
+configuration problem, so a typo'd declaration read as the unit's defect. Two
+things changed since: **T05** implements run-time attribution by exit status
+127, and `GATE-01.md`'s definition of done was **narrowed** — pre-flight
+resolution of an arbitrary shell string is now explicitly out of scope, because
+it is not reliably decidable and the judge was right to refuse a `met` against
+the original wording. Re-measure against the definition of done **as it now
+reads**, and say plainly in the retrospective that the bar was narrowed rather
+than met as originally written.
+
+`RETROSPECTIVE.md` from attempt 1 is already in this folder. **Rewrite its
+`## Measurements` and `## Guard-wiring audit` sections in place** — including a
+fresh audit of T05's new branch — and do not append a second copy of any
+section. Measure; the judge decides.
 
 **The recursive audit is the point of this close.** Per
 `[FEAT-2026-0008/G1-CLOSE]`, a feature that fixes a methodology failure mode

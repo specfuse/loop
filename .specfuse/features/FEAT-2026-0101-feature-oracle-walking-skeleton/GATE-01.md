@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_feature_oracle_e2e -q"
 baseline:
   sha: c87253320408b600d52dbb5c99e239d24f01f365
@@ -24,9 +24,22 @@ baseline:
 - The **close re-runs it** and records the verdict in `## Measurements`, and
   `specfuse lint --closing` fails a close that omits it. This is what makes the
   judge's binary signal real: the judge already reads measurements.
-- A declared-but-unrunnable oracle (empty, or a command that cannot be resolved)
-  is a CONFIGURATION ERROR before any unit dispatches — never a silent skip and
-  never a silent pass.
+- A declared oracle that is **empty or whitespace-only** is a CONFIGURATION
+  ERROR before any unit dispatches — never a silent skip and never a silent
+  pass.
+- A declared oracle whose **command the shell cannot run at all** (exit status
+  127) is detected when it runs and reported as a configuration problem naming
+  the gate file, not as an ordinary gate failure attributable to the unit under
+  test. Nothing passes silently either way; the requirement is correct
+  *attribution*, because an ordinary `FAIL` tells the next agent its code is
+  broken when the real defect is the declaration.
+  **Narrowed after this gate's first close (issue #3260).** The original wording
+  demanded a configuration error "before any unit dispatches" for any command
+  that "cannot be resolved". Pre-flight resolution of an arbitrary shell string
+  — pipes, `&&`, environment-dependent lookup — is not reliably decidable, and
+  the judge correctly refused a `met` against the wording as written. Pre-flight
+  resolution is explicitly **out of scope**; run-time attribution is what T05
+  delivers.
 - A gate declaring no `feature_oracle` is ERROR when its feature is `active`,
   WARN when `planned` / `blocked` / `deferred`, skipped when the gate is
   `passed` or the feature is `done` / `abandoned`. The corpus sweep reports

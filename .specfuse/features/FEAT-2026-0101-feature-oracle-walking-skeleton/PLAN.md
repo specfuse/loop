@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0101-feature-oracle-walking-skeleton
 roadmap_goal: Every gate declares one `feature_oracle` command in its `GATE-NN.md` — the executable proof of that gate's definition of done — which the driver runs as part of every unit's verification in that gate and again at the close, so the gate's definition of done is the oracle rather than a list of units that each went green.
 autonomy_default: review
 status: active
-planned_cost_usd: 19.00
+planned_cost_usd: 21.50
 ---
 
 # Plan: Feature oracle and walking skeleton
@@ -171,10 +171,18 @@ gates:
       - id: FEAT-2026-0101/T04
         file: WU-04-authoring-surfaces.md
         depends_on: [FEAT-2026-0101/T01, FEAT-2026-0101/T02, FEAT-2026-0101/T03]
+      # T05 added after the gate's first close recorded `not_met`. The judge
+      # found that an oracle naming a command the shell cannot run is reported
+      # as an ordinary gate FAIL rather than a configuration problem, so a
+      # typo'd declaration reads to the next agent as "your code is broken"
+      # (issue #3260). Attribution, not detection: the run already fails.
+      - id: FEAT-2026-0101/T05
+        file: WU-05-unrunnable-oracle-attribution.md
+        depends_on: [FEAT-2026-0101/T01]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0101/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0101/T01, FEAT-2026-0101/T02, FEAT-2026-0101/T03, FEAT-2026-0101/T04]
+        depends_on: [FEAT-2026-0101/T01, FEAT-2026-0101/T02, FEAT-2026-0101/T03, FEAT-2026-0101/T04, FEAT-2026-0101/T05]
 ```
 
 ## Notes
