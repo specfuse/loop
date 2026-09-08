@@ -1,17 +1,18 @@
 ---
 id: FEAT-2026-0101/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
 oracle_env: macos_local
 auto_close_disabled: true
+verdict: met
 produces:
   - .specfuse/features/FEAT-2026-0101-feature-oracle-walking-skeleton/RETROSPECTIVE.md
-duration_seconds: 942.257
-cost_usd: 9.448288
-input_tokens: 250
-output_tokens: 69723
+duration_seconds: 1732.443
+cost_usd: 8.770697
+input_tokens: 200
+output_tokens: 72009
 re_arm_count: 1
 re_arm_history:
   -
@@ -21,6 +22,17 @@ re_arm_history:
     prior_cost_usd: 9.448288
     prior_duration_seconds: 942.257
     reason: "judge lowered to not_met on issue #3260; T05 added to fix oracle attribution and the gate's definition of done narrowed to run-time detection"
+cumulative_cost_usd: 9.448288
+cumulative_duration_seconds: 942.257
+cumulative_input_tokens: 250
+cumulative_output_tokens: 69723
+cumulative_attempts: 1
+folded_through_re_arm: 1
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.16.0
+started_at: 2026-09-08T02:18:21.829956+00:00
 ---
 
 # Gate 1 close — audit that the oracle is wired, not merely defined

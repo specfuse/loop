@@ -4000,3 +4000,35 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `[FEAT-2026-0070/G2-CLOSE]`, which is about a guard that is inert because nothing it
   applies to exists yet; this one is about a guard that is inert while the artifacts it was
   written for sit on disk in front of it.
+
+## FEAT-2026-0101/G1-CLOSE — an acceptance criterion stating an undecidable property can never be met, only re-drafted
+
+- [FEAT-2026-0101/G1-CLOSE] **Every bullet of a gate's definition of done must name the
+  command that would prove it; a bullet for which no such command can exist is a drafting
+  defect, not a hard criterion.** FEAT-2026-0101's gate 1 required a declared-but-unrunnable
+  `feature_oracle` to be a CONFIGURATION ERROR "before any unit dispatches", for any command
+  that "cannot be resolved". The close recorded `met`; the judge lowered it to `not_met` and
+  was correct — a `feature_oracle` is an arbitrary shell string, so deciding in advance
+  whether it resolves means evaluating pipes, `&&`, shell functions, aliases and `PATH` as
+  they will exist at run time. No implementation satisfies that wording, so no amount of
+  further work could have closed the gate; the second close cost a full re-run of a terminal
+  close plus one new work unit. The fix that is legitimate keeps the PROPERTY and narrows the
+  MECHANISM: pre-flight resolution moved explicitly out of scope, run-time attribution by
+  exit status 127 shipped instead, and the residual cost — a typo'd oracle now takes one
+  dispatch to discover rather than zero — was written down as a known limit. The fix that is
+  NOT legitimate is editing the wording down to whatever the code already does, which is the
+  `never-touch.md` failure of weakening a gate to make a unit pass; the two are
+  distinguishable only if the narrowing is stated explicitly, and it must be stated in
+  `## Measurements` — the judge is deliberately not shown the close's `## Verdict` or
+  `## Retrospective` prose, so a narrowing announced anywhere else never reaches the reader
+  who grades against it. Drafting-time check: for each definition-of-done bullet, write the
+  command that proves it. If none can be written, the item belongs in a `## Post-merge
+  checklist` line, a `type: human` work unit, or a `PLAN.md` known limit — `close-discipline.md`
+  §2 provides all three channels. This is the definition-of-done analogue of
+  `planning-discipline.md` §2's satisfiability requirement for escalation predicates: that
+  rule is applied to predicates and was applied here, while the document the judge actually
+  grades against went unchecked. Cost corollary, observed twice on this feature: a per-unit
+  `planned_cost_usd` cannot see run count. One unit needed three attempts; the terminal close
+  needed two, because a judge may lower `met` to `not_met` — a structural possibility for
+  every judged gate. Do not pad estimates for it; padding feeds `evaluate_auto_close`'s
+  per-WU ratio checks and makes gates auto-close that should not.
