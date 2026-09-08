@@ -122,7 +122,26 @@ gates:
         depends_on: [FEAT-2026-0109/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []
+    work_units:
+      - id: FEAT-2026-0109/T04
+        file: WU-04-per-attempt-tier.md
+        depends_on: []
+      - id: FEAT-2026-0109/T05
+        file: WU-05-changed-file-test-selector.md
+        depends_on: [FEAT-2026-0109/T04]
+      - id: FEAT-2026-0109/T06
+        file: WU-06-per-gate-broad-run.md
+        depends_on: [FEAT-2026-0109/T04]
+      - id: FEAT-2026-0109/T07
+        file: WU-07-attribution-tree-bound.md
+        depends_on: []
+      # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
+      - id: FEAT-2026-0109/G2-CLOSE-INTERMEDIATE
+        file: WU-90-gate-2-close-intermediate.md
+        depends_on: [FEAT-2026-0109/T04, FEAT-2026-0109/T05, FEAT-2026-0109/T06, FEAT-2026-0109/T07]
+      - id: FEAT-2026-0109/G2-PLAN
+        file: WU-91-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0109/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:

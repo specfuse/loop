@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
@@ -10,10 +10,10 @@ produces:
   - .specfuse/features/FEAT-2026-0109-tiered-verification/GATE-02.md
   - .specfuse/features/FEAT-2026-0109-tiered-verification/PLAN.md
 escalation_reason: deterministic_refusal_repeat
-duration_seconds: 378.256
-cost_usd: 2.193218
-input_tokens: 34
-output_tokens: 27350
+duration_seconds: 984.346
+cost_usd: 7.413869
+input_tokens: 146
+output_tokens: 65957
 re_arm_count: 2
 re_arm_history:
   -
@@ -30,6 +30,17 @@ re_arm_history:
     prior_cost_usd: 2.193218
     prior_duration_seconds: 378.256
     reason: "go with option 2, close the differing-sha gap"
+cumulative_cost_usd: 2.193218
+cumulative_duration_seconds: 378.256
+cumulative_input_tokens: 34
+cumulative_output_tokens: 27350
+cumulative_attempts: 0
+folded_through_re_arm: 2
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.16.0
+started_at: 2026-09-08T14:09:48.245501+00:00
 ---
 
 # Draft gate 2 — the per-attempt tier — and its own oracle
