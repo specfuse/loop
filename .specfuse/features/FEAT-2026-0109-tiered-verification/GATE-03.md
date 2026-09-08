@@ -1,7 +1,18 @@
 ---
 gate: 3
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_installed_copy_driver_e2e -q"
+broad_run:
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:3e1ed273ab9179bbc8a1519961dcece15f51277e:5ff66b6e4d8a264f23709ea60706111a4c59ed11:831280d4f4defc99cf113cf1968b467da7b51390:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:863d8cb380c6778e41ebdf2c44ce04ef3367e8b4:97bcab1bc7244262cec901f46035f51dfdd07278:9e056efcc507fb445e198c7ca1d80b291f0e250a:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:c57ce21723b9a1e02f4cd3002278096fa0e3a4f4:caffe2d63ceacde448842a91bc7a12c206a67523:d4c9482c61e5ab32c45191fb1d2080539c9e6666:d7a119faadbd9fe577b4091c5fb908e6760d9adb:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:efde0847dce23ff89ddf38ac07d88f490cad8d66
+  ran_at: 2026-09-08T20:33:47.661222+00:00
+  ok: false
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "test_driver_edit_halts_before_next_dispatch"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 3 — the driver runs from a pinned build, and says which one
