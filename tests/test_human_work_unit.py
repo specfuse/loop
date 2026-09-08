@@ -75,7 +75,10 @@ def _write_feature(root: Path, feature_id: str, slug: str,
         f"# Plan\n\n```yaml\ngates:\n  - gate: 1\n    file: GATE-01.md\n"
         f"    work_units:\n" + "".join(rows) + "```\n"
     )
-    (fdir / "GATE-01.md").write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+    (fdir / "GATE-01.md").write_text(
+        '---\ngate: 1\nstatus: open\nfeature_oracle: "python3 -m unittest -q"\n'
+        '---\n\n# Gate 1\n'
+    )
 
     (fdir / "WU-T01.md").write_text(
         f"---\nid: {wu_ids[0]}\ntype: human\nstatus: {human_status}\n"

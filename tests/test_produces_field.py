@@ -155,6 +155,7 @@ def _make_feature(tmpdir: str, produces: str | None = None) -> Path:
     (feature / "GATE-01.md").write_text(
         "---\n"
         "status: open\n"
+        'feature_oracle: "python3 -m unittest -q"\n'
         "---\n\n"
         "# Gate 1\n"
     )

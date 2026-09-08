@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0101/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/lint_plan.py
   - tests/test_lint_feature_oracle_declared.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-07T23:41:37.022377+00:00
+duration_seconds: 1738.859
+cost_usd: 1.960136
+input_tokens: 144
+output_tokens: 24395
 ---
 
 # Refuse a gate that declares no oracle — ERROR when active, WARN otherwise

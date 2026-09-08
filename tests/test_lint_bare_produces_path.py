@@ -82,7 +82,9 @@ def _make_feature(tmpdir: str, produces: str, wu_type: str = "implementation") -
         "---\n\n# Close\n"
     )
 
-    (feature / "GATE-01.md").write_text("---\nstatus: open\n---\n\n# Gate 1\n")
+    (feature / "GATE-01.md").write_text(
+        '---\nstatus: open\nfeature_oracle: "python3 -m unittest -q"\n---\n\n# Gate 1\n'
+    )
 
     return feature
 

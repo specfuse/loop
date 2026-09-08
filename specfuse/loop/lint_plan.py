@@ -964,6 +964,49 @@ def lint_gate_proportionality(feature_dir: Path, gates: list) -> None:
         )
 
 
+_ORACLE_ERROR_FEATURE_STATUSES = frozenset({"active"})
+_ORACLE_WARN_FEATURE_STATUSES = frozenset({"planned", "blocked", "deferred"})
+
+
+def lint_feature_oracle_declared(feature_dir: Path, plan_fm: dict) -> list[str]:
+    """Flag a gate that declares no `feature_oracle` (FEAT-2026-0101/T03).
+
+    ERROR when the owning feature is `active` — the moment its author is
+    actually working the gate — WARN when `planned`/`blocked`/`deferred`,
+    skipped when the gate is `passed` or the feature is `done`/`abandoned`.
+    Graduating by feature status (not gate status alone) keeps the predicate
+    satisfiable: scoping ERROR to "any non-passed gate in a non-done feature"
+    fires on every gate drafted before this rule existed. See PLAN.md's
+    Escalation-predicate-satisfiability section.
+    """
+    feature_status = plan_fm.get("status")
+    if feature_status not in _ORACLE_ERROR_FEATURE_STATUSES | _ORACLE_WARN_FEATURE_STATUSES:
+        return []
+    feature_id_val = plan_fm.get("feature_id", feature_dir.name)
+    errs: list[str] = []
+    for gate_path in _gate_files_from_plan(feature_dir):
+        gfm, _ = read_frontmatter(gate_path)
+        if gfm.get("status") == "passed":
+            continue
+        oracle = gfm.get("feature_oracle")
+        if isinstance(oracle, str) and oracle.strip():
+            continue
+        gate_label = f"{feature_id_val}/{gate_path.stem}"
+        if feature_status in _ORACLE_ERROR_FEATURE_STATUSES:
+            errs.append(
+                f"ERROR: {gate_label}: gate declares no `feature_oracle` in "
+                f"an active feature — see .specfuse/roadmap.md's oracle "
+                f"contract and declare one before the next dispatch."
+            )
+        else:
+            print(
+                f"WARN: {gate_label}: gate declares no `feature_oracle` — "
+                f"required before this feature goes active. See "
+                f".specfuse/roadmap.md's oracle contract."
+            )
+    return errs
+
+
 _DNT_CARVEOUT_RE = re.compile(r"(?i)\bexcept\b")
 _DNT_ALLOW_ENUM_RE = re.compile(
     r"(?i)\b(?:files?|paths?)(?:\s+that)?\s+change\b|\badds?\b|\bnew\b"
@@ -2009,6 +2052,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     errs.extend(check_decision_override_signoff(feature_dir, fm))
     errs.extend(lint_ac_observable(feature_dir))
     errs.extend(lint_close_verdict_not_predecided(feature_dir))
+    errs.extend(lint_feature_oracle_declared(feature_dir, fm))
 
     # Cross-gate mixed-shape check. Two directions of mix:
     #
