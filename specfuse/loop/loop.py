@@ -4203,6 +4203,71 @@ def _run_gate_set(
     return results
 
 
+def resolve_gate_tiers(gate_set: list, tier: str) -> list:
+    """Filter *gate_set* to the entries that run in *tier* (FEAT-2026-0109/T04).
+
+    *tier* is `"narrow"` (per attempt) or `"broad"` (once per gate, T06's own
+    unfiltered code path — this function is never called for it today, but the
+    `"broad"` branch is here so the meaning of the annotation is defined in one
+    place). An entry declaring no `tier` key runs in BOTH tiers — the
+    absent-key default that keeps a `verification.yml` with no tier
+    declarations anywhere byte-identical to today (`GATE-02.md`). Opting a
+    gate OUT of the narrow (per-attempt) run is an explicit `tier: broad`
+    declaration; nothing is ever silently demoted out of the per-attempt run
+    by omission.
+    """
+    if tier == "broad":
+        return list(gate_set)
+    return [gate for gate in gate_set if gate.get("tier", "narrow") != "broad"]
+
+
+def _test_module_name(path: str) -> str:
+    """Convert a `tests/...` file path to its dotted unittest module name."""
+    module = path[:-3] if path.endswith(".py") else path
+    return module.replace("/", ".").replace("\\", ".")
+
+
+def select_narrow_test_modules(wu: WorkUnit) -> "list[str] | None":
+    """This unit's own declared test paths (FEAT-2026-0109/T04) — the entries
+    of its `produces:` list that live under `tests/`, as dotted unittest
+    module names. Returns None, never `[]`, when the selection is empty, so
+    the caller's fail-safe fallback (`GATE-02.md`: "fail safe, never open")
+    always has an unambiguous trigger.
+
+    This is the cheap, author-declared half of "tests touching changed
+    files" — T05 unions in the changed-file half. Until T05 lands, a unit
+    whose `produces:` names no test path selects nothing here, which
+    `resolve_narrow_command` falls back to the gate's full command for, not
+    an empty run.
+    """
+    modules = [
+        _test_module_name(p) for p in wu.produces
+        if p.startswith("tests/") or p.startswith("tests\\")
+    ]
+    return modules or None
+
+
+def resolve_narrow_command(gate: dict, wu: WorkUnit) -> str:
+    """The command to run for *gate* in the per-attempt (narrow) tier
+    (FEAT-2026-0109/T04).
+
+    Most gates declare one `command` and it runs unchanged in both tiers. A
+    gate may additionally declare `narrow_command` — a template carrying the
+    `{selected_test_modules}` placeholder — to run a cheaper, unit-scoped
+    command per attempt while `command` still runs whole in the once-per-gate
+    broad run (`GATE-02.md`: "one gate entry with two commands, not two
+    entries"). An empty selection falls back to the gate's full `command` —
+    fail safe, never open.
+    """
+    narrow_command = gate.get("narrow_command")
+    if not narrow_command:
+        return gate["command"]
+    modules = select_narrow_test_modules(wu)
+    if not modules:
+        return gate["command"]
+    return narrow_command.replace("{selected_test_modules}", " ".join(modules))
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None,
            gate_file: "Path | None" = None) -> tuple[bool, str]:
@@ -4222,6 +4287,15 @@ def verify(wu: WorkUnit, feature_dir: Path,
     byte-identical to before this key existed. A declared oracle that is empty,
     whitespace-only, or not a string is a CONFIGURATION ERROR — same shape as an
     unknown `extra_gates` name — refused before any gate runs.
+
+    Every existing call site of `verify()` is a per-attempt verification (the
+    once-per-gate broad run is T06's own code path, not this function), so
+    this narrows unconditionally to the `"narrow"` tier (FEAT-2026-0109/T04):
+    a gate declaring `tier: broad` does not run here, and the `tests` gate (or
+    any gate declaring `narrow_command`) runs its unit-scoped command instead
+    of its full one when the WU's `produces:` selects at least one test path.
+    The `feature_oracle` append below is untiered — it runs on every attempt
+    regardless, by FEAT-2026-0101's contract.
     """
     if cfg is None:
         cfg = load_verification()
@@ -4263,6 +4337,15 @@ def verify(wu: WorkUnit, feature_dir: Path,
             f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
             f"This is not a work-unit failure — fix verification.yml and re-run."
         )
+    # Per-attempt tier (FEAT-2026-0109/T04). Narrowing happens after
+    # order_gate_set (so a `needs:` edge still resolves against the full,
+    # unfiltered set) and before the feature_oracle append (so the oracle
+    # stays untiered). Dropping a `needs` target here is safe: the target is
+    # only ever a `tier: broad` gate a `tier: broad` dependent also lost.
+    gate_set = [
+        {**gate, "command": resolve_narrow_command(gate, wu)}
+        for gate in resolve_gate_tiers(gate_set, "narrow")
+    ]
     if gate_file is not None:
         oracle_command = read_gate_feature_oracle(Path(gate_file))
         if oracle_command is not None:

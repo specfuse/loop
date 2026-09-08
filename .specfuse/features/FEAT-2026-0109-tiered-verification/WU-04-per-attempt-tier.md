@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: resolve_gate_tiers
@@ -14,6 +14,12 @@ produces:
 model: sonnet
 effort: high
 gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T15:56:02.620379+00:00
+duration_seconds: 1375.405
+cost_usd: 3.379605
+input_tokens: 146
+output_tokens: 52870
 ---
 
 # Tracer bullet — a per-attempt tier that runs the narrow gates and only those
