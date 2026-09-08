@@ -1,13 +1,18 @@
 ---
 id: FEAT-2026-0109/G1-PLAN
 type: plan-next
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 6.00
 oracle_env: macos_local
 produces:
   - .specfuse/features/FEAT-2026-0109-tiered-verification/GATE-02-REVIEW.md
   - .specfuse/features/FEAT-2026-0109-tiered-verification/GATE-02.md
+escalation_reason: deterministic_refusal_repeat
+duration_seconds: 450.221
+cost_usd: 3.093962
+input_tokens: 62
+output_tokens: 30356
 ---
 
 # Draft gate 2 — the per-attempt tier — and its own oracle
