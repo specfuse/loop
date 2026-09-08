@@ -99,7 +99,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
 | FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
 | FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
-| FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | planned | — | [→ detail](#feat-2026-0101) |
+| FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-2026-0101) |
 | FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | planned | — | [→ detail](#feat-2026-0104) |
@@ -965,17 +965,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
-
-<a id="feat-2026-0101"></a>
-## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
-
-**Why.** Per-unit gates verify units; nothing forces the feature to work end to end. FEAT-2026-0050 shipped seven green units connected to nothing and needed FEAT-2026-0082 to wire them; nine hedged features across the corpus were green on fixtures and never given a real ride. Anthropic's harness, tracer bullets, and spec-kit all make the user-visible behaviour the thing that flips green.
-
-**Goal.** Every PLAN.md declares one `feature_oracle` command that exercises the user-visible outcome. The first implementation unit is the tracer bullet that makes it runnable (stubs allowed only there); every later unit's verification and the close re-run it; the gate's definition of done is the oracle, never a list of units. `/draft-feature` refuses a plan without one.
-
-**Benefits.** Ends hollow passes at the feature level; shortens features because later units become deepening rather than assembly; gives the judge (separate judge session) a binary signal to read.
-
-**Status: planned.**
 
 <a id="feat-2026-0103"></a>
 ## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart

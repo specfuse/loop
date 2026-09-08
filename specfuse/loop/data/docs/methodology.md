@@ -86,6 +86,16 @@ it mostly does not need. Author-set unless marked driver-owned.
 - `generated_surfaces` — OPTIONAL. Generated files this unit's acceptance depends on.
 - `oracle_env` — OPTIONAL. Where the verifying oracle runs: `macos_local`,
   `linux_docker`, `github_actions_ci`, or an operator-named string.
+- `feature_oracle` — GATE-level, not WU-level: lives in `GATE-NN.md`
+  frontmatter, one per gate. The executable proof of that gate's definition of
+  done, exercising the user-visible outcome end to end. Required to start
+  **red** and go **green** at the gate's walking skeleton (its first
+  implementation unit, permitted to stub anything off the thinnest end-to-end
+  path — `.specfuse/skills/authoring-work-units/SKILL.md` §14). The driver
+  runs it as part of every unit's verification in that gate and again at the
+  close, which records the verdict. `GATE.template.md` carries the key;
+  `/draft-feature` refuses to draft a gate without one
+  (`.specfuse/rules/close-discipline.md` §5, FEAT-2026-0101).
 - `produces` — OPTIONAL. Path(s) or glob(s) this unit must yield; the driver's
   presence gate refuses `complete` when one is missing or empty.
 - `produces_driver_helper` — OPTIONAL. Symbol(s) this unit adds to the driver.
@@ -554,6 +564,15 @@ their rationale, an explicit "if you check only three things, check these" list,
 a roadmap-anchor check (with a loud flag if the goal itself seems to be drifting),
 and open questions — each mapped to the draft WU it affects. The summary is
 advisory and owns no state.
+
+**The oracle-progression obligation.** `plan-next` also drafts the next gate's
+`feature_oracle`, and its review summary must state how the drafted oracle
+advances the prior gate's oracle — in prose, as a judgment call, not as a
+lint rule. Nothing can decide mechanically whether one shell command is a
+"stronger" proof than another, so this is the one place an
+unenforceable-but-important question belongs: the summary is already weighted
+toward doubt and already carries the roadmap-anchor check above it
+(FEAT-2026-0101).
 
 ## 8. LEARNINGS — the cross-feature feedback loop
 

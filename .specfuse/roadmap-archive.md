@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0101"></a>
+## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
+
+**Why.** Per-unit gates verify units; nothing forces the feature to work end to end. FEAT-2026-0050 shipped seven green units connected to nothing and needed FEAT-2026-0082 to wire them; nine hedged features across the corpus were green on fixtures and never given a real ride. Anthropic's harness, tracer bullets, and spec-kit all make the user-visible behaviour the thing that flips green.
+
+**Goal.** Every gate declares one `feature_oracle` command in its `GATE-NN.md` — the executable proof of that gate's definition of done, exercising the user-visible outcome end to end. It lives with the gate, not in `verification.yml`: a quality gate must be green at all times, while an oracle is required to start red and go green at the tracer bullet, and the DoD it proves is per-gate. Gate 1's oracle is authored at feature planning and its first implementation unit is the tracer bullet that makes it runnable (stubs allowed only there); every later gate's oracle is drafted by the prior gate's `plan-next`, which already anchors each gate to `roadmap_goal` — the feature-scoped intent stays prose in `PLAN.md`, the per-gate proof is executable. Every later unit's verification and the close re-run it; the gate's definition of done is the oracle, never a list of units. `/draft-feature` refuses to draft a gate without one.
+
+**Benefits.** Ends hollow passes at the feature level; shortens features because later units become deepening rather than assembly; gives the judge (separate judge session) a binary signal to read.
+
+**Status: done.**
+
 <a id="feat-2026-0102"></a>
 ## FEAT-2026-0102 — Gate dependencies: a gate declares `needs:` so shared work runs once per pass
 

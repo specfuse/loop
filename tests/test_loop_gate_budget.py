@@ -31,7 +31,8 @@ LINT_PATH = REPO_ROOT / ".specfuse/scripts/lint_plan.py"
 
 
 def _write_gate(path: Path, *, budget_line: str | None = None) -> None:
-    lines = ["---", "gate: 1", "status: open"]
+    lines = ["---", "gate: 1", "status: open",
+             'feature_oracle: "python3 -m unittest -q"']
     if budget_line is not None:
         lines.append(budget_line)
     lines += ["---", "", "# Gate 1", ""]

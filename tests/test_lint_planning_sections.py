@@ -49,7 +49,8 @@ def _write_feature(tmpdir: str, *, plan_status: str = "active",
         f"{plan_sections}"
     )
     (feature / "GATE-01.md").write_text(
-        f"---\ngate: 1\nstatus: {gate_status}\n---\n\n# Gate 1\n{gate_body}"
+        f'---\ngate: 1\nstatus: {gate_status}\n'
+        f'feature_oracle: "python3 -m unittest -q"\n---\n\n# Gate 1\n{gate_body}'
     )
     for fname, wid, wtype in (("WU-01-impl.md", "T01", "implementation"),
                               ("WU-90-close.md", "G1-CLOSE", "close")):

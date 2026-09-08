@@ -44,6 +44,7 @@ import datetime as dt
 import fnmatch
 import glob
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -4063,7 +4064,10 @@ def order_gate_set(gate_set: list) -> list:
     return ordered
 
 
-def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
+def _run_gate_set(
+    gate_set: list, feature_dir: Path,
+    _capture_returncodes: "dict | None" = None,
+) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
     Each dict is {"name": str, "ok": bool, "report": str} where "report" is
@@ -4079,6 +4083,14 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
     shared) and a gate whose dependency failed is skipped — `ok=False`, never
     run, reported as `SKIP` rather than `FAIL` so `parse_gate_failure_signature`
     still attributes the attempt to the dependency that actually failed.
+
+    `_capture_returncodes` (FEAT-2026-0101/T05) is an optional out-parameter:
+    when given a dict, each gate that actually spawns a subprocess records its
+    raw `returncode` under its gate name. It does not change the return
+    contract above — existing callers that omit it see byte-identical
+    behaviour — it exists so `verify()`'s oracle path can distinguish "the
+    oracle command could not even be found" (exit 127) from "the oracle ran
+    and failed" without every caller having to carry that detail.
     """
     results = []
     failed_names: set[str] = set()
@@ -4151,6 +4163,8 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
             ok = proc.returncode == 0
+            if _capture_returncodes is not None:
+                _capture_returncodes[gate["name"]] = proc.returncode
             tail = select_gate_report_lines(out, window=15)
             # A green gate whose oracle silently degraded is a hollow pass
             # (issue #134): force FAIL and name the degradation honestly so the
@@ -4190,7 +4204,8 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
 
 
 def verify(wu: WorkUnit, feature_dir: Path,
-           cfg: dict | None = None) -> tuple[bool, str]:
+           cfg: dict | None = None,
+           gate_file: "Path | None" = None) -> tuple[bool, str]:
     """Driver runs the gates itself — the exit oracle. Agent self-report is advisory.
 
     Empty or missing gate set for the WU's type is a CONFIGURATION failure (not a
@@ -4198,6 +4213,15 @@ def verify(wu: WorkUnit, feature_dir: Path,
     The failure message names the configuration cause so a human reading the log
     knows to fix verification.yml, not the work unit. `cfg` is injectable for
     testing; in production it is read from VERIFICATION_PATH.
+
+    `gate_file` (FEAT-2026-0101/T01) is the WU's `GATE-NN.md` — when it declares
+    a `feature_oracle`, that command is appended to this call's gate list via the
+    same `_run_gate_set`, so a unit that breaks the gate's end-to-end behaviour
+    fails on the attempt that broke it. `gate_file` is None in most existing
+    call sites (tests, stubs); the oracle union is skipped, so behaviour is
+    byte-identical to before this key existed. A declared oracle that is empty,
+    whitespace-only, or not a string is a CONFIGURATION ERROR — same shape as an
+    unknown `extra_gates` name — refused before any gate runs.
     """
     if cfg is None:
         cfg = load_verification()
@@ -4239,7 +4263,43 @@ def verify(wu: WorkUnit, feature_dir: Path,
             f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
             f"This is not a work-unit failure — fix verification.yml and re-run."
         )
-    gate_results = _run_gate_set(gate_set, feature_dir)
+    if gate_file is not None:
+        oracle_command = read_gate_feature_oracle(Path(gate_file))
+        if oracle_command is not None:
+            if not oracle_command.strip():
+                return False, (
+                    f"CONFIGURATION ERROR: {gate_file} declares `feature_oracle` "
+                    f"but its value is empty (or not a string). This is not a "
+                    f"work-unit failure — fix {Path(gate_file).name} and re-run."
+                )
+            gate_set = gate_set + [
+                {"name": "feature_oracle", "command": oracle_command}
+            ]
+    oracle_declared = gate_file is not None and oracle_command
+    returncodes: "dict | None" = {} if oracle_declared else None
+    gate_results = _run_gate_set(gate_set, feature_dir, _capture_returncodes=returncodes)
+    if oracle_declared:
+        # An oracle the shell could not even run (exit 127 — "command not
+        # found") is a verification.yml misconfiguration, not a defect in the
+        # work just done (FEAT-2026-0101/T05). Detect by exit status, never by
+        # matching the words "command not found" in the output — a legitimate
+        # test that prints that phrase while failing for a real reason must
+        # still be reported as an ordinary gate failure.
+        for i, g in enumerate(gate_results):
+            if (g["name"] == "feature_oracle" and not g["ok"]
+                    and returncodes.get("feature_oracle") == 127):
+                gate_results[i] = {
+                    "name": "feature_oracle",
+                    "ok": False,
+                    "report": (
+                        f"CONFIGURATION ERROR: {gate_file} declares "
+                        f"`feature_oracle: {oracle_command!r}` but that command "
+                        f"could not be run (exit 127 — command not found). This "
+                        f"is not a work-unit failure — fix "
+                        f"{Path(gate_file).name} and re-run."
+                    ),
+                }
+                break
     ok_all = all(g["ok"] for g in gate_results)
     return ok_all, "\n\n".join(g["report"] for g in gate_results)
 
@@ -4458,6 +4518,28 @@ def read_gate_baseline(gate_file: Path) -> dict | None:
     }
 
 
+def read_gate_feature_oracle(gate_file: Path) -> "str | None":
+    """Return the gate's declared `feature_oracle` command, or None if the key
+    is absent or the gate file's frontmatter fails to parse (FEAT-2026-0101/T01).
+
+    None means "no declaration" — inert, `verify()` runs unchanged. A declared
+    value that is empty, whitespace-only, or not a string is returned as `""`
+    (never None) so the caller can tell "declared but unusable" from "not
+    declared at all" and raise a CONFIGURATION ERROR rather than silently
+    skip or silently pass. Mirrors `read_gate_baseline`'s shape.
+    """
+    try:
+        fm, _ = read_frontmatter(gate_file)
+    except _miniyaml.MiniYAMLError:
+        return None
+    if "feature_oracle" not in fm:
+        return None
+    value = fm.get("feature_oracle")
+    if not isinstance(value, str):
+        return ""
+    return value
+
+
 def write_gate_baseline(
     gate_file: Path, sha: str, probed_at: str, failing: list[dict],
     feature_dir: "Path | None" = None,
@@ -4571,6 +4653,22 @@ def baseline_probe_enabled(no_baseline_probe: bool, cfg: dict | None = None) -> 
     return cfg.get("baseline_probe", True) is not False
 
 
+def _accepts_gate_file(fn) -> bool:
+    """True if calling *fn* with a `gate_file=` keyword would not raise
+    TypeError (FEAT-2026-0101/T01) — structural, not identity-based, since a
+    verify_fn resolved from the module-level `verify` name may be a test's
+    monkeypatch rather than the real function.
+    """
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+    return any(
+        p.name == "gate_file" or p.kind is inspect.Parameter.VAR_KEYWORD
+        for p in params.values()
+    )
+
+
 def execute_unit_attempt(
     wu: WorkUnit,
     feature_dir: Path,
@@ -4581,6 +4679,7 @@ def execute_unit_attempt(
     cost_tracking: bool = True,
     head_before: str | None = None,
     prerun_cfg: dict | None = None,
+    gate_file: "Path | None" = None,
 ) -> tuple[str, object, dict | None]:
     """Pre-dispatch + dispatch + parse + (if not blocked) verify cycle.
 
@@ -4618,6 +4717,15 @@ def execute_unit_attempt(
     `prerun_cfg` is a `verification.yml`-shaped dict injectable for testing;
     None reads it from VERIFICATION_PATH via `load_verification()`, mirroring
     `verify()`'s own `cfg` parameter.
+
+    `gate_file` (FEAT-2026-0101/T01) is forwarded to `verify_fn` as a keyword
+    ONLY when `verify_fn`'s signature actually accepts it (`_accepts_gate_file`)
+    — checked structurally, not by identity, because tests monkeypatch the
+    module-level `verify` name itself (leaving `verify_fn` at its default
+    None, then resolving to the patched callable), not just the `verify_fn=`
+    parameter. Every existing stub is `def f(wu, fd)` / `def f(wu, fd,
+    cfg=None)` with no `gate_file` parameter and no `**kwargs`, so it is left
+    untouched.
 
     Deferred imports (not module-level): `specfuse.loop.prerun` imports
     `_run_gate_set` from this module, so importing it at module load time
@@ -4657,7 +4765,10 @@ def execute_unit_attempt(
     is_blocked, reason = agent_reported_blocked(stdout or "")
     if is_blocked:
         return "blocked", reason, usage
-    passed, evidence = verify_fn(wu, feature_dir)
+    if _accepts_gate_file(verify_fn):
+        passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
+    else:
+        passed, evidence = verify_fn(wu, feature_dir)
     if not passed:
         return "failed", evidence, usage
     # files_changed guard (FEAT-2026-0008/T02): the agent's RESULT claim
@@ -7866,6 +7977,7 @@ def run(
                     outcome, payload, usage = execute_unit_attempt(
                         wu, feature_dir, failure_note, cost_tracking=cost_tracking,
                         head_before=head_before, prerun_cfg=cfg,
+                        gate_file=gate.file,
                     )
                     duration = round(time.monotonic() - t0, 3)
                     attempt_record: dict = {"attempt": attempt,

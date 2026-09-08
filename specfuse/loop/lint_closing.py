@@ -27,8 +27,14 @@ from pathlib import Path
 
 from . import closing_requirements as creq
 from . import criteria_state
+from ._wu_sections import slice_wu_section
 from .changelog import parse_changelog
-from .loop import _gate_number_from_wu_id, summarize_attempt_failure_classes
+from .judge import MEASUREMENTS_SECTION
+from .loop import (
+    _gate_number_from_wu_id,
+    read_gate_feature_oracle,
+    summarize_attempt_failure_classes,
+)
 from .lint_plan import _find_task_graph_block, read_frontmatter
 
 _CLOSING_TYPES = frozenset({"close", "close-intermediate", "plan-next"})
@@ -288,6 +294,39 @@ def _check_changelog_entry_for_contract_changes(req: creq.Requirement, ctx: Clos
     )
 
 
+def check_feature_oracle_verdict_recorded(req: creq.Requirement, ctx: ClosingContext):
+    """The gate's declared `feature_oracle`, re-run and recorded (T02).
+
+    Not applicable (returns None — the scope guard) whenever the gate cannot
+    be resolved or declares no `feature_oracle` at all: a gate that never
+    named an oracle imposes no requirement here. A declared-but-unusable
+    value is `verify()`'s own CONFIGURATION ERROR to catch, not this check's.
+    """
+    if ctx.gate_num is None:
+        return None
+    gate_entry = next((g for g in ctx.gates if g.get("gate") == ctx.gate_num), None)
+    if gate_entry is None or not gate_entry.get("file"):
+        return None
+    gate_file = ctx.feature_dir / gate_entry["file"]
+    if not gate_file.is_file():
+        return None
+    oracle_command = read_gate_feature_oracle(gate_file)
+    if not oracle_command:
+        return None
+    retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
+    if not retro.exists():
+        return True, ""  # assert_retrospective_exists already covers this
+    retro_text = retro.read_text()
+    section = slice_wu_section(retro_text, MEASUREMENTS_SECTION) or retro_text
+    if creq.FEATURE_ORACLE_VERDICT_RE.search(section):
+        return True, ""
+    return False, (
+        f"gate {ctx.gate_num} declares {creq.FEATURE_ORACLE_KEY} but "
+        f"{creq.RETROSPECTIVE_FILENAME}'s '{MEASUREMENTS_SECTION}' section "
+        f"records no '{creq.FEATURE_ORACLE_KEY}' PASS/FAIL verdict"
+    )
+
+
 def _check_followups_recorded(req: creq.Requirement, ctx: ClosingContext):
     if ctx.wfm.get("verdict") != "not_met":
         return None
@@ -368,6 +407,7 @@ _CHECKS = {
     "assert_changelog_entry_for_contract_changes": _check_changelog_entry_for_contract_changes,
     "check_criteria_state_well_formed": check_criteria_state_well_formed,
     "assert_followups_recorded": _check_followups_recorded,
+    "check_feature_oracle_verdict_recorded": check_feature_oracle_verdict_recorded,
 }
 
 

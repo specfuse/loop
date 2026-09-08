@@ -50,6 +50,16 @@ project and ask it to run this skill against your feature idea.
   sequence is rejected. So: intermediate later gates may be empty; the
   last gate carries a lone `close` placeholder (plan-next inserts that
   gate's substantive WUs *before* it). See step 6.
+- **No gate without a `feature_oracle`.** Every `GATE-NN.md` declares one
+  `feature_oracle` command — the executable proof of that gate's definition
+  of done, exercising the user-visible outcome end to end
+  (`docs/methodology.md` §2.1). It is required to start **red** — the
+  gate's feature isn't built yet — and go **green** at the walking
+  skeleton: the gate's first implementation unit is the tracer bullet that
+  wires the thinnest possible path end to end and makes the oracle
+  runnable. Refuse to write a `GATE-NN.md` that leaves the key unset;
+  propose the oracle command as part of step 4 and confirm it with the
+  user before writing.
 
 ## When to invoke
 
@@ -234,6 +244,13 @@ initiative). For each gate:
   this gate produces).
 - A bullet sketch of the substantive WUs it will contain (no
   details — those happen in step 5, and only for gate 1).
+- The gate's **`feature_oracle`** — one command that exercises the
+  definition of done end to end and is red on the current tree. For gate
+  1 this is proposed now, since gate 1 is fully detailed in this pass;
+  for later gates, sketch what the oracle will need to prove (its
+  drafting agent is that gate's `plan-next`, per step 4's "later gates
+  are skeletal" rule) and flag if it's unclear how the gate would even
+  be exercised end to end — that's a sign the gate boundary is wrong.
 - Explicit **uncertainty callouts**: "I'm unsure whether X belongs in
   gate 2 or gate 3 — your call." Make these loud so they aren't
   missed in review.
@@ -255,6 +272,13 @@ For gate 1 only:
 - List the substantive WUs (typically 2–5; the
   `/authoring-work-units` skill's sizing rule applies — if there are
   more than ~5, consider whether this is really one gate).
+- **The first implementation WU is the walking skeleton.** Its job is to
+  make gate 1's `feature_oracle` go from red to green by wiring the
+  thinnest possible path end to end — not to build any one part well.
+  Frame it as such in its Objective, and apply
+  `/authoring-work-units`'s tracer-bullet rule: stubs are permitted in
+  this unit and this unit only, everywhere else in the gate they are a
+  hollow pass waiting to happen.
 - For each, propose the `id`, `file`, `depends_on`, and the five-
   section body. **Delegate the per-WU craft** to
   [`../authoring-work-units/SKILL.md`](../authoring-work-units/SKILL.md) —
