@@ -28,6 +28,22 @@ self-report: `done` is a claim, the re-run is the verification. When the
 feature's criteria assert on generated artifacts, regenerate into a clean
 output directory before asserting — stale output satisfies any assertion.
 
+**The gate's `feature_oracle` is the feature-level re-run, not one more unit
+oracle.** Re-running every producing unit's own oracle is a different, weaker
+question: `[FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question]`
+records a close where fifteen unit oracles re-ran green and none could
+observe the defect, because none asserted on the path the feature was meant
+to change. A gate's `GATE-NN.md` may declare one `feature_oracle` — the
+composite question the units were each too small to ask. When it does, the
+close re-runs it fresh, same as any other oracle above, and records its
+verdict as a `### feature_oracle: PASS` or `### feature_oracle: FAIL` line in
+`## Measurements`. `specfuse lint --closing` fails a close that omits this
+line when the gate declares an oracle (`close-n`,
+`check_feature_oracle_verdict_recorded` in `closing_requirements.py` /
+`lint_closing.py`); a gate that declares no `feature_oracle` imposes no such
+requirement here — see this rule's "What the driver checks" section and T03
+for whether an absent declaration is itself a finding.
+
 > **Provenance.** A WU reported `done` while its source was untouched and its
 > oracle never ran; the driver-side produces-vs-diff guard now refuses that
 > pass (specfuse-loop >= 0.3.21), but only the close's own fresh re-run

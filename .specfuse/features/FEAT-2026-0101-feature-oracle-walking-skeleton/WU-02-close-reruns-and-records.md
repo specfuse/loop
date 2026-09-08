@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0101/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
@@ -10,10 +10,10 @@ produces:
   - specfuse/loop/lint_closing.py
   - .specfuse/rules/close-discipline.md
   - tests/test_close_records_feature_oracle.py
-duration_seconds: 2953.024
-cost_usd: 3.957437
-input_tokens: 258
-output_tokens: 54605
+duration_seconds: 860.053
+cost_usd: 1.043078
+input_tokens: 60
+output_tokens: 13843
 re_arm_count: 1
 re_arm_history:
   -
@@ -23,6 +23,17 @@ re_arm_history:
     prior_cost_usd: 3.957437
     prior_duration_seconds: 2953.024
     reason: "both hidden constraints now written into the WU, retry from clean slate"
+cumulative_cost_usd: 3.957437
+cumulative_duration_seconds: 2953.024
+cumulative_input_tokens: 258
+cumulative_output_tokens: 54605
+cumulative_attempts: 0
+folded_through_re_arm: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T00:21:48.723850+00:00
 ---
 
 # The close re-runs the gate's oracle and records its verdict

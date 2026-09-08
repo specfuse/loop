@@ -140,6 +140,16 @@ def gate_section_heading_re(gate_n: int) -> re.Pattern:
     )
 
 
+#: The feature-oracle verdict line a close's `## Measurements` section must
+#: carry when the gate declares `feature_oracle` (FEAT-2026-0101/T02). The
+#: gate's `feature_oracle` *is* the feature-level re-run
+#: `close-discipline.md` §1 requires — see
+#: [FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question].
+FEATURE_ORACLE_KEY = "feature_oracle"
+FEATURE_ORACLE_VERDICT_RE = re.compile(
+    rf"^###\s+{re.escape(FEATURE_ORACLE_KEY)}:\s*(PASS|FAIL)\s*$", re.MULTILINE,
+)
+
 GATE_REVIEW_FILENAME_TEMPLATE = "GATE-{next_gate:02d}-REVIEW.md"
 
 
@@ -338,6 +348,19 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             applies_when="criteria_artifact_present",
             enforced_by="check_criteria_state_well_formed",
+        ),
+        Requirement(
+            id="close-n", wu_type="close", phase="pre-squash",
+            description=(
+                f"When the gate's GATE-NN.md declares {FEATURE_ORACLE_KEY}, "
+                "RETROSPECTIVE.md's Measurements section records a "
+                "PASS/FAIL verdict line naming it — the gate's "
+                f"{FEATURE_ORACLE_KEY} is the feature-level re-run "
+                "close-discipline.md §1 requires "
+                "[FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question]"
+            ),
+            file=RETROSPECTIVE_FILENAME,
+            enforced_by="check_feature_oracle_verdict_recorded",
         ),
     ],
     "close-intermediate": [
