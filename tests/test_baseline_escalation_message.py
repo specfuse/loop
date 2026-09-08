@@ -230,12 +230,17 @@ gates:
             fdir = self._scaffold(root, "FEAT-2026-8910", "escalation-message",
                                    "feat/escalation-message")
 
+            # FEAT-2026-0109/T01: the driver no longer probes the `code` set
+            # at gate entry, so this scenario is now reached via a genuine
+            # verification failure — attribution (which reuses
+            # format_preexisting_gate_failure, exactly as the old gate-entry
+            # probe did) then finds the tree pre-broken via probe_baseline.
             def fake_dispatch(wu, failure_note, cost_tracking=True):
                 write_stub_deliverable(wu)
                 return "```result\nstatus: complete\n```\n"
 
             self._patch("dispatch", fake_dispatch)
-            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+            self._patch("verify", lambda wu, fd, cfg=None: (False, "gate output"))
             self._patch("probe_baseline", lambda feature_dir, cfg=None: FAILING_GATES)
 
             rc = loop.run(None, dry_run=False)

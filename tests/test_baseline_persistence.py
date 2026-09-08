@@ -359,32 +359,12 @@ gates:
                         "scaffold fixture"], check=True)
         return fdir
 
-    def test_green_baseline_is_written_and_committed_alongside_gate_file(self):
-        with integration_workspace() as root:
-            os.chdir(root)
-            fdir = self._scaffold(root, "FEAT-2026-8901", "green-persist",
-                                   "feat/green-persist")
-
-            def fake_dispatch(wu, failure_note, cost_tracking=True):
-                write_stub_deliverable(wu)
-                return "```result\nstatus: complete\n```\n"
-
-            self._patch("dispatch", fake_dispatch)
-            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
-            self._patch("probe_baseline", lambda feature_dir, cfg=None: [])
-
-            loop.run(None, dry_run=False)
-
-            gate_text = (fdir / "GATE-01.md").read_text()
-            self.assertIn("baseline:", gate_text)
-            self.assertIn("failing: []", gate_text)
-
-            status = subprocess.run(
-                ["git", "-C", str(root), "status", "--porcelain"],
-                capture_output=True, text=True, check=True,
-            ).stdout
-            self.assertNotIn("GATE-01.md", status,
-                              "baseline write must be committed, not left dirty")
+    # test_green_baseline_is_written_and_committed_alongside_gate_file retired
+    # (FEAT-2026-0109/T01): the driver no longer probes at gate entry, so a
+    # fully-green run (nothing ever fails) never calls probe_baseline and
+    # writes no baseline block at all — that absence is the point of the lazy
+    # design, not a regression. Attribution's own write-and-commit behaviour
+    # is covered by tests/test_lazy_baseline_e2e.py.
 
     def test_no_baseline_probe_flag_skips_probe_entirely(self):
         with integration_workspace() as root:

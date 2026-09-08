@@ -168,72 +168,12 @@ class TestBaselineProbeIntegration(unittest.TestCase):
         self._patches.append((name, getattr(loop, name)))
         setattr(loop, name, replacement)
 
-    def test_red_baseline_halts_before_any_dispatch(self):
-        """A red probe halts before the frontier loop — dispatch is called
-        exactly zero times. Fails on HEAD before this WU's edits (module does
-        not yet exist / probe_baseline is absent)."""
-        with integration_workspace() as root:
-            os.chdir(root)
-            fdir = write_minimal_feature(
-                root, "FEAT-2026-8801", "red-baseline",
-                "feat/red-baseline", [
-                    ("FEAT-2026-8801/T01", "implementation", "pending"),
-                ])
-
-            dispatch_calls = []
-
-            def fake_dispatch(wu, failure_note, cost_tracking=True):
-                dispatch_calls.append(wu.wu_id)
-                write_stub_deliverable(wu)
-                return "```result\nstatus: complete\n```\n"
-
-            self._patch("dispatch", fake_dispatch)
-            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
-            self._patch(
-                "probe_baseline",
-                lambda feature_dir, cfg=None: [{
-                    "gate": "tests",
-                    "failure_class": "tests",
-                    "failure_signature": "test_something",
-                }],
-            )
-
-            rc = loop.run(None, dry_run=False)
-            self.assertEqual(rc, 1, "red baseline must halt the run (exit 1)")
-            self.assertEqual(dispatch_calls, [],
-                              "dispatch must be called exactly zero times "
-                              "when the baseline probe is red")
-
-            gate_fm = _read_frontmatter(fdir / "GATE-01.md")
-            self.assertEqual(gate_fm.get("status"), "awaiting_review")
-
-            events = _read_events(fdir / "events.jsonl")
-            escalations = [e for e in events
-                           if e["event_type"] == "human_escalation"]
-            self.assertEqual(len(escalations), 1)
-            self.assertEqual(
-                escalations[0]["payload"]["reason"], "preexisting_gate_failure")
-            self.assertEqual(escalations[0]["payload"]["gate"], 1)
-            self.assertEqual(
-                escalations[0]["payload"]["failing_gates"],
-                [{"gate": "tests", "failure_class": "tests",
-                  "failure_signature": "test_something"}],
-            )
-
-            # The status flip must be COMMITTED, not just written to disk — an
-            # uncommitted flip silently reverts on the next `git reset --hard`.
-            log = subprocess.run(
-                ["git", "-C", str(root), "log", "--oneline", "-1"],
-                capture_output=True, text=True, check=True,
-            ).stdout
-            self.assertIn("preexisting gate failure", log)
-            status = subprocess.run(
-                ["git", "-C", str(root), "status", "--porcelain"],
-                capture_output=True, text=True, check=True,
-            ).stdout
-            self.assertNotIn("GATE-01.md", status,
-                              "gate status flip must be committed, not left "
-                              "dirty in the working tree")
+    # test_red_baseline_halts_before_any_dispatch retired (FEAT-2026-0109/T01):
+    # the driver no longer probes the `code` set at gate entry, so a red
+    # `probe_baseline` stub with dispatch/verify stubbed to always succeed no
+    # longer halts anything — nothing ever calls probe_baseline in that
+    # scenario. The lazy, failure-triggered replacement is covered by
+    # tests/test_lazy_baseline_e2e.py::test_preexisting_failure_does_not_consume_an_attempt.
 
     def test_green_baseline_dispatches_normally(self):
         """A green probe leaves dispatch behavior byte-identical to today —

@@ -4640,6 +4640,30 @@ def gate_baseline_check(
     return failing, True
 
 
+def attribute_failure_to_baseline(
+    gate_file: Path, feature_dir: Path, cfg: dict, head_sha: str, wu_id: str,
+    probed_at: str | None = None,
+) -> tuple[list[dict], bool]:
+    """Retroactive counterpart to the old gate-entry probe (FEAT-2026-0109/T01):
+    called from the attempt-failure path, after the failed attempt's `git
+    reset --hard` has restored the tree the unit was dispatched against, to
+    decide whether the failure the unit just hit pre-existed the unit's own
+    work.
+
+    Delegates to `gate_baseline_check`, which already carries the tree-sha
+    dedup this needs — a second failing unit at the same *head_sha* (the
+    common case: nothing landed between the two failures) finds the record
+    `gate_baseline_check` wrote for the first and does not re-probe, which is
+    what bounds attribution to at most once per gate. `wu_id` is accepted
+    for the caller's own bookkeeping (which unit's failure triggered this
+    probe); the record's shape is whatever `write_gate_baseline` already
+    writes today — provenance distinguishing this path from a gate-entry
+    probe is FEAT-2026-0109/T03's job, not this one's.
+    """
+    del wu_id  # not yet persisted into the record — see docstring
+    return gate_baseline_check(gate_file, feature_dir, cfg, head_sha, probed_at)
+
+
 def baseline_probe_enabled(no_baseline_probe: bool, cfg: dict | None = None) -> bool:
     """Resolve whether the pre-flight baseline probe runs at gate entry
     (FEAT-2026-0051/T02), in this one place. Precedence: the `--no-baseline-probe`
@@ -7572,48 +7596,12 @@ def run(
         close_wu_completed = None  # any close with a well-formed verdict (#3243)
         _terminal_auto_closed_wu: WorkUnit | None = None  # FEAT-2026-0018/T11H
 
-        # Pre-flight baseline gate probe (FEAT-2026-0051/T01) — one run of the
-        # `code` set at gate entry, before any WU is dispatched, so a gate
-        # already red on the base tree halts here instead of every WU
-        # inheriting it as a self-inflicted exit oracle. Skipped in dry_run
-        # (no gates should run) and when the gate is already awaiting_review
-        # (mirrors the budget brake's skip condition just below).
-        if (not dry_run and gate.status != "awaiting_review"
-                and baseline_probe_enabled(no_baseline_probe, cfg)):
-            head_sha = git("rev-parse", "HEAD")
-            failing_gates, freshly_probed = gate_baseline_check(
-                gate.file, feature_dir, cfg, head_sha)
-            # A fresh green probe still needs its record committed — nothing
-            # else touches gate.file on this path, so without this commit the
-            # write would sit uncommitted and vanish on the next reset (#199's
-            # class of bug). The red path's commit below already carries the
-            # write (same gate.file), so this only fires on green.
-            if freshly_probed and not failing_gates:
-                commit_bookkeeping(
-                    [gate.file],
-                    f"chore(loop): gate {gate.number} baseline probed clean"
-                    f"\n\nFeature: {feature_id}",
-                )
-            if failing_gates:
-                backend.set_gate(gate, "awaiting_review")
-                escalation_message = format_preexisting_gate_failure(
-                    gate.number, failing_gates, feat_fm,
-                    done_unit_ids=[u.wu_id for u in units if u.status == "done"])
-                flush_events(events_path, [build_event(
-                    "human_escalation", feature_id, {
-                        "reason": "preexisting_gate_failure",
-                        "gate": gate.number,
-                        "failing_gates": failing_gates,
-                        "message": escalation_message,
-                    }),
-                    build_arm_predicate_event(feature_dir, feature_id, gate.number)])
-                commit_bookkeeping(
-                    [gate.file, events_path],
-                    f"chore(loop): gate {gate.number} preexisting gate failure "
-                    f"— awaiting_review\n\nFeature: {feature_id}",
-                )
-                print(f"\n{escalation_message}")
-                return 1
+        # No gate-entry baseline probe (FEAT-2026-0109/T01 — supersedes the
+        # FEAT-2026-0051/T01 pre-flight probe that used to run here). The
+        # `code` set no longer runs before the first WU is dispatched; a
+        # pre-existing failure is now discovered and attributed lazily, the
+        # first time a unit's own verification fails — see
+        # `attribute_failure_to_baseline` in the attempt-failure path below.
 
         while True:
             pending = ready(units, done_ids)
@@ -8699,6 +8687,73 @@ def run(
                         reset_preserving_events(
                             head_before, events_path,
                             untracked_before=untracked_before)
+                        # Retroactive baseline attribution (FEAT-2026-0109/T01):
+                        # decide, right after the reset above restores the
+                        # tree the unit was dispatched against, whether this
+                        # failure pre-existed the unit's own work. Reuses
+                        # gate_baseline_check's tree-sha dedup (via
+                        # attribute_failure_to_baseline) so a second failing
+                        # unit at the same head_before does not re-probe.
+                        # Convergent (`iterate_on_failure`) units are out of
+                        # scope: their post-attempt tree is not reliably
+                        # head_before, which attribution requires.
+                        if baseline_probe_enabled(no_baseline_probe, cfg):
+                            _attr_failing, _attr_fresh = (
+                                attribute_failure_to_baseline(
+                                    gate.file, feature_dir, cfg, head_before,
+                                    wu.wu_id))
+                            if _attr_fresh:
+                                wu_events.append(build_event(
+                                    "baseline_attribution", wu.wu_id, {
+                                        "gate": gate.number,
+                                        "failing": _attr_failing,
+                                        "attributed_to": wu.wu_id,
+                                    }))
+                            if _attr_failing:
+                                # Pre-existing: this attempt did not cause the
+                                # failure, so it is not counted against the
+                                # unit's attempts (PLAN.md — the accepted
+                                # cost is the one dispatch already spent, not
+                                # a spent retry budget on top of it).
+                                backend.set_wu(wu, "attempts", attempt - 1)
+                                write_cost_to_wu(backend, wu, cum_usage)
+                                backend.set_gate(gate, "awaiting_review")
+                                escalation_message = (
+                                    format_preexisting_gate_failure(
+                                        gate.number, _attr_failing, feat_fm,
+                                        done_unit_ids=[
+                                            u.wu_id for u in units
+                                            if u.status == "done"]))
+                                wu_events.append(build_event(
+                                    "human_escalation", feature_id, {
+                                        "reason": "preexisting_gate_failure",
+                                        "gate": gate.number,
+                                        "failing_gates": _attr_failing,
+                                        "message": escalation_message,
+                                        "attributed_to": wu.wu_id,
+                                    }))
+                                wu_events.append(build_arm_predicate_event(
+                                    feature_dir, feature_id, gate.number))
+                                flush_events(events_path, wu_events)
+                                note_paths = persist_attempt_notes(
+                                    work_dir, wu.wu_id, attempt_notes)
+                                commit_bookkeeping(
+                                    [wu.file, gate.file, events_path,
+                                     *note_paths],
+                                    f"chore(loop): gate {gate.number} "
+                                    f"preexisting gate failure attributed to "
+                                    f"{wu.wu_id} — awaiting_review"
+                                    f"\n\nFeature: {feature_id}",
+                                )
+                                print(f"\n{escalation_message}")
+                                return 1
+                            if _attr_fresh:
+                                commit_bookkeeping(
+                                    [gate.file],
+                                    f"chore(loop): gate {gate.number} "
+                                    f"baseline attributed clean after "
+                                    f"{wu.wu_id}\n\nFeature: {feature_id}",
+                                )
                     if _converge_blocked:
                         note_paths = persist_attempt_notes(
                             work_dir, wu.wu_id, attempt_notes)

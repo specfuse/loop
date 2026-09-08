@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0109/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 oracle_env: macos_local
 produces_driver_helper: attribute_failure_to_baseline
 produces:
   - specfuse/loop/loop.py
   - tests/test_lazy_baseline_e2e.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T11:29:24.732807+00:00
+duration_seconds: 2092.083
+cost_usd: 3.79238
+input_tokens: 170
+output_tokens: 63303
 ---
 
 # Tracer bullet — skip the probe at gate entry, attribute on the first failure

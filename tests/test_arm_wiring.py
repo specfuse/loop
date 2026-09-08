@@ -373,18 +373,34 @@ class TestAutoArm(unittest.TestCase):
         first cut of the fix passed every formatter unit test while the call
         site read a non-existent `u.id`, and only an unrelated integration test
         caught it.
+
+        FEAT-2026-0109/T01: the driver no longer probes the `code` set at gate
+        entry — a resumed gate with nothing left to dispatch would never
+        discover a red baseline under the new lazy design, since attribution
+        only fires on an actual verification failure. T02, a pending unit
+        whose verification fails, is what makes attribution fire here.
         """
         with integration_workspace() as root:
             os.chdir(root)
-            (root / ".specfuse/verification.yml").write_text(
-                "code:\n  - name: fail\n    command: \"false\"\n"
-                "doc:\n  - name: noop\n    command: \"true\"\n"
-                "plannext:\n  - name: noop\n    command: \"true\"\n"
-            )
             fdir = write_armable_feature(
                 root, "FEAT-2026-9005", "resumed-halt", "auto",
-                [("FEAT-2026-9005/T01", "implementation", "done")],
+                [("FEAT-2026-9005/T01", "implementation", "done"),
+                 ("FEAT-2026-9005/T02", "implementation", "pending")],
             )
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                return "```result\nstatus: complete\n```\n"
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", lambda wu, fd, cfg=None: (False, "FAIL"))
+            self._patch(
+                "probe_baseline",
+                lambda feature_dir, cfg=None: [{
+                    "gate": "tests", "failure_class": "tests",
+                    "failure_signature": "test_something",
+                }],
+            )
+
             loop.run(None, dry_run=False)
 
             events = _read_events(fdir / "events.jsonl")
@@ -405,17 +421,25 @@ class TestAutoArm(unittest.TestCase):
     def test_preexisting_gate_failure_does_not_arm_even_if_would_arm_true(self):
         with integration_workspace() as root:
             os.chdir(root)
-            # Rig the `code` set to fail so the pre-flight baseline probe
-            # escalates BEFORE the normal-completion arm site is reached.
-            (root / ".specfuse/verification.yml").write_text(
-                "code:\n  - name: fail\n    command: \"false\"\n"
-                "doc:\n  - name: noop\n    command: \"true\"\n"
-                "plannext:\n  - name: noop\n    command: \"true\"\n"
-            )
             fdir = write_armable_feature(
                 root, "FEAT-2026-9004", "preexisting-fail", "auto",
-                [("FEAT-2026-9004/T01", "implementation", "done")],
+                [("FEAT-2026-9004/T01", "implementation", "done"),
+                 ("FEAT-2026-9004/T02", "implementation", "pending")],
             )
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                return "```result\nstatus: complete\n```\n"
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", lambda wu, fd, cfg=None: (False, "FAIL"))
+            self._patch(
+                "probe_baseline",
+                lambda feature_dir, cfg=None: [{
+                    "gate": "tests", "failure_class": "tests",
+                    "failure_signature": "test_something",
+                }],
+            )
+
             rc = loop.run(None, dry_run=False)
             self.assertEqual(rc, 1)
 
