@@ -3,8 +3,8 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_feature_oracle_e2e -q"
 baseline:
-  sha: dd07be32e80c3ccf6cc94b72e5269e582c6dee3a
-  probed_at: 2026-09-08T00:18:01.174163+00:00
+  sha: c87253320408b600d52dbb5c99e239d24f01f365
+  probed_at: 2026-09-08T00:36:26.522214+00:00
   entry_sha: df61e150605ea1949fb065a01d44cbd8ca7713e4
   failing: []
 ---
