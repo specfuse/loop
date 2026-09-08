@@ -36,6 +36,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 - **`/draft-feature` no longer drafts a gate without a `feature_oracle`, and the authoring surfaces teach the walking skeleton.** `GATE.template.md` ships the key with a comment saying what it is and that it starts red; `/draft-feature` refuses a gate without one and asks for it at the gate-1 proposal step; `/authoring-work-units` §14 states the matching rule that stubs are permitted only in the unit that turns the oracle green, and nowhere else; `docs/methodology.md` documents the key once in its frontmatter reference beside `oracle_env`, and adds `plan-next`'s obligation to state in its review summary how a drafted gate's oracle advances the prior gate's — in prose, because nothing can decide mechanically whether one shell command is a stronger proof than another (FEAT-2026-0101)
 
+### Fixed
+
+- **A multi-gate feature could not be drafted while `active`: the feature-oracle lint refused gates nobody had designed yet.** `lint_feature_oracle_declared` reported ERROR on every non-`passed` gate of an `active` feature, including the later gates that are deliberately skeletal at feature-planning time — so satisfying it meant writing an executable assertion for a gate whose work units do not exist. That contradicts "detail only as far as the next gate", and it reintroduced at gate level the exact objection that put the key on `GATE-NN.md` rather than `PLAN.md`: FEAT-2026-0101's own plan says gate 1's oracle is authored at feature planning and *every later gate's by the prior gate's `plan-next`*, and the rule implemented only the first half. It went unnoticed because the feature that shipped it is single-gate — the shape that cannot expose it. A gate whose `work_units` hold no substantive unit (empty, or carrying only the terminal `close` placeholder) is now skipped; the requirement lands the moment `plan-next` gives that gate real units, which is when its author is designing it. Gate 1 of an active feature is unchanged and still ERRORs (#3262)
+
 ## [0.16.0+umbrella.0.12.1] - 2026-09-07
 
 ### Fixed

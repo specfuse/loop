@@ -968,6 +968,60 @@ _ORACLE_ERROR_FEATURE_STATUSES = frozenset({"active"})
 _ORACLE_WARN_FEATURE_STATUSES = frozenset({"planned", "blocked", "deferred"})
 
 
+def _undrafted_gate_files(feature_dir: Path) -> set[Path]:
+    """Gate files `plan-next` has not drafted yet (#3262).
+
+    A later gate is deliberately skeletal at feature-planning time: the
+    methodology details only as far as the next gate, and each later gate's
+    work units — and its `feature_oracle` — are authored by the prior gate's
+    `plan-next`. A gate is "not drafted yet" when its `work_units` hold no
+    substantive unit: either empty, or carrying only the terminal `close`
+    placeholder that lets the linter identify the first gate as non-terminal.
+
+    Requiring an oracle from such a gate makes every multi-gate feature
+    un-draftable while `active`, because satisfying it means writing an
+    executable assertion for a gate nobody has designed. That is the same
+    objection that put the key on `GATE-NN.md` rather than `PLAN.md`; this
+    helper keeps it from reappearing one level down. A gate that HAS
+    substantive units is drafted, and its oracle is due.
+    """
+    plan = feature_dir / "PLAN.md"
+    if not plan.exists():
+        return set()
+    try:
+        _, body = read_frontmatter(plan)
+        graph = _find_task_graph_block(body)
+    except Exception:  # noqa: BLE001 - an unparseable PLAN is another check's finding
+        return set()
+    if not graph:
+        return set()
+    undrafted: set[Path] = set()
+    for gate in graph.get("gates", []) or []:
+        if not isinstance(gate, dict):
+            continue
+        name = gate.get("file")
+        if not isinstance(name, str) or not name:
+            continue
+        path = feature_dir / name
+        if not path.exists():
+            continue
+        for entry in gate.get("work_units") or []:
+            if not isinstance(entry, dict):
+                continue
+            wfile = entry.get("file")
+            if not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            if wfm.get("type") in GATE_PROPORTIONALITY_SUBSTANTIVE_TYPES:
+                break
+        else:
+            undrafted.add(path)
+    return undrafted
+
+
 def lint_feature_oracle_declared(feature_dir: Path, plan_fm: dict) -> list[str]:
     """Flag a gate that declares no `feature_oracle` (FEAT-2026-0101/T03).
 
@@ -983,10 +1037,13 @@ def lint_feature_oracle_declared(feature_dir: Path, plan_fm: dict) -> list[str]:
     if feature_status not in _ORACLE_ERROR_FEATURE_STATUSES | _ORACLE_WARN_FEATURE_STATUSES:
         return []
     feature_id_val = plan_fm.get("feature_id", feature_dir.name)
+    undrafted = _undrafted_gate_files(feature_dir)
     errs: list[str] = []
     for gate_path in _gate_files_from_plan(feature_dir):
         gfm, _ = read_frontmatter(gate_path)
         if gfm.get("status") == "passed":
+            continue
+        if gate_path in undrafted:
             continue
         oracle = gfm.get("feature_oracle")
         if isinstance(oracle, str) and oracle.strip():
