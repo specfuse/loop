@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_lazy_baseline_e2e -q"
 baseline:
   sha: cc8b2613561af3cda5297d5088b33ea3158ccedc
