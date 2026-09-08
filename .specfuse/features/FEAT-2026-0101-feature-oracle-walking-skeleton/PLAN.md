@@ -5,7 +5,7 @@ slug: feature-oracle-walking-skeleton
 branch: feat/FEAT-2026-0101-feature-oracle-walking-skeleton
 roadmap_goal: Every gate declares one `feature_oracle` command in its `GATE-NN.md` — the executable proof of that gate's definition of done — which the driver runs as part of every unit's verification in that gate and again at the close, so the gate's definition of done is the oracle rather than a list of units that each went green.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 21.50
 ---
 
