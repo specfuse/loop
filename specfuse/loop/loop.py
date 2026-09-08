@@ -4595,6 +4595,24 @@ def select_tests_for_changed_files(
     return sorted(modules)
 
 
+#: Whether the changed-file half of the per-attempt selection participates
+#: (FEAT-2026-0109/T05). **Default OFF, on measured evidence.** Gate 2's close
+#: measured the half forcing a full-command fallback on 2 of 3 tiered attempts,
+#: because the source->test map it needs was never built: every unit in that
+#: gate edited `specfuse/loop/loop.py`, which resolves to no test module, so
+#: `select_tests_for_changed_files` returned None and took the whole selection
+#: with it. Realised effect on that gate was **+38.4s (+5.7%) — the tier cost
+#: more than it saved**. With this half off, the declared-tests rule alone
+#: measured **-43.4%** on the same attempts, and the mechanism itself is sound:
+#: the narrow tier ran 5.3-10.2s against 169.4s, matching the 6s prediction.
+#:
+#: T05's code and tests are deliberately kept, not deleted — the capability is
+#: correct and stays exercised (its tests set this flag). What is missing is
+#: the map, which is its own design problem and is tracked as gate 2's review
+#: question Q4. Flip this to True in the same change that lands the map.
+CHANGED_FILE_SELECTION_ENABLED = False
+
+
 def resolve_narrow_test_selection(
     wu: WorkUnit,
     changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
@@ -4615,6 +4633,10 @@ def resolve_narrow_test_selection(
     unresolvable while there was something for it to resolve.
     """
     declared = select_narrow_test_modules(wu) or []
+    if not CHANGED_FILE_SELECTION_ENABLED:
+        # Declared-tests only. Not a silent narrowing: an empty `declared`
+        # still returns None, so the caller runs the gate's full command.
+        return declared or None
     if not changed_lines_by_path:
         return declared or None
     changed = select_tests_for_changed_files(changed_lines_by_path, map_path)

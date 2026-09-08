@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from tests._loop_loader import load_loop
@@ -167,6 +168,17 @@ class ChangedFileTestSelectionTests(unittest.TestCase):
             "a stale map must not be consulted, even for a path it maps")
 
     def test_selection_is_the_union_with_the_declared_paths(self):
+        # The changed-file half ships DISABLED by default
+        # (`CHANGED_FILE_SELECTION_ENABLED`, FEAT-2026-0109 gate 2 close:
+        # it forced a full-command fallback on 2 of 3 tiered attempts because
+        # the source->test map does not exist yet). The capability is correct
+        # and stays covered, so this case enables it explicitly rather than
+        # being deleted or skipped — when the map lands and the default flips,
+        # this patch becomes a no-op and the test keeps asserting the union.
+        patcher = unittest.mock.patch.object(
+            loop, "CHANGED_FILE_SELECTION_ENABLED", True)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self._write_map(files={
             "specfuse/thing.py": {"42": ["tests.test_from_map"]},
         })
