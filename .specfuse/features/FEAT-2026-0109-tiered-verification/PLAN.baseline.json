@@ -1,0 +1,54 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Tracer bullet \u2014 skip the probe at gate entry, attribute on the first failure",
+          "id": "FEAT-2026-0109/T01",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Key the baseline record on the tree hash, not the HEAD sha",
+          "id": "FEAT-2026-0109/T02",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Record how the baseline was determined, not just what it said",
+          "id": "FEAT-2026-0109/T03",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Gate 1 close \u2014 measure what the lazy probe actually saved, and what it cost",
+          "id": "FEAT-2026-0109/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the per-attempt tier \u2014 and its own oracle",
+          "id": "FEAT-2026-0109/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": []
+    },
+    {
+      "gate": 3,
+      "work_units": [
+        {
+          "goal": "Gate 3 close \u2014 terminal close of FEAT-2026-0109",
+          "id": "FEAT-2026-0109/G3-CLOSE",
+          "planned_cost_usd": 8.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
