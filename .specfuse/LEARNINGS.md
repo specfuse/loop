@@ -3971,3 +3971,32 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   threshold criterion pinned to an absolute from another era is the same defect class as an
   unsatisfiable escalation predicate (`planning-discipline.md` §2) — it just takes months to
   become one.
+
+## FEAT-2026-0101/G1-CLOSE — a guard scoped by parsing an identifier can be silent on every real artifact
+
+- [FEAT-2026-0101/G1-CLOSE] **A guard that derives its scope by parsing an identifier or by
+  matching a list marker must be tested against a real artifact from the repository it
+  guards, not only against a fixture written to match the parser.** FEAT-2026-0101's
+  guard-wiring audit found two, both passing their own unit tests and both silent on every
+  work unit this repository actually produces. `_gate_number_from_wu_id` parses `G(\d+)-`,
+  so it resolves `FEAT-2026-0101/G1-CLOSE` to `1` and `FEAT-2026-0101/T02` to `None`; every
+  substantive WU is named `T01`, `T02`, …, so `summarize_attempt_failure_classes(fd,
+  gate_n=1, exclude_correlation_id=<the close>)` filters out every implementation unit's
+  `attempt_outcome` and then excludes the only IDs that survived. Measured on this feature:
+  the gate-scoped call returned `(no non-passing attempts in scope)` while the unscoped call
+  returned `tests | 3 | test_package_data_matches_canonical` — three real failed attempts,
+  invisible to `close-f` and to `_precreate_retrospective_stub`. Separately,
+  `_DEBT_AC_ITEM_RE = r"(?m)^\s*\d+\.\s+(.*)$"` matches only NUMBERED acceptance-criterion
+  items while this repo's work units, its own templates and `/authoring-work-units`' house
+  style all use `-` bullets, so `extract_wu_criteria` returns `status: ok` with zero
+  criteria for every substantive WU, `GATE-NN-CRITERIA.md` is never seeded and `close-l`
+  never applies. The shared defect is not the parser being wrong — it is that both fail
+  OPEN: they report "nothing to check", which is indistinguishable from "checked and clean"
+  in a close's transcript, so a close can honestly record a green guard that never looked at
+  anything. Drafting-time check, mechanical: any guard whose scope comes from a regex over
+  an ID or a body must carry one test that feeds it a work unit copied from
+  `.specfuse/features/`, and any guard whose "nothing matched" path returns success must say
+  so in its own output rather than falling through silently. Distinct from
+  `[FEAT-2026-0070/G2-CLOSE]`, which is about a guard that is inert because nothing it
+  applies to exists yet; this one is about a guard that is inert while the artifacts it was
+  written for sit on disk in front of it.
