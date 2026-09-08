@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0101/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
@@ -10,6 +10,15 @@ produces:
   - plugins/specfuse/skills/draft-feature/SKILL.md
   - plugins/specfuse/skills/authoring-work-units/SKILL.md
   - docs/methodology.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T00:39:28.711342+00:00
+duration_seconds: 1029.89
+cost_usd: 1.824907
+input_tokens: 122
+output_tokens: 14893
 ---
 
 # Make the oracle the drafted default across the authoring surfaces

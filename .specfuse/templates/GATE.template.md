@@ -1,6 +1,10 @@
 ---
 gate: 1
 status: open        # open | awaiting_review | passed
+# feature_oracle: "<command>"   # REQUIRED for a drafted gate. The executable proof of
+# this gate's definition of done, exercising the user-visible outcome end to end. Starts
+# red — the feature is not built yet — and the gate's first implementation unit is the
+# tracer bullet that makes it runnable and green.
 # cost_budget_usd: 5.0   # optional cumulative-cost ceiling (USD).
 # When the sum of `cost_usd` across this gate's done WUs reaches the ceiling,
 # the loop halts to `awaiting_review` between WUs — the current WU always runs

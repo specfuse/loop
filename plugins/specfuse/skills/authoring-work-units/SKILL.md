@@ -1,6 +1,6 @@
 ---
 name: authoring-work-units
-description: "How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Thirteen numbered rules, five written in full (§2 criteria scope, §6 sizing, §9 hollow-pass pre-flight, §12 red-test-first, §13 produces:) and the rest one-paragraph pointers to the surface that owns them."
+description: "How to write a single Specfuse work unit that won't block spuriously or pass hollowly. Reference for humans authoring WUs in the loop, and for reviewing PM-agent drafts in the orchestrator. Fourteen numbered rules, six written in full (§2 criteria scope, §6 sizing, §9 hollow-pass pre-flight, §12 red-test-first, §13 produces:, §14 tracer bullet) and the rest one-paragraph pointers to the surface that owns them."
 ---
 
 <!--
@@ -175,6 +175,22 @@ empty, recording `deliverable_missing`; a body-level `test -s` is advisory.
 
 *Prevents:* the zero-deliverable and partial-bundle hollow passes the
 no-code-written guard left open (`[FEAT-2026-0020/G2/hollow-pass-presence-gates]`).
+
+## 14. Tracer bullet — stubs permitted only in the unit that turns the oracle green
+
+A gate's `feature_oracle` (`docs/methodology.md` §2.1) is red on the tree until
+its walking skeleton lands. That first implementation WU may stub out anything
+not on the thinnest end-to-end path the oracle exercises — it is proving the
+path is wired, not that every part along it is finished. Every WU **after**
+it, in the same gate, may not: a stub there is the hollow pass §9 exists to
+catch, dressed up as "the tracer bullet already covers this."
+
+State which unit is the tracer bullet in that unit's Objective, so the rule has
+something to point at during review — an unnamed tracer bullet is just an
+undisciplined WU that happens to run first.
+
+*Prevents:* a gate whose oracle goes green on a stub wired straight through,
+with every later unit assuming the stub was real (FEAT-2026-0101).
 
 ## Haiku — when (and when not)
 
