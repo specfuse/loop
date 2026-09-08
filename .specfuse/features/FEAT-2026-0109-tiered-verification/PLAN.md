@@ -161,8 +161,9 @@ gates:
 - **The cost gate 1 accepts, stated plainly.** When the tree really is
   pre-broken, one agent dispatch is burned discovering it — roughly $1–4 and
   15–25 minutes — and that agent may thrash on a failure it did not cause.
-  Bounded to one dispatch per gate because the retroactive probe fires on the
-  first failure, and the driver's hard reset discards the thrash. Against
+  Bounded to one dispatch per tree state per gate because the retroactive
+  probe fires on the first failure against that tree, and the driver's hard
+  reset discards the thrash. Against
   ~3 minutes × every entry and restart, at the failure rates measured, the
   trade is clearly right — but it is a trade, not a free win.
 - **Why gate 2 waits for gate 1's `plan-next`.** The per-attempt tier needs a

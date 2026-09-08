@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 oracle_env: macos_local
 produces:
@@ -13,6 +13,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T17:29:51.072512+00:00
+duration_seconds: 676.816
+cost_usd: 0.877821
+input_tokens: 62
+output_tokens: 10835
 ---
 
 # Say the bound the mechanism actually holds, and test the case that has none

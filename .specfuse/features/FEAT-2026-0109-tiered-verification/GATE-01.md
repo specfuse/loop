@@ -20,8 +20,12 @@ baseline:
   pre-existed. A pre-existing failure escalates `preexisting_gate_failure` as
   it does today and **is not counted against the unit's attempts**; a genuine
   failure counts normally and the unit retries.
-- **Attribution runs at most once per gate.** A second failing unit does not
-  re-probe if the gate already has a fresh attribution record for this tree.
+- **Attribution runs at most once per tree state per gate.** A second failing
+  unit does not re-probe if the gate already has a fresh attribution record
+  for this tree; a unit failing against a tree a landed change has since moved
+  past legitimately re-probes. (Corrected by FEAT-2026-0109/T07 from an
+  overclaim of the tree-independent bound — see `GATE-02-REVIEW.md`
+  § "The differing-sha gap".)
 - **The probe that does still run is keyed on the tree hash**, not the HEAD
   sha, so a bookkeeping commit that leaves the code tree identical does not
   invalidate the record — the case that made every restart re-probe.

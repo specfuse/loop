@@ -5335,7 +5335,9 @@ def attribute_failure_to_baseline(
     dedup this needs — a second failing unit at the same *head_sha* (the
     common case: nothing landed between the two failures) finds the record
     `gate_baseline_check` wrote for the first and does not re-probe, which is
-    what bounds attribution to at most once per gate. `wu_id` names the unit
+    what bounds attribution to at most once per tree state per gate: a unit
+    failing against a tree a landed change has since moved past legitimately
+    re-probes (FEAT-2026-0109/T07). `wu_id` names the unit
     whose failure triggered this probe; when a probe actually runs, it is
     carried into the persisted record's `source` field as
     `attributed:<wu_id>` (FEAT-2026-0109/T03), so a later reader of

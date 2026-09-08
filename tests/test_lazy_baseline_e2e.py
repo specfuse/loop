@@ -348,8 +348,25 @@ class LazyBaselineIntegration(unittest.TestCase):
 
 
 class AttributionDedup(unittest.TestCase):
-    """attribute_failure_to_baseline: the once-per-gate bound, in isolation —
-    two attributions at the same tree must not re-run probe_baseline."""
+    """attribute_failure_to_baseline: the bound `gate_baseline_check` actually
+    holds is at most once per tree state per gate, not per gate outright
+    (FEAT-2026-0109/T07) — two attributions at the same tree must not
+    re-run probe_baseline, but two at genuinely different trees must."""
+
+    def _run_git(self, *args):
+        subprocess.run(["git", *args], check=True,
+                        capture_output=True, text=True)
+
+    def _init_repo(self, root: Path) -> str:
+        self._run_git("init", "-q")
+        self._run_git("config", "user.email", "test@example.com")
+        self._run_git("config", "user.name", "Test")
+        (root / "src.py").write_text("value = 1\n")
+        self._run_git("add", "src.py")
+        self._run_git("commit", "-q", "-m", "initial")
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True,
+            check=True).stdout.strip()
 
     def test_attribution_runs_at_most_once_per_gate(self):
         import tempfile
@@ -381,6 +398,111 @@ class AttributionDedup(unittest.TestCase):
             self.assertFalse(second_fresh)
             self.assertEqual(first, second)
             self.assertEqual(first, [])
+
+    def test_attribution_reprobes_when_the_tree_moved(self):
+        """The case with no test anywhere today: two units fail at different
+        head shas separated by a landed unit that changed tracked content
+        outside `.specfuse/`. The tree really moved, so the record from the
+        first probe must not be reused for the second."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                sha1 = self._init_repo(root)
+
+                gf = root / "GATE-01.md"
+                gf.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+                cfg = {"code": [{"name": "tests", "command": "true"}]}
+
+                calls = []
+                orig = loop.probe_baseline
+
+                def counting_probe(feature_dir, cfg=None):
+                    calls.append(1)
+                    return orig(feature_dir, cfg)
+
+                loop.probe_baseline = counting_probe
+                try:
+                    _, first_fresh = loop.attribute_failure_to_baseline(
+                        gf, root, cfg, sha1, "FEAT-X/T01")
+
+                    (root / "src.py").write_text("value = 2\n")
+                    self._run_git("add", "src.py")
+                    self._run_git("commit", "-q", "-m", "landed unit changes code")
+                    sha2 = subprocess.run(
+                        ["git", "rev-parse", "HEAD"], capture_output=True,
+                        text=True, check=True).stdout.strip()
+
+                    _, second_fresh = loop.attribute_failure_to_baseline(
+                        gf, root, cfg, sha2, "FEAT-X/T02")
+                finally:
+                    loop.probe_baseline = orig
+
+                self.assertEqual(len(calls), 2,
+                                  "a genuinely different tree must re-probe")
+                self.assertTrue(first_fresh)
+                self.assertTrue(second_fresh)
+                record = loop.read_gate_baseline(gf)
+                self.assertEqual(
+                    record["source"], "attributed:FEAT-X/T02",
+                    "the persisted record must name the second unit")
+            finally:
+                os.chdir(cwd)
+
+    def test_attribution_dedups_across_a_bookkeeping_commit(self):
+        """The boundary that makes the reprobe test a real distinction: a
+        commit that touches only `.specfuse/` moves the sha but not the
+        tree `_current_tree_hash` tracks, so the second call must still
+        dedup against the first."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cwd = os.getcwd()
+            os.chdir(root)
+            try:
+                sha1 = self._init_repo(root)
+
+                gf = root / "GATE-01.md"
+                gf.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+                cfg = {"code": [{"name": "tests", "command": "true"}]}
+
+                calls = []
+                orig = loop.probe_baseline
+
+                def counting_probe(feature_dir, cfg=None):
+                    calls.append(1)
+                    return orig(feature_dir, cfg)
+
+                loop.probe_baseline = counting_probe
+                try:
+                    _, first_fresh = loop.attribute_failure_to_baseline(
+                        gf, root, cfg, sha1, "FEAT-X/T01")
+
+                    specfuse_dir = root / ".specfuse"
+                    specfuse_dir.mkdir()
+                    (specfuse_dir / "events.jsonl").write_text("{}\n")
+                    self._run_git("add", ".specfuse/events.jsonl")
+                    self._run_git("commit", "-q", "-m", "bookkeeping commit")
+                    sha2 = subprocess.run(
+                        ["git", "rev-parse", "HEAD"], capture_output=True,
+                        text=True, check=True).stdout.strip()
+                    self.assertNotEqual(sha1, sha2)
+
+                    _, second_fresh = loop.attribute_failure_to_baseline(
+                        gf, root, cfg, sha2, "FEAT-X/T02")
+                finally:
+                    loop.probe_baseline = orig
+
+                self.assertEqual(
+                    len(calls), 1,
+                    "a different sha whose commit touched only .specfuse/ "
+                    "must still dedup against the prior probe")
+                self.assertTrue(first_fresh)
+                self.assertFalse(second_fresh)
+            finally:
+                os.chdir(cwd)
 
 
 if __name__ == "__main__":
