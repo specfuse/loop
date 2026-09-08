@@ -2,6 +2,11 @@
 gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_lazy_baseline_e2e -q"
+baseline:
+  sha: cc8b2613561af3cda5297d5088b33ea3158ccedc
+  probed_at: 2026-09-08T11:26:09.498081+00:00
+  entry_sha: cc8b2613561af3cda5297d5088b33ea3158ccedc
+  failing: []
 ---
 
 # Gate 1 — the probe stops running when nothing is wrong, and still attributes when something is
