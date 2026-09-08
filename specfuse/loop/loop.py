@@ -4064,7 +4064,10 @@ def order_gate_set(gate_set: list) -> list:
     return ordered
 
 
-def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
+def _run_gate_set(
+    gate_set: list, feature_dir: Path,
+    _capture_returncodes: "dict | None" = None,
+) -> list[dict]:
     """Run every gate in *gate_set* and return one result dict per gate.
 
     Each dict is {"name": str, "ok": bool, "report": str} where "report" is
@@ -4080,6 +4083,14 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
     shared) and a gate whose dependency failed is skipped — `ok=False`, never
     run, reported as `SKIP` rather than `FAIL` so `parse_gate_failure_signature`
     still attributes the attempt to the dependency that actually failed.
+
+    `_capture_returncodes` (FEAT-2026-0101/T05) is an optional out-parameter:
+    when given a dict, each gate that actually spawns a subprocess records its
+    raw `returncode` under its gate name. It does not change the return
+    contract above — existing callers that omit it see byte-identical
+    behaviour — it exists so `verify()`'s oracle path can distinguish "the
+    oracle command could not even be found" (exit 127) from "the oracle ran
+    and failed" without every caller having to carry that detail.
     """
     results = []
     failed_names: set[str] = set()
@@ -4152,6 +4163,8 @@ def _run_gate_set(gate_set: list, feature_dir: Path) -> list[dict]:
         try:
             out, _ = proc.communicate(timeout=GATE_TIMEOUT_SECONDS)
             ok = proc.returncode == 0
+            if _capture_returncodes is not None:
+                _capture_returncodes[gate["name"]] = proc.returncode
             tail = select_gate_report_lines(out, window=15)
             # A green gate whose oracle silently degraded is a hollow pass
             # (issue #134): force FAIL and name the degradation honestly so the
@@ -4262,7 +4275,31 @@ def verify(wu: WorkUnit, feature_dir: Path,
             gate_set = gate_set + [
                 {"name": "feature_oracle", "command": oracle_command}
             ]
-    gate_results = _run_gate_set(gate_set, feature_dir)
+    oracle_declared = gate_file is not None and oracle_command
+    returncodes: "dict | None" = {} if oracle_declared else None
+    gate_results = _run_gate_set(gate_set, feature_dir, _capture_returncodes=returncodes)
+    if oracle_declared:
+        # An oracle the shell could not even run (exit 127 — "command not
+        # found") is a verification.yml misconfiguration, not a defect in the
+        # work just done (FEAT-2026-0101/T05). Detect by exit status, never by
+        # matching the words "command not found" in the output — a legitimate
+        # test that prints that phrase while failing for a real reason must
+        # still be reported as an ordinary gate failure.
+        for i, g in enumerate(gate_results):
+            if (g["name"] == "feature_oracle" and not g["ok"]
+                    and returncodes.get("feature_oracle") == 127):
+                gate_results[i] = {
+                    "name": "feature_oracle",
+                    "ok": False,
+                    "report": (
+                        f"CONFIGURATION ERROR: {gate_file} declares "
+                        f"`feature_oracle: {oracle_command!r}` but that command "
+                        f"could not be run (exit 127 — command not found). This "
+                        f"is not a work-unit failure — fix "
+                        f"{Path(gate_file).name} and re-run."
+                    ),
+                }
+                break
     ok_all = all(g["ok"] for g in gate_results)
     return ok_all, "\n\n".join(g["report"] for g in gate_results)
 

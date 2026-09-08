@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0101/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/loop.py
   - tests/test_oracle_unrunnable_attribution.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T01:59:22.101194+00:00
+duration_seconds: 887.169
+cost_usd: 0.563103
+input_tokens: 36
+output_tokens: 11439
 ---
 
 # An oracle the shell cannot run is a configuration problem, not the unit's fault
