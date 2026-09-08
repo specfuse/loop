@@ -4247,22 +4247,341 @@ def select_narrow_test_modules(wu: WorkUnit) -> "list[str] | None":
     return modules or None
 
 
-def resolve_narrow_command(gate: dict, wu: WorkUnit) -> str:
+# --------------------------------------------------------------------------- #
+# FEAT-2026-0109/T05 — "tests touching changed files": a measured map, not a
+# guessed one. `GATE-02-REVIEW.md` § "Tests touching changed files" records
+# why line-granularity coverage contexts were chosen over an import-graph or
+# path-convention rule: this repo's `specfuse/loop/loop.py` is one ~9k-line
+# module that most test modules import, so anything coarser than "which
+# lines did a test actually execute" cannot narrow it.
+# --------------------------------------------------------------------------- #
+
+#: Where the changed-file test map is persisted (FEAT-2026-0109/T05). Not
+#: committed — it is derived from a coverage run, like `.coverage` itself
+#: (already gitignored) — and never written by an attempt, only by the
+#: once-per-gate broad run (T06), so `reset_preserving_events`'s untracked
+#: sweep (which only deletes paths that appeared SINCE the WU's pre-dispatch
+#: snapshot) never touches a copy that predates the WU it is consulted from.
+CHANGED_FILE_TEST_MAP_PATH = Path(".specfuse-changed-file-test-map.json")
+
+#: The `coverage run --source=` root the map is built from (matches
+#: `.specfuse/verification.yml`'s `tests` gate). Changed paths outside this
+#: prefix (test files, docs, config) are a different question T04's declared-
+#: test selection already answers — feeding them to the map would report a
+#: false "unmapped path" on every attempt that merely adds a test file.
+CHANGED_FILE_TEST_MAP_SOURCE_PREFIX = "specfuse/"
+
+#: The directory `coverage run ... -m unittest discover -s tests` (the
+#: `tests` gate's broad command) passes to `-s`. `discover -s tests` with no
+#: `-t` makes `tests` its own top-level dir, so dynamic-context test ids come
+#: back as bare module names (`test_foo.Class.method`), not dotted from the
+#: repo root — but the narrow tier invokes `python3 -m unittest
+#: {selected_test_modules}` FROM the repo root, which needs the `tests.`
+#: prefix `_test_module_name` already puts on declared paths. This constant
+#: is what `_coverage_context_module` reattaches.
+CHANGED_FILE_TEST_MAP_TEST_ROOT = "tests"
+
+
+def _coverage_context_module(
+    context: str, test_root: str = CHANGED_FILE_TEST_MAP_TEST_ROOT,
+) -> "str | None":
+    """Convert a `dynamic_context = "test_function"` context (a unittest test
+    id) to its dotted MODULE name, reattaching *test_root* — the same
+    granularity `_test_module_name` already selects at, and the same dotted
+    form it produces (FEAT-2026-0109/T05).
+
+    Returns None for a context that is not a test id: the empty string
+    coverage.py records for lines executed outside any test (e.g. at import
+    time), or any name with too few dotted segments to carry a `Class.method`
+    suffix.
+    """
+    if not context:
+        return None
+    parts = context.split(".")
+    if len(parts) < 3:
+        return None
+    module = ".".join(parts[:-2])
+    if test_root and not module.startswith(f"{test_root}."):
+        module = f"{test_root}.{module}"
+    return module
+
+
+def build_changed_file_test_map(
+    coverage_data_path: str = ".coverage",
+    test_root: str = CHANGED_FILE_TEST_MAP_TEST_ROOT,
+) -> dict:
+    """Build the changed-file -> test-module map from a coverage run recorded
+    with `dynamic_context = "test_function"` (FEAT-2026-0109/T05).
+
+    Reads the coverage.py SQLite data at *coverage_data_path* through the
+    `coverage` package's own reader — the same data the `coverage` gate
+    already reports over, so this asks nothing new of the broad run beyond
+    turning on dynamic contexts. For every measured file, records which test
+    modules' contexts executed which lines.
+
+    Stamped with `git rev-parse HEAD` and T02's `_current_tree_hash()` at
+    build time, read from the process's own working directory (the repo
+    root the broad run executes in, not *coverage_data_path*'s location) —
+    `is_map_stale` uses `sha` to test ancestry against the tree consulting
+    the map later.
+
+    `coverage` is a dev-only dependency (`pyproject.toml`'s `dev` extra), so
+    the import is deferred to this call rather than module load time — a
+    production install with no dev extras must still be able to import this
+    module.
+    """
+    import coverage
+
+    data = coverage.CoverageData(basename=coverage_data_path)
+    data.read()
+    base_dir = Path(coverage_data_path).resolve().parent
+    files: dict = {}
+    for file_path in data.measured_files():
+        try:
+            rel = str(Path(file_path).resolve().relative_to(base_dir))
+        except ValueError:
+            rel = file_path
+        rel = rel.replace("\\", "/")
+        contexts_by_line = data.contexts_by_lineno(file_path)
+        line_modules: dict = {}
+        for lineno, contexts in contexts_by_line.items():
+            modules = sorted({
+                module for c in contexts
+                if (module := _coverage_context_module(c, test_root)) is not None
+            })
+            if modules:
+                line_modules[str(lineno)] = modules
+        if line_modules:
+            files[rel] = line_modules
+    sha_result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=False,
+    )
+    return {
+        "sha": sha_result.stdout.strip() or None,
+        "tree": _current_tree_hash(),
+        "files": files,
+    }
+
+
+def write_changed_file_test_map(path: "Path | None" = None,
+                                 coverage_data_path: str = ".coverage") -> None:
+    """Build and persist the changed-file test map to *path* (default
+    `CHANGED_FILE_TEST_MAP_PATH`) (FEAT-2026-0109/T05). Called once per gate,
+    after the broad run's `coverage run` has produced fresh contexts —
+    never by an attempt (see `CHANGED_FILE_TEST_MAP_PATH`'s docstring).
+    """
+    target = path or CHANGED_FILE_TEST_MAP_PATH
+    target.write_text(json.dumps(build_changed_file_test_map(coverage_data_path)))
+
+
+def read_changed_file_test_map(path: "Path | None" = None) -> "dict | None":
+    """Read the persisted changed-file test map, or None if absent,
+    unparseable, or malformed (FEAT-2026-0109/T05) — mirrors
+    `read_gate_baseline`'s "never raise, treat as never-built" shape. A
+    corrupt or missing map must fail toward the selector's fallback, not
+    crash the driver mid-attempt.
+    """
+    target = path or CHANGED_FILE_TEST_MAP_PATH
+    if not target.is_file():
+        return None
+    try:
+        data = json.loads(target.read_text())
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("files"), dict):
+        return None
+    return data
+
+
+def is_map_stale(map_data: dict) -> bool:
+    """True if *map_data* was not built at an ancestor of the current tree
+    (FEAT-2026-0109/T05) — its recorded `sha` fails `git merge-base
+    --is-ancestor <sha> HEAD`, so its line -> test associations describe a
+    tree the current one did not grow from and cannot be trusted. A missing,
+    non-string `sha`, or one git cannot resolve at all, is treated as stale —
+    fail toward refusing an unverifiable record, never toward trusting one.
+    """
+    sha = map_data.get("sha")
+    if not isinstance(sha, str) or not sha:
+        return True
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", sha, "HEAD"],
+        capture_output=True, check=False,
+    )
+    return result.returncode != 0
+
+
+def select_tests_for_changed_files(
+    changed_lines_by_path: "dict[str, list[int] | None]",
+    map_path: "Path | None" = None,
+) -> "list[str] | None":
+    """The changed-file half of "tests touching changed files"
+    (FEAT-2026-0109/T05) — the test modules whose contexts executed the
+    changed lines of *changed_lines_by_path* (path -> changed line numbers,
+    or `None` to mean "treat every mapped line of this path as changed",
+    e.g. when precise line numbers were not available), read from the map a
+    real coverage run with `dynamic_context` produced.
+
+    Returns None — "unresolvable" — for every fail-safe trigger
+    `GATE-02.md` names: no map on disk, a stale map (`is_map_stale`), or any
+    changed path absent from the map (a brand-new source file is exactly
+    this case, and the map — built before the file existed — cannot cover
+    it). The caller's fallback then runs the gate's full command; this
+    function never returns an answer narrower than that.
+
+    An empty *changed_lines_by_path* resolves to `[]`, distinct from None
+    ("could not resolve") — a WU that changed nothing under the coverage
+    source root has nothing for this half to add, which is not a failure.
+    """
+    if not changed_lines_by_path:
+        return []
+    map_data = read_changed_file_test_map(map_path)
+    if map_data is None or is_map_stale(map_data):
+        return None
+    files = map_data["files"]
+    modules: set = set()
+    for path, changed_lines in changed_lines_by_path.items():
+        entry = files.get(path.replace("\\", "/"))
+        if entry is None:
+            return None
+        lines = changed_lines if changed_lines is not None else [
+            int(n) for n in entry
+        ]
+        touched = {m for lineno in lines for m in entry.get(str(lineno), [])}
+        if not touched:
+            # every changed line is unmapped for this path — same fail-safe
+            # trigger as the path being absent entirely.
+            return None
+        modules.update(touched)
+    return sorted(modules)
+
+
+def resolve_narrow_test_selection(
+    wu: WorkUnit,
+    changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
+    map_path: "Path | None" = None,
+) -> "list[str] | None":
+    """The full per-attempt test selection (FEAT-2026-0109/T05): the union of
+    the unit's own declared test paths (T04's `select_narrow_test_modules`)
+    and whatever `select_tests_for_changed_files` resolves for
+    *changed_lines_by_path*. "The map may add, never subtract"
+    (`GATE-02.md`) — but an unresolvable changed-file half is not silently
+    dropped either: it forces the same fallback an empty selection does,
+    because a changed source file this feature cannot vouch for is exactly
+    the case the fail-safe design exists to catch, not one to run narrower
+    for.
+
+    Returns None exactly when the caller must fall back to the gate's full
+    command: nothing resolved at all, or the changed-file half was
+    unresolvable while there was something for it to resolve.
+    """
+    declared = select_narrow_test_modules(wu) or []
+    if not changed_lines_by_path:
+        return declared or None
+    changed = select_tests_for_changed_files(changed_lines_by_path, map_path)
+    if changed is None:
+        return None
+    union = sorted(set(declared) | set(changed))
+    return union or None
+
+
+def _diff_hunk_new_lines(diff_output: str) -> list[int]:
+    """Line numbers a unified diff's hunks add or modify in the NEW file
+    version (FEAT-2026-0109/T05), parsed from `@@ -a,b +c,d @@` headers. A
+    pure-deletion hunk (new-side count 0) contributes nothing — there is no
+    new line left to attribute a broken test to.
+    """
+    lines: list[int] = []
+    for line in diff_output.splitlines():
+        if not line.startswith("@@"):
+            continue
+        m = re.search(r"\+(\d+)(?:,(\d+))?", line)
+        if not m:
+            continue
+        start = int(m.group(1))
+        count = int(m.group(2)) if m.group(2) is not None else 1
+        if count == 0:
+            continue
+        lines.extend(range(start, start + count))
+    return lines
+
+
+def attempt_changed_source_lines(
+    source_prefix: str = CHANGED_FILE_TEST_MAP_SOURCE_PREFIX,
+) -> "dict[str, list[int] | None]":
+    """This attempt's changed lines under *source_prefix*
+    (FEAT-2026-0109/T05) — the input `select_tests_for_changed_files` needs,
+    computed from the working tree's diff against HEAD.
+
+    HEAD is the pre-attempt commit for the whole of `verify()`'s call: the
+    dispatched agent only edits files, never commits
+    (`result-contract.md` Rule 1), so this is exactly the diff the attempt
+    just produced. A path new to the working tree (untracked) maps to
+    `None` — there is no HEAD version to diff against — which
+    `select_tests_for_changed_files` resolves by treating every mapped line
+    as changed, or (the common case for a genuinely new file) by finding no
+    entry for the path at all and reporting unresolvable.
+
+    Best-effort: any git failure (not a repo, git absent, or — in several
+    existing unit tests — `subprocess.Popen` itself patched out for the
+    duration of a `verify()` call that stubs the gate command) degrades to
+    `{}`, the same as "nothing changed", rather than raising. This function
+    only ever narrows what a WU's own tests already declare; it must never
+    be the thing that crashes verification.
+    """
+    try:
+        tracked = [
+            line for line in subprocess.run(
+                ["git", "diff", "--name-only", "HEAD"],
+                capture_output=True, text=True, check=False,
+            ).stdout.splitlines() if line
+        ]
+        untracked = [
+            line for line in subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                capture_output=True, text=True, check=False,
+            ).stdout.splitlines() if line
+        ]
+        untracked_set = set(untracked)
+        result: "dict[str, list[int] | None]" = {}
+        for path in sorted(set(tracked) | untracked_set):
+            if not path.startswith(source_prefix):
+                continue
+            if path in untracked_set:
+                result[path] = None
+                continue
+            diff = subprocess.run(
+                ["git", "diff", "-U0", "HEAD", "--", path],
+                capture_output=True, text=True, check=False,
+            )
+            result[path] = _diff_hunk_new_lines(diff.stdout)
+        return result
+    except Exception:  # noqa: BLE001 - best-effort; see docstring
+        return {}
+
+
+def resolve_narrow_command(
+    gate: dict, wu: WorkUnit,
+    changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
+) -> str:
     """The command to run for *gate* in the per-attempt (narrow) tier
-    (FEAT-2026-0109/T04).
+    (FEAT-2026-0109/T04, changed-file half added by T05).
 
     Most gates declare one `command` and it runs unchanged in both tiers. A
     gate may additionally declare `narrow_command` — a template carrying the
     `{selected_test_modules}` placeholder — to run a cheaper, unit-scoped
     command per attempt while `command` still runs whole in the once-per-gate
     broad run (`GATE-02.md`: "one gate entry with two commands, not two
-    entries"). An empty selection falls back to the gate's full `command` —
+    entries"). *changed_lines_by_path* is the changed-file half
+    (`resolve_narrow_test_selection`) — omitted or empty, this is byte-
+    identical to T04's declared-tests-only behaviour. An empty or
+    unresolvable final selection falls back to the gate's full `command` —
     fail safe, never open.
     """
     narrow_command = gate.get("narrow_command")
     if not narrow_command:
         return gate["command"]
-    modules = select_narrow_test_modules(wu)
+    modules = resolve_narrow_test_selection(wu, changed_lines_by_path)
     if not modules:
         return gate["command"]
     return narrow_command.replace("{selected_test_modules}", " ".join(modules))
@@ -4342,9 +4661,23 @@ def verify(wu: WorkUnit, feature_dir: Path,
     # unfiltered set) and before the feature_oracle append (so the oracle
     # stays untiered). Dropping a `needs` target here is safe: the target is
     # only ever a `tier: broad` gate a `tier: broad` dependent also lost.
+    # `changed_lines_by_path` (FEAT-2026-0109/T05) is this attempt's own
+    # diff against HEAD, scoped to the coverage source root — resolved once
+    # here rather than per gate, since every narrow_command gate shares it,
+    # and only when some gate actually declares narrow_command: shelling
+    # git for a gate set that has nothing to do with the result is both
+    # wasted work and, in tests that assert zero subprocess calls before a
+    # config-error return (`test_bash_routing.py`'s
+    # TestNoBashFoundFailsLoud), an observable side effect this feature owes
+    # no one.
+    narrow_gate_set = resolve_gate_tiers(gate_set, "narrow")
+    changed_lines_by_path = (
+        attempt_changed_source_lines()
+        if any(g.get("narrow_command") for g in narrow_gate_set) else {}
+    )
     gate_set = [
-        {**gate, "command": resolve_narrow_command(gate, wu)}
-        for gate in resolve_gate_tiers(gate_set, "narrow")
+        {**gate, "command": resolve_narrow_command(gate, wu, changed_lines_by_path)}
+        for gate in narrow_gate_set
     ]
     if gate_file is not None:
         oracle_command = read_gate_feature_oracle(Path(gate_file))

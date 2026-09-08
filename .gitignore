@@ -10,6 +10,10 @@ dist/
 .coverage.*
 htmlcov/
 
+# FEAT-2026-0109/T05 changed-file test map — derived from a coverage run
+# with dynamic contexts, like .coverage itself; never committed.
+.specfuse-changed-file-test-map.json
+
 # Editor / OS noise
 .DS_Store
 *.swp

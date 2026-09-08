@@ -88,3 +88,16 @@ namespaces = true
 # templates, rules, and other seed files out of the wheel without needing the
 # loop source repo on disk.
 "specfuse.loop" = ["data/**/*", "data/*"]
+
+# FEAT-2026-0109/T05: per-test dynamic contexts turn the `tests` gate's
+# existing `coverage run --source=specfuse` (`.specfuse/verification.yml`)
+# into a measured file/line -> test map for free — see
+# `GATE-02-REVIEW.md` § "Tests touching changed files" for why this beat an
+# import-graph or path-convention rule. Lives here rather than a new
+# `.coveragerc` because none exists today and the `tests` gate already
+# passes `--source` on the command line; adding a second config surface
+# would split coverage configuration in two. Read by `build_changed_file_test_map`
+# (`specfuse/loop/loop.py`) via the `coverage` package's own config loading —
+# no code here parses this section directly.
+[tool.coverage.run]
+dynamic_context = "test_function"
