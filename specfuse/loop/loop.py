@@ -111,6 +111,7 @@ from .judge import (
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
+from .build_provenance import head_tree_hash
 from .cost import wu_lifetime_cost_usd
 from .driver_edit import changed_paths_for_commit, driver_paths_in
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
@@ -8163,6 +8164,29 @@ def run(
     backend = make_backend(feat_fm)
     backend.on_feature_start(feature_id, feat_fm)
 
+    # Build-pin identity (FEAT-2026-0109/T08): once per process, when this
+    # process is itself a materialized pin, record what it is actually
+    # executing — the pin's tree hash and its path — so an operator (or a
+    # test) reading events.jsonl never has to infer the build from `ps`
+    # output. The recorded path is `running_package_dir()`, the pin, never
+    # the working tree's `specfuse/loop/`.
+    if not dry_run and os.environ.get(PINNED_BUILD_ENV_VAR):
+        from specfuse.loop.build_provenance import running_package_dir
+        flush_events(events_path, [build_event(
+            "driver_build_pinned", feature_id, {
+                "tree": os.environ[PINNED_BUILD_ENV_VAR],
+                "path": str(running_package_dir()),
+            })])
+        # Committed immediately, same as the baseline-snapshot write just
+        # below: an uncommitted events.jsonl line would not survive the
+        # first WU attempt's `git reset --hard head_before` if that attempt
+        # fails.
+        commit_bookkeeping(
+            [events_path],
+            f"chore(loop): {feature_id} build pin recorded\n\n"
+            f"Feature: {feature_id}",
+        )
+
     gate = next((g for g in gates if g.status != "passed"), None)
     if gate is None:
         # Observation-only path (#276). This poll used to write PLAN.md
@@ -8298,6 +8322,10 @@ def run(
         # above) are not "dispatched" by this process and are excluded.
         dispatch_order: list[str] = []
         driver_edits: list[tuple[str, list[str]]] = []
+        # Driver edits already recorded (non-halting) while this process runs
+        # pinned (FEAT-2026-0109/T08) — so a stable driver_edits tail is not
+        # re-emitted on every subsequent pending-unit's pre-dispatch check.
+        pinned_edits_recorded: set[str] = set()
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         close_wu_completed = None  # any close with a well-formed verdict (#3243)
@@ -8358,7 +8386,32 @@ def run(
                     # 49 of 90 gates repo-wide never edit the driver) or on
                     # the gate's final unit (nothing left in `pending` after
                     # it, so this check is never reached for it at all).
-                    if driver_edits:
+                    #
+                    # FEAT-2026-0109/T08: the halt's premise — "this process
+                    # will execute code it cannot observe" — is false when
+                    # this process is itself a recorded pin: the NEXT process
+                    # re-pins from the post-squash `HEAD^{tree}` anyway, so
+                    # this one keeps dispatching against its own snapshot and
+                    # records the edit instead of stopping for a human.
+                    # `driver_edit.py`'s detection is untouched — only the
+                    # response to it moves.
+                    if driver_edits and os.environ.get(PINNED_BUILD_ENV_VAR):
+                        for _edit_wu_id, _edit_paths in driver_edits:
+                            if _edit_wu_id in pinned_edits_recorded:
+                                continue
+                            pinned_edits_recorded.add(_edit_wu_id)
+                            _next_tree = head_tree_hash(REPO_ROOT)
+                            flush_events(events_path, [build_event(
+                                "driver_staleness_detected", feature_id, {
+                                    "gate": gate.number,
+                                    "wu_id": _edit_wu_id,
+                                    "driver_paths": _edit_paths,
+                                    "halted": False,
+                                    "reason": HALT_REASON_DRIVER_RESTART,
+                                    "pinned_tree": os.environ[PINNED_BUILD_ENV_VAR],
+                                    "next_pin_tree": _next_tree,
+                                })])
+                    elif driver_edits:
                         _edit_wu_id, _edit_paths = driver_edits[-1]
                         _remaining_ids = [
                             w.wu_id for w in pending[pending.index(wu):]]
@@ -10099,6 +10152,54 @@ def _force_utf8_console() -> None:
             reconfigure(encoding="utf-8")
 
 
+#: Set on the child's environment by `_reexec_pinned` and read back by both
+#: the pinned process (to skip re-pinning — a single hop, provably
+#: terminating) and the pre-dispatch driver-restart check (to know this
+#: process is a pin, so a driver edit records rather than halts).
+#: FEAT-2026-0109/T08.
+PINNED_BUILD_ENV_VAR = "SPECFUSE_LOOP_PINNED_TREE"
+
+
+def _reexec_pinned(argv: list) -> "int | None":
+    """Materialize a pin of `specfuse/` outside the working tree and re-run
+    *argv* from it, once. Returns the child's exit code, or `None` when this
+    process should just keep going unpinned (FEAT-2026-0109/T08).
+
+    Declines silently (returns `None`) in every case where pinning cannot be
+    reached without asking an operator to type something different:
+    already inside a pin (the env var is set — re-pinning would recurse),
+    no driver source tree at the cwd (a downstream project: nothing to
+    pin, matching `build_provenance`'s existing silence-by-construction),
+    or no resolvable `HEAD^{tree}` (no git, not a repo, no commits yet).
+    A `subprocess.run` — not `exec` — so this hop is bounded to depth one and
+    terminates provably: the parent blocks on the child and returns its exit
+    code, and the child carries the env var forward so it cannot re-enter.
+    """
+    if os.environ.get(PINNED_BUILD_ENV_VAR):
+        return None
+    from specfuse.loop import build_provenance
+
+    repo_root = build_provenance.repo_root_for()
+    if repo_root is None:
+        return None
+    tree_hash = build_provenance.head_tree_hash(repo_root)
+    if tree_hash is None:
+        return None
+    try:
+        pin_dir = build_provenance.materialize_pin(repo_root, tree_hash)
+    except OSError:
+        # Pinning unavailable (unwritable cache, disk full, ...): run
+        # unpinned rather than fail the whole invocation over it — the same
+        # posture `build_provenance` already takes toward its own warning.
+        return None
+    launcher = pin_dir / build_provenance.PIN_LAUNCHER_NAME
+    env = dict(os.environ)
+    env[PINNED_BUILD_ENV_VAR] = tree_hash
+    result = subprocess.run(
+        [sys.executable, str(launcher), *argv], env=env, check=False)
+    return result.returncode
+
+
 def main() -> int:
     _force_utf8_console()
 
@@ -10143,6 +10244,16 @@ def main() -> int:
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+
+    # Build-pin re-entry (FEAT-2026-0109/T08): after argparse (so `--help`
+    # and a bad flag exit here, in-process, without ever touching a pin) and
+    # after the FEATURES_DIR guard, but before any work that would run
+    # against the wrong build — auto_sync, recheck-verdict, and dispatch all
+    # come after this.
+    _pinned_rc = _reexec_pinned(sys.argv[1:])
+    if _pinned_rc is not None:
+        return _pinned_rc
+
     if args.recheck_verdict:
         feature_dir = _resolve_feature_dir(args.recheck_verdict)
         result = recheck_terminal_verdict(feature_dir, REPO_ROOT)

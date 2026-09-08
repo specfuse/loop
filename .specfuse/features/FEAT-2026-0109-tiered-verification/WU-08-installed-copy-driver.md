@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.50
 oracle_env: macos_local
 produces_driver_helper: pin_driver_build
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/build_provenance.py
   - specfuse/loop/data/schemas/driver-event.schema.json
   - tests/test_installed_copy_driver_e2e.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-08T19:54:33.067309+00:00
+duration_seconds: 2072.869
+cost_usd: 4.546399
+input_tokens: 194
+output_tokens: 79188
 ---
 
 # The driver runs from a pinned build, and a driver edit stops halting the run
