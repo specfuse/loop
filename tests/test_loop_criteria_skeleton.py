@@ -168,6 +168,12 @@ class TestCriteriaArtifactPrecreation(unittest.TestCase):
     def test_reseed_is_additive_and_preserves_recorded_state(self):
         specs = self._two_wu_gate(gate_n=1)
         close_wu = _make_wu("FEAT-TEST-0001/G1-CLOSE", self.fd / "WU-90-close.md", "close")
+        # The recorded entry below carries `attempt: "1"`, so the close must be
+        # AT attempt 1 for the fixture to describe a state a real run can reach.
+        # Left at 0 it is the re-armed shape, where an entry recording a higher
+        # attempt is stale by definition and #3279 resets it — a different
+        # property from the additive reseed this test is about.
+        close_wu.attempts = 1
         loop.precreate_dispatch_skeleton(close_wu, self.fd)
 
         path = self._criteria_path(1)
