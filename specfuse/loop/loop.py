@@ -3843,7 +3843,13 @@ def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     for cmd in commands:
         cmd = normalize_interpreter(cmd)
         proc = subprocess.run(  # nosec B602
-            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd), check=False,
+            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
+            check=False,
+            # Runs project commands, so the driver's pin marker must not leak
+            # in — see `child_env_without_pin_marker`. Found by the spawn-site
+            # enumeration in tests/test_pin_marker_spawn_sites.py, not by
+            # anyone noticing.
+            env=child_env_without_pin_marker(),
         )
         if proc.returncode != 0:
             summary = (
@@ -7422,9 +7428,15 @@ def run_judge_session(
     fixture without touching the close path's logic. `subprocess.TimeoutExpired`
     is left to propagate — `judge_close` owns what a timeout means.
     """
+    # The judge reads evidence by running the project's own commands, so it
+    # must not inherit the driver's pin marker either. Missing this strip made
+    # a judge dispatched from a pinned driver see three pin-conditional tests
+    # take their pinned branch and lowered a correct `met` to `not_met` on
+    # evidence that was an artifact of its environment. See
+    # `child_env_without_pin_marker`.
     proc = subprocess.run(
         build_judge_cmd(), input=prompt, capture_output=True, text=True,
-        check=False, timeout=timeout,
+        check=False, timeout=timeout, env=child_env_without_pin_marker(),
     )
     return parse_claude_json_output(proc.stdout or "")
 

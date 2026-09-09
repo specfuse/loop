@@ -15,9 +15,9 @@ verdict: not_met
 driver_version: 0.16.0
 started_at: 2026-09-09T13:49:39.728913+00:00
 duration_seconds: 1838.141
-cost_usd: 16.982736
-input_tokens: 266
-output_tokens: 100884
+cost_usd: 17.167716
+input_tokens: 272
+output_tokens: 102532
 re_arm_count: 1
 re_arm_history:
   -
