@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/G3-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 8.00
 oracle_env: macos_local
 auto_close_disabled: true
@@ -11,14 +11,13 @@ produces:
 model: opus
 effort: high
 gate_set: plannext
-verdict: not_met
 driver_version: 0.16.0
 started_at: 2026-09-09T13:49:39.728913+00:00
 duration_seconds: 1838.141
 cost_usd: 17.167716
 input_tokens: 272
 output_tokens: 102532
-re_arm_count: 1
+re_arm_count: 2
 re_arm_history:
   -
     timestamp: 2026-09-09T11:42:46+00:00
@@ -27,6 +26,13 @@ re_arm_history:
     prior_cost_usd: 12.620459
     prior_duration_seconds: 1547.333
     reason: "go with option 1, add T09 and re-run the close"
+  -
+    timestamp: 2026-09-09T14:59:28+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 17.167716
+    prior_duration_seconds: 1838.141
+    reason: "go with option 1, fix the judge env and re-run the close"
 cumulative_cost_usd: 12.620459
 cumulative_duration_seconds: 1547.333
 cumulative_input_tokens: 256
@@ -42,13 +48,37 @@ done, enumerate the consumer-visible contract this feature changed across all
 three gates, reconcile the whole feature's cost, and record the lessons.
 Measure; a separate judge session reads the evidence and decides.
 
-**This is the close's second attempt.** Attempt 1 recorded `not_met` and a fresh
-judge agreed, unlowered — correctly. Two of `GATE-03.md`'s seven bullets were
-unmet, filed as **#3270** (a pinned run printed the unpinned halt text at the
-point it declines to halt) and **#3271** (`materialize_pin` reused a pin on a
-marker match alone, so a partially reaped pin was still reported as the running
-build). **T09 closes both.** Re-measure against the same seven bullets and say
-plainly which ones T09 moved.
+**This is the close's THIRD attempt, and attempt 2's `not_met` was not your
+fault or the judge's.** Attempt 2 wrote `met`; the judge lowered it on three
+observed failures in `tests.test_installed_copy_driver_e2e`. Those failures
+were real *in the environment the judge was given* and absent everywhere else:
+`run_judge_session` spawned without `env=`, so a judge dispatched from a pinned
+driver inherited `SPECFUSE_LOOP_PINNED_TREE` and three pin-conditional tests
+took their pinned branch. One variable reproduces it exactly:
+
+```
+env SPECFUSE_LOOP_PINNED_TREE=<hash> python3 -m unittest \
+    tests.test_installed_copy_driver_e2e     # FAILED (failures=3)
+python3 -m unittest tests.test_installed_copy_driver_e2e     # OK
+```
+
+`75543e7` strips the marker at the judge and at the smoke-import runner, and
+adds `tests/test_pin_marker_spawn_sites.py`, which enumerates spawn sites
+rather than patching the ones anyone remembers — that enumeration found the
+smoke-import site nobody had reported. **Do not re-litigate attempt 2's five
+follow-up entries as code defects**: `#3273`–`#3277` are environment artifacts
+of that leak. Verify that claim yourself with the two commands above, then say
+so plainly in `## Measurements` — an environment artifact recorded as a code
+defect is as wrong as the reverse.
+
+**Attempt 1's two findings are genuinely closed.** `#3270` and `#3271` were
+real; T09 fixed both, and attempt 2 confirmed both re-run conditions. Their
+`FOLLOW-UPS.md` entries are retained verbatim with `Closed by` lines only so
+the driver's issue deduplication keeps working — do not treat their presence as
+open work.
+
+Re-measure against `GATE-03.md`'s seven bullets and say which ones T09 and T10
+moved.
 
 Attempt 1 found #3270 by driving the pinned scenario as a subprocess and reading
 its **stdout** — a surface this gate's oracle does not see, since `GATE-03.md`
