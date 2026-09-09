@@ -34,6 +34,18 @@ WUs and stop" mode.
   the gate file's `status`.** No body edits, no PLAN graph surgery,
   no roadmap edits. If a blocked WU needs spec changes, exit the
   skill and edit the WU file directly, then re-run.
+- **Never hand-edit `GATE-NN-CRITERIA.md`, and do not delete it.**
+  Re-arming a `close` resets `attempts`, which leaves that artifact
+  recording a superseded attempt — the two then disagree and
+  `check_criteria_state_well_formed` refuses the tree
+  (`close-l: … attempt '1' != current attempt '0'`), the gate's broad
+  run goes red on the corpus lint, and the close never dispatches.
+  **The driver now repairs this itself** at dispatch (#3279): an entry
+  whose recorded attempt exceeds the WU's current `attempts` is reset
+  to `unverified`, while entries at or below it keep the state the
+  close recorded. So there is nothing to do here — and hand-clearing
+  the file, which was the only recovery before the fix, now risks
+  discarding state a live attempt still owns.
 - **Do not retry without acknowledging the root cause.** Before
   flipping a WU to `pending`, the user must confirm what changed
   (credentials updated, spec amended, dep installed, environment

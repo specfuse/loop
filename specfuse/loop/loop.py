@@ -3512,10 +3512,12 @@ def precreate_dispatch_skeleton(wu: WorkUnit, feature_dir: Path) -> None:
         _precreate_gate_review_stub(feature_dir, gate_n)
     else:
         _precreate_retrospective_stub(wu, feature_dir, gate_n)
-        _precreate_criteria_state_stub(feature_dir, gate_n)
+        _precreate_criteria_state_stub(feature_dir, gate_n, wu.attempts)
 
 
-def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
+def _precreate_criteria_state_stub(
+    feature_dir: Path, gate_n: int, current_attempt: "int | None" = None,
+) -> None:
     """Seed/extend `GATE-NN-CRITERIA.md` from the gate's substantive WUs'
     acceptance criteria, ahead of a `close` / `close-intermediate` session.
 
@@ -3527,7 +3529,59 @@ def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
     intended. Every appended entry is seeded with only `criterion_id` and
     `criterion`/`state: unverified` — `oracle`, `kind`, `proved_at_sha`, and
     `attempt` are absent until the close's own session fills them in.
+
+    **One exception to "untouched", for a re-armed close (#3279).** Re-arming
+    resets the WU's `attempts` to 0, so an entry recording a HIGHER attempt was
+    measured in a cycle that no longer exists. Left in place it disagrees with
+    the WU, `check_criteria_state_well_formed` refuses the tree
+    (`close-l: … attempt '1' != current attempt '0'`), the gate's broad run
+    goes red on the corpus lint, and the close never dispatches — every restart
+    repeating it until someone deletes the artifact by hand. That recurred
+    three times across two closes of FEAT-2026-0109 and cost more of that
+    session than any code defect.
+
+    So an entry whose recorded `attempt` exceeds *current_attempt* is reset to
+    `unverified` with its per-attempt fields cleared, exactly as if it had never
+    been verified. Entries at or below the current attempt, and entries with no
+    recorded attempt, keep the additive behaviour above — a close re-running
+    inside one attempt cycle must not lose the state it recorded.
+
+    Owning this here rather than in `/unblock-wu`'s prose covers every re-arm
+    path: the skill, a hand edit, or future tooling. *current_attempt* is
+    optional so existing callers and tests that pass none keep today's
+    behaviour exactly.
     """
+    path = feature_dir / criteria_state.criteria_filename(gate_n)
+    existing = criteria_state.parse_criteria_state(path.read_text()) if path.is_file() else []
+
+    # Reset entries left behind by a superseded attempt cycle (#3279). This
+    # runs BEFORE the `not fresh` early return below: a re-armed close whose
+    # criteria cannot be re-extracted (a WU edited since, an unparseable body)
+    # still has stale entries to clear, and returning early would leave the
+    # gate in exactly the state that cannot progress.
+    stale_reset = False
+    if current_attempt is not None:
+        refreshed = []
+        for entry in existing:
+            recorded = entry.attempt
+            try:
+                is_stale = recorded is not None and int(str(recorded).strip()) > current_attempt
+            except (TypeError, ValueError):
+                is_stale = False       # unparseable attempt: leave it for the close
+            if is_stale:
+                stale_reset = True
+                entry = criteria_state.CriterionStateEntry(
+                    criterion_id=entry.criterion_id,
+                    criterion=entry.criterion,
+                    oracle=None,
+                    kind=None,
+                    state="unverified",
+                    proved_at_sha=None,
+                    attempt=None,
+                )
+            refreshed.append(entry)
+        existing = refreshed
+
     fresh: list[tuple[str, str]] = []
     for wc in extract_wu_criteria(feature_dir, gate_n):
         if wc.status != "ok":
@@ -3536,10 +3590,10 @@ def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
             fresh.append((criteria_state.criterion_id_for(wc.sub_id, ordinal), criterion))
 
     if not fresh:
+        if stale_reset:
+            path.write_text(criteria_state.render_criteria_state(existing))
         return
 
-    path = feature_dir / criteria_state.criteria_filename(gate_n)
-    existing = criteria_state.parse_criteria_state(path.read_text()) if path.is_file() else []
     existing_ids = {e.criterion_id for e in existing}
 
     appended = [
@@ -3555,7 +3609,7 @@ def _precreate_criteria_state_stub(feature_dir: Path, gate_n: int) -> None:
         for cid, criterion in fresh
         if cid not in existing_ids
     ]
-    if not appended and existing:
+    if not appended and existing and not stale_reset:
         return
 
     path.write_text(criteria_state.render_criteria_state(existing + appended))
