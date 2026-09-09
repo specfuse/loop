@@ -5393,7 +5393,7 @@ def gate_baseline_check(
     nothing.
     """
     baseline = read_gate_baseline(gate_file)
-    if baseline is not None:
+    if baseline is not None and not baseline["failing"]:
         if baseline["tree"] is not None:
             if baseline["tree"] == _current_tree_hash():
                 return baseline["failing"], False

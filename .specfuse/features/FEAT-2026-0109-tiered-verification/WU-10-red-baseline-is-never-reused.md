@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0109/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - specfuse/loop/loop.py
   - tests/test_red_baseline_never_reused.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-09T13:30:52.342984+00:00
+duration_seconds: 90.093
+cost_usd: 0.472204
+input_tokens: 34
+output_tokens: 6360
 ---
 
 # A red baseline record is never reused; only a green one is a cache
