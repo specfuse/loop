@@ -162,10 +162,18 @@ gates:
       - id: FEAT-2026-0109/T09
         file: WU-09-pin-honesty-and-integrity.md
         depends_on: [FEAT-2026-0109/T08]
+      # T10 added after gate 3 LIVELOCKED on this feature's own mechanism: a
+      # cached red baseline attributed T09's failure to a pre-existing entry
+      # that its own fix could not invalidate, because _current_tree_hash
+      # excludes .specfuse/ while the code gates read it. Independent of T09
+      # (depends_on: []) so the two do not block each other.
+      - id: FEAT-2026-0109/T10
+        file: WU-10-red-baseline-is-never-reused.md
+        depends_on: []
       # --- closing sequence: terminal close (last gate) ---
       - id: FEAT-2026-0109/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: [FEAT-2026-0109/T08, FEAT-2026-0109/T09]
+        depends_on: [FEAT-2026-0109/T08, FEAT-2026-0109/T09, FEAT-2026-0109/T10]
 ```
 
 ## Notes
