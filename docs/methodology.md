@@ -374,7 +374,7 @@ bound to the emitter by `tests/test_attempt_outcome_contract.py`:
 | `closing_deliverable_missing` | a closing-WU guard refused (see `close-discipline.md` §4) |
 | `deliverable_missing` | a declared `produces:` path is absent |
 | `no_deliverable_files` | the squash names only the WU file / events |
-| `produces_not_in_diff` | `produces:` path exists but is not in the squash |
+| `produces_not_in_diff` | `produces:` path exists but is not in the squash, and the RESULT's `produces_unchanged:` did not justify it |
 | `squash_commit_failed` | `git commit` for the squash was rejected |
 | `smoke_import_failed` | a declared smoke-import line failed post-squash |
 | `learnings_not_staged` | a closing WU under `autonomy_default: auto` touched `.specfuse/LEARNINGS.md` directly instead of staging to `LEARNINGS-pending.md` (FEAT-2026-0053/T09) |
