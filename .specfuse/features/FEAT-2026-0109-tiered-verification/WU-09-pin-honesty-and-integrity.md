@@ -10,6 +10,10 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/build_provenance.py
   - tests/test_pin_honesty_and_integrity.py
+duration_seconds: 671.496
+cost_usd: 1.207852
+input_tokens: 56
+output_tokens: 28088
 ---
 
 # A pinned run says what it actually does, and never trusts a half-reaped pin
