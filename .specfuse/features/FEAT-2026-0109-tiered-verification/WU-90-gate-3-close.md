@@ -15,9 +15,9 @@ gate_set: plannext
 driver_version: 0.16.0
 started_at: 2026-09-09T15:23:24.019544+00:00
 duration_seconds: 2039.375
-cost_usd: 11.6672
-input_tokens: 184
-output_tokens: 98367
+cost_usd: 12.022952
+input_tokens: 204
+output_tokens: 101932
 re_arm_count: 2
 re_arm_history:
   -
