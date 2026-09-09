@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.17.0+umbrella.0.12.1] - 2026-09-09
+
 ### Added
 
 - **`specfuse lint` WARNs when a gate's substantive work units carry more than `MAX_CRITERIA_PER_GATE_WARN` (20) acceptance criteria.** Nothing bounded a gate's criteria count; in one consumer a 46-criterion gate ran six close attempts, three of them operator re-closes at $8–13 each, and closes were close to half of loop spend. `check_criteria_per_gate` counts `-`/`*` and numbered bullets in each substantive unit's Acceptance criteria section, skips ceremony units, `passed` gates and `done` features, and prints one WARN per gate over the threshold — WARN, never ERROR, so no existing feature turns red on upgrade. `close-discipline.md` §1 now says what §5 already permitted: a re-close carries a `narrow` criterion's recorded green forward and re-runs every `broad` oracle; the `unblock-wu` and `arm-gate` skills state the gate's criteria count and the last close attempt's cost before the operator re-arms or arms. The issue's other half — the driver auto re-arming a close — was not a mechanism: `re_arm_count` is written only by operator skills. (#3269)
