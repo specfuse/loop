@@ -5,7 +5,7 @@ slug: tiered-verification
 branch: feat/FEAT-2026-0109-tiered-verification
 roadmap_goal: The driver stops paying for verification nobody needed — the baseline probe becomes lazy and attributes a failure only when one happens, the per-attempt gate set narrows to what the unit actually touched with the full suite reserved for once per gate, and a unit that edits the driver no longer halts the run.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 26.00
 ---
 

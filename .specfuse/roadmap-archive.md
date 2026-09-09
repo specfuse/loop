@@ -43,6 +43,27 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0109"></a>
+## FEAT-2026-0109 — Tiered verification and a cached baseline probe
+
+**Why.** Split out of FEAT-2026-0102 when that feature was rescoped to the `needs:` gate-dependency mechanism alone. The remainder of the original framing still holds: every attempt re-runs the full gate suite on top of the agent's own work; every driver restart re-probes the baseline because the probe is keyed on the HEAD sha that every bookkeeping commit moves; and a unit that edits the driver halts the run for a restart. FEAT-2026-0102 removes the duplicated suite execution inside a pass, but not the per-attempt cost of running the whole set, and not the re-probe.
+
+**Goal.** Per attempt: the unit's declared tests, tests touching changed files, lint, and the feature oracle. Once per gate before the close: the full suite with coverage, bats, leak-scan, security. The gate-entry baseline probe becomes **lazy** (below). The driver runs from an installed copy so a unit editing `specfuse/loop/` does not halt the run.
+
+**The baseline probe becomes lazy, and that is the primary mechanism.** The probe's real job is **attribution** — telling "this WU broke it" from "it was already broken", which is why a red probe escalates `preexisting_gate_failure` instead of blaming a unit. That answer is not needed until something fails. So: skip the probe at gate entry, and when a WU's verification fails, run `probe_baseline` against the post-reset tree *then*, to attribute the failure before the attempt is counted. A green run never pays; a broken tree pays once, when the answer matters. Measured on the FEAT-2026-0101 run: five probes, roughly 15 minutes of wall clock, every one returning `failing: []` — the premium was paid on every gate entry and every restart against an event that did not occur once. Half of this already ships (`--no-baseline-probe`, and the `baseline_probe` key in `verification.yml`); the missing half is the retroactive attribution on failure.
+
+**Tree-hash caching supports it rather than leading.** When the probe *does* run, key its record on the tree hash rather than the HEAD sha, because a bookkeeping commit moves the sha while leaving the code tree identical. This is what makes a resume at an unchanged tree free; it is no longer the headline, since a lazy probe mostly does not run at all.
+
+**A green CI result for a SHA is an optional fast path, not a replacement.** CI runs `scripts/smoke-test.sh`, which derives its gate list from `verification.yml` (#592), so a CI verdict really does cover the same gate set, and `gh` is already a driver dependency. It is worth using at feature start, where HEAD is usually a pushed, CI-validated merge commit. It cannot be the general answer, for two measured reasons. **Coverage:** every probe SHA on the FEAT-2026-0101 run was local-only — `ba8fab4`, `ba29587`, `f7e20c4`, `320456c`, 0 of 4 known to CI — because the probe runs at HEAD and HEAD after `--prepare`, a bookkeeping commit or a squash is never pushed; the restart case, which is the expensive one, has no CI result by construction. **Environment:** CI is Linux plus a Windows job while the driver here runs macOS, and the probe must predict whether *this* machine's gate run will be green, since that run is the WU's exit oracle. If it is adopted, the gate's `baseline:` block must record provenance (`source: ci:<run_id>` versus `source: local`), which it does not today — without it, a later escalation cannot distinguish "we measured this tree" from "we trusted a Linux run".
+
+**Benefits.** Attempt duration drops further on top of FEAT-2026-0102's saving; a green run stops paying ~3 minutes at every gate entry and every restart; self-hosting features stop paying a restart per unit.
+
+**Cost, stated plainly.** When the tree really is pre-broken, one agent dispatch is burned discovering it — roughly $1–4 and 15–25 minutes — and that agent may thrash on a failure it did not cause before failing. Bounded to one dispatch per gate if the retroactive probe fires on the first failure, and the driver's hard reset discards the thrash.
+
+**Depends on.** FEAT-2026-0101 (merged) supplies the feature oracle the per-attempt tier lists among its cheap gates. FEAT-2026-0102 (merged) removed the duplicated suite execution, so the per-gate tier is not re-deriving work `needs:` already deduplicates. Both prerequisites are satisfied. The installed-copy driver remains a packaging migration in its own right; [FEAT-2026-0019/G1] applies to it directly and argues for landing it atomically rather than as one unit among several — which is why it gets gate 3 to itself.
+
+**Status: done.**
+
 <a id="feat-2026-0101"></a>
 ## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
 
