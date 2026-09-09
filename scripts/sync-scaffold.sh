@@ -85,11 +85,55 @@ file_hash() {  # $1=path
   else sha256sum "$1" | cut -d' ' -f1; fi
 }
 
+# Vendored paths that are dirty in core's own checkout (#3285).
+#
+# The classification below reads destination-vs-core and so cannot see the case
+# where CORE ITSELF is uncommitted: the destination then legitimately matches
+# core, the run reports `unchanged`, and the baseline is rewritten with the new
+# hash — after which nothing here can detect the divergence again. That is how
+# 3194d24 vendored a `verification-discipline.md` the umbrella had never seen;
+# it surfaced on the umbrella's publish PR after v0.17.0 was tagged and on PyPI.
+#
+# Prints one relative path per line. Silent when core is not a git work tree (an
+# installed copy) or git is unavailable: the check cannot be made, and this
+# stage already degrades rather than failing when it cannot verify. A dirty file
+# OUTSIDE CORE_FILES is not reported — unrelated umbrella work must not block a
+# vendor run.
+dirty_core_files() {
+  command -v git >/dev/null 2>&1 || return 0
+  git -C "$CORE" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  # --porcelain output is `XY <path>`; -uall so a never-added file counts too.
+  git -C "$CORE" status --porcelain -uall -- "${CORE_FILES[@]}" 2>/dev/null \
+    | sed 's/^.\{3\}//'
+}
+
 vendored=0
 echo "Vendoring shared substrate from core:"
 if [[ -d "$CORE" ]]; then
   echo "  from: $CORE"
   echo "  to:   $SRC"
+
+  dirty="$(dirty_core_files)"
+  if [[ -n "$dirty" ]]; then
+    {
+      echo
+      echo "error: core has uncommitted changes to vendored file(s):"
+      while IFS= read -r rel; do [[ -n "$rel" ]] && echo "  $rel"; done <<< "$dirty"
+      echo
+      echo "These files are owned by the methodology core ($CORE). Vendoring"
+      echo "from a dirty checkout copies an edit no other consumer of the"
+      echo "substrate will ever receive, and records it in the baseline as"
+      echo "though it came from upstream — after which this script can no"
+      echo "longer tell it apart from a clean vendor."
+      echo
+      echo "Commit the canonical edit in core first, then re-run. If the change"
+      echo "is loop-specific it does not belong in a vendored file at all: move"
+      echo "it to a loop-local rule, repo docs, or a comment at the code it"
+      echo "describes."
+    } >&2
+    exit 1
+  fi
+
   diverged=()
   for rel in "${CORE_FILES[@]}"; do
     core_path="$CORE/$rel"

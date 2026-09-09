@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`sync-scaffold.sh` vendored from a dirty core checkout, so an uncommitted upstream edit shipped as vendored content.** The vendor stage compares the loop's copies against `$SPECFUSE_CORE` — a working tree — and classifies only destination-vs-core, so it cannot see the case where core itself is uncommitted: the destination legitimately matches core, the run reports `unchanged`, and `.vendored.json` is rewritten with the new hash, after which nothing here can tell the divergence apart from a clean vendor. `3194d24` vendored a `rules/verification-discipline.md` edit that was never committed upstream — the umbrella's history for that file goes `#22`, `#79`, then a manual back-port on 2026-09-09 — so `specfuse-loop 0.17.0` shipped a rule the umbrella had never seen, and it surfaced as a red publish-PR check after `v0.17.0` was already tagged and on PyPI. The stage now refuses when core has uncommitted changes to any file in `CORE_FILES`, naming them and saying to commit the canonical edit upstream first, or to move a loop-specific change out of a vendored file entirely. A dirty file outside that set does not block the run, and a core that is not a git work tree (an installed copy) is vendored from as before — the check cannot be made there, and this stage already degrades rather than failing when it cannot verify. Comparing against the *published* umbrella was rejected: during a release window the loop legitimately vendors ahead of the umbrella's publish, so that check would go red on correct work. (#3285)
+
 ## [0.17.0+umbrella.0.12.1] - 2026-09-09
 
 ### Added
