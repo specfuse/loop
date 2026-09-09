@@ -231,3 +231,82 @@ git_core() {  # make $TESTDIR/core a git work tree with everything committed
   [ "$status" -eq 0 ]
   [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"verifdisc"* ]]
 }
+
+# --- #3287: core must be PUSHED before it can be vendored from ---------------
+#
+# #3285 closed the uncommitted case. A commit that exists only in the local core
+# checkout still reaches the loop the same way: the loop ships substrate no
+# other consumer has, and .vendored.json baselines it out of detection. Narrower
+# window — it takes a commit rather than a stray edit — but the same failure and
+# the same late detection on the umbrella's publish PR.
+#
+# Answerable from local refs (`@{u}..HEAD`); a sync script does not reach the
+# network to find out.
+
+git_core_pushed() {  # core is a git work tree with an upstream, fully pushed
+  git -C "$TESTDIR/core" init -q -b main
+  git -C "$TESTDIR/core" config user.email t@example.com
+  git -C "$TESTDIR/core" config user.name t
+  git -C "$TESTDIR/core" add -A
+  git -C "$TESTDIR/core" commit -qm core
+  git init -q --bare "$TESTDIR/core-remote"
+  git -C "$TESTDIR/core" remote add origin "$TESTDIR/core-remote"
+  git -C "$TESTDIR/core" push -q -u origin main
+}
+
+@test "vendoring from a core commit that was never pushed halts" {
+  setup_core
+  git_core_pushed
+  # Committed, so the #3285 dirty check is satisfied — and still reachable by
+  # nobody but this checkout.
+  printf 'verifdisc\ncommitted in core but never pushed\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  git -C "$TESTDIR/core" commit -qam "local only"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rules/verification-discipline.md"* ]]
+}
+
+@test "the unpushed halt does not vendor the unpushed content" {
+  setup_core
+  git_core_pushed
+  printf 'verifdisc\ncommitted in core but never pushed\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  git -C "$TESTDIR/core" commit -qam "local only"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [ ! -f "$TESTDIR/.specfuse/rules/verification-discipline.md" ] \
+    || ! grep -q "never pushed" "$TESTDIR/.specfuse/rules/verification-discipline.md"
+}
+
+@test "a pushed core commit vendors normally" {
+  setup_core
+  git_core_pushed
+  printf 'verifdisc\nlanded upstream\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  git -C "$TESTDIR/core" commit -qam "core moves forward"
+  git -C "$TESTDIR/core" push -q origin main
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"landed upstream"* ]]
+}
+
+@test "an unpushed commit outside the vendored set does not block the sync" {
+  setup_core
+  git_core_pushed
+  printf 'scratch\n' > "$TESTDIR/core/UNRELATED.md"
+  git -C "$TESTDIR/core" add -A
+  git -C "$TESTDIR/core" commit -qm "unrelated work in progress"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "a core branch with no upstream is vendored from as before" {
+  # Nothing to compare HEAD against, so the check cannot be made. Same degrade
+  # posture as a non-git core: vendor, do not fail.
+  setup_core
+  git_core          # committed, but no remote and no tracking branch
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"verifdisc"* ]]
+}

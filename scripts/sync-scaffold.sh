@@ -107,6 +107,26 @@ dirty_core_files() {
     | sed 's/^.\{3\}//'
 }
 
+# Vendored paths changed by core commits that were never pushed (#3287).
+#
+# The check above only proves the edit was committed. A commit reachable from
+# nowhere but this checkout reaches the loop exactly as an uncommitted edit did,
+# and gets baselined out of detection the same way — narrower window, same
+# failure. Answered from local refs: a sync script does not reach the network.
+#
+# Silent, like the check above, whenever it cannot be made: no git, not a work
+# tree, a detached HEAD, or a branch with no upstream. A commit touching a file
+# OUTSIDE CORE_FILES is not reported.
+unpushed_core_files() {
+  command -v git >/dev/null 2>&1 || return 0
+  git -C "$CORE" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  git -C "$CORE" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || return 0
+  # --name-only prints repo-root-relative paths; the pathspec is cwd-relative,
+  # which -C makes CORE, so a core that is a subdirectory still filters right.
+  git -C "$CORE" log --name-only --pretty=format: '@{u}..HEAD' \
+    -- "${CORE_FILES[@]}" 2>/dev/null | sed '/^$/d' | sort -u
+}
+
 vendored=0
 echo "Vendoring shared substrate from core:"
 if [[ -d "$CORE" ]]; then
@@ -130,6 +150,26 @@ if [[ -d "$CORE" ]]; then
       echo "is loop-specific it does not belong in a vendored file at all: move"
       echo "it to a loop-local rule, repo docs, or a comment at the code it"
       echo "describes."
+    } >&2
+    exit 1
+  fi
+
+  unpushed="$(unpushed_core_files)"
+  if [[ -n "$unpushed" ]]; then
+    {
+      echo
+      echo "error: core has unpushed commits touching vendored file(s):"
+      while IFS= read -r rel; do [[ -n "$rel" ]] && echo "  $rel"; done <<< "$unpushed"
+      echo
+      echo "The edit is committed but reachable from nowhere but this checkout,"
+      echo "so vendoring it ships substrate no other consumer has — the same"
+      echo "failure a dirty checkout produces, and baselined out of detection"
+      echo "the same way."
+      echo
+      echo "Push core, then re-run. If you believe it is already pushed, this"
+      echo "compares against a remote-tracking ref that may be stale: run"
+      echo "'git -C $CORE fetch' and re-run. (This script does not reach the"
+      echo "network on its own.)"
     } >&2
     exit 1
   fi
