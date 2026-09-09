@@ -2964,13 +2964,67 @@ def apply_diff(diff_text: str) -> bool:
     return proc.returncode == 0
 
 
+def _untracked_file_blocks(max_chars: int) -> str:
+    """Render files the attempt CREATED as diff-shaped blocks, capped (#3249).
+
+    `git diff` only reports tracked content, so a file that did not exist at
+    `head_before` has nothing to diff against and never reached the attempt
+    note. FEAT-2026-0100/T03 spun twice against six failures in a new test
+    module that the note did not contain — the operator had to guess.
+
+    `--exclude-standard` honours .gitignore, which keeps `work/` out: folding
+    the notes directory into a note would nest each attempt's evidence inside
+    the next one's. Binary files are named but not inlined.
+
+    Best-effort like its caller: any git error yields "".
+    """
+    try:
+        raw = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+            capture_output=True, text=True, check=True,
+        ).stdout
+    except (subprocess.CalledProcessError, OSError):
+        return ""
+    blocks: list[str] = []
+    used = 0
+    for path in filter(None, raw.split("\0")):
+        if used >= max_chars:
+            blocks.append("… (further created files omitted)\n")
+            break
+        header = f"--- /dev/null\n+++ b/{path}\n"
+        try:
+            data = Path(path).read_bytes()
+        except OSError:
+            continue
+        if b"\x00" in data:
+            body = f"(binary file, {len(data)} bytes - content omitted)\n"
+        else:
+            text = data.decode("utf-8", errors="replace")
+            # `+` prefix so the block reads as the new-file hunk it stands for.
+            body = "".join(f"+{line}\n" for line in text.splitlines())
+            room = max_chars - used - len(header)
+            if len(body) > room:
+                body = body[:max(room, 0)] + "\n… (file truncated)\n"
+        block = header + body
+        blocks.append(block)
+        used += len(block)
+    return "".join(blocks)
+
+
 def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
-    """Return `git diff <head_before>` (working tree vs pre-attempt base), capped.
+    """Return the working tree's departure from `head_before`, capped.
 
     Folded into a failing attempt's evidence note BEFORE the per-attempt
     `git reset --hard` discards the rejected work, so a blocked WU stays
     diagnosable — a human (or /gate-status) can see the diff that was rolled
     back, not just a truncated failure excerpt (#168).
+
+    Covers tracked changes via `git diff` AND files the attempt created, which
+    `git diff` cannot see (#3249). Created files get a reserved share of the
+    budget rather than whatever a concatenation leaves over: truncating the
+    combined text would let a large tracked diff consume everything and drop
+    the new file again, on exactly the large attempts where diagnosis is
+    hardest.
 
     Best-effort: returns "" on any git error or a clean tree. Truncated to
     max_chars so a large refactor's diff cannot bloat the committed note.
@@ -2982,9 +3036,11 @@ def capture_working_tree_diff(head_before: str, max_chars: int = 20000) -> str:
         ).stdout
     except (subprocess.CalledProcessError, OSError):
         return ""
-    if len(out) > max_chars:
-        out = out[:max_chars] + "\n… (diff truncated)\n"
-    return out
+    created = _untracked_file_blocks(max_chars // 2)
+    budget = max_chars - len(created)
+    if len(out) > budget:
+        out = out[:max(budget, 0)] + "\n… (diff truncated)\n"
+    return out + created
 
 
 def persist_attempt_notes(
