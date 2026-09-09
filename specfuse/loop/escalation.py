@@ -330,7 +330,7 @@ def _find_existing_issue_by_label(
         "--label", label,
         "--state", "open",
         "--search", f'"{correlation_id}"',
-        "--json", "number,title",
+        "--json", "number,title,body",
     ]
     if repo:
         argv[2:2] = ["--repo", repo]
@@ -341,8 +341,14 @@ def _find_existing_issue_by_label(
         issues = json.loads(result.stdout)
     except ValueError:
         return None
+    # Precision: the id in the title (the pre-fix follow-up shape — matching
+    # only while the id hashes the same, i.e. headings without a list
+    # enumerator — and any caller that still puts it there) or as a body
+    # marker (`file_followup_issues` since the title became a person's title).
+    # Search alone is recall only.
+    marker = f"id={correlation_id} -->"
     for issue in issues:
-        if correlation_id in issue.get("title", ""):
+        if correlation_id in issue.get("title", "") or marker in (issue.get("body") or ""):
             return str(issue["number"])
     return None
 
@@ -363,10 +369,11 @@ def emit_issue_with_body(
     shape or embed a correlation marker in the body — *body* reaches
     `gh issue create --body` untouched, byte-for-byte. Idempotency instead
     keys off *title*, which callers are expected to make correlation_id
-    -bearing (see `issue_title`): a second call for the same correlation_id
-    finds the existing open issue (via `_find_existing_issue_by_label`,
-    scoped to ``labels[0]``) and returns its number instead of filing a
-    duplicate.
+    -bearing (see `issue_title`) **or** to open with a
+    ``<!-- specfuse:followup id=<correlation_id> -->`` marker: a second call
+    for the same correlation_id finds the existing open issue (via
+    `_find_existing_issue_by_label`, scoped to ``labels[0]``) and returns
+    its number instead of filing a duplicate.
 
     Best-effort like `emit_escalation`: a raising or non-zero-exit runner
     returns `""` rather than propagating, so a filing failure never takes

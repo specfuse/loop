@@ -305,11 +305,16 @@ line.
 
 **Unfinished work becomes tracked issues, not prose.** After a `not_met`
 close's squash, `file_followup_issues` files one GitHub issue per
-`FOLLOW-UPS.md` entry under `specfuse:follow-up`, carrying the entry body
-verbatim and idempotent per entry; on a `met` close it files the optional
-`## Post-merge checklist` section as one `specfuse:post-merge` issue. `gh`
-absent or failing leaves `FOLLOW-UPS.md` itself as the record — the driver
-never deletes or rewrites it — and emits one `followups_recorded` event naming
+`FOLLOW-UPS.md` entry under `specfuse:follow-up`, titled from the entry's
+heading text (`[FEAT-2026-0155 follow-up] <heading>`), carrying the entry body
+verbatim behind a `<!-- specfuse:followup id=… -->` marker, and writing
+`**Tracked as #N.**` back under the heading so the entry is filed once across
+every later attempt — an entry that already carries that line, by the driver's
+hand or a person's, is skipped; on a `met` close it files the optional
+`## Post-merge checklist` section as one `specfuse:post-merge` issue and writes
+the same line under that heading in `PLAN.md`. `gh` absent or failing leaves
+`FOLLOW-UPS.md` itself as the record — the driver never deletes or rewrites an
+entry, it only adds the tracked line — and emits one `followups_recorded` event naming
 the `filed` and `unfiled` counts.
 
 **Re-firing the flips out of band** (FEAT-2026-0070) — `fire_terminal_flips`

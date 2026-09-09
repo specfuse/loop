@@ -53,6 +53,7 @@ RETROSPECTIVE_FILENAME = "RETROSPECTIVE.md"
 #: creates the artifact and the requirement that a `not_met` close carry it.
 FOLLOW_UPS_FILENAME = "FOLLOW-UPS.md"
 FOLLOW_UP_ENTRY_RE = re.compile(r"^### ", re.MULTILINE)
+FOLLOW_UP_ENTRY_END_RE = re.compile(r"^#{1,3}\s", re.MULTILINE)
 
 #: `## Post-merge checklist` — the optional PLAN.md section a `met` close
 #: files as one `specfuse:post-merge` issue (FEAT-2026-0085/T03).
@@ -74,8 +75,12 @@ def parse_followup_entries(text: str) -> list[str]:
     """
     matches = list(FOLLOW_UP_ENTRY_RE.finditer(text))
     entries = []
-    for i, m in enumerate(matches):
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+    for m in matches:
+        # An entry ends at the next heading of any level up to `###`, not
+        # only the next `### `: a closing `## Discharged` section used to be
+        # filed as the tail of the last entry's issue body (#1729).
+        nxt = FOLLOW_UP_ENTRY_END_RE.search(text, m.end())
+        end = nxt.start() if nxt else len(text)
         entries.append(text[m.start():end].strip("\n") + "\n")
     return entries
 
