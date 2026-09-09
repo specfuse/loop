@@ -4422,7 +4422,18 @@ def gate_broad_run_check(
     """
     tree = _current_tree_hash()
     existing = read_gate_broad_run(gate_file)
-    if existing is not None and tree is not None and existing["tree"] == tree:
+    # Reuse only a GREEN record — T10's rule, which applies to any cached
+    # verdict and not just the baseline's. `_current_tree_hash` excludes
+    # `.specfuse/` (correct: bookkeeping commits write there on every gate
+    # entry), but the `code` set READS `.specfuse/` — the corpus lint walks
+    # feature folders, as do the roadmap-link, arm-sweep and event-type gates.
+    # So a red verdict recorded against `.specfuse/` content cannot be
+    # invalidated by the `.specfuse/`-side change that fixes it, and the gate
+    # replays a failure that no longer exists. That livelocked this gate twice:
+    # once through the baseline record (fixed by T10) and once through this
+    # one, which T10 did not cover.
+    if (existing is not None and tree is not None
+            and existing["tree"] == tree and existing["ok"]):
         return existing["ok"], existing["failing"], False
     ok, failing = run_gate_broad_set(feature_dir, cfg)
     ran_at = dt.datetime.now(dt.timezone.utc).isoformat()

@@ -187,3 +187,82 @@ class TestRedBaselineNeverReused(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRedBroadRunIsNeverReused(unittest.TestCase):
+    """The same rule for the once-per-gate broad run (FEAT-2026-0109).
+
+    T10 fixed red-record reuse for `gate_baseline_check` and was scoped to
+    that function. `gate_broad_run_check` cached verdicts the same way and had
+    the identical defect: a red broad run recorded against `.specfuse/`
+    content could not be invalidated by the `.specfuse/`-side change that
+    fixed it, because the tree key excludes `.specfuse/` while the `code` set
+    reads it. Gate 3 livelocked on this a second time, replaying a failure
+    that no longer existed without re-running a single gate.
+    """
+
+    def _gate_file(self, tmp: Path) -> Path:
+        gf = tmp / "GATE-01.md"
+        gf.write_text("---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+        return gf
+
+    def test_a_red_broad_run_is_re_run_rather_than_replayed(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            gf = self._gate_file(Path(td))
+            calls = {"n": 0}
+
+            def red_then_green(feature_dir, cfg=None):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    return False, [{"gate": "tests", "failure_class": "tests",
+                                    "failure_signature": "sig"}]
+                return True, []          # fixed between the two calls
+
+            orig_run = loop.run_gate_broad_set
+            orig_tree = loop._current_tree_hash
+            loop.run_gate_broad_set = red_then_green
+            loop._current_tree_hash = lambda: "same-tree"
+            try:
+                ok1, failing1, ran1 = loop.gate_broad_run_check(gf, Path(td), {})
+                ok2, failing2, ran2 = loop.gate_broad_run_check(gf, Path(td), {})
+            finally:
+                loop.run_gate_broad_set = orig_run
+                loop._current_tree_hash = orig_tree
+
+            self.assertFalse(ok1)
+            self.assertTrue(ran1)
+            self.assertEqual(
+                calls["n"], 2,
+                "a red broad run must re-run at an unchanged tree — replaying "
+                "it lets a recorded failure outlive the fix, which livelocked "
+                "gate 3")
+            self.assertTrue(ok2, "the re-run observes the fix")
+            self.assertTrue(ran2)
+
+    def test_a_green_broad_run_is_still_reused(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            gf = self._gate_file(Path(td))
+            calls = {"n": 0}
+
+            def green_then_crash(feature_dir, cfg=None):
+                calls["n"] += 1
+                if calls["n"] > 1:
+                    raise AssertionError("a green broad run must not re-run")
+                return True, []
+
+            orig_run = loop.run_gate_broad_set
+            orig_tree = loop._current_tree_hash
+            loop.run_gate_broad_set = green_then_crash
+            loop._current_tree_hash = lambda: "same-tree"
+            try:
+                loop.gate_broad_run_check(gf, Path(td), {})
+                ok2, _, ran2 = loop.gate_broad_run_check(gf, Path(td), {})
+            finally:
+                loop.run_gate_broad_set = orig_run
+                loop._current_tree_hash = orig_tree
+
+            self.assertTrue(ok2)
+            self.assertFalse(ran2, "the green record was reused, not re-run")
+            self.assertEqual(calls["n"], 1)
