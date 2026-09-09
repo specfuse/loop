@@ -93,6 +93,12 @@ separate gate to pass silently.
 > exposed in seconds. Also confirm any flag-introducing draft carries its
 > flag-scope table (§3).
 
+Before the per-draft walk, state the gate's size in one line: the total
+acceptance criteria across its substantive drafts (the number `specfuse
+lint` WARNs on above `MAX_CRITERIA_PER_GATE_WARN`, #3269). Every criterion is
+re-derived by the close and again by any re-close; a gate over the threshold
+is a split-the-gate decision to take now, while the drafts are still drafts.
+
 For each WU in the target gate whose `status: draft`:
 
 1. **Show**: the WU's ID, title, type, model, the body's five
