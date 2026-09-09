@@ -4090,3 +4090,34 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   but only one attempt in the gate genuinely narrowed, so that zero is the absence of an
   opportunity rather than evidence of safety — count the *narrowed* attempts, not the
   attempts, before reading a zero as reassurance.
+
+- [FEAT-2026-0109/G3] When the driver chooses between two behaviours per attempt, the branch it
+  took is part of that attempt's record — not something a later reader recomputes. The tiered-
+  verification feature shipped a per-attempt/per-gate split across two gates and added neither a
+  `tier` field nor the resolved selection to `attempt_outcome`. The cost compounds: gate 2's close
+  could answer "did this attempt narrow?" only by re-running `resolve_narrow_test_selection`
+  against the driver as it stood at close time, and gate 3's close could not answer it for its own
+  unit at all, because the driver had moved and the answer was never written down. Every number a
+  close reports about the split — the fallback rate, the narrowed-attempt count, the denominator
+  under any safety claim — is therefore an inference over source that may no longer exist,
+  presented as a measurement. The drafting-time check is one question: **name the command the
+  close will run to count how often each branch fired.** If the honest answer is "re-implement the
+  predicate and hope the source has not changed", the branch is unrecorded and one field in the
+  event the driver already emits fixes it.
+
+- [FEAT-2026-0109/G3] Moving a program's identity outside the working tree makes the filesystem's
+  retention policy part of your correctness argument. The pinned-build unit wrote the driver's own
+  build into `tempfile.gettempdir()` keyed by tree hash, reused a pin whenever its marker file
+  matched, and copied with `shutil.copytree` — which preserves source mtimes, so a pin is born
+  looking days old to any age-based reaper. On macOS the `$TMPDIR` cleaner removed 91 of 131 files
+  from that feature's own recorded pin within twelve hours, the package `__init__.py` among them;
+  because the package is a namespace package with the working tree on `sys.path`, re-entering that
+  pin resolves the program from the tree while the marker still validates and the "I am running
+  build X" event still names the pin. Silent, and exactly the confidently-wrong failure the pin was
+  built to retire. Two rules. **(a)** A content-addressed cache's validity check must cover the
+  content, not only the marker naming it — a manifest, a file count, or re-materialize-on-mismatch
+  — so a partially reaped entry fails loudly instead of degrading into a hybrid of cache and source.
+  **(b)** When every acceptance criterion for a unit is satisfiable within one process lifetime,
+  ask explicitly what the artifact looks like on the *second* run, hours later, on the platform it
+  ships to. Durability is a property no single-run oracle can express: each test built a fresh
+  cache directory and threw it away, so all of them passed and none could see this.
