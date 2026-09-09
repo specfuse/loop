@@ -209,3 +209,38 @@ and both left it to the operator; it was not corrected, and the re-armed close
 did not correct it either. It is not an acceptance criterion of any work unit
 and the driver owns `PLAN.md`, so it is recorded here rather than filed as a
 follow-up. The arithmetic is in `RETROSPECTIVE.md` § Cost analysis.
+
+### T08#1
+
+Recorded path for pin identity is not under pin cache — points at working tree's `specfuse/loop`, not the materialized build. Identity is not actually recorded correctly on the run.
+
+- command: `python3 -m unittest tests.test_installed_copy_driver_e2e -q`
+- exit: 1
+
+### T08#2
+
+`UnpinnedRunStillHalts.test_halt_event_and_exit_code_are_unchanged` fails: unpinned run now returns exit 0 instead of 3 — "unpinned run keeps today's behaviour byte-identically" is false.
+
+- command: `python3 -m unittest tests.test_installed_copy_driver_e2e -q`
+- exit: 1
+
+### T08#4
+
+Same suite this criterion cites reports 3 failures, not `OK`.
+
+- command: `python3 -m unittest tests.test_installed_copy_driver_e2e tests.test_pin_honesty_and_integrity -q`
+- exit: 1
+
+### T08#6
+
+`ProjectWithoutDriverSourceIsUnaffected.test_no_pin_materialized_no_new_event` fails: a `driver_build_pinned` event IS emitted for a project with no `specfuse/loop/` in its working tree — contradicts "no new event".
+
+- command: `python3 -m unittest tests.test_installed_copy_driver_e2e -q`
+- exit: 1
+
+### G3-CLOSE#4
+
+`tests.test_installed_copy_driver_e2e` (one of the three gates' `feature_oracle` commands) does not report `OK` — 3 failures.
+
+- command: `python3 -m unittest tests.test_installed_copy_driver_e2e -q`
+- exit: 1

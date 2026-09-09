@@ -11,7 +11,7 @@ produces:
 model: opus
 effort: high
 gate_set: plannext
-verdict: met
+verdict: not_met
 driver_version: 0.16.0
 started_at: 2026-09-09T13:49:39.728913+00:00
 duration_seconds: 1838.141
