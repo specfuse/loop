@@ -6,7 +6,7 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 # Rule: operator escalation framing
 
 Binding whenever work **stops and needs a human decision** — a `blocked` work
-unit, a gate at `awaiting_review`, a hedged verdict, a scope question, a refusal,
+unit, a gate at `awaiting_review`, a `not_met` verdict, a scope question, a refusal,
 or any skill that asks before writing.
 
 The audience is someone **deciding**, not someone executing. They may not have
@@ -60,7 +60,7 @@ so in that line rather than dropping it silently.
 ## The feature briefing — required when the halt is at feature scope
 
 The six parts frame a **decision**. When the halt is at feature or gate scope —
-a hedged terminal verdict, a feature that stopped partway and needs a human —
+a `not_met` terminal verdict, a feature that stopped partway and needs a human —
 the decision is not the whole question. The operator also needs to know whether
 the work *achieved what it was funded to achieve*, and that is a separate
 question from whether the tasks passed.
@@ -124,11 +124,11 @@ success is the failure this section prevents.
 
 - **Options without a recommendation.** Surfacing choices and stopping pushes the
   analysis back onto the person who asked. Always make the call; they can override.
-- **A refusal reported as a malfunction.** A withheld terminal flip on a hedged
+- **A refusal reported as a malfunction.** A withheld terminal flip on a `not_met`
   verdict is the contract working. Reporting it in the same tone as a crash makes
   a correct system look broken and invites someone to "fix" the safety catch.
 - **Writing the human's own justification for them.** Where a field records *why a
-  human accepted something* — `/accept-hedged-close`'s reason line, `/unblock-wu`'s
+  human decided something* — a `type: human` unit's `evidence:` line, `/unblock-wu`'s
   rationale, a contract-change acknowledgment — that text must come from the human.
   An agent that drafts it has removed the signature it was collecting. Ask; do not
   supply.
