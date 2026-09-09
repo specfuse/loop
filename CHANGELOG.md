@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.18.0+umbrella.0.12.1] - 2026-09-09
+
 ### Fixed
 
 - **Attempt notes omitted the files an attempt created, so a spinning unit could not be diagnosed from its own artifacts.** `capture_working_tree_diff` folds `git diff <head_before>` into a failing attempt's note before the per-attempt `git reset --hard` discards the work, and `git diff` only reports tracked content — a file that did not exist at `head_before` has nothing to diff against. FEAT-2026-0100/T03 spun twice on 2026-09-06 against six failures in a new test module that the note never contained; the operator had to guess, which is what `/gate-status` ended up doing. The note now also carries files the attempt created, rendered as new-file hunks, with `--exclude-standard` keeping `work/` out so an attempt's evidence is not nested inside the next attempt's. Created files get a reserved share of the size cap rather than whatever a concatenation leaves over: truncating the combined text would let a large tracked diff consume the whole budget and drop the new file again, on exactly the large attempts where diagnosis is hardest. Binary files are named, not inlined. (#3249)
