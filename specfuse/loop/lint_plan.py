@@ -544,6 +544,75 @@ def _find_task_graph_block(body: str) -> dict | None:
 # either warns on a correctly-drafted close-intermediate or lets a wishful
 # plan-next through. Canonical statement: planning-discipline.md §5 — these
 # values are bound to it by tests/test_planning_cost_floor.py.
+#: Criteria-per-gate WARN threshold (#3269). Measured before this existed:
+#: across 112 gates in this repo and 158 in one consumer, roughly one gate in
+#: eight carried more than 20 acceptance criteria, and the worst — 46 in one
+#: gate — ran six close attempts, three of them operator re-closes at $8–13
+#: each, every one re-deriving the lot. A gate that needs more than this is
+#: two gates. WARN, never ERROR: an ERROR would break every existing large
+#: gate on the next scaffold upgrade, and the number is a starting point.
+MAX_CRITERIA_PER_GATE_WARN = 20
+
+#: Unit types whose criteria are the ceremony's, not the gate's definition of
+#: done — never counted toward the cap.
+_CRITERIA_CAP_EXEMPT_TYPES = frozenset({
+    "close", "close-intermediate", "plan-next", "retrospective", "lessons",
+    "docs", "human",
+})
+_AC_ANY_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+
+
+def count_gate_criteria(feature_dir: Path, gate: dict) -> int:
+    """Acceptance-criteria bullets across a gate's substantive units.
+
+    Counts `-`/`*` and `1.`/`1)` bullets inside each unit's Acceptance
+    criteria section; ceremony units (`_CRITERIA_CAP_EXEMPT_TYPES`) and
+    missing files contribute nothing.
+    """
+    total = 0
+    for ref in gate.get("work_units") or []:
+        wfile = ref.get("file")
+        if not wfile or not (feature_dir / wfile).exists():
+            continue
+        wfm, wbody = read_frontmatter(feature_dir / wfile)
+        if wfm.get("type") in _CRITERIA_CAP_EXEMPT_TYPES:
+            continue
+        section = _slice_ac_section(wbody)
+        total += sum(1 for line in section.splitlines() if _AC_ANY_BULLET_RE.match(line))
+    return total
+
+
+def check_criteria_per_gate(
+    feature_dir: Path, plan_fm: dict, gates: list, errs: "list[str] | None" = None,
+) -> None:
+    """WARN when a gate's substantive acceptance criteria exceed
+    `MAX_CRITERIA_PER_GATE_WARN` (#3269).
+
+    Skips a sealed feature (`status: done`) and any gate already `passed`:
+    those are history, and the WARN exists to change a plan, not to grade
+    one. Never appends to *errs* — accepted only so the signature mirrors
+    the ERROR-capable checks and a future escalation is a one-line change.
+    """
+    if plan_fm.get("status") == "done":
+        return
+    for g in gates:
+        gnum = g.get("gate")
+        gfile = g.get("file") or (f"GATE-{int(gnum):02d}.md" if gnum is not None else None)
+        if gfile and (feature_dir / gfile).exists():
+            gfm, _ = read_frontmatter(feature_dir / gfile)
+            if gfm.get("status") == "passed":
+                continue
+        n = count_gate_criteria(feature_dir, g)
+        if n > MAX_CRITERIA_PER_GATE_WARN:
+            print(
+                f"WARN: gate {gnum}: {n} acceptance criteria across its "
+                f"substantive work units, above {MAX_CRITERIA_PER_GATE_WARN}. "
+                f"Every close attempt re-derives the broad ones and a re-close "
+                f"pays for all of them again (close-discipline.md §1, §5); a "
+                f"gate that needs more than this is two gates."
+            )
+
+
 CEREMONY_COST_FLOORS_USD = {
     "plan-next": 6.0,
     "close": 5.0,
@@ -2092,6 +2161,8 @@ def _lint_impl(feature_dir: Path) -> list[str]:
 
     # Planned-cost capture: WARN on missing/divergent planned_cost_usd fields.
     check_planned_cost(feature_dir, fm, gates)
+    # Criteria-per-gate cap (#3269): WARN-only.
+    check_criteria_per_gate(feature_dir, fm, gates, errs)
     # Planning-discipline section presence (#201): WARN-only.
     check_planning_sections(feature_dir, fm, body, gates)
     check_closing_guard_literals(feature_dir, gates)
