@@ -54,9 +54,9 @@ bullet names a scoped test that fails on HEAD and passes after this unit's edits
 sibling-WU files in this gate and the repo-specific paths this unit might brush
 against. Generated dirs, secrets, `.git/` and "the driver owns all git" bind there.
 
-**Verification.** The gate set the driver runs for this `type` (for `implementation`,
-the `code` set in `.specfuse/verification.yml`) plus any unit-specific command,
-including a symbol-existence check per new importable symbol (`/authoring-work-units` §9).
+**Verification.** The narrow tier for this `type` (`code` minus `tier: broad`; `tests`
+narrowed to this unit's `produces:` modules), plus any unit-specific command and a
+symbol check per new symbol (§9). The broad tier is the driver's — never run in-session.
 
 **Escalation triggers.** One or two conditions that stop the session with
 `status: blocked` instead of pushing through: a spec ambiguity, a `never-touch.md`

@@ -2,7 +2,7 @@
   "rules/correlation-ids.md": "5657a0959d0a3c66b87f46cca9220f31836e685dea33ad09f0d9b488b09e144f",
   "rules/never-touch.md": "60d590668cffeb759d7706d927e85e2d7d11b8aaacc648741a54de20faf3bfc2",
   "rules/security-boundaries.md": "c6d4cdeb4aa1dfa16eca295bc07d5899e90155eef3d5fed57d1ad9338fc7e7e6",
-  "rules/verification-discipline.md": "17b8434dce245aac5dd59b132a8cfb2256e4ff934b1f3803e0a1048a10e5e4a5",
+  "rules/verification-discipline.md": "c005663ea5417840980df4ea98dc6d788e98119bbe0195178d13a2d0799c7771",
   "schemas/event.schema.json": "e5767027863eeb428b85a01b6cbfb368b6a45bb5fa4866533e362b6bb0b7ee5a",
   "schemas/events/initiative_created.schema.json": "961bd517d1e7594ff0820fdfb466adcc6f413f156465835485eba1a267fed233",
   "schemas/events/spec_validated.schema.json": "7643e04ea4d877e48d61b755a63b729d2256061fbf2c398fb48458ad1bb66eea",

@@ -5,7 +5,7 @@ slug: tiered-verification
 branch: feat/FEAT-2026-0109-tiered-verification
 roadmap_goal: The driver stops paying for verification nobody needed — the baseline probe becomes lazy and attributes a failure only when one happens, the per-attempt gate set narrows to what the unit actually touched with the full suite reserved for once per gate, and a unit that edits the driver no longer halts the run.
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 26.00
 ---
 
@@ -152,10 +152,28 @@ gates:
       - id: FEAT-2026-0109/T08
         file: WU-08-installed-copy-driver.md
         depends_on: []
+      # T09 added after the terminal close recorded `not_met` and a fresh
+      # judge agreed, unlowered. Two of GATE-03.md's seven bullets were
+      # unmet: a pinned run printed the unpinned halt text at the point it
+      # declines to halt (#3270), and `materialize_pin` reused a pin on a
+      # marker match alone, so a partially reaped pin was still reported as
+      # the running build (#3271). T08's mechanism is sound and untouched;
+      # this closes what the driver SAYS and what it TRUSTS.
+      - id: FEAT-2026-0109/T09
+        file: WU-09-pin-honesty-and-integrity.md
+        depends_on: [FEAT-2026-0109/T08]
+      # T10 added after gate 3 LIVELOCKED on this feature's own mechanism: a
+      # cached red baseline attributed T09's failure to a pre-existing entry
+      # that its own fix could not invalidate, because _current_tree_hash
+      # excludes .specfuse/ while the code gates read it. Independent of T09
+      # (depends_on: []) so the two do not block each other.
+      - id: FEAT-2026-0109/T10
+        file: WU-10-red-baseline-is-never-reused.md
+        depends_on: []
       # --- closing sequence: terminal close (last gate) ---
       - id: FEAT-2026-0109/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: [FEAT-2026-0109/T08]
+        depends_on: [FEAT-2026-0109/T08, FEAT-2026-0109/T09, FEAT-2026-0109/T10]
 ```
 
 ## Notes

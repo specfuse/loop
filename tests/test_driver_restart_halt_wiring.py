@@ -26,6 +26,7 @@ import json
 import os
 import subprocess
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from tests._loop_loader import load_loop
@@ -105,7 +106,28 @@ class TestDriverRestartHaltWiring(unittest.TestCase):
         self._patches.append((name, getattr(loop, name)))
         setattr(loop, name, replacement)
 
+    def _unpinned(self):
+        """Assert the unpinned halt path with the pin marker deliberately
+        absent, rather than inheriting whatever the parent process has.
+
+        This test asserts the halt FIRES. Since FEAT-2026-0109/T08 the halt is
+        pin-conditional: a pinned driver records the driver edit and keeps
+        going. Run inside a pinned driver's gate subprocess this test used to
+        inherit `SPECFUSE_LOOP_PINNED_TREE`, take the pinned branch and fail —
+        which is exactly what gate 3's broad run caught. The driver now strips
+        the marker at the spawn boundary (`child_env_without_pin_marker`); this
+        makes the test's own precondition explicit as well, so it states what
+        it is testing instead of depending on how it was launched.
+        """
+        env = dict(os.environ)
+        env.pop(loop.PINNED_BUILD_ENV_VAR, None)
+        return unittest.mock.patch.dict(os.environ, env, clear=True)
+
     def test_driver_edit_halts_before_next_dispatch(self):
+        with self._unpinned():
+            self._assert_driver_edit_halts()
+
+    def _assert_driver_edit_halts(self):
         """T01 edits the driver; T02 is still pending. The run must halt
         with EXIT_DRIVER_RESTART_REQUIRED, T02 must never be dispatched, and
         the halt message must reach stdout."""

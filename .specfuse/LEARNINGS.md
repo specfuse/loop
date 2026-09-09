@@ -4090,3 +4090,51 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   but only one attempt in the gate genuinely narrowed, so that zero is the absence of an
   opportunity rather than evidence of safety — count the *narrowed* attempts, not the
   attempts, before reading a zero as reassurance.
+
+- [FEAT-2026-0109/G3] When a driver picks between two behaviours per attempt, the branch it
+  took belongs in that attempt's record — and a snapshot of the code is not a substitute for it.
+  The tiered-verification feature shipped a per-attempt/per-gate split across two gates and added
+  neither a `tier` field nor the resolved selection to `attempt_outcome`. Gate 2's close could
+  answer "did this attempt narrow?" only by re-running the predicate against the driver as it
+  stood at close time; the first gate-3 close could not answer it for its own unit at all. The
+  second gate-3 close *could*, but only because that gate happens to cache the driver source by
+  tree hash, so the build that dispatched the later units was still readable on disk — a lucky
+  affordance, not a record: the cache lives in `$TMPDIR`, one of that feature's own pins had
+  already lost 91 of its 131 files, and the module surviving in it was chance. Reconstructing a
+  decision by re-executing the code that made it is strictly weaker than writing the decision
+  down, because it can only ever answer for the runs whose code you still have. The drafting-time
+  check is one question: **name the command the close will run to count how often each branch
+  fired.** If the honest answer involves re-implementing the predicate, or reading a build out of
+  a temp directory, the branch is unrecorded, and one field on an event the driver already emits
+  fixes it.
+
+- [FEAT-2026-0109/G3] A cache keyed on identity must validate its contents, and a negative result
+  is never a cache. One gate produced THREE independent instances of this within two days, in code
+  written by three different hands on the same feature. The pinned-build cache trusted a marker file
+  naming a tree hash and executed a directory that had silently lost 91 of 131 files to the
+  platform's `$TMPDIR` reaper — because the package is a namespace package with the working tree
+  on `sys.path`, the program resolved back to the tree while the process still emitted "I am
+  running build X". The baseline record trusted a tree hash that deliberately excludes the
+  scaffold directory — correct for surviving bookkeeping commits — while the gates it summarises
+  *read* that directory, so a recorded failure could not be invalidated by the fix that cleared
+  it and the gate livelocked: two dispatches, $3.10, 24 minutes, and an attempt counter that never
+  moved. The once-per-gate broad-run record then repeated that mistake verbatim in the one cache
+  the baseline fix did not cover, and replayed a red verdict without re-running a single gate, for
+  a failure the tree no longer had. None failed loudly; each produced a confident wrong answer.
+  Two rules and a corollary. **(a)** A
+  content-addressed cache's validity check must cover the content, not only the marker naming it —
+  a manifest, a file count, or re-materialize-on-mismatch — so a partially reaped entry fails
+  loudly instead of degrading into a hybrid of cache and source. **(b)** A cache entry recording a
+  *failure* must always be re-derived, never reused, whatever its key says. A green record is a
+  real cache: nothing has to be re-checked. A red record is the single case where re-checking is
+  the whole point, because someone is presumably fixing it, so reusing it can only ever be
+  redundant or wrong. The shape of both: a key that cannot see everything the value depends on is
+  not an identity, and the cheapest correct fix is to shrink what you are willing to cache, not to
+  widen the key. **(c) The corollary that gate paid for twice more:** when you fix one instance of
+  a trusting-the-key cache, fix every sibling cache in the same commit, and ENUMERATE the
+  boundaries rather than patching the ones you remember. The third instance existed only because
+  the second fix covered one of two identical caches; separately, an environment marker leaking
+  across a spawn boundary made a judge lower a correct verdict on five defects that did not exist,
+  and the fix that finally held was a test enumerating every spawn site — which immediately found
+  a site nobody had reported. Enumerating the boundaries is cheap; rediscovering them one halt at
+  a time is not.

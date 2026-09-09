@@ -236,21 +236,82 @@ class TestGateBaselineCheck(unittest.TestCase):
             self.assertEqual(len(probe_calls), 2,
                               "a changed sha must run the probe a second time")
 
-    def test_skip_uses_recorded_failing_set(self):
+    def test_a_red_record_re_probes_rather_than_being_reused(self):
+        """A RED record is never reused, even at an unchanged sha
+        (FEAT-2026-0109/T10).
+
+        This test previously asserted the opposite — that a red record at an
+        unchanged sha must NOT re-probe — and that contract shipped in gate 1.
+        It caused a livelock in this repository's own gate 3: a recorded
+        failure inside `.specfuse/` could not be invalidated by the
+        `.specfuse/`-side change that fixed it, because `_current_tree_hash`
+        excludes `.specfuse/` from the key while the `code` gates read it. The
+        work unit whose attempt tripped it could never consume an attempt,
+        never surface its own defect, and never progress; only hand-clearing
+        the persisted block broke the loop.
+
+        The contract is now: a green record is a cache and is reused; a red
+        record always re-probes, because re-checking is exactly the point when
+        the operator is presumably fixing it. `test_skip_reuses_a_green_record`
+        below is the other half and is what keeps this from degrading into
+        "always re-probe".
+        """
         import tempfile
         with tempfile.TemporaryDirectory() as td:
             gf = self._gate_file(Path(td))
             calls = {"n": 0}
 
-            def red_then_crash_probe(feature_dir, cfg=None):
+            def red_then_green_probe(feature_dir, cfg=None):
                 calls["n"] += 1
-                if calls["n"] > 1:
-                    raise AssertionError("probe must not re-run on unchanged sha")
-                return [{"gate": "tests", "failure_class": "test_failure",
-                          "failure_signature": "sig"}]
+                if calls["n"] == 1:
+                    return [{"gate": "tests", "failure_class": "test_failure",
+                             "failure_signature": "sig"}]
+                return []          # the operator fixed it between the two calls
 
             orig = loop.probe_baseline
-            loop.probe_baseline = red_then_crash_probe
+            loop.probe_baseline = red_then_green_probe
+            try:
+                cfg = {"code": []}
+                first, freshly = loop.gate_baseline_check(
+                    gf, Path(td), cfg, "same-sha", probed_at="t1")
+                second, freshly2 = loop.gate_baseline_check(
+                    gf, Path(td), cfg, "same-sha", probed_at="t2")
+            finally:
+                loop.probe_baseline = orig
+
+            self.assertTrue(freshly, "the first probe is always fresh")
+            self.assertEqual(first[0]["gate"], "tests",
+                             "the first result is the recorded failing set")
+            self.assertEqual(calls["n"], 2,
+                             "a red record must re-probe at an unchanged sha — "
+                             "reusing it lets a recorded failure outlive its fix")
+            self.assertTrue(freshly2, "the re-probe is a fresh measurement")
+            self.assertEqual(second, [],
+                             "the re-probe observes the fix rather than "
+                             "replaying the stale red verdict")
+
+    def test_skip_reuses_a_green_record(self):
+        """A GREEN record at an unchanged sha is reused — T02's caching is
+        intact (FEAT-2026-0109/T10).
+
+        The other half of the contract above. Without this, "a red record
+        re-probes" could be satisfied by re-probing unconditionally, which
+        would discard the saving gate 1 exists to provide.
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            gf = self._gate_file(Path(td))
+            calls = {"n": 0}
+
+            def green_then_crash_probe(feature_dir, cfg=None):
+                calls["n"] += 1
+                if calls["n"] > 1:
+                    raise AssertionError(
+                        "a green record must not re-probe at an unchanged sha")
+                return []
+
+            orig = loop.probe_baseline
+            loop.probe_baseline = green_then_crash_probe
             try:
                 cfg = {"code": []}
                 first, freshly = loop.gate_baseline_check(
@@ -261,9 +322,10 @@ class TestGateBaselineCheck(unittest.TestCase):
                 loop.probe_baseline = orig
 
             self.assertTrue(freshly)
-            self.assertFalse(freshly2)
-            self.assertEqual(first, second)
-            self.assertEqual(first[0]["gate"], "tests")
+            self.assertFalse(freshly2, "the green record was reused, not re-run")
+            self.assertEqual(first, [])
+            self.assertEqual(second, [])
+            self.assertEqual(calls["n"], 1)
 
 
 class TestBaselineProbeEnabled(unittest.TestCase):

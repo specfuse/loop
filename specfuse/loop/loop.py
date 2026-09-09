@@ -114,6 +114,7 @@ from .judge import (
 )
 from .arm_eval import evaluate_arm_predicate
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
+from .build_provenance import head_tree_hash
 from .cost import wu_lifetime_cost_usd
 from .driver_edit import changed_paths_for_commit, driver_paths_in
 from .plan_baseline import load_plan_graph, write_baseline_if_absent
@@ -3077,7 +3078,10 @@ def format_deliverable_missing_note(
     return "\n".join(lines)
 
 
-def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
+def format_driver_staleness_warning(
+    wu_id: str, driver_paths: list,
+    pinned_tree: "str | None" = None, next_pin_tree: "str | None" = None,
+) -> str:
     """Render the driver-editing staleness warning for `wu_id`, or "" if
     `driver_paths` is empty (FEAT-2026-0075/T02).
 
@@ -3086,10 +3090,29 @@ def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
     process dispatches next — including a close armed to verify it. The
     message names the offending unit and every path it touched, and states
     the required remedy explicitly rather than leaving the reader to infer it.
+
+    `pinned_tree` is `os.environ[PINNED_BUILD_ENV_VAR]` when this process is
+    running a pinned build (FEAT-2026-0109/T09): that process's halt is
+    retired, so the unpinned wording above — which tells the operator to
+    stop and restart — would be false. When set, the message instead names
+    the pin's tree, the tree the edit takes effect in (`next_pin_tree`), and
+    states plainly that this process keeps dispatching against its own
+    pinned snapshot. `pinned_tree=None` reproduces the unpinned text
+    byte-for-byte (`UnpinnedRunStillHalts`).
     """
     if not driver_paths:
         return ""
     paths = ", ".join(driver_paths)
+    if pinned_tree:
+        return (
+            f"DRIVER EDIT RECORDED (pinned build {pinned_tree}): {wu_id} "
+            f"edited the driver itself ({paths}). This process is executing "
+            f"a pinned build materialized at tree {pinned_tree}, not the "
+            f"working tree, so this edit does not change what this process "
+            f"runs. It takes effect in the next pinned build, at tree "
+            f"{next_pin_tree}. This process continues dispatching against "
+            f"its own pinned snapshot; no restart is required."
+        )
     return (
         f"STALE DRIVER PROCESS: {wu_id} edited the driver itself ({paths}). "
         f"This process cached the pre-edit versions of those modules at "
@@ -3157,7 +3180,10 @@ def merge_gate_driver_edits(process_edits: list, recorded_edits: list) -> list:
     return merged
 
 
-def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
+def format_driver_staleness_summary(
+    edits: list, dispatched_after: list,
+    pinned_tree: "str | None" = None, next_pin_tree: "str | None" = None,
+) -> str:
     """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
 
     `edits` is `[(wu_id, driver_paths), ...]` for units that edited the
@@ -3170,9 +3196,32 @@ def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
     of reconstructing the fact from `ps` output and `started_at` timestamps.
     Returns "" when `edits` is empty so a gate with no driver-editing unit
     stays silent.
+
+    `pinned_tree` carries the same meaning as in
+    `format_driver_staleness_warning` (FEAT-2026-0109/T09): this gate closed
+    in a process running a pinned build, so nothing here was ever untrusted,
+    and the summary says so instead of repeating the unpinned "a fresh
+    driver process is required" line. `pinned_tree=None` reproduces the
+    unpinned text byte-for-byte.
     """
     if not edits:
         return ""
+    if pinned_tree:
+        lines = ["DRIVER EDITS RECORDED (gate summary, pinned build "
+                  f"{pinned_tree}):"]
+        for wu_id, paths in edits:
+            lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
+        affected = ", ".join(dispatched_after) if dispatched_after else "(none)"
+        lines.append(
+            f"  This process executed the pinned build at tree "
+            f"{pinned_tree}, not the working tree, so the edit(s) above "
+            f"took effect in the next pinned build (tree {next_pin_tree}), "
+            f"not this one. Dispatched after the edit above in this same "
+            f"process: {affected} — each executed against this process's "
+            f"own pinned snapshot, which is what a pinned run is for. No "
+            f"restart was required."
+        )
+        return "\n".join(lines)
     lines = ["STALE DRIVER PROCESS (gate summary):"]
     for wu_id, paths in edits:
         lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
@@ -3285,9 +3334,16 @@ def squash_commit(
 PROMPT_PREAMBLE = """\
 You are executing a single Specfuse work unit. Read .specfuse/rules/ in full before \
 acting; they are binding. Do NOT run any git command — the driver owns all commits \
-and bookkeeping. Edit files only. End your turn with the RESULT block defined in \
-.specfuse/rules/result-contract.md. Verification is run by the driver, not by you; \
-report honestly.
+and bookkeeping. Edit files only. Verification is tiered: before you report, run \
+only the per-attempt (narrow) tier yourself — your unit type's gate set in \
+.specfuse/verification.yml minus every gate declaring `tier: broad`, with the \
+`tests` gate run through its `narrow_command` over the test modules in your \
+`produces:` list. Do NOT run the full test suite, coverage, or any `tier: broad` \
+gate: the driver re-runs the narrow tier as this attempt's exit oracle and runs \
+the full set once per gate. Only when the `tests` gate declares no \
+`narrow_command`, or your `produces:` names no tests/ path, run the full `tests` \
+command — exactly once, at the end. End your turn with the RESULT block defined in \
+.specfuse/rules/result-contract.md; report honestly.
 """
 
 CAVEMAN_DIRECTIVE = """\
@@ -3599,7 +3655,11 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
         cmd.insert(2, "--dangerously-skip-permissions")
     if cost_tracking:
         cmd += ["--output-format", "json"]
-    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, check=False)
+    # Same reasoning as the gate runner: a dispatched agent runs the project's
+    # narrow tier in-session, so it must not inherit the driver's pin marker.
+    # See `child_env_without_pin_marker`.
+    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                          check=False, env=child_env_without_pin_marker())
     raw = proc.stdout or ""
     if not cost_tracking:
         return raw, None
@@ -3786,7 +3846,13 @@ def run_smoke_imports(commands: list[str], cwd: Path) -> tuple[bool, str]:
     for cmd in commands:
         cmd = normalize_interpreter(cmd)
         proc = subprocess.run(  # nosec B602
-            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd), check=False,
+            cmd, shell=True, capture_output=True, text=True, cwd=str(cwd),
+            check=False,
+            # Runs project commands, so the driver's pin marker must not leak
+            # in — see `child_env_without_pin_marker`. Found by the spawn-site
+            # enumeration in tests/test_pin_marker_spawn_sites.py, not by
+            # anyone noticing.
+            env=child_env_without_pin_marker(),
         )
         if proc.returncode != 0:
             summary = (
@@ -4161,6 +4227,10 @@ def _run_gate_set(
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            # Gate commands run the project's own suite; the driver's pin
+            # marker must not leak into them. See
+            # `child_env_without_pin_marker` for the failure this prevents.
+            env=child_env_without_pin_marker(),
             **popen_kwargs, **spawn_kwargs,
         )
         try:
@@ -4355,7 +4425,18 @@ def gate_broad_run_check(
     """
     tree = _current_tree_hash()
     existing = read_gate_broad_run(gate_file)
-    if existing is not None and tree is not None and existing["tree"] == tree:
+    # Reuse only a GREEN record — T10's rule, which applies to any cached
+    # verdict and not just the baseline's. `_current_tree_hash` excludes
+    # `.specfuse/` (correct: bookkeeping commits write there on every gate
+    # entry), but the `code` set READS `.specfuse/` — the corpus lint walks
+    # feature folders, as do the roadmap-link, arm-sweep and event-type gates.
+    # So a red verdict recorded against `.specfuse/` content cannot be
+    # invalidated by the `.specfuse/`-side change that fixes it, and the gate
+    # replays a failure that no longer exists. That livelocked this gate twice:
+    # once through the baseline record (fixed by T10) and once through this
+    # one, which T10 did not cover.
+    if (existing is not None and tree is not None
+            and existing["tree"] == tree and existing["ok"]):
         return existing["ok"], existing["failing"], False
     ok, failing = run_gate_broad_set(feature_dir, cfg)
     ran_at = dt.datetime.now(dt.timezone.utc).isoformat()
@@ -5332,7 +5413,7 @@ def gate_baseline_check(
     nothing.
     """
     baseline = read_gate_baseline(gate_file)
-    if baseline is not None:
+    if baseline is not None and not baseline["failing"]:
         if baseline["tree"] is not None:
             if baseline["tree"] == _current_tree_hash():
                 return baseline["failing"], False
@@ -7513,9 +7594,15 @@ def run_judge_session(
     fixture without touching the close path's logic. `subprocess.TimeoutExpired`
     is left to propagate — `judge_close` owns what a timeout means.
     """
+    # The judge reads evidence by running the project's own commands, so it
+    # must not inherit the driver's pin marker either. Missing this strip made
+    # a judge dispatched from a pinned driver see three pin-conditional tests
+    # take their pinned branch and lowered a correct `met` to `not_met` on
+    # evidence that was an artifact of its environment. See
+    # `child_env_without_pin_marker`.
     proc = subprocess.run(
         build_judge_cmd(), input=prompt, capture_output=True, text=True,
-        check=False, timeout=timeout,
+        check=False, timeout=timeout, env=child_env_without_pin_marker(),
     )
     return parse_claude_json_output(proc.stdout or "")
 
@@ -8318,6 +8405,29 @@ def run(
     backend = make_backend(feat_fm)
     backend.on_feature_start(feature_id, feat_fm)
 
+    # Build-pin identity (FEAT-2026-0109/T08): once per process, when this
+    # process is itself a materialized pin, record what it is actually
+    # executing — the pin's tree hash and its path — so an operator (or a
+    # test) reading events.jsonl never has to infer the build from `ps`
+    # output. The recorded path is `running_package_dir()`, the pin, never
+    # the working tree's `specfuse/loop/`.
+    if not dry_run and os.environ.get(PINNED_BUILD_ENV_VAR):
+        from specfuse.loop.build_provenance import running_package_dir
+        flush_events(events_path, [build_event(
+            "driver_build_pinned", feature_id, {
+                "tree": os.environ[PINNED_BUILD_ENV_VAR],
+                "path": str(running_package_dir()),
+            })])
+        # Committed immediately, same as the baseline-snapshot write just
+        # below: an uncommitted events.jsonl line would not survive the
+        # first WU attempt's `git reset --hard head_before` if that attempt
+        # fails.
+        commit_bookkeeping(
+            [events_path],
+            f"chore(loop): {feature_id} build pin recorded\n\n"
+            f"Feature: {feature_id}",
+        )
+
     gate = next((g for g in gates if g.status != "passed"), None)
     if gate is None:
         # Observation-only path (#276). This poll used to write PLAN.md
@@ -8453,6 +8563,10 @@ def run(
         # above) are not "dispatched" by this process and are excluded.
         dispatch_order: list[str] = []
         driver_edits: list[tuple[str, list[str]]] = []
+        # Driver edits already recorded (non-halting) while this process runs
+        # pinned (FEAT-2026-0109/T08) — so a stable driver_edits tail is not
+        # re-emitted on every subsequent pending-unit's pre-dispatch check.
+        pinned_edits_recorded: set[str] = set()
         blocked = False
         close_wu_for_terminal: WorkUnit | None = None
         close_wu_completed = None  # any close with a well-formed verdict (#3243)
@@ -8513,7 +8627,32 @@ def run(
                     # 49 of 90 gates repo-wide never edit the driver) or on
                     # the gate's final unit (nothing left in `pending` after
                     # it, so this check is never reached for it at all).
-                    if driver_edits:
+                    #
+                    # FEAT-2026-0109/T08: the halt's premise — "this process
+                    # will execute code it cannot observe" — is false when
+                    # this process is itself a recorded pin: the NEXT process
+                    # re-pins from the post-squash `HEAD^{tree}` anyway, so
+                    # this one keeps dispatching against its own snapshot and
+                    # records the edit instead of stopping for a human.
+                    # `driver_edit.py`'s detection is untouched — only the
+                    # response to it moves.
+                    if driver_edits and os.environ.get(PINNED_BUILD_ENV_VAR):
+                        for _edit_wu_id, _edit_paths in driver_edits:
+                            if _edit_wu_id in pinned_edits_recorded:
+                                continue
+                            pinned_edits_recorded.add(_edit_wu_id)
+                            _next_tree = head_tree_hash(REPO_ROOT)
+                            flush_events(events_path, [build_event(
+                                "driver_staleness_detected", feature_id, {
+                                    "gate": gate.number,
+                                    "wu_id": _edit_wu_id,
+                                    "driver_paths": _edit_paths,
+                                    "halted": False,
+                                    "reason": HALT_REASON_DRIVER_RESTART,
+                                    "pinned_tree": os.environ[PINNED_BUILD_ENV_VAR],
+                                    "next_pin_tree": _next_tree,
+                                })])
+                    elif driver_edits:
                         _edit_wu_id, _edit_paths = driver_edits[-1]
                         _remaining_ids = [
                             w.wu_id for w in pending[pending.index(wu):]]
@@ -9034,8 +9173,14 @@ def run(
                         if sha is not None:
                             _changed = changed_paths_for_commit(sha, REPO_ROOT)
                             _driver_paths = driver_paths_in(_changed)
+                            _pinned_tree = os.environ.get(PINNED_BUILD_ENV_VAR)
+                            _next_pin_tree = (
+                                head_tree_hash(REPO_ROOT) if _pinned_tree
+                                else None)
                             _warning = format_driver_staleness_warning(
-                                wu.wu_id, _driver_paths)
+                                wu.wu_id, _driver_paths,
+                                pinned_tree=_pinned_tree,
+                                next_pin_tree=_next_pin_tree)
                             if _warning:
                                 print(_warning)
                                 # Recorded for the gate-completion summary
@@ -9817,8 +9962,12 @@ def run(
                 _dispatched_after = dispatch_order[_first_edit_idx + 1:]
             else:
                 _dispatched_after = []
+            _pinned_tree = os.environ.get(PINNED_BUILD_ENV_VAR)
+            _next_pin_tree = (
+                head_tree_hash(REPO_ROOT) if _pinned_tree else None)
             _staleness_summary = format_driver_staleness_summary(
-                _gate_edits, _dispatched_after)
+                _gate_edits, _dispatched_after,
+                pinned_tree=_pinned_tree, next_pin_tree=_next_pin_tree)
             if _staleness_summary:
                 print(f"\n{_staleness_summary}")
                 staleness_gate_events.append(build_event(
@@ -10254,6 +10403,85 @@ def _force_utf8_console() -> None:
             reconfigure(encoding="utf-8")
 
 
+#: Set on the child's environment by `_reexec_pinned` and read back by both
+#: the pinned process (to skip re-pinning — a single hop, provably
+#: terminating) and the pre-dispatch driver-restart check (to know this
+#: process is a pin, so a driver edit records rather than halts).
+#: FEAT-2026-0109/T08.
+PINNED_BUILD_ENV_VAR = "SPECFUSE_LOOP_PINNED_TREE"
+
+
+def child_env_without_pin_marker() -> dict:
+    """This process's environment with the pin marker removed, for any child
+    that runs the PROJECT's own code (FEAT-2026-0109/T08, gate-3 broad run).
+
+    The marker is set by `_reexec_pinned` on the re-exec and is meaningful to
+    exactly one process: the driver itself, as its recursion guard and as the
+    "this run is pinned, so record a driver edit instead of halting" signal.
+    It is passed by environment, so without this it is inherited by every
+    descendant — including the gate subprocesses that run the project's test
+    suite.
+
+    That is not cosmetic. `test_driver_edit_halts_before_next_dispatch`
+    asserts the halt fires; run inside a pinned driver's gate subprocess it
+    saw the marker, took the pinned "record, do not halt" branch, and failed —
+    a failure invisible to `smoke-test.sh`, to CI, and to any local run,
+    because none of those has the marker set. Gate 3's once-per-gate broad run
+    found it, correctly, and the reproduction is one line:
+
+        env SPECFUSE_LOOP_PINNED_TREE=<hash> python3 -m unittest \\
+            tests.test_driver_restart_halt_wiring   # -> FAILED
+
+    Generally: a test that exercises a pin-conditional branch must control the
+    marker, never inherit it, or it measures the driver's runtime state
+    instead of the state it set up. Stripping it at the spawn boundary makes
+    that the default rather than something each test must remember.
+    """
+    env = dict(os.environ)
+    env.pop(PINNED_BUILD_ENV_VAR, None)
+    return env
+
+
+def _reexec_pinned(argv: list) -> "int | None":
+    """Materialize a pin of `specfuse/` outside the working tree and re-run
+    *argv* from it, once. Returns the child's exit code, or `None` when this
+    process should just keep going unpinned (FEAT-2026-0109/T08).
+
+    Declines silently (returns `None`) in every case where pinning cannot be
+    reached without asking an operator to type something different:
+    already inside a pin (the env var is set — re-pinning would recurse),
+    no driver source tree at the cwd (a downstream project: nothing to
+    pin, matching `build_provenance`'s existing silence-by-construction),
+    or no resolvable `HEAD^{tree}` (no git, not a repo, no commits yet).
+    A `subprocess.run` — not `exec` — so this hop is bounded to depth one and
+    terminates provably: the parent blocks on the child and returns its exit
+    code, and the child carries the env var forward so it cannot re-enter.
+    """
+    if os.environ.get(PINNED_BUILD_ENV_VAR):
+        return None
+    from specfuse.loop import build_provenance
+
+    repo_root = build_provenance.repo_root_for()
+    if repo_root is None:
+        return None
+    tree_hash = build_provenance.head_tree_hash(repo_root)
+    if tree_hash is None:
+        return None
+    try:
+        pin_dir = build_provenance.materialize_pin(repo_root, tree_hash)
+    except OSError:
+        # Pinning unavailable (unwritable cache, disk full, ...): run
+        # unpinned rather than fail the whole invocation over it — the same
+        # posture `build_provenance` already takes toward its own warning.
+        return None
+    launcher = pin_dir / build_provenance.PIN_LAUNCHER_NAME
+    env = dict(os.environ)
+    env[PINNED_BUILD_ENV_VAR] = tree_hash
+    result = subprocess.run(
+        [sys.executable, str(launcher), *argv], env=env, check=False)
+    return result.returncode
+
+
 def main() -> int:
     _force_utf8_console()
 
@@ -10298,6 +10526,16 @@ def main() -> int:
     args = ap.parse_args()
     if not FEATURES_DIR.exists():
         sys.exit(f"No {FEATURES_DIR}. Run from your repo root.")
+
+    # Build-pin re-entry (FEAT-2026-0109/T08): after argparse (so `--help`
+    # and a bad flag exit here, in-process, without ever touching a pin) and
+    # after the FEATURES_DIR guard, but before any work that would run
+    # against the wrong build — auto_sync, recheck-verdict, and dispatch all
+    # come after this.
+    _pinned_rc = _reexec_pinned(sys.argv[1:])
+    if _pinned_rc is not None:
+        return _pinned_rc
+
     if args.recheck_verdict:
         feature_dir = _resolve_feature_dir(args.recheck_verdict)
         result = recheck_terminal_verdict(feature_dir, REPO_ROOT)
