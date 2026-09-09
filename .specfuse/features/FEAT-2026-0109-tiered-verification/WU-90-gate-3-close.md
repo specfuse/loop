@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/G3-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 8.00
 oracle_env: macos_local
 auto_close_disabled: true
@@ -11,13 +11,21 @@ produces:
 model: opus
 effort: high
 gate_set: plannext
-verdict: not_met
 driver_version: 0.16.0
 started_at: 2026-09-09T11:12:05.726329+00:00
 duration_seconds: 1547.333
-cost_usd: 11.979693
-input_tokens: 210
-output_tokens: 90884
+cost_usd: 12.620459
+input_tokens: 256
+output_tokens: 100688
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-09-09T11:42:46+00:00
+    prior_status: done
+    prior_attempts: 1
+    prior_cost_usd: 12.620459
+    prior_duration_seconds: 1547.333
+    reason: "go with option 1, add T09 and re-run the close"
 ---
 
 # Gate 3 close — terminal close of FEAT-2026-0109
@@ -26,6 +34,30 @@ output_tokens: 90884
 done, enumerate the consumer-visible contract this feature changed across all
 three gates, reconcile the whole feature's cost, and record the lessons.
 Measure; a separate judge session reads the evidence and decides.
+
+**This is the close's second attempt.** Attempt 1 recorded `not_met` and a fresh
+judge agreed, unlowered — correctly. Two of `GATE-03.md`'s seven bullets were
+unmet, filed as **#3270** (a pinned run printed the unpinned halt text at the
+point it declines to halt) and **#3271** (`materialize_pin` reused a pin on a
+marker match alone, so a partially reaped pin was still reported as the running
+build). **T09 closes both.** Re-measure against the same seven bullets and say
+plainly which ones T09 moved.
+
+Attempt 1 found #3270 by driving the pinned scenario as a subprocess and reading
+its **stdout** — a surface this gate's oracle does not see, since `GATE-03.md`
+binds it to the exit code and `events.jsonl`. Re-run that probe rather than
+trusting the oracle's silence; it is the only thing that can confirm the fix.
+
+`RETROSPECTIVE.md` from attempt 1 is in this folder. **Rewrite its `## Gate 3`
+measurements and verdict sections in place** — do not append a second copy of any
+section. `FOLLOW-UPS.md` carries both entries with explicit re-run conditions;
+answer against that text, and if T09 satisfied a condition, quote it.
+
+**One item attempt 1 recorded as "noted, not filed" and left open.** `PLAN.md`'s
+`planned_cost_usd` is $26.00 against a WU sum of $56.00 and actual spend of
+$50.34 across 16 attempts. Both gate reviews flagged it; nobody corrected it. The
+driver owns `PLAN.md`, so do not edit it — but state the discrepancy rather than
+reconciling against a figure already known to be wrong.
 
 **Context.** Depends on T08. Binding: `.specfuse/rules/close-discipline.md` —
 all five sections, not only §1. Append to the existing `RETROSPECTIVE.md` under

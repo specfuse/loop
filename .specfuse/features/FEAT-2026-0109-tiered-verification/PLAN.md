@@ -152,10 +152,20 @@ gates:
       - id: FEAT-2026-0109/T08
         file: WU-08-installed-copy-driver.md
         depends_on: []
+      # T09 added after the terminal close recorded `not_met` and a fresh
+      # judge agreed, unlowered. Two of GATE-03.md's seven bullets were
+      # unmet: a pinned run printed the unpinned halt text at the point it
+      # declines to halt (#3270), and `materialize_pin` reused a pin on a
+      # marker match alone, so a partially reaped pin was still reported as
+      # the running build (#3271). T08's mechanism is sound and untouched;
+      # this closes what the driver SAYS and what it TRUSTS.
+      - id: FEAT-2026-0109/T09
+        file: WU-09-pin-honesty-and-integrity.md
+        depends_on: [FEAT-2026-0109/T08]
       # --- closing sequence: terminal close (last gate) ---
       - id: FEAT-2026-0109/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: [FEAT-2026-0109/T08]
+        depends_on: [FEAT-2026-0109/T08, FEAT-2026-0109/T09]
 ```
 
 ## Notes
