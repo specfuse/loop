@@ -17,6 +17,8 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import tempfile
 import unittest
@@ -413,3 +415,34 @@ class TestTitlesTrackingAndBoundaries(unittest.TestCase):
             again = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
             self.assertEqual((again["filed"], again["already_tracked"]), (0, 1))
             self.assertEqual(len(runner.create_calls), 1)
+
+
+class TestTrackedLineIsReadUnderTheHeadingOnly(unittest.TestCase):
+    def test_a_foreign_tracked_line_quoted_in_the_evidence_does_not_skip_the_entry(self):
+        entry = (
+            "### The consumer gate failure is FEAT-2026-0160's\n\n"
+            "**Evidence.** FEAT-2026-0160's entry reads:\n\n"
+            "> **Tracked as #1700.**\n"
+        )
+        self.assertIsNone(loop.followup_tracked_issue(entry))
+        self.assertEqual(loop.followup_tracked_issue("### X\n\n**Tracked as #7.**\n\nbody\n"), "7")
+        self.assertEqual(loop.followup_tracked_issue("### X\n**Tracked as [#8](u).**\n"), "8")
+        # A post-merge section has no heading line of its own.
+        self.assertEqual(loop.followup_tracked_issue("\n**Tracked as #9.**\n\n- item\n"), "9")
+
+    def test_write_back_commit_failure_is_printed_not_swallowed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)  # not a git repository: commit_bookkeeping raises
+            _write_plan(feature_dir)
+            (feature_dir / "FOLLOW-UPS.md").write_text(_FOLLOW_UPS_AS_THE_CLOSES_WROTE_THEM)
+            runner = _FakeGhRunner()
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                result = loop.file_followup_issues(feature_dir, feature_dir, runner=runner, commit=True)
+            self.assertEqual(result["filed"], 1)
+            self.assertFalse(result["writeback_committed"])
+            self.assertEqual(result["written_back"], ["FOLLOW-UPS.md"])
+            self.assertIn("WARNING: follow-up write-back not committed", buf.getvalue())
+            self.assertIn("FOLLOW-UPS.md", buf.getvalue())
+            event = json.loads((feature_dir / "events.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(event["payload"]["written_back"], ["FOLLOW-UPS.md"])

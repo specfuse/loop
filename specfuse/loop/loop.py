@@ -6913,9 +6913,22 @@ def followup_correlation_id(feature_id: str, entry: str) -> str:
 
 
 def followup_tracked_issue(entry: str) -> str | None:
-    """Issue number an entry already names via `Tracked as #N`, else None."""
-    m = FOLLOW_UP_TRACKED_RE.search(entry)
-    return m.group(1) if m else None
+    """Issue number an entry already names via `Tracked as #N`, else None.
+
+    Read from the first non-blank line under the heading only — where
+    `record_tracked_issue` writes it and where a person writes it by hand.
+    An entry whose *evidence* quotes another issue's "Tracked as #N" line is
+    not tracked; matching anywhere in the body would skip it and append a
+    foreign number to the filed list.
+    """
+    lines = entry.splitlines()
+    if lines and lines[0].lstrip().startswith("#"):
+        lines = lines[1:]
+    for line in lines:
+        if line.strip():
+            m = FOLLOW_UP_TRACKED_RE.match(line)
+            return m.group(1) if m else None
+    return None
 
 
 def followup_issue_title(feature_id: str, heading: str, label: str) -> str:
@@ -6978,8 +6991,10 @@ def file_followup_issues(
        driver wrote that line on an earlier attempt, or a person filed by
        hand. This is the check that needs no network and survives a retitle.
     2. `emit_issue_with_body` finds an open issue whose body carries the
-       entry's correlation marker (or whose title names the id, the pre-fix
-       shape) and returns it instead of creating one.
+       entry's correlation marker (or whose title names the id — the pre-fix
+       shape, which still matches only when the heading carried no list
+       enumerator: stripping it changed the hash) and returns it instead of
+       creating one.
     3. Otherwise `gh issue create`, titled from the entry's heading text
        (`[FEAT-2026-0155 follow-up] <heading>`), body = marker + entry.
 
@@ -7069,22 +7084,34 @@ def file_followup_issues(
             unfiled += 1
 
     events_path = feature_dir / "events.jsonl"
+    written_back = [str(p.relative_to(feature_dir)) for p in sorted(recorded_paths)]
     payload = {
         "filed": filed,
         "unfiled": unfiled,
         "already_tracked": skipped_tracked,
         "issue_numbers": filed_issues,
+        "written_back": written_back,
     }
     flush_events(events_path, [build_event("followups_recorded", feature_id, payload)])
+    writeback_committed = False
     if commit and recorded_paths:
         try:
             commit_bookkeeping(
                 [*sorted(recorded_paths), events_path],
                 f"chore(loop): {feature_id} — record the follow-up issues the driver filed",
             )
+            writeback_committed = True
         except Exception as exc:  # noqa: BLE001 - bookkeeping must not fail the close
-            logging.debug("follow-up write-back commit failed: %s", exc)
-    return {**payload, "labels_unensured": labels_unensured}
+            # Loud, not debug-level: an uncommitted tracked line reverts on the
+            # next `git reset --hard`, and the entry files again — the exact
+            # duplicate this write-back exists to prevent.
+            print(
+                f"   WARNING: follow-up write-back not committed ({exc}); the "
+                f"`Tracked as` lines in {', '.join(written_back)} will revert on "
+                f"the next reset — commit them by hand.",
+            )
+    return {**payload, "labels_unensured": labels_unensured,
+            "writeback_committed": writeback_committed}
 
 
 def _ensure_labels_exist(names: list, *, runner=None) -> list:

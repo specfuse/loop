@@ -341,9 +341,11 @@ def _find_existing_issue_by_label(
         issues = json.loads(result.stdout)
     except ValueError:
         return None
-    # Precision: the id in the title (the pre-fix follow-up shape, and any
-    # caller that still puts it there) or as a body marker (`file_followup_issues`
-    # since the title became a person's title). Search alone is recall only.
+    # Precision: the id in the title (the pre-fix follow-up shape — matching
+    # only while the id hashes the same, i.e. headings without a list
+    # enumerator — and any caller that still puts it there) or as a body
+    # marker (`file_followup_issues` since the title became a person's title).
+    # Search alone is recall only.
     marker = f"id={correlation_id} -->"
     for issue in issues:
         if correlation_id in issue.get("title", "") or marker in (issue.get("body") or ""):
