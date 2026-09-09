@@ -38,7 +38,10 @@ Two generic meanings, both apply unless the unit narrows the scope:
 - **Run the declared verification commands.** The unit names the checks that
   decide done. Run them yourself first, in declared order, with full output.
   Generic verifications — "I assume the tests still pass" — are not verifications.
-  The commands are the verification.
+  The commands are the verification. Where a surface tiers its checks — the
+  loop's per-attempt narrow tier against the driver's once-per-gate broad run —
+  the declared set is the tier the surface assigns to the session; running the
+  broader tier in-session proves nothing the surface does not re-run itself.
 - **Observe behavior, not source.** A claim that code does X is verified by making
   X happen and reading the output — never by reading the source that looks like it
   does X. A rule read as `ERROR` in source may be gated off and never fire; only a
@@ -50,8 +53,8 @@ Two generic meanings, both apply unless the unit narrows the scope:
 decided by the checks passing, not by the agent's belief. If a check fails you are
 in one of three situations:
 
-1. **Correctable locally.** Fix the cause, re-run the **full** check set from the
-   top, then continue. A re-run that fixes the original failure but introduces a
+1. **Correctable locally.** Fix the cause, re-run the **whole declared** check set
+   from the top, then continue. A re-run that fixes the original failure but introduces a
    new one is still a failed cycle.
 2. **Spinning threshold reached** (typically three fresh attempts on one unit).
    Signal blocked with precise evidence rather than spending the cycle guessing.

@@ -1,6 +1,6 @@
 ---
 name: specfuse-verification
-description: "Run and report Specfuse work-unit verification gates before declaring a task done. Use this skill whenever you are executing a Specfuse work unit and need to confirm the work is actually complete \u2014 running tests, coverage, linting, compiler-warning, and security-scan gates and reporting structured evidence. Use it even when the work \"looks done\"; declaring complete without running the gates is the single most common failure mode and this skill exists to prevent it."
+description: "Run and report Specfuse work-unit verification gates before declaring a task done. Use this skill whenever you are executing a Specfuse work unit and need to confirm the work is actually complete \u2014 running the per-attempt (narrow) tier: the unit's own test modules through the tests gate's narrow_command plus every gate not declaring tier: broad \u2014 and reporting structured evidence. The full suite, coverage and the tier: broad gates are the driver's, once per gate; never run them in-session. Use it even when the work \"looks done\"; declaring complete without running the narrow tier is the single most common failure mode and this skill exists to prevent it."
 ---
 
 <!--
@@ -13,10 +13,11 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 The discipline: **state intent, act, verify, report.** This skill covers the *verify*
 step. You do not get to decide a work unit is done — the gates do. Your job is to run
-them, read the output honestly, and put the evidence in the RESULT block. The driver
-re-runs these same gates as the real exit oracle (see
+**your tier** of them, read the output honestly, and put the evidence in the RESULT
+block. The driver re-runs that same tier as the real exit oracle (see
 [`../../rules/result-contract.md`](../../rules/result-contract.md)), so a dishonest
-self-report buys nothing but a wasted attempt.
+self-report buys nothing but a wasted attempt — and running the driver's broader
+tier in-session buys nothing either, see "Two tiers" below.
 
 ## Where the gates come from
 
@@ -32,12 +33,48 @@ grouped into sets. Which set applies depends on your work unit's `type`:
 | `plan-next`      | `plannext` | The drafted next gate is structurally dispatchable |
 
 Read `.specfuse/verification.yml`, select the set for your type, and run **every**
-command in it. If a command is missing for a gate your acceptance criteria need, that
-is itself a `blocked` condition — report it; do not skip the gate.
+command in its **narrow tier** (next section). If a command is missing for a gate
+your acceptance criteria need, that is itself a `blocked` condition — report it; do
+not skip the gate.
 
 A `verification.yml` that is missing, invalid YAML, or missing a mandatory set for the
 WU type you are executing makes the repo not ready for autonomous work. Emit
 `status: blocked` with a precise reason — do not guess at what the gate "should" be.
+
+## Two tiers: what you run, what the driver runs
+
+Verification is tiered (FEAT-2026-0109). Each attempt is checked twice — once by
+you before you report, once by the driver as the exit oracle — and both runs are
+the **narrow tier**. The **broad tier** runs once per gate, driver-side, after the
+gate's last substantive unit passes and before its closing unit dispatches.
+
+| Tier | Who runs it | What it contains |
+|---|---|---|
+| **narrow** (per attempt) | you, then the driver | every gate in your type's set that does **not** declare `tier: broad`; the `tests` gate through its `narrow_command`, with `{selected_test_modules}` = the entries of your `produces:` list under `tests/`, as dotted module names |
+| **broad** (once per gate) | the driver only | the whole set, tiered or not: the full suite under coverage, `coverage`, `security`, `leak-scan`, anything marked `tier: broad` |
+
+So in-session you run, for this repository, `tests` as
+`python3 -m unittest <your produces: test modules> -v -b`, then `lint` and the
+other untiered script gates. You do **not** run `unittest discover`,
+`scripts/smoke-test.sh`, `coverage`, `bandit` or `leak_scan.py --all`. Measured
+before this rule existed: dispatched sessions ran the full suite about four times
+each, ~2 minutes a run, half of every session's wall clock — every one of those
+runs re-done by the driver's narrow verify and then again by its broad run.
+
+Two fail-safes, both "run the full `tests` command exactly once, at the end":
+
+- the `tests` gate declares no `narrow_command` (a repository that has not
+  opted in); or
+- your `produces:` names no path under `tests/`, so the selection is empty and
+  the driver itself falls back to the full command (`GATE-02.md`: "fail safe,
+  never open").
+
+Targeted runs while iterating — one module, one class, one test — are cheap
+(~2 s) and encouraged. The rule bounds the *full-suite* run, not the tight loop.
+
+A broad-tier failure the driver finds is not your attempt's failure: it halts the
+gate with `broad_run_gate_failure` for a human, and the closing unit that follows
+sees it as evidence. Do not pre-empt it.
 
 ## The code gates (mergeability)
 
@@ -52,8 +89,9 @@ thing.
 - **Lint clean.** No violations.
 - **Security scan clean (OWASP-aligned).** No findings at the configured severity.
 
-The gates are a **conjunction**: all must pass. A single failure means the unit is
-not done.
+The gates are a **conjunction**: all must pass before the gate closes. A single
+failure means the unit is not done. Per attempt you prove the narrow slice; the
+driver's broad run proves the rest, once per gate.
 
 ## Pre-dispatch: `prep` and `oracles` (before dispatch, not at exit)
 
@@ -151,8 +189,12 @@ expected to know to run.
 
 For each gate:
 
-1. **Resolve the command** from the relevant set in `.specfuse/verification.yml`. Run
-   it exactly as declared. Do not substitute a "quick" check.
+1. **Resolve the command** from the relevant set in `.specfuse/verification.yml`,
+   at the narrow tier: skip `tier: broad` gates, and run `tests` through its
+   `narrow_command` with your `produces:` test modules substituted. Run it exactly
+   as declared for that tier. Do not substitute a check narrower than the tier (a
+   single class when the tier names your modules) and do not widen it to the full
+   suite.
 2. **Invoke** with the repo root as the working directory (or `{feature_dir}` for
    commands that substitute it).
 3. **Capture** exit code, stdout, and stderr.
@@ -188,8 +230,8 @@ Roll each gate's result into the RESULT block (see
 single-repo analog of the orchestrator surface's structured `task_completed` payload;
 keep them aligned so a fold-in is a rename, not a redesign.
 
-If **any** mandatory gate fails, do **not** emit `status: complete`. Fix the cause
-and re-run the **full** gate set from the top — partial re-runs are forbidden,
+If **any** narrow-tier gate fails, do **not** emit `status: complete`. Fix the cause
+and re-run the **whole narrow tier** from the top — partial re-runs are forbidden,
 because a later gate may have been masked by the earlier failure. Or, if an
 escalation trigger applies, emit `status: blocked` with the failing evidence and
 stop.
@@ -209,8 +251,8 @@ Before emitting:
 A failed gate puts you in one of three situations, in order of first-to-try:
 
 1. **Correctable locally.** Read the failing evidence, make a corrective edit, and
-   re-run the **full** gate set from the top. A cycle is complete only when the
-   whole set has been re-run green. A run that fixes the original failure but
+   re-run the **whole narrow tier** from the top. A cycle is complete only when the
+   whole tier has been re-run green. A run that fixes the original failure but
    introduces a new failure counts as a **failed** cycle, not a passed one.
 2. **Spinning threshold reached.** The driver dispatches at most three fresh
    attempts (see `loop.py`'s `MAX_ATTEMPTS`). If you are on attempt three and still
@@ -224,33 +266,35 @@ A failed gate puts you in one of three situations, in order of first-to-try:
 
 ## Worked example — clean run
 
-A `T01` implementation unit. The repo's `.specfuse/verification.yml` declares the
-five `code` gates with Python commands.
+A `T01` implementation unit with `produces: [src/orders.py, tests/test_orders.py]`.
+The repo's `.specfuse/verification.yml` declares five `code` gates; `tests` has
+`narrow_command: "pytest {selected_test_modules} -q"`, and `coverage` and
+`security` declare `tier: broad`.
 
-1. Read `.specfuse/verification.yml`. Valid, all five `code` gates present.
-2. Run `tests` (`pytest -q`): exit `0`, evidence `"127 passed"`, duration `8.1s` →
-   **pass**.
-3. Run `coverage` (`coverage report --fail-under=90`): exit `0`, line coverage
-   `0.93` → **pass**.
-4. Run `warnings`: exit `0` → **pass**.
-5. Run `lint` (`ruff check .`): exit `0` → **pass**.
-6. Run `security` (`bandit -r src -ll`): exit `0`, 0 high/critical → **pass**.
-7. Re-read changed files. Confirm correlation ID `FEAT-2026-0007/T01` matches the
+1. Read `.specfuse/verification.yml`. Valid, all five `code` gates present. Narrow
+   tier: `tests`, `warnings`, `lint`. Broad-only: `coverage`, `security`.
+2. Run `tests` narrowed (`pytest tests/test_orders.py -q`): exit `0`, evidence
+   `"14 passed"`, duration `1.9s` → **pass**.
+3. Run `warnings`: exit `0` → **pass**.
+4. Run `lint` (`ruff check .`): exit `0` → **pass**.
+5. `coverage` and `security` are `tier: broad` — not run; note them in the
+   RESULT as driver-owned, once per gate.
+6. Re-read changed files. Confirm correlation ID `FEAT-2026-0007/T01` matches the
    WU file. Confirm no secret-looking value in evidence.
-8. Emit RESULT with `status: complete` and the per-gate evidence. Stop.
+7. Emit RESULT with `status: complete` and the per-gate evidence. Stop.
 
 ## Worked example — failing run, retried
 
 Same unit. The first pass introduces a test regression.
 
-1. Run `tests`: exit `1`, evidence
-   `"Failed: 1, Passed: 126 — test_orders.py::test_reject_missing_email"` →
+1. Run `tests` narrowed: exit `1`, evidence
+   `"Failed: 1, Passed: 13 — test_orders.py::test_reject_missing_email"` →
    **fail**. Cycle 1 failure.
 2. Read the failing test; the validation check was over-permissive. Fix the
-   handler. Re-run **all five gates** from `tests`.
-3. `tests` now passes (`127/127`); `coverage` `0.91` passes; `warnings` passes;
-   `lint` fails — the new code path has a style violation. Cycle 2 failure.
-4. Apply the lint fix. Re-run all five gates from the top.
+   handler. Re-run **the whole narrow tier** from `tests`.
+3. `tests` now passes (`14/14`); `warnings` passes; `lint` fails — the new code
+   path has a style violation. Cycle 2 failure.
+4. Apply the lint fix. Re-run the narrow tier from the top.
 5. Full pass on cycle 2 re-run. Emit RESULT with `status: complete` and the
    final green evidence. The failed cycles are reconstructable from the
    per-attempt notes the driver wrote under the feature's `work/` directory
@@ -269,9 +313,12 @@ verification keeps rejecting.
   action they took, not for the property you want to guarantee.
 - It does not mean "a similar unit has passed before." Nothing about a prior run
   transfers to this one.
-- It does not mean "I ran some of the gate commands." Run all of them; if one is
-  legitimately not applicable, that is a `blocked` condition to report, not a
-  shortcut to take.
+- It does not mean "I ran some of the gate commands." Run all of the narrow tier;
+  if one is legitimately not applicable, that is a `blocked` condition to report,
+  not a shortcut to take.
+- It does not mean "I ran the full suite to be safe." That is the driver's broad
+  run, once per gate; in-session it is ~2 minutes per repetition of evidence the
+  driver discards.
 
 ## "Pre-existing" is a claim about another commit — cite it or don't write it
 
@@ -286,9 +333,14 @@ merge-base:
 
 ```
 git stash && git checkout $(git merge-base HEAD main)
-python3 -m unittest discover -s tests   # 3232 tests OK
+python3 -m unittest tests.test_orders -v -b   # 14 tests OK
 git checkout - && git stash pop
 ```
+
+(Measure at the narrow tier, the same command that failed for you — a full-suite
+baseline is the driver's `preexisting_gate_failure` attribution, not yours. And
+recall the driver preamble: you do not run git; this comparison is one a human or
+the driver performs, so cite theirs or report `blocked`.)
 
 Write the measured numbers from both sides. "Identical to the pre-fix
 baseline" without them is not a weaker version of the claim, it is a different
@@ -321,7 +373,10 @@ baseline nobody had run.
   does not replace them.
 - Running the commands once, seeing a failure, fixing the artifact, and reporting
   without running them again. Every verification cycle ends with a green run of
-  the full set, or the cycle is not complete.
+  the whole narrow tier, or the cycle is not complete.
+- Running the full suite, `coverage`, or any `tier: broad` gate per attempt.
+  The driver runs the narrow tier as the exit oracle and the broad tier once per
+  gate; an in-session full-suite run is paid for and then thrown away.
 - Calling a failure **pre-existing** without having run the commit you claim it
   pre-exists. See the section above: cite the command and the commit, or report
   `blocked` because the baseline could not be measured. A number nobody measured

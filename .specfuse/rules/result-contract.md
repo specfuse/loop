@@ -35,14 +35,19 @@ cycle; this file is normative on how the loop surface reports step 4.
    the work unit's **Do not touch** section is binding.
 3. **Verify.** Re-read what you produced — the Write/Edit tool reports the
    action it took, not the property you wanted — and run the work unit's own
-   verification commands, in declared order, with full output. "I assume the
+   verification commands, in declared order, with full output. On the loop
+   that set is the **per-attempt (narrow) tier**: the unit type's gates minus
+   any declaring `tier: broad`, with `tests` through its `narrow_command` over
+   the unit's `produces:` test modules. The full suite, coverage and every
+   `tier: broad` gate are the driver's, once per gate — running them in-session
+   buys nothing the driver does not re-run. "I assume the
    tests still pass" is not a verification. A behavioural claim needs a run, not
    a reading of the source; a rule-or-severity claim needs a **negative
    observation**, the rule seen rejecting a purpose-built bad input.
 4. **Report.** Report only what verification confirmed.
 
 A failing check leaves you in one of three situations: correctable locally (fix
-the cause, re-run the **full** gate set from the top), spinning (three fresh
+the cause, re-run the **whole narrow tier** from the top), spinning (three fresh
 attempts is the driver's budget — emit `status: blocked` with the evidence
 rather than guessing), or fundamentally blocked (a spec ambiguity, generated
 code that must change, a missing dependency — emit `status: blocked` naming the

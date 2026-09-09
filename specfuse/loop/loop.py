@@ -3283,9 +3283,16 @@ def squash_commit(
 PROMPT_PREAMBLE = """\
 You are executing a single Specfuse work unit. Read .specfuse/rules/ in full before \
 acting; they are binding. Do NOT run any git command — the driver owns all commits \
-and bookkeeping. Edit files only. End your turn with the RESULT block defined in \
-.specfuse/rules/result-contract.md. Verification is run by the driver, not by you; \
-report honestly.
+and bookkeeping. Edit files only. Verification is tiered: before you report, run \
+only the per-attempt (narrow) tier yourself — your unit type's gate set in \
+.specfuse/verification.yml minus every gate declaring `tier: broad`, with the \
+`tests` gate run through its `narrow_command` over the test modules in your \
+`produces:` list. Do NOT run the full test suite, coverage, or any `tier: broad` \
+gate: the driver re-runs the narrow tier as this attempt's exit oracle and runs \
+the full set once per gate. Only when the `tests` gate declares no \
+`narrow_command`, or your `produces:` names no tests/ path, run the full `tests` \
+command — exactly once, at the end. End your turn with the RESULT block defined in \
+.specfuse/rules/result-contract.md; report honestly.
 """
 
 CAVEMAN_DIRECTIVE = """\
