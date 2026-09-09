@@ -1,22 +1,23 @@
 ---
 id: FEAT-2026-0109/G3-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 8.00
 oracle_env: macos_local
 auto_close_disabled: true
+verdict: met
 produces:
   - .specfuse/features/FEAT-2026-0109-tiered-verification/RETROSPECTIVE.md
 model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.16.0
-started_at: 2026-09-09T13:49:39.728913+00:00
-duration_seconds: 1838.141
-cost_usd: 17.167716
-input_tokens: 272
-output_tokens: 102532
+started_at: 2026-09-09T15:23:24.019544+00:00
+duration_seconds: 2039.375
+cost_usd: 11.6672
+input_tokens: 184
+output_tokens: 98367
 re_arm_count: 2
 re_arm_history:
   -
@@ -33,12 +34,12 @@ re_arm_history:
     prior_cost_usd: 17.167716
     prior_duration_seconds: 1838.141
     reason: "go with option 1, fix the judge env and re-run the close"
-cumulative_cost_usd: 12.620459
-cumulative_duration_seconds: 1547.333
-cumulative_input_tokens: 256
-cumulative_output_tokens: 100688
-cumulative_attempts: 1
-folded_through_re_arm: 1
+cumulative_cost_usd: 29.788175
+cumulative_duration_seconds: 3385.474
+cumulative_input_tokens: 528
+cumulative_output_tokens: 203220
+cumulative_attempts: 2
+folded_through_re_arm: 2
 ---
 
 # Gate 3 close — terminal close of FEAT-2026-0109

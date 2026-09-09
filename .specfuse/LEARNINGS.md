@@ -4109,8 +4109,8 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   fixes it.
 
 - [FEAT-2026-0109/G3] A cache keyed on identity must validate its contents, and a negative result
-  is never a cache. One gate produced two independent instances of this within a day, in code
-  written by two different units of the same feature. The pinned-build cache trusted a marker file
+  is never a cache. One gate produced THREE independent instances of this within two days, in code
+  written by three different hands on the same feature. The pinned-build cache trusted a marker file
   naming a tree hash and executed a directory that had silently lost 91 of 131 files to the
   platform's `$TMPDIR` reaper — because the package is a namespace package with the working tree
   on `sys.path`, the program resolved back to the tree while the process still emitted "I am
@@ -4118,7 +4118,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   scaffold directory — correct for surviving bookkeeping commits — while the gates it summarises
   *read* that directory, so a recorded failure could not be invalidated by the fix that cleared
   it and the gate livelocked: two dispatches, $3.10, 24 minutes, and an attempt counter that never
-  moved. Neither failed loudly; both produced a confident wrong answer. Two rules. **(a)** A
+  moved. The once-per-gate broad-run record then repeated that mistake verbatim in the one cache
+  the baseline fix did not cover, and replayed a red verdict without re-running a single gate, for
+  a failure the tree no longer had. None failed loudly; each produced a confident wrong answer.
+  Two rules and a corollary. **(a)** A
   content-addressed cache's validity check must cover the content, not only the marker naming it —
   a manifest, a file count, or re-materialize-on-mismatch — so a partially reaped entry fails
   loudly instead of degrading into a hybrid of cache and source. **(b)** A cache entry recording a
@@ -4127,4 +4130,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the whole point, because someone is presumably fixing it, so reusing it can only ever be
   redundant or wrong. The shape of both: a key that cannot see everything the value depends on is
   not an identity, and the cheapest correct fix is to shrink what you are willing to cache, not to
-  widen the key.
+  widen the key. **(c) The corollary that gate paid for twice more:** when you fix one instance of
+  a trusting-the-key cache, fix every sibling cache in the same commit, and ENUMERATE the
+  boundaries rather than patching the ones you remember. The third instance existed only because
+  the second fix covered one of two identical caches; separately, an environment marker leaking
+  across a spawn boundary made a judge lower a correct verdict on five defects that did not exist,
+  and the fix that finally held was a test enumerating every spawn site — which immediately found
+  a site nobody had reported. Enumerating the boundaries is cheap; rediscovering them one halt at
+  a time is not.
