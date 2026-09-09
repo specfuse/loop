@@ -800,271 +800,456 @@ Gate 3 changed **what the driver is** while it runs: `main()` materializes a
 content-addressed copy of `specfuse/` outside the working tree, keyed on
 `HEAD^{tree}`, re-execs into it, and — because the running process is then a
 stable snapshot — stops halting the run when a work unit edits the driver.
-One substantive unit, T08, plus this close.
+T08 built that mechanism. T09 and T10 were added after the gate's first close
+recorded `not_met`: T09 closed the two definition-of-done bullets that close
+found unmet (#3270, #3271), and T10 fixed a livelock the gate hit while T09 was
+being retried.
 
-Two of the gate's seven definition-of-done bullets are **not met**, both found
-by running the gate rather than reading it. They are recorded in
-`FOLLOW-UPS.md`. The rest of this section is the evidence.
+All seven definition-of-done bullets are met on this attempt's evidence.
+Two of them — bullets 5 and 3 — moved from `not_met` to `met`, and both moved
+because T09 landed, not because the measurement changed: they are re-measured
+below with the same probes that failed them, against the re-run conditions
+`FOLLOW-UPS.md` wrote.
+
+Three numbers gate 1 and gate 2 both deferred to "the next failure" are no
+longer zero. That is the substantive thing this gate produced beyond its own
+mechanism, and it happened because gate 3 was the first gate in this feature
+that actually failed.
 
 ## Measurements
 
 All commands below were run in this close session, on this working tree, exit
-codes read directly.
+codes read directly. This session runs no `git` command; every fact about
+history is read from `events.jsonl`, from the pin cache on disk, or from the
+process table.
 
 ### Definition of done — one command per bullet
 
 | # | `GATE-03.md` bullet | Command run in this session | Exit | State |
 |---|---|---|---|---|
-| 1 | The driver executes a pinned build, and records which one | `python3 -m unittest tests.test_installed_copy_driver_e2e -q` (Ran 9 tests, `OK`); `python3 -c "…event_type=='driver_build_pinned'"` over `events.jsonl` → **2** events, trees `021342f2…` and `134a81f0…`, each carrying its pin path | 0 | **met** |
-| 2 | A unit editing `specfuse/loop/*.py` does not halt the run | oracle above (`test_a_driver_edit_does_not_halt_the_run`, `test_the_driver_edit_is_still_recorded`); production: `driver_staleness_detected` with `halted: true` after the first pin (2026-09-08T20:30:25Z) → **0** | 0 | **met** (unit-tested; production count of the non-halting branch is **0** — see below) |
-| 3 | The pin is transparent to the operator's command | `python3 -c "from specfuse.loop.loop import resume_command_for; print(resume_command_for('FEAT-2026-0109'))"` → `python3 -m specfuse.loop.loop --feature FEAT-2026-0109`; `grep -n '"run"' …/site-packages/specfuse/cli.py` → `"run": ("specfuse.loop.loop:main", …)`, so both forms reach `main()` and therefore `_reexec_pinned`. **But** the reaped-pin probe below shows a resume at an already-pinned tree can silently escape to the working tree | 0 | **not met** |
-| 4 | #1040's guarantee survives — a third state, `pinned at a recorded tree` | observed live, both branches: a pinned driver subprocess printed `running a recorded pin of specfuse from …/specfuse-pins/8353a86c…/ (tree 8353a86c…); the working tree at … is now at tree 8353a86c…` on stderr, with no "confidently wrong" text; and `specfuse lint … --closing` (the installed wheel, an **unidentified** out-of-tree build) printed the alarming text verbatim, unchanged. Both in this session | 0 | **met** |
-| 5 | The cost is stated at the moment it is incurred, in words | pinned-run probe (below): at the point it declines to halt the driver prints `STALE DRIVER PROCESS: … A fresh driver process is required before any close can verify this change: stop this driver now and start a new one before dispatching the next work unit.` — the pre-T08 text, contradicting what the pinned driver then does. `grep -c -i pin` over the pinned run's stdout → **2**, both the feature slug | 0 | **not met** |
+| 1 | The driver executes a pinned build, and records which one | `python3 -m unittest tests.test_installed_copy_driver_e2e -q` (Ran 9 tests in 3.230s, `OK`); `python3 -c "…event_type=='driver_build_pinned'…"` over `events.jsonl` → **6** events, trees `021342f2…`, `134a81f0…`, `51a3e401…`, `869aed0a…`, `4545ce57…`, `b396c1a6…`, each carrying its pin path; `ps -eo pid,ppid,etime,command` → PID 55697 executing `…/specfuse-pins/b396c1a6…/_run_pinned.py --feature FEAT-2026-0109` | 0 | **met** |
+| 2 | A unit editing `specfuse/loop/*.py` does not halt the run | oracle above; **and in production**: `driver_staleness_detected` with `halted: false` → **2** (T09 at 2026-09-09T13:30:52Z, T10 at 13:32:22Z), each carrying `pinned_tree: 4545ce57…` and a `next_pin_tree`, with the same process dispatching T10 straight after T09's squash (T10 completed 90.1s later); `halted: true` after the pin landed → **0** | 0 | **met** |
+| 3 | The pin is transparent to the operator's command | `python3 -c "…resume_command_for('FEAT-2026-0109')"` → `python3 -m specfuse.loop.loop --feature FEAT-2026-0109`, and that exact command is PID 55692 in the process table with the pinned `_run_pinned.py` as its child; **and the reuse-integrity half that failed at attempt 1**: the real reaped pin `021342f2…` (40 of 131 files) now fails `_pin_is_complete`; a fresh pin with two files deleted behind its back is **rebuilt to 131 files** by the next `materialize_pin`, not reused; and a launcher-shaped import inside the reused pin resolves `specfuse.loop.loop` to the pin, not to the working tree. Full output below | 0 | **met** (was `not_met`, #3271; closed by T09) |
+| 4 | #1040's guarantee survives — a third state, `pinned at a recorded tree` | `python3 -c "…build_provenance.out_of_tree_warning()"` from inside the live pin → `running a recorded pin of specfuse from …/specfuse-pins/b396c1a6…/ (tree b396c1a6…); the working tree at … is now at tree …`, no "confidently wrong" text; the installed wheel (an **unidentified** out-of-tree build) still prints the original warning verbatim | 0 | **met** |
+| 5 | The cost is stated at the moment it is incurred, in words | stdout probe of the real pinned driver subprocess (returncode 0): the per-unit seam prints `DRIVER EDIT RECORDED (pinned build <tree>)` naming `next_pin_tree` and "continues dispatching against its own pinned snapshot"; the gate summary prints `DRIVER EDITS RECORDED (gate summary, pinned build <tree>)` and "No restart was required."; **neither** pre-T09 string (`STALE DRIVER PROCESS:` / "stop this driver now and start a new one") appears anywhere. Case-insensitive `pin` occurrences on that stdout: **11**, against **2** at attempt 1 (both of which were the feature slug). Full output below | 0 | **met** (was `not_met`, #3270; closed by T09) |
 | 6 | A project that never installed the driver is unaffected | oracle above (`ProjectWithoutDriverSourceIsUnaffected.test_no_pin_materialized_no_new_event`) | 0 | **met** |
-| 7 | Per-criterion state and the narrow/broad oracle contract (`close-discipline.md` §5) | `GATE-03-CRITERIA.md`, written by this close; `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | 0 | **met** |
+| 7 | Per-criterion state and the narrow/broad oracle contract (`close-discipline.md` §5) | `GATE-03-CRITERIA.md`, 13 entries, written by this close; `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | 0 | **met** |
 
-The bullet-5 and bullet-3 probes are reproduced under
-`## What the loop did NOT verify` and `FOLLOW-UPS.md`.
+### The two bullets T09 moved, against `FOLLOW-UPS.md`'s re-run conditions
+
+`FOLLOW-UPS.md` wrote an explicit re-run condition for each. Both are quoted
+verbatim below and answered against a probe run in this session — not against
+the gate's oracle, which by `GATE-03.md`'s own binding instruction asserts only
+on the subprocess exit code and `events.jsonl` and therefore cannot see either
+defect.
+
+**#3270 — "A pinned run prints the pre-T08 halt text at the point it declines
+to halt."** The condition: *"Satisfied when the probe above shows a pin-aware
+sentence at both the per-unit seam and the gate summary, and
+`UnpinnedRunStillHalts` still passes unchanged. Because the gate's oracle is
+bound to `events.jsonl` and the exit code, the covering assertion needs a
+separate test that reads the subprocess's stdout."*
+
+Re-ran that probe — the same one attempt 1 used to find the defect: drive
+`PinnedRunRecordsAndSurvivesDriverEdits`'s real pinned driver subprocess and
+read `proc.stdout`.
+
+```
+RETURNCODE: 0
+driver_build_pinned: 1  tree 57803dac6cfbdbb9d7282cf8b87c5b97b683907e
+staleness halted=False: 1     next_pin_tree 6478bc49c731037949efbff35003f873d859718f
+staleness halted=True : 0
+--- pre-T09 wording present on stdout? ---
+  'STALE DRIVER PROCESS:'                     : False
+  'stop this driver now and start a new one'  : False
+  'STALE DRIVER PROCESS (gate summary):'      : False
+  'A fresh driver process is required'        : False
+--- pin-aware wording present on stdout? ---
+  'DRIVER EDIT RECORDED (pinned build'                    : True
+  'continues dispatching against its own pinned snapshot' : True
+  'DRIVER EDITS RECORDED (gate summary, pinned build'     : True
+  'No restart was required.'                              : True
+  pinned tree hash on stdout   : True
+  next_pin_tree hash on stdout : True
+  case-insensitive 'pin' occurrences: 11        # was 2, both the feature slug
+
+--- the per-unit seam, verbatim from the pinned run's stdout ---
+DRIVER EDIT RECORDED (pinned build 57803dac6cfbdbb9d7282cf8b87c5b97b683907e):
+FEAT-2026-8801/T01 edited the driver itself (specfuse/loop/loop.py). This
+process is executing a pinned build materialized at tree 57803dac...907e, not
+the working tree, so this edit does not change what this process runs. It takes
+effect in the next pinned build, at tree 6478bc49c731037949efbff35003f873d859718f.
+This process continues dispatching against its own pinned snapshot; no restart
+is required.
+
+--- the gate-completion summary, verbatim ---
+DRIVER EDITS RECORDED (gate summary, pinned build 57803dac...907e):
+This process executed the pinned build at tree 57803dac...907e, not the working
+tree, so the edit(s) above took effect in the next pinned build (tree
+a7f013fb53d69197601d1d7e50b041acc70218b9), not this one. Dispatched after the
+edit above in this same process: FEAT-2026-8801/T02 - each executed against this
+process's own pinned snapshot, which is what a pinned run is for. No restart was
+required.
+```
+
+All three clauses of the condition hold: pin-aware text at the per-unit seam,
+pin-aware text at the gate summary, and `UnpinnedRunStillHalts` green
+(`tests.test_installed_copy_driver_e2e`, and `tests.test_pin_honesty_and_integrity`'s
+`test_unpinned_text_is_byte_identical` compares the unpinned strings against
+HEAD's wording directly). The covering assertion the condition asked for exists:
+`tests/test_pin_honesty_and_integrity.py::PinnedSeamTextIsPinAware`, which reads
+the subprocess's stdout rather than the event log.
+
+**#3271 — "A materialized pin can lose its files and still be reported as the
+running build."** The condition: *"`materialize_pin`'s reuse check validates the
+pin's **content**, not only its marker — a manifest written alongside
+`.specfuse-pin-tree`, or a re-materialize when the tree does not match — so a
+partially reaped pin is rebuilt rather than reused … Satisfied when a test
+materializes a pin, deletes `specfuse/loop/__init__.py` (or any other file)
+behind its back, calls `materialize_pin` again, and asserts the returned pin is
+**complete** — and when the launcher-shaped import inside a reused pin resolves
+`specfuse.loop.loop` to the pin, never to the working tree."*
+
+T09 took the first of the two offered options — a manifest — and did not
+relocate the cache out of `tempfile.gettempdir()`, which `FOLLOW-UPS.md` offered
+as an "and/or" and this unit's escalation trigger named as an operator decision.
+Re-ran the probe:
+
+```
+REAL REAPED PIN 021342f2 (the build events.jsonl records executing 2026-09-08T20:30:25Z):
+  files present    : 40          # 131 when materialized
+  marker present   : True
+  manifest present : False       # materialized before T09
+  _pin_is_complete -> False      # refused; a re-entry rebuilds it
+
+FRESH PIN 4964ec81 (this working tree, into a throwaway SPECFUSE_PIN_CACHE_DIR):
+  131 files; manifest lines: 131
+  after deleting specfuse/loop/__init__.py and build_provenance.py behind its back: 129
+  marker still matches : True    # the check that used to be the only one
+  _pin_is_complete     -> False
+  materialize_pin() again:
+    same dir returned      : True
+    files after reuse      : 131
+    deleted files restored : True True
+    RESULT: rebuilt, not reused -> True
+
+LAUNCHER-SHAPED IMPORT FROM THE REUSED PIN (cwd = repo root):
+  RESOLVED: <cache>/4964ec81.../specfuse/loop/loop.py
+  resolves to the PIN      : True
+  resolves to WORKING TREE : False
+```
+
+Both clauses hold. Note the third line especially: the pin this feature's own
+event log records the driver executing on 2026-09-08 is **still** reaped on
+disk, still 40 of its 131 files, and `_pin_is_complete` now refuses it — the
+defect's original artifact, failing the new check rather than being reasoned
+about.
+
+**What T09 did not change.** Pins still live in `tempfile.gettempdir()` and
+`shutil.copytree` still preserves source mtimes, so a pin is still born looking
+days old to an age-based reaper. What changed is that losing files is now loud
+instead of silent: a reaped pin is rebuilt, at the cost of one re-copy, instead
+of being executed as a hybrid of pin and working tree. The retention question is
+recorded under `## What the loop did NOT verify`.
 
 ### Fresh oracle re-runs
 
 | Oracle | Command | Result | Exit |
 |---|---|---|---|
-| Gate 3 `feature_oracle` | `python3 -m unittest tests.test_installed_copy_driver_e2e -q` | Ran 9 tests in 3.174s, `OK` | 0 |
-| Gate 2 `feature_oracle` | `python3 -m unittest tests.test_tiered_verification_e2e -q` | Ran 5 tests in 4.867s, `OK` | 0 |
-| Gate 1 `feature_oracle` | `python3 -m unittest tests.test_lazy_baseline_e2e -q` | Ran 8 tests in 3.165s, `OK` | 0 |
-| Full suite | `python3 -m unittest discover -s tests -q` | Ran 3819 tests in 158.908s, `OK (skipped=3)` | 0 |
+| Gate 3 `feature_oracle` | `python3 -m unittest tests.test_installed_copy_driver_e2e -q` | Ran 9 tests in 3.230s, `OK` | 0 |
+| Gate 2 `feature_oracle` | `python3 -m unittest tests.test_tiered_verification_e2e -q` | Ran 5 tests in 4.833s, `OK` | 0 |
+| Gate 1 `feature_oracle` | `python3 -m unittest tests.test_lazy_baseline_e2e -q` | Ran 8 tests in 3.072s, `OK` | 0 |
+| Full suite | `python3 -m unittest discover -s tests -q` | Ran 3829 tests in 199.120s, `OK (skipped=3)` | 0 |
 | Smoke test | `bash scripts/smoke-test.sh` | `smoke test: OK` | 0 |
 | Lint sweep | `lint_plan.py` over all 77 `.specfuse/features/*/` folders | 77 folders linted, **0** with an ERROR finding | 0 |
-| Closing lint | `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | see `## Verdict` | 0 |
+| T09's covering tests | `python3 -m unittest tests.test_pin_honesty_and_integrity -q` | Ran 5 tests in 1.784s, `OK` | 0 |
+| T10's covering tests | `python3 -m unittest tests.test_red_baseline_never_reused -q` | Ran 4 tests in 0.488s, `OK` | 0 |
+| Closing lint | `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | `CLOSING-READY` | 0 |
 
-Gate 1's oracle reports **8** tests here against the **9** gate 2's close
-recorded. The delta is not a regression: the suite as a whole grew 3806 → 3819
-and every module is green. It is recorded because a close that quotes a
-count should say when the count moved.
+The full suite grew 3819 → 3829 tests since the previous close attempt: T09
+added 5 (`tests/test_pin_honesty_and_integrity.py`), T10 added 4
+(`tests/test_red_baseline_never_reused.py`), and the operator commit that
+re-asserted the baseline contract replaced one test with two in
+`tests/test_baseline_persistence.py`.
 
 ### feature_oracle: PASS
 
 ### The restart count, against the prediction of 1
 
-| Gate | `driver_staleness_detected` with `halted: true` | Dead time to the next event |
-|---|---|---|
-| 1 | 3 | 138.3s |
-| 2 | 4 | 419.4s |
-| 3 | **1** | **79.5s** |
-| **Feature** | **8** | **637.2s (10.6 min)** |
+| Gate | `driver_staleness_detected` `halted: true` | `halted: false` | Dead time to the next event |
+|---|---|---|---|
+| 1 | 3 | 0 | 138.3s |
+| 2 | 4 | 0 | 419.4s |
+| 3 | **1** | **2** | **79.5s** |
+| **Feature** | **8** | **2** | **637.2s (10.6 min)** |
 
-**Gate 3's count is exactly 1, as predicted.** The single halt fired at
-2026-09-08T20:29:06Z, naming `wu_id: FEAT-2026-0109/T08`, `driver_paths:
-[specfuse/loop/build_provenance.py, specfuse/loop/loop.py]` and
+**Gate 3's halted count is exactly 1, as this unit's body predicted.** The
+single halt fired at 2026-09-08T20:29:06Z naming `wu_id: FEAT-2026-0109/T08`,
+`driver_paths: [specfuse/loop/build_provenance.py, specfuse/loop/loop.py]` and
 `remaining_wu_ids: [FEAT-2026-0109/G3-CLOSE]` — the pre-T08 driver halting on
-T08's own squash, with only this close left to dispatch. 79.5 seconds later the
-restarted driver emitted the feature's first `driver_build_pinned`. The
-prediction in this unit's body — "the pre-T08 halt fires once, and the restarted
-driver is the first one to pin" — is confirmed event for event.
+T08's own squash, with only the close left to dispatch. 79.5 seconds later the
+restarted driver emitted this feature's first `driver_build_pinned`. The
+prediction — "the pre-T08 halt fires once, and the restarted driver is the first
+one to pin" — is confirmed event for event, and it held even though the gate
+subsequently grew two units nobody had drafted when the prediction was written.
 
 `GATE-03.md` recorded this feature at **7** restarts before gate 3 ran, tied
-worst repo-wide with FEAT-2026-0100. The feature's final count is **8**.
+worst repo-wide with FEAT-2026-0100. The feature's final count is **8**, and the
+repo-wide count is now **50** across 14 features.
 
-**The non-halting branch fired 0 times in production.** Count of
-`driver_staleness_detected` with `halted: false` across this feature's
-`events.jsonl`: **0**. Gate 3 had exactly one substantive unit and it was the
-last one before the close, so after the pin landed no unit ever edited the
-driver again. The branch that retires the halt is proven only by
-`tests/test_installed_copy_driver_e2e.py`. This is the same shape gate 1's
-lesson 1 named — a gate whose feature is "stop doing X" measuring its saving on
-a run that never needed X — and it is now the third consecutive gate to close
-that way.
+**And the branch that retires the halt fired in production — twice.** This is
+the number the previous close attempt recorded as 0 and could only defend with
+unit tests. T09 and T10 both edited `specfuse/loop/loop.py`; both squashes
+produced `driver_staleness_detected` with `halted: false`, `pinned_tree:
+4545ce57035e7b67408004da0770a16161e92656`, and a `next_pin_tree` naming the
+build the edit takes effect in (`b77b5c95…` for T09, `a5930047…` for T10). T10
+was then dispatched **in the same process** immediately after T09's squash and
+completed 90.1 seconds later, at 13:32:22Z. Under the pre-T08 driver those two
+units would have cost two halts and two operator restarts; they cost none.
+
+That is the gate's central claim, observed rather than asserted, and it is worth
+being precise about what it took to observe it: gate 3 could only produce this
+evidence because the gate *failed*. T08 was the last unit before the close, so
+nothing followed it. The two units that exercised the non-halting branch exist
+only because the close recorded `not_met` and the operator added them.
 
 ### Did this close session run from a pinned build? Yes.
 
 The evidence, in order, none of it inferred from silence:
 
-1. `driver_build_pinned` at **2026-09-09T11:08:31.673Z**, payload
-   `{"tree": "134a81f087ed9c49aaac29ae9958f8e98ca805ef", "path":
-   "$TMPDIR/specfuse-pins/134a81f087ed9c49aaac29ae9958f8e98ca805ef/specfuse/loop"}`.
-2. This work unit's frontmatter `started_at: 2026-09-09T11:12:05.726329+00:00`
-   — 3m34s after that pin, with no intervening `driver_build_pinned`, no
-   `driver_staleness_detected`, and no restart of any kind between them. The
-   same process emitted `broad_run_result` at 11:12:05.538Z, 188ms before the
-   dispatch.
-3. The pin exists on disk and validates: `cat
-   $TMPDIR/specfuse-pins/134a81f087…/.specfuse-pin-tree` →
-   `134a81f087ed9c49aaac29ae9958f8e98ca805ef`, equal to its own directory name,
-   which is exactly what `pinned_build_info` requires before it will call a
-   build identified.
-4. `diff -rq --exclude=__pycache__ --exclude='*.pyc'
-   $TMPDIR/specfuse-pins/134a81f087…/specfuse ./specfuse` → exit 0, no output:
-   the build that dispatched this close is byte-identical to the `specfuse/`
-   in the working tree it is verifying.
-5. The working tree has nonetheless **moved**: `head_tree_hash(REPO_ROOT)` in
-   this session returns `f89d7273fe5c266699a4a284b9e5cf6587ea4dac`, not
-   `134a81f0…`, because the driver committed bookkeeping after pinning. This is
-   the "pinned run whose working tree has since moved" case, live — and the two
-   hashes differ for reasons outside `specfuse/`, which is why (4) still holds.
+1. **The process table, read in this session.** `ps -eo pid,ppid,etime,command`
+   shows PID 55692 running `python3 -m specfuse.loop.loop --feature
+   FEAT-2026-0109` and its child PID 55697 running
+   `/private/var/folders/…/T/specfuse-pins/b396c1a62fee67b966aa4e113a57c0be6ea06921/_run_pinned.py
+   --feature FEAT-2026-0109`. The driver that dispatched this session is
+   executing the pin, not the working tree, right now.
+2. `driver_build_pinned` at **2026-09-09T13:46:00Z**, payload `{"tree":
+   "b396c1a62fee67b966aa4e113a57c0be6ea06921", "path":
+   "…/specfuse-pins/b396c1a6…/specfuse/loop"}` — the last such event in the log.
+3. This work unit's frontmatter `started_at: 2026-09-09T13:49:39.728913+00:00` —
+   3m40s after that pin, with no intervening `driver_build_pinned`, no
+   `driver_staleness_detected` and no restart of any kind between them. The same
+   process emitted `broad_run_result` (`ok: true`, `failing: []`) at
+   13:49:39.570Z, 158ms before the dispatch.
+4. **The pin validates on disk, by the check T09 added.** `.specfuse-pin-tree`
+   reads `b396c1a62fee67b966aa4e113a57c0be6ea06921`, equal to its own directory
+   name; `.specfuse-pin-manifest` lists **131** files and **131** are present.
+   It is the first pin in this cache to carry a manifest at all — the five pins
+   materialized before T09's squash have none, which is exactly the chronology
+   you would expect and is itself evidence of when the fix landed.
 
-Note what this session could **not** read: `SPECFUSE_LOOP_PINNED_TREE` is absent
+Note what this session still cannot read: `SPECFUSE_LOOP_PINNED_TREE` is absent
 from this agent's environment (`env | grep -i specfuse` → nothing), and that is
-correct — `child_env_without_pin_marker` strips it at every spawn boundary
-precisely so a gate subprocess does not take pin-conditional branches. A close
-therefore cannot ask its own environment which build dispatched it; it has to
-read the event log and the pin on disk, as above.
+correct — `child_env_without_pin_marker` strips it at every spawn boundary so a
+gate subprocess does not take pin-conditional branches. A close cannot ask its
+own environment which build dispatched it. It has to read the event log, the pin
+on disk, and — as of this attempt — the process table.
 
 ### The three counts gate 1 and gate 2 each deferred
 
-**1. `baseline_attribution` firings: 0. Across all three gates, and across the
-whole repository.**
+Gate 1 deferred all three to "the next failure". Gate 2 deferred them again.
+Gate 3 is the next failure, and all three moved.
+
+**1. `baseline_attribution` firings: 1 — the first in this repository's
+history, and it livelocked the gate.**
 
 ```
-python3 -c "…e['event_type']=='baseline_attribution'…"  # this feature   -> 0
-python3 -c "…over .specfuse/features/*/events.jsonl…"   # repo-wide      -> 0
+python3 -c "…e['event_type']=='baseline_attribution'…"   # this feature  -> 1
+python3 -c "…over 71 .specfuse/features/*/events.jsonl…" # repo-wide     -> 1
 ```
 
-Method note, because it changes how this number must be read: `grep -c
-"baseline_attribution" events.jsonl` — the command gate 1's and gate 2's closes
-used, and which returned 0 for both — now returns **2** on this same file. Both
-hits are prose inside a `human_escalation` payload, where `G1-PLAN`'s
-blocked_reason quotes its own earlier grep returning 0. The event count is still
-0. A substring count over `events.jsonl` counts payload text as well as events;
-only a count keyed on `event_type` is a count of firings.
+The single firing is at **2026-09-09T11:58:48Z**, gate 3, payload
+`{"attributed_to": "FEAT-2026-0109/T09", "failing": [{"gate": "tests",
+"failure_signature": "test_real_feature_corpus_has_no_close_l_or_close_intermediate_f_findings"},
+{"gate": "coverage", "failure_signature": "no_gate_marker"}]}`, followed
+immediately by `human_escalation` `reason: preexisting_gate_failure`.
+Attribution did precisely what T01 built it to do: T09's first attempt failed,
+the retroactive probe ran against the post-reset tree, the failure was
+pre-existing, and T09's attempt count was not charged.
 
-*What the zero establishes:* nothing about attribution has been exercised in
-production by this feature, or by any feature in this repository, since T01
-landed. All eight implementation attempts across three gates passed on attempt
-1, so no unit's verification ever failed, so the retroactive probe was never
-reached. *What it does not establish:* that attribution works. Three gates of
-"checked instead by `tests/test_lazy_baseline_e2e.py`" is nine unit tests
-driving an injected failing `verify`, not evidence from a run. The trade
-`PLAN.md` accepts — one burned dispatch when the tree is genuinely pre-broken —
-has still never been paid, and its stated magnitude ($1–4, 15–25 minutes)
-remains an estimate. Gate 1 deferred this to "the next failure", gate 2
-deferred it again, and gate 3 closes with the same zero.
+And then the mechanism ate itself. The tree was fixed. The next attribution, at
+**12:12:54Z**, emitted **no `baseline_attribution` event at all** — it reused
+the 11:58:54 record and re-escalated a failure that no longer existed, leaving
+`attempts` at 0 again. T09 could not consume an attempt, could not surface its
+own defect, and could not progress; every restart repeated it. Only hand-clearing
+the block broke the loop, and T10 was added to fix the class.
 
-**2. Attempts that genuinely narrowed: 1 across the feature, and gate 3's own
-attempt is undeterminable from the record.**
+The root cause is a collision between two things this feature itself shipped.
+T02 keys the baseline on `HEAD^{tree}` with the `.specfuse` entry dropped —
+correct for its stated purpose, since bookkeeping commits write to `.specfuse/`
+on every gate entry. But the `code` gate set *reads* `.specfuse/`: the corpus
+lint walks real feature folders, as do the roadmap-link, arm-sweep and event-type
+gates. So a failure inside `.specfuse/` can be recorded under a key that no
+`.specfuse/`-side fix can move. T07's "at most once per tree state per gate"
+bound then makes it sticky. T10's fix is to reuse only a **green** record.
 
-Gate 2's close established n=1 (T05). For gate 3's single attempt, T08, the
-answer cannot be read off anything: **`attempt_outcome` records no tier field.**
-T08's payload carries `attempt`, `outcome`, `duration_seconds`, `cost_usd`,
-token counts, `model`, `effort`, `failure_*`, `files_touched`, `agent_status`,
-`agent_blocked_reason`, `re_arm_count` — and nothing about which tier ran or
-what it selected. Reconstructing it requires the driver source as it stood at
-19:54:33Z on 2026-09-08, and this close does not run git.
+*What the 1 establishes:* attribution works on its first firing, in production,
+exactly as designed — the failing set was correctly identified as pre-existing
+and no attempt was charged. Three gates of "checked instead by
+`tests/test_lazy_baseline_e2e.py`" turned out to be right about the happy path.
+*What it does not establish, and what a zero would have hidden:* the mechanism's
+**second** call is where it breaks, and no unit test in eight modules covered a
+red record surviving its own fix. The cost of that gap is measurable — see
+`## Cost analysis`; it is $3.10 and 24 minutes of dispatch on two attempts that
+were never counted. The trade `PLAN.md` accepts — "one burned dispatch when the
+tree is genuinely pre-broken, bounded to one per tree state per gate" — was paid
+for the first time here, and the bound is what made it unbounded.
 
-What can be measured, and was, this session:
+**2. Attempts that genuinely narrowed: 5 across the feature — and gate 3's own
+pin is what made the count knowable.**
 
-```
-loop.CHANGED_FILE_SELECTION_ENABLED                      -> False
-loop.read_changed_file_test_map()                        -> None
-loop.resolve_narrow_test_selection(wu=T08, changed=…)    -> ['tests.test_installed_copy_driver_e2e']
-```
+Gate 2's close established n=1 (T05) and said the answer could only be
+reconstructed by re-running `resolve_narrow_test_selection` against the driver
+as it stood at close time. The previous close attempt said it could not answer
+the question for T08 at all, because the driver had moved and `attempt_outcome`
+records no tier. Both statements are still true of the *record*: `attempt_outcome`
+carries `attempt`, `outcome`, `duration_seconds`, `cost_usd`, token counts,
+`model`, `effort`, `failure_*`, `files_touched`, `agent_status`,
+`agent_blocked_reason`, `re_arm_count` — and nothing about which tier ran or what
+it selected.
 
-So under the driver as it stands, T08's `produces:` resolves to a genuine
-narrow selection rather than gate 2's full-command fallback — because the
-changed-file half is now **off by default** (`CHANGED_FILE_SELECTION_ENABLED =
-False`, landed in gate 3's window on gate 2's own measured evidence, and present
-in the post-T08 pin `021342f2…` at line 4614). Whether that flag was already
-False in the driver that dispatched T08 is exactly what the event log does not
-say.
-
-*What the count establishes:* the declared-tests narrow tier is sound and cheap
-(gate 2 measured 5.3–10.2s against 169.4s), and turning the changed-file half
-off removes the fallback that cancelled it. *What it does not establish:*
-anything about narrowing's safety, still at n=1 — and it now also fails to
-establish what tier this feature's own last unit ran, which is a gap in the
-record, not in the mechanism.
-
-**3. Broad runs that went red on narrow-passed work: 1 — and it caught a real
-defect no other surface could see.**
-
-This is the number gates 1 and 2 both recorded as **0** and deferred to "the
-first gate in which a broad run actually goes red". It happened, in gate 3.
+But gate 3 ships a cache of the driver source keyed by the tree it ran at, so
+for a unit dispatched from a pin the question is answerable after the fact by
+reading the build itself. Done in this session:
 
 ```
-broad_run_result  2026-09-08T20:33:47.673Z  gate 3  ok: false
-  failing: [ {gate: tests,    failure_class: tests, failure_signature: test_driver_edit_halts_before_next_dispatch},
-             {gate: coverage, failure_class: other, failure_signature: no_gate_marker} ]
-human_escalation  2026-09-08T20:33:47.674Z  reason: broad_run_gate_failure
+<pin>/021342f2…/specfuse/loop/loop.py:4614  CHANGED_FILE_SELECTION_ENABLED = False
+<pin>/134a81f0…/specfuse/loop/loop.py:4629  CHANGED_FILE_SELECTION_ENABLED = False
+<pin>/51a3e401…/specfuse/loop/loop.py:4629  CHANGED_FILE_SELECTION_ENABLED = False
+<pin>/869aed0a…/specfuse/loop/loop.py:4629  CHANGED_FILE_SELECTION_ENABLED = False
+<pin>/4545ce57…/specfuse/loop/loop.py:4629  CHANGED_FILE_SELECTION_ENABLED = False
+<pin>/b396c1a6…/specfuse/loop/loop.py:4677  CHANGED_FILE_SELECTION_ENABLED = False
 ```
 
-T08 had passed its own per-attempt verification. The gate's once-per-gate broad
-run then went red on `tests/test_driver_restart_halt_wiring.py::…::test_driver_edit_halts_before_next_dispatch`,
-the driver halted before dispatching this close, and no unit's attempt count was
-charged. The defect: T08 passed the pin identity to the re-exec'd driver through
-`SPECFUSE_LOOP_PINNED_TREE`, environment is inherited, and every gate subprocess
-of a pinned driver therefore saw the marker and took the pinned "record, do not
-halt" branch. The fix (`child_env_without_pin_marker`, plus
-`tests/test_pin_marker_not_inherited.py`, whose module docstring records the
-reproduction) landed, the gate was reopened, and the second broad run at
-2026-09-09T11:12:05.538Z was `ok: true, failing: []`.
+and `resolve_narrow_test_selection` is byte-identical between pin `4545ce57…`
+— the build that dispatched T09's passing attempt and T10 — and this working
+tree, so today's computation is valid for that build:
 
-*What the 1 establishes:* the backstop is load-bearing. That test module's own
-docstring states the failure "was invisible to `smoke-test.sh`, to CI, and to
-any local run, because none of those has the marker set — only a gate subprocess
-of a *pinned driver* does." The once-per-gate broad run is the only surface in
-the system that runs the full suite from inside a pinned driver, and it is what
-found this.
+```
+T09  produces=[…, tests/test_pin_honesty_and_integrity.py]  -> ['tests.test_pin_honesty_and_integrity']
+T10  produces=[…, tests/test_red_baseline_never_reused.py]  -> ['tests.test_red_baseline_never_reused']
+```
 
-*What it does not establish — and this is the part it would be easy to
-overstate:* that **narrowing** let the defect through. It could not have been
-caught at T08's attempt at any tier. T08's own verification ran under the
-**pre-T08, unpinned** driver, whose subprocesses have no marker to inherit;
-a full-suite run there would have been green. The defect became observable only
-once the pin existed, i.e. only after T08's squash, and the broad run was the
-first thing to run after it. So this is a datapoint about the broad run's value
-and about gate 3's own "a driver change takes effect at the next run" property —
-not a datapoint about narrow-vs-broad safety, which stays at n=1 and unresolved.
+So T09's three attempts and T10's one attempt all ran a genuine narrow selection
+with no fallback, giving **4 in gate 3** on top of gate 2's **1**, for **5**
+across the feature. T08 remains undeterminable — it was dispatched by the
+pre-T08, unpinned driver, and there is no pin of that build to read.
 
-*Cost of the catch:* the escalation halted at 2026-09-08T20:33:47Z and the next
-run pinned at 2026-09-09T11:08:31Z — **52,484s (14.6 hours)** of dead time,
-against the 637.2s the feature's eight driver restarts cost in total. Gate 3
-removed a tax measured in minutes and the feature then paid fourteen hours to a
-different, correct halt. That is the honest shape of the win: gate 3 buys the
-ability to run unattended between halts, not the absence of halts.
+*What the 5 establishes:* the declared-tests rule resolves cleanly for every
+implementation unit in this feature (all ten resolve to exactly one module), and
+with the changed-file half off there is no fallback left to cancel the saving —
+which is what gate 2's measurement predicted. *What it does not establish:*
+anything new about narrowing's **safety** from the count itself; that comes from
+the third number below. And the method has a shelf life worth naming: the pin
+cache is a `$TMPDIR` cache, `021342f2…` has already lost 91 of its 131 files, and
+`loop.py` surviving in it is luck. A build you can read only until the OS reaps
+it is not a record.
+
+**3. Broad runs that went red on narrow-passed work: 2 — and the second one is
+the first real evidence in this repository that narrowing let something
+through.**
+
+This is the number gates 1 and 2 both recorded as 0 and deferred to "the first
+gate in which a broad run actually goes red". Both reds are in gate 3. Five broad
+runs have ever executed in this repository; 3 green, 2 red, all 5 in this feature.
+
+| When | Gate | `ok` | Failing signature |
+|---|---|---|---|
+| 2026-09-08T17:45:06Z | 2 | true | — |
+| 2026-09-08T20:33:47Z | 3 | **false** | `test_driver_edit_halts_before_next_dispatch`; `coverage`/`no_gate_marker` |
+| 2026-09-09T11:12:05Z | 3 | true | — |
+| 2026-09-09T13:35:58Z | 3 | **false** | `test_skip_uses_recorded_failing_set`; `coverage`/`no_gate_marker` |
+| 2026-09-09T13:49:39Z | 3 | true | — |
+
+**The first red (after T08) was not a narrowing miss, and the previous close
+said so correctly.** T08's own verification ran under the pre-T08, unpinned
+driver, whose subprocesses have no `SPECFUSE_LOOP_PINNED_TREE` to inherit; a
+full-suite run at that attempt would have been green. The defect
+(`child_env_without_pin_marker`) became observable only once the pin existed,
+i.e. only after T08's squash. It is a datapoint about the broad run's value and
+about gate 3's "a driver change takes effect at the next run" property.
+
+**The second red is the datapoint the first was not.** T10 passed its own
+per-attempt verification at 2026-09-09T13:32:22Z. Its narrow selection was
+`['tests.test_red_baseline_never_reused']` — its own `produces:` module, and
+nothing else. 216 seconds later the once-per-gate broad run went red on
+`test_skip_uses_recorded_failing_set`, a test that is **not in that module**:
+T10 changed the baseline-reuse contract, and an existing test asserting the old
+contract broke. That test was observable at T10's attempt — it existed, it was
+green before the squash, and a full-suite run at that attempt would have caught
+it. The narrow tier structurally could not: the selection names one module by
+construction, and the broken test was in another.
+
+The failure was then fixed by replacing the stale assertion — the name
+`test_skip_uses_recorded_failing_set` now appears nowhere in `tests/`, and
+`tests/test_baseline_persistence.py` carries
+`test_a_red_record_re_probes_rather_than_being_reused` and
+`test_skip_reuses_a_green_record` in its place — and the third broad run at
+13:49:39Z was `ok: true, failing: []`.
+
+*What the 2 establishes:* the once-per-gate broad run is load-bearing, on both
+of the two shapes it was built for. The first red caught something no other
+surface in the system could see (that test module's own docstring records the
+failure as "invisible to `smoke-test.sh`, to CI, and to any local run, because
+none of those has the marker set"). The second caught exactly what the driver's
+own escalation text claims it catches: *"the per-attempt narrow tier … scopes
+checks to changed files as a speed optimization — this full-set run is the
+safety net that catches what that narrowing missed."* Until 13:35:58Z on
+2026-09-09 that sentence was a design claim. It is now a measurement, n=1.
+
+*What it does not establish:* a rate. One narrowing miss in five genuinely
+narrowed attempts is not a safety number, it is an existence proof, and the
+denominator is far too small to price the trade. It also says nothing about the
+window between the miss and the catch: T10's miss was caught 216 seconds later
+by the same gate, because T10 happened to be the last unit. A miss in a unit
+early in a long gate is carried by every subsequent unit's attempt until the
+gate boundary, and nothing in this feature measured that.
+
+*Cost of the two catches:* the first escalation halted at 2026-09-08T20:33:47Z
+and the next run pinned at 2026-09-09T11:08:31Z — **52,484s (14.6 hours)** of
+dead time. The second halted at 13:35:58Z and the next run pinned at 13:46:00Z —
+**602s (10.0 min)**. Against the 637.2s the feature's eight driver restarts cost
+in total. Gate 3 removed a tax measured in minutes; the feature then paid
+fourteen and a half hours to a different, correct halt. That is the honest shape
+of the win: gate 3 buys the ability to run unattended *between* halts, not the
+absence of halts. Both broad-run halts, and both `preexisting_gate_failure`
+halts, still stop the run for a human.
 
 ## Retrospective
 
-Gate 3 did the thing it was for. The driver materializes a pin, re-execs into
-it, records what it executed, and stopped halting on a driver edit — and this
-close is the first work unit in this repository dispatched by a driver that can
-say which build it is. The gate was one unit because `[FEAT-2026-0019/G1]` said
-a harness migration cannot be decomposed, and one unit is what it took: T08
-passed on attempt 1, $4.55 against $6.50 planned, 34.5 minutes.
+Gate 3 did the thing it was for, and then the feature spent two more units and
+$4.81 proving it. The driver materializes a pin, re-execs into it, records what
+it executed, says so in words when it declines to halt, refuses a pin that has
+lost files, and dispatched two consecutive driver-editing units without a single
+restart. This close is the first work unit in this repository dispatched by a
+driver that can say which build it is, and it can now read that build off disk.
+
+The gate was one substantive unit because `[FEAT-2026-0019/G1]` said a harness
+migration cannot be decomposed. That was right about T08, which passed on
+attempt 1 at $4.55 against $6.50 planned. It was also, in retrospect, the reason
+the gate had no second unit to exercise its own central branch — and the first
+close therefore had to close a gate whose headline property had never fired.
 
 What the gate did not anticipate is that its two failures would both be about
-*telling the operator the truth*, not about the mechanism.
+*telling the operator the truth* rather than about the mechanism, and that the
+correction would surface a third defect nobody had looked for. T09 fixed the
+words and the pin's integrity check. Retrying T09 is what made attribution fire
+for the first time in this repository's history, and attribution's first firing
+livelocked the gate: a red baseline record, keyed on a tree hash that
+deliberately ignores `.specfuse/`, outliving the `.specfuse/`-side fix that
+cleared it. Two attempts and 24 minutes of dispatch were spent on a unit whose
+attempt counter never moved. T10 fixed that in 90 seconds and $0.47, and then
+its own squash broke a test asserting the old contract, which the broad run
+caught. Four defects, three of them found only by running the thing.
 
-The first is the words. The pin works; the message at the seam is the pre-T08
-message. An operator watching a pinned run still reads "stop this driver now and
-start a new one before dispatching the next work unit" and then watches the
-driver dispatch the next work unit. `format_driver_staleness_warning` takes
-`(wu_id, driver_paths)` and has no way to know whether the process is pinned, so
-the same string serves both branches. The definition-of-done bullet asked for
-words at the decline point so an operator "must never have to infer from silence
-which build verified their gate" — the failure is worse than silence.
-
-The second is durability, and it is the more interesting one. A pin lives in
-`tempfile.gettempdir()`, and `shutil.copytree` preserves source mtimes, so most
-of a freshly written pin looks days old to macOS's `$TMPDIR` reaper the moment
-it is created. Pin `021342f2…` — the build this feature's own event log records
-the driver executing at 2026-09-08T20:30:25Z — held 131 files then and holds
-**40** now; its subdirectories are stamped 2026-09-09T08:03Z, when the reaper
-ran. `specfuse/loop/__init__.py` is among the casualties. And `materialize_pin`
-reuses a pin whenever the marker file matches, without checking that anything
-else survived. Probed directly this session: with `specfuse/loop/__init__.py`
-removed and the marker intact, `import specfuse.loop.loop` from inside the pin
-resolves to `<REPO_ROOT>/specfuse/loop/loop.py` — the working
-tree — while `pinned_build_info` still returns a valid pin. A second run at that
-tree hash would emit `driver_build_pinned` naming a build it is not executing,
-and take the "do not halt" branch while running code that can go stale under it.
-That is #1040's exact failure mode, reintroduced one level up by the mechanism
-built to retire it.
-
-Neither is a reason to doubt the design. Both are reasons the gate's own oracle
-could not see them: it builds a fresh `SPECFUSE_PIN_CACHE_DIR` per test class
-and never reuses an aged pin, and it asserts on `events.jsonl` — which, by the
-gate's own binding instruction, is all it asserts on — so nothing in it reads
-stdout.
+The pattern worth naming is that every one of them was a **cache trusting its
+key instead of its contents**. The pin trusted a marker file and executed a
+directory that had lost 91 files. The baseline record trusted a tree hash that
+by design excludes the directory the gates read. Neither failed loudly; both
+produced a confident answer that was wrong, which is the exact failure mode
+`build_provenance` exists to prevent and the one #1040 named. A cache is a
+promise that re-deriving would give the same answer, and both of these were
+caches whose key could not see the thing that had changed.
 
 ### Contract surface gate 3 changed
 
@@ -1085,9 +1270,11 @@ enumeration below.
    pins are materialized (operator-facing). `SPECFUSE_LOOP_PINNED_TREE` is the
    driver's own pin marker, set on the re-exec and **stripped from every child
    process** — a gate command must never see it.
-5. **A pin cache on disk** (T08) — `$TMPDIR/specfuse-pins/<tree-hash>/`, holding
-   a copy of `specfuse/`, a generated `_run_pinned.py` launcher, and a
-   `.specfuse-pin-tree` marker.
+5. **A pin cache on disk** (T08, extended by T09) —
+   `$TMPDIR/specfuse-pins/<tree-hash>/`, holding a copy of `specfuse/`, a
+   generated `_run_pinned.py` launcher, a `.specfuse-pin-tree` marker, and — as
+   of T09 — a `.specfuse-pin-manifest` listing every file the copy contained at
+   materialize time.
 6. **`build_provenance.out_of_tree_warning` gains a third state** (T08) — a
    recorded pin now reports both tree hashes in plain text; only an
    *unidentified* out-of-tree build keeps the "confidently wrong" warning.
@@ -1095,24 +1282,41 @@ enumeration below.
    `CHANGED_FILE_SELECTION_ENABLED = False`, on gate 2's measured evidence
    (+38.4s realised, −43.4% with the half off). T05's code and tests are kept,
    not deleted; the flag is to be flipped in the same change that lands the map.
-8. **Dispatched sessions are told to run the narrow tier** — `.specfuse/rules/result-contract.md`,
-   `.specfuse/rules/verification-discipline.md`, `.specfuse/templates/WU.template.md`
-   and the `verification` skill (plus their `specfuse/loop/data/` mirrors) now
-   instruct a work-unit session to run its type's gate set **minus** `tier:
-   broad`, with `tests` through `narrow_command`, and never the full suite. This
-   is the agent-facing half of gate 2's driver-side split; it landed in gate 3's
-   window as operator commits rather than as a work-unit squash, which is why no
-   gate's close enumerated it before this one.
+8. **Dispatched sessions are told to run the narrow tier** —
+   `.specfuse/rules/result-contract.md`,
+   `.specfuse/rules/verification-discipline.md`,
+   `.specfuse/templates/WU.template.md` and the `verification` skill (plus their
+   `specfuse/loop/data/` mirrors) now instruct a work-unit session to run its
+   type's gate set **minus** `tier: broad`, with `tests` through
+   `narrow_command`, and never the full suite. This is the agent-facing half of
+   gate 2's driver-side split; it landed in gate 3's window as operator commits
+   rather than as a work-unit squash, which is why no gate's close enumerated it
+   before the previous close attempt.
+9. **The pinned staleness seam and gate summary print their own text** (T09) —
+   `format_driver_staleness_warning` and `format_driver_staleness_summary` take
+   optional `pinned_tree` / `next_pin_tree`; with them they name the pin, name
+   the build the edit takes effect in, and say the process continues against its
+   snapshot. Without them the pre-T09 wording is reproduced byte-for-byte.
+   Operator-visible output, changed on the pinned path only.
+10. **A pin is reused only when its recorded content is still present** (T09) —
+    `materialize_pin` validates the manifest, not just the marker, and rebuilds
+    a partially reaped pin from scratch.
+11. **A red baseline record is never reused; only a green one is a cache**
+    (T10) — a `baseline:` record whose `failing` is non-empty always re-probes,
+    at any tree state. Behavioural change to `--no-baseline-probe`'s subject
+    matter; the key computation, when attribution fires, and the once-per-tree
+    -state bound for green records are all unchanged.
 
 ## Consumer-visible contract changes
 
 The reconciled enumeration across gates 1, 2 and 3, built from gate 1's staged
 list (`### Contract surface gate 1 changed`, 3 items), gate 2's staged list
-(`### Contract surface gate 2 changed`, 7 items) and gate 3's above (8 items),
+(`### Contract surface gate 2 changed`, 7 items) and gate 3's above (11 items),
 with gate 2's item 5 (T07's three reworded claims) folded into item 15 as
-documentation-only. Neither gate 1's nor gate 2's section was edited to produce
+documentation-only. Twelve `added`, six `changed`, four `fixed` — the same
+counts `parse_changelog` reports over `Unreleased` for this feature's traces. Neither gate 1's nor gate 2's section was edited to produce
 this. Every item below has a matching `CHANGELOG.md` `Unreleased` entry carrying
-`FEAT-2026-0109`.
+`FEAT-2026-0109`, `#3270` or `#3271`.
 
 **Added**
 
@@ -1138,8 +1342,8 @@ this. Every item below has a matching `CHANGELOG.md` `Unreleased` entry carrying
 10. `SPECFUSE_LOOP_PINNED_TREE` environment variable — the driver's pin marker,
     stripped from every child process (gate 3 / T08).
 11. A pin cache directory `$TMPDIR/specfuse-pins/<tree-hash>/` containing a copy
-    of `specfuse/`, a `_run_pinned.py` launcher and a `.specfuse-pin-tree`
-    marker (gate 3 / T08).
+    of `specfuse/`, a `_run_pinned.py` launcher, a `.specfuse-pin-tree` marker
+    and a `.specfuse-pin-manifest` (gate 3 / T08, manifest added by T09).
 12. `.specfuse-changed-file-test-map.json` reserved in `.gitignore` (gate 2 /
     T05). Nothing writes it.
 
@@ -1170,23 +1374,39 @@ this. Every item below has a matching `CHANGELOG.md` `Unreleased` entry carrying
 
 **Fixed**
 
-19. The pin marker no longer leaks into child processes (gate 3). Every gate
+19. A recorded baseline *failure* outlived the change that fixed it and
+    livelocked a gate; a `baseline:` record whose `failing` is non-empty is now
+    never reused and always re-probes, while a green record stays a real cache
+    (gate 3 / T10). The key computation, the firing condition and the
+    once-per-tree-state bound for green records are unchanged.
+20. The pin marker no longer leaks into child processes (gate 3). Every gate
     subprocess of a pinned driver used to inherit `SPECFUSE_LOOP_PINNED_TREE`
     and take pin-conditional branches; `child_env_without_pin_marker` strips it
     at each spawn boundary.
+21. A pinned run no longer prints the pre-pin "stop this driver now and start a
+    new one" text at the point it declines to halt (gate 3 / T09, #3270). Both
+    the per-unit seam and the gate-completion summary are pin-aware; the
+    unpinned wording, event and exit code 3 are unchanged byte-for-byte.
+22. A pin that has lost files is rebuilt rather than reused and reported as the
+    running build (gate 3 / T09, #3271). Reuse now requires every file in the
+    pin's manifest to still be present.
 
 **Breaking**
 
 None. Every key above is additive with an absent-key default that preserves
-prior behaviour, and the two behavioural default changes (13, 14) are scoped to
-a driver-source checkout, which downstream projects do not have.
+prior behaviour; the behavioural default changes (13, 14, 17) and the baseline
+reuse fix (19) are scoped either to a driver-source checkout, which downstream
+projects do not have, or to the driver's own baseline bookkeeping, which no
+consumer reads.
 
 ## Cost analysis
 
 `PLAN.md` frontmatter still reads `planned_cost_usd: 26.00`. It was **not**
 corrected. `GATE-02-REVIEW.md` Q4 flagged it, `GATE-03-REVIEW.md` Q3 flagged it
-again and left it to the operator, and this close does not own `PLAN.md`. The
-arithmetic follows.
+again and left it to the operator, the previous close attempt recorded it under
+"Noted, not filed", and this close does not own `PLAN.md`. The arithmetic
+follows, reported against the WU sums rather than against a figure already known
+to be wrong.
 
 Per-unit, from `events.jsonl` `attempt_outcome` payloads (summed across
 attempts, so failed attempts are included), against each WU's own
@@ -1206,27 +1426,35 @@ attempts, so failed attempts are included), against each WU's own
 | G2-CLOSE-INTERMEDIATE | 2 | $4.50 | $6.66057 | 1 | 2185.8s |
 | G2-PLAN | 2 | $6.00 | $6.34852 | 1 | 796.7s |
 | T08 installed-copy driver | 3 | $6.50 | $4.54640 | 1 | 2072.9s |
-| G3-CLOSE (this unit) | 3 | $8.00 | not yet in `events.jsonl` | — | — |
+| T09 pin honesty and integrity | 3 | $4.00 | **$4.33568** | **3** | 2263.1s |
+| T10 red baseline never reused | 3 | $2.50 | $0.47220 | 1 | 90.1s |
+| G3-CLOSE (attempt 1) | 3 | $8.00 | $12.62046 | 1 | 1547.3s |
+
+This close's own second attempt is not in `events.jsonl` yet; its planned $8.00
+was already consumed and exceeded by attempt 1.
 
 Per gate, and per feature:
 
 | Scope | Planned | Actual | Delta |
 |---|---|---|---|
-| Gate 1 (5 units) | $18.00 | $21.98789 | **+$3.99 (+22.2%)** |
-| Gate 2 (6 units) | $23.50 | $23.80638 | +$0.31 (+1.3%) |
-| Gate 3 (2 units, 1 landed) | $14.50 | $4.54640 | −$9.95, of which $8.00 is this unpaid close |
-| **Feature, WU-sum** | **$56.00** | **$50.34066** | **−$5.66 (−10.1%)**, $8.00 outstanding |
-| **Feature, `PLAN.md` figure** | **$26.00** | **$50.34066** | **+$24.34 (+93.6%)** |
+| Gate 1 (5 units, 9 attempts) | $18.00 | $21.98789 | **+$3.99 (+22.2%)** |
+| Gate 2 (6 units, 6 attempts) | $23.50 | $23.80638 | +$0.31 (+1.3%) |
+| Gate 3 (4 units, 6 attempts) | $21.00 | $21.97474 | +$0.97 (+4.6%) |
+| **Feature, WU-sum (15 units, 21 attempts)** | **$62.50** | **$67.76901** | **+$5.27 (+8.4%)** |
+| **Feature, `PLAN.md` figure** | **$26.00** | **$67.76901** | **+$41.77 (+160.7%)** |
 
 **The delta, named.** Against the WU sums the drafts actually declare, the
-feature is $5.66 under with one unit unpaid. Against `PLAN.md`'s
-`planned_cost_usd`, it is 93.6% over — and that figure is stale, not exceeded:
-$26.00 describes gate 1's five units plus a scaffolded gate-3 close, and was
-never raised when gate 2's six units and gate 3's two were drafted. It is what
-`arm_predicate_evaluated` fired `budget_projection` against at gate 1's
-boundary, and it will misreport again for any future reader. $56.00 is the
-arithmetic; correcting the field is the operator's call and is carried as a
-follow-up.
+feature is **$5.27 (+8.4%) over**, with this close's second attempt still
+unpriced. Against `PLAN.md`'s `planned_cost_usd`, it is **160.7% over** — and
+that figure is stale, not exceeded: $26.00 describes gate 1's five units plus a
+scaffolded gate-3 close, and was never raised when gate 2's six units, gate 3's
+two, or the two remedial units drafted after the first close were added. The
+plan lint says so unprompted on every run: `WARN: PLAN.md: planned_cost_usd
+$26.00 differs from sum of WU planned costs $62.50 (delta 140%, threshold 10%)`.
+It is what `arm_predicate_evaluated` fired `budget_projection` against at gate
+1's boundary, and it will misreport for any future reader. **$62.50 is the
+arithmetic.** Correcting the field is the operator's call; it is not an
+acceptance criterion of any work unit and `PLAN.md` is the driver's.
 
 **Implementation-only, the number that is actually about estimation quality:**
 
@@ -1234,149 +1462,169 @@ follow-up.
 |---|---|---|---|
 | 1 (T01–T03) | $7.50 | $6.17217 | −17.7% |
 | 2 (T04–T07) | $13.00 | $10.79728 | −16.9% |
-| 3 (T08) | $6.50 | $4.54640 | **−30.0%** |
-| **All 8 units** | **$27.00** | **$21.51585** | **−20.3%** |
+| 3 (T08–T10) | $13.00 | $9.35428 | **−28.0%** |
+| **All 10 units** | **$33.50** | **$26.32374** | **−$7.18 (−21.4%)** |
 
-FEAT-2026-0101's recalibrated estimates held across all three gates. No
-re-calibration is indicated.
+FEAT-2026-0101's recalibrated estimates held across all three gates and across
+all ten implementation units. No re-calibration is indicated.
 
-**The feature's only real overrun is a closing unit.** G1-PLAN cost $12.70
-against $6.00 across **5** attempts — two `closing_deliverable_missing` guard
-refusals, a `deterministic_refusal_repeat` escalation, a re-arm, one more guard
-refusal, an `agent_reported_blocked`, and a second re-arm. That single unit is
-$6.70 of the feature's $6.03 of gate-1 overspend; without it gate 1 came in
-under. Every one of the eight implementation units passed on attempt 1.
+**Every dollar of overrun is in a closing or planning unit.**
+
+| Scope | Planned | Actual | Delta |
+|---|---|---|---|
+| 10 implementation units | $33.50 | $26.32374 | −21.4% |
+| 5 closing / planning units | $29.00 | $41.44527 | **+42.9%** |
+
+Two units account for almost all of it. **G1-PLAN** cost $12.70 against $6.00
+across **5** attempts — three `closing_deliverable_missing` guard refusals, a
+`deterministic_refusal_repeat` escalation, a re-arm, an `agent_reported_blocked`,
+and a second re-arm. **G3-CLOSE attempt 1** cost $12.62 against $8.00 in a single
+attempt, of which the judge session is a part. Nine of the ten implementation
+units passed on attempt 1.
+
+**The livelock's price, isolated.** T09's first two attempts cost **$3.09577**
+across **1427.7s (23.8 min)** and neither incremented T09's attempt counter —
+`attempts` still reads 1 in its frontmatter. That is 71% of T09's total spend,
+bought by a red baseline record that could not be invalidated by the fix that
+cleared it. It is also, precisely, the cost `PLAN.md` accepted in the abstract
+when gate 1 made attribution lazy — "one burned dispatch when the tree is
+genuinely pre-broken" — paid for the first time, at twice the stated unit
+because the bound made it repeatable. T10 removed the class for $0.47.
 
 ### Failure-class breakdown
 
 | `failure_class` | Attempts | Units |
 |---|---|---|
 | `guard_refusal` | 3 | G1-PLAN (`closing_deliverable_missing` ×3) |
+| `lint` | 2 | T09 (both attributed to a pre-existing failure; neither charged) |
 | (none — `blocked`) | 1 | G1-PLAN (`agent_reported_blocked`) |
-| — (passed) | 12 | all others |
+| — (passed) | 15 | all others |
 
-16 attempts across 13 units. No implementation unit produced a non-passing
-attempt in any gate.
+21 attempts across 15 units. No implementation unit produced a non-passing
+attempt that was charged against it in any gate.
 
 ## What the loop did NOT verify
 
 Each entry names the criterion, why it went unverified here, and where it
 actually gets checked.
 
-1. **That the driver says anything pin-aware when it declines to halt.**
-   *Criterion:* "The cost is stated at the moment it is incurred … The driver
-   says so, in words, at the point where it declines to halt." *Reason:* it does
-   not, and this is a failed criterion, not merely an unverified one — see
-   `FOLLOW-UPS.md`. The gate's oracle asserts **only** on the subprocess exit
-   code and `events.jsonl`, by `GATE-03.md`'s own binding instruction, so no
-   test reads stdout and the wrong text passes every check. *Checked instead by:*
-   nothing. *Observed by:* driving `PinnedRunRecordsAndSurvivesDriverEdits`'s
-   real pinned subprocess in this session and reading `proc.stdout` directly.
-   *Where it gets fixed:* `format_driver_staleness_warning` needs the pinned
-   flag, and the gate-completion summary the same.
+1. **Whether a pin survives the reaper — only whether it is caught when it does
+   not.** *Criterion:* bullet 1's "materializes that package into a
+   content-addressed build outside the working tree … and executes from it".
+   *Reason:* T09 took the manifest half of `FOLLOW-UPS.md`'s "and/or" and left
+   pins in `tempfile.gettempdir()` with `shutil.copytree`'s preserved mtimes, so
+   a pin is still born looking days old to an age-based cleaner. Relocating the
+   cache and choosing a retention policy is an operator decision this unit's
+   escalation trigger explicitly declined to make. *Checked instead by:*
+   `tests/test_pin_honesty_and_integrity.py::AReapedPinIsRebuiltNotReused`, and
+   in this session by `_pin_is_complete` refusing the real reaped pin
+   `021342f2…`. *What is unmeasured:* the re-copy rate in steady state. Every
+   pin in this cache is 131 files; if the reaper runs between two runs at the
+   same tree, the second pays a full re-copy instead of a reuse, and nothing
+   counts that.
 
-2. **That a pin survives long enough to be reused.** *Criterion:* "the driver
-   materializes that package into a content-addressed build outside the working
-   tree … and executes from it" plus bullet 3's "reproduces the same pinned
-   execution rather than one that silently escapes it". *Reason:* every oracle
-   builds a fresh `SPECFUSE_PIN_CACHE_DIR` per test class and tears it down, so
-   no test ever re-enters a pin that has aged in a real `$TMPDIR`. *Checked
-   instead by:* nothing. *Observed by:* `ls -lT` on pin `021342f2…` (40 of 131
-   files remain; subdirectories stamped 2026-09-09T08:03Z) and a direct probe —
-   removing `specfuse/loop/__init__.py` from a fresh pin leaves the marker valid
-   and makes `import specfuse.loop.loop` resolve to the working tree. Carried as
-   a follow-up.
+2. **Which tier any given attempt ran, from the record.** *Criterion:* implicit
+   in gate 2's definition of done and load-bearing for every close that reports
+   on it. *Reason:* `attempt_outcome` carries no `tier`, no selection and no
+   resolved command. *Checked instead by:* nothing in the record. This close
+   recovered it for T09 and T10 by reading `CHANGED_FILE_SELECTION_ENABLED` and
+   `resolve_narrow_test_selection` out of the pin that dispatched them — which
+   works only for pinned units, only while the pin survives, and not at all for
+   T08. *Where it gets checked:* nowhere today. Two fields on the event the
+   driver already emits would close it.
 
-3. **The retroactive attribution path, for the third gate running.**
-   *Criterion:* carried over from gate 1's definition of done. *Reason:*
-   `baseline_attribution` events: 0 in this feature, 0 repo-wide. *Checked
-   instead by:* `tests/test_lazy_baseline_e2e.py` (8 tests). *Where it gets real
-   evidence:* the next attempt that goes red anywhere. Unchanged from gate 1's
-   item 1 and gate 2's item 3.
+3. **The size of the narrowing risk.** *Criterion:* implicit in gate 2's tier
+   split. *Reason:* the broad run caught one genuine narrowing miss (T10) in
+   five genuinely narrowed attempts. n=1 numerator, n=5 denominator, one repo,
+   one feature. *Checked instead by:* nothing — there is no synthetic test for
+   "how often does a unit break a test outside its own module". *Where it gets
+   real evidence:* accumulated `broad_run_result` events over many features.
+   Five broad runs have ever executed.
 
-4. **Which tier any given attempt ran.** *Criterion:* implicit in gate 2's
-   definition of done and load-bearing for every close that has to report on it.
-   *Reason:* `attempt_outcome` carries no tier, no selection and no resolved
-   command, so the fact is unrecoverable from the record; gate 2's close
-   reconstructed it by re-running `resolve_narrow_test_selection` against the
-   *current* driver, and this close cannot do even that for T08 because the
-   driver has moved since. *Checked instead by:* nothing. *Where it gets
-   checked:* nowhere today. Adding `tier` and `selected_modules` to
-   `attempt_outcome` would close it in one field.
+4. **The window between a narrowing miss and its catch.** *Criterion:* none
+   states it, which is the point. *Reason:* T10's miss was caught 216 seconds
+   later because T10 was the gate's last unit. A miss by an early unit in a long
+   gate is carried by every subsequent unit's attempt until the gate boundary,
+   and no unit in this feature was in that position. *Checked instead by:*
+   nothing. *Where it gets real evidence:* the first multi-unit gate whose broad
+   run goes red on a unit that was not the last one.
 
-5. **The non-halting branch, in production.** *Criterion:* "A unit editing
-   `specfuse/loop/*.py` does not halt the run … The edit is still recorded —
-   non-halting — naming the build it will take effect in." *Reason:*
-   `driver_staleness_detected` with `halted: false`: **0**. Gate 3 has one
-   substantive unit and it is the last before the close, so nothing edited the
-   driver after the pin existed. *Checked instead by:*
-   `test_a_driver_edit_does_not_halt_the_run`,
-   `test_the_driver_edit_is_still_recorded` and
-   `test_a_moving_working_tree_does_not_move_the_running_build`, which drive a
-   real pinned driver subprocess over a scaffold repo. *Where it gets real
-   evidence:* the first multi-unit gate, in any feature, in which a
-   non-terminal unit edits the driver under a pinned run.
+5. **`specfuse run --feature X` reaching the pin.** *Criterion:* bullet 3's
+   "`specfuse run --feature X` and `python3 -m specfuse.loop.loop --feature X`
+   both still work and both reach the pinned execution". *Reason:* the `-m` form
+   is verified in production — it is PID 55692 in this session's process table,
+   with the pinned `_run_pinned.py` as its child. The console-script form is
+   not: `grep -c "_reexec_pinned" <pipx-venv>/specfuse/loop/loop.py` returns
+   **0**, because today's installed wheel predates T08. *Checked instead by:*
+   reading the installed `specfuse/cli.py` dispatch table, which maps `"run"` to
+   `specfuse.loop.loop:main`, the function that calls `_reexec_pinned`. *Where
+   it gets real evidence:* the first run from a wheel built after this feature
+   merges — gate 3's own "takes effect at the next run" property, one level up.
 
-6. **`specfuse run --feature X` reaching the pin.** *Criterion:* "`specfuse run
-   --feature X` and `python3 -m specfuse.loop.loop --feature X` both still work
-   and both reach the pinned execution." *Reason:* the oracle drives only the
-   `-m` form. The console script resolves to the installed wheel, and
-   `grep -c "_reexec_pinned" …/site-packages/specfuse/loop/loop.py` returns
-   **0** — today's installed build predates T08, so `specfuse run` does not pin
-   yet. *Checked instead by:* reading the installed `specfuse/cli.py` dispatch
-   table, which maps `"run"` to `specfuse.loop.loop:main`, the function that
-   calls `_reexec_pinned`. *Where it gets real evidence:* the first run from a
-   wheel built after this feature merges — which is gate 3's own "takes effect
-   at the next run" property, one level up.
-
-7. **A downstream project upgrading without editing `verification.yml`.**
+6. **A downstream project upgrading without editing `verification.yml`.**
    *Criterion:* carried from gate 2 — absent-`tier:` behaviour. *Reason:* this
-   repo declares `tier: broad` on nine gates. *Checked instead by:*
+   repository declares `tier: broad` on nine gates and cannot stand in for a
+   project that declares none. *Checked instead by:*
    `test_a_config_with_no_tier_keys_is_byte_identical_to_today`. Unchanged from
-   gate 2's item 5; this repo cannot stand in for that population.
+   gate 2's item 5 and the previous close attempt's item 7.
+
+7. **Attribution's behaviour on a genuinely pre-broken tree that stays broken.**
+   *Criterion:* gate 1's "a pre-existing failure escalates
+   `preexisting_gate_failure` … and is not counted against the unit's attempts".
+   *Reason:* the one production firing was a `.specfuse/`-side failure that was
+   fixed between attempts, which is what exposed the livelock. The case the
+   escalation is actually designed for — an operator who cannot fix the
+   pre-existing failure quickly — has still never occurred here. *Checked
+   instead by:* `tests/test_lazy_baseline_e2e.py` (8 tests) and
+   `tests/test_red_baseline_never_reused.py` (4 tests). *Where it gets real
+   evidence:* the next red baseline that stays red.
 
 ## Lessons
 
-1. **A tier split that does not record which tier it took makes every later
-   close a reconstruction.** Gate 2 shipped the per-attempt/per-gate split and
-   gate 3 shipped the pin, and between them `attempt_outcome` gained neither a
-   `tier` field nor the selection it resolved. The consequence compounds: gate
-   2's close could still answer "did this attempt narrow?" only by re-running
-   `resolve_narrow_test_selection` against the driver as it stood at close time,
-   and gate 3's close cannot answer it for T08 at all, because the driver has
-   moved and the answer was never written down. Every number a close reports
-   about tiering — the fallback rate, the narrowed-attempt count, the safety
-   denominator — is therefore an inference over source that may no longer exist,
-   dressed as a measurement. The generalizable move: **when a feature makes the
-   driver choose between two behaviours per attempt, the chosen branch is part
-   of that attempt's record, not something a reader recomputes.** One field in
-   the event the driver already emits. The cheap test at drafting time: ask what
-   command the close will run to count how often each branch fired, and if the
-   honest answer is "re-implement the predicate and hope the source has not
-   changed", the branch is unrecorded.
+1. **When a driver picks between two behaviours per attempt, the branch it took
+   belongs in that attempt's record — and a snapshot of the code is not a
+   substitute for it.** This feature shipped a per-attempt/per-gate tier split
+   across two gates and added neither a `tier` field nor the resolved selection
+   to `attempt_outcome`. Gate 2's close could answer "did this attempt narrow?"
+   only by re-running the predicate against the driver as it stood at close
+   time; the first gate-3 close could not answer it for T08 at all. This close
+   *could* answer it for T09 and T10 — but only because gate 3 happens to cache
+   the driver source by tree hash, so the build that dispatched them is still
+   readable on disk. That is a lucky affordance, not a record: the cache lives
+   in `$TMPDIR`, one of this feature's own pins has already lost 91 of its 131
+   files, and `loop.py` surviving in it is chance. Reconstructing a decision by
+   re-executing the code that made it is strictly weaker than writing the
+   decision down, because it can only ever answer for the runs whose code you
+   still have. **The drafting-time check is one question: name the command the
+   close will run to count how often each branch fired.** If the honest answer
+   involves re-implementing the predicate, or reading a build out of a temp
+   directory, the branch is unrecorded, and one field on an event the driver
+   already emits fixes it.
 
-2. **Moving a program's identity outside the working tree makes the filesystem's
-   retention policy part of your correctness argument.** T08 put the driver's
-   build in `tempfile.gettempdir()` keyed by tree hash, reused a pin whenever its
-   marker matched, and copied files with `shutil.copytree` — which preserves
-   source mtimes, so a pin is born looking days old to any age-based reaper. On
-   macOS the `$TMPDIR` cleaner took 91 of 131 files out of this feature's own
-   recorded pin within twelve hours, `specfuse/loop/__init__.py` among them, and
-   because `specfuse` is a namespace package with the working tree on `sys.path`,
-   a re-entry into that pin resolves the driver from the tree while
-   `pinned_build_info` still calls it a valid pin and `driver_build_pinned` still
-   names a build that is not running. The failure is silent, it is exactly the
-   "confidently wrong" mode `build_provenance` exists to prevent, and no oracle
-   saw it because every test built a fresh cache directory and threw it away.
-   Two generalizable moves. **(a)** A content-addressed cache's validity check
-   must cover the content, not just the marker naming it — a manifest, a file
-   count, or a re-materialize-on-mismatch, so a partially reaped cache entry
-   fails loudly instead of degrading into a hybrid. **(b)** When a unit's
-   acceptance criteria are all satisfiable within one process lifetime, ask
-   explicitly what the artifact looks like on the *second* run, hours later, on
-   the platform it actually ships to — the durability of a cache is a property no
-   single-run oracle can express, and it needs its own criterion or it will not
-   be tested at all.
+2. **A cache keyed on identity must validate its contents, and a negative
+   result is never a cache.** Gate 3 produced two independent instances of the
+   same failure within a day, in code written by two different units of the same
+   feature. The pin trusted a marker file naming a tree hash and executed a
+   directory that had silently lost 91 of 131 files, resolving the program back
+   to the working tree while still emitting "I am running build X". The baseline
+   record trusted a tree hash that deliberately excludes `.specfuse/` — correct
+   for surviving bookkeeping commits — while the gates it summarises *read*
+   `.specfuse/`, so a recorded failure could not be invalidated by the fix that
+   cleared it, and the gate livelocked: two dispatches, $3.10, 24 minutes, and
+   an attempt counter that never moved. Neither failed loudly. Both produced a
+   confident wrong answer, which is the exact mode `build_provenance` exists to
+   prevent. Two rules, and the second is the one that is easy to miss.
+   **(a)** A content-addressed cache's validity check must cover the content,
+   not only the marker naming it — a manifest, a file count, or
+   re-materialize-on-mismatch — so a partially reaped entry fails loudly instead
+   of degrading into a hybrid of cache and source. **(b)** A cache entry
+   recording a *failure* must always be re-derived, never reused, whatever its
+   key says. A green record is a real cache: nothing has to be re-checked. A red
+   record is the single case where re-checking is the whole point, because
+   someone is presumably fixing it — so reusing it can only ever be redundant or
+   wrong. The general shape of both: a key that cannot see everything the value
+   depends on is not an identity, and the cheapest correct fix is to shrink what
+   you are willing to cache, not to widen the key.
 
 ## Verdict
 
@@ -1384,21 +1632,31 @@ Advisory only, per `close-discipline.md` §1 — the judge session reads
 `## Measurements`, the per-criterion state and the gate diff, and is
 deliberately not given this section.
 
-**`not_met`.** Five of `GATE-03.md`'s seven definition-of-done bullets are met
-on re-run evidence; two are not, and both are recorded in `FOLLOW-UPS.md` with
-the command, the exit code and the re-run condition:
+**`met`.** All seven of `GATE-03.md`'s definition-of-done bullets are met on
+re-run evidence gathered in this session, including the two the previous close
+attempt recorded as unmet:
 
-- **T08#5** — a pinned run prints the pre-T08 halt text at the point it declines
-  to halt, and then does not halt.
-- **T08#3** — `materialize_pin` reuses a pin on its marker alone; this feature's
-  own recorded pin has since lost 91 of its 131 files to the OS tmp reaper, and
-  a re-entry into that pin resolves the driver from the working tree while still
-  reporting itself pinned.
+- **Bullet 5** (#3270) — the pinned seam and the gate-completion summary print
+  pin-aware text naming the pin's tree and the tree the edit takes effect in;
+  neither pre-T09 string appears anywhere on the pinned run's stdout. Re-probed
+  by driving the real pinned driver subprocess and reading `proc.stdout`, the
+  same probe that found the defect.
+- **Bullet 3** (#3271) — `materialize_pin` validates the pin's manifest, not
+  only its marker; the real reaped pin `021342f2…` now fails `_pin_is_complete`,
+  a mutilated pin is rebuilt rather than reused, and a launcher-shaped import
+  inside a reused pin resolves to the pin rather than the working tree.
 
-There is no partial credit and neither is hedged. `specfuse lint --closing`
-reports `CLOSING-READY` for this feature — run as
-`python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing`, exit 0. The
-installed console script (`specfuse lint … --closing`) reports the same three
-requirements and the same result, and prefaces it with the "confidently wrong"
-out-of-tree warning, which is why the in-tree shim's answer is the one recorded
-here.
+Both `FOLLOW-UPS.md` re-run conditions are quoted and answered in
+`## Measurements`. No criterion is unmet, so no new `FOLLOW-UPS.md` entry is
+written; the two existing entries are annotated with the evidence that closed
+them and their `### ` headings are left byte-identical so the driver's
+deduplication still resolves them to issues #3270 and #3271.
+
+There is no partial credit and nothing is hedged. `specfuse lint --closing`
+reports `CLOSING-READY` for this feature — run as `python3
+.specfuse/scripts/lint_plan.py <feature_dir> --closing`, exit 0.
+
+One thing is knowingly left uncorrected and is not a criterion of any unit:
+`PLAN.md`'s `planned_cost_usd` of $26.00 against a WU sum of $62.50 and actual
+spend of $67.77 across 21 attempts. It is the driver's file and the operator's
+number; the arithmetic is in `## Cost analysis`.

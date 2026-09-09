@@ -1,11 +1,20 @@
 # Follow-ups — FEAT-2026-0109
 
+> **Both entries below are closed.** `FEAT-2026-0109/T09` was drafted from this
+> file and landed on 2026-09-09; the re-armed `G3-CLOSE` re-ran both probes in
+> its own session and both re-run conditions are satisfied — the evidence is in
+> `RETROSPECTIVE.md` § *The two bullets T09 moved, against `FOLLOW-UPS.md`'s
+> re-run conditions*, and each entry carries a **Closed by** line below. The
+> entries and their `### ` headings are left verbatim: they are what issues
+> **#3270** and **#3271** were filed from, and rewriting a heading would break
+> the driver's deduplication against those issues.
+
 Written by `FEAT-2026-0109/G3-CLOSE`, attempt 1, per `close-discipline.md` §2.
-The gate's verdict is `not_met`; two of `GATE-03.md`'s seven definition-of-done
-bullets are not satisfied. One entry per failed criterion, each carrying the
-criterion verbatim, the command run and its exit code, and the condition whose
-re-run would satisfy it. The driver files one tracked `specfuse:follow-up` issue
-per entry.
+That attempt's verdict was `not_met`; two of `GATE-03.md`'s seven
+definition-of-done bullets were not satisfied. One entry per failed criterion,
+each carrying the criterion verbatim, the command run and its exit code, and the
+condition whose re-run would satisfy it. The driver files one tracked
+`specfuse:follow-up` issue per entry.
 
 ### A pinned run prints the pre-T08 halt text at the point it declines to halt
 
@@ -71,6 +80,21 @@ pin-aware sentence at both the per-unit seam and the gate summary, and
 `UnpinnedRunStillHalts` still passes unchanged. Because the gate's oracle is
 bound to `events.jsonl` and the exit code, the covering assertion needs a
 separate test that reads the subprocess's stdout.
+
+**Closed by `FEAT-2026-0109/T09` (issue #3270).** Re-ran the same probe in the
+re-armed close's session, returncode 0. The per-unit seam now prints `DRIVER
+EDIT RECORDED (pinned build <tree>)` naming `next_pin_tree` and "This process
+continues dispatching against its own pinned snapshot; no restart is required.";
+the gate summary prints `DRIVER EDITS RECORDED (gate summary, pinned build
+<tree>)` and "No restart was required." Neither `STALE DRIVER PROCESS:` nor
+"stop this driver now and start a new one" nor "A fresh driver process is
+required" appears anywhere on that stdout. Case-insensitive `pin` occurrences:
+**11**, against the 2 recorded above. `UnpinnedRunStillHalts` passes unchanged,
+and `tests/test_pin_honesty_and_integrity.py::UnpinnedTextIsByteIdentical`
+compares the unpinned strings against HEAD's wording directly. The covering
+assertion this condition asked for is
+`tests/test_pin_honesty_and_integrity.py::PinnedSeamTextIsPinAware`, which reads
+the subprocess's stdout rather than `events.jsonl`.
 
 ### A materialized pin can lose its files and still be reported as the running build
 
@@ -148,11 +172,40 @@ policy the driver controls. Satisfied when a test materializes a pin, deletes
 launcher-shaped import inside a reused pin resolves `specfuse.loop.loop` to the
 pin, never to the working tree.
 
+**Closed by `FEAT-2026-0109/T09` (issue #3271).** T09 took the first of the two
+options this condition offered — a manifest — and did **not** relocate the cache
+out of `tempfile.gettempdir()`, which was offered as an "and/or" and is an
+operator decision. `materialize_pin` now writes a `.specfuse-pin-manifest`
+alongside `.specfuse-pin-tree` at materialize time and `_pin_is_complete`
+requires every manifested file to still be present. Re-probed in the re-armed
+close's session, exit 0 on each:
+
+```
+real reaped pin 021342f2… : 40 of 131 files, marker present, manifest absent
+                            _pin_is_complete -> False      # refused, would rebuild
+fresh pin, 131 files, manifest 131 lines
+  delete specfuse/loop/__init__.py + build_provenance.py behind its back -> 129
+  marker still matches: True ;  _pin_is_complete -> False
+  materialize_pin() again -> same dir, 131 files, both deleted files restored
+launcher-shaped import inside the reused pin, cwd = repo root
+  RESOLVED: <cache>/<tree>/specfuse/loop/loop.py
+  resolves to the PIN: True ;  resolves to WORKING TREE: False
+```
+
+Both clauses of the condition hold. What T09 did not change: pins still live in
+`tempfile.gettempdir()` and `shutil.copytree` still preserves source mtimes, so
+a pin is still born looking days old to an age-based reaper — losing files is
+now loud (one re-copy) instead of silent (a hybrid of pin and working tree).
+Recorded in `RETROSPECTIVE.md` § *What the loop did NOT verify* item 1.
+
 ## Noted, not filed
 
-`PLAN.md`'s `planned_cost_usd` is **$26.00** against a WU sum of **$56.00** and
-actual spend of **$50.34** across 16 attempts. `GATE-02-REVIEW.md` Q4 and
-`GATE-03-REVIEW.md` Q3 both flagged it and both left it to the operator; it was
-not corrected. It is not an acceptance criterion of any work unit and the driver
-owns `PLAN.md`, so it is recorded here rather than filed as a follow-up. The
-arithmetic is in `RETROSPECTIVE.md` § Cost analysis.
+`PLAN.md`'s `planned_cost_usd` is **$26.00**. At the time this was written the
+WU sum was **$56.00** and actual spend **$50.34** across 16 attempts; with T09
+and T10 added the WU sum is **$62.50** and actual spend **$67.77** across 21
+attempts, a delta of **+160.7%** against the plan figure and **+8.4%** against
+the WU sum. `GATE-02-REVIEW.md` Q4 and `GATE-03-REVIEW.md` Q3 both flagged it
+and both left it to the operator; it was not corrected, and the re-armed close
+did not correct it either. It is not an acceptance criterion of any work unit
+and the driver owns `PLAN.md`, so it is recorded here rather than filed as a
+follow-up. The arithmetic is in `RETROSPECTIVE.md` § Cost analysis.
