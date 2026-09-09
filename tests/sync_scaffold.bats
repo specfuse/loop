@@ -159,3 +159,75 @@ setup_core() {
   # The whole point: the edit survives the refusal.
   [[ "$(cat "$TESTDIR/.specfuse/rules/correlation-ids.md")" == *"loop-local block"* ]]
 }
+
+# --- #3285: core must be committed before it can be vendored from ------------
+#
+# The stage above classifies destination-vs-core. It cannot see the case where
+# CORE ITSELF is dirty: the loop's copy then legitimately matches core, the run
+# reports `unchanged`, and .vendored.json is rewritten with the new hash — so
+# the divergence is baselined and this script can never detect it again.
+#
+# That is how 3194d24 shipped a `verification-discipline.md` the umbrella had
+# never seen; it surfaced on the umbrella's publish PR after v0.17.0 was already
+# tagged and on PyPI.
+
+git_core() {  # make $TESTDIR/core a git work tree with everything committed
+  git -C "$TESTDIR/core" init -q
+  git -C "$TESTDIR/core" config user.email t@example.com
+  git -C "$TESTDIR/core" config user.name t
+  git -C "$TESTDIR/core" add -A
+  git -C "$TESTDIR/core" commit -qm core
+}
+
+@test "vendoring from a core checkout with an uncommitted vendored file halts" {
+  setup_core
+  git_core
+  # The edit exists only in core's working tree — never committed, so no other
+  # consumer of the substrate will ever receive it.
+  printf 'verifdisc\nedited in core but not committed\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"rules/verification-discipline.md"* ]]
+}
+
+@test "the dirty-core halt does not vendor the uncommitted content" {
+  setup_core
+  git_core
+  printf 'verifdisc\nedited in core but not committed\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -ne 0 ]
+  # Nothing uncommitted reached the loop, and no baseline was written for it.
+  [ ! -f "$TESTDIR/.specfuse/rules/verification-discipline.md" ] \
+    || ! grep -q "not committed" "$TESTDIR/.specfuse/rules/verification-discipline.md"
+}
+
+@test "a committed core edit vendors normally" {
+  setup_core
+  git_core
+  printf 'verifdisc\nlanded upstream\n' \
+    > "$TESTDIR/core/rules/verification-discipline.md"
+  git -C "$TESTDIR/core" commit -qam "core moves forward"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"landed upstream"* ]]
+}
+
+@test "a dirty file outside the vendored set does not block the sync" {
+  setup_core
+  git_core
+  # Unrelated umbrella work in progress must not stop the loop from vendoring.
+  printf 'scratch\n' > "$TESTDIR/core/UNRELATED.md"
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "a non-git core is vendored from as before" {
+  # An installed copy has no git metadata; the check cannot be made and this
+  # stage already degrades rather than failing when it cannot verify.
+  setup_core
+  REPO_ROOT="$TESTDIR" SPECFUSE_CORE="$TESTDIR/core" run bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$TESTDIR/.specfuse/rules/verification-discipline.md")" == *"verifdisc"* ]]
+}
