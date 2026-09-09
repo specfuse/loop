@@ -101,6 +101,12 @@ a diagnosis pass).
 For each blocked WU, before asking the user, pull and quote:
 
 - The WU's `id`, `file`, `attempts`, `cost_usd`, `duration_seconds`.
+- **For a `close` / `close-intermediate` unit, the price of re-closing**
+  (#3269): the gate's acceptance-criteria count across its substantive
+  units (what `specfuse lint` WARNs on above `MAX_CRITERIA_PER_GATE_WARN`),
+  and the cost of the gate's last close attempt from `events.jsonl`. A
+  re-close re-derives every broad criterion; in one consumer three re-closes
+  of a 46-criterion gate cost $8–13 each. Say the number before asking.
 - The latest `human_escalation` event for that correlation_id in
   `events.jsonl` — quote `blocked_reason` and `reason`.
 - If `work/<wu_id>/attempt-N.md` notes exist, quote the tail of the
@@ -129,6 +135,7 @@ For each candidate, ask:
 Re-arm sandboxed (r) / Re-arm UNSANDBOXED (u) / Abandon (a) / Skip (s)
   — FEAT-YYYY-NNNN/TNN ?
   attempts: <N>  cost: <$X>  duration: <Ys>
+  (close units only) criteria in gate: <N>  last close attempt: <$X>
   blocked_reason: "<...>"
   re-arm rationale (required for r and u — one line):
 ```

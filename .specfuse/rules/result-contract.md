@@ -66,6 +66,9 @@ acceptance_criteria:
     met: true | false
     evidence: <how you know — a test name, a behavior, a line reference>
 blocked_reason: <present only when status is blocked>
+produces_unchanged:               # optional — closing obligation 1 below
+  - path: <a produces: entry, verbatim>
+    justification: <the command you ran and its output showing the deliverable already holds>
 ```
 ````
 
@@ -101,9 +104,12 @@ blocked_reason: <present only when status is blocked>
 
 1. **Diff against `produces:` first.** Every path in the WU's `produces:` list
    must show a working-tree change, or the RESULT must justify each unchanged
-   path with the command and output showing the deliverable already holds.
-   Silence on an unchanged deliverable is not a valid close (#198, outcome
-   `produces_not_in_diff`).
+   path under `produces_unchanged:` — the entry spelled as `produces:` spells
+   it, plus the command and output showing the deliverable already holds. The
+   driver reads that list: a justified entry passes and is recorded on the
+   attempt as `produces_justified`; an unjustified one, or a blank
+   justification, is refused (#198, #3268, outcome `produces_not_in_diff`).
+   Silence on an unchanged deliverable is not a valid close.
 2. **A plan-level contradiction is `blocked`, not `complete`.** If the plan
    cannot be delivered as written, put the finding in `blocked_reason`; never
    write it into a gate document and close `complete`.

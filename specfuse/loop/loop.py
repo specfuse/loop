@@ -489,6 +489,12 @@ class WorkUnit:
     # quotes it — so the step is on the record before the verdict is written
     # instead of softening the verdict after the fact.
     evidence: str = ""
+    # INTERNAL, never frontmatter: the parsed RESULT block of the attempt
+    # `execute_unit_attempt` just ran, so guards that fire after the squash
+    # (`assert_produces_in_diff`'s site in run()) can read what the agent
+    # claimed — the per-path `produces_unchanged:` justification the contract
+    # promises to honour (#3268). None until a session has run.
+    result_block: "dict | None" = None
 
 
 @dataclass
@@ -5645,12 +5651,15 @@ def execute_unit_attempt(
     # mismatch flags the attempt as a verification failure even though
     # verify() reported PASS — gates can't see "the diff is empty" when
     # the gate commands operate on files unrelated to the WU's scope.
-    if head_before is not None:
-        parsed = parse_result_block(stdout or "")
-        if parsed:
-            unchanged = verify_files_changed(parsed, head_before)
-            if unchanged:
-                return "files_changed_mismatch", unchanged, usage
+    parsed = parse_result_block(stdout or "")
+    # Kept on the unit for the post-squash guards in run() (#3268): the
+    # produces-vs-diff check needs the squash diff, which does not exist yet
+    # here, and the RESULT text does not survive past this function.
+    wu.result_block = parsed
+    if head_before is not None and parsed:
+        unchanged = verify_files_changed(parsed, head_before)
+        if unchanged:
+            return "files_changed_mismatch", unchanged, usage
     return "passed", evidence, usage
 
 
@@ -8228,8 +8237,20 @@ def assert_produces_in_diff(
     neither side's spelling should decide the outcome. Unmatched entries are
     still reported in the author's original spelling.
     """
+    unmatched = unmatched_produces(wu, touched)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
+
+def unmatched_produces(wu: WorkUnit, touched: list[str]) -> list[str]:
+    """The ``produces:`` entries no path in *touched* satisfies, in the
+    author's original spelling. Empty ``produces:`` is the opt-out."""
     if not wu.produces:
-        return True, ""
+        return []
     touched_norm = [t.removeprefix("./") for t in touched]
     unmatched = []
     for raw in wu.produces:
@@ -8241,12 +8262,63 @@ def assert_produces_in_diff(
         pattern = produces_glob_pattern(probe)
         if not any(t == probe or fnmatch.fnmatch(t, pattern) for t in touched_norm):
             unmatched.append(entry)
-    if unmatched:
-        return False, (
-            "declared produces path(s) not in this WU's squash diff: "
-            + ", ".join(unmatched)
-        )
-    return True, ""
+    return unmatched
+
+
+def produces_justifications(result_block: "dict | None") -> dict[str, str]:
+    """The RESULT's ``produces_unchanged:`` entries as ``{path: justification}``.
+
+    ``result-contract.md`` closing obligation 1: an unchanged ``produces:``
+    path is acceptable when the RESULT justifies it "with the command and
+    output showing the deliverable already holds". This reads that claim
+    (#3268). Defensive throughout — the block is agent output: a non-list
+    field, a bare string, a missing path, or a blank justification is dropped,
+    never raised. Paths are keyed with a leading ``./`` stripped, the same
+    normalisation ``unmatched_produces`` applies.
+    """
+    if not isinstance(result_block, dict):
+        return {}
+    entries = result_block.get("produces_unchanged")
+    if not isinstance(entries, list):
+        return {}
+    out: dict[str, str] = {}
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        why = item.get("justification")
+        if not isinstance(path, str) or not path.strip():
+            continue
+        if not isinstance(why, str) or not why.strip():
+            continue
+        out[path.strip().removeprefix("./")] = why.strip()
+    return out
+
+
+def resolve_produces_refusal(
+    wu: WorkUnit, touched: list[str], result_block: "dict | None",
+) -> tuple[list[str], list[dict]]:
+    """Split the unmatched ``produces:`` entries into the ones the RESULT
+    justified and the ones still refused (#3268).
+
+    Returns ``(remaining, accepted)``: *remaining* are unmatched entries with
+    no usable justification — the refusal names exactly these; *accepted* are
+    ``{"path", "justification"}`` records for the entries the agent justified,
+    recorded on the passed attempt_outcome as ``produces_justified`` so the
+    claim is auditable. A justification for a path the diff already covers is
+    ignored: it is not a claim about anything. A hollow attempt — nothing
+    declared touched, nothing justified — is refused exactly as before.
+    """
+    justified = produces_justifications(result_block)
+    remaining: list[str] = []
+    accepted: list[dict] = []
+    for entry in unmatched_produces(wu, touched):
+        key = entry.removeprefix("./")
+        if key in justified:
+            accepted.append({"path": entry, "justification": justified[key]})
+        else:
+            remaining.append(entry)
+    return remaining, accepted
 
 
 # --------------------------------------------------------------------------- #
@@ -9368,6 +9440,10 @@ def run(
                         # produced no deliverable — refuse the pass, MAX_ATTEMPTS
                         # exhaustion escalates via existing machinery.
                         touched = git_diff_names(head_before, sha) if sha else []
+                        # Justified-unchanged `produces:` entries this attempt
+                        # (#3268); filled by the produces guard below, recorded
+                        # on the passed event.
+                        _produces_justified: list = []
                         impl_ok, impl_summary = assert_implementation_touched_files(
                             wu, touched,
                         )
@@ -9398,8 +9474,23 @@ def run(
                         # delivering shape). Every produces: entry must match a
                         # path in this WU's squash diff; otherwise refuse the
                         # pass, roll back the squash, retry within budget.
-                        prod_ok, prod_summary = assert_produces_in_diff(
-                            wu, touched,
+                        # An unmatched entry the RESULT justified under
+                        # `produces_unchanged:` is accepted, not refused —
+                        # the escape hatch result-contract.md closing
+                        # obligation 1 always promised and the driver never
+                        # read (#3268). Only the still-unjustified entries
+                        # refuse; the accepted ones are recorded on the
+                        # passed event.
+                        _prod_remaining, _produces_justified = resolve_produces_refusal(
+                            wu, touched, wu.result_block,
+                        )
+                        for _pj in _produces_justified:
+                            print(f"   produces: {_pj['path']} unchanged, "
+                                  f"justified — {_pj['justification'][:120]}")
+                        prod_ok = not _prod_remaining
+                        prod_summary = "" if prod_ok else (
+                            "declared produces path(s) not in this WU's squash diff: "
+                            + ", ".join(_prod_remaining)
                         )
                         if not prod_ok:
                             reset_preserving_events(head_before, events_path,
@@ -9408,15 +9499,17 @@ def run(
                                 prod_summary
                                 + "\n\nEach listed path is a deliverable this WU "
                                   "declared in `produces:` but did not change. "
-                                  "Make the declared change this attempt — do "
-                                  "not declare done while a deliverable is "
-                                  "untouched."
+                                  "Either make the declared change this attempt, "
+                                  "or — if the deliverable already holds at HEAD — "
+                                  "say so in the RESULT block under "
+                                  "`produces_unchanged:` with the command and "
+                                  "output that show it (result-contract.md, "
+                                  "closing obligation 1). Do not declare done "
+                                  "while a deliverable is untouched and "
+                                  "unjustified."
                             )
                             _prod_sig = ", ".join(sorted(
-                                Path(p).name for p in wu.produces
-                                if not any(t == str(p)
-                                           or fnmatch.fnmatch(t, str(p))
-                                           for t in touched)
+                                Path(p).name for p in _prod_remaining
                             ))[:100] or "produces_unchanged"
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "produces_not_in_diff",
@@ -9579,6 +9672,8 @@ def run(
                             files_touched=touched,
                             agent_status="complete",
                             agent_blocked_reason=None,
+                            extras=({"produces_justified": _produces_justified}
+                                    if _produces_justified else None),
                         ))
                         # Lifetime fields (#199): a retrospective must be able
                         # to compute rework-vs-new-work and planned-vs-actual

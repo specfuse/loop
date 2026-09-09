@@ -24,7 +24,13 @@ WU's frontmatter so the auto-close predicate cannot optimize it away (#189).
 The close re-runs every oracle the feature's acceptance criteria name — the
 full test command(s), plus any compile/execution gates — fresh, in this
 session, exit codes read directly. Never inherit a producing WU's
-self-report: `done` is a claim, the re-run is the verification. When the
+self-report: `done` is a claim, the re-run is the verification. What may be
+inherited is narrower and stated in §5: on a **re-close** of the same gate, a
+`narrow` criterion's green recorded in `GATE-NN-CRITERIA.md` by an earlier
+close attempt is carried forward; every `broad` oracle and the gate's
+`feature_oracle` re-run on every attempt. "Fresh" binds the first close of a
+gate in full, and the broad half of every close after it — never a producing
+unit's own report. When the
 feature's criteria assert on generated artifacts, regenerate into a clean
 output directory before asserting — stale output satisfies any assertion.
 
