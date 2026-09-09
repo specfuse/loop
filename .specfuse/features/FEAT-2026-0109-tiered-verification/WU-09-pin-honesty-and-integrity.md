@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0109/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 oracle_env: macos_local
 produces_driver_helper: format_driver_staleness_warning
@@ -10,10 +10,15 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/build_provenance.py
   - tests/test_pin_honesty_and_integrity.py
-duration_seconds: 756.228
-cost_usd: 1.887924
-input_tokens: 94
-output_tokens: 42841
+duration_seconds: 835.406
+cost_usd: 1.239905
+input_tokens: 74
+output_tokens: 26169
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.16.0
+started_at: 2026-09-09T13:16:56.669156+00:00
 ---
 
 # A pinned run says what it actually does, and never trusts a half-reaped pin

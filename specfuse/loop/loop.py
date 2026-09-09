@@ -3075,7 +3075,10 @@ def format_deliverable_missing_note(
     return "\n".join(lines)
 
 
-def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
+def format_driver_staleness_warning(
+    wu_id: str, driver_paths: list,
+    pinned_tree: "str | None" = None, next_pin_tree: "str | None" = None,
+) -> str:
     """Render the driver-editing staleness warning for `wu_id`, or "" if
     `driver_paths` is empty (FEAT-2026-0075/T02).
 
@@ -3084,10 +3087,29 @@ def format_driver_staleness_warning(wu_id: str, driver_paths: list) -> str:
     process dispatches next — including a close armed to verify it. The
     message names the offending unit and every path it touched, and states
     the required remedy explicitly rather than leaving the reader to infer it.
+
+    `pinned_tree` is `os.environ[PINNED_BUILD_ENV_VAR]` when this process is
+    running a pinned build (FEAT-2026-0109/T09): that process's halt is
+    retired, so the unpinned wording above — which tells the operator to
+    stop and restart — would be false. When set, the message instead names
+    the pin's tree, the tree the edit takes effect in (`next_pin_tree`), and
+    states plainly that this process keeps dispatching against its own
+    pinned snapshot. `pinned_tree=None` reproduces the unpinned text
+    byte-for-byte (`UnpinnedRunStillHalts`).
     """
     if not driver_paths:
         return ""
     paths = ", ".join(driver_paths)
+    if pinned_tree:
+        return (
+            f"DRIVER EDIT RECORDED (pinned build {pinned_tree}): {wu_id} "
+            f"edited the driver itself ({paths}). This process is executing "
+            f"a pinned build materialized at tree {pinned_tree}, not the "
+            f"working tree, so this edit does not change what this process "
+            f"runs. It takes effect in the next pinned build, at tree "
+            f"{next_pin_tree}. This process continues dispatching against "
+            f"its own pinned snapshot; no restart is required."
+        )
     return (
         f"STALE DRIVER PROCESS: {wu_id} edited the driver itself ({paths}). "
         f"This process cached the pre-edit versions of those modules at "
@@ -3155,7 +3177,10 @@ def merge_gate_driver_edits(process_edits: list, recorded_edits: list) -> list:
     return merged
 
 
-def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
+def format_driver_staleness_summary(
+    edits: list, dispatched_after: list,
+    pinned_tree: "str | None" = None, next_pin_tree: "str | None" = None,
+) -> str:
     """Render the gate-completion staleness summary (FEAT-2026-0075/T03).
 
     `edits` is `[(wu_id, driver_paths), ...]` for units that edited the
@@ -3168,9 +3193,32 @@ def format_driver_staleness_summary(edits: list, dispatched_after: list) -> str:
     of reconstructing the fact from `ps` output and `started_at` timestamps.
     Returns "" when `edits` is empty so a gate with no driver-editing unit
     stays silent.
+
+    `pinned_tree` carries the same meaning as in
+    `format_driver_staleness_warning` (FEAT-2026-0109/T09): this gate closed
+    in a process running a pinned build, so nothing here was ever untrusted,
+    and the summary says so instead of repeating the unpinned "a fresh
+    driver process is required" line. `pinned_tree=None` reproduces the
+    unpinned text byte-for-byte.
     """
     if not edits:
         return ""
+    if pinned_tree:
+        lines = ["DRIVER EDITS RECORDED (gate summary, pinned build "
+                  f"{pinned_tree}):"]
+        for wu_id, paths in edits:
+            lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
+        affected = ", ".join(dispatched_after) if dispatched_after else "(none)"
+        lines.append(
+            f"  This process executed the pinned build at tree "
+            f"{pinned_tree}, not the working tree, so the edit(s) above "
+            f"took effect in the next pinned build (tree {next_pin_tree}), "
+            f"not this one. Dispatched after the edit above in this same "
+            f"process: {affected} — each executed against this process's "
+            f"own pinned snapshot, which is what a pinned run is for. No "
+            f"restart was required."
+        )
+        return "\n".join(lines)
     lines = ["STALE DRIVER PROCESS (gate summary):"]
     for wu_id, paths in edits:
         lines.append(f"  - {wu_id} edited the driver: {', '.join(paths)}")
@@ -8947,8 +8995,14 @@ def run(
                         if sha is not None:
                             _changed = changed_paths_for_commit(sha, REPO_ROOT)
                             _driver_paths = driver_paths_in(_changed)
+                            _pinned_tree = os.environ.get(PINNED_BUILD_ENV_VAR)
+                            _next_pin_tree = (
+                                head_tree_hash(REPO_ROOT) if _pinned_tree
+                                else None)
                             _warning = format_driver_staleness_warning(
-                                wu.wu_id, _driver_paths)
+                                wu.wu_id, _driver_paths,
+                                pinned_tree=_pinned_tree,
+                                next_pin_tree=_next_pin_tree)
                             if _warning:
                                 print(_warning)
                                 # Recorded for the gate-completion summary
@@ -9730,8 +9784,12 @@ def run(
                 _dispatched_after = dispatch_order[_first_edit_idx + 1:]
             else:
                 _dispatched_after = []
+            _pinned_tree = os.environ.get(PINNED_BUILD_ENV_VAR)
+            _next_pin_tree = (
+                head_tree_hash(REPO_ROOT) if _pinned_tree else None)
             _staleness_summary = format_driver_staleness_summary(
-                _gate_edits, _dispatched_after)
+                _gate_edits, _dispatched_after,
+                pinned_tree=_pinned_tree, next_pin_tree=_next_pin_tree)
             if _staleness_summary:
                 print(f"\n{_staleness_summary}")
                 staleness_gate_events.append(build_event(

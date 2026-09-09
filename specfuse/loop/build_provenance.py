@@ -102,6 +102,15 @@ _PIN_CACHE_ENV_VAR = "SPECFUSE_PIN_CACHE_DIR"
 #: unidentified, never trusted silently.
 _PIN_MARKER_NAME = ".specfuse-pin-tree"
 
+#: Manifest of every file `materialize_pin` copied into a pin, written
+#: alongside the marker. The marker alone only proves a directory CLAIMS to be
+#: the pin for a tree hash; an age-based tmp reaper (or anything else) can
+#: delete files from under it without touching the marker, and a copy missing
+#: files must never be reported as the running build (FEAT-2026-0109/T09,
+#: FOLLOW-UPS.md "A materialized pin can lose its files ..."). Reuse checks
+#: every path this manifest lists before trusting an existing pin.
+_PIN_MANIFEST_NAME = ".specfuse-pin-manifest"
+
 #: The launcher `main()` re-execs through once a pin is materialized. Its own
 #: directory becomes `sys.path[0]` for a script invocation (probed fact #2 in
 #: FEAT-2026-0109/T08's work-unit body), so it lives beside the pinned
@@ -172,18 +181,55 @@ def pin_dir_for(tree_hash: str) -> Path:
     return pin_cache_root() / tree_hash
 
 
+def _pin_manifest_lines(pin_specfuse_dir: Path) -> list:
+    """Relative paths of every file under *pin_specfuse_dir*, sorted."""
+    return sorted(
+        str(p.relative_to(pin_specfuse_dir))
+        for p in pin_specfuse_dir.rglob("*") if p.is_file()
+    )
+
+
+def _pin_is_complete(pin_dir: Path, tree_hash: str) -> bool:
+    """Whether *pin_dir* is a matching, fully-present pin for *tree_hash*.
+
+    Checks the marker's content (as before) AND that every file the manifest
+    recorded at materialize time is still present -- a manifest recorded once
+    and never re-derived from the possibly-reaped directory, so a pin missing
+    files fails this check instead of being reported as complete because most
+    of it happens to still be there.
+    """
+    marker = pin_dir / _PIN_MARKER_NAME
+    if not (marker.is_file()
+            and marker.read_text(encoding="utf-8").strip() == tree_hash):
+        return False
+    manifest = pin_dir / _PIN_MANIFEST_NAME
+    if not manifest.is_file():
+        return False
+    try:
+        expected = [line for line in
+                    manifest.read_text(encoding="utf-8").splitlines() if line]
+    except OSError:
+        return False
+    specfuse_dir = pin_dir / "specfuse"
+    return bool(expected) and all(
+        (specfuse_dir / rel).is_file() for rel in expected)
+
+
 def materialize_pin(repo_root: Path, tree_hash: str) -> Path:
     """Copy *repo_root*'s `specfuse/` package to a pin keyed on *tree_hash*.
 
-    Idempotent: a pin already materialized for this tree hash (the marker
-    file matches) is reused as-is, so a second process pinning the same
-    commit does not re-copy. Builds into a sibling temp directory first and
+    Idempotent: a pin already materialized for this tree hash -- marker
+    matches AND every manifested file is still present, `_pin_is_complete`
+    -- is reused as-is, so a second process pinning the same commit does not
+    re-copy. A pin that is missing files (an age-based tmp reaper, or
+    anything else, deleting from under an intact marker) fails that check
+    and is rebuilt from scratch here rather than reused half-complete
+    (FEAT-2026-0109/T09). Builds into a sibling temp directory first and
     installs it with a single `os.replace` so a reader never observes a
     half-copied pin.
     """
     pin_dir = pin_dir_for(tree_hash)
-    marker = pin_dir / _PIN_MARKER_NAME
-    if marker.is_file() and marker.read_text(encoding="utf-8").strip() == tree_hash:
+    if _pin_is_complete(pin_dir, tree_hash):
         return pin_dir
 
     cache_root = pin_cache_root()
@@ -196,10 +242,19 @@ def materialize_pin(repo_root: Path, tree_hash: str) -> Path:
         )
         (staging / PIN_LAUNCHER_NAME).write_text(_PIN_LAUNCHER_SOURCE, encoding="utf-8")
         (staging / _PIN_MARKER_NAME).write_text(tree_hash, encoding="utf-8")
+        manifest = _pin_manifest_lines(staging / "specfuse")
+        (staging / _PIN_MANIFEST_NAME).write_text(
+            "\n".join(manifest) + ("\n" if manifest else ""), encoding="utf-8")
         if pin_dir.exists():
-            # Another process won the race and finished first; its copy is
-            # equally valid (same tree hash), so keep it and discard ours.
-            shutil.rmtree(staging, ignore_errors=True)
+            if _pin_is_complete(pin_dir, tree_hash):
+                # Another process won the race and finished first; its copy
+                # is equally valid (same tree hash, fully present), so keep
+                # it and discard ours.
+                shutil.rmtree(staging, ignore_errors=True)
+            else:
+                # Stale marker, or a prior pin that lost files -- replace it.
+                shutil.rmtree(pin_dir, ignore_errors=True)
+                os.replace(staging, pin_dir)
         else:
             os.replace(staging, pin_dir)
     finally:
