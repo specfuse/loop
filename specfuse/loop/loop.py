@@ -79,6 +79,8 @@ from .closing_requirements import (
     LEGACY_VERDICT_VALUES,
     NO_FAILURES_SENTINEL,
     NOTHING_GENERALIZES_PHRASE,
+    POST_MERGE_CHECKLIST_HEADING,
+    POST_MERGE_CHECKLIST_HEADING_RE,
     POST_MERGE_LABEL,
     RETROSPECTIVE_FILENAME,
     ROADMAP_PATH,
@@ -95,6 +97,7 @@ from .closing_requirements import (
 )
 from .escalation import (
     _PART_HEADINGS as ESCALATION_PART_HEADINGS,
+    CREATED_NUMBER_UNKNOWN,
     emit_issue_with_body,
     issue_title,
 )
@@ -6866,6 +6869,34 @@ def assert_followups_recorded(
     return True, ""
 
 
+#: What the driver writes back into an entry once its issue exists, and what it
+#: reads to skip an entry already tracked — by itself on an earlier close attempt,
+#: or by a person who filed by hand (the `[#1721](url)` form is the hand-written
+#: one FEAT-2026-0155 used). The driver must never file twice for one entry.
+FOLLOW_UP_TRACKED_RE = re.compile(
+    r"^\s*\**Tracked as:?\s*\[?#(\d+)", re.MULTILINE | re.IGNORECASE,
+)
+FOLLOW_UP_TRACKED_TEMPLATE = "**Tracked as #{number}.**"
+#: Body marker carrying the entry's correlation id, the same shape
+#: `emit_escalation` uses. The title no longer carries the id — a title is for
+#: a person — so idempotency keys off this marker in the body instead.
+FOLLOW_UP_MARKER_TEMPLATE = "<!-- specfuse:followup id={correlation_id} -->"
+def followup_heading(entry: str) -> str:
+    """Heading text of one entry, as a person would read it.
+
+    First non-empty line with the `#` marks, a leading list enumerator
+    (`1.`, `2)`, `-`) and surrounding whitespace removed, inner whitespace
+    collapsed. This is what the issue title carries; ``### 1. `T04#1` — …``
+    used to reach GitHub verbatim as the title (#1716–#1730).
+    """
+    for line in entry.splitlines():
+        if line.strip():
+            text = line.strip().lstrip("#").strip()
+            text = re.sub(r"^(?:\d+[.)]|[-*])\s+", "", text)
+            return " ".join(text.split())
+    return ""
+
+
 def followup_correlation_id(feature_id: str, entry: str) -> str:
     """Correlation id for one FOLLOW-UPS.md entry: `<feature>-followup-<hash>`.
 
@@ -6876,54 +6907,132 @@ def followup_correlation_id(feature_id: str, entry: str) -> str:
     Heading-only, not body, so an entry whose evidence text changes between
     attempts still deduplicates against the issue already open for it.
     """
-    import hashlib
-    heading = ""
-    for line in entry.splitlines():
-        if line.strip():
-            heading = line.strip().lstrip("#").strip()
-            break
-    key = " ".join(heading.split()).casefold()
+    key = followup_heading(entry).casefold()
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
     return f"{feature_id}-followup-{digest}"
 
 
-def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dict:
+def followup_tracked_issue(entry: str) -> str | None:
+    """Issue number an entry already names via `Tracked as #N`, else None."""
+    m = FOLLOW_UP_TRACKED_RE.search(entry)
+    return m.group(1) if m else None
+
+
+def followup_issue_title(feature_id: str, heading: str, label: str) -> str:
+    """`[FEAT-2026-0155 follow-up] <heading>` — a person's title, not a hash.
+
+    The kind (`follow-up` / `post-merge`) is read off the label so the two
+    filing paths cannot drift; `issue_title` applies the length ceiling.
+    """
+    kind = "post-merge" if label == POST_MERGE_LABEL else "follow-up"
+    return issue_title(f"{feature_id} {kind}", heading or kind)
+
+
+def record_tracked_issue(
+    path: Path, entry: str, number: str, *, heading_line: str | None = None,
+) -> bool:
+    """Write `**Tracked as #N.**` under *entry*'s heading line in *path*.
+
+    The write-back `close-discipline.md` §2 promises ("files one tracked
+    issue per entry and writes the issue number back") and the driver never
+    did, which is why a second close attempt — or a person — could not tell
+    a filed entry from an unfiled one. Inserts one line; rewrites nothing
+    else. A FOLLOW-UPS.md entry carries its own heading as its first line;
+    PLAN.md's post-merge section does not, so its caller names the
+    *heading_line* to insert under. Returns False when the entry is not
+    found verbatim or is already tracked, so a caller can count what it
+    recorded.
+    """
+    if followup_tracked_issue(entry):
+        return False
+    text = path.read_text()
+    body = entry.rstrip("\n")
+    if heading_line is None:
+        heading_line, _, body = body.partition("\n")
+    body = body.lstrip("\n")
+    if heading_line not in text or body not in text:
+        return False
+    tracked = FOLLOW_UP_TRACKED_TEMPLATE.format(number=number)
+    at = text.index(heading_line) + len(heading_line)
+    rest = text[at:]
+    if body.strip():
+        # one blank line, the tracked line, one blank line, then the body as it was
+        rest = "\n\n" + tracked + "\n\n" + rest[rest.index(body):]
+    else:
+        rest = "\n\n" + tracked + rest
+    path.write_text(text[:at] + rest)
+    return True
+
+
+def file_followup_issues(
+    feature_dir: Path, repo_root: Path, runner=None, *, commit: bool | None = None,
+) -> dict:
     """File one tracked GitHub issue per FOLLOW-UPS.md entry, after a close's squash.
 
     Runs for both verdicts: on `not_met`, one `FOLLOW_UP_LABEL` issue per
     `### `-headed entry in FOLLOW-UPS.md; on `met`, one `POST_MERGE_LABEL`
     issue for PLAN.md's optional `## Post-merge checklist` section, if
-    present. Idempotent per entry — a title carrying the entry's
-    correlation id lets a second call find the issue `emit_issue_with_body`
-    already filed instead of duplicating it.
+    present. Idempotent per entry, three ways, checked in this order:
+
+    1. An entry that already says `Tracked as #N` is skipped outright — the
+       driver wrote that line on an earlier attempt, or a person filed by
+       hand. This is the check that needs no network and survives a retitle.
+    2. `emit_issue_with_body` finds an open issue whose body carries the
+       entry's correlation marker (or whose title names the id, the pre-fix
+       shape) and returns it instead of creating one.
+    3. Otherwise `gh issue create`, titled from the entry's heading text
+       (`[FEAT-2026-0155 follow-up] <heading>`), body = marker + entry.
+
+    Every entry that ends up with a number gets `Tracked as #N` written back
+    under its heading, and when *commit* is on (the default outside tests,
+    i.e. when no *runner* is injected) the artifact and the event are
+    committed as bookkeeping — an uncommitted write-back reverts on the next
+    reset, which is how FEAT-2026-0155's four entries were filed twice.
 
     `gh` absent or every call failing leaves FOLLOW-UPS.md itself as the
-    record (this never deletes or rewrites it) and still emits one
+    record (this never deletes or rewrites an entry) and still emits one
     `followups_recorded` event naming how many entries filed vs. did not.
     Best-effort throughout: a filing failure is counted in `unfiled`, never
     raised.
     """
+    if commit is None:
+        commit = runner is None
     plan_path = feature_dir / "PLAN.md"
     plan_fm, plan_body = read_frontmatter(plan_path)
     feature_id = plan_fm.get("feature_id") or feature_dir.name.split("-", 2)[0]
 
-    entries: list[tuple[str, str, str]] = []  # (correlation_id, body, label)
+    # (correlation_id, entry_text, label, file the entry lives in)
+    entries: list[tuple[str, str, str, Path]] = []
     followups_path = feature_dir / FOLLOW_UPS_FILENAME
     if followups_path.exists():
         for entry in parse_followup_entries(followups_path.read_text()):
             # #3253: keyed by the entry's heading, not its position, so a
             # later close attempt's new finding files a new issue and a
             # repeated finding still finds the one already filed.
-            entries.append((followup_correlation_id(feature_id, entry), entry, FOLLOW_UP_LABEL))
+            entries.append((
+                followup_correlation_id(feature_id, entry), entry, FOLLOW_UP_LABEL,
+                followups_path,
+            ))
 
     if plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done":
         section = find_post_merge_checklist_section(plan_body)
         if section:
-            entries.append((f"{feature_id}-post-merge-checklist", section, POST_MERGE_LABEL))
+            entries.append((
+                f"{feature_id}-post-merge-checklist", section, POST_MERGE_LABEL, plan_path,
+            ))
 
     filed = 0
     unfiled = 0
     filed_issues: list[str] = []
+    recorded_paths: set[Path] = set()
+    to_file: list[tuple[str, str, str, Path]] = []
+    for item in entries:
+        tracked = followup_tracked_issue(item[1])
+        if tracked:
+            filed_issues.append(tracked)
+        else:
+            to_file.append(item)
+    skipped_tracked = len(entries) - len(to_file)
     # #3244: the labels are registered in `labels.LABEL_REGISTRY` but a
     # repository provisioned before they were added does not have them, and
     # `gh issue create --label` 422s on a missing label. Ensure each distinct
@@ -6931,32 +7040,51 @@ def file_followup_issues(feature_dir: Path, repo_root: Path, runner=None) -> dic
     # than fails when it exists). A failure here is recorded, never raised —
     # the create below then fails on its own and counts as `unfiled`.
     labels_unensured = _ensure_labels_exist(
-        sorted({label for _, _, label in entries}), runner=runner)
-    for correlation_id, body, label in entries:
-        title = issue_title(correlation_id, body)
+        sorted({label for _, _, label, _ in to_file}), runner=runner)
+    for correlation_id, entry, label, source in to_file:
+        heading = (
+            POST_MERGE_CHECKLIST_HEADING if label == POST_MERGE_LABEL
+            else followup_heading(entry)
+        )
+        title = followup_issue_title(feature_id, heading, label)
+        marker = FOLLOW_UP_MARKER_TEMPLATE.format(correlation_id=correlation_id)
         number = emit_issue_with_body(
             correlation_id,
             title=title,
-            body=body,
+            body=f"{marker}\n{entry}",
             labels=[label],
             runner=runner,
         )
         if number:
             filed += 1
             filed_issues.append(number)
+            if number != CREATED_NUMBER_UNKNOWN:
+                heading_line = None
+                if label == POST_MERGE_LABEL:
+                    m = POST_MERGE_CHECKLIST_HEADING_RE.search(source.read_text())
+                    heading_line = m.group(0) if m else None
+                if record_tracked_issue(source, entry, number, heading_line=heading_line):
+                    recorded_paths.add(source)
         else:
             unfiled += 1
 
     events_path = feature_dir / "events.jsonl"
-    flush_events(events_path, [build_event(
-        "followups_recorded", feature_id, {
-            "filed": filed,
-            "unfiled": unfiled,
-            "issue_numbers": filed_issues,
-        },
-    )])
-    return {"filed": filed, "unfiled": unfiled, "issue_numbers": filed_issues,
-            "labels_unensured": labels_unensured}
+    payload = {
+        "filed": filed,
+        "unfiled": unfiled,
+        "already_tracked": skipped_tracked,
+        "issue_numbers": filed_issues,
+    }
+    flush_events(events_path, [build_event("followups_recorded", feature_id, payload)])
+    if commit and recorded_paths:
+        try:
+            commit_bookkeeping(
+                [*sorted(recorded_paths), events_path],
+                f"chore(loop): {feature_id} — record the follow-up issues the driver filed",
+            )
+        except Exception as exc:  # noqa: BLE001 - bookkeeping must not fail the close
+            logging.debug("follow-up write-back commit failed: %s", exc)
+    return {**payload, "labels_unensured": labels_unensured}
 
 
 def _ensure_labels_exist(names: list, *, runner=None) -> list:
