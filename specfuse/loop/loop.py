@@ -3604,7 +3604,11 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
         cmd.insert(2, "--dangerously-skip-permissions")
     if cost_tracking:
         cmd += ["--output-format", "json"]
-    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True, check=False)
+    # Same reasoning as the gate runner: a dispatched agent runs the project's
+    # narrow tier in-session, so it must not inherit the driver's pin marker.
+    # See `child_env_without_pin_marker`.
+    proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+                          check=False, env=child_env_without_pin_marker())
     raw = proc.stdout or ""
     if not cost_tracking:
         return raw, None
@@ -4166,6 +4170,10 @@ def _run_gate_set(
         proc = subprocess.Popen(  # nosec B602
             popen_argv, stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            # Gate commands run the project's own suite; the driver's pin
+            # marker must not leak into them. See
+            # `child_env_without_pin_marker` for the failure this prevents.
+            env=child_env_without_pin_marker(),
             **popen_kwargs, **spawn_kwargs,
         )
         try:
@@ -10165,6 +10173,37 @@ def _force_utf8_console() -> None:
 #: process is a pin, so a driver edit records rather than halts).
 #: FEAT-2026-0109/T08.
 PINNED_BUILD_ENV_VAR = "SPECFUSE_LOOP_PINNED_TREE"
+
+
+def child_env_without_pin_marker() -> dict:
+    """This process's environment with the pin marker removed, for any child
+    that runs the PROJECT's own code (FEAT-2026-0109/T08, gate-3 broad run).
+
+    The marker is set by `_reexec_pinned` on the re-exec and is meaningful to
+    exactly one process: the driver itself, as its recursion guard and as the
+    "this run is pinned, so record a driver edit instead of halting" signal.
+    It is passed by environment, so without this it is inherited by every
+    descendant — including the gate subprocesses that run the project's test
+    suite.
+
+    That is not cosmetic. `test_driver_edit_halts_before_next_dispatch`
+    asserts the halt fires; run inside a pinned driver's gate subprocess it
+    saw the marker, took the pinned "record, do not halt" branch, and failed —
+    a failure invisible to `smoke-test.sh`, to CI, and to any local run,
+    because none of those has the marker set. Gate 3's once-per-gate broad run
+    found it, correctly, and the reproduction is one line:
+
+        env SPECFUSE_LOOP_PINNED_TREE=<hash> python3 -m unittest \\
+            tests.test_driver_restart_halt_wiring   # -> FAILED
+
+    Generally: a test that exercises a pin-conditional branch must control the
+    marker, never inherit it, or it measures the driver's runtime state
+    instead of the state it set up. Stripping it at the spawn boundary makes
+    that the default rather than something each test must remember.
+    """
+    env = dict(os.environ)
+    env.pop(PINNED_BUILD_ENV_VAR, None)
+    return env
 
 
 def _reexec_pinned(argv: list) -> "int | None":
