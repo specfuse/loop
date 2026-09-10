@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_guard_repair_e2e -v"
 cost_budget_usd: 40.00
 broad_run:
