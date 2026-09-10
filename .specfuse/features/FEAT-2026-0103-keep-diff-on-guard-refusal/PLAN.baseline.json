@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "A guard refusal keeps the working tree",
+          "id": "FEAT-2026-0103/T01",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The repair turn opens with the complaint, not with a restart",
+          "id": "FEAT-2026-0103/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A RESULT naming an untouched non-deliverable is repaired without a dispatch",
+          "id": "FEAT-2026-0103/T03",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The retain-and-repair contract is documented where operators read",
+          "id": "FEAT-2026-0103/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 keep the diff on guard refusals",
+          "id": "FEAT-2026-0103/G1-CLOSE",
+          "planned_cost_usd": 8.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
