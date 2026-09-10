@@ -1,18 +1,18 @@
 ---
 id: FEAT-2026-0103/T04H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 provenance: "Gate 1 broad run (2026-09-10T02:32Z): test_package_data_matches_canonical — T04 wrote the defaults block into specfuse/loop/data/verification.yml.example, the package mirror, while the canonical .specfuse/verification.yml.example was left untouched; T04's produces: named the mirror, an authoring defect"
 produces:
   - .specfuse/verification.yml.example
   - specfuse/loop/data/docs/methodology.md
 model: sonnet
-duration_seconds: 1232.612
-cost_usd: 0.998202
-input_tokens: 22
-output_tokens: 2322
+duration_seconds: 229.748
+cost_usd: 0.372726
+input_tokens: 36
+output_tokens: 3821
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: test_package_docs_match_canonical
@@ -26,6 +26,16 @@ re_arm_history:
     prior_duration_seconds: 1232.612
     reason: "go, try again"
 reproduced_signature: "test_package_docs_match_canonical"
+cumulative_cost_usd: 0.998202
+cumulative_duration_seconds: 1232.612
+cumulative_input_tokens: 22
+cumulative_output_tokens: 2322
+cumulative_attempts: 2
+folded_through_re_arm: 1
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T10:44:21.726201+00:00
 ---
 
 # Hygiene: both of T04's edits land on the canonical side and the mirrors are re-synced
