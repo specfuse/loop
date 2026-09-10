@@ -94,6 +94,46 @@ gate that re-planned it until the driver restarts. Establishing a reload
 point for one unit is therefore not a detail of the feature — it is the
 thinnest end-to-end path, and T01 is the tracer bullet that wires it.
 
+## Gate 1 was reverted once — what the first attempt taught
+
+Gate 1's first run dispatched T01-T04, all passed first try, all committed.
+The gate then halted at T05's entry with a red baseline. The work was
+reverted to this plan's baseline commit and gate 1 re-run against the
+criteria below, which are rewritten as a result.
+
+Three defects, none of which any unit's acceptance criteria could fail on:
+
+1. **The unit loop did not terminate.** The re-plan branch rewound the attempt
+   counter to 0, so the ceiling-relative trigger re-fired at the same point on
+   every fresh budget. `test_bookkeeping_commit_crash_run` hung, and because
+   it sorts early the rest of the suite never ran — the hang masked the other
+   two defects for the whole gate.
+2. **The planning turn was a string append.** `run_replan_turn` returned
+   `wu.body.strip() + marker`: no session dispatched, nothing narrowed. The
+   roadmap goal's "dispatches a planning turn" was not implemented, and every
+   criterion still passed.
+3. **A re-planned unit that passed was stranded.** The reload replaced the
+   unit object without reconciling it with the list `ready()` iterates, so a
+   unit that had passed and committed was reported `never became ready`.
+
+The common cause is criteria, not agents. Each unit was asked to prove its own
+part worked and none was asked to prove the composition still did. Two
+structural changes follow from that, and both are in the criteria below:
+
+- **Termination and end-to-end survival are acceptance criteria**, not
+  implications of one. T02 must prove the loop ends; T01 must prove a
+  re-planned unit still reaches `done` through the gate's own bookkeeping.
+- **The narrow per-attempt tier cannot verify these units.** They edit the
+  central dispatch loop, which 44 test modules drive through `loop.run()`, so
+  their blast radius is the whole suite while `produces:` names only their own
+  new module. T01-T04 each carry the full suite in **Verification**:
+  `python3 -m unittest discover -s tests -b`, OK on 3901 tests in ~151s on a
+  clean tree. That is the check that would have caught all three at attempt 1.
+
+The four test modules the first attempt wrote are kept out of tree as the
+contract the rewrite must meet, not restored: they assert against symbols that
+no longer exist.
+
 ## Scope boundary — deliberately out
 
 - Splitting a unit into new units, and any mid-gate mutation of `gate.refs`.

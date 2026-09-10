@@ -31,12 +31,16 @@ T04's; stub each to the thinnest thing that lets the oracle observe the path.
 - `python3 -m unittest tests.test_replan_end_to_end -v -b` fails on HEAD
   before this unit's edits (the module does not exist) and passes after.
 - The end-to-end test drives a unit to its second-to-last permitted attempt
-  and asserts the next dispatch receives a **body that differs from the one
-  the prior attempt received** — asserted on the dispatched prompt, not on the
-  file on disk, since the snapshot at `loop.py:9202` is exactly what this unit
+  and asserts the next dispatch receives a **body that differs** from the one
+  the prior attempt received — asserted on the dispatched prompt, not the file
+  on disk, since the snapshot at `loop.py:9202` is exactly what this unit
   changes.
-- The same test asserts the re-planned unit's `attempts` is reset before that
-  dispatch, so the re-plan does not consume the attempt it replaces.
+- A re-planned unit that then **passes** reaches `status: done` and the gate
+  runs to completion without reporting it stranded. Reloading a unit must
+  reconcile it with the list `ready()` iterates and with `done_ids`: a
+  previous attempt reloaded the object but left the gate's bookkeeping
+  pointing at the stale one, so a unit that had passed was reported as
+  `never became ready` and stranded its gate.
 - `python3 -m unittest tests.test_deterministic_refusal_repeat -v -b` still
   passes: a byte-identical refusal over an untouched tree escalates where it
   did before and does not become a re-plan.
@@ -46,7 +50,10 @@ already correct and T04 owns the emit side that meets it.
 `driver-event.schema.json` is T04's. The sibling WU files in this gate.
 `.specfuse/rules/never-touch.md` binds as always: the driver owns all git.
 
-**Verification.** Narrow tier for `implementation`: the `code` gates minus
+**Verification.** The narrow tier is NOT sufficient for this unit: it edits
+the central dispatch loop, which 44 test modules drive through `loop.run()`,
+so run the **full** suite — `python3 -m unittest discover -s tests -b`, OK on
+3901 tests in ~151s on a clean tree — before reporting complete. Narrow tier for `implementation`: the `code` gates minus
 `tier: broad`, plus `python3 -m unittest tests.test_replan_end_to_end -v -b`.
 Symbol check for every new symbol this unit introduces (§9) — name it in the
 attempt report and grep it in the tree you are handing over.

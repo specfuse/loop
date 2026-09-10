@@ -36,21 +36,22 @@ the seam. Do not assert this one against a hand-built event dict.
 - `python3 .specfuse/scripts/event_type_gate.py` exits 0 with a real emitted
   `replan` event in the corpus — which requires `replan` added to
   `driver-event.schema.json`'s `event_types`.
-- One test drives a real re-plan through the driver and then calls
-  `gate_eval.evaluate_auto_close` over the events the run actually wrote,
-  asserting `auto=False` with a reason starting `replan_event`. The event
-  under assertion must be the one the driver emitted, never a constructed
-  dict.
-- The re-planned unit's `attempts` reset is visible in the attempt record, and
-  a re-plan is distinguishable from FEAT-2026-0103's retained-tree repair in
-  that record.
+- The validation assertion is scoped to the `replan` event this unit emits,
+  not to every line of a synthetic fixture's `events.jsonl`. A previous
+  attempt asserted zero offenders across the whole file and failed on 19
+  unrelated envelope complaints from other event types, which says nothing
+  about whether `replan` validates.
+
 
 **Do not touch.** `gate_eval.py`'s consumer logic — it is already correct and
 this unit's job is to satisfy it, not to edit it. The vendored
 `event.schema.json` (only the driver-local registry is ours to extend). The
 sibling WU files in this gate.
 
-**Verification.** Narrow tier for `implementation`, plus
+**Verification.** The narrow tier is NOT sufficient for this unit: it edits
+the central dispatch loop, which 44 test modules drive through `loop.run()`,
+so run the **full** suite — `python3 -m unittest discover -s tests -b`, OK on
+3901 tests in ~151s on a clean tree — before reporting complete. Narrow tier for `implementation`, plus
 `python3 -m unittest tests.test_replan_event_emission tests.test_replan_end_to_end -v -b`
 and `python3 .specfuse/scripts/event_type_gate.py`.
 
