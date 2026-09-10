@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0110/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces_driver_helper:
   - NARROW_SELECTION_FORMATS
 produces:
   - specfuse/loop/loop.py
   - tests/test_language_aware_narrow_selection.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T00:32:29.084819+00:00
+duration_seconds: 142.942
+cost_usd: 0.77393
+input_tokens: 62
+output_tokens: 12664
 ---
 
 # Complete the format set, and refuse an unknown one

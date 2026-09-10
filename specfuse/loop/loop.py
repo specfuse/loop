@@ -4578,6 +4578,12 @@ DEFAULT_NARROW_SELECTION_CONFIG = {
     "separator": " ",
 }
 
+#: The only `format` values `render_selected_tests` knows how to render
+#: (FEAT-2026-0110/T02). An unknown value is a CONFIGURATION ERROR, never a
+#: silent fallback to the gate's full `command` — see
+#: `resolve_narrow_selection_config`'s docstring.
+NARROW_SELECTION_FORMATS = {"python_module", "class_name", "path"}
+
 
 def resolve_narrow_selection_config(gate: "dict | None") -> dict:
     """Read a `code` gate's optional `narrow_selection` block
@@ -4588,11 +4594,27 @@ def resolve_narrow_selection_config(gate: "dict | None") -> dict:
     `narrow_selection` anywhere resolves to exactly this default on every
     gate, which is what keeps this repo's own gate set byte-identical to
     before this key existed.
+
+    A `format` outside `NARROW_SELECTION_FORMATS` raises ValueError
+    naming the gate (FEAT-2026-0110/T02) rather than falling back to the
+    gate's full command: an empty selection already takes that fallback
+    path by design, and a typo'd `format` silently taking the same path
+    would leave a project with no way to tell why narrowing never took
+    effect. `verify()`, the only caller in the resolution chain that has
+    `.specfuse/verification.yml` in scope, turns this into the
+    "CONFIGURATION ERROR" shape shared with `order_gate_set`.
     """
     cfg = (gate or {}).get("narrow_selection") or {}
+    fmt = cfg.get("format", DEFAULT_NARROW_SELECTION_CONFIG["format"])
+    if fmt not in NARROW_SELECTION_FORMATS:
+        gate_name = (gate or {}).get("name", "<unknown>")
+        raise ValueError(
+            f"gate {gate_name!r} declares `narrow_selection.format: {fmt!r}` "
+            f"which is not one of {sorted(NARROW_SELECTION_FORMATS)}"
+        )
     return {
         "test_roots": cfg.get("test_roots", DEFAULT_NARROW_SELECTION_CONFIG["test_roots"]),
-        "format": cfg.get("format", DEFAULT_NARROW_SELECTION_CONFIG["format"]),
+        "format": fmt,
         "item_template": cfg.get("item_template", DEFAULT_NARROW_SELECTION_CONFIG["item_template"]),
         "separator": cfg.get("separator", DEFAULT_NARROW_SELECTION_CONFIG["separator"]),
     }
@@ -4605,15 +4627,20 @@ def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
     `format: python_module` (the default) is `_test_module_name`'s dotted
     conversion — the only shape today's Python-only selection ever produced.
     `format: class_name` takes the bare file stem instead (`FooTest.java` ->
-    `FooTest`), which is what a JVM test runner's `-Dtest=` flag wants. Either
-    way, the result is substituted into `item_template` (default `"{module}"`,
-    i.e. verbatim) before returning.
+    `FooTest`), which is what a JVM test runner's `-Dtest=` flag wants.
+    `format: path` takes *p* verbatim, unchanged. Either way, the result is
+    substituted into `item_template` (default `"{module}"`, i.e. verbatim)
+    before returning. *config*'s `format` is assumed already validated by
+    `resolve_narrow_selection_config` — this function never sees an unknown
+    one.
     """
     fmt = config["format"]
     items = []
     for p in paths:
         if fmt == "class_name":
             module = Path(p).stem
+        elif fmt == "path":
+            module = p
         else:
             module = _test_module_name(p)
         items.append(config["item_template"].format(module=module))
@@ -5100,10 +5127,16 @@ def verify(wu: WorkUnit, feature_dir: Path,
         attempt_changed_source_lines()
         if any(g.get("narrow_command") for g in narrow_gate_set) else {}
     )
-    gate_set = [
-        {**gate, "command": resolve_narrow_command(gate, wu, changed_lines_by_path)}
-        for gate in narrow_gate_set
-    ]
+    try:
+        gate_set = [
+            {**gate, "command": resolve_narrow_command(gate, wu, changed_lines_by_path)}
+            for gate in narrow_gate_set
+        ]
+    except ValueError as exc:
+        return False, (
+            f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
+            f"This is not a work-unit failure — fix verification.yml and re-run."
+        )
     if gate_file is not None:
         oracle_command = read_gate_feature_oracle(Path(gate_file))
         if oracle_command is not None:
