@@ -101,7 +101,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-2026-0101) |
 | FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
-| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | planned | — | [→ detail](#feat-2026-0103) |
+| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | active | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ detail](#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | planned | — | [→ detail](#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
@@ -976,7 +976,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Benefits.** Recovers most of the 10% of spend lost to guards; halves the retry tail; stops training agents to under-declare.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0104"></a>
 ## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
