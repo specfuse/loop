@@ -509,6 +509,10 @@ class WorkUnit:
     # claimed — the per-path `produces_unchanged:` justification the contract
     # promises to honour (#3268). None until a session has run.
     result_block: "dict | None" = None
+    # Set by auto_repair_files_changed (FEAT-2026-0103/T03) when a passed
+    # attempt's RESULT named untouched paths outside `produces:` that got
+    # silently dropped from files_changed. None on every other attempt.
+    auto_repaired_files_changed: "list[str] | None" = None
 
 
 @dataclass
@@ -4022,6 +4026,42 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
     return unchanged
 
 
+def auto_repair_files_changed(
+    wu: "WorkUnit", parsed: dict, unchanged: "list[str]",
+) -> "list[str] | None":
+    """Drop `unchanged` paths from `parsed['files_changed']` when none of
+    them is a declared deliverable (FEAT-2026-0103/T03).
+
+    A path `verify_files_changed` flags as showing no diff is only a hollow
+    claim about work that was never a deliverable in the first place when it
+    falls outside `wu.produces` AND at least one OTHER declared path is a
+    real change — declaring one changed and one didn't is a clerical slip,
+    not a failed attempt. Any `unchanged` path that IS in `wu.produces` is a
+    real gap (`produces_not_in_diff`'s business, not this repair's), and an
+    attempt whose entire `files_changed` claim is unchanged paths is the
+    hollow-pass shape `verify_files_changed` exists to catch (FEAT-2026-0008)
+    — neither is repaired: returns None and the caller must fall back to the
+    `files_changed_mismatch` guard.
+
+    Returns the list of dropped paths (in `unchanged`'s original spelling)
+    on repair, or None when repair is refused. Mutates
+    `parsed["files_changed"]` in place on repair.
+    """
+    produces_norm = {str(p).removeprefix("./") for p in (wu.produces or [])}
+    if any(str(p).removeprefix("./") in produces_norm for p in unchanged):
+        return None
+    unchanged_norm = {str(p).removeprefix("./") for p in unchanged}
+    files_changed = parsed.get("files_changed") or []
+    repaired = [
+        f for f in files_changed
+        if str(f).removeprefix("./") not in unchanged_norm
+    ]
+    if not repaired:
+        return None
+    parsed["files_changed"] = repaired
+    return list(unchanged)
+
+
 def _annotate_unchanged_paths(paths: "list[str]") -> str:
     """Format files_changed-mismatch paths, distinguishing missing from unchanged.
 
@@ -6067,7 +6107,10 @@ def execute_unit_attempt(
                                   ran); payload is None
       "blocked"                 — agent explicitly emitted status: blocked
       "passed"                  — verify() passed AND the files_changed
-                                  guard found nothing to flag
+                                  guard found nothing to flag, or found only
+                                  paths outside `produces:` that
+                                  auto_repair_files_changed dropped (see
+                                  wu.auto_repaired_files_changed)
       "failed"                  — verify() failed
       "files_changed_mismatch"  — verify() passed but the RESULT's
                                   files_changed list names paths that show
@@ -6162,7 +6205,10 @@ def execute_unit_attempt(
     if head_before is not None and parsed:
         unchanged = verify_files_changed(parsed, head_before)
         if unchanged:
-            return "files_changed_mismatch", unchanged, usage
+            dropped = auto_repair_files_changed(wu, parsed, unchanged)
+            if dropped is None:
+                return "files_changed_mismatch", unchanged, usage
+            wu.auto_repaired_files_changed = dropped
     return "passed", evidence, usage
 
 
@@ -10181,14 +10227,26 @@ def run(
                                     {"gate": gate.number, "warns": list(_warns),
                                      "blocking": False},
                                 ))
+                        _pass_extras = (
+                            {"produces_justified": _produces_justified}
+                            if _produces_justified else {}
+                        )
+                        if wu.auto_repaired_files_changed:
+                            _pass_extras["auto_repaired_files_changed"] = (
+                                wu.auto_repaired_files_changed
+                            )
+                            print(
+                                "   auto-repaired files_changed — dropped "
+                                f"untouched non-deliverable(s): "
+                                f"{', '.join(wu.auto_repaired_files_changed)}"
+                            )
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "passed",
                             attempts_usage[-1],
                             files_touched=touched,
                             agent_status="complete",
                             agent_blocked_reason=None,
-                            extras=({"produces_justified": _produces_justified}
-                                    if _produces_justified else None),
+                            extras=(_pass_extras or None),
                         ))
                         # Lifetime fields (#199): a retrospective must be able
                         # to compute rework-vs-new-work and planned-vs-actual

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0103/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces_driver_helper:
   - auto_repair_files_changed
@@ -10,6 +10,14 @@ produces:
   - specfuse/loop/loop.py
   - tests/test_files_changed_auto_repair.py
 model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T02:20:28.961005+00:00
+duration_seconds: 355.835
+cost_usd: 1.736334
+input_tokens: 122
+output_tokens: 30381
 ---
 
 # A RESULT naming an untouched non-deliverable is repaired without a dispatch

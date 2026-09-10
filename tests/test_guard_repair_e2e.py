@@ -126,7 +126,8 @@ class TestGuardRefusalRetainsTree(unittest.TestCase):
             os.chdir(root)
             fdir = _write_minimal_feature(
                 root, "FEAT-2026-9601", "guard-repair",
-                "feat/guard-repair", produces=["src/foo.py"])
+                "feat/guard-repair",
+                produces=["src/foo.py", "src/extra.py"])
 
             calls = []
             failure_notes = []
@@ -136,9 +137,11 @@ class TestGuardRefusalRetainsTree(unittest.TestCase):
                 failure_notes.append(failure_note)
                 if wu.wu_id.endswith("/T01"):
                     if len([c for c in calls if c == wu.wu_id]) == 1:
-                        # Attempt 1: writes the real deliverable, but also
-                        # declares an untouched extra path — the guard's
-                        # trigger.
+                        # Attempt 1: writes one declared deliverable, but
+                        # also declares a SECOND declared deliverable
+                        # (`src/extra.py`, also in `produces:`) untouched —
+                        # a real gap, not the auto-repairable "stray extra
+                        # path" case — the guard's trigger.
                         Path("src").mkdir(exist_ok=True)
                         Path("src/foo.py").write_text("v1\n")
                         return (
@@ -148,14 +151,17 @@ class TestGuardRefusalRetainsTree(unittest.TestCase):
                             "  - src/extra.py\n"
                             "```\n"
                         )
-                    # Attempt 2: attempt 1's file must already be here.
+                    # Attempt 2: attempt 1's file must already be here, and
+                    # this attempt finishes the job by delivering extra.py.
                     assert Path("src/foo.py").exists(), (
                         "attempt 1's deliverable must survive into attempt 2"
                     )
+                    Path("src/extra.py").write_text("extra\n")
                     return (
                         "```result\nstatus: complete\n"
                         "files_changed:\n"
                         "  - src/foo.py\n"
+                        "  - src/extra.py\n"
                         "```\n"
                     )
                 (fdir / "RETROSPECTIVE.md").write_text(
@@ -206,7 +212,8 @@ class TestGuardRefusalRetainsTree(unittest.TestCase):
             )
             fdir = _write_minimal_feature(
                 root, "FEAT-2026-9602", "guard-repair-off",
-                "feat/guard-repair-off", produces=["src/foo.py"])
+                "feat/guard-repair-off",
+                produces=["src/foo.py", "src/extra.py"])
 
             t01_calls = []
             attempt2_saw_file = []
