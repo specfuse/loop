@@ -122,6 +122,8 @@ gates:
 
 ## Post-merge checklist
 
+**Tracked as #3301.**
+
 Observable only across repositories and over time, so filed as a post-merge
 observation rather than an acceptance criterion (`close-discipline.md` §2).
 
