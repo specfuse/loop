@@ -5,7 +5,7 @@ slug: language-aware-narrow-selection
 branch: feat/FEAT-2026-0110-language-aware-narrow-selection
 roadmap_goal: A project whose tests are not Python under tests/ can narrow its per-attempt tests gate, instead of silently paying the full suite on every attempt.
 autonomy_default: review
-status: planned
+status: active
 planned_cost_usd: 15.00
 ---
 
