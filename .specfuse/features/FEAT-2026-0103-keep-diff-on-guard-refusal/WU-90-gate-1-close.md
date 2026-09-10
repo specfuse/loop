@@ -12,9 +12,9 @@ verdict: met
 driver_version: 0.18.0
 started_at: 2026-09-10T10:51:13.666536+00:00
 duration_seconds: 491.527
-cost_usd: 3.976907
-input_tokens: 72
-output_tokens: 36673
+cost_usd: 4.471722
+input_tokens: 108
+output_tokens: 42647
 ---
 
 # Close gate 1 — keep the diff on guard refusals
