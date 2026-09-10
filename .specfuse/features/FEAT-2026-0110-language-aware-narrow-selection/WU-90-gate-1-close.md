@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.18.0
 started_at: 2026-09-10T00:47:07.579086+00:00
 duration_seconds: 528.45
-cost_usd: 5.359607
-input_tokens: 100
-output_tokens: 40501
+cost_usd: 5.582307
+input_tokens: 108
+output_tokens: 41745
 ---
 
 # Close gate 1 — language-aware narrow test selection
