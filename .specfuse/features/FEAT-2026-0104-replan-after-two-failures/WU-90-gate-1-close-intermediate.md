@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0104/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 auto_close_disabled: true
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.19.0
+started_at: 2026-09-10T20:19:52.502186+00:00
+duration_seconds: 431.957
+cost_usd: 2.918651
+input_tokens: 70
+output_tokens: 28717
 ---
 
 # Close gate 1 — the re-plan trigger

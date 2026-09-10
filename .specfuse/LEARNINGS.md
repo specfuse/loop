@@ -4187,3 +4187,41 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `--tests A --tests B` at all, because no join character produces a repeated flag. Splitting
   the render into a per-item template plus a separator is one extra key and one extra default,
   and it is the difference between covering two ecosystems and covering one.
+
+- [FEAT-2026-0104/G1] When a gate's units edit the central dispatch loop, the per-attempt
+  narrow tier is not an exit oracle — it is a smoke test, and the plan must say so in each
+  unit's **Verification** section. FEAT-2026-0109's `narrow_command` selects a unit's own
+  `produces:` test modules, so for four units that each rewrote `loop.run()`'s retry path the
+  driver's exit oracle ran 1, 6, 13 and 1 tests (`work/gate-logs/tests-*.log`), while the blast
+  radius was the 44 test modules that drive `loop.run()`. This gate's first run died exactly
+  there: four units passed their narrow tiers, and the first full-suite run — at the fifth
+  unit's entry, because that unit's `produces:` named only docs and the empty selection falls
+  back to the whole command — hung and never completed, taking the gate with it. The narrowing
+  is right for ordinary units and this is not an argument against it; the fix is that a unit
+  editing the loop the harness runs carries `python3 -m unittest discover -s tests -b` in its
+  own **Verification** text, with the expected test count and wall-clock so the session can
+  tell a hang from slowness. Note what that costs you: nothing in `work/gate-logs/` records a
+  session-side suite run, so the instruction is an unverifiable self-report, and the only
+  artifact confirming it was honoured arrives one unit later. Two consequences for drafting.
+  **(a)** Order the gate so at least one unit has an empty narrow selection — a docs unit
+  works — because its fallback to the full command is the first driver-run suite of the gate,
+  and you want that to happen at unit 5, not at the gate boundary. **(b)** A hang is not a
+  failure: it emits no `attempt_outcome`, so it carries no `failure_class` for the learnings
+  pass to cluster on and no cost row for the close to reconcile. It is invisible to every
+  aggregate the methodology builds, which is why it is worth naming here.
+
+- [FEAT-2026-0104/G1] A gate reverted to its plan baseline takes its own spend record with it,
+  and the close that follows will report a cost that is confidently wrong. `events.jsonl` is a
+  committed artifact, so reverting the gate's commits reverts the `task_started` /
+  `attempt_outcome` / `task_completed` events too — this gate's log opens with an orphaned
+  `driver_build_pinned` and then jumps three and a half hours to the second run, and the close
+  reconciled $8.76 against a $14.50 plan when the true cost of reaching green was roughly
+  double that. `work/gate-logs/` is what survives, because it is untracked working-tree state
+  the revert does not reach: its per-gate log timestamps reconstruct how many verification
+  passes ran and, from the log bodies, which ones failed and where. So the rule for any close
+  after a revert is to reconcile against BOTH surfaces and say plainly which numbers came from
+  which — a variance explained only from `events.jsonl` after a revert is not an explanation,
+  it is the artifact of the discard being read as an estimating win. The generalizable
+  drafting move is smaller than a driver change: when a gate is reverted, record the discarded
+  run's wall-clock bounds in `PLAN.md` at the same time you write the "what the first attempt
+  taught" section, while someone still knows them.
