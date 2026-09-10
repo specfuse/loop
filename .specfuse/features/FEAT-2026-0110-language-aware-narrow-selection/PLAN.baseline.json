@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Read `narrow_selection` from the gate and render the selection through it",
+          "id": "FEAT-2026-0110/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Complete the format set, and refuse an unknown one",
+          "id": "FEAT-2026-0110/T02",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Say `narrow_selection` on every surface that currently says \"Python\"",
+          "id": "FEAT-2026-0110/T03",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 language-aware narrow test selection",
+          "id": "FEAT-2026-0110/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}
