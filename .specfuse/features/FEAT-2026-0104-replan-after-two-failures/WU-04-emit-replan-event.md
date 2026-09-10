@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces_driver_helper:
   - emit_replan_event
 produces:
   - tests/test_replan_event_emission.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-10T19:52:21.364991+00:00
+duration_seconds: 490.363
+cost_usd: 1.272766
+input_tokens: 102
+output_tokens: 18130
 ---
 
 # Emit the replan event into the consumer that already waits for it

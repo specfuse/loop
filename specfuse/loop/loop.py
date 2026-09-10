@@ -10824,6 +10824,14 @@ def run(
                         ))
                         write_wu_body(wu.file, replan_result["body"])
                         wu = reload_unit_after_replan(units, feature_dir, wu)
+                        # gate_eval.py's evaluate_auto_close reads this as
+                        # check 2 (a WU that needed a re-plan disqualifies
+                        # its gate from auto-close) — the consumer predates
+                        # this emitter by two years (FEAT-2026-0018/T02).
+                        wu_events.append(build_event("replan", wu.wu_id, {
+                            "attempt": attempt,
+                            "max_attempts": wu_max_attempts,
+                        }))
                         failure_note = None
                         print(f"   RE-PLANNED {wu.wu_id} after attempt "
                               f"{attempt}/{wu_max_attempts} — next dispatch "
