@@ -3403,7 +3403,8 @@ only the per-attempt (narrow) tier yourself — your unit type's gate set in \
 `produces:` list. Do NOT run the full test suite, coverage, or any `tier: broad` \
 gate: the driver re-runs the narrow tier as this attempt's exit oracle and runs \
 the full set once per gate. Only when the `tests` gate declares no \
-`narrow_command`, or your `produces:` names no tests/ path, run the full `tests` \
+`narrow_command`, or your `produces:` names none of that gate's configured test \
+roots (`narrow_selection.test_roots`, default `tests/`), run the full `tests` \
 command — exactly once, at the end. End your turn with the RESULT block defined in \
 .specfuse/rules/result-contract.md; report honestly.
 """

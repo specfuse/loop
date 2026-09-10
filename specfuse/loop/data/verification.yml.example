@@ -68,6 +68,41 @@
 # `narrow_command` — see `tests` below — to run a cheaper command per attempt
 # while `command` still runs whole in the broad run; that is orthogonal to
 # `tier` and most gates need only one or the other, not both.
+#
+# PER-GATE `narrow_selection` (optional, FEAT-2026-0110). Controls how a
+# dispatched unit's own `produces:` entries are turned into the
+# `{selected_test_modules}` a `narrow_command` substitutes — for repos whose
+# tests are not Python modules under `tests/`. Four keys, each independently
+# defaulted (an absent `narrow_selection` block, or an absent key within one
+# that IS declared, resolves to the value shown):
+#   test_roots: ["tests/"]     # produces: entries under one of these roots
+#                               # are what gets selected; entries elsewhere are
+#                               # ignored by this gate's narrow tier.
+#   format: python_module      # how a selected path is turned into an item:
+#                               #   python_module — dotted module name
+#                               #     (src/foo/bar.py -> src.foo.bar)
+#                               #   class_name — bare file stem
+#                               #     (FooTest.java -> FooTest)
+#                               #   path — the path itself, unchanged
+#                               # An unrecognized format is a CONFIGURATION
+#                               # ERROR, never a silent fallback.
+#   item_template: "{module}"  # each rendered item is substituted into this
+#                               # template before joining; default is verbatim.
+#   separator: " "              # how rendered items are joined before
+#                               # replacing {selected_test_modules}.
+# An empty selection (no produces: entry under any test_root) falls back to
+# the gate's full `command` — fail safe, never open.
+#
+# Example for a Maven repo (#3281), where tests are JUnit classes under
+# src/test/java rather than tests/, selected by class name, space-separated
+# for `-Dtest=`:
+#   - name: tests
+#     command: "mvn -q test"
+#     narrow_command: "mvn -q test -Dtest={selected_test_modules}"
+#     narrow_selection:
+#       test_roots: ["src/test/java/"]
+#       format: class_name
+#       separator: ","
 code:
   - name: tests
     # Run the suite UNDER `coverage run` so the `coverage` gate below can reuse

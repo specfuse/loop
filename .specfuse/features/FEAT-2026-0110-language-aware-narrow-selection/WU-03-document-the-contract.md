@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0110/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - .specfuse/verification.yml.example
   - specfuse/loop/loop.py
   - specfuse/loop/data/verification.yml.example
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T00:34:52.199892+00:00
+duration_seconds: 460.673
+cost_usd: 0.73301
+input_tokens: 74
+output_tokens: 8694
 ---
 
 # Say `narrow_selection` on every surface that currently says "Python"
