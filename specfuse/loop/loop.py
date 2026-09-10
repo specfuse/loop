@@ -2321,6 +2321,48 @@ def write_cost_to_wu(backend, wu: WorkUnit, cum_usage: dict) -> None:
     backend.set_wu(wu, "output_tokens", cum_usage["output_tokens"])
 
 
+def record_judge_cost_fold(
+    backend, wu: "WorkUnit", attempt_usage: dict, cum_usage: dict,
+    judged: dict, feature_id: str,
+) -> None:
+    """Fold a judge session's spend into a close's usage, write it, commit it (#3296).
+
+    The fold happens AFTER the close's squash commit — the block that follows
+    this call re-reads the WU frontmatter precisely because the squash has
+    already run. So the write `write_cost_to_wu` makes here reaches the working
+    tree and nothing else picks it up: `_fire_and_verify_terminal_flips` commits
+    only `flip_paths` (the gate file, the roadmap row, `PLAN.md`), and the only
+    other `commit_bookkeeping` after the fold sits on the `not_met` /
+    `revert_terminal_surfaces` path. A `met` close therefore finished with the
+    write still uncommitted: the driver ended on a dirty tree — which
+    `/wrap-feature` refuses to push from — and the committed frontmatter
+    under-reported the close by exactly the judge's spend, which is the one
+    number FEAT-2026-0100 introduced a separate judge session to make
+    attributable.
+
+    Committing here rather than in either verdict branch is deliberate: the fold
+    runs BEFORE the verdict is branched on, so a commit attached to one branch
+    would leave the other exactly as broken.
+
+    Both usage dicts are folded because they feed different readers —
+    `attempt_usage` the `attempt_outcome` event, `cum_usage` the frontmatter.
+    A judge with no usage envelope (plain-text reply, disabled, skipped) has no
+    spend to record: nothing is written and no empty commit is made.
+    """
+    judge_usage = judged.get("usage")
+    if not isinstance(judge_usage, dict):
+        return
+    judged["judge_cost_usd"] = round(float(judge_usage.get("cost_usd", 0.0)), 6)
+    fold_judge_usage(attempt_usage, judged)
+    fold_judge_usage(cum_usage, judged)
+    write_cost_to_wu(backend, wu, cum_usage)
+    commit_bookkeeping(
+        [wu.file],
+        f"chore(loop): {wu.wu_id} judge cost fold"
+        f"\n\nFeature: {feature_id}",
+    )
+
+
 def fold_judge_usage(attempt_usage: dict, judge_envelope: dict | None) -> dict:
     """Fold a judge session's usage into a close attempt's usage, in place.
 
@@ -9749,13 +9791,9 @@ def run(
                                                    f"{type(_exc).__name__}: {_exc}"),
                                     }
                                     print(f"   JUDGE ERROR — {_judged['reason']}")
-                                _judge_usage = _judged.get("usage")
-                                if isinstance(_judge_usage, dict):
-                                    _judged["judge_cost_usd"] = round(
-                                        float(_judge_usage.get("cost_usd", 0.0)), 6)
-                                    fold_judge_usage(attempts_usage[-1], _judged)
-                                    fold_judge_usage(cum_usage, _judged)
-                                    write_cost_to_wu(backend, wu, cum_usage)
+                                record_judge_cost_fold(
+                                    backend, wu, attempts_usage[-1], cum_usage,
+                                    _judged, feature_id)
                                 wu_events.append(build_event(
                                     "judged", wu.wu_id, _judged))
                             # Re-read frontmatter post-squash: the agent writes
