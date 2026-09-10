@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0103/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - compose_guard_repair_note
@@ -10,6 +10,14 @@ produces:
   - specfuse/loop/loop.py
   - tests/test_guard_repair_prompt.py
 model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T02:15:37.449681+00:00
+duration_seconds: 291.129
+cost_usd: 1.19454
+input_tokens: 78
+output_tokens: 23693
 ---
 
 # The repair turn opens with the complaint, not with a restart

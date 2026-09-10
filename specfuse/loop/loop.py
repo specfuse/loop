@@ -1503,7 +1503,24 @@ _RETRY_CLASS_HINT: dict[str, str] = {
                 "coverage gate before declaring done.",
     "security": "Resolve the flagged security findings (or add a narrowly "
                 "scoped, justified suppression) before declaring done.",
+    "guard_refusal": "The guard's fix is mechanical: touch (create or modify) "
+                      "at least one declared deliverable file before "
+                      "declaring done.",
+    "files_changed_mismatch": "Declare only files you actually changed under "
+                               "`files_changed` — omit any path you did not "
+                               "edit — before declaring done.",
+    "produces_not_in_diff": "Make the declared `produces:` change this "
+                            "attempt, or justify it as already satisfied "
+                            "under `produces_unchanged:` in the RESULT block, "
+                            "before declaring done.",
 }
+
+# The three bookkeeping-guard failure_class values (FEAT-2026-0103): a
+# retained tree under one of these was kept because verify() already passed
+# on it, not because a convergence unit is mid-iteration — the retained=True
+# lead below must say so, distinctly from the convergent-unit lead.
+_GUARD_FAILURE_CLASSES = frozenset(
+    {"guard_refusal", "files_changed_mismatch", "produces_not_in_diff"})
 
 
 def synthesize_retry_directive(failure_class: "str | None", *,
@@ -1518,13 +1535,27 @@ def synthesize_retry_directive(failure_class: "str | None", *,
     per-class hint names the remedy generically.
     """
     if retained:
-        # A convergent unit (#2650) keeps its tree between attempts, so the
-        # standing "was DISCARDED" lead is false — and acting on it means
-        # re-authoring from scratch, the exact opposite of iterating.
-        lead = ("Your previous attempt's work is STILL PRESENT in the working "
-                "tree — it was not discarded. The gate output below describes "
-                "that tree as it now stands. Continue from it: fix what the "
-                "output reports rather than starting over. ")
+        if failure_class in _GUARD_FAILURE_CLASSES:
+            # A bookkeeping guard refused the pass (FEAT-2026-0103), not a
+            # convergent unit mid-iteration: the tree is retained because
+            # verify() already PASSED on it, and the one thing to avoid is
+            # re-authoring work that is already correct.
+            lead = ("A bookkeeping guard refused this attempt's pass. The "
+                    "previous attempt's edits are STILL PRESENT in the "
+                    "working tree, and verification already PASSED on them "
+                    "— re-authoring them is the one thing not to do. Apply "
+                    "only the mechanical fix below, then re-emit the RESULT "
+                    "block in full. ")
+        else:
+            # A convergent unit (#2650) keeps its tree between attempts, so
+            # the standing "was DISCARDED" lead is false — and acting on it
+            # means re-authoring from scratch, the exact opposite of
+            # iterating.
+            lead = ("Your previous attempt's work is STILL PRESENT in the "
+                    "working tree — it was not discarded. The gate output "
+                    "below describes that tree as it now stands. Continue "
+                    "from it: fix what the output reports rather than "
+                    "starting over. ")
     else:
         lead = ("The previous attempt's work was DISCARDED before this retry, "
                 "so the gate output below refers to files that no longer "
@@ -1534,6 +1565,28 @@ def synthesize_retry_directive(failure_class: "str | None", *,
         failure_class or "",
         "Satisfy every declared gate before declaring done.")
     return lead + hint
+
+
+def compose_guard_repair_note(
+    failure_class: "str | None", complaint: str,
+    retained_diff: "str | None", retained: bool,
+) -> str:
+    """Build the retry note for a bookkeeping-guard refusal (FEAT-2026-0103).
+
+    Order matters: the guard's own *complaint* leads (it is the one thing
+    that names what actually failed), then `synthesize_retry_directive`'s
+    lead+hint carries the retained/discarded framing and the mechanical
+    remedy, then the retained diff last — it is evidence for the fix above,
+    not the instruction itself.
+    """
+    note = complaint + "\n\n" + synthesize_retry_directive(
+        failure_class, retained=retained)
+    if retained and retained_diff:
+        note += (
+            "\n\nRetained diff (your tree is still here):\n\n"
+            "```diff\n" + retained_diff + "\n```\n"
+        )
+    return note
 
 
 def emit_attempt_outcome(
@@ -3020,24 +3073,21 @@ def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
 
 def _resolve_guard_refusal_tree(
     cfg: dict, head_before: str, events_path: Path,
-    untracked_before, note: str,
+    untracked_before, note: str, failure_class: "str | None" = None,
 ) -> "tuple[str, bool]":
     """Shared retain-or-reset decision for the four bookkeeping-guard sites.
 
-    Returns (note, tree_retained) — note has the retained diff folded in
-    under a `Retained diff` line when the tree was kept, unchanged otherwise.
+    Returns (note, tree_retained) — note is built by
+    `compose_guard_repair_note`, which leads with *note* (the guard's
+    complaint), then the retained/discarded framing and mechanical remedy,
+    then the retained diff last when the tree was kept.
     """
     if resolve_retain_on_guard_refusal(cfg):
         diff = retain_tree_after_refusal(head_before, events_path)
-        if diff:
-            note = (
-                note + "\n\nRetained diff (your tree is still here):\n\n"
-                "```diff\n" + diff + "\n```\n"
-            )
-        return note, True
+        return compose_guard_repair_note(failure_class, note, diff, True), True
     reset_preserving_events(head_before, events_path,
                             untracked_before=untracked_before)
-    return note, False
+    return compose_guard_repair_note(failure_class, note, None, False), False
 
 
 def apply_diff(diff_text: str) -> bool:
@@ -9865,6 +9915,7 @@ def run(
                                 _resolve_guard_refusal_tree(
                                     cfg, head_before, events_path,
                                     untracked_before, _deliv_note,
+                                    failure_class="guard_refusal",
                                 ))
                             missing = deliv_summary.split(": ", 1)[-1]
                             wu_events.append(emit_attempt_outcome(
@@ -9909,6 +9960,7 @@ def run(
                                 _resolve_guard_refusal_tree(
                                     cfg, head_before, events_path,
                                     untracked_before, impl_summary,
+                                    failure_class="guard_refusal",
                                 ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "no_deliverable_files",
@@ -9975,6 +10027,7 @@ def run(
                                 _resolve_guard_refusal_tree(
                                     cfg, head_before, events_path,
                                     untracked_before, _prod_note,
+                                    failure_class="produces_not_in_diff",
                                 ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "produces_not_in_diff",
@@ -10222,6 +10275,7 @@ def run(
                         note, _mm_retained = _resolve_guard_refusal_tree(
                             cfg, head_before, events_path,
                             untracked_before, note,
+                            failure_class="files_changed_mismatch",
                         )
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "files_changed_mismatch",
