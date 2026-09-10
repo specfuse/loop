@@ -5,7 +5,7 @@ slug: keep-diff-on-guard-refusal
 branch: feat/FEAT-2026-0103-keep-diff-on-guard-refusal
 roadmap_goal: When a bookkeeping guard refuses an attempt, the working tree is kept and the next attempt repairs it with the guard's exact complaint in hand, instead of re-authoring from scratch.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 24.00
 ---
 

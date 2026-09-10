@@ -101,7 +101,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-2026-0101) |
 | FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
-| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | active | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ detail](#feat-2026-0103) |
+| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | planned | — | [→ detail](#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
@@ -966,17 +966,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
-
-<a id="feat-2026-0103"></a>
-## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
-
-**Why.** 323 attempts across the corpus, roughly $830 and 42 hours, failed on driver bookkeeping guards (`files_changed_mismatch`, `deliverable_missing`, `produces_not_in_diff`, `no_deliverable_files`) rather than on correctness, and every one was hard-reset and re-dispatched from scratch with only a truncated failure note. The agent never sees its own rejected diff.
-
-**Goal.** When a bookkeeping guard fires, the working tree is kept and a short repair turn is dispatched with the guard's exact complaint and the retained diff. `iterate_on_failure` defaults on. Purely clerical cases (a `produces:` path that exists but was not listed; a RESULT block naming an untouched file; a declared deletion, #3119) are auto-repaired without a dispatch.
-
-**Benefits.** Recovers most of the 10% of spend lost to guards; halves the retry tail; stops training agents to under-declare.
-
-**Status: active.**
 
 <a id="feat-2026-0104"></a>
 ## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
