@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0104/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces_driver_helper:
   - synthesize_replan_brief
   - assert_replan_changed_body
 produces:
   - tests/test_replan_turn_contract.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-10T19:39:57.154556+00:00
+duration_seconds: 743.964
+cost_usd: 2.713218
+input_tokens: 166
+output_tokens: 43302
 ---
 
 # Define what the re-plan turn is told and what it must produce

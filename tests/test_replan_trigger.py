@@ -170,6 +170,12 @@ class ReplanTerminatesTest(unittest.TestCase):
         dispatch_count = {"n": 0}
 
         def fake_dispatch(wu, failure_note, cost_tracking=True):
+            # A re-plan turn (FEAT-2026-0104/T03) dispatches through this
+            # same boundary too, to rewrite the body — that dispatch is not
+            # one of the unit's own attempts, so it must not count against
+            # the attempt ceiling this test asserts on.
+            if wu.body.startswith(loop._REPLAN_BRIEF_MARKER):
+                return "Re-planned body.\n"
             dispatch_count["n"] += 1
             if dispatch_count["n"] > _DISPATCH_CEILING:
                 self.fail(

@@ -55,7 +55,7 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dataclass_replace
 from pathlib import Path
 
 from . import _filelock
@@ -1091,17 +1091,101 @@ def should_replan_instead_of_retry(wu: WorkUnit, attempt: int,
     return attempt == wu_max_attempts - 1
 
 
-def run_replan_turn(wu: WorkUnit, failure_note: str | None) -> str:
-    """Return a rewritten body for a unit about to spend its last attempt.
+class ReplanUnchangedError(RuntimeError):
+    """A re-plan turn's rewritten body was byte-identical to its input (T03).
 
-    Tracer-bullet stub (FEAT-2026-0104/T01): no session is dispatched here,
-    the failure history is not diagnosed, and the rewrite is a marker append,
-    not a narrowed scope. T03 owns the real turn — a fresh `claude -p` session
-    that reads the failure note and re-scopes the unit. This stub only has to
-    prove that whatever body it writes is the body the next dispatch sees.
+    Dispatching the unit's last permitted attempt against a body it already
+    failed under twice cannot do better than a coin flip — refuse instead so
+    the caller can escalate to a human.
     """
-    marker = "\n\n<!-- re-planned after a failed attempt -->\n"
-    return wu.body.strip() + marker
+
+
+_REPLAN_BRIEF_MARKER = "## RE-PLAN BRIEF (FEAT-2026-0104/T03)"
+
+
+def synthesize_replan_brief(wu: WorkUnit, failure_history: list[dict]) -> str:
+    """Build the prompt for the fresh re-plan session (FEAT-2026-0104/T03).
+
+    `failure_history` is one dict per prior failed attempt, newest last, each
+    carrying `attempt`, `failure_class`, `failure_signature`, and `note` — the
+    full retained evidence text for that attempt, not a summary of it. This
+    is the turn's whole value: a fresh planner sees what every cold attempt
+    actually hit, which the attempts themselves never could.
+
+    Neighbouring surface: `synthesize_retry_directive` builds a short lead
+    for the SAME session to keep retrying with; this builds the brief for a
+    DIFFERENT session whose job is to rewrite the unit, not attempt it.
+    """
+    parts = [
+        _REPLAN_BRIEF_MARKER,
+        f"`{wu.wu_id}` has failed {len(failure_history)} attempt(s) and has "
+        "exactly one attempt left. Read what each attempt actually hit "
+        "below, then rewrite the unit body into a NARROWER unit: tighten "
+        "the objective, scope the acceptance criteria to what a single "
+        "attempt can carry, and add at least one explicit non-goal drawn "
+        "from what these attempts proved hard.",
+        "Keep all five mandatory sections present and non-empty: Context, "
+        "Acceptance criteria, Do not touch, Verification, Escalation "
+        "triggers. Do not author new work units and do not touch "
+        "`depends_on` — the unit graph is PLAN.md's, out of scope here.",
+        "Reply with ONLY the rewritten unit body (the Markdown that follows "
+        "the frontmatter and title) — no commentary, no frontmatter, no "
+        "RESULT block.",
+    ]
+    for entry in failure_history:
+        parts.append(
+            f"### Attempt {entry.get('attempt')} — "
+            f"failure_class={entry.get('failure_class')} "
+            f"failure_signature={entry.get('failure_signature')}\n\n"
+            f"{entry.get('note', '')}"
+        )
+    parts.append("### Current unit body\n\n" + wu.body)
+    return "\n\n".join(parts)
+
+
+def assert_replan_changed_body(old_body: str, new_body: str) -> None:
+    """Raise `ReplanUnchangedError` iff `new_body` doesn't differ from `old_body`.
+
+    A re-plan turn that changes nothing has produced a body that already
+    failed under the SAME text twice; dispatching the last attempt against
+    it is not a re-plan, it's a third try at an unchanged prompt.
+    """
+    if new_body.strip() == (old_body or "").strip():
+        raise ReplanUnchangedError(
+            "re-plan turn returned a body byte-identical to its input — "
+            "refusing to dispatch an attempt that cannot differ from the "
+            "one before it"
+        )
+
+
+def run_replan_turn(wu: WorkUnit, failure_history: list[dict]) -> dict:
+    """Dispatch a fresh session to re-plan `wu` after two failed attempts (T03).
+
+    Replaces T01's stub (a driver-side marker append, no session dispatched)
+    with the real turn: a fresh `claude -p` session — the SAME `dispatch()`
+    boundary every real attempt goes through, not a second vocabulary for it
+    — reads `synthesize_replan_brief`'s brief and returns a rewritten body.
+
+    Returns `{"body": str, "usage": dict | None, "transcript": str}`. The
+    session's raw output IS both the transcript and the source of the
+    rewritten body (stripped) — the rewrite is that session's output, not a
+    function of the input body alone. Raises `ReplanUnchangedError` when the
+    rewritten body doesn't differ from `wu.body`; callers must not write it
+    back or dispatch against it.
+    """
+    brief = synthesize_replan_brief(wu, failure_history)
+    session_wu = _dataclass_replace(wu, body=brief)
+    result = dispatch(session_wu, None, cost_tracking=True)
+    # Same backward-compatible contract execute_unit_attempt's dispatch call
+    # honours: a stub (or a future dispatch() change) may return plain text
+    # instead of (text, usage).
+    if isinstance(result, tuple):
+        transcript, usage = result
+    else:
+        transcript, usage = result, None
+    new_body = transcript.strip()
+    assert_replan_changed_body(wu.body, new_body)
+    return {"body": new_body, "usage": usage, "transcript": transcript}
 
 
 def reload_unit_after_replan(units: list[WorkUnit], feature_dir: Path,
@@ -9723,6 +9807,12 @@ def run(
                           f"{wu.unsandboxed_rationale}")
                 attempt_notes: list[tuple[int, str]] = []
                 attempt_outcomes: list[str] = []
+                # Per-failed-attempt (class, signature, full note) — the raw
+                # material `synthesize_replan_brief` reads (FEAT-2026-0104/T03).
+                # Only the "failed" outcome branch below reaches the re-plan
+                # trigger check (every other outcome `continue`s earlier), so
+                # this only needs populating there.
+                replan_history: list[dict] = []
                 # Cost accumulators: per-attempt list goes to events.jsonl,
                 # cumulative sum to WU frontmatter at outcome time.
                 attempts_usage: list[dict] = []
@@ -10468,6 +10558,12 @@ def run(
                     attempt_notes.append((attempt, _evidence))
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
+                    replan_history.append({
+                        "attempt": attempt,
+                        "failure_class": _fc,
+                        "failure_signature": _fs,
+                        "note": _evidence,
+                    })
                     # `failure_note` is built AFTER the retain/reset decision
                     # below (#2650): its lead depends on whether the tree
                     # survived, and #175 fix 1's directive is only true for
@@ -10688,7 +10784,45 @@ def run(
                     # guard refusal or spinning signature escalates there and
                     # never reaches this trigger.
                     if should_replan_instead_of_retry(wu, attempt, wu_max_attempts):
-                        write_wu_body(wu.file, run_replan_turn(wu, payload))
+                        try:
+                            replan_result = run_replan_turn(wu, replan_history)
+                        except ReplanUnchangedError:
+                            note_paths = persist_attempt_notes(
+                                work_dir, wu.wu_id, attempt_notes)
+                            backend.set_wu(wu, "status", "blocked_human")
+                            backend.set_wu(wu, "escalation_reason",
+                                           "replan_unchanged_body")
+                            write_cost_to_wu(backend, wu, cum_usage)
+                            wu_events.append(build_event(
+                                "human_escalation", wu.wu_id, {
+                                    "reason": "replan_unchanged_body",
+                                    "attempts": attempt,
+                                    "attempts_usage": attempts_usage,
+                                }))
+                            flush_events(events_path, wu_events)
+                            commit_bookkeeping(
+                                [wu.file, events_path, *note_paths],
+                                f"chore(loop): {wu.wu_id} blocked_human "
+                                f"(replan_unchanged_body, attempt {attempt})"
+                                f"\n\nFeature: {wu.wu_id}",
+                            )
+                            print(f"   BLOCKED — re-plan turn at attempt "
+                                  f"{attempt}/{wu_max_attempts} returned a "
+                                  f"body identical to its input; refusing to "
+                                  f"dispatch an attempt that cannot differ "
+                                  f"from the one before it")
+                            blocked = True
+                            break
+                        # The dispatched session's transcript IS the rewrite
+                        # (T03): fold it into this unit's own attempt-note
+                        # record so it rides with the evidence any later
+                        # escalation for this unit persists to disk.
+                        attempt_notes.append((
+                            attempt,
+                            "## Re-plan turn transcript\n\n"
+                            + replan_result["transcript"]
+                        ))
+                        write_wu_body(wu.file, replan_result["body"])
                         wu = reload_unit_after_replan(units, feature_dir, wu)
                         failure_note = None
                         print(f"   RE-PLANNED {wu.wu_id} after attempt "

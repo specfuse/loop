@@ -3,7 +3,7 @@
 # Copyright 2026 Specfuse contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 #
-"""End-to-end tracer bullet for re-plan-after-two-failures (FEAT-2026-0104/T01).
+"""End-to-end re-plan-after-two-failures (FEAT-2026-0104/T01, turn body T03).
 
 `run()`'s `units = [load_wu(feature_dir, ref) for ref in gate.refs]` snapshots
 every unit's body once, before the `while True:` dispatch loop starts, and
@@ -14,15 +14,21 @@ in a temp git repo, stubbing only the `claude -p` boundary (`loop.dispatch` /
 `loop.verify`, same seam as `tests/test_lifecycle_integration.py`), and proves
 the reload point end to end:
 
-- the unit's second-to-last permitted attempt fails, the re-plan tracer
-  trigger fires (opt-in via `replan_stub_trigger: true`, inert for every
-  other unit in the suite), and the body dispatched on the LAST attempt
-  differs from the one the failing attempt received;
+- the unit's second-to-last permitted attempt fails, the re-plan trigger
+  fires, a SEPARATE dispatched session (T03's `run_replan_turn`) rewrites the
+  body, and the body dispatched on the LAST attempt differs from the one the
+  failing attempt received;
 - the re-planned unit's last attempt then PASSES, and the unit reaches
   `status: done` with the gate running to completion (not stranded) — the
   reconciliation the first (reverted) attempt at this WU got wrong: it
   reloaded the object but left the gate's own `units` list pointing at the
   stale one, so a passed unit was reported "never became ready".
+
+`fake_dispatch` below stands in for every `claude -p` session this run
+dispatches, real attempts AND the re-plan turn alike — the same boundary
+production code goes through (`run_replan_turn` calls the same `dispatch`).
+It tells them apart by `_REPLAN_BRIEF_MARKER`, the same way a real session
+would recognise which job it's being asked to do from the prompt itself.
 """
 
 from __future__ import annotations
@@ -41,6 +47,7 @@ _FEATURE_ID = "FEAT-TEST-0104"
 _SLUG = "replan-fixture"
 _BRANCH = f"feat/{_FEATURE_ID}-{_SLUG}"
 _ORIGINAL_BODY_MARKER = "ORIGINAL BODY — the pre-replan prompt.\n"
+_REWRITTEN_BODY_MARKER = "REWRITTEN BODY — the re-plan turn's own output.\n"
 
 
 def _read_frontmatter(path: Path) -> dict:
@@ -120,8 +127,17 @@ class ReplanEndToEndTest(unittest.TestCase):
 
     def test_replan_reload_reaches_done_with_a_rewritten_body(self):
         dispatched_bodies: list[str] = []
+        replan_briefs: list[str] = []
 
         def fake_dispatch(wu, failure_note, cost_tracking=True):
+            # `run_replan_turn` dispatches through this SAME boundary
+            # (FEAT-2026-0104/T03) — a real session would tell the two jobs
+            # apart from the prompt; this fake does the same via the brief's
+            # marker, routed to a separate list so the real-attempt
+            # assertions below stay about real attempts only.
+            if wu.body.startswith(loop._REPLAN_BRIEF_MARKER):
+                replan_briefs.append(wu.body)
+                return _REWRITTEN_BODY_MARKER
             dispatched_bodies.append(wu.body)
             return "```result\nstatus: complete\n```\n"
 
@@ -150,6 +166,13 @@ class ReplanEndToEndTest(unittest.TestCase):
             self.assertEqual(verify_calls["n"], 3,
                              "expected exactly 3 attempts (max_attempts=3)")
             self.assertEqual(len(dispatched_bodies), 3)
+            self.assertEqual(
+                len(replan_briefs), 1,
+                "exactly one re-plan turn dispatched, between attempts 2 and 3")
+            self.assertIn(_ORIGINAL_BODY_MARKER.strip(), replan_briefs[0],
+                          "the brief must carry the failing unit's own body")
+            self.assertIn("failure_class=", replan_briefs[0])
+            self.assertIn("failure_signature=", replan_briefs[0])
 
             # The first two attempts (before any re-plan fired) saw the
             # identical, un-replanned body.
@@ -186,7 +209,7 @@ class ReplanEndToEndTest(unittest.TestCase):
             # even though the assertions above are keyed to the dispatched
             # prompt, per the WU's own instruction not to assert on the file.
             on_disk_body = (feature_dir / "WU-T01.md").read_text()
-            self.assertIn("re-planned after a failed attempt", on_disk_body)
+            self.assertIn(_REWRITTEN_BODY_MARKER.strip(), on_disk_body)
 
 
 if __name__ == "__main__":
