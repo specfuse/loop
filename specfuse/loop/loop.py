@@ -513,12 +513,11 @@ class WorkUnit:
     # attempt's RESULT named untouched paths outside `produces:` that got
     # silently dropped from files_changed. None on every other attempt.
     auto_repaired_files_changed: "list[str] | None" = None
-    # OPTIONAL tracer-bullet opt-in (FEAT-2026-0104/T01). Fires the thinnest
-    # possible re-plan turn on this unit's second-to-last permitted attempt,
-    # replacing its body ahead of the last dispatch. Inert (False) on every
-    # unit that does not declare it, so this cannot change behaviour for the
-    # 44 test modules that drive the dispatch loop today. T02 replaces this
-    # opt-in with the real spinning-detection predicate.
+    # VESTIGIAL tracer-bullet opt-in (FEAT-2026-0104/T01). Parsed for
+    # backward compatibility with fixtures that still declare it, but no
+    # longer read by the dispatch loop — T02's `should_replan_instead_of_retry`
+    # applies to every unit unconditionally, so this flag no longer gates
+    # anything.
     replan_stub_trigger: bool = False
 
 
@@ -1063,6 +1062,33 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         evidence=str(fm.get("evidence", "") or "").strip(),
         replan_stub_trigger=replan_stub_trigger,
     )
+
+
+def should_replan_instead_of_retry(wu: WorkUnit, attempt: int,
+                                    wu_max_attempts: int) -> bool:
+    """Whether *attempt*, having just failed, should re-plan rather than retry (FEAT-2026-0104/T02).
+
+    Fires exactly when the NEXT attempt would be the last one this unit is
+    permitted (`attempt == wu_max_attempts - 1`, so attempt+1 == wu_max_attempts),
+    at the default ceiling that is "after two failures" the roadmap names.
+    The ceiling is `resolve_max_attempts`'s per-unit result, not the bare
+    constant — a unit that declared its own `max_attempts` (#2650) keeps its
+    own budget, both wider and narrower. `wu_max_attempts >= 2` excludes a
+    one-attempt unit, which has no "second-to-last" attempt to re-plan from
+    and must simply fail.
+
+    `iterate_on_failure` units are exempt outright: they fail on purpose
+    against a convergent validator (#2650), and reading that as spinning
+    would be a defect, not a rescue.
+
+    Replaces T01's `replan_stub_trigger` opt-in — this predicate applies to
+    every unit, not only ones that declared the tracer flag.
+    """
+    if wu.iterate_on_failure:
+        return False
+    if wu_max_attempts < 2:
+        return False
+    return attempt == wu_max_attempts - 1
 
 
 def run_replan_turn(wu: WorkUnit, failure_note: str | None) -> str:
@@ -10642,22 +10668,26 @@ def run(
                               f"(best findings {convergence.best_findings})")
                         blocked = True
                         break
-                    # Re-plan tracer trigger (FEAT-2026-0104/T01): thinnest
-                    # possible predicate, opt-in only (see WorkUnit.
-                    # replan_stub_trigger) so this cannot change behaviour for
-                    # any unit that doesn't declare it. Fires once this
-                    # attempt — the unit's second-to-last permitted one — has
-                    # failed, rewrites the body ahead of the LAST attempt, and
-                    # reloads so both this local `wu` and the `units` list
-                    # `ready()`/`stranded` read see the fresh object (#3 in
-                    # PLAN.md's retrospective on the reverted first attempt).
-                    # Does NOT touch the attempt counter — attempt still runs
-                    # to `wu_max_attempts` on its own budget, so this cannot
-                    # spin forever the way rewinding attempts to 0 did (#1 in
-                    # the same retrospective).
-                    if (wu.replan_stub_trigger and not wu.iterate_on_failure
-                            and attempt == wu_max_attempts - 1
-                            and wu_max_attempts >= 2):
+                    # Re-plan trigger (FEAT-2026-0104/T02): ceiling-relative,
+                    # not opt-in — `should_replan_instead_of_retry` applies to
+                    # every unit whose next attempt would be its last
+                    # permitted one, replacing T01's `replan_stub_trigger`
+                    # tracer flag. Fires once this attempt — the unit's
+                    # second-to-last permitted one — has failed, rewrites the
+                    # body ahead of the LAST attempt, and reloads so both this
+                    # local `wu` and the `units` list `ready()`/`stranded`
+                    # read see the fresh object (#3 in PLAN.md's retrospective
+                    # on the reverted first attempt). Does NOT touch the
+                    # attempt counter — attempt still runs to
+                    # `wu_max_attempts` on its own budget, so this cannot spin
+                    # forever the way rewinding attempts to 0 did (#1 in the
+                    # same retrospective). Only reached once the
+                    # `detect_deterministic_refusal_repeat` and
+                    # `spinning_signature_repeat` checks above have both
+                    # declined to `break` this attempt loop — a repeated
+                    # guard refusal or spinning signature escalates there and
+                    # never reaches this trigger.
+                    if should_replan_instead_of_retry(wu, attempt, wu_max_attempts):
                         write_wu_body(wu.file, run_replan_turn(wu, payload))
                         wu = reload_unit_after_replan(units, feature_dir, wu)
                         failure_note = None

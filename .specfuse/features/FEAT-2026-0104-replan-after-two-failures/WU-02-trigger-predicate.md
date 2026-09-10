@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - should_replan_instead_of_retry
 produces:
   - tests/test_replan_trigger.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-10T19:31:44.231232+00:00
+duration_seconds: 492.689
+cost_usd: 1.673818
+input_tokens: 104
+output_tokens: 30928
 ---
 
 # Decide when a re-plan fires instead of a retry
@@ -25,6 +34,23 @@ firing yields "after two failures" at the default that every unit in the corpus
 actually runs at, while respecting any unit that said otherwise. Units
 declaring `iterate_on_failure` are exempt outright: they fail on purpose
 against a convergent validator.
+
+**Flag-scope table** (`.specfuse/rules/planning-discipline.md` §3). The
+behavior flag is T01's `replan_stub_trigger` opt-in, replaced here by
+`should_replan_instead_of_retry` — a predicate every unit is now subject to,
+not an opt-in. Headline claim: *"a unit re-plans on its next-to-last
+permitted attempt, unless it declared `iterate_on_failure`; every other retry
+path is unaffected."*
+
+| Code path | Gated by the new decision? | Why |
+|---|---|---|
+| The attempt loop's real-failure branch (`outcome == "failed"`, `loop.py` dispatch loop) | **yes** | The one path `should_replan_instead_of_retry` is consulted from — it decides whether this attempt's retry becomes a re-plan instead. |
+| Guard-refusal branches (`deliverable_missing`, `no_deliverable_files`, `produces_not_in_diff`, `files_changed_mismatch`, `closing_deliverable_missing`, `smoke_import_failed`, `squash_commit_failed`) | no | These sit in the `outcome == "passed"` branch and `continue` immediately; the new predicate is never reached from them. |
+| `detect_deterministic_refusal_repeat` (top-of-loop, before dispatch) | no | Unchanged. It can still escalate a unit whose next iteration would otherwise have hit the re-plan trigger — checked first, so it owns that outcome (see the dedicated AC below). |
+| `detect_spinning_signature_repeat` (real-failure branch, before the re-plan check) | no | Unchanged. It `break`s before the re-plan check when a `(failure_class, failure_signature)` repeats, so its own escalation always wins. |
+| `resolve_max_attempts` / the per-unit `max_attempts` ceiling | no | Read by the new predicate, not altered by it. |
+| `iterate_on_failure` convergence branch | no — exempted, not gated | The predicate returns `False` unconditionally for these units; their own convergence-plateau escalation is untouched. |
+| The attempt counter / `for attempt in range(1, wu_max_attempts + 1)` | no | A re-plan does not rewind or extend it — same loop, same budget, only the body dispatched on the last attempt changes. |
 
 **Acceptance criteria.**
 
