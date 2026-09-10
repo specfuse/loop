@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.19.0+umbrella.0.12.2] - 2026-09-10
+
 ### Fixed
 
 - **A declared `narrow_command` whose per-attempt selection is empty now says so.** The fallback to the gate's full `command` was silent, so a project whose `produces:` named `src/test/java/...` while `narrow_selection.test_roots` sat at its `tests/` default paid the full suite every attempt believing narrowing fired. `verify` prints the reason to stderr and appends it to the attempt report, naming the roots used and the paths offered. (#3292)
