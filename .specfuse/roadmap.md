@@ -108,6 +108,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
+| FEAT-2026-0110 | Language-aware narrow test selection | planned | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ detail](#feat-2026-0110) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1018,6 +1019,21 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Goal.** For features of up to three units, one session works the PLAN as a checklist (one unit per iteration, Ralph style); the driver verifies once with the feature oracle and the full gate set at the end; the only human touchpoints are the plan and the PR. Correlation ids, the squash commit, and the event log are kept.
 
 **Benefits.** Small features finish in the time of one prompt; the full loop is reserved for features that need decomposition.
+
+**Status: planned.**
+
+<a id="feat-2026-0110"></a>
+## FEAT-2026-0110 — Language-aware narrow test selection
+
+**Why.** FEAT-2026-0109 gate 2 narrows the per-attempt `tests` gate to a unit's own test modules, but both halves of the selection are Python-and-`tests/`-shaped: only `produces:` entries starting with `tests/` are kept, and they are converted to dotted unittest module names. A Maven or Gradle project keeps tests under `src/test/java/`, a JS project under `__tests__/` — so the selection is always empty, the fail-safe fallback runs the full suite, and the tiering delivers nothing there. Measured in one Maven consumer: 8 to 11 minutes of driver-side verification per attempt, a third to a half of each attempt, across roughly 47 full-suite runs per feature (#3281).
+
+**Goal.** A project whose tests are not Python under `tests/` can narrow its per-attempt `tests` gate, instead of silently paying the full suite on every attempt.
+
+**Shape.** Four optional keys in a `code` gate's `narrow_selection` block, whose defaults reproduce today's behaviour byte-for-byte: `test_roots` (default `["tests/"]`), `format` (`python_module` | `path` | `class_name`), `item_template` (default `"{module}"`), and `separator` (default `" "`). The render is split in two because a separator alone covers Maven's `-Dtest=A,B` but cannot express Gradle's repeated `--tests A --tests B`. An empty or unresolvable selection still falls back to the gate's full `command` — fail safe, never open — and an unknown `format` is a `CONFIGURATION ERROR` naming the gate rather than a silent fallback.
+
+**Benefits.** The tiering FEAT-2026-0109 measured on this repo becomes available to consumers on other stacks, where the per-attempt cost is highest.
+
+**Scope boundary.** The changed-file half (`select_tests_for_changed_files`) stays disabled and `tests/`-shaped — nothing writes its map yet, so code keyed on the new roots there could not be exercised end to end; the contract for whoever enables it is recorded in the feature's PLAN.md. This repo's own `.specfuse/verification.yml` is not edited, which is what keeps every work unit's exit oracle intact (`[FEAT-2026-0019/G1]`). No consumer repository is edited, and the consumer wall-clock figure is not re-measured in-loop.
 
 **Status: planned.**
 
