@@ -8,6 +8,10 @@ provenance: "Gate 1 broad run (2026-09-10T02:32Z): test_package_data_matches_can
 produces:
   - .specfuse/verification.yml.example
 model: sonnet
+duration_seconds: 276.73
+cost_usd: 0.241148
+input_tokens: 24
+output_tokens: 2446
 ---
 
 # Hygiene: the `defaults:` block lives in the canonical example, mirrored by sync-scaffold
