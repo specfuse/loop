@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces_driver_helper:
   - reload_unit_after_replan
 produces:
   - tests/test_replan_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-10T19:19:50.315687+00:00
+duration_seconds: 713.628
+cost_usd: 2.321728
+input_tokens: 120
+output_tokens: 40563
 ---
 
 # Wire the thinnest re-plan path end to end

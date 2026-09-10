@@ -513,6 +513,13 @@ class WorkUnit:
     # attempt's RESULT named untouched paths outside `produces:` that got
     # silently dropped from files_changed. None on every other attempt.
     auto_repaired_files_changed: "list[str] | None" = None
+    # OPTIONAL tracer-bullet opt-in (FEAT-2026-0104/T01). Fires the thinnest
+    # possible re-plan turn on this unit's second-to-last permitted attempt,
+    # replacing its body ahead of the last dispatch. Inert (False) on every
+    # unit that does not declare it, so this cannot change behaviour for the
+    # 44 test modules that drive the dispatch loop today. T02 replaces this
+    # opt-in with the real spinning-detection predicate.
+    replan_stub_trigger: bool = False
 
 
 @dataclass
@@ -608,6 +615,28 @@ def write_frontmatter_field(path: Path, key: str, value) -> None:
     else:
         block.append(f"{key}: {rendered}")
     new = ["---", *block, "---", *lines[j + 1 :]]
+    path.write_text("\n".join(new) + "\n")
+
+
+def write_wu_body(path: Path, new_body: str) -> None:
+    """Replace a work-unit file's body, leaving its frontmatter untouched.
+
+    Sibling of `write_frontmatter_field`, which does the opposite half (a
+    frontmatter key, body untouched). Used by the re-plan turn (FEAT-2026-0104)
+    to rewrite a spinning unit's own prompt ahead of its last attempt.
+    """
+    if not path.exists():
+        raise WorkUnitFileMissingError(
+            f"work-unit file {path} is gone — cannot write its re-planned body."
+        )
+    lines = path.read_text().splitlines()
+    if not lines or not FM.match(lines[0]):
+        raise ValueError(f"{path} has no frontmatter")
+    j = 1
+    while j < len(lines) and not FM.match(lines[j]):
+        j += 1
+    block = lines[1:j]
+    new = ["---", *block, "---", "", *new_body.strip().splitlines()]
     path.write_text("\n".join(new) + "\n")
 
 
@@ -1009,6 +1038,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         # Validated at resolve time, not here, so a work unit and a project
         # default fail the same way with the same message.
         max_attempts = raw_max_attempts
+    replan_stub_trigger = bool(fm.get("replan_stub_trigger", False))
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -1031,7 +1061,49 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         max_attempts=max_attempts,
         iterate_on_failure=iterate_on_failure,
         evidence=str(fm.get("evidence", "") or "").strip(),
+        replan_stub_trigger=replan_stub_trigger,
     )
+
+
+def run_replan_turn(wu: WorkUnit, failure_note: str | None) -> str:
+    """Return a rewritten body for a unit about to spend its last attempt.
+
+    Tracer-bullet stub (FEAT-2026-0104/T01): no session is dispatched here,
+    the failure history is not diagnosed, and the rewrite is a marker append,
+    not a narrowed scope. T03 owns the real turn — a fresh `claude -p` session
+    that reads the failure note and re-scopes the unit. This stub only has to
+    prove that whatever body it writes is the body the next dispatch sees.
+    """
+    marker = "\n\n<!-- re-planned after a failed attempt -->\n"
+    return wu.body.strip() + marker
+
+
+def reload_unit_after_replan(units: list[WorkUnit], feature_dir: Path,
+                              old_wu: WorkUnit) -> WorkUnit:
+    """Re-read a re-planned unit's file and splice it back into `units`.
+
+    `run()`'s `units = [load_wu(feature_dir, ref) for ref in gate.refs]`
+    (loop.py:9202-ish) snapshots every unit's body once, before the dispatch
+    loop starts, and never calls `load_wu` again — so a re-plan turn's
+    rewritten body is invisible to the rest of the gate unless something
+    re-reads it and hands the fresh object back to both the caller's local
+    `wu` binding AND the `units` list `ready()` and the end-of-gate
+    `stranded` check both iterate. Splicing into `units` only (leaving the
+    caller holding the stale object) is exactly the bug this closes: a unit
+    that went on to pass would flip status on the fresh object while `units`
+    still held the stale one at `in_progress`, and the stale entry would
+    still show up in `stranded` — "never became ready" — after the gate
+    otherwise finished clean.
+    """
+    ref = {"id": old_wu.wu_id,
+           "file": str(old_wu.file.relative_to(feature_dir)),
+           "depends_on": old_wu.depends_on}
+    fresh = load_wu(feature_dir, ref)
+    for idx, u in enumerate(units):
+        if u.wu_id == old_wu.wu_id:
+            units[idx] = fresh
+            break
+    return fresh
 
 
 # --------------------------------------------------------------------------- #
@@ -10570,6 +10642,29 @@ def run(
                               f"(best findings {convergence.best_findings})")
                         blocked = True
                         break
+                    # Re-plan tracer trigger (FEAT-2026-0104/T01): thinnest
+                    # possible predicate, opt-in only (see WorkUnit.
+                    # replan_stub_trigger) so this cannot change behaviour for
+                    # any unit that doesn't declare it. Fires once this
+                    # attempt — the unit's second-to-last permitted one — has
+                    # failed, rewrites the body ahead of the LAST attempt, and
+                    # reloads so both this local `wu` and the `units` list
+                    # `ready()`/`stranded` read see the fresh object (#3 in
+                    # PLAN.md's retrospective on the reverted first attempt).
+                    # Does NOT touch the attempt counter — attempt still runs
+                    # to `wu_max_attempts` on its own budget, so this cannot
+                    # spin forever the way rewinding attempts to 0 did (#1 in
+                    # the same retrospective).
+                    if (wu.replan_stub_trigger and not wu.iterate_on_failure
+                            and attempt == wu_max_attempts - 1
+                            and wu_max_attempts >= 2):
+                        write_wu_body(wu.file, run_replan_turn(wu, payload))
+                        wu = reload_unit_after_replan(units, feature_dir, wu)
+                        failure_note = None
+                        print(f"   RE-PLANNED {wu.wu_id} after attempt "
+                              f"{attempt}/{wu_max_attempts} — next dispatch "
+                              f"uses a rewritten body")
+                        continue
                     failure_note = (
                         synthesize_retry_directive(_fc, retained=_retained)
                         + "\n\n## Gate output from the previous attempt\n\n"
