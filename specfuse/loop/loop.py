@@ -1255,6 +1255,9 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
         "lint": "lint",
         "security": "security",
         "coverage": "coverage",
+        # A driver-side refusal written in the gate-report shape (#3293):
+        # the produced document's verdict contradicted the RESULT.
+        "produced-document-verdict": "guard_refusal",
     }
     # `[\w-]`, not `\w` (#2557). The marker is written with the gate's raw
     # name (see the emitters below), and gate names are hyphenated far more
@@ -4086,6 +4089,81 @@ def parse_result_block(stdout: str) -> dict | None:
     return parsed if isinstance(parsed, dict) else None
 
 
+#: Verdict tokens that, in a produced document's heading or on a `Verdict:`
+#: line, contradict a `status: complete` RESULT (#3293). Uppercase and
+#: whole-word on headings so prose ("was BLOCKED on credentials last time")
+#: and ordinary headings ("## Incomplete migrations") never fire.
+_BLOCKING_VERDICT_TOKENS = r"(?:BLOCKED|NOT SHIPPABLE|INCOMPLETE|NOT MET)"
+_BLOCKING_VERDICT_HEADING_RE = re.compile(
+    r"^#{1,6}\s+.*\b" + _BLOCKING_VERDICT_TOKENS + r"\b"
+)
+_BLOCKING_VERDICT_LINE_RE = re.compile(
+    r"^[\s*_]*Verdict[\s*_]*[:.]\s*[\s*_]*" + _BLOCKING_VERDICT_TOKENS + r"\b",
+    re.IGNORECASE,
+)
+
+#: Unit types whose deliverable legitimately carries a `not_met` or blocking
+#: verdict while the RESULT reads `complete`: a close writes the feature's
+#: verdict into RETROSPECTIVE.md, and that verdict being negative is the
+#: honest outcome, not a contradiction.
+_VERDICT_GUARD_EXEMPT_TYPES = frozenset({
+    "close", "close-intermediate", "plan-next",
+    "retrospective", "lessons", "docs",
+})
+
+
+def find_produced_verdict_contradiction(wu: "WorkUnit") -> "tuple[str, str] | None":
+    """The first (path, line) among *wu*'s produced Markdown files whose
+    heading or `Verdict:` line carries a blocking verdict (#3293), or None.
+
+    FEAT-2026-0167/T04 (generator) produced `CONSUMER-VERIFICATION.md` with
+    the heading `## Verdict: BLOCKED — ...` and reported `status: complete`.
+    The driver read only the RESULT, flipped the unit to `done`, and
+    dispatched an opus close against a gate the document says is not met.
+    For a unit whose deliverable *is* a verdict, the document is the
+    stronger signal, so `execute_unit_attempt` asks this before accepting
+    `complete`. Paths that are missing or not Markdown are skipped; closing
+    unit types are exempt (see `_VERDICT_GUARD_EXEMPT_TYPES`).
+    """
+    if wu.type in _VERDICT_GUARD_EXEMPT_TYPES:
+        return None
+    for rel in wu.produces:
+        path = Path(rel)
+        if path.suffix.lower() != ".md" or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if (_BLOCKING_VERDICT_HEADING_RE.match(stripped)
+                    or _BLOCKING_VERDICT_LINE_RE.match(stripped)):
+                return rel, stripped
+    return None
+
+
+def format_produced_verdict_contradiction_note(path: str, line: str) -> str:
+    """The failed-attempt note for a `complete` RESULT over a blocking
+    verdict (#3293), in the gate-report shape so `parse_gate_failure_signature`
+    attributes it (`guard_refusal`) and the retry prompt renders it like any
+    other failed gate. The first line after the marker carries the keyword
+    the signature parser keys on and the offending line itself.
+    """
+    return (
+        "### produced-document-verdict: FAIL\n"
+        f"FAILED: blocking verdict {line!r} in {path}\n\n"
+        "The RESULT block said `status: complete`, but the document this "
+        "unit was dispatched to produce says the work is not done. That is "
+        "the contradiction result-contract.md §2 forbids: a plan-level "
+        "contradiction is `status: blocked`, never written into a document "
+        "and closed `complete`. On this attempt, either resolve what the "
+        "document reports as blocking (if it is within this unit's scope) "
+        "and rewrite the verdict, or report `status: blocked` with the "
+        "document's own reason as `blocked_reason` so a human decides."
+    )
+
+
 def agent_reported_blocked(stdout: str) -> tuple[bool, str | None]:
     """Did the agent explicitly emit `status: blocked` in its RESULT block?
 
@@ -5889,6 +5967,13 @@ def execute_unit_attempt(
     # mismatch flags the attempt as a verification failure even though
     # verify() reported PASS — gates can't see "the diff is empty" when
     # the gate commands operate on files unrelated to the WU's scope.
+    # A `complete` RESULT over a produced document whose heading says the
+    # work is BLOCKED is a contradiction (#3293): treat it as a failed
+    # attempt whose note names the line, before the RESULT's other claims
+    # are even looked at.
+    contradiction = find_produced_verdict_contradiction(wu)
+    if contradiction is not None:
+        return "failed", format_produced_verdict_contradiction_note(*contradiction), usage
     parsed = parse_result_block(stdout or "")
     # Kept on the unit for the post-squash guards in run() (#3268): the
     # produces-vs-diff check needs the squash diff, which does not exist yet
