@@ -1441,7 +1441,11 @@ def extract_failure_excerpt(stdout: str, max_chars: int = 500) -> str:
     Trims to a UTF-8 safe boundary.
     """
     _KW = re.compile(r"FAIL|Error|Exception|Traceback", re.IGNORECASE)
-    relevant = [ln for ln in stdout.splitlines() if _KW.search(ln)]
+    # The report echoes the gate's own command as `$ <command>`; a command
+    # that mentions FAIL in its text (a surefire grep fallback, say) would
+    # otherwise be the excerpt's head and eat half its budget (#3293).
+    relevant = [ln for ln in stdout.splitlines()
+                if _KW.search(ln) and not ln.lstrip().startswith("$ ")]
     # Hoist surefire failing-test lines to the front (#207): Maven emits
     # dozens of boilerplate [ERROR] wrapper lines that all pass the keyword
     # filter, so the head+tail budget reliably crowded out the actual
@@ -4274,6 +4278,11 @@ _VERDICT_RE = re.compile(
     # that content-free tail.
     r"|\bTests run: \d+, Failures: \d+"      # surefire run summary
     r"|<<< (?:FAILURE|ERROR)!"               # surefire per-test failure marker
+    # Maven build-level failures (#3293). A clean-plugin "Failed to delete"
+    # or any mojo failure names no test, but it IS the verdict when there is
+    # no surefire output — without these the whole run reads NO VERDICT.
+    r"|\[ERROR\] Failed to execute goal"     # Maven mojo failure
+    r"|\bBUILD (?:FAILURE|SUCCESS)\b"        # Maven reactor verdict
     # tsc / vue-tsc (#2390). Neither prints a summary line under a plain
     # non-TTY invocation in either direction — success is a silent exit 0,
     # failure is one `file(line,col): error TSxxxx: message` line per
@@ -4282,6 +4291,21 @@ _VERDICT_RE = re.compile(
     # compiler output reaching the retry.
     r"|error TS\d+:"                         # tsc/vue-tsc diagnostic
     r")"
+)
+
+#: Lines that mark the output as a Maven/surefire run (#3293). Once one is
+#: seen, only Maven-shaped lines are verdicts: an application's own runtime
+#: log (`... Found 0 errors, 0 warnings`, matched by the ruff pattern) is
+#: emitted thousands of times per build and would otherwise fill the pinned
+#: block while the failing test's line is elided.
+_MAVEN_MARKER_RE = re.compile(
+    r"\bTests run: \d+, Failures: \d+|<<< (?:FAILURE|ERROR)!"
+    r"|\[ERROR\] Failed to execute goal|\bBUILD (?:FAILURE|SUCCESS)\b"
+)
+_MAVEN_VERDICT_RE = re.compile(
+    r"\bTests run: \d+, Failures: \d+|<<< (?:FAILURE|ERROR)!"
+    r"|\[ERROR\] Failed to execute goal|\bBUILD (?:FAILURE|SUCCESS)\b"
+    r"|^\[ERROR\]\s+[A-Z]\w*(?:Test|Tests|IT)\w*\.\w+"
 )
 
 _NO_VERDICT_NOTE = (
@@ -4315,7 +4339,19 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
     tail = lines[-window:] if window > 0 else []
     head = lines[: len(lines) - len(tail)]
 
-    pinned = [ln for ln in head if _VERDICT_RE.search(ln.strip())]
+    maven = any(_MAVEN_MARKER_RE.search(ln) for ln in lines)
+    if maven:
+        # Surefire-exclusive (#3293): pin Maven-shaped lines only, and keep
+        # the `[ERROR]   Class.method:line` list — the part a retry can act
+        # on — ahead of the run summary when the window is short.
+        candidates = [ln for ln in head if _MAVEN_VERDICT_RE.search(ln.strip())]
+        per_test = [ln for ln in candidates if _SUREFIRE_FAILING_TEST_RE.match(ln.strip())]
+        others = [ln for ln in candidates if not _SUREFIRE_FAILING_TEST_RE.match(ln.strip())]
+        pinned = per_test[:window]
+        room = window - len(pinned)
+        pinned = pinned + (others[-room:] if room > 0 else [])
+    else:
+        pinned = [ln for ln in head if _VERDICT_RE.search(ln.strip())]
     if pinned:
         # Cap the pinned block so a suite emitting hundreds of `FAIL:` headers
         # cannot itself flood the report it exists to make readable.
@@ -4324,7 +4360,8 @@ def select_gate_report_lines(out: "str | None", window: int = 15) -> list[str]:
         marker = [f"... ({elided} line(s) elided) ..."] if elided > 0 else []
         return pinned + marker + tail
 
-    if any(_VERDICT_RE.search(ln.strip()) for ln in tail):
+    tail_verdict_re = _MAVEN_VERDICT_RE if maven else _VERDICT_RE
+    if any(tail_verdict_re.search(ln.strip()) for ln in tail):
         return tail
     return tail + [_NO_VERDICT_NOTE]
 
@@ -4368,6 +4405,44 @@ def order_gate_set(gate_set: list) -> list:
     for gate in gate_set:
         visit(gate["name"])
     return ordered
+
+
+#: How many persisted gate logs to keep per gate name under
+#: `<feature_dir>/work/gate-logs/` (#3293). The directory is gitignored
+#: scratch; the cap bounds it across a long feature.
+GATE_LOG_KEEP = 30
+
+
+def persist_gate_output(feature_dir: Path, gate_name: str,
+                        out: "str | None") -> "Path | None":
+    """Write a gate's full stdout+stderr to
+    `<feature_dir>/work/gate-logs/<gate>-<UTC stamp>.log` and return the
+    path, or None when the directory cannot be written (#3293).
+
+    The report keeps 15 lines and the event excerpt 500 bytes; everything
+    else was dropped, so the only way to learn a failing Maven test's name
+    was to read `target/surefire-reports` by hand. The log is the source the
+    heuristics summarise; the report names its path. Older logs beyond
+    `GATE_LOG_KEEP` per gate are pruned, oldest first.
+    """
+    feature_dir = Path(feature_dir)
+    # Only a real feature folder gets a work/ tree: a placeholder such as
+    # `/tmp/feat` in a unit test, or the repository root, must not.
+    if not feature_dir.is_dir() or feature_dir.resolve() == Path.cwd().resolve():
+        return None
+    try:
+        log_dir = feature_dir / "work" / "gate-logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        safe = re.sub(r"[^A-Za-z0-9_-]", "_", gate_name)
+        path = log_dir / f"{safe}-{stamp}.log"
+        path.write_text(out or "", encoding="utf-8", errors="replace")
+        older = sorted(log_dir.glob(f"{safe}-*.log"))
+        for stale in older[:-GATE_LOG_KEEP] if len(older) > GATE_LOG_KEEP else []:
+            stale.unlink(missing_ok=True)
+        return path
+    except OSError:
+        return None
 
 
 def _run_gate_set(
@@ -4504,6 +4579,9 @@ def _run_gate_set(
             ]
         if not ok:
             failed_names.add(gate["name"])
+        log_path = persist_gate_output(feature_dir, gate["name"], out)
+        if log_path is not None:
+            tail = tail + [f"full output: {log_path}"]
         results.append({
             "name": gate["name"],
             "ok": ok,

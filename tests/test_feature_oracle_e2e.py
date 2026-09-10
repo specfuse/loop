@@ -89,7 +89,13 @@ class TestGateWithoutOracleUnchanged(unittest.TestCase):
             wu = _make_wu()
             with_gate_file = loop.verify(wu, fd, cfg=_CODE_CFG, gate_file=gate_file)
             without_gate_file = loop.verify(wu, fd, cfg=_CODE_CFG, gate_file=None)
-            self.assertEqual(with_gate_file, without_gate_file)
+            # The persisted gate-log path (#3293) carries a timestamp; compare
+        # the reports with that one line removed.
+        def _stable(result):
+            ok, report = result
+            return ok, "\n".join(ln for ln in report.splitlines()
+                                 if not ln.startswith("full output: "))
+        self.assertEqual(_stable(with_gate_file), _stable(without_gate_file))
 
 
 class TestEmptyOracleIsConfigurationError(unittest.TestCase):
