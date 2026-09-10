@@ -84,6 +84,11 @@ context per attempt) only buys leverage when the unit fits.
 *Prevents:* a WU that spends its whole attempt budget on the first of its two
 sub-problems, and a squash commit mixing two unrelated changes.
 
+A unit that re-plans (FEAT-2026-0104) was mis-sized at authoring time — the
+re-plan is a recovery the driver performs mid-flight, not a workflow to design
+units around. Seeing one fire is a signal to shrink or re-scope the WU next
+time, not a mechanism to lean on.
+
 ## 7. Hygiene work units — when a blocked WU points outside its scope
 
 When a WU's verification cannot pass because of a pre-existing bug in a path its

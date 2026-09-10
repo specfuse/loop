@@ -185,6 +185,14 @@ For the full design rationale see `PLAN.md` for FEAT-2026-0018.
    FEAT-2026-0016, if present, is also inspected — any prior `blocked_human`
    cycle disables auto.
 2. **No replan** — no `replan` event in `events.jsonl` for this gate's WUs.
+   A replan fires when a unit's next attempt would be its last permitted one
+   (the ceiling `resolve_max_attempts` resolves for that unit, not a bare
+   count of two) — the driver runs a fresh re-plan session instead of
+   retrying the same failing body verbatim. Units with `iterate_on_failure:
+   true` are exempt: they fail on purpose against a convergent validator, and
+   a replan there would misread deliberate iteration as spinning. Seeing this
+   check disable auto-close means a unit was mis-sized at authoring time (see
+   `/authoring-work-units` §6), not that anything is broken.
 3. **Per-WU cost ≤ 1.5× planned** — every substantive WU's `cost_usd` ≤
    `planned_cost_usd × 1.5`. If `planned_cost_usd` absent: skip this check for
    that WU (graceful degrade — emits a warning reason in the decision but doesn't

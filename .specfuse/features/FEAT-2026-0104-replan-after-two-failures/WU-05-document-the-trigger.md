@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - docs/methodology.md
   - .specfuse/verification.yml.example
   - .specfuse/skills/authoring-work-units/SKILL.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-10T20:00:31.903770+00:00
+duration_seconds: 956.096
+cost_usd: 0.777467
+input_tokens: 78
+output_tokens: 9330
 ---
 
 # Document when a unit re-plans and what an operator sees
