@@ -1,14 +1,22 @@
 ---
 id: FEAT-2026-0103/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/data/verification.yml.example
   - docs/methodology.md
   - tests/test_retain_on_guard_refusal_docs.py
 model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T02:26:25.037380+00:00
+duration_seconds: 96.677
+cost_usd: 0.591725
+input_tokens: 44
+output_tokens: 8862
 ---
 
 # The retain-and-repair contract is documented where operators read
