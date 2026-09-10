@@ -5082,6 +5082,39 @@ def resolve_narrow_command(
     return narrow_command.replace("{selected_test_modules}", config["separator"].join(modules))
 
 
+def narrow_fallback_note(
+    gate: dict, wu: WorkUnit,
+    changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
+) -> "str | None":
+    """Why *gate*'s declared `narrow_command` did not fire this attempt
+    (#3292), or None when it did — or when the gate declares none.
+
+    The fallback to the full `command` is correct by design ("fail safe,
+    never open"), but silent it is indistinguishable from narrowing that
+    works: a Maven project whose `produces:` names `src/test/java/...`
+    while `narrow_selection.test_roots` sits at its `tests/` default pays
+    the full suite on every attempt and reads its `narrow_command:` line
+    as an optimisation. `verify` prints this note to stderr and appends it
+    to the report it returns, so the no-op shows in the live log and in
+    the attempt note. Worded to stay clear of `_FAILURE_KEYWORD_RE`: it is
+    a configuration hint, not a gate failure.
+    """
+    if not gate.get("narrow_command"):
+        return None
+    if resolve_narrow_test_selection(wu, changed_lines_by_path, gate=gate):
+        return None
+    config = resolve_narrow_selection_config(gate)
+    offered = ", ".join(wu.produces) if wu.produces else "(no produces: at all)"
+    return (
+        f"narrow_command declared on gate {gate['name']!r} did not fire this "
+        f"attempt: the selection resolved to nothing under "
+        f"narrow_selection.test_roots {config['test_roots']} "
+        f"(produces: offered {offered}); ran the full command instead. "
+        f"Set `narrow_selection.test_roots` (and `format`) on that gate in "
+        f".specfuse/verification.yml if this repo's tests live elsewhere."
+    )
+
+
 def verify(wu: WorkUnit, feature_dir: Path,
            cfg: dict | None = None,
            gate_file: "Path | None" = None) -> tuple[bool, str]:
@@ -5175,6 +5208,10 @@ def verify(wu: WorkUnit, feature_dir: Path,
             {**gate, "command": resolve_narrow_command(gate, wu, changed_lines_by_path)}
             for gate in narrow_gate_set
         ]
+        fallback_notes = [
+            note for gate in narrow_gate_set
+            if (note := narrow_fallback_note(gate, wu, changed_lines_by_path))
+        ]
     except ValueError as exc:
         return False, (
             f"CONFIGURATION ERROR: {exc} in .specfuse/verification.yml. "
@@ -5218,7 +5255,12 @@ def verify(wu: WorkUnit, feature_dir: Path,
                 }
                 break
     ok_all = all(g["ok"] for g in gate_results)
-    return ok_all, "\n\n".join(g["report"] for g in gate_results)
+    for note in fallback_notes:
+        print(f"  {note}", file=sys.stderr)
+    report = "\n\n".join(g["report"] for g in gate_results)
+    if fallback_notes:
+        report += "\n\n" + "\n".join(f"NOTE: {note}" for note in fallback_notes)
+    return ok_all, report
 
 
 def probe_baseline(feature_dir: Path, cfg: dict | None = None) -> list[dict]:
