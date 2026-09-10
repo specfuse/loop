@@ -120,6 +120,8 @@ gates:
 
 ## Post-merge checklist
 
+**Tracked as #3294.**
+
 Observable only outside this repository, so filed as a post-merge observation
 rather than an acceptance criterion (`close-discipline.md` §2). Gate 1 verified
 that the resolved command *strings* are correct; it could not verify that the
