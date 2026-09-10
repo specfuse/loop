@@ -8,7 +8,7 @@ autonomy_default: review        # this feature edits the driver; the judge_editi
                                 # class vetoes an auto-arm regardless, so `review` states
                                 # up front what would otherwise surface at the gate boundary
 status: active
-planned_cost_usd: 30.00
+planned_cost_usd: 39.50   # revised at G1-PLAN; see "The estimate was revised once"
 ---
 
 # Plan: Re-plan after two failures instead of a third identical attempt
@@ -134,14 +134,37 @@ The four test modules the first attempt wrote are kept out of tree as the
 contract the rewrite must meet, not restored: they assert against symbols that
 no longer exist.
 
+## The estimate was revised once — $30.00 → $39.50 at G1-PLAN
+
+`planned_cost_usd: 30.00` was set before gate 2 had any work units, and it
+decomposed exactly as 14.50 (T01–T05) + 4.50 (G1-CLOSE-INTERMEDIATE) + 6.00
+(G1-PLAN) + 5.00 (G2-CLOSE) — leaving **nothing** for gate 2's substantive
+work. `RETROSPECTIVE.md` § "Cost analysis" flagged that hole and asked
+`G1-PLAN` to either fit gate 2 into the ~$5.74 remaining or revise the figure
+deliberately. Revised, deliberately: gate 2's four substantive units are
+3.50 + 3.00 + 1.50 + 1.50 = **9.50**, so the feature's plan is 14.50 + 4.50 +
+6.00 + 9.50 + 5.00 = **39.50**.
+
+Fitting gate 2 into $5.74 was the alternative and was rejected: at
+`planning-discipline.md` §5's floors a terminal `close` alone is $5.00, so
+the whole of gate 2's implementation would have had to cost under a dollar.
+That is not a smaller gate, it is a fictional one.
+
+Neither gate carries a `cost_budget_usd`. Gate 1 was drafted without one and
+adding the brake to gate 2 alone would make the two gates behave differently
+for a reason unrelated to their content; the feature-level estimate above is
+the number to hold this gate against.
+
 ## Scope boundary — deliberately out
 
 - Splitting a unit into new units, and any mid-gate mutation of `gate.refs`.
 - Changing `MAX_ATTEMPTS`' default of 3.
 - Parallel dispatch of the ready frontier — that is FEAT-2026-0105.
-- Whether gate 2's brief can *execute* a re-plan on the operator's yes, or
-  only recommend it. That depends on how gate 1 behaves on real spins, and
-  gate 1's `plan-next` will have the evidence this draft does not.
+- Executing a re-plan from gate 2's brief. This was drafted as an open
+  question — it depended on how gate 1 behaved on real spins — and `G1-PLAN`
+  settled it as **recommend only** on gate-1 evidence. The reasoning and the
+  four citations are in `GATE-02.md` § "The question gate 1 left open";
+  executing is now deliberately out of scope rather than undecided.
 
 ## Task graph
 
@@ -180,12 +203,26 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      - id: FEAT-2026-0104/T06
+        file: WU-06-spinout-brief-tracer-bullet.md
+        depends_on: []
+      - id: FEAT-2026-0104/T07
+        file: WU-07-replan-option-recommend-only.md
+        depends_on: [FEAT-2026-0104/T06]
+      - id: FEAT-2026-0104/T08
+        file: WU-08-replan-note-collision.md
+        depends_on: [FEAT-2026-0104/T06]
+      - id: FEAT-2026-0104/T09
+        file: WU-09-document-the-brief.md
+        depends_on: [FEAT-2026-0104/T07, FEAT-2026-0104/T08]
       # --- closing sequence: 1-WU close (terminal gate) ---
-      # Scaffolded now so lint reads gate 1 as non-terminal.
-      # G1-PLAN fills in gate 2's substantive WUs above this entry.
       - id: FEAT-2026-0104/G2-CLOSE
         file: WU-90-gate-2-close.md
-        depends_on: []   # G1-PLAN will set real depends_on when it drafts gate 2
+        depends_on:
+          - FEAT-2026-0104/T06
+          - FEAT-2026-0104/T07
+          - FEAT-2026-0104/T08
+          - FEAT-2026-0104/T09
 ```
 
 ## Notes

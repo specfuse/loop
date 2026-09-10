@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0104/G1-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.19.0
+started_at: 2026-09-10T20:27:04.649562+00:00
+duration_seconds: 631.1
+cost_usd: 6.050012
+input_tokens: 118
+output_tokens: 45904
 ---
 
 # Draft gate 2 — the escalation brief's re-plan option
