@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0103/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces_driver_helper:
   - retain_tree_after_refusal
@@ -11,6 +11,14 @@ produces:
   - specfuse/loop/loop.py
   - tests/test_guard_repair_e2e.py
 model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T02:07:25.299311+00:00
+duration_seconds: 491.894
+cost_usd: 2.593358
+input_tokens: 150
+output_tokens: 40201
 ---
 
 # A guard refusal keeps the working tree

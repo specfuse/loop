@@ -283,6 +283,20 @@ def resolve_max_attempts(wu, verification_cfg: dict) -> int:
         return _coerce_max_attempts(
             project["max_attempts"], "verification.yml defaults")
     return MAX_ATTEMPTS
+
+
+def resolve_retain_on_guard_refusal(verification_cfg: dict) -> bool:
+    """Whether a bookkeeping-guard refusal keeps the working tree (FEAT-2026-0103).
+
+    Reads `defaults.retain_on_guard_refusal` from verification.yml — the same
+    `defaults` block `resolve_max_attempts` reads. Defaults to True: a guard
+    refusal (`deliverable_missing`, `no_deliverable_files`,
+    `produces_not_in_diff`, `files_changed_mismatch`) uncommits the squash and
+    leaves the tree as the attempt left it, so the next attempt repairs in
+    place instead of re-authoring from scratch.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("retain_on_guard_refusal", True))
 # Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
 # FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
 # stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
@@ -2986,6 +3000,44 @@ def reset_preserving_events(
         events_path.write_text(saved)
     if untracked_before is not None:
         _clean_attempt_untracked(untracked_before, events_path)
+
+
+def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
+    """`git reset --mixed <head_before>` — uncommit the squash, keep the tree.
+
+    Counterpart to `reset_preserving_events` for a bookkeeping-guard refusal
+    (FEAT-2026-0103): `--mixed` moves HEAD and the index back to
+    *head_before* but never touches the working tree, so unlike the `--hard`
+    reset above, events.jsonl and every file the attempt wrote are already
+    exactly where they need to end up — nothing to read back and rewrite.
+
+    Returns the retained diff via `capture_working_tree_diff` so the caller
+    can fold it into the note the next attempt sees.
+    """
+    git("reset", "--mixed", head_before)
+    return capture_working_tree_diff(head_before)
+
+
+def _resolve_guard_refusal_tree(
+    cfg: dict, head_before: str, events_path: Path,
+    untracked_before, note: str,
+) -> "tuple[str, bool]":
+    """Shared retain-or-reset decision for the four bookkeeping-guard sites.
+
+    Returns (note, tree_retained) — note has the retained diff folded in
+    under a `Retained diff` line when the tree was kept, unchanged otherwise.
+    """
+    if resolve_retain_on_guard_refusal(cfg):
+        diff = retain_tree_after_refusal(head_before, events_path)
+        if diff:
+            note = (
+                note + "\n\nRetained diff (your tree is still here):\n\n"
+                "```diff\n" + diff + "\n```\n"
+            )
+        return note, True
+    reset_preserving_events(head_before, events_path,
+                            untracked_before=untracked_before)
+    return note, False
 
 
 def apply_diff(diff_text: str) -> bool:
@@ -9809,8 +9861,11 @@ def run(
                             _deliv_note = format_deliverable_missing_note(
                                 wu, deliv_summary, _refusal_touched, attempt,
                             )
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
+                            _deliv_note, _deliv_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, _deliv_note,
+                                ))
                             missing = deliv_summary.split(": ", 1)[-1]
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "deliverable_missing",
@@ -9820,7 +9875,8 @@ def run(
                                 failure_excerpt=extract_failure_excerpt(deliv_summary),
                                 files_touched=_refusal_touched,
                                 extras={"summary": deliv_summary,
-                                        "missing": missing},
+                                        "missing": missing,
+                                        "tree_retained": _deliv_retained},
                             ))
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
@@ -9849,8 +9905,11 @@ def run(
                             wu, touched,
                         )
                         if not impl_ok:
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
+                            _impl_note, _impl_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, impl_summary,
+                                ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "no_deliverable_files",
                                 attempts_usage[-1],
@@ -9858,12 +9917,13 @@ def run(
                                 failure_signature="assert_implementation_touched_files",
                                 failure_excerpt=extract_failure_excerpt(impl_summary),
                                 files_touched=_refusal_touched,
-                                extras={"summary": impl_summary},
+                                extras={"summary": impl_summary,
+                                        "tree_retained": _impl_retained},
                             ))
                             refusal_history.append(
                                 (impl_summary, _refusal_touched))
-                            attempt_notes.append((attempt, impl_summary))
-                            failure_note = impl_summary
+                            attempt_notes.append((attempt, _impl_note))
+                            failure_note = _impl_note
                             print(
                                 f"   NO DELIVERABLE FILES attempt "
                                 f"{attempt}/{wu_max_attempts}"
@@ -9894,8 +9954,6 @@ def run(
                             + ", ".join(_prod_remaining)
                         )
                         if not prod_ok:
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
                             _prod_note = (
                                 prod_summary
                                 + "\n\nEach listed path is a deliverable this WU "
@@ -9912,14 +9970,21 @@ def run(
                             _prod_sig = ", ".join(sorted(
                                 Path(p).name for p in _prod_remaining
                             ))[:100] or "produces_unchanged"
+                            _prod_excerpt = extract_failure_excerpt(_prod_note)
+                            _prod_note, _prod_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, _prod_note,
+                                ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "produces_not_in_diff",
                                 attempts_usage[-1],
                                 failure_class="produces_not_in_diff",
                                 failure_signature=_prod_sig,
-                                failure_excerpt=extract_failure_excerpt(_prod_note),
+                                failure_excerpt=_prod_excerpt,
                                 files_touched=touched,
-                                extras={"summary": prod_summary},
+                                extras={"summary": prod_summary,
+                                        "tree_retained": _prod_retained},
                             ))
                             attempt_notes.append((attempt, _prod_note))
                             failure_note = _prod_note
@@ -10153,18 +10218,22 @@ def run(
                         _mm_sig = ", ".join(
                             sorted({Path(str(p)).name for p in _mm_paths})
                         )[:100] or "unchanged"
+                        _mm_excerpt = extract_failure_excerpt(note)
+                        note, _mm_retained = _resolve_guard_refusal_tree(
+                            cfg, head_before, events_path,
+                            untracked_before, note,
+                        )
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "files_changed_mismatch",
                             attempts_usage[-1],
                             failure_class="files_changed_mismatch",
                             failure_signature=_mm_sig,
-                            failure_excerpt=extract_failure_excerpt(note),
-                            extras={"unchanged_paths": _mm_paths},
+                            failure_excerpt=_mm_excerpt,
+                            extras={"unchanged_paths": _mm_paths,
+                                    "tree_retained": _mm_retained},
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
-                        reset_preserving_events(head_before, events_path,
-                                                untracked_before=untracked_before)
                         print(f"   FILES_CHANGED MISMATCH attempt "
                               f"{attempt}/{wu_max_attempts} — {len(payload)} path(s) "
                               f"unchanged")
