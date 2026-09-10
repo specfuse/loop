@@ -283,6 +283,20 @@ def resolve_max_attempts(wu, verification_cfg: dict) -> int:
         return _coerce_max_attempts(
             project["max_attempts"], "verification.yml defaults")
     return MAX_ATTEMPTS
+
+
+def resolve_retain_on_guard_refusal(verification_cfg: dict) -> bool:
+    """Whether a bookkeeping-guard refusal keeps the working tree (FEAT-2026-0103).
+
+    Reads `defaults.retain_on_guard_refusal` from verification.yml — the same
+    `defaults` block `resolve_max_attempts` reads. Defaults to True: a guard
+    refusal (`deliverable_missing`, `no_deliverable_files`,
+    `produces_not_in_diff`, `files_changed_mismatch`) uncommits the squash and
+    leaves the tree as the attempt left it, so the next attempt repairs in
+    place instead of re-authoring from scratch.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("retain_on_guard_refusal", True))
 # Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
 # FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
 # stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
@@ -495,6 +509,10 @@ class WorkUnit:
     # claimed — the per-path `produces_unchanged:` justification the contract
     # promises to honour (#3268). None until a session has run.
     result_block: "dict | None" = None
+    # Set by auto_repair_files_changed (FEAT-2026-0103/T03) when a passed
+    # attempt's RESULT named untouched paths outside `produces:` that got
+    # silently dropped from files_changed. None on every other attempt.
+    auto_repaired_files_changed: "list[str] | None" = None
 
 
 @dataclass
@@ -1489,7 +1507,24 @@ _RETRY_CLASS_HINT: dict[str, str] = {
                 "coverage gate before declaring done.",
     "security": "Resolve the flagged security findings (or add a narrowly "
                 "scoped, justified suppression) before declaring done.",
+    "guard_refusal": "The guard's fix is mechanical: touch (create or modify) "
+                      "at least one declared deliverable file before "
+                      "declaring done.",
+    "files_changed_mismatch": "Declare only files you actually changed under "
+                               "`files_changed` — omit any path you did not "
+                               "edit — before declaring done.",
+    "produces_not_in_diff": "Make the declared `produces:` change this "
+                            "attempt, or justify it as already satisfied "
+                            "under `produces_unchanged:` in the RESULT block, "
+                            "before declaring done.",
 }
+
+# The three bookkeeping-guard failure_class values (FEAT-2026-0103): a
+# retained tree under one of these was kept because verify() already passed
+# on it, not because a convergence unit is mid-iteration — the retained=True
+# lead below must say so, distinctly from the convergent-unit lead.
+_GUARD_FAILURE_CLASSES = frozenset(
+    {"guard_refusal", "files_changed_mismatch", "produces_not_in_diff"})
 
 
 def synthesize_retry_directive(failure_class: "str | None", *,
@@ -1504,13 +1539,27 @@ def synthesize_retry_directive(failure_class: "str | None", *,
     per-class hint names the remedy generically.
     """
     if retained:
-        # A convergent unit (#2650) keeps its tree between attempts, so the
-        # standing "was DISCARDED" lead is false — and acting on it means
-        # re-authoring from scratch, the exact opposite of iterating.
-        lead = ("Your previous attempt's work is STILL PRESENT in the working "
-                "tree — it was not discarded. The gate output below describes "
-                "that tree as it now stands. Continue from it: fix what the "
-                "output reports rather than starting over. ")
+        if failure_class in _GUARD_FAILURE_CLASSES:
+            # A bookkeeping guard refused the pass (FEAT-2026-0103), not a
+            # convergent unit mid-iteration: the tree is retained because
+            # verify() already PASSED on it, and the one thing to avoid is
+            # re-authoring work that is already correct.
+            lead = ("A bookkeeping guard refused this attempt's pass. The "
+                    "previous attempt's edits are STILL PRESENT in the "
+                    "working tree, and verification already PASSED on them "
+                    "— re-authoring them is the one thing not to do. Apply "
+                    "only the mechanical fix below, then re-emit the RESULT "
+                    "block in full. ")
+        else:
+            # A convergent unit (#2650) keeps its tree between attempts, so
+            # the standing "was DISCARDED" lead is false — and acting on it
+            # means re-authoring from scratch, the exact opposite of
+            # iterating.
+            lead = ("Your previous attempt's work is STILL PRESENT in the "
+                    "working tree — it was not discarded. The gate output "
+                    "below describes that tree as it now stands. Continue "
+                    "from it: fix what the output reports rather than "
+                    "starting over. ")
     else:
         lead = ("The previous attempt's work was DISCARDED before this retry, "
                 "so the gate output below refers to files that no longer "
@@ -1520,6 +1569,28 @@ def synthesize_retry_directive(failure_class: "str | None", *,
         failure_class or "",
         "Satisfy every declared gate before declaring done.")
     return lead + hint
+
+
+def compose_guard_repair_note(
+    failure_class: "str | None", complaint: str,
+    retained_diff: "str | None", retained: bool,
+) -> str:
+    """Build the retry note for a bookkeeping-guard refusal (FEAT-2026-0103).
+
+    Order matters: the guard's own *complaint* leads (it is the one thing
+    that names what actually failed), then `synthesize_retry_directive`'s
+    lead+hint carries the retained/discarded framing and the mechanical
+    remedy, then the retained diff last — it is evidence for the fix above,
+    not the instruction itself.
+    """
+    note = complaint + "\n\n" + synthesize_retry_directive(
+        failure_class, retained=retained)
+    if retained and retained_diff:
+        note += (
+            "\n\nRetained diff (your tree is still here):\n\n"
+            "```diff\n" + retained_diff + "\n```\n"
+        )
+    return note
 
 
 def emit_attempt_outcome(
@@ -2988,6 +3059,41 @@ def reset_preserving_events(
         _clean_attempt_untracked(untracked_before, events_path)
 
 
+def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
+    """`git reset --mixed <head_before>` — uncommit the squash, keep the tree.
+
+    Counterpart to `reset_preserving_events` for a bookkeeping-guard refusal
+    (FEAT-2026-0103): `--mixed` moves HEAD and the index back to
+    *head_before* but never touches the working tree, so unlike the `--hard`
+    reset above, events.jsonl and every file the attempt wrote are already
+    exactly where they need to end up — nothing to read back and rewrite.
+
+    Returns the retained diff via `capture_working_tree_diff` so the caller
+    can fold it into the note the next attempt sees.
+    """
+    git("reset", "--mixed", head_before)
+    return capture_working_tree_diff(head_before)
+
+
+def _resolve_guard_refusal_tree(
+    cfg: dict, head_before: str, events_path: Path,
+    untracked_before, note: str, failure_class: "str | None" = None,
+) -> "tuple[str, bool]":
+    """Shared retain-or-reset decision for the four bookkeeping-guard sites.
+
+    Returns (note, tree_retained) — note is built by
+    `compose_guard_repair_note`, which leads with *note* (the guard's
+    complaint), then the retained/discarded framing and mechanical remedy,
+    then the retained diff last when the tree was kept.
+    """
+    if resolve_retain_on_guard_refusal(cfg):
+        diff = retain_tree_after_refusal(head_before, events_path)
+        return compose_guard_repair_note(failure_class, note, diff, True), True
+    reset_preserving_events(head_before, events_path,
+                            untracked_before=untracked_before)
+    return compose_guard_repair_note(failure_class, note, None, False), False
+
+
 def apply_diff(diff_text: str) -> bool:
     """Replay *diff_text* onto the working tree; True when it applied.
 
@@ -3918,6 +4024,42 @@ def verify_files_changed(result: dict, head_before: str) -> list[str]:
             if not ls:
                 unchanged.append(path)
     return unchanged
+
+
+def auto_repair_files_changed(
+    wu: "WorkUnit", parsed: dict, unchanged: "list[str]",
+) -> "list[str] | None":
+    """Drop `unchanged` paths from `parsed['files_changed']` when none of
+    them is a declared deliverable (FEAT-2026-0103/T03).
+
+    A path `verify_files_changed` flags as showing no diff is only a hollow
+    claim about work that was never a deliverable in the first place when it
+    falls outside `wu.produces` AND at least one OTHER declared path is a
+    real change — declaring one changed and one didn't is a clerical slip,
+    not a failed attempt. Any `unchanged` path that IS in `wu.produces` is a
+    real gap (`produces_not_in_diff`'s business, not this repair's), and an
+    attempt whose entire `files_changed` claim is unchanged paths is the
+    hollow-pass shape `verify_files_changed` exists to catch (FEAT-2026-0008)
+    — neither is repaired: returns None and the caller must fall back to the
+    `files_changed_mismatch` guard.
+
+    Returns the list of dropped paths (in `unchanged`'s original spelling)
+    on repair, or None when repair is refused. Mutates
+    `parsed["files_changed"]` in place on repair.
+    """
+    produces_norm = {str(p).removeprefix("./") for p in (wu.produces or [])}
+    if any(str(p).removeprefix("./") in produces_norm for p in unchanged):
+        return None
+    unchanged_norm = {str(p).removeprefix("./") for p in unchanged}
+    files_changed = parsed.get("files_changed") or []
+    repaired = [
+        f for f in files_changed
+        if str(f).removeprefix("./") not in unchanged_norm
+    ]
+    if not repaired:
+        return None
+    parsed["files_changed"] = repaired
+    return list(unchanged)
 
 
 def _annotate_unchanged_paths(paths: "list[str]") -> str:
@@ -5965,7 +6107,10 @@ def execute_unit_attempt(
                                   ran); payload is None
       "blocked"                 — agent explicitly emitted status: blocked
       "passed"                  — verify() passed AND the files_changed
-                                  guard found nothing to flag
+                                  guard found nothing to flag, or found only
+                                  paths outside `produces:` that
+                                  auto_repair_files_changed dropped (see
+                                  wu.auto_repaired_files_changed)
       "failed"                  — verify() failed
       "files_changed_mismatch"  — verify() passed but the RESULT's
                                   files_changed list names paths that show
@@ -6060,7 +6205,10 @@ def execute_unit_attempt(
     if head_before is not None and parsed:
         unchanged = verify_files_changed(parsed, head_before)
         if unchanged:
-            return "files_changed_mismatch", unchanged, usage
+            dropped = auto_repair_files_changed(wu, parsed, unchanged)
+            if dropped is None:
+                return "files_changed_mismatch", unchanged, usage
+            wu.auto_repaired_files_changed = dropped
     return "passed", evidence, usage
 
 
@@ -9809,8 +9957,12 @@ def run(
                             _deliv_note = format_deliverable_missing_note(
                                 wu, deliv_summary, _refusal_touched, attempt,
                             )
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
+                            _deliv_note, _deliv_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, _deliv_note,
+                                    failure_class="guard_refusal",
+                                ))
                             missing = deliv_summary.split(": ", 1)[-1]
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "deliverable_missing",
@@ -9820,7 +9972,8 @@ def run(
                                 failure_excerpt=extract_failure_excerpt(deliv_summary),
                                 files_touched=_refusal_touched,
                                 extras={"summary": deliv_summary,
-                                        "missing": missing},
+                                        "missing": missing,
+                                        "tree_retained": _deliv_retained},
                             ))
                             refusal_history.append(
                                 (deliv_summary, _refusal_touched))
@@ -9849,8 +10002,12 @@ def run(
                             wu, touched,
                         )
                         if not impl_ok:
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
+                            _impl_note, _impl_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, impl_summary,
+                                    failure_class="guard_refusal",
+                                ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "no_deliverable_files",
                                 attempts_usage[-1],
@@ -9858,12 +10015,13 @@ def run(
                                 failure_signature="assert_implementation_touched_files",
                                 failure_excerpt=extract_failure_excerpt(impl_summary),
                                 files_touched=_refusal_touched,
-                                extras={"summary": impl_summary},
+                                extras={"summary": impl_summary,
+                                        "tree_retained": _impl_retained},
                             ))
                             refusal_history.append(
                                 (impl_summary, _refusal_touched))
-                            attempt_notes.append((attempt, impl_summary))
-                            failure_note = impl_summary
+                            attempt_notes.append((attempt, _impl_note))
+                            failure_note = _impl_note
                             print(
                                 f"   NO DELIVERABLE FILES attempt "
                                 f"{attempt}/{wu_max_attempts}"
@@ -9894,8 +10052,6 @@ def run(
                             + ", ".join(_prod_remaining)
                         )
                         if not prod_ok:
-                            reset_preserving_events(head_before, events_path,
-                                                    untracked_before=untracked_before)
                             _prod_note = (
                                 prod_summary
                                 + "\n\nEach listed path is a deliverable this WU "
@@ -9912,14 +10068,22 @@ def run(
                             _prod_sig = ", ".join(sorted(
                                 Path(p).name for p in _prod_remaining
                             ))[:100] or "produces_unchanged"
+                            _prod_excerpt = extract_failure_excerpt(_prod_note)
+                            _prod_note, _prod_retained = (
+                                _resolve_guard_refusal_tree(
+                                    cfg, head_before, events_path,
+                                    untracked_before, _prod_note,
+                                    failure_class="produces_not_in_diff",
+                                ))
                             wu_events.append(emit_attempt_outcome(
                                 wu, attempt, "produces_not_in_diff",
                                 attempts_usage[-1],
                                 failure_class="produces_not_in_diff",
                                 failure_signature=_prod_sig,
-                                failure_excerpt=extract_failure_excerpt(_prod_note),
+                                failure_excerpt=_prod_excerpt,
                                 files_touched=touched,
-                                extras={"summary": prod_summary},
+                                extras={"summary": prod_summary,
+                                        "tree_retained": _prod_retained},
                             ))
                             attempt_notes.append((attempt, _prod_note))
                             failure_note = _prod_note
@@ -10063,14 +10227,26 @@ def run(
                                     {"gate": gate.number, "warns": list(_warns),
                                      "blocking": False},
                                 ))
+                        _pass_extras = (
+                            {"produces_justified": _produces_justified}
+                            if _produces_justified else {}
+                        )
+                        if wu.auto_repaired_files_changed:
+                            _pass_extras["auto_repaired_files_changed"] = (
+                                wu.auto_repaired_files_changed
+                            )
+                            print(
+                                "   auto-repaired files_changed — dropped "
+                                f"untouched non-deliverable(s): "
+                                f"{', '.join(wu.auto_repaired_files_changed)}"
+                            )
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "passed",
                             attempts_usage[-1],
                             files_touched=touched,
                             agent_status="complete",
                             agent_blocked_reason=None,
-                            extras=({"produces_justified": _produces_justified}
-                                    if _produces_justified else None),
+                            extras=(_pass_extras or None),
                         ))
                         # Lifetime fields (#199): a retrospective must be able
                         # to compute rework-vs-new-work and planned-vs-actual
@@ -10153,18 +10329,23 @@ def run(
                         _mm_sig = ", ".join(
                             sorted({Path(str(p)).name for p in _mm_paths})
                         )[:100] or "unchanged"
+                        _mm_excerpt = extract_failure_excerpt(note)
+                        note, _mm_retained = _resolve_guard_refusal_tree(
+                            cfg, head_before, events_path,
+                            untracked_before, note,
+                            failure_class="files_changed_mismatch",
+                        )
                         wu_events.append(emit_attempt_outcome(
                             wu, attempt, "files_changed_mismatch",
                             attempts_usage[-1],
                             failure_class="files_changed_mismatch",
                             failure_signature=_mm_sig,
-                            failure_excerpt=extract_failure_excerpt(note),
-                            extras={"unchanged_paths": _mm_paths},
+                            failure_excerpt=_mm_excerpt,
+                            extras={"unchanged_paths": _mm_paths,
+                                    "tree_retained": _mm_retained},
                         ))
                         attempt_notes.append((attempt, note))
                         failure_note = note
-                        reset_preserving_events(head_before, events_path,
-                                                untracked_before=untracked_before)
                         print(f"   FILES_CHANGED MISMATCH attempt "
                               f"{attempt}/{wu_max_attempts} — {len(payload)} path(s) "
                               f"unchanged")

@@ -103,6 +103,25 @@
 #       test_roots: ["src/test/java/"]
 #       format: class_name
 #       separator: ","
+
+# TOP-LEVEL `defaults:` block (optional). Project-wide fallbacks a work unit's
+# own frontmatter can override.
+#   max_attempts: 3            # attempt ceiling when a WU declares none of
+#                               # its own; the constant MAX_ATTEMPTS is the
+#                               # fallback when this key is also absent.
+#   retain_on_guard_refusal: true  # whether a bookkeeping-guard refusal keeps
+#                               # the working tree instead of uncommitting it
+#                               # back to a blank slate. Covers four outcomes:
+#                               # `deliverable_missing`, `no_deliverable_files`,
+#                               # `produces_not_in_diff`, `files_changed_mismatch`
+#                               # (FEAT-2026-0103). Defaults to true: the next
+#                               # attempt repairs the retained tree in place
+#                               # instead of re-authoring from scratch. Set to
+#                               # false to restore the pre-0.18 discard behaviour.
+# defaults:
+#   max_attempts: 3
+#   retain_on_guard_refusal: true
+
 code:
   - name: tests
     # Run the suite UNDER `coverage run` so the `coverage` gate below can reuse

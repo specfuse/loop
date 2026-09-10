@@ -407,6 +407,28 @@ consumer that queries only those concludes the record is empty when it is not.
 A cross-repo audit reported three separate "missing diagnostic" findings that
 were all query errors against this contract, none of which existed (#270).
 
+**Retain-and-repair (FEAT-2026-0103).** `files_changed_mismatch`,
+`produces_not_in_diff`, `deliverable_missing`, and `no_deliverable_files` —
+the guard-refusal outcomes — record `tree_retained: true` in `extras` by
+default: the driver uncommits the squash but leaves the working tree exactly
+as the refused attempt left it, so the next attempt repairs in place instead
+of re-authoring from scratch. Controlled by `defaults.retain_on_guard_refusal`
+in `verification.yml` (default `true`; set `false` to restore the pre-0.18
+discard-and-restart behaviour) — see `specfuse/loop/data/verification.yml.example`
+for the four covered outcomes and the exact default. A `passed` outcome may
+separately carry `auto_repaired_files_changed` in `extras`: the list of
+declared-but-unchanged `files_changed` paths the driver dropped on the
+WU's behalf rather than failing the attempt over.
+
+Retention interacts with spinning detection, not around it:
+`detect_deterministic_refusal_repeat` (#1415) escalates a WU to
+`blocked_human` when two consecutive attempts emit an identical refusal
+summary over an identical touched-paths set. A retained tree that the repair
+attempt leaves untouched reproduces exactly that signature on its next
+refusal, so a session that ignores the retained-tree brief still escalates
+after two refusals rather than grinding to the attempt ceiling — retention
+does not weaken the spinning guard, it feeds it a cleaner signal.
+
 Consumers that read `attempt_outcome` events (the auto-close
 predicate, `/gate-status`, the spinning-detector hook, close-ceremony
 cost analysis) treat the `outcome` and `failure_class` values as an

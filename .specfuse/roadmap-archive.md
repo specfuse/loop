@@ -43,6 +43,17 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0103"></a>
+## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
+
+**Why.** 323 attempts across the corpus, roughly $830 and 42 hours, failed on driver bookkeeping guards (`files_changed_mismatch`, `deliverable_missing`, `produces_not_in_diff`, `no_deliverable_files`) rather than on correctness, and every one was hard-reset and re-dispatched from scratch with only a truncated failure note. The agent never sees its own rejected diff.
+
+**Goal.** When a bookkeeping guard fires, the working tree is kept and a short repair turn is dispatched with the guard's exact complaint and the retained diff. `iterate_on_failure` defaults on. Purely clerical cases (a `produces:` path that exists but was not listed; a RESULT block naming an untouched file; a declared deletion, #3119) are auto-repaired without a dispatch.
+
+**Benefits.** Recovers most of the 10% of spend lost to guards; halves the retry tail; stops training agents to under-declare.
+
+**Status: done.**
+
 <a id="feat-2026-0110"></a>
 ## FEAT-2026-0110 — Language-aware narrow test selection
 
