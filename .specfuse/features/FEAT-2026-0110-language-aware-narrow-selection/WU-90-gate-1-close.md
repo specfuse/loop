@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0110/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.18.0
+started_at: 2026-09-10T00:47:07.579086+00:00
+duration_seconds: 528.45
+cost_usd: 5.359607
+input_tokens: 100
+output_tokens: 40501
 ---
 
 # Close gate 1 — language-aware narrow test selection

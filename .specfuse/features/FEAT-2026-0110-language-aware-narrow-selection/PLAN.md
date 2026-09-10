@@ -118,6 +118,29 @@ gates:
   figure is #3281's, already measured; re-measuring it needs that consumer's
   repo and is a post-merge observation, not an in-loop acceptance criterion.
 
+## Post-merge checklist
+
+Observable only outside this repository, so filed as a post-merge observation
+rather than an acceptance criterion (`close-discipline.md` §2). Gate 1 verified
+that the resolved command *strings* are correct; it could not verify that the
+runners accept them or that narrowing recovers the wall clock #3281 measured,
+because neither is measurable here.
+
+- [ ] In the Maven consumer that reported #3281, declare `narrow_selection` on
+      its `tests` gate (`test_roots: ["src/test/java/"]`, `format: class_name`,
+      `separator: ","`) and confirm `./mvnw test -Dtest=...` is accepted by the
+      runner and selects the expected classes.
+- [ ] Over one feature's worth of attempts in that consumer, compare per-attempt
+      driver-side verification wall clock against the 8–11 minutes recorded in
+      #3281's 2026-09-09 review of its `events.jsonl`, and record the delta on
+      that issue. A narrowed attempt that still falls back to the full command is
+      the failure mode to watch for — it means the declared `test_roots` do not
+      match where that project's `produces:` entries actually point.
+- [ ] Confirm the Gradle (`item_template: "--tests {module}"`) and JS
+      (`format: path`) shapes against a real `./gradlew` and `jest` invocation in
+      any consumer that adopts them. This repository has no JVM or Node toolchain
+      and asserted string equality only.
+
 ## Notes
 
 - Dependencies live here, not in WU frontmatter.

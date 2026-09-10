@@ -50,7 +50,7 @@ gate's last substantive unit passes and before its closing unit dispatches.
 
 | Tier | Who runs it | What it contains |
 |---|---|---|
-| **narrow** (per attempt) | you, then the driver | every gate in your type's set that does **not** declare `tier: broad`; the `tests` gate through its `narrow_command`, with `{selected_test_modules}` = the entries of your `produces:` list under `tests/`, as dotted module names |
+| **narrow** (per attempt) | you, then the driver | every gate in your type's set that does **not** declare `tier: broad`; the `tests` gate through its `narrow_command`, with `{selected_test_modules}` = the entries of your `produces:` list under the gate's `narrow_selection.test_roots` (default `tests/`), rendered in its `narrow_selection.format` (default `python_module`, i.e. dotted module names) |
 | **broad** (once per gate) | the driver only | the whole set, tiered or not: the full suite under coverage, `coverage`, `security`, `leak-scan`, anything marked `tier: broad` |
 
 So in-session you run, for this repository, `tests` as
@@ -65,7 +65,8 @@ Two fail-safes, both "run the full `tests` command exactly once, at the end":
 
 - the `tests` gate declares no `narrow_command` (a repository that has not
   opted in); or
-- your `produces:` names no path under `tests/`, so the selection is empty and
+- your `produces:` names no path under the gate's configured
+  `narrow_selection.test_roots` (default `tests/`), so the selection is empty and
   the driver itself falls back to the full command (`GATE-02.md`: "fail safe,
   never open").
 

@@ -4138,3 +4138,52 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and the fix that finally held was a test enumerating every spawn site — which immediately found
   a site nobody had reported. Enumerating the boundaries is cheap; rediscovering them one halt at
   a time is not.
+
+- [FEAT-2026-0110/G1] A documentation-surface list written from memory misses the surfaces
+  that state the *old* rule in their own words, and the new key cannot be grepped for because
+  it does not exist yet — grep the behaviour being replaced instead. This feature added an
+  optional `narrow_selection` block so a non-Python project can narrow its per-attempt tests
+  gate. The doc unit was scoped from a three-surface list in `PLAN.md`: the
+  `verification.yml.example` a consumer copies, the dispatched-session prompt text, and a
+  vendored rule file (correctly escalated rather than edited). The list was complete for the
+  surfaces whose *names* the author remembered and missed
+  `plugins/specfuse/skills/verification/SKILL.md` — the verification skill every dispatched
+  session is pointed at — which stated "the entries of your `produces:` list under `tests/`,
+  as dotted module names" as a universal rule in two places, including a fail-safe bullet
+  telling sessions when to run the full suite. The unit passed its own criteria (three greps
+  and a `diff`, all against the three named files) and the gate's `feature_oracle` passed, so
+  nothing in the loop could see the omission; the terminal close found it and fixed it, which
+  is the most expensive place to find a doc defect that a grep would have caught at drafting
+  time. **The check, at drafting time, before the doc WU's `produces:` list is fixed:** take
+  the sentence the feature makes obsolete — not the key being added — and grep its
+  distinguishing phrase across every prose surface in the repo (`docs/`, skills, rules,
+  templates, `*.example`, prompt strings in source). Every hit is a candidate surface. A
+  surface that repeats the old rule in different words will still be missed, which is why the
+  grep is a floor and the enumeration belongs in `PLAN.md` where a reviewer can argue with it.
+  Corollary on where to write the fix: when a surface exists in two places, find the canonical
+  one first — here `plugins/` is canonical and `.specfuse/skills/` is a `cp -R` of it, the
+  opposite direction from `.specfuse/` → `specfuse/loop/data/` in the same repository, and
+  editing the derived copy would have been silently reverted by the next sync.
+
+- [FEAT-2026-0110/G1] An optional key whose absent-key default reproduces current behaviour
+  byte-for-byte is what makes a harness-migrating feature decomposable at all — it is the
+  reusable escape from `[FEAT-2026-0019/G1]` ("a feature that migrates the verification
+  harness the driver itself runs cannot be decomposed into separately-gated WUs, because each
+  WU's exit oracle is the very surface being migrated"). This feature changed the driver's own
+  per-attempt test selector, which is exactly that hazard, and paid nothing for it: three
+  units, three first-attempt passes, no re-arm, no blocked unit, 77.5% under the cost
+  estimate. The mechanism is entirely in the defaults. Four keys were added
+  (`test_roots`, `format`, `item_template`, `separator`) and each default was chosen so that a
+  `verification.yml` declaring none of them resolves to the identical string the pre-feature
+  code produced — so the repository's own gate set needed no edit, and every WU kept a working
+  exit oracle throughout. Two drafting consequences worth copying. **(a)** State the defaults
+  as a table in `GATE-NN.md`, one row per key naming the exact prior behaviour it reproduces,
+  and treat it as the contract rather than a summary — the units then have something to assert
+  against, and the byte-identity claim gets its own test (here:
+  `test_no_narrow_selection_key_is_byte_identical_to_today`, asserting the resolved command
+  string, not that some flag is false). **(b)** Resist collapsing the key set to match the
+  issue's proposal when the collapse costs expressiveness: the issue asked for `test_roots`
+  and `format`, which covers Maven's `-Dtest=A,B` and cannot express Gradle's repeated
+  `--tests A --tests B` at all, because no join character produces a repeated flag. Splitting
+  the render into a per-item template plus a separator is one extra key and one extra default,
+  and it is the difference between covering two ecosystems and covering one.
