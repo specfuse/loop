@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0103-keep-diff-on-guard-refusal
 roadmap_goal: When a bookkeeping guard refuses an attempt, the working tree is kept and the next attempt repairs it with the guard's exact complaint in hand, instead of re-authoring from scratch.
 autonomy_default: auto
 status: active
-planned_cost_usd: 23.00
+planned_cost_usd: 24.00
 ---
 
 # Plan: Keep the diff on guard refusals — repair, do not restart
@@ -92,10 +92,15 @@ gates:
       - id: FEAT-2026-0103/T04
         file: WU-04-document-the-contract.md
         depends_on: [FEAT-2026-0103/T02, FEAT-2026-0103/T03]
+      # hygiene (gate 1 broad run, 2026-09-10): T04 edited the package mirror,
+      # not the canonical .specfuse/ example; T04H moves the block home.
+      - id: FEAT-2026-0103/T04H
+        file: WU-04H-canonical-example-mirrored.md
+        depends_on: [FEAT-2026-0103/T04]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0103/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0103/T01, FEAT-2026-0103/T02, FEAT-2026-0103/T03, FEAT-2026-0103/T04]
+        depends_on: [FEAT-2026-0103/T01, FEAT-2026-0103/T02, FEAT-2026-0103/T03, FEAT-2026-0103/T04, FEAT-2026-0103/T04H]
 ```
 
 ## Scope boundary — explicitly OUT
