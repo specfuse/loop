@@ -4566,12 +4566,69 @@ def _test_module_name(path: str) -> str:
     return module.replace("/", ".").replace("\\", ".")
 
 
-def select_narrow_test_modules(wu: WorkUnit) -> "list[str] | None":
+#: `select_narrow_test_modules`' and `resolve_narrow_command`'s absent-key
+#: defaults (FEAT-2026-0110/T01) — chosen to reproduce, byte-for-byte, the
+#: pre-`narrow_selection` behaviour `GATE-01.md`'s table documents: Python
+#: tests under `tests/`, dotted module names, substituted verbatim, joined
+#: with a single space.
+DEFAULT_NARROW_SELECTION_CONFIG = {
+    "test_roots": ["tests/"],
+    "format": "python_module",
+    "item_template": "{module}",
+    "separator": " ",
+}
+
+
+def resolve_narrow_selection_config(gate: "dict | None") -> dict:
+    """Read a `code` gate's optional `narrow_selection` block
+    (FEAT-2026-0110/T01), defaulting every key absent from it — and the
+    whole block when *gate* declares none at all — to
+    `DEFAULT_NARROW_SELECTION_CONFIG`, the same shape `resolve_gate_tiers`
+    uses for its own optional per-gate key. A `verification.yml` with no
+    `narrow_selection` anywhere resolves to exactly this default on every
+    gate, which is what keeps this repo's own gate set byte-identical to
+    before this key existed.
+    """
+    cfg = (gate or {}).get("narrow_selection") or {}
+    return {
+        "test_roots": cfg.get("test_roots", DEFAULT_NARROW_SELECTION_CONFIG["test_roots"]),
+        "format": cfg.get("format", DEFAULT_NARROW_SELECTION_CONFIG["format"]),
+        "item_template": cfg.get("item_template", DEFAULT_NARROW_SELECTION_CONFIG["item_template"]),
+        "separator": cfg.get("separator", DEFAULT_NARROW_SELECTION_CONFIG["separator"]),
+    }
+
+
+def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
+    """Render *paths* (already filtered to *config*'s `test_roots`) through
+    *config*'s `format` and `item_template` (FEAT-2026-0110/T01).
+
+    `format: python_module` (the default) is `_test_module_name`'s dotted
+    conversion — the only shape today's Python-only selection ever produced.
+    `format: class_name` takes the bare file stem instead (`FooTest.java` ->
+    `FooTest`), which is what a JVM test runner's `-Dtest=` flag wants. Either
+    way, the result is substituted into `item_template` (default `"{module}"`,
+    i.e. verbatim) before returning.
+    """
+    fmt = config["format"]
+    items = []
+    for p in paths:
+        if fmt == "class_name":
+            module = Path(p).stem
+        else:
+            module = _test_module_name(p)
+        items.append(config["item_template"].format(module=module))
+    return items
+
+
+def select_narrow_test_modules(
+    wu: WorkUnit, config: "dict | None" = None,
+) -> "list[str] | None":
     """This unit's own declared test paths (FEAT-2026-0109/T04) — the entries
-    of its `produces:` list that live under `tests/`, as dotted unittest
-    module names. Returns None, never `[]`, when the selection is empty, so
-    the caller's fail-safe fallback (`GATE-02.md`: "fail safe, never open")
-    always has an unambiguous trigger.
+    of its `produces:` list that live under *config*'s `test_roots` (default
+    `["tests/"]`), rendered per *config*'s `format` (FEAT-2026-0110/T01).
+    Returns None, never `[]`, when the selection is empty, so the caller's
+    fail-safe fallback (`GATE-02.md`: "fail safe, never open") always has an
+    unambiguous trigger.
 
     This is the cheap, author-declared half of "tests touching changed
     files" — T05 unions in the changed-file half. Until T05 lands, a unit
@@ -4579,10 +4636,14 @@ def select_narrow_test_modules(wu: WorkUnit) -> "list[str] | None":
     `resolve_narrow_command` falls back to the gate's full command for, not
     an empty run.
     """
-    modules = [
-        _test_module_name(p) for p in wu.produces
-        if p.startswith("tests/") or p.startswith("tests\\")
+    config = config or DEFAULT_NARROW_SELECTION_CONFIG
+    roots = config["test_roots"]
+    matched = [
+        p for p in wu.produces
+        if any(p.startswith(root) or p.startswith(root.replace("/", "\\"))
+               for root in roots)
     ]
+    modules = render_selected_tests(matched, config)
     return modules or None
 
 
@@ -4817,6 +4878,7 @@ def resolve_narrow_test_selection(
     wu: WorkUnit,
     changed_lines_by_path: "dict[str, list[int] | None] | None" = None,
     map_path: "Path | None" = None,
+    gate: "dict | None" = None,
 ) -> "list[str] | None":
     """The full per-attempt test selection (FEAT-2026-0109/T05): the union of
     the unit's own declared test paths (T04's `select_narrow_test_modules`)
@@ -4832,7 +4894,8 @@ def resolve_narrow_test_selection(
     command: nothing resolved at all, or the changed-file half was
     unresolvable while there was something for it to resolve.
     """
-    declared = select_narrow_test_modules(wu) or []
+    config = resolve_narrow_selection_config(gate)
+    declared = select_narrow_test_modules(wu, config) or []
     if not CHANGED_FILE_SELECTION_ENABLED:
         # Declared-tests only. Not a silent narrowing: an empty `declared`
         # still returns None, so the caller runs the gate's full command.
@@ -4942,10 +5005,11 @@ def resolve_narrow_command(
     narrow_command = gate.get("narrow_command")
     if not narrow_command:
         return gate["command"]
-    modules = resolve_narrow_test_selection(wu, changed_lines_by_path)
+    modules = resolve_narrow_test_selection(wu, changed_lines_by_path, gate=gate)
     if not modules:
         return gate["command"]
-    return narrow_command.replace("{selected_test_modules}", " ".join(modules))
+    config = resolve_narrow_selection_config(gate)
+    return narrow_command.replace("{selected_test_modules}", config["separator"].join(modules))
 
 
 def verify(wu: WorkUnit, feature_dir: Path,

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0110/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces_driver_helper:
   - resolve_narrow_selection_config
@@ -10,6 +10,15 @@ produces_driver_helper:
 produces:
   - specfuse/loop/loop.py
   - tests/test_language_aware_narrow_selection.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.18.0
+started_at: 2026-09-10T00:29:48.602367+00:00
+duration_seconds: 160.147
+cost_usd: 0.747519
+input_tokens: 54
+output_tokens: 11251
 ---
 
 # Read `narrow_selection` from the gate and render the selection through it
