@@ -1,17 +1,20 @@
 ---
 id: FEAT-2026-0103/T04H
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 1.00
 provenance: "Gate 1 broad run (2026-09-10T02:32Z): test_package_data_matches_canonical — T04 wrote the defaults block into specfuse/loop/data/verification.yml.example, the package mirror, while the canonical .specfuse/verification.yml.example was left untouched; T04's produces: named the mirror, an authoring defect"
 produces:
   - .specfuse/verification.yml.example
 model: sonnet
-duration_seconds: 276.73
-cost_usd: 0.241148
-input_tokens: 24
-output_tokens: 2446
+duration_seconds: 1232.612
+cost_usd: 0.998202
+input_tokens: 22
+output_tokens: 2322
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: test_package_docs_match_canonical
 ---
 
 # Hygiene: the `defaults:` block lives in the canonical example, mirrored by sync-scaffold

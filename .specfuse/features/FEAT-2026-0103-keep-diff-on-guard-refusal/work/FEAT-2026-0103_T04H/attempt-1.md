@@ -18,7 +18,7 @@ Diffs:
   content differs: docs/methodology.md
 
 ----------------------------------------------------------------------
-Ran 3887 tests in 232.847s
+Ran 3887 tests in 204.442s
 
 FAILED (failures=1, skipped=3)
 ```
@@ -38,7 +38,7 @@ $ python3 .specfuse/scripts/lint_agent_policy.py .specfuse/agent-policy.yml.exam
 ### event-type-gate: PASS
 ```
 $ python3 .specfuse/scripts/event_type_gate.py
-ok: no validation errors across 73 events.jsonl file(s), 2006 event(s) checked
+ok: no validation errors across 73 events.jsonl file(s), 2012 event(s) checked
 NO VERDICT FOUND: the gate command produced no recognisable pass/fail summary anywhere in its output — the lines above are the tail only, and may be unrelated to the failure. Run the command directly.
 ```
 
@@ -75,20 +75,20 @@ OK — monitoring config is structurally valid (or absent).
 ### feature_oracle: PASS
 ```
 $ python3 -m unittest tests.test_guard_repair_e2e -v
-Ran 2 tests in 1.207s
+Ran 2 tests in 1.442s
 OK
 ... (21 line(s) elided) ...
 == FEAT-2026-9601 — Gate 1 [open] (2 work units) ==
 
-[22:53:51] -- FEAT-2026-9601/T01 [implementation] model=sonnet effort=medium
+[23:15:07] -- FEAT-2026-9601/T01 [implementation] model=sonnet effort=medium
    ↳ T01
-   [22:53:51] attempt 1/2 model=sonnet effort=medium — fresh session
+   [23:15:07] attempt 1/2 model=sonnet effort=medium — fresh session
    FILES_CHANGED MISMATCH attempt 1/2 — 1 path(s) unchanged
-   [22:53:51] attempt 2/2 model=sonnet effort=medium — fresh session
+   [23:15:07] attempt 2/2 model=sonnet effort=medium — fresh session
    retry reason: The RESULT block declared these `files_changed` paths, but each shows NO diff against HEAD before this attempt:
-   PASS — committed 4ba37612fe539f82fdbb8a34d79b93aa6d505147
+   PASS — committed 4b2353c17755b25c34cf408b58f29840e546ae74
 
-[22:53:51] -- FEAT-2026-9601/G1-CLOSE [close] model=opus effort=high
+[23:15:07] -- FEAT-2026-9601/G1-CLOSE [close] model=opus effort=high
    ↳ Close
 
    POST-PASS INVARIANT FAILED — roadmap_row_not_done: roadmap.md absent at .specfuse/roadmap.md
@@ -99,10 +99,10 @@ Close WU passed with verdict=met but a terminal flip did not materialize. This i
 
 ```diff
 diff --git a/.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/WU-04H-canonical-example-mirrored.md b/.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/WU-04H-canonical-example-mirrored.md
-index 9db9754..ec8d82c 100644
+index 2c7d738..70b3b01 100644
 --- a/.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/WU-04H-canonical-example-mirrored.md
 +++ b/.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/WU-04H-canonical-example-mirrored.md
-@@ -1,13 +1,17 @@
+@@ -1,8 +1,8 @@
  ---
  id: FEAT-2026-0103/T04H
  type: implementation
@@ -113,12 +113,14 @@ index 9db9754..ec8d82c 100644
  planned_cost_usd: 1.00
  provenance: "Gate 1 broad run (2026-09-10T02:32Z): test_package_data_matches_canonical — T04 wrote the defaults block into specfuse/loop/data/verification.yml.example, the package mirror, while the canonical .specfuse/verification.yml.example was left untouched; T04's produces: named the mirror, an authoring defect"
  produces:
-   - .specfuse/verification.yml.example
- model: sonnet
+@@ -12,6 +12,10 @@ duration_seconds: 276.73
+ cost_usd: 0.241148
+ input_tokens: 24
+ output_tokens: 2446
 +effort: medium
 +gate_set: code
 +driver_version: 0.18.0
-+started_at: 2026-09-10T02:49:15.463014+00:00
++started_at: 2026-09-10T02:58:48.266335+00:00
  ---
  
  # Hygiene: the `defaults:` block lives in the canonical example, mirrored by sync-scaffold
