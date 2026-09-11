@@ -1,14 +1,13 @@
 ---
 id: FEAT-2026-0104/G2-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 model: opus
 effort: high
 gate_set: plannext
-verdict: not_met
 driver_version: 0.19.0
 started_at: 2026-09-11T16:47:03.995982+00:00
 duration_seconds: 1271.648
