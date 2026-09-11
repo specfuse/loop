@@ -239,3 +239,59 @@ class SpinoutBriefEveryPartHasContent(unittest.TestCase):
                 self.assertRegex(part3, r"(failed|exhaust|run out)")
                 # the consequence of not deciding
                 self.assertRegex(part3, r"(blocked|cannot close|nothing further)")
+
+
+class BriefPartThreeAgreesWithPartOne(unittest.TestCase):
+    """Part 3's claim about the attempt record must match part 1's (#3308).
+
+    The part 3 written for #3305 asserted "every attempt its budget allowed has
+    been dispatched and has failed". That was true at the only site it rendered
+    from — the attempt-exhaustion `for-else`. T10 widened the brief to every
+    per-unit escalation site, and at the other nine the budget is untouched: an
+    `agent_reported_blocked` unit stops after one attempt of three, so part 1
+    said "dispatched 1 time(s)" while part 3 claimed exhaustion. Both tests that
+    covered this brief were green, because neither asserted on the *truth* of a
+    part's claim, only its presence and length.
+    """
+
+    def _brief(self, *, reason: str, attempts: list[str], max_attempts: int = 3):
+        wu = loop.WorkUnit.__new__(loop.WorkUnit)
+        object.__setattr__(wu, "wu_id", "FEAT-2026-8888/T01")
+        object.__setattr__(wu, "title", "Do the thing")
+        return loop.format_spinout_escalation_brief(
+            wu, 1, [], ["FEAT-2026-8888/T02"], reason, max_attempts,
+            attempts, False, "specfuse run --feature FEAT-2026-8888")
+
+    def _part(self, brief: str, index: int) -> str:
+        want = loop.ESCALATION_PART_HEADINGS[index]
+        out, grabbing = [], False
+        for line in brief.splitlines():
+            if line.startswith("## "):
+                grabbing = line[3:].strip() == want
+                continue
+            if grabbing:
+                out.append(line)
+        return "\n".join(out)
+
+    def test_exhaustion_is_claimed_only_when_the_budget_ran_out(self):
+        exhausted = self._brief(
+            reason="spinning_detected", attempts=["failed"] * 3)
+        self.assertIn("every attempt its budget", self._part(exhausted, 2))
+
+        for reason in ("agent_reported_blocked", "deterministic_refusal_repeat"):
+            with self.subTest(reason=reason):
+                short = self._brief(reason=reason, attempts=["blocked"])
+                part3 = self._part(short, 2)
+                self.assertNotIn(
+                    "every attempt its budget", part3,
+                    "part 3 claims exhaustion on a unit that stopped after "
+                    "1 of 3 attempts")
+                self.assertIn("stopped short", part3)
+
+    def test_part_three_does_not_contradict_part_one(self):
+        # part 1 renders the real attempt count; part 3 must not assert
+        # exhaustion against it.
+        brief = self._brief(reason="agent_reported_blocked", attempts=["blocked"])
+        part1, part3 = self._part(brief, 0), self._part(brief, 2)
+        self.assertIn("dispatched 1 time(s)", part1)
+        self.assertNotIn("every attempt its budget", part3)

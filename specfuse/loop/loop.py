@@ -3154,8 +3154,20 @@ def format_spinout_escalation_brief(
         "",
         f"## {ESCALATION_PART_HEADINGS[2]}",
         f"Someone must choose how {wu.wu_id} proceeds, because the driver "
-        f"has run out of ways to choose for it: every attempt its budget "
-        f"allowed has been dispatched and has failed, and "
+        f"has run out of ways to choose for it: "
+        # The exhaustion clause is true only where the budget actually ran
+        # out. T10 widened this brief from the attempt-exhaustion `for-else`
+        # to every per-unit escalation site, and at the other nine the budget
+        # is untouched — an `agent_reported_blocked` unit stops after one
+        # attempt of three. Claiming exhaustion there contradicts part 1's own
+        # attempt record, which is a claim the artifact refutes rather than
+        # supports. Same two-reason test part 4 below already applies.
+        + (f"every attempt its budget ({wu_max_attempts}) allowed has been "
+           f"dispatched and has failed"
+           if reason in ("spinning_detected", "all_attempts_zero_token") else
+           f"it stopped short of its attempt budget ({wu_max_attempts}) for a "
+           f"reason no further attempt would change ({reason})")
+        + ", and "
         + ("the one automatic remedy available — re-planning the unit into "
            "a narrower one — has already been applied once and its attempt "
            "failed too. "
