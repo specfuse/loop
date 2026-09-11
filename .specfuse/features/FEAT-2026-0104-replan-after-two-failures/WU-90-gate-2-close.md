@@ -12,9 +12,9 @@ verdict: not_met
 driver_version: 0.19.0
 started_at: 2026-09-11T11:26:38.337192+00:00
 duration_seconds: 660.741
-cost_usd: 7.000115
-input_tokens: 144
-output_tokens: 47682
+cost_usd: 7.281791
+input_tokens: 162
+output_tokens: 50503
 ---
 
 # Close the feature — re-plan replaces the third identical attempt
