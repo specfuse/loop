@@ -3570,11 +3570,27 @@ def persist_attempt_notes(
     left nothing on disk to diagnose (#168). Returns the written paths for
     inclusion in the escalation commit. `work/` is gitignored, so the explicit
     `git add` in commit_bookkeeping is what tracks these.
+
+    A re-planned attempt buffers TWICE under the same attempt number — the
+    failure evidence that triggered the re-plan, then the re-plan turn's own
+    transcript — and both used to land on the same `attempt-N.md` path, the
+    second write clobbering the first (#3341). The two callers that buffer
+    this way are correct and stay untouched; this function is the only place
+    that knows a collision happened, so it is the only place that can name
+    around it. The first write for a given attempt keeps the unchanged
+    `attempt-N.md` name; a later collision on the same attempt number is a
+    re-plan transcript (the only thing that ever buffers twice) and gets
+    `attempt-N-replan.md`, so a WU that never re-plans sees no name change.
     """
     wu_key = wu_id.replace("/", "_")
     paths: list[Path] = []
+    seen_attempts: set[int] = set()
     for atmpt, evidence in attempt_notes:
-        p = work_dir / wu_key / f"attempt-{atmpt}.md"
+        if atmpt in seen_attempts:
+            p = work_dir / wu_key / f"attempt-{atmpt}-replan.md"
+        else:
+            p = work_dir / wu_key / f"attempt-{atmpt}.md"
+            seen_attempts.add(atmpt)
         p.parent.mkdir(parents=True, exist_ok=True)
         # Terminate the last line. A note without one counts 0 under `wc -l`,
         # which is how #1412 came to be reported as a 0-byte file when it

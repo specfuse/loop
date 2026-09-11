@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces_driver_helper:
   - persist_attempt_notes
 produces:
   - tests/test_replan_note_collision.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-11T02:55:38.184888+00:00
+duration_seconds: 336.668
+cost_usd: 0.825284
+input_tokens: 68
+output_tokens: 12919
 ---
 
 # Stop the re-plan transcript overwriting the attempt it re-planned
