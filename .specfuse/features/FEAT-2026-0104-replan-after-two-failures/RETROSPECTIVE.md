@@ -9,10 +9,12 @@ built the operator-facing half: a unit that still exhausts its budget escalates
 re-planning the remaining gate — recommended, never executed.
 
 Nine implementation units, one intermediate close, one plan-next, one terminal
-close. Every dispatched attempt passed on its first try. That last sentence is
-the most important fact in this document, and the reason it is: a feature whose
-mechanism only fires on failure cannot observe itself in a run where nothing
-fails. The sections below measure that rather than talk around it.
+close. Every dispatched attempt passed its own verification on the first try;
+the terminal close ran twice, because a judge lowered its verdict, not because
+an attempt failed. That first clause is the most important fact in this
+document, and the reason it is: a feature whose mechanism only fires on failure
+cannot observe itself in a run where nothing fails. The sections below measure
+that rather than talk around it.
 
 ## Measurements
 
@@ -20,6 +22,18 @@ Every command below was run fresh in this terminal close session, from the
 repository root, against the working tree as this close found it. Exit codes are
 read directly from the shell, never inferred from output text. Commands ran
 through `.venv/bin/python`.
+
+This is close **attempt 2**. Attempt 1 recorded an advisory `met`; the judge
+session lowered it to `not_met` on one finding — the `judged` event carries
+`close_verdict: "met"`, `judge_verdict: "not_met"`, `lowered: true`,
+`disagreed: true`, `findings: 1` — and the driver filed it as **#3305**
+(`followups_recorded`, `issue_numbers: ["3305"]`). That finding has since been
+fixed in tree, and this attempt re-measures everything rather than inheriting
+attempt 1's greens: the gate carries no `GATE-NN-CRITERIA.md`, so
+`close-discipline.md` §5's carry-forward for `narrow` criteria has nothing to
+read and does not apply. Every command below was executed again in this
+session. What the finding was, and the evidence that it is discharged, is in
+§ "The defect this close found, and what happened to it".
 
 ### feature_oracle: PASS
 
@@ -66,30 +80,40 @@ Four facts were checked against that run, not read off the source:
    names to be verified against `.specfuse/skills/`; checked here rather than
    inherited — `.specfuse/skills/unblock-wu/SKILL.md` is present.
    `specfuse run --feature <id>` is the driver's own resume form.
-4. **A tracer-bullet stub survived the gate.** Part 3 reads "(Full decision text
-   is FEAT-2026-0104/T07's; this brief only guarantees the decision point
-   exists.)" — an internal work-unit ID in operator-facing output. See
-   § "A defect this close found".
+4. **Part 3 now states the decision.** At attempt 1 this line reported a
+   tracer-bullet stub — "(Full decision text is FEAT-2026-0104/T07's; this
+   brief only guarantees the decision point exists.)", an internal work-unit ID
+   in operator-facing output. In the run reproduced below it reads "Someone
+   must choose how FEAT-2026-8961/T01 proceeds, because the driver has run out
+   of ways to choose for it…", names the consequence of not deciding, and
+   carries no `FEAT-2026-0104` reference. `grep -n "Full decision text is"
+   specfuse/loop/loop.py` exits 1 (no match). See § "The defect this close
+   found, and what happened to it".
 
 ### Fresh oracle re-runs, per acceptance criterion
 
 | Command | Result | Covers |
 |---|---|---|
 | `.venv/bin/python -m unittest tests.test_spinout_brief_end_to_end -v -b` | exit 0, Ran 1 | gate 2 `feature_oracle`; T06 |
-| `.venv/bin/python -m unittest tests.test_spinout_brief_replan_option -v -b` | exit 0, Ran 3 | T07 — option 1 + recommendation, the eleven-reason table, the negative observation that nothing flips |
+| `.venv/bin/python -m unittest tests.test_spinout_brief_replan_option -v -b` | exit 0, Ran 6 | T07 — option 1 + recommendation, the eleven-reason table, the negative observation that nothing flips; plus #3305's three: every part is >= 40 chars, no part leaks an implementing WU ID, part 3 states the decision and why |
 | `.venv/bin/python -m unittest tests.test_replan_note_collision -v -b` | exit 0, Ran 1 | T08 — both records survive a re-planned attempt |
 | `.venv/bin/python -m unittest tests.test_replan_end_to_end -v -b` | exit 0, Ran 1 | gate 1 `feature_oracle` |
 | `.venv/bin/python -m unittest tests.test_replan_trigger tests.test_replan_turn_contract tests.test_replan_event_emission -v -b` | exit 0, Ran 20 | T02, T03, T04 |
 | `.venv/bin/python -m unittest tests.test_deterministic_refusal_repeat -v -b` | exit 0, Ran 13 | `GATE-01.md` § "What this gate must not break" — a byte-identical refusal over an untouched tree still escalates where it did, and never becomes a re-plan |
-| `.venv/bin/python .specfuse/scripts/event_type_gate.py` | exit 0 — "no validation errors across 74 events.jsonl file(s), 2078 event(s) checked" | T04's schema addition, over the whole corpus |
+| `.venv/bin/python -m unittest tests.test_escalation_contract tests.test_operator_escalation_rule -v -b` | exit 0, Ran 20 | the escalation contract the brief is rendered against, re-run because #3305's fix rewrote a part the contract validates |
+| `.venv/bin/python .specfuse/scripts/event_type_gate.py` | exit 0 — "no validation errors across 74 events.jsonl file(s), 2091 event(s) checked" | T04's schema addition, over the whole corpus |
 | `.venv/bin/python .specfuse/scripts/leak_scan.py --all` | exit 0 — "gitleaks 8.30.1", "clean" | T09's prose criterion |
 | `.venv/bin/python .specfuse/scripts/lint_plan.py <feature_dir>` | exit 0 — "structurally valid" | narrow tier for `close` (`plannext`) |
+| `grep -n "Full decision text is" specfuse/loop/loop.py` | exit 1, no match | #3305 — the negative observation that the stub is gone from the built code, the inverse of the grep the judge used to find it |
+| `grep -o '"reason": "[a-z_]*"' specfuse/loop/loop.py \| sort -u \| wc -l` | exit 0 — 13 | re-check of the flag-scope table's stated derivation; see § "What the loop did NOT verify" item 7 |
 
-The driver's own once-per-gate broad run for gate 2 is recorded in `GATE-02.md`:
-`ok: true`, `failing: []`, `ran_at: 2026-09-11T03:12:25Z`, and
-`work/gate-logs/tests-20260911T031159587497Z.log` shows `Ran 3927 tests`,
-`OK (skipped=3)`. Gate 1's, in `GATE-01.md`, shows `Ran 3922 tests`,
-`OK (skipped=3)`.
+The driver's own once-per-gate broad run is the driver's, not this session's,
+and gate 2's was re-run at this attempt's dispatch: `GATE-02.md` now records
+`ok: true`, `failing: []`, `ran_at: 2026-09-11T11:26:38Z`, and
+`work/gate-logs/tests-20260911T112612264837Z.log` shows `Ran 3930 tests`,
+`OK (skipped=3)` — three tests more than attempt 1's 3927, which are #3305's.
+Attempt 1's broad run (`tests-20260911T031159587497Z.log`, 3927, OK) and gate
+1's (`GATE-01.md`, 3922, OK) both stand.
 
 ### The driver builds that actually ran this feature, and what was in them
 
@@ -102,12 +126,22 @@ pinned to a tree before the gate's units land, and the pins are recorded as
 |---|---|---|---|
 | `2bbbe6d0` | gate 1, first run (discarded) | absent | absent |
 | `0de44d13` | gate 1, run of record (T01–T05, G1-CLOSE-INTERMEDIATE, G1-PLAN) | absent | absent |
-| `f68ab48b` | gate 2 (T06–T09, this close) | **present** | absent |
+| `f68ab48b` | gate 2 (T06–T09, **and this close's attempt 1**) | **present** | absent |
+| `f05ff633` | gate 2 re-entry after the judge's `not_met` | **present** | **present** |
+| `3e879017` | gate 2, this close's attempt 2 | **present** | **present** |
 
-So: gate 1 was dispatched by a driver with no re-plan trigger — it could not have
-re-planned anything. Gate 2 was dispatched by a driver that carried the trigger
-but not the brief, because the pin was taken before T06 wrote it. **No driver
-that ran any part of this feature contained the spin-out brief.** Whatever this
+Each row is a grep of that pin's own `loop.py` under
+`$TMPDIR/specfuse-pins/<tree>/specfuse/loop/`, run in this session; the last two
+rows are new since attempt 1, because re-entering the gate re-pinned the driver
+against the tree the #3305 fix had landed in.
+
+So: gate 1 was dispatched by a driver with no re-plan trigger — it could not
+have re-planned anything. Every implementation unit of gate 2, and this close's
+first attempt, ran on a driver that carried the trigger but not the brief,
+because that pin was taken before T06 wrote it. **No unit that produced any of
+this feature's code ran on a driver containing the spin-out brief, and no run of
+this feature has ever rendered one** — the last two pins do carry the brief, but
+a close is not a spin-out and nothing in this feature has spun out. Whatever this
 feature's own run shows, it cannot show the brief working in the field.
 
 ### Re-plan count across both gates: zero
@@ -116,10 +150,10 @@ The escalation trigger on this close is that a missing re-plan count is a defect
 in the feature's own emit path. The count is recoverable and it is zero, which is
 a measurement, not an absence of one:
 
-- `events.jsonl` for this feature: 11 `attempt_outcome` events, all
-  `outcome: "passed"` at `attempt: 1`, every `failure_class` and
-  `failure_signature` null, every `re_arm_count` 0. No `replan` event, no
-  `human_escalation` event, no `re_arm_dispatched` event.
+- `events.jsonl` for this feature: 12 `attempt_outcome` events (eleven, plus
+  this close's own attempt 1), all `outcome: "passed"` at `attempt: 1`, every
+  `failure_class` and `failure_signature` null, every `re_arm_count` 0. No
+  `replan` event, no `human_escalation` event, no `re_arm_dispatched` event.
 - Across every `.specfuse/features/*/events.jsonl` in this repository: **0**
   `replan` events.
 - The emit path is not broken, and that is separately checkable: the harness run
@@ -149,6 +183,12 @@ that ran their attempts):
 | `0.19.x` — this feature alone | 1 | 0.00 |
 | target | — | < 0.5 |
 
+Re-run again in this attempt rather than carried over from attempt 1
+(`mine.py` then `metrics.py`, 567 features and 4687 work units mined, 224 and 12
+surviving the dedup in the two bands). Every figure is identical to attempt 1's,
+which is the expected result — no new feature completed between the two
+attempts — and re-running it is how that is known rather than assumed.
+
 #### The move from 2.09 to 1.92 is arithmetic, not evidence
 
 2.09 × 11 ≈ 23
@@ -161,7 +201,8 @@ counted one more thing.
 
 Its own zero is not the mechanism working: no unit failed, so nothing escalated,
 so the trigger was never consulted and the brief — absent from every driver that
-ran here, per the pin table above — could not have rendered even if one had. A
+dispatched a unit which produced any of this feature's code, per the pin table
+above — could not have rendered even if one had. A
 run with zero failures tells you nothing about a mechanism that only fires on
 failure. The honest reading is that the metric is unmoved and untested by this
 feature, and stays untested until a real unit spins out on a driver built from
@@ -175,18 +216,22 @@ drive a real `loop.run()`, which preflights `require_session_env_writable`
 against the agent session-env directory under the user home. A sandboxed shell
 denies that write and every one of them errors with
 `SystemExit: loop.py: cannot create a directory under '<session-env>' (Operation
-not permitted)` before reaching a line of feature code. Observed again in this
-session, then green unsandboxed. This is a report about where the suite ran, not
-about the repository — gate 1's close recorded the same thing, and it recurred
-exactly as predicted.
+not permitted)` before reaching a line of feature code. Gate 1's close recorded
+it, close attempt 1 observed it recur exactly as predicted and then ran green
+unsandboxed; this attempt ran every command unsandboxed from the start and so
+did not reproduce it — recorded here as the standing property it is, not as an
+observation this session made. It is a report about where the suite runs, not
+about the repository.
 
 ### Per-criterion state (`close-discipline.md` §5)
 
 Gate 2 carries no `GATE-NN-CRITERIA.md` artifact, so there is no per-criterion
-record to check and `close-l` does not apply. This is attempt 1 of this close, so
-nothing could have been carried forward in any case: every oracle above — narrow
-and broad alike — ran fresh in this session. Nothing in this document inherits a
-producing unit's self-report.
+record to check and `close-l` does not apply. This is attempt 2 of this close,
+and §5's carry-forward would have been available for `narrow` criteria had that
+artifact existed — it does not, so there was nothing to carry and nothing was:
+every oracle above, narrow and broad alike, ran fresh in this session, as it did
+at attempt 1. Nothing in this document inherits a producing unit's self-report,
+and nothing inherits attempt 1's.
 
 ## The brief, as a real `loop.run()` produces it
 
@@ -217,7 +262,7 @@ Gate 1 is open. Work units finished so far: (none yet). FEAT-2026-8961/T01 was d
 FEAT-2026-8961/T01 exhausted its attempt budget without a passing verification run and has been escalated (spinning_detected).
 
 ## What decision is needed, and why
-A person needs to decide how this unit proceeds. (Full decision text is FEAT-2026-0104/T07's; this brief only guarantees the decision point exists.)
+Someone must choose how FEAT-2026-8961/T01 proceeds, because the driver has run out of ways to choose for it: every attempt its budget allowed has been dispatched and has failed, and the one automatic remedy available — re-planning the unit into a narrower one — has already been applied once and its attempt failed too. The options below are the only ways gate 1 moves again. Until one is chosen nothing further is dispatched: the 4 work unit(s) waiting behind this one stay blocked, and the gate cannot close.
 
 Work units still waiting behind it: FEAT-2026-8961/G1-RETRO, FEAT-2026-8961/G1-LESSONS, FEAT-2026-8961/G1-DOCS, FEAT-2026-8961/G1-PLAN.
 
@@ -520,44 +565,110 @@ gate-2 evidence is a mix, and it is worth separating:
    an operator one confused read; the same text wired to an action that resets
    attempt counters across a gate costs a gate.
 
+**A fourth thing arrived after attempt 1 and points the same way.** #3305 is
+evidence about this brief specifically: its part 3 shipped an internal work-unit
+ID to an operator, through a green `feature_oracle`, a green contract validator
+and a close that read the text and did not fail on it. Only a judge session
+reading the rendered output caught it. Text that fragile is cheap to correct
+when a person is the one acting on it and reads it first; the same text wired to
+an action that resets attempt counters across a gate would have executed before
+anyone noticed the words were wrong. The finding is now fixed and carries its own
+oracle, so it is not an argument that the brief is untrustworthy — it is a
+measurement of how far the gate's checks sat from catching an operator-facing
+error, and that distance is what "recommend only" is insuring against.
+
 **Conclusion: no gate-2 evidence changes the decision, and finding 1 above is
 recorded as the thing to re-read first when it is next revisited** — if the
 recommended action is a re-arm rather than an authored re-plan, then the eventual
 "execute" question is narrower than `GATE-02.md` framed it, and should be asked
 in those terms.
 
-### A defect this close found
+### The defect this close found, and what happened to it
 
-Part 3 of the brief — "What decision is needed, and why" — still carries T06's
-tracer-bullet placeholder:
+**What it was.** Part 3 of the brief — "What decision is needed, and why" —
+shipped T06's tracer-bullet placeholder:
 
 > A person needs to decide how this unit proceeds. (Full decision text is
 > FEAT-2026-0104/T07's; this brief only guarantees the decision point exists.)
 
 T06 was licensed to stub "the option text and the recommendation" (parts 5 and
 6); it stubbed part 3 as well. T07's criteria named parts 5 and 6, so nothing in
-the gate owned part 3, and the parenthetical shipped. It is not a criteria
-failure — every acceptance criterion in the gate is about parts 1, 5 and 6, and
-`escalation.validate_escalation_body` only requires the part to be present and
-non-empty — but it is an operator-facing string naming an internal work-unit ID,
-which is exactly the class of thing `.specfuse/rules/human-output.md` exists to
-keep out of a human's way.
+the gate owned part 3, and the parenthetical shipped. It was not a criteria
+failure in the narrow sense — every acceptance criterion in the gate is about
+parts 1, 5 and 6, and `escalation.validate_escalation_body` only requires each
+part to be present and non-empty — but it was an operator-facing string naming
+an internal work-unit ID, which is exactly the class of thing
+`.specfuse/rules/human-output.md` exists to keep out of a human's way.
 
-Recorded here rather than fixed: this close's **Do not touch** does not cover
-driver code, but rewriting an escalation string is an implementation change with
-its own oracle, and doing it inside a close is the drift `result-contract.md` §2
-names. It belongs in a bug issue against `format_spinout_escalation_brief`.
+**What attempt 1 did with it, and why that was wrong.** Attempt 1 recorded the
+finding here, declined to fix it — correctly, since rewriting an escalation
+string is an implementation change with its own oracle and doing it inside a
+close is the drift `result-contract.md` §2 names — and then wrote an advisory
+`verdict: met` anyway, on the reasoning that no acceptance criterion asserted on
+part 3. The judge disagreed and lowered it: `judged` carries
+`close_verdict: "met"`, `judge_verdict: "not_met"`, `lowered: true`,
+`disagreed: true`, `findings: 1`. The judge was right, and the split is worth
+naming precisely, because the two halves of attempt 1's reasoning are not the
+same question. *Where* to fix an operator-facing defect the close found is a
+scope question, and "not in the close" is the right answer. *Whether the gate's
+definition of done is met* is a different question, and a gate whose
+user-visible deliverable ships a placeholder naming an internal work unit does
+not meet it — whatever the per-unit criteria happened to assert on. Deferring
+the fix is scope hygiene; deferring the verdict is a hedge, and
+`close-discipline.md` §2 retired hedges.
 
-The generalizable half is in `LEARNINGS.md`: a tracer bullet that stubs more
-parts than the plan licensed leaves stubs no later unit owns, because the later
-units are scoped to what the plan said would be stubbed.
+**Discharged.** The driver filed the finding as **#3305**
+(`followups_recorded`, `filed: 1`, `issue_numbers: ["3305"]`), and it was fixed
+in tree before this attempt was dispatched. Verified here by executed command,
+not by reading the diff:
+
+- `grep -n "Full decision text is" specfuse/loop/loop.py` — **exit 1, no
+  match**. The inverse of the grep the judge used to find it; the stub is gone
+  from the built code, not merely from a diff.
+- The brief pasted in § "The brief, as a real `loop.run()` produces it" is from
+  a real `loop.run()` in this session. Its part 3 reads "Someone must choose how
+  FEAT-2026-8961/T01 proceeds, because the driver has run out of ways to choose
+  for it: every attempt its budget allowed has been dispatched and has failed,
+  and the one automatic remedy available … has already been applied once and its
+  attempt failed too. … Until one is chosen nothing further is dispatched: the 4
+  work unit(s) waiting behind this one stay blocked, and the gate cannot close."
+  It states the decision, the reason it cannot be made automatically, and the
+  consequence of not making it, and it names no `FEAT-2026-0104` anything.
+- The fix carried its own oracle, which is what keeps it from regressing:
+  `tests.test_spinout_brief_replan_option` grew a
+  `SpinoutBriefEveryPartHasContent` class — `test_no_part_is_empty_or_a_placeholder`
+  (every part >= 40 characters), `test_no_part_leaks_an_implementing_work_unit_id`
+  (no `FEAT-2026-0104`, no "Full decision"), and
+  `test_part_three_states_the_decision_and_why_it_is_needed` — taking the module
+  from 3 tests to 6, all green in this session, and the broad run from 3927
+  tests to 3930.
+
+**Why no separate `CHANGELOG.md` entry.** The stub never reached a release: the
+brief itself is an `Unreleased` entry added by this feature, so the corrected
+part 3 is the first version any consumer will ever see. A `Fixed` entry for a
+defect that existed only between two commits on an unmerged branch would be the
+changelog padding `close-discipline.md` §3 warns against. #3305 is the record
+that it happened.
+
+**The generalizable half** is in `LEARNINGS.md`, now in two entries: a tracer
+bullet that stubs more parts than the plan licensed leaves stubs no later unit
+owns; and a close that finds an operator-facing defect in its own gate's
+deliverable owes the verdict, not just a note.
 
 ### Failure-class breakdown
 
 No non-passing attempts in gate 2: four attempts, four `passed`, every
 `failure_class` and `failure_signature` null. Nothing to classify. Across both
-gates' runs of record the count is eleven attempts, eleven `passed`, zero
+gates' runs of record the count is twelve attempts, twelve `passed`, zero
 non-passing — which is why this feature could not observe its own mechanism.
+
+**One non-passing outcome exists and no failure class names it.** The judge
+lowered this close's attempt 1 from `met` to `not_met` on #3305. That is a
+gate-level verdict, not an attempt outcome: the `attempt_outcome` event for that
+attempt reads `passed`, so the re-close it forced appears in no failure-class
+aggregate and in no spend-by-outcome cut. It is the same shape of blind spot as
+gate 1's hang, which emitted no `attempt_outcome` either — twice in one feature,
+the most expensive thing that happened was invisible to the failure taxonomy.
 
 The gate-1 first run's hang is unrecoverable from `events.jsonl` and is
 classified by hand in § "Gate 1" above from `work/gate-logs/`; it is a `hang`,
@@ -586,7 +697,11 @@ configuration file needs an edit.
 3. **A `blocked_human` spin-out now prints a six-part operator brief and carries
    it on the `human_escalation` event's `message` field.** Previously that halt
    printed one line and the payload carried `reason`, `attempts` and
-   `attempts_usage` only. `message` is a new payload field consumers may read;
+   `attempts_usage` only. All six parts state their own content — part 3 names
+   the decision, why no automatic move remains, and what stays blocked until it
+   is made; the tracer-bullet placeholder it carried at close attempt 1 was
+   #3305 and is fixed, with the enumeration above describing the text that
+   actually ships. `message` is a new payload field consumers may read;
    the brief satisfies `escalation.validate_escalation_body`, so an escalation
    issue filed from it is well-formed. Four of the eleven unit-level escalation
    reasons carry the re-plan option (`spinning_detected`,
@@ -640,8 +755,11 @@ the event log is the source that survives a re-arm.
 | T08 re-plan note collision | $1.50 | $0.825284 | −$0.6747 (−45.0%) | 336.7s |
 | T09 document the brief | $1.50 | $0.646968 | −$0.8530 (−56.9%) | 487.7s |
 | **gate 2 substantive** | **$9.50** | **$4.218489** | **−$5.2815 (−55.6%)** | 29.1 min |
-| G2-CLOSE (this attempt) | $5.00 | not yet recorded | — | — |
-| **feature, recorded** | **$39.50** | **$21.946148** | **−$17.5539 (−44.4%)** | this close unpriced |
+| G2-CLOSE attempt 1 (dispatch) | — | $8.243503 | — | 863.8s |
+| G2-CLOSE attempt 1 (judge session) | — | $0.291491 | — | — |
+| **G2-CLOSE, attempt 1 total** | **$5.00** | **$8.534994** | **+$3.5350 (+70.7%)** | — |
+| G2-CLOSE attempt 2 (this attempt) | — | not yet recorded | — | — |
+| **feature, recorded** | **$39.50** | **$30.481142** | **−$9.0189 (−22.8%)** | this attempt unpriced |
 
 **Gate 1's variance, per gate.** −29.1%, and it is not estimating skill. Every
 unit's estimate carried headroom for a second attempt and every unit passed on
@@ -664,19 +782,50 @@ stopping mid-line at the same never-completing test). Bounded by wall clock —
 ~64 discarded minutes against the ~60 that bought the $8.76 of record — gate 1's
 close put the discarded spend at roughly **$16–18**.
 
-So the honest feature-level figure is not −44.4%. Recorded $21.95, plus $16–18
-discarded, plus this close (unpriced; the comparable closing units cost $2.92 and
-$6.05) puts the true cost of this feature at roughly **$41–46 against a $39.50
-plan** — at plan or slightly over it, not 44% under. **Any reader taking the
-−44.4% row as this feature's cost performance is reading an artifact of the
-revert.** The revised 39.50 estimate was, in the end, close to right; it looks
-generous only because the expensive half of gate 1 was discarded along with the
-code, and the ledger has no way to say so.
+So the honest feature-level figure is not −22.8%. Recorded $30.48, plus $16–18
+discarded in gate 1, plus the #3305 fix session (unpriced, outside this ledger),
+plus this close attempt (unpriced; attempt 1's dispatch was $8.24) puts the true
+cost of this feature at roughly **$52–63 against a $39.50 plan** — $30.48
+recorded, $16–18 discarded, $1–4 for the fix session and $5–10 for this attempt
+— i.e. **30% to 60% *over* plan**, not 23% under it. Two of those four terms are
+estimates rather than records, which is why it is a range; what is not uncertain
+is the sign. **Any reader taking the −22.8%
+row as this feature's cost performance is reading an artifact of the revert and
+of two costs the ledger cannot hold.** The revised 39.50 estimate priced the
+work as planned accurately — every substantive unit came in under it — and the
+overrun is entirely in what was not planned: a reverted gate, a judge-lowered
+verdict, and a bug fix between close attempts.
 
-**Restarts and re-arms.** Eight `driver_staleness_detected` events, all
-non-halting — one after each unit that edited `specfuse/loop/loop.py`, which is
-the predictable count. Zero `re_arm_dispatched` events. Zero `human_escalation`
-events.
+**The close is the one unit that overran, and by the most.** Every substantive
+unit came in under its estimate; `G2-CLOSE` is +70.7% before this attempt is
+priced at all, and the overrun is not the close being expensive — attempt 1's
+dispatch alone was $8.24 against a $5.00 plan, which is the terminal-close floor
+in `planning-discipline.md` §5 meeting a two-gate feature with a $16–18 hole in
+its own ledger to reconcile. Adding the judge's $0.29 and a whole second attempt
+on top means the closing sequence for this feature will cost more than gate 2's
+four implementation units put together ($4.22). A plan that prices a terminal
+close at the floor is pricing a close that has nothing hard to reconcile; this
+one had a reverted gate, a revised estimate and a corpus metric to re-measure.
+
+**The re-close is a real cost with no line in the plan.** `planned_cost_usd`
+prices work units, and a judge-lowered verdict buys a second full dispatch of a
+unit already priced once. There is no budget line for it and no event that
+classifies it (see § "Failure-class breakdown"), so the only place it appears is
+the two `G2-CLOSE` rows above.
+
+**The #3305 fix is named, not netted out — and is not in this ledger either.**
+Fixing part 3 was a separate session on this branch between the two close
+attempts. It emitted no events into this feature's `events.jsonl` — correctly,
+it was not a work unit of this feature — so its spend is unrecoverable here in
+exactly the way gate 1's discarded run is. It is nonetheless a cost this feature
+caused: the defect was this feature's, and the fix (a rewritten part 3 plus a
+new three-test class) exists only because of it. Any total below that omits it
+is low by that amount.
+
+**Restarts and re-arms.** Nine `driver_staleness_detected` events, all
+non-halting — one after each unit that edited `specfuse/loop/loop.py`, plus one
+at the gate-2 boundary, which is the predictable count. Zero `re_arm_dispatched`
+events. Zero `human_escalation` events. One `judged` event, `lowered: true`.
 
 ## What the loop did NOT verify
 
@@ -751,21 +900,41 @@ Gate 2 adds three of its own:
    table, verified by `test_unknown_reason_defaults_to_no_replan_option`, so a
    reason nobody enumerated fails closed. Where it is actually checked: that
    fail-closed default, not the enumeration.
-8. **Part 3 of the brief.** No acceptance criterion in either gate asserts on it,
-   and it still carries a tracer-bullet stub. See § "A defect this close found".
+8. **Part 3 of the brief.** **Discharged, not deferred.** At attempt 1 no
+   acceptance criterion in either gate asserted on part 3 and it carried a
+   tracer-bullet stub; the judge filed it as #3305, it is fixed in tree, and it
+   now has the oracle it lacked —
+   `tests.test_spinout_brief_replan_option.SpinoutBriefEveryPartHasContent`
+   asserts that every part says at least 40 characters, that no part leaks an
+   implementing work-unit ID, and that part 3 states the decision, the reason no
+   automatic move remains, and the consequence of not deciding. Verified in this
+   session by that module's green run (Ran 6) and by `grep -n "Full decision
+   text is" specfuse/loop/loop.py` exiting 1. Where it is checked from here:
+   that test class, on every run of the suite. See § "The defect this close
+   found, and what happened to it".
 
 Nothing else was deferred. Everything in `GATE-02.md`'s definition of done other
 than the human review step has an executed command behind it in § Measurements.
 
 ## Lessons
 
-Three entries promoted to `.specfuse/LEARNINGS.md`, all tagged
-`[FEAT-2026-0104/G2]`: a self-hosting gate cannot exercise its own code because
-the driver pin predates the gate's commits; a feature whose mechanism fires only
-on failure must buy its evidence with a committed probe rather than hope it trips
-itself; and a tracer bullet must stub only the parts the plan licensed, because
-later units are scoped to that list. The defect in § "A defect this close found"
-is the concrete instance of the third.
+Three entries were promoted to `.specfuse/LEARNINGS.md` at close attempt 1, all
+tagged `[FEAT-2026-0104/G2]`: a self-hosting gate cannot exercise its own code
+because the driver pin predates the gate's commits; a feature whose mechanism
+fires only on failure must buy its evidence with a committed probe rather than
+hope it trips itself; and a tracer bullet must stub only the parts the plan
+licensed, because later units are scoped to that list. The defect in § "The
+defect this close found, and what happened to it" is the concrete instance of
+the third.
+
+A fourth is promoted by this attempt, tagged `[FEAT-2026-0104/G2-CLOSE]`, and it
+is the lesson of the re-close itself: a close that finds an operator-facing
+defect in its own gate's deliverable owes the verdict, not just a note. Attempt 1
+found the part 3 stub, wrote it up accurately, declined to fix it in the close —
+right, on scope — and then recorded `met` because no acceptance criterion
+asserted on part 3. The judge lowered it and the gate cost a second close. Where
+to fix and whether the gate is done are separate questions, and answering the
+first does not discharge the second.
 
 Not promoted: gate 2's cost variance (the same retry-pad pattern gate 1 already
 recorded and `[FEAT-2026-0040/G3-CLOSE]` already generalizes) and the sandbox
@@ -783,6 +952,19 @@ definition of done has an executed command behind it in § Measurements, the
 gate's `feature_oracle` re-ran green in this session, all four implementation
 units are `done`, and the documentation and roadmap surfaces match what shipped.
 
+**What changed since attempt 1, which the judge lowered.** The one finding it
+lowered on — #3305, a tracer-bullet placeholder in part 3 of the operator brief
+— is fixed in the tree this attempt measured, and the fix carries its own
+oracle. Two executed checks, not a reading of the diff: `grep -n "Full decision
+text is" specfuse/loop/loop.py` exits 1 with no match, and the brief pasted in
+§ "The brief, as a real `loop.run()` produces it" is the output of a real
+`loop.run()` in this session whose part 3 states the decision, the reason no
+automatic move remains and what stays blocked until someone chooses. The three
+tests that now hold it are green (`Ran 6` in
+`tests.test_spinout_brief_replan_option`), and the driver's own gate-2 broad run
+at this attempt's dispatch is `Ran 3930 tests, OK (skipped=3)`, `ok: true`,
+`failing: []`. Nothing else about the gate changed between the two attempts.
+
 What that verdict does **not** claim, stated plainly because the temptation to
 round it off is the whole reason this feature is worth a careful close: the
 feature is proven **runnable**, not **useful**. Zero re-plans fired, zero units
@@ -791,5 +973,6 @@ brief. The metric that motivated the feature is unmoved — its apparent
 improvement from 2.09 to 1.92 is one more zero in the denominator, nothing else.
 Every claim about field behaviour rests on tests and a probe that stub the
 `claude -p` boundary. The first real spin-out on a driver built from this branch
-is the first evidence that will mean anything, and until then eight items in
-§ "What the loop did NOT verify" stay open.
+is the first evidence that will mean anything, and until then seven of the eight
+items in § "What the loop did NOT verify" stay open — the eighth, part 3, is the
+one this feature's own close cost a re-attempt to discharge.

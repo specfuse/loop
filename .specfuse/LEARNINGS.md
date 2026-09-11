@@ -4262,3 +4262,22 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   move is cheap: the tracer-bullet WU lists the stubs it is allowed to leave, and the
   follow-up units' criteria are written against that list rather than against part numbers
   someone remembers.
+
+- [FEAT-2026-0104/G2-CLOSE] A close that finds an operator-facing defect in its own gate's
+  deliverable owes the **verdict**, not just a note — "not fixed here" and "gate is done" are
+  separate answers to separate questions. This close's attempt 1 found a tracer-bullet
+  placeholder in part 3 of the operator escalation brief, wrote it up precisely, correctly
+  declined to fix it inside a close (an escalation string is an implementation change with its
+  own oracle, and editing it there is the drift `result-contract.md` §2 names) — and then
+  recorded `verdict: met`, reasoning that no acceptance criterion asserted on part 3. The judge
+  session lowered it (`judged`: `close_verdict: "met"`, `judge_verdict: "not_met"`,
+  `lowered: true`, `findings: 1`), the finding was filed as a tracked follow-up, and the gate
+  paid a second full close. The per-unit criteria are not the definition of done; the gate's
+  is, and a user-visible deliverable shipping a placeholder does not meet it. Two moves follow.
+  **(a)** When a close finds a defect in the gate's own output, record `not_met` with the
+  follow-up, and leave the fix to a unit or a bug branch — that is what `FOLLOW-UPS.md` and
+  `close-discipline.md` §2 are for, and it costs one tracked issue instead of one re-close.
+  **(b)** A contract validator that checks a part is *present and non-empty* cannot check that
+  it *says* anything, so a placeholder passes it: assert on content — a minimum length, the
+  absence of internal `FEAT-`/work-unit IDs in operator-facing text, the specific facts the
+  part is supposed to state.
