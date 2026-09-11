@@ -2995,6 +2995,54 @@ def format_human_unit_brief(
     return "\n".join(lines)
 
 
+# Flag-scope table (FEAT-2026-0104/T07, `.specfuse/rules/planning-discipline.md`
+# §3): every `blocked_human` escalation `reason` string in this module
+# (`grep -n '"reason": "' specfuse/loop/loop.py`), each mapped to whether the
+# spin-out brief may offer re-planning the remaining gate as an option, and
+# why. `replan_option_applies` is the single predicate the brief consults, so
+# the scope is testable per reason rather than on one sampled path.
+REPLAN_OPTION_SCOPE = {
+    "spinning_detected": (True,
+        "the unit met its own oracle three times and lost; a narrower unit "
+        "is the remedy"),
+    "spinning_signature_repeat": (True,
+        "same failure twice — the unit's shape, not the attempt"),
+    "convergence_plateau": (True,
+        "progress stopped short of the oracle; re-scoping is what moves it"),
+    "replan_unchanged_body": (True,
+        "the unit-scoped re-plan produced nothing; widening is the next "
+        "step, and only a human can authorise it"),
+    "all_attempts_zero_token": (False,
+        "no session ever ran — a CLI, quota or connectivity fault; "
+        "re-planning fixes nothing"),
+    "deterministic_refusal_repeat": (False,
+        "GATE-01.md's \"What this gate must not break\" binds this to "
+        "escalate where it does"),
+    "produces_shape_invalid": (False,
+        "pre-dispatch frontmatter refusal; nothing was attempted"),
+    "spinning_reproduction_missing": (False,
+        "a re-arm gate, not a failure; the operator is mid-decision already"),
+    "prep_halted": (False,
+        "pre-dispatch halt, no session spawned"),
+    "agent_reported_blocked": (False,
+        "the session named a boundary; its own blocked_reason is the "
+        "better lead"),
+    "human_step_required": (False,
+        "not a spin-out; format_human_unit_brief owns it"),
+}
+
+
+def replan_option_applies(reason: str) -> bool:
+    """Whether *reason* may offer re-planning the remaining gate (T07).
+
+    Decides `REPLAN_OPTION_SCOPE` above. Unknown reasons default to `False`
+    — an escalation this module has never named gets the conservative
+    answer, not a guess.
+    """
+    scoped = REPLAN_OPTION_SCOPE.get(reason)
+    return scoped[0] if scoped is not None else False
+
+
 def format_spinout_escalation_brief(
     wu: "WorkUnit",
     gate_number: int,
@@ -3015,8 +3063,12 @@ def format_spinout_escalation_brief(
     part names — plus the one thing that sibling omits: the
     `<!-- specfuse:escalation id=... -->` correlation marker, keyed on
     `wu.wu_id`, so `escalation.validate_escalation_body` accepts this brief.
-    The options text and recommendation are T07's; stubbed here to the
-    thinnest text the oracle can observe rather than invented content.
+    Option 1 and the recommendation (T07) are driven by
+    `replan_option_applies`: re-planning the remaining gate when the
+    escalation `reason` is in scope, naming `/unblock-wu` — the command that
+    actually resets `attempts` and re-arms — over inventing a new one; a
+    plain re-arm, with the reason the table excludes it, otherwise. Neither
+    branch flips anything itself: the brief only recommends.
     """
     done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
     remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
@@ -3024,12 +3076,57 @@ def format_spinout_escalation_brief(
         f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
     ) or "(no attempt produced a recorded outcome)"
     replan_line = (
-        "The automatic re-plan fired before the last attempt: a fresh "
-        "session rewrote the unit body after the earlier failures, and the "
-        "rewritten body still did not pass."
+        "The automatic re-plan fired before the last attempt, and already "
+        "failed: a fresh session rewrote the unit body after the earlier "
+        "failures, and the rewritten body still did not pass."
         if replanned else
         "The automatic re-plan did not fire during this run."
     )
+
+    offers_replan = replan_option_applies(reason)
+    _scoped = REPLAN_OPTION_SCOPE.get(reason)
+    scope_why = _scoped[1] if _scoped is not None else (
+        "this escalation reason is not in the flag-scope table")
+    replan_targets = ", ".join([wu.wu_id] + list(remaining_wu_ids))
+
+    if offers_replan:
+        already_spent = (
+            "the automatic re-plan already ran once against "
+            f"{wu.wu_id} and that rewritten attempt already failed"
+            if replanned else
+            "no automatic re-plan ran during this run"
+        )
+        option_1 = (
+            "1. **Re-plan the remaining gate** — run `/unblock-wu` on "
+            f"{replan_targets}, choosing re-arm (retry-as-is) for each. "
+            "Re-arming resets each unit's `attempts` to 0, so the driver's "
+            f"automatic re-plan trigger — {already_spent} — becomes "
+            f"reachable again for every re-armed unit in gate {gate_number}, "
+            "not just the one that spun out. Pros: widens a remedy that "
+            "already produced a rewrite once, without inventing a new "
+            "mechanism. Cons: it is the same remedy that already failed for "
+            f"{wu.wu_id}; if nothing about scope or shape changes first, "
+            "the re-plan may reproduce the same rewrite."
+        )
+        recommendation = (
+            f"Option 1. {scope_why[0].upper()}{scope_why[1:]}, and the "
+            f"remedy is already named and one command away — {already_spent}, "
+            "so this is widening it rather than proposing anything new."
+        )
+    else:
+        option_1 = (
+            "1. **Re-arm the unit** — run `/unblock-wu` on "
+            f"{wu.wu_id}, choosing re-arm (retry-as-is). Re-planning the "
+            f"remaining gate is not offered for `{reason}`: {scope_why}. "
+            "Pros: another automatic pass may succeed once the underlying "
+            "condition changes; cons: repeats the same dispatch if nothing "
+            "about the unit or its environment changed."
+        )
+        recommendation = (
+            f"Option 1. `{reason}` is not in the re-plan scope table "
+            f"because {scope_why}, so re-arming as-is is the next "
+            "available step rather than a wider re-scope."
+        )
 
     lines = [
         _escalation_correlation_marker(wu.wu_id),
@@ -3058,18 +3155,17 @@ def format_spinout_escalation_brief(
         f"further automatic attempt is possible.",
         "",
         f"## {ESCALATION_PART_HEADINGS[4]}",
-        "1. **Re-arm the unit** — pros: another automatic pass may succeed "
-        "once whatever blocked it is addressed; cons: repeats work if "
-        "nothing about the unit or its environment changed.",
+        option_1,
         "2. **Abandon the unit** — pros: unblocks the rest of the gate; "
-        "cons: anything depending on this unit is stranded. (Stub — "
-        "FEAT-2026-0104/T07 owns the real option set.)",
+        "cons: anything depending on this unit, and everything named in "
+        "option 1 if it was re-armed instead, is stranded.",
         "",
         f"## {ESCALATION_PART_HEADINGS[5]}",
-        "No recommendation yet — FEAT-2026-0104/T07 owns this part.",
+        recommendation,
         "",
         "Reply with the number of your choice, or prose if none fit:",
-        "1. Re-arm the unit",
+        "1. " + ("Re-plan the remaining gate" if offers_replan
+                  else "Re-arm the unit"),
         "2. Abandon the unit",
         "",
         f"Resume after deciding:\n  {resume_command}",

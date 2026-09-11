@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - replan_option_applies
 produces:
   - tests/test_spinout_brief_replan_option.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-11T02:48:24.434318+00:00
+duration_seconds: 433.518
+cost_usd: 1.17822
+input_tokens: 74
+output_tokens: 21413
 ---
 
 # Make re-planning the remaining gate the brief's default option — and only a recommendation
