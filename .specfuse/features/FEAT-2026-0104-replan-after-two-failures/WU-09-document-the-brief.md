@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0104/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - docs/methodology.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-11T03:01:15.060407+00:00
+duration_seconds: 487.689
+cost_usd: 0.646968
+input_tokens: 54
+output_tokens: 8915
 ---
 
 # Document what a spun-out unit's brief tells an operator
