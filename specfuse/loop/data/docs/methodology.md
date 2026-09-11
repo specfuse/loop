@@ -194,7 +194,7 @@ For the full design rationale see `PLAN.md` for FEAT-2026-0018.
    check disable auto-close means a unit was mis-sized at authoring time (see
    `/authoring-work-units` §6), not that anything is broken. A unit that
    still spins out after this automatic re-plan escalates to a human — see
-   the spin-out brief below for what that escalation tells the operator.
+   the escalation brief below for what that escalation tells the operator.
 3. **Per-WU cost ≤ 1.5× planned** — every substantive WU's `cost_usd` ≤
    `planned_cost_usd × 1.5`. If `planned_cost_usd` absent: skip this check for
    that WU (graceful degrade — emits a warning reason in the decision but doesn't
@@ -212,11 +212,15 @@ For the full design rationale see `PLAN.md` for FEAT-2026-0018.
    failed (already governed by check 1 if blocked), but the FINAL outcome on
    each WU must be clean.
 
-**The spin-out brief (FEAT-2026-0104)** — a unit that still spins out after
-the automatic re-plan above escalates `blocked_human` with a six-part
-operator brief (`.specfuse/rules/operator-escalation.md`'s six parts, in
-order), printed to the console and recorded verbatim in the `human_escalation`
-event's `message` field in `events.jsonl`. The escalation `reason` decides
+**The escalation brief (FEAT-2026-0104)** — **every** `blocked_human`
+escalation of a work unit, not only the spin-out that follows the automatic
+re-plan above, halts with a six-part operator brief
+(`.specfuse/rules/operator-escalation.md`'s six parts, in order), printed to
+the console and recorded verbatim in the `human_escalation` event's `message`
+field in `events.jsonl`. Gate-level halts — a gate budget exceeded, a
+pre-existing gate failure, a failing broad run — are excluded: those are keyed
+on the feature rather than on one unit, and there is no single unit to brief
+about. The escalation `reason` decides
 whether the brief's first option is re-planning the remaining gate:
 `spinning_detected`, `spinning_signature_repeat`, `convergence_plateau`, and
 `replan_unchanged_body` carry it, because for those a wider re-scope is the

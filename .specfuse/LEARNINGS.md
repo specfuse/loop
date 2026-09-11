@@ -4281,3 +4281,37 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   it *says* anything, so a placeholder passes it: assert on content — a minimum length, the
   absence of internal `FEAT-`/work-unit IDs in operator-facing text, the specific facts the
   part is supposed to state.
+
+- [FEAT-2026-0104/T10] Widening **where** a message is rendered is not the same change as
+  widening **what it may claim** — a unit that moves a render site inherits every condition the
+  old site guaranteed, and the guarantees that were implicit at the old site become false
+  statements at the new ones. T10 moved the six-part escalation brief from one call site (the
+  `for-else` that fires when a unit exhausts its attempt budget) to all ten per-unit escalation
+  sites, and left part 3's "every attempt its budget allowed has been dispatched and has
+  failed" unconditional — while part 4, four lines below and written by an earlier unit, had
+  already been gated on exactly the two reasons where that is true. At the other nine sites the
+  brief now contradicts its own part 1, which reports the real attempt count correctly. The
+  drafting move: when a unit widens a render site, its criteria must enumerate the facts the
+  old site made true by construction and assert each one at the new sites — a diff of the
+  *conditions*, not of the call graph.
+
+- [FEAT-2026-0104/T10] When a deliverable has enumerable parts, **one criterion must assert on
+  the enumeration**, not one criterion per part the plan happened to think of. Gate 2 shipped
+  the same class of defect three times into the same six-part brief: a tracer bullet stubbed a
+  part the plan had not licensed (#3305), the next unit's criteria named parts 5 and 6 so
+  nothing owned part 3, and a later unit widened the render site without widening part 3's
+  conditional. Each unit met its own criteria; the part nobody's criteria named shipped
+  whatever the last unit to touch it left there. Criteria written per unit cannot cover a
+  deliverable whose parts outnumber the units, and every checker the gate shipped
+  (`validate_escalation_body`, a minimum-length assertion, a leaked-ID assertion) tests the
+  brief's *shape* rather than the truth of what it says.
+
+- [FEAT-2026-0104/G2-CLOSE] A gate expecting more than one close dispatch should write a
+  `GATE-NN-CRITERIA.md`. `close-discipline.md` §5 lets a `narrow` oracle's recorded green carry
+  forward across close attempts; with no such artifact there is nothing to carry, so every
+  dispatch re-runs the whole oracle set from scratch. This feature's close was dispatched three
+  times — twice after a judge lowered the verdict, once after the gate was reopened — and
+  re-ran the same twelve oracles each time. The closing sequence then cost $16.10 over two
+  recorded dispatches against a $5.00 plan line, within $1.48 of what all ten implementation
+  units cost together. The artifact is cheap to write at the first close and pays for itself on
+  the second.
