@@ -55,7 +55,7 @@ import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as _dataclass_replace
 from pathlib import Path
 
 from . import _filelock
@@ -96,6 +96,7 @@ from .closing_requirements import (
     parse_followup_entries,
 )
 from .escalation import (
+    _correlation_marker as _escalation_correlation_marker,
     _PART_HEADINGS as ESCALATION_PART_HEADINGS,
     CREATED_NUMBER_UNKNOWN,
     emit_issue_with_body,
@@ -513,6 +514,12 @@ class WorkUnit:
     # attempt's RESULT named untouched paths outside `produces:` that got
     # silently dropped from files_changed. None on every other attempt.
     auto_repaired_files_changed: "list[str] | None" = None
+    # VESTIGIAL tracer-bullet opt-in (FEAT-2026-0104/T01). Parsed for
+    # backward compatibility with fixtures that still declare it, but no
+    # longer read by the dispatch loop — T02's `should_replan_instead_of_retry`
+    # applies to every unit unconditionally, so this flag no longer gates
+    # anything.
+    replan_stub_trigger: bool = False
 
 
 @dataclass
@@ -608,6 +615,28 @@ def write_frontmatter_field(path: Path, key: str, value) -> None:
     else:
         block.append(f"{key}: {rendered}")
     new = ["---", *block, "---", *lines[j + 1 :]]
+    path.write_text("\n".join(new) + "\n")
+
+
+def write_wu_body(path: Path, new_body: str) -> None:
+    """Replace a work-unit file's body, leaving its frontmatter untouched.
+
+    Sibling of `write_frontmatter_field`, which does the opposite half (a
+    frontmatter key, body untouched). Used by the re-plan turn (FEAT-2026-0104)
+    to rewrite a spinning unit's own prompt ahead of its last attempt.
+    """
+    if not path.exists():
+        raise WorkUnitFileMissingError(
+            f"work-unit file {path} is gone — cannot write its re-planned body."
+        )
+    lines = path.read_text().splitlines()
+    if not lines or not FM.match(lines[0]):
+        raise ValueError(f"{path} has no frontmatter")
+    j = 1
+    while j < len(lines) and not FM.match(lines[j]):
+        j += 1
+    block = lines[1:j]
+    new = ["---", *block, "---", "", *new_body.strip().splitlines()]
     path.write_text("\n".join(new) + "\n")
 
 
@@ -1009,6 +1038,7 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         # Validated at resolve time, not here, so a work unit and a project
         # default fail the same way with the same message.
         max_attempts = raw_max_attempts
+    replan_stub_trigger = bool(fm.get("replan_stub_trigger", False))
     return WorkUnit(
         wu_id=ref["id"],
         file=path,
@@ -1031,7 +1061,160 @@ def load_wu(feature_dir: Path, ref: dict) -> WorkUnit:
         max_attempts=max_attempts,
         iterate_on_failure=iterate_on_failure,
         evidence=str(fm.get("evidence", "") or "").strip(),
+        replan_stub_trigger=replan_stub_trigger,
     )
+
+
+def should_replan_instead_of_retry(wu: WorkUnit, attempt: int,
+                                    wu_max_attempts: int) -> bool:
+    """Whether *attempt*, having just failed, should re-plan rather than retry (FEAT-2026-0104/T02).
+
+    Fires exactly when the NEXT attempt would be the last one this unit is
+    permitted (`attempt == wu_max_attempts - 1`, so attempt+1 == wu_max_attempts),
+    at the default ceiling that is "after two failures" the roadmap names.
+    The ceiling is `resolve_max_attempts`'s per-unit result, not the bare
+    constant — a unit that declared its own `max_attempts` (#2650) keeps its
+    own budget, both wider and narrower. `wu_max_attempts >= 2` excludes a
+    one-attempt unit, which has no "second-to-last" attempt to re-plan from
+    and must simply fail.
+
+    `iterate_on_failure` units are exempt outright: they fail on purpose
+    against a convergent validator (#2650), and reading that as spinning
+    would be a defect, not a rescue.
+
+    Replaces T01's `replan_stub_trigger` opt-in — this predicate applies to
+    every unit, not only ones that declared the tracer flag.
+    """
+    if wu.iterate_on_failure:
+        return False
+    if wu_max_attempts < 2:
+        return False
+    return attempt == wu_max_attempts - 1
+
+
+class ReplanUnchangedError(RuntimeError):
+    """A re-plan turn's rewritten body was byte-identical to its input (T03).
+
+    Dispatching the unit's last permitted attempt against a body it already
+    failed under twice cannot do better than a coin flip — refuse instead so
+    the caller can escalate to a human.
+    """
+
+
+_REPLAN_BRIEF_MARKER = "## RE-PLAN BRIEF (FEAT-2026-0104/T03)"
+
+
+def synthesize_replan_brief(wu: WorkUnit, failure_history: list[dict]) -> str:
+    """Build the prompt for the fresh re-plan session (FEAT-2026-0104/T03).
+
+    `failure_history` is one dict per prior failed attempt, newest last, each
+    carrying `attempt`, `failure_class`, `failure_signature`, and `note` — the
+    full retained evidence text for that attempt, not a summary of it. This
+    is the turn's whole value: a fresh planner sees what every cold attempt
+    actually hit, which the attempts themselves never could.
+
+    Neighbouring surface: `synthesize_retry_directive` builds a short lead
+    for the SAME session to keep retrying with; this builds the brief for a
+    DIFFERENT session whose job is to rewrite the unit, not attempt it.
+    """
+    parts = [
+        _REPLAN_BRIEF_MARKER,
+        f"`{wu.wu_id}` has failed {len(failure_history)} attempt(s) and has "
+        "exactly one attempt left. Read what each attempt actually hit "
+        "below, then rewrite the unit body into a NARROWER unit: tighten "
+        "the objective, scope the acceptance criteria to what a single "
+        "attempt can carry, and add at least one explicit non-goal drawn "
+        "from what these attempts proved hard.",
+        "Keep all five mandatory sections present and non-empty: Context, "
+        "Acceptance criteria, Do not touch, Verification, Escalation "
+        "triggers. Do not author new work units and do not touch "
+        "`depends_on` — the unit graph is PLAN.md's, out of scope here.",
+        "Reply with ONLY the rewritten unit body (the Markdown that follows "
+        "the frontmatter and title) — no commentary, no frontmatter, no "
+        "RESULT block.",
+    ]
+    for entry in failure_history:
+        parts.append(
+            f"### Attempt {entry.get('attempt')} — "
+            f"failure_class={entry.get('failure_class')} "
+            f"failure_signature={entry.get('failure_signature')}\n\n"
+            f"{entry.get('note', '')}"
+        )
+    parts.append("### Current unit body\n\n" + wu.body)
+    return "\n\n".join(parts)
+
+
+def assert_replan_changed_body(old_body: str, new_body: str) -> None:
+    """Raise `ReplanUnchangedError` iff `new_body` doesn't differ from `old_body`.
+
+    A re-plan turn that changes nothing has produced a body that already
+    failed under the SAME text twice; dispatching the last attempt against
+    it is not a re-plan, it's a third try at an unchanged prompt.
+    """
+    if new_body.strip() == (old_body or "").strip():
+        raise ReplanUnchangedError(
+            "re-plan turn returned a body byte-identical to its input — "
+            "refusing to dispatch an attempt that cannot differ from the "
+            "one before it"
+        )
+
+
+def run_replan_turn(wu: WorkUnit, failure_history: list[dict]) -> dict:
+    """Dispatch a fresh session to re-plan `wu` after two failed attempts (T03).
+
+    Replaces T01's stub (a driver-side marker append, no session dispatched)
+    with the real turn: a fresh `claude -p` session — the SAME `dispatch()`
+    boundary every real attempt goes through, not a second vocabulary for it
+    — reads `synthesize_replan_brief`'s brief and returns a rewritten body.
+
+    Returns `{"body": str, "usage": dict | None, "transcript": str}`. The
+    session's raw output IS both the transcript and the source of the
+    rewritten body (stripped) — the rewrite is that session's output, not a
+    function of the input body alone. Raises `ReplanUnchangedError` when the
+    rewritten body doesn't differ from `wu.body`; callers must not write it
+    back or dispatch against it.
+    """
+    brief = synthesize_replan_brief(wu, failure_history)
+    session_wu = _dataclass_replace(wu, body=brief)
+    result = dispatch(session_wu, None, cost_tracking=True)
+    # Same backward-compatible contract execute_unit_attempt's dispatch call
+    # honours: a stub (or a future dispatch() change) may return plain text
+    # instead of (text, usage).
+    if isinstance(result, tuple):
+        transcript, usage = result
+    else:
+        transcript, usage = result, None
+    new_body = transcript.strip()
+    assert_replan_changed_body(wu.body, new_body)
+    return {"body": new_body, "usage": usage, "transcript": transcript}
+
+
+def reload_unit_after_replan(units: list[WorkUnit], feature_dir: Path,
+                              old_wu: WorkUnit) -> WorkUnit:
+    """Re-read a re-planned unit's file and splice it back into `units`.
+
+    `run()`'s `units = [load_wu(feature_dir, ref) for ref in gate.refs]`
+    (loop.py:9202-ish) snapshots every unit's body once, before the dispatch
+    loop starts, and never calls `load_wu` again — so a re-plan turn's
+    rewritten body is invisible to the rest of the gate unless something
+    re-reads it and hands the fresh object back to both the caller's local
+    `wu` binding AND the `units` list `ready()` and the end-of-gate
+    `stranded` check both iterate. Splicing into `units` only (leaving the
+    caller holding the stale object) is exactly the bug this closes: a unit
+    that went on to pass would flip status on the fresh object while `units`
+    still held the stale one at `in_progress`, and the stale entry would
+    still show up in `stranded` — "never became ready" — after the gate
+    otherwise finished clean.
+    """
+    ref = {"id": old_wu.wu_id,
+           "file": str(old_wu.file.relative_to(feature_dir)),
+           "depends_on": old_wu.depends_on}
+    fresh = load_wu(feature_dir, ref)
+    for idx, u in enumerate(units):
+        if u.wu_id == old_wu.wu_id:
+            units[idx] = fresh
+            break
+    return fresh
 
 
 # --------------------------------------------------------------------------- #
@@ -2812,6 +2995,253 @@ def format_human_unit_brief(
     return "\n".join(lines)
 
 
+# Flag-scope table (FEAT-2026-0104/T07, `.specfuse/rules/planning-discipline.md`
+# §3): every `blocked_human` escalation `reason` string in this module
+# (`grep -n '"reason": "' specfuse/loop/loop.py`), each mapped to whether the
+# spin-out brief may offer re-planning the remaining gate as an option, and
+# why. `replan_option_applies` is the single predicate the brief consults, so
+# the scope is testable per reason rather than on one sampled path.
+REPLAN_OPTION_SCOPE = {
+    "spinning_detected": (True,
+        "the unit met its own oracle three times and lost; a narrower unit "
+        "is the remedy"),
+    "spinning_signature_repeat": (True,
+        "same failure twice — the unit's shape, not the attempt"),
+    "convergence_plateau": (True,
+        "progress stopped short of the oracle; re-scoping is what moves it"),
+    "replan_unchanged_body": (True,
+        "the unit-scoped re-plan produced nothing; widening is the next "
+        "step, and only a human can authorise it"),
+    "all_attempts_zero_token": (False,
+        "no session ever ran — a CLI, quota or connectivity fault; "
+        "re-planning fixes nothing"),
+    "deterministic_refusal_repeat": (False,
+        "GATE-01.md's \"What this gate must not break\" binds this to "
+        "escalate where it does"),
+    "produces_shape_invalid": (False,
+        "pre-dispatch frontmatter refusal; nothing was attempted"),
+    "spinning_reproduction_missing": (False,
+        "a re-arm gate, not a failure; the operator is mid-decision already"),
+    "prep_halted": (False,
+        "pre-dispatch halt, no session spawned"),
+    "agent_reported_blocked": (False,
+        "the session named a boundary; its own blocked_reason is the "
+        "better lead"),
+    "human_step_required": (False,
+        "not a spin-out; format_human_unit_brief owns it"),
+}
+
+
+def replan_option_applies(reason: str) -> bool:
+    """Whether *reason* may offer re-planning the remaining gate (T07).
+
+    Decides `REPLAN_OPTION_SCOPE` above. Unknown reasons default to `False`
+    — an escalation this module has never named gets the conservative
+    answer, not a guess.
+    """
+    scoped = REPLAN_OPTION_SCOPE.get(reason)
+    return scoped[0] if scoped is not None else False
+
+
+def format_spinout_escalation_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    reason: str,
+    wu_max_attempts: int,
+    attempt_outcomes: list,
+    replanned: bool,
+    resume_command: str,
+) -> str:
+    """Render the six-part operator brief for a spun-out unit (FEAT-2026-0104/T06).
+
+    This gate's tracer bullet: wires a real six-part brief onto the
+    attempt-exhaustion halt so `feature_oracle` can observe one, following
+    `format_human_unit_brief`'s pattern — same `ESCALATION_PART_HEADINGS`, so
+    the printed brief and an eventual escalation issue can never disagree on
+    part names — plus the one thing that sibling omits: the
+    `<!-- specfuse:escalation id=... -->` correlation marker, keyed on
+    `wu.wu_id`, so `escalation.validate_escalation_body` accepts this brief.
+    Option 1 and the recommendation (T07) are driven by
+    `replan_option_applies`: re-planning the remaining gate when the
+    escalation `reason` is in scope, naming `/unblock-wu` — the command that
+    actually resets `attempts` and re-arms — over inventing a new one; a
+    plain re-arm, with the reason the table excludes it, otherwise. Neither
+    branch flips anything itself: the brief only recommends.
+    """
+    done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    outcomes = ", ".join(
+        f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
+    ) or "(no attempt produced a recorded outcome)"
+    # T10 widened this function to every per-unit reason, not just the two
+    # for-else shapes (spinning_detected, all_attempts_zero_token) it was
+    # written for -- those two are the only ones where "the attempt budget is
+    # exhausted" is actually true, so the dispatch count and the why-not-auto
+    # line below both branch on it rather than asserting it unconditionally.
+    dispatch_summary = (
+        f"was dispatched {len(attempt_outcomes)} time(s): {outcomes}"
+        if attempt_outcomes else
+        "was not dispatched — refused or halted before any attempt ran"
+    )
+    replan_line = (
+        "The automatic re-plan fired before the last attempt, and already "
+        "failed: a fresh session rewrote the unit body after the earlier "
+        "failures, and the rewritten body still did not pass."
+        if replanned else
+        "The automatic re-plan did not fire during this run."
+    )
+
+    offers_replan = replan_option_applies(reason)
+    _scoped = REPLAN_OPTION_SCOPE.get(reason)
+    scope_why = _scoped[1] if _scoped is not None else (
+        "this escalation reason is not in the flag-scope table")
+    replan_targets = ", ".join([wu.wu_id] + list(remaining_wu_ids))
+
+    if offers_replan:
+        already_spent = (
+            "the automatic re-plan already ran once against "
+            f"{wu.wu_id} and that rewritten attempt already failed"
+            if replanned else
+            "no automatic re-plan ran during this run"
+        )
+        option_1 = (
+            "1. **Re-plan the remaining gate** — run `/unblock-wu` on "
+            f"{replan_targets}, choosing re-arm (retry-as-is) for each. "
+            "Re-arming resets each unit's `attempts` to 0, so the driver's "
+            f"automatic re-plan trigger — {already_spent} — becomes "
+            f"reachable again for every re-armed unit in gate {gate_number}, "
+            "not just the one that spun out. Pros: widens a remedy that "
+            "already produced a rewrite once, without inventing a new "
+            "mechanism. Cons: it is the same remedy that already failed for "
+            f"{wu.wu_id}; if nothing about scope or shape changes first, "
+            "the re-plan may reproduce the same rewrite."
+        )
+        recommendation = (
+            f"Option 1. {scope_why[0].upper()}{scope_why[1:]}, and the "
+            f"remedy is already named and one command away — {already_spent}, "
+            "so this is widening it rather than proposing anything new."
+        )
+    else:
+        option_1 = (
+            "1. **Re-arm the unit** — run `/unblock-wu` on "
+            f"{wu.wu_id}, choosing re-arm (retry-as-is). Re-planning the "
+            f"remaining gate is not offered for `{reason}`: {scope_why}. "
+            "Pros: another automatic pass may succeed once the underlying "
+            "condition changes; cons: repeats the same dispatch if nothing "
+            "about the unit or its environment changed."
+        )
+        recommendation = (
+            f"Option 1. `{reason}` is not in the re-plan scope table "
+            f"because {scope_why}, so re-arming as-is is the next "
+            "available step rather than a wider re-scope."
+        )
+
+    lines = [
+        _escalation_correlation_marker(wu.wu_id),
+        "",
+        f"ESCALATED — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is open. Work units finished so far: {done_list}. "
+        f"{wu.wu_id} {dispatch_summary}. "
+        f"{replan_line}",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        f"{wu.wu_id} has escalated for a human decision ({reason}) and no "
+        f"further automatic attempt will be dispatched until one is made.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        f"Someone must choose how {wu.wu_id} proceeds, because the driver "
+        f"has run out of ways to choose for it: "
+        # The exhaustion clause is true only where the budget actually ran
+        # out. T10 widened this brief from the attempt-exhaustion `for-else`
+        # to every per-unit escalation site, and at the other nine the budget
+        # is untouched — an `agent_reported_blocked` unit stops after one
+        # attempt of three. Claiming exhaustion there contradicts part 1's own
+        # attempt record, which is a claim the artifact refutes rather than
+        # supports. Same two-reason test part 4 below already applies.
+        + (f"every attempt its budget ({wu_max_attempts}) allowed has been "
+           f"dispatched and has failed"
+           if reason in ("spinning_detected", "all_attempts_zero_token") else
+           f"it stopped short of its attempt budget ({wu_max_attempts}) for a "
+           f"reason no further attempt would change ({reason})")
+        + ", and "
+        + ("the one automatic remedy available — re-planning the unit into "
+           "a narrower one — has already been applied once and its attempt "
+           "failed too. "
+           if replanned else
+           "no automatic re-plan applies to this unit. ")
+        + f"The options below are the only ways gate {gate_number} moves "
+        f"again. Until one is chosen nothing further is dispatched: "
+        + (f"the {len(remaining_wu_ids)} work unit(s) waiting behind this "
+           f"one stay blocked, and the gate cannot close."
+           if remaining_wu_ids else
+           "this gate cannot close."),
+        "",
+        f"Work units still waiting behind it: {remaining}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        (
+            f"Every dispatched attempt failed its own verification and the "
+            f"unit's attempt budget ({wu_max_attempts}) is exhausted, so no "
+            f"further automatic attempt is possible."
+            if reason in ("spinning_detected", "all_attempts_zero_token") else
+            f"No further automatic attempt is available for `{reason}`: "
+            f"{scope_why}."
+        ),
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        option_1,
+        "2. **Abandon the unit** — pros: unblocks the rest of the gate; "
+        "cons: anything depending on this unit, and everything named in "
+        "option 1 if it was re-armed instead, is stranded.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        recommendation,
+        "",
+        "Reply with the number of your choice, or prose if none fit:",
+        "1. " + ("Re-plan the remaining gate" if offers_replan
+                  else "Re-arm the unit"),
+        "2. Abandon the unit",
+        "",
+        f"Resume after deciding:\n  {resume_command}",
+    ]
+    return "\n".join(lines)
+
+
+def escalate_unit(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    reason: str,
+    resume_command: str,
+    wu_max_attempts: int,
+    attempt_outcomes: list,
+    replanned: bool = False,
+) -> str:
+    """Render the six-part operator brief for ANY per-unit `blocked_human`
+    escalation -- the single call every `human_escalation` site keyed on
+    `wu.wu_id` makes for its `message` field (FEAT-2026-0104/T10).
+
+    Thin wrapper over `format_spinout_escalation_brief`, which T06/T07
+    already made reason-generic (it consults `replan_option_applies`, not a
+    hardcoded reason). Widening the brief to every per-unit reason was a
+    matter of calling it from every per-unit site rather than only the
+    attempt-exhaustion one -- this is that one call, named for what it does
+    so a reason added later gets a brief by construction instead of by
+    remembering to wire one in. Gate-level halts (`human_escalation` keyed on
+    `feature_id`) do not call this: a gate-level halt has no single unit to
+    brief about.
+    """
+    return format_spinout_escalation_brief(
+        wu, gate_number, done_wu_ids, remaining_wu_ids, reason,
+        wu_max_attempts, attempt_outcomes, replanned, resume_command,
+    )
+
+
 def halt_for_human_unit(
     wu: "WorkUnit",
     backend: "Backend",
@@ -3209,11 +3639,27 @@ def persist_attempt_notes(
     left nothing on disk to diagnose (#168). Returns the written paths for
     inclusion in the escalation commit. `work/` is gitignored, so the explicit
     `git add` in commit_bookkeeping is what tracks these.
+
+    A re-planned attempt buffers TWICE under the same attempt number — the
+    failure evidence that triggered the re-plan, then the re-plan turn's own
+    transcript — and both used to land on the same `attempt-N.md` path, the
+    second write clobbering the first (#3341). The two callers that buffer
+    this way are correct and stay untouched; this function is the only place
+    that knows a collision happened, so it is the only place that can name
+    around it. The first write for a given attempt keeps the unchanged
+    `attempt-N.md` name; a later collision on the same attempt number is a
+    re-plan transcript (the only thing that ever buffers twice) and gets
+    `attempt-N-replan.md`, so a WU that never re-plans sees no name change.
     """
     wu_key = wu_id.replace("/", "_")
     paths: list[Path] = []
+    seen_attempts: set[int] = set()
     for atmpt, evidence in attempt_notes:
-        p = work_dir / wu_key / f"attempt-{atmpt}.md"
+        if atmpt in seen_attempts:
+            p = work_dir / wu_key / f"attempt-{atmpt}-replan.md"
+        else:
+            p = work_dir / wu_key / f"attempt-{atmpt}.md"
+            seen_attempts.add(atmpt)
         p.parent.mkdir(parents=True, exist_ok=True)
         # Terminate the last line. A note without one counts 0 under `wc -l`,
         # which is how #1412 came to be reported as a 0-byte file when it
@@ -7306,12 +7752,21 @@ def _fire_and_verify_terminal_flips(
     feature_dir: Path,
     events_path: Path,
     feature_id: str,
+    gate_number: int,
+    done_wu_ids: list,
 ) -> int:
     """Fire terminal state flips and run the post-pass invariant guard.
 
     Returns 0 on success, 1 when the guard fires. Called from both the
     auto-close path and the normal close-WU path; factored here to avoid
     duplicating the fire+verify block across both branches (FEAT-2026-0018/T04).
+
+    `gate_number`/`done_wu_ids` (FEAT-2026-0104/T10): threaded through so the
+    `post_pass_invariant_failed` escalation below -- a per-unit halt keyed on
+    `close_wu.wu_id` -- can carry the six-part brief like every other one.
+    `close_wu` already passed its own verification (that is why it reached
+    terminal-flip time at all), so this is the one per-unit reason where
+    `attempt_outcomes=["passed"]` is the honest record, not an exhaustion.
     """
     flip_paths = fire_terminal_flips(close_wu, feature_dir, REPO_ROOT)
     if flip_paths:
@@ -7323,11 +7778,17 @@ def _fire_and_verify_terminal_flips(
     head_post = git("rev-parse", "HEAD")
     ok, reason = verify_post_pass_invariants(close_wu, feature_dir, REPO_ROOT, head_post)
     if not ok:
+        message = escalate_unit(
+            close_wu, gate_number, done_wu_ids, [],
+            "post_pass_invariant_failed", resume_command_for(feature_id),
+            resolve_max_attempts(close_wu, load_verification()), ["passed"],
+        )
         flush_events(events_path, [build_event(
             "human_escalation", close_wu.wu_id, {
                 "reason": "post_pass_invariant_failed",
                 "assertion": reason.split(":", 1)[0].strip(),
                 "summary": reason,
+                "message": message,
             })])
         commit_bookkeeping(
             [events_path],
@@ -9550,6 +10011,14 @@ def run(
                 shape_ok, shape_reason = assert_produces_shape(wu)
                 if not shape_ok:
                     backend.set_wu(wu, "status", "blocked_human")
+                    _shape_message = escalate_unit(
+                        wu, gate.number, sorted(done_ids),
+                        [w.wu_id for w in units
+                         if w.wu_id != wu.wu_id
+                         and w.status not in (DONE, "abandoned")],
+                        "produces_shape_invalid", resume_command_for(feature_id),
+                        resolve_max_attempts(wu, load_verification()), [],
+                    )
                     flush_events(events_path, [build_event(
                         "human_escalation", wu.wu_id, {
                             "reason": "produces_shape_invalid",
@@ -9557,6 +10026,7 @@ def run(
                             "attempts": 0,
                             "failure_class": "guard_refusal",
                             "failure_signature": "assert_produces_shape",
+                            "message": _shape_message,
                         })])
                     commit_bookkeeping(
                         [wu.file, events_path],
@@ -9625,6 +10095,18 @@ def run(
                           f"{wu.unsandboxed_rationale}")
                 attempt_notes: list[tuple[int, str]] = []
                 attempt_outcomes: list[str] = []
+                # Set once a re-plan turn succeeds (below). Unlike wu_events,
+                # never cleared mid-loop by the per-failed-attempt flush/clear
+                # (FEAT-2026-0104/T06) — the exhaustion brief needs to know
+                # whether a re-plan fired at any point in this WU's attempts,
+                # not only in the final one still buffered when it renders.
+                replanned_this_wu = False
+                # Per-failed-attempt (class, signature, full note) — the raw
+                # material `synthesize_replan_brief` reads (FEAT-2026-0104/T03).
+                # Only the "failed" outcome branch below reaches the re-plan
+                # trigger check (every other outcome `continue`s earlier), so
+                # this only needs populating there.
+                replan_history: list[dict] = []
                 # Cost accumulators: per-attempt list goes to events.jsonl,
                 # cumulative sum to WU frontmatter at outcome time.
                 attempts_usage: list[dict] = []
@@ -9665,12 +10147,23 @@ def run(
                         backend.set_wu(wu, "escalation_reason",
                                        "deterministic_refusal_repeat")
                         write_cost_to_wu(backend, wu, cum_usage)
+                        _drr_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "deterministic_refusal_repeat",
+                            resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event(
                             "human_escalation", wu.wu_id, {
                                 "reason": "deterministic_refusal_repeat",
                                 "blocked_reason": _rsum,
                                 "attempts": attempt - 1,
                                 "attempts_usage": attempts_usage,
+                                "message": _drr_message,
                             }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -9751,11 +10244,21 @@ def run(
                                 "summary": payload.get("message"),
                             },
                         ))
+                        _prep_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "prep_halted", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "prep_halted",
                             "blocked_reason": payload.get("message"),
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _prep_message,
                         }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -9783,11 +10286,21 @@ def run(
                             agent_status="blocked",
                             agent_blocked_reason=payload,
                         ))
+                        _blocked_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "agent_reported_blocked", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "agent_reported_blocked",
                             "blocked_reason": payload,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _blocked_message,
                         }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -9795,6 +10308,7 @@ def run(
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(agent-reported)\n\nFeature: {wu.wu_id}",
                         )
+                        print(f"\n{_blocked_message}")
                         print(f"   BLOCKED by agent — "
                               f"{payload or '(no reason given)'}")
                         blocked = True
@@ -10370,6 +10884,12 @@ def run(
                     attempt_notes.append((attempt, _evidence))
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
+                    replan_history.append({
+                        "attempt": attempt,
+                        "failure_class": _fc,
+                        "failure_signature": _fs,
+                        "note": _evidence,
+                    })
                     # `failure_note` is built AFTER the retain/reset decision
                     # below (#2650): its lead depends on whether the tree
                     # survived, and #175 fix 1's directive is only true for
@@ -10386,12 +10906,22 @@ def run(
                     ))
                     # T04: halt early when same (class, signature) repeats.
                     if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                        _sig_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "spinning_signature_repeat", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "spinning_signature_repeat",
                             "failure_class": _fc,
                             "failure_signature": _fs,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _sig_message,
                         }))
                         reset_preserving_events(head_before, events_path,
                                                 untracked_before=untracked_before)
@@ -10551,12 +11081,22 @@ def run(
                         backend.set_wu(wu, "escalation_reason",
                                        "convergence_plateau")
                         write_cost_to_wu(backend, wu, cum_usage)
+                        _plateau_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "convergence_plateau", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event(
                             "human_escalation", wu.wu_id, {
                                 "reason": "convergence_plateau",
                                 "attempts": attempt,
                                 "best_findings": convergence.best_findings,
                                 "attempts_usage": attempts_usage,
+                                "message": _plateau_message,
                             }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -10570,6 +11110,91 @@ def run(
                               f"(best findings {convergence.best_findings})")
                         blocked = True
                         break
+                    # Re-plan trigger (FEAT-2026-0104/T02): ceiling-relative,
+                    # not opt-in — `should_replan_instead_of_retry` applies to
+                    # every unit whose next attempt would be its last
+                    # permitted one, replacing T01's `replan_stub_trigger`
+                    # tracer flag. Fires once this attempt — the unit's
+                    # second-to-last permitted one — has failed, rewrites the
+                    # body ahead of the LAST attempt, and reloads so both this
+                    # local `wu` and the `units` list `ready()`/`stranded`
+                    # read see the fresh object (#3 in PLAN.md's retrospective
+                    # on the reverted first attempt). Does NOT touch the
+                    # attempt counter — attempt still runs to
+                    # `wu_max_attempts` on its own budget, so this cannot spin
+                    # forever the way rewinding attempts to 0 did (#1 in the
+                    # same retrospective). Only reached once the
+                    # `detect_deterministic_refusal_repeat` and
+                    # `spinning_signature_repeat` checks above have both
+                    # declined to `break` this attempt loop — a repeated
+                    # guard refusal or spinning signature escalates there and
+                    # never reaches this trigger.
+                    if should_replan_instead_of_retry(wu, attempt, wu_max_attempts):
+                        try:
+                            replan_result = run_replan_turn(wu, replan_history)
+                        except ReplanUnchangedError:
+                            note_paths = persist_attempt_notes(
+                                work_dir, wu.wu_id, attempt_notes)
+                            backend.set_wu(wu, "status", "blocked_human")
+                            backend.set_wu(wu, "escalation_reason",
+                                           "replan_unchanged_body")
+                            write_cost_to_wu(backend, wu, cum_usage)
+                            _unchanged_message = escalate_unit(
+                                wu, gate.number, sorted(done_ids),
+                                [w.wu_id for w in units
+                                 if w.wu_id != wu.wu_id
+                                 and w.status not in (DONE, "abandoned")],
+                                "replan_unchanged_body",
+                                resume_command_for(feature_id),
+                                wu_max_attempts, attempt_outcomes,
+                                replanned_this_wu,
+                            )
+                            wu_events.append(build_event(
+                                "human_escalation", wu.wu_id, {
+                                    "reason": "replan_unchanged_body",
+                                    "attempts": attempt,
+                                    "attempts_usage": attempts_usage,
+                                    "message": _unchanged_message,
+                                }))
+                            flush_events(events_path, wu_events)
+                            commit_bookkeeping(
+                                [wu.file, events_path, *note_paths],
+                                f"chore(loop): {wu.wu_id} blocked_human "
+                                f"(replan_unchanged_body, attempt {attempt})"
+                                f"\n\nFeature: {wu.wu_id}",
+                            )
+                            print(f"   BLOCKED — re-plan turn at attempt "
+                                  f"{attempt}/{wu_max_attempts} returned a "
+                                  f"body identical to its input; refusing to "
+                                  f"dispatch an attempt that cannot differ "
+                                  f"from the one before it")
+                            blocked = True
+                            break
+                        # The dispatched session's transcript IS the rewrite
+                        # (T03): fold it into this unit's own attempt-note
+                        # record so it rides with the evidence any later
+                        # escalation for this unit persists to disk.
+                        attempt_notes.append((
+                            attempt,
+                            "## Re-plan turn transcript\n\n"
+                            + replan_result["transcript"]
+                        ))
+                        write_wu_body(wu.file, replan_result["body"])
+                        wu = reload_unit_after_replan(units, feature_dir, wu)
+                        # gate_eval.py's evaluate_auto_close reads this as
+                        # check 2 (a WU that needed a re-plan disqualifies
+                        # its gate from auto-close) — the consumer predates
+                        # this emitter by two years (FEAT-2026-0018/T02).
+                        wu_events.append(build_event("replan", wu.wu_id, {
+                            "attempt": attempt,
+                            "max_attempts": wu_max_attempts,
+                        }))
+                        replanned_this_wu = True
+                        failure_note = None
+                        print(f"   RE-PLANNED {wu.wu_id} after attempt "
+                              f"{attempt}/{wu_max_attempts} — next dispatch "
+                              f"uses a rewritten body")
+                        continue
                     failure_note = (
                         synthesize_retry_directive(_fc, retained=_retained)
                         + "\n\n## Gate output from the previous attempt\n\n"
@@ -10597,10 +11222,25 @@ def run(
                         work_dir, wu.wu_id, attempt_notes)
                     backend.set_wu(wu, "status", "blocked_human")
                     write_cost_to_wu(backend, wu, cum_usage)
+                    _spinout_brief = format_spinout_escalation_brief(
+                        wu=wu,
+                        gate_number=gate.number,
+                        done_wu_ids=sorted(done_ids),
+                        remaining_wu_ids=[
+                            w.wu_id for w in units
+                            if w.wu_id != wu.wu_id
+                            and w.status not in (DONE, "abandoned")],
+                        reason=reason,
+                        wu_max_attempts=wu_max_attempts,
+                        attempt_outcomes=attempt_outcomes,
+                        replanned=replanned_this_wu,
+                        resume_command=resume_command_for(feature_id),
+                    )
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": reason,
                         "attempts": wu_max_attempts,
                         "attempts_usage": attempts_usage,
+                        "message": _spinout_brief,
                     }))
                     flush_events(events_path, wu_events)
                     # Post-dispatch budget breach check (#2174): see the
@@ -10619,8 +11259,7 @@ def run(
                         f"({reason}, {wu_max_attempts} attempts)"
                         f"\n\nFeature: {wu.wu_id}",
                     )
-                    print(f"   BLOCKED after {wu_max_attempts} attempts — "
-                          f"escalated ({reason})")
+                    print(f"\n{_spinout_brief}")
                     blocked = True
 
         if blocked:
@@ -10768,6 +11407,7 @@ def run(
         if _terminal_auto_closed_wu is not None:
             rc = _fire_and_verify_terminal_flips(
                 _terminal_auto_closed_wu, feature_dir, events_path, feature_id,
+                gate.number, sorted(done_ids),
             )
             if rc:
                 return rc
@@ -10777,6 +11417,7 @@ def run(
             # `passed`, roadmap row `done`, archive anchor) observe the flips.
             rc = _fire_and_verify_terminal_flips(
                 close_wu_for_terminal, feature_dir, events_path, feature_id,
+                gate.number, sorted(done_ids),
             )
             if rc:
                 return rc

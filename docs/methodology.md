@@ -185,6 +185,16 @@ For the full design rationale see `PLAN.md` for FEAT-2026-0018.
    FEAT-2026-0016, if present, is also inspected — any prior `blocked_human`
    cycle disables auto.
 2. **No replan** — no `replan` event in `events.jsonl` for this gate's WUs.
+   A replan fires when a unit's next attempt would be its last permitted one
+   (the ceiling `resolve_max_attempts` resolves for that unit, not a bare
+   count of two) — the driver runs a fresh re-plan session instead of
+   retrying the same failing body verbatim. Units with `iterate_on_failure:
+   true` are exempt: they fail on purpose against a convergent validator, and
+   a replan there would misread deliberate iteration as spinning. Seeing this
+   check disable auto-close means a unit was mis-sized at authoring time (see
+   `/authoring-work-units` §6), not that anything is broken. A unit that
+   still spins out after this automatic re-plan escalates to a human — see
+   the escalation brief below for what that escalation tells the operator.
 3. **Per-WU cost ≤ 1.5× planned** — every substantive WU's `cost_usd` ≤
    `planned_cost_usd × 1.5`. If `planned_cost_usd` absent: skip this check for
    that WU (graceful degrade — emits a warning reason in the decision but doesn't
@@ -201,6 +211,28 @@ For the full design rationale see `PLAN.md` for FEAT-2026-0018.
    final attempt's `attempt_outcome` must be `passed`. Earlier attempts may have
    failed (already governed by check 1 if blocked), but the FINAL outcome on
    each WU must be clean.
+
+**The escalation brief (FEAT-2026-0104)** — **every** `blocked_human`
+escalation of a work unit, not only the spin-out that follows the automatic
+re-plan above, halts with a six-part operator brief
+(`.specfuse/rules/operator-escalation.md`'s six parts, in order), printed to
+the console and recorded verbatim in the `human_escalation` event's `message`
+field in `events.jsonl`. Gate-level halts — a gate budget exceeded, a
+pre-existing gate failure, a failing broad run — are excluded: those are keyed
+on the feature rather than on one unit, and there is no single unit to brief
+about. The escalation `reason` decides
+whether the brief's first option is re-planning the remaining gate:
+`spinning_detected`, `spinning_signature_repeat`, `convergence_plateau`, and
+`replan_unchanged_body` carry it, because for those a wider re-scope is the
+remedy; `all_attempts_zero_token`, `deterministic_refusal_repeat`,
+`produces_shape_invalid`, `spinning_reproduction_missing`, `prep_halted`, and
+`agent_reported_blocked` do not, because re-planning would fix nothing about
+that reason's actual cause (`REPLAN_OPTION_SCOPE` in `loop.py` is the single
+table both the brief and its tests consult). When it applies, the option is a
+recommendation, not an action the driver performs: the brief names
+`/unblock-wu` for the operator to run, re-arming the unit(s) so the driver's
+own automatic re-plan trigger (check 2 above) becomes reachable again for
+each — it resets `attempts`, it does not itself rewrite a body.
 
 **Auto-close terminal** — when the predicate fires on a terminal gate, the driver
 writes a stub `RETROSPECTIVE.md`, marks the close WU `status: done` with

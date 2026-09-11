@@ -43,6 +43,19 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0104"></a>
+## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
+
+**Why.** Retrying the same 100-line unit three times with the same context is the pattern the field warns against; FEAT-2026-0082/T04 took six dispatches and two carve-outs, and iac FEAT-2026-0039 spent $2.82 re-deriving a precondition its plan had already predicted. Spinning is a unit-shape problem, not a retry-count problem.
+
+**Goal.** After two failed attempts on a unit, the driver dispatches a planning turn that splits or re-scopes the unit (and may add a hygiene unit) rather than re-running the same prompt. After any `blocked_human`, the escalation brief offers a re-plan of the remaining gate as the default option.
+
+**Benefits.** Turns spinning into progress; fewer human escalations; the plan stays disposable rather than sacred.
+
+**Shipped.** Narrower than the goal above on two points, both deliberate and both recorded in `PLAN.md` § "Scope boundary". The planning turn **re-scopes the unit in place**; it does not split it into new units and does not add a hygiene unit, because splitting mutates `gate.refs` mid-flight and was deferred until re-plan has behaved on real spins. The brief itself now renders at **every** unit-level `blocked_human` escalation, which the feature's second gate reached only after being reopened: it first shipped at the single attempt-exhaustion site, reaching about 19% of real escalations in the corpus and none of the most common one. Gate-level halts stay excluded, having no single unit to brief about. The re-plan **option** inside that brief is offered on **four of the eleven** unit-level reasons rather than after any of them — the seven excluded are ones a wider re-scope cannot help — and it **recommends** the re-plan, naming the units and the `/unblock-wu` command, rather than executing it. Proven runnable, not proven useful: zero re-plans fired during the feature's own run, so the success rate of a re-planned unit is unmeasured at n=0, and the one attempt that did fail stopped one failure short of the trigger.
+
+**Status: done.**
+
 <a id="feat-2026-0103"></a>
 ## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
 

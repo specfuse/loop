@@ -4187,3 +4187,144 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `--tests A --tests B` at all, because no join character produces a repeated flag. Splitting
   the render into a per-item template plus a separator is one extra key and one extra default,
   and it is the difference between covering two ecosystems and covering one.
+
+- [FEAT-2026-0104/G1] When a gate's units edit the central dispatch loop, the per-attempt
+  narrow tier is not an exit oracle — it is a smoke test, and the plan must say so in each
+  unit's **Verification** section. FEAT-2026-0109's `narrow_command` selects a unit's own
+  `produces:` test modules, so for four units that each rewrote `loop.run()`'s retry path the
+  driver's exit oracle ran 1, 6, 13 and 1 tests (`work/gate-logs/tests-*.log`), while the blast
+  radius was the 44 test modules that drive `loop.run()`. This gate's first run died exactly
+  there: four units passed their narrow tiers, and the first full-suite run — at the fifth
+  unit's entry, because that unit's `produces:` named only docs and the empty selection falls
+  back to the whole command — hung and never completed, taking the gate with it. The narrowing
+  is right for ordinary units and this is not an argument against it; the fix is that a unit
+  editing the loop the harness runs carries `python3 -m unittest discover -s tests -b` in its
+  own **Verification** text, with the expected test count and wall-clock so the session can
+  tell a hang from slowness. Note what that costs you: nothing in `work/gate-logs/` records a
+  session-side suite run, so the instruction is an unverifiable self-report, and the only
+  artifact confirming it was honoured arrives one unit later. Two consequences for drafting.
+  **(a)** Order the gate so at least one unit has an empty narrow selection — a docs unit
+  works — because its fallback to the full command is the first driver-run suite of the gate,
+  and you want that to happen at unit 5, not at the gate boundary. **(b)** A hang is not a
+  failure: it emits no `attempt_outcome`, so it carries no `failure_class` for the learnings
+  pass to cluster on and no cost row for the close to reconcile. It is invisible to every
+  aggregate the methodology builds, which is why it is worth naming here.
+
+- [FEAT-2026-0104/G1] A gate reverted to its plan baseline takes its own spend record with it,
+  and the close that follows will report a cost that is confidently wrong. `events.jsonl` is a
+  committed artifact, so reverting the gate's commits reverts the `task_started` /
+  `attempt_outcome` / `task_completed` events too — this gate's log opens with an orphaned
+  `driver_build_pinned` and then jumps three and a half hours to the second run, and the close
+  reconciled $8.76 against a $14.50 plan when the true cost of reaching green was roughly
+  double that. `work/gate-logs/` is what survives, because it is untracked working-tree state
+  the revert does not reach: its per-gate log timestamps reconstruct how many verification
+  passes ran and, from the log bodies, which ones failed and where. So the rule for any close
+  after a revert is to reconcile against BOTH surfaces and say plainly which numbers came from
+  which — a variance explained only from `events.jsonl` after a revert is not an explanation,
+  it is the artifact of the discard being read as an estimating win. The generalizable
+  drafting move is smaller than a driver change: when a gate is reverted, record the discarded
+  run's wall-clock bounds in `PLAN.md` at the same time you write the "what the first attempt
+  taught" section, while someone still knows them.
+
+- [FEAT-2026-0104/G2] A gate that edits the driver cannot exercise its own edit: the driver
+  build is pinned before the gate's units land, so the earliest a gate-N change can run is
+  gate N+1. Measured on this feature by grepping each `driver_build_pinned` tree's `loop.py` —
+  gate 1's pin had no `should_replan_instead_of_retry`, gate 2's had the trigger but not
+  `format_spinout_escalation_brief`, which T06 wrote after that pin was taken. Two consequences
+  for drafting a self-hosting feature. **(a)** If you want field evidence of your own change,
+  schedule the thing that would produce it at least one gate later; a criterion of the form
+  "the new behaviour is observed during this gate" is unsatisfiable by construction and will
+  be quietly answered n=0. **(b)** A close must check the pin before writing "ran on a driver
+  carrying this code" — the sentence is checkable in one grep and is wrong more often than it
+  looks, because `driver_version` in the event payload names the released version, not the
+  tree, and both gates here report `0.19.0`.
+
+- [FEAT-2026-0104/G2] When a feature's mechanism only fires on failure, its own clean run is
+  not evidence and the plan must buy the evidence deliberately. Both gates here passed every
+  attempt first try, so the re-plan trigger was never consulted, zero `replan` events exist in
+  any feature in the repo, and the success rate of a re-planned unit is n=0 after a whole
+  feature was spent building it. The plan's own headline metric moved 2.09 -> 1.92 purely
+  because one more zero-escalation feature joined an eleven-feature mean — the numerator never
+  moved. So: **(a)** a plan whose goal is a failure-path mechanism should carry a committed,
+  re-runnable probe as a work unit with its own `produces:`, not a session-local one a
+  `plan-next` runs and pastes into prose (this feature's probe found a real defect — a
+  clobbered attempt note — and still left nothing anyone can re-run); and **(b)** a close whose
+  criteria name a corpus metric must decompose the delta into numerator and denominator and
+  report n, because at n≈10 adding one feature moves a mean by more than most real effects.
+
+- [FEAT-2026-0104/G2] A tracer bullet must stub only the parts the plan named as stubbed, and
+  the units after it are scoped to that same list — so a part stubbed beyond the licence is
+  owned by nobody and ships. Here T06 was licensed to stub "the option text and the
+  recommendation" (parts 5 and 6) and also stubbed part 3; T07's criteria named parts 5 and 6,
+  so the placeholder "(Full decision text is FEAT-2026-0104/T07's; this brief only guarantees
+  the decision point exists.)" reached operator-facing output and passed every gate, because
+  the contract validator only requires each part to be present and non-empty. The drafting
+  move is cheap: the tracer-bullet WU lists the stubs it is allowed to leave, and the
+  follow-up units' criteria are written against that list rather than against part numbers
+  someone remembers.
+
+- [FEAT-2026-0104/G2-CLOSE] A close that finds an operator-facing defect in its own gate's
+  deliverable owes the **verdict**, not just a note — "not fixed here" and "gate is done" are
+  separate answers to separate questions. This close's attempt 1 found a tracer-bullet
+  placeholder in part 3 of the operator escalation brief, wrote it up precisely, correctly
+  declined to fix it inside a close (an escalation string is an implementation change with its
+  own oracle, and editing it there is the drift `result-contract.md` §2 names) — and then
+  recorded `verdict: met`, reasoning that no acceptance criterion asserted on part 3. The judge
+  session lowered it (`judged`: `close_verdict: "met"`, `judge_verdict: "not_met"`,
+  `lowered: true`, `findings: 1`), the finding was filed as a tracked follow-up, and the gate
+  paid a second full close. The per-unit criteria are not the definition of done; the gate's
+  is, and a user-visible deliverable shipping a placeholder does not meet it. Two moves follow.
+  **(a)** When a close finds a defect in the gate's own output, record `not_met` with the
+  follow-up, and leave the fix to a unit or a bug branch — that is what `FOLLOW-UPS.md` and
+  `close-discipline.md` §2 are for, and it costs one tracked issue instead of one re-close.
+  **(b)** A contract validator that checks a part is *present and non-empty* cannot check that
+  it *says* anything, so a placeholder passes it: assert on content — a minimum length, the
+  absence of internal `FEAT-`/work-unit IDs in operator-facing text, the specific facts the
+  part is supposed to state.
+
+- [FEAT-2026-0104/T10] Widening **where** a message is rendered is not the same change as
+  widening **what it may claim** — a unit that moves a render site inherits every condition the
+  old site guaranteed, and the guarantees that were implicit at the old site become false
+  statements at the new ones. T10 moved the six-part escalation brief from one call site (the
+  `for-else` that fires when a unit exhausts its attempt budget) to all ten per-unit escalation
+  sites, and left part 3's "every attempt its budget allowed has been dispatched and has
+  failed" unconditional — while part 4, four lines below and written by an earlier unit, had
+  already been gated on exactly the two reasons where that is true. At the other nine sites the
+  brief now contradicts its own part 1, which reports the real attempt count correctly. The
+  drafting move: when a unit widens a render site, its criteria must enumerate the facts the
+  old site made true by construction and assert each one at the new sites — a diff of the
+  *conditions*, not of the call graph.
+
+- [FEAT-2026-0104/T10] When a deliverable has enumerable parts, **one criterion must assert on
+  the enumeration**, not one criterion per part the plan happened to think of. Gate 2 shipped
+  the same class of defect three times into the same six-part brief: a tracer bullet stubbed a
+  part the plan had not licensed (#3305), the next unit's criteria named parts 5 and 6 so
+  nothing owned part 3, and a later unit widened the render site without widening part 3's
+  conditional. Each unit met its own criteria; the part nobody's criteria named shipped
+  whatever the last unit to touch it left there. Criteria written per unit cannot cover a
+  deliverable whose parts outnumber the units, and every checker the gate shipped
+  (`validate_escalation_body`, a minimum-length assertion, a leaked-ID assertion) tests the
+  brief's *shape* rather than the truth of what it says.
+
+- [FEAT-2026-0104/G2-CLOSE] A gate expecting more than one close dispatch should write a
+  `GATE-NN-CRITERIA.md`. `close-discipline.md` §5 lets a `narrow` oracle's recorded green carry
+  forward across close attempts; with no such artifact there is nothing to carry, so every
+  dispatch re-runs the whole oracle set from scratch. This feature's close was dispatched four
+  times — twice after a judge lowered the verdict, once after the gate was reopened, once after
+  the close recorded its own `not_met` — and re-ran the same twelve oracles every time. The
+  closing sequence cost $31.47 over three recorded dispatches against a $5.00 plan line, which
+  is 1.8x what all ten implementation units cost together: the feature spent more closing
+  itself than building itself. The artifact is cheap to write at the first close and pays for
+  itself on the second.
+
+- [FEAT-2026-0104/G2-CLOSE] A follow-up's **re-run condition is a specification for the
+  discharging change's oracle**, and nothing in the loop ever compares the two. The driver
+  files the issue and writes the number back; after that the follow-up entry and the fix that
+  clears it never meet again, so a fix can discharge the defect while missing the barrier the
+  entry asked for and no surface notices. #3308's condition asked for a test driving a real
+  `loop.run()` to a non-exhaustion escalation and asserting part 3 against part 1. What
+  shipped was two function-level tests asserting exactly the right property one layer down;
+  the end-to-end half was checked by the re-closing session instead, which discharges the
+  defect and commits nothing. The drafting move: write the re-run condition as the acceptance
+  criterion of the unit that will discharge it, and have the re-closing session diff what
+  shipped against the condition rather than against the defect.

@@ -1,0 +1,62 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Wire the thinnest re-plan path end to end",
+          "id": "FEAT-2026-0104/T01",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Decide when a re-plan fires instead of a retry",
+          "id": "FEAT-2026-0104/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Define what the re-plan turn is told and what it must produce",
+          "id": "FEAT-2026-0104/T03",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Emit the replan event into the consumer that already waits for it",
+          "id": "FEAT-2026-0104/T04",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document when a unit re-plans and what an operator sees",
+          "id": "FEAT-2026-0104/T05",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 the re-plan trigger",
+          "id": "FEAT-2026-0104/G1-CLOSE-INTERMEDIATE",
+          "planned_cost_usd": 4.5,
+          "type": "close-intermediate"
+        },
+        {
+          "goal": "Draft gate 2 \u2014 the escalation brief's re-plan option",
+          "id": "FEAT-2026-0104/G1-PLAN",
+          "planned_cost_usd": 6.0,
+          "type": "plan-next"
+        }
+      ]
+    },
+    {
+      "gate": 2,
+      "work_units": [
+        {
+          "goal": "Close the feature \u2014 re-plan replaces the third identical attempt",
+          "id": "FEAT-2026-0104/G2-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

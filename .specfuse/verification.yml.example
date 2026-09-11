@@ -121,6 +121,12 @@
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
+#
+# The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
+# `max_attempts` resolution and adds no config key of its own — a unit's
+# next-to-last attempt re-plans instead of retrying verbatim, governed
+# entirely by the ceiling above (or a WU's own `max_attempts`) plus that WU's
+# `iterate_on_failure` flag.
 
 code:
   - name: tests
