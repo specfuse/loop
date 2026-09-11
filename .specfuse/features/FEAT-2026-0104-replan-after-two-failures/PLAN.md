@@ -7,7 +7,7 @@ roadmap_goal: After two failed attempts on a unit the driver re-plans it rather 
 autonomy_default: review        # this feature edits the driver; the judge_editing stop
                                 # class vetoes an auto-arm regardless, so `review` states
                                 # up front what would otherwise surface at the gate boundary
-status: active
+status: done
 planned_cost_usd: 43.50   # revised at G1-PLAN; see "The estimate was revised once"
 ---
 

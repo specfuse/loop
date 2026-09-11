@@ -102,7 +102,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-2026-0101) |
 | FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-2026-0103) |
-| FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | active | — | [→ detail](#feat-2026-0104) |
+| FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | done | — | [→ archive](roadmap-archive.md#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
 | FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
@@ -966,19 +966,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
 **Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
-
-<a id="feat-2026-0104"></a>
-## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
-
-**Why.** Retrying the same 100-line unit three times with the same context is the pattern the field warns against; FEAT-2026-0082/T04 took six dispatches and two carve-outs, and iac FEAT-2026-0039 spent $2.82 re-deriving a precondition its plan had already predicted. Spinning is a unit-shape problem, not a retry-count problem.
-
-**Goal.** After two failed attempts on a unit, the driver dispatches a planning turn that splits or re-scopes the unit (and may add a hygiene unit) rather than re-running the same prompt. After any `blocked_human`, the escalation brief offers a re-plan of the remaining gate as the default option.
-
-**Benefits.** Turns spinning into progress; fewer human escalations; the plan stays disposable rather than sacred.
-
-**Shipped.** Narrower than the goal above on two points, both deliberate and both recorded in `PLAN.md` § "Scope boundary". The planning turn **re-scopes the unit in place**; it does not split it into new units and does not add a hygiene unit, because splitting mutates `gate.refs` mid-flight and was deferred until re-plan has behaved on real spins. The brief itself now renders at **every** unit-level `blocked_human` escalation, which the feature's second gate reached only after being reopened: it first shipped at the single attempt-exhaustion site, reaching about 19% of real escalations in the corpus and none of the most common one. Gate-level halts stay excluded, having no single unit to brief about. The re-plan **option** inside that brief is offered on **four of the eleven** unit-level reasons rather than after any of them — the seven excluded are ones a wider re-scope cannot help — and it **recommends** the re-plan, naming the units and the `/unblock-wu` command, rather than executing it. Proven runnable, not proven useful: zero re-plans fired during the feature's own run, so the success rate of a re-planned unit is unmeasured at n=0, and the one attempt that did fail stopped one failure short of the trigger.
-
-**Status: active.**
 
 <a id="feat-2026-0105"></a>
 ## FEAT-2026-0105 — Parallel dispatch of the ready frontier
