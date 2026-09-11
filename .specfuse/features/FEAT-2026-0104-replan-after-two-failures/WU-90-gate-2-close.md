@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.19.0
 started_at: 2026-09-11T03:12:25.674221+00:00
 duration_seconds: 863.799
-cost_usd: 7.952012
-input_tokens: 132
-output_tokens: 63788
+cost_usd: 8.243503
+input_tokens: 152
+output_tokens: 67685
 ---
 
 # Close the feature — re-plan replaces the third identical attempt
