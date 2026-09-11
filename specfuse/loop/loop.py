@@ -3143,9 +3143,20 @@ def format_spinout_escalation_brief(
         f"verification run and has been escalated ({reason}).",
         "",
         f"## {ESCALATION_PART_HEADINGS[2]}",
-        "A person needs to decide how this unit proceeds. (Full decision "
-        "text is FEAT-2026-0104/T07's; this brief only guarantees the "
-        "decision point exists.)",
+        f"Someone must choose how {wu.wu_id} proceeds, because the driver "
+        f"has run out of ways to choose for it: every attempt its budget "
+        f"allowed has been dispatched and has failed, and "
+        + ("the one automatic remedy available — re-planning the unit into "
+           "a narrower one — has already been applied once and its attempt "
+           "failed too. "
+           if replanned else
+           "no automatic re-plan applies to this unit. ")
+        + f"The options below are the only ways gate {gate_number} moves "
+        f"again. Until one is chosen nothing further is dispatched: "
+        + (f"the {len(remaining_wu_ids)} work unit(s) waiting behind this "
+           f"one stay blocked, and the gate cannot close."
+           if remaining_wu_ids else
+           "this gate cannot close."),
         "",
         f"Work units still waiting behind it: {remaining}.",
         "",

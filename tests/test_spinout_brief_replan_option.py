@@ -168,3 +168,74 @@ class SpinoutBriefReplanOption(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class SpinoutBriefEveryPartHasContent(unittest.TestCase):
+    """Every one of the six parts must SAY something (#3305).
+
+    `validate_escalation_body` checks the headings are present, two numbered
+    options exist and the correlation marker is there. It cannot check that a
+    part says anything useful, so a part rendered as a placeholder satisfies
+    it — which is how a hardcoded part 3 stub ("Full decision text is
+    <work-unit-id>'s") shipped through a green gate whose oracle and whose
+    close both read the brief and neither failed on it. These assertions are
+    the missing half of that oracle.
+    """
+
+    def _render(self, *, replanned: bool, reason: str = "spinning_detected",
+                remaining: list[str] | None = None) -> str:
+        wu = loop.WorkUnit.__new__(loop.WorkUnit)
+        object.__setattr__(wu, "wu_id", "FEAT-2026-8888/T01")
+        object.__setattr__(wu, "title", "Do the thing")
+        return loop.format_spinout_escalation_brief(
+            wu, 1, ["FEAT-2026-8888/T00"],
+            ["FEAT-2026-8888/T02"] if remaining is None else remaining,
+            reason, 3, ["failed", "failed", "failed"], replanned,
+            "specfuse run --feature FEAT-2026-8888")
+
+    def _parts(self, brief: str) -> dict[str, str]:
+        parts, current = {}, None
+        for line in brief.splitlines():
+            if line.startswith("## "):
+                current = line[3:].strip()
+                parts[current] = ""
+            elif current:
+                parts[current] += line + "\n"
+        return parts
+
+    def test_no_part_is_empty_or_a_placeholder(self):
+        for replanned in (True, False):
+            with self.subTest(replanned=replanned):
+                parts = self._parts(self._render(replanned=replanned))
+                self.assertEqual(len(parts), len(loop.ESCALATION_PART_HEADINGS))
+                for heading, body in parts.items():
+                    stripped = body.strip()
+                    self.assertTrue(
+                        len(stripped) >= 40,
+                        f"part {heading!r} is {len(stripped)} chars — a part "
+                        f"that cannot say 40 characters is a placeholder")
+
+    def test_no_part_leaks_an_implementing_work_unit_id(self):
+        # The brief describes the operator's feature, never the feature that
+        # built the brief. `operator-escalation.md` forbids assuming the
+        # reader has read the work unit; an internal FEAT/T-ID is exactly
+        # that assumption, and #3305 shipped one in part 3.
+        for replanned in (True, False):
+            for reason in ("spinning_detected", "agent_reported_blocked"):
+                with self.subTest(replanned=replanned, reason=reason):
+                    brief = self._render(replanned=replanned, reason=reason)
+                    self.assertNotIn("FEAT-2026-0104", brief)
+                    self.assertNotIn(
+                        "Full decision", brief,
+                        "part 3 is deferring instead of stating the decision")
+
+    def test_part_three_states_the_decision_and_why_it_is_needed(self):
+        heading = loop.ESCALATION_PART_HEADINGS[2]
+        for replanned in (True, False):
+            with self.subTest(replanned=replanned):
+                part3 = self._parts(self._render(replanned=replanned))[heading]
+                self.assertIn("FEAT-2026-8888/T01", part3)
+                # the "why": the driver has no remaining automatic move
+                self.assertRegex(part3, r"(failed|exhaust|run out)")
+                # the consequence of not deciding
+                self.assertRegex(part3, r"(blocked|cannot close|nothing further)")
