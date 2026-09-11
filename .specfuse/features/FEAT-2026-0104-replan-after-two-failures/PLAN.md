@@ -8,7 +8,7 @@ autonomy_default: review        # this feature edits the driver; the judge_editi
                                 # class vetoes an auto-arm regardless, so `review` states
                                 # up front what would otherwise surface at the gate boundary
 status: active
-planned_cost_usd: 39.50   # revised at G1-PLAN; see "The estimate was revised once"
+planned_cost_usd: 43.50   # revised at G1-PLAN; see "The estimate was revised once"
 ---
 
 # Plan: Re-plan after two failures instead of a third identical attempt
@@ -136,7 +136,7 @@ no longer exist.
 
 ## The estimate was revised once — $30.00 → $39.50 at G1-PLAN
 
-`planned_cost_usd: 30.00` was set before gate 2 had any work units, and it
+`planned_cost_usd: 43.50` was set before gate 2 had any work units, and it
 decomposed exactly as 14.50 (T01–T05) + 4.50 (G1-CLOSE-INTERMEDIATE) + 6.00
 (G1-PLAN) + 5.00 (G2-CLOSE) — leaving **nothing** for gate 2's substantive
 work. `RETROSPECTIVE.md` § "Cost analysis" flagged that hole and asked
@@ -154,6 +154,31 @@ Neither gate carries a `cost_budget_usd`. Gate 1 was drafted without one and
 adding the brake to gate 2 alone would make the two gates behave differently
 for a reason unrelated to their content; the feature-level estimate above is
 the number to hold this gate against.
+
+## Gate 2 was widened once, on measured evidence
+
+Gate 2 closed twice and was reopened to add T10. The reason is not the judge's
+second finding — that one is circular and is tracked as a judge defect in
+#3307, having asked for terminal-flip state only a `met` verdict can produce.
+
+It is a probe. Every proof this feature had stubbed the `claude -p` boundary,
+so a throwaway feature was run against a real one to see the trigger fire. It
+never fired: two differently-rigged units both **blocked honestly** rather than
+spinning, the second because the session found a real repository constraint the
+probe's own work unit contradicted. That is worth recording on its own —
+well-specified units escalate with a reason instead of spinning, which bounds
+how much of the 2.09 human-waits number a re-plan trigger can move.
+
+What the probe did produce is a real `agent_reported_blocked` escalation, and
+its payload carried `reason`, `attempts`, `attempts_usage`, `blocked_reason`
+and no `message`. `format_spinout_escalation_brief` is called from exactly one
+site. Measured across 636 `human_escalation` events in the corpus, the brief
+reaches about 19% of real escalations; the most common reason of all,
+`agent_reported_blocked` at 22.2%, gets none of it.
+
+`GATE-02-REVIEW.md` predicted this at arming — "that narrowing is the draft's
+reading, not the plan's words" — and named `agent_reported_blocked` as the row
+most likely wrong. It was armed anyway. T10 closes the gap the review called.
 
 ## Scope boundary — deliberately out
 
@@ -215,6 +240,9 @@ gates:
       - id: FEAT-2026-0104/T09
         file: WU-09-document-the-brief.md
         depends_on: [FEAT-2026-0104/T07, FEAT-2026-0104/T08]
+      - id: FEAT-2026-0104/T10
+        file: WU-10-brief-every-unit-escalation.md
+        depends_on: [FEAT-2026-0104/T09]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0104/G2-CLOSE
         file: WU-90-gate-2-close.md
@@ -223,6 +251,7 @@ gates:
           - FEAT-2026-0104/T07
           - FEAT-2026-0104/T08
           - FEAT-2026-0104/T09
+          - FEAT-2026-0104/T10
 ```
 
 ## Notes
