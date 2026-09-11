@@ -111,3 +111,57 @@ non-exhaustion escalation and asserts that part 3's statement about the attempt
 record agrees with part 1's, so the two cannot drift apart again. Discharged
 when that test is green and a real `agent_reported_blocked` run renders a part 3
 whose claim matches the unit's actual attempt count.
+
+---
+
+## Discharge record — close dispatch 4
+
+Appended below dispatch 3's entry without editing it: the entry above is the
+record of what was found and it stands as written.
+
+**#3308 is discharged in tree.** Part 3 of `format_spinout_escalation_brief`
+now gates its exhaustion clause on the same two-reason test part 4 four lines
+below it already applied, and renders the unit's real position at every other
+site. The fix caught part 2 as well, which carried the same unconditional claim
+one part earlier. Verified by executed command in this close session, not by
+reading the diff:
+
+- A real `loop.run()` driven to `agent_reported_blocked` on a unit declaring
+  `max_attempts: 3`, through the harness from
+  `tests/test_brief_covers_every_unit_escalation.py`. `rc=1`,
+  `validate_escalation_body(stdout) == []`, `message in stdout` → `True`. The
+  `human_escalation` event's brief renders part 1 as "was dispatched 1 time(s):
+  attempt 1: blocked" and part 3 as "it stopped short of its attempt budget (3)
+  for a reason no further attempt would change (agent_reported_blocked)".
+  `"every attempt its budget" in part 3` → **False** — the inverse of the
+  observation in the entry above.
+- A second real `loop.run()` driven to attempt exhaustion (`spinning_detected`,
+  three failed attempts with a `replan` event between them) still renders part 3
+  as "every attempt its budget (3) allowed has been dispatched and has failed".
+  The fix narrowed the claim rather than deleting it.
+- `.venv/bin/python -m unittest tests.test_spinout_brief_replan_option -v -b` —
+  exit 0, Ran 8 (was 6). The two new tests are
+  `BriefPartThreeAgreesWithPartOne.test_exhaustion_is_claimed_only_when_the_budget_ran_out`
+  and `.test_part_three_does_not_contradict_part_one`.
+- `.venv/bin/python -m unittest tests.test_brief_covers_every_unit_escalation -v -b`
+  — exit 0, Ran 3; the declared `feature_oracle`
+  `tests.test_spinout_brief_end_to_end` — exit 0, Ran 1. The driver's broad run
+  at this dispatch: `Ran 3935 tests`, `OK (skipped=3)`.
+
+**One gap between the fix and this entry's own re-run condition, named rather
+than smoothed over.** The condition asked for "a test that drives a real
+`loop.run()` to a non-exhaustion escalation and asserts that part 3's statement
+about the attempt record agrees with part 1's". The committed test calls
+`format_spinout_escalation_brief` directly with a hand-built attempts list; the
+one committed test that drives a real `loop.run()` to a non-exhaustion
+escalation asserts only `validate_escalation_body` and the correlation marker.
+The composition of the two — a real run whose *rendered* part 3 is asserted
+against its own part 1 — was checked by this close session and is not committed.
+The defect is discharged; the regression barrier is one layer shallower than
+this entry asked for. Carried as item 11 in `RETROSPECTIVE.md` § "What the loop
+did NOT verify" and generalized in § "Lessons".
+
+Closing the GitHub issue is a bookkeeping step outside this session's scope —
+the close edits files and runs no `git` or `gh`. Full account in
+`RETROSPECTIVE.md` § "The defect T10's widening shipped, and how it was
+discharged".

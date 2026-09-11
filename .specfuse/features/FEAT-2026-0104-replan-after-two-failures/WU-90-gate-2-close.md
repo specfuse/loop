@@ -1,19 +1,20 @@
 ---
 id: FEAT-2026-0104/G2-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
 model: opus
 effort: high
 gate_set: plannext
 driver_version: 0.19.0
-started_at: 2026-09-11T16:47:03.995982+00:00
-duration_seconds: 1271.648
-cost_usd: 14.982412
-input_tokens: 266
-output_tokens: 96812
+started_at: 2026-09-11T17:17:10.629907+00:00
+duration_seconds: 943.627
+cost_usd: 11.598313
+input_tokens: 220
+output_tokens: 73211
 ---
 
 # Close the feature — re-plan replaces the third identical attempt

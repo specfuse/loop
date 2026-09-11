@@ -4309,9 +4309,22 @@ compaction counterpart — it merges duplicates, retires superseded entries into
 - [FEAT-2026-0104/G2-CLOSE] A gate expecting more than one close dispatch should write a
   `GATE-NN-CRITERIA.md`. `close-discipline.md` §5 lets a `narrow` oracle's recorded green carry
   forward across close attempts; with no such artifact there is nothing to carry, so every
-  dispatch re-runs the whole oracle set from scratch. This feature's close was dispatched three
-  times — twice after a judge lowered the verdict, once after the gate was reopened — and
-  re-ran the same twelve oracles each time. The closing sequence then cost $16.10 over two
-  recorded dispatches against a $5.00 plan line, within $1.48 of what all ten implementation
-  units cost together. The artifact is cheap to write at the first close and pays for itself on
-  the second.
+  dispatch re-runs the whole oracle set from scratch. This feature's close was dispatched four
+  times — twice after a judge lowered the verdict, once after the gate was reopened, once after
+  the close recorded its own `not_met` — and re-ran the same twelve oracles every time. The
+  closing sequence cost $31.47 over three recorded dispatches against a $5.00 plan line, which
+  is 1.8x what all ten implementation units cost together: the feature spent more closing
+  itself than building itself. The artifact is cheap to write at the first close and pays for
+  itself on the second.
+
+- [FEAT-2026-0104/G2-CLOSE] A follow-up's **re-run condition is a specification for the
+  discharging change's oracle**, and nothing in the loop ever compares the two. The driver
+  files the issue and writes the number back; after that the follow-up entry and the fix that
+  clears it never meet again, so a fix can discharge the defect while missing the barrier the
+  entry asked for and no surface notices. #3308's condition asked for a test driving a real
+  `loop.run()` to a non-exhaustion escalation and asserting part 3 against part 1. What
+  shipped was two function-level tests asserting exactly the right property one layer down;
+  the end-to-end half was checked by the re-closing session instead, which discharges the
+  defect and commits nothing. The drafting move: write the re-run condition as the acceptance
+  criterion of the unit that will discharge it, and have the re-closing session diff what
+  shipped against the condition rather than against the defect.
