@@ -57,6 +57,8 @@ are the record of what each earlier dispatch found and they stand as written.
 
 ### Part 3 of the escalation brief claims an exhausted attempt budget at nine of the ten sites T10 widened it to
 
+**Tracked as #3308.**
+
 **Criterion (verbatim, `GATE-02.md` § "Definition of done").** "After a work unit
 escalates with `blocked_human`, the operator-facing brief presents re-planning
 the remaining gate as its default option, inside the six-part framing
