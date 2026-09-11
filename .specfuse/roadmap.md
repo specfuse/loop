@@ -976,6 +976,8 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Benefits.** Turns spinning into progress; fewer human escalations; the plan stays disposable rather than sacred.
 
+**Shipped.** Narrower than the goal above on two points, both deliberate and both recorded in `PLAN.md` § "Scope boundary". The planning turn **re-scopes the unit in place**; it does not split it into new units and does not add a hygiene unit, because splitting mutates `gate.refs` mid-flight and was deferred until re-plan has behaved on real spins. The escalation brief offers the re-plan option on **four of the eleven** unit-level `blocked_human` reasons rather than after any of them — the seven excluded are ones a wider re-scope cannot help — and it **recommends** the re-plan, naming the units and the `/unblock-wu` command, rather than executing it. Proven runnable, not proven useful: zero re-plans fired during the feature's own run, so the success rate of a re-planned unit is unmeasured at n=0.
+
 **Status: active.**
 
 <a id="feat-2026-0105"></a>

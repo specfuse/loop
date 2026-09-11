@@ -4225,3 +4225,40 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   drafting move is smaller than a driver change: when a gate is reverted, record the discarded
   run's wall-clock bounds in `PLAN.md` at the same time you write the "what the first attempt
   taught" section, while someone still knows them.
+
+- [FEAT-2026-0104/G2] A gate that edits the driver cannot exercise its own edit: the driver
+  build is pinned before the gate's units land, so the earliest a gate-N change can run is
+  gate N+1. Measured on this feature by grepping each `driver_build_pinned` tree's `loop.py` —
+  gate 1's pin had no `should_replan_instead_of_retry`, gate 2's had the trigger but not
+  `format_spinout_escalation_brief`, which T06 wrote after that pin was taken. Two consequences
+  for drafting a self-hosting feature. **(a)** If you want field evidence of your own change,
+  schedule the thing that would produce it at least one gate later; a criterion of the form
+  "the new behaviour is observed during this gate" is unsatisfiable by construction and will
+  be quietly answered n=0. **(b)** A close must check the pin before writing "ran on a driver
+  carrying this code" — the sentence is checkable in one grep and is wrong more often than it
+  looks, because `driver_version` in the event payload names the released version, not the
+  tree, and both gates here report `0.19.0`.
+
+- [FEAT-2026-0104/G2] When a feature's mechanism only fires on failure, its own clean run is
+  not evidence and the plan must buy the evidence deliberately. Both gates here passed every
+  attempt first try, so the re-plan trigger was never consulted, zero `replan` events exist in
+  any feature in the repo, and the success rate of a re-planned unit is n=0 after a whole
+  feature was spent building it. The plan's own headline metric moved 2.09 -> 1.92 purely
+  because one more zero-escalation feature joined an eleven-feature mean — the numerator never
+  moved. So: **(a)** a plan whose goal is a failure-path mechanism should carry a committed,
+  re-runnable probe as a work unit with its own `produces:`, not a session-local one a
+  `plan-next` runs and pastes into prose (this feature's probe found a real defect — a
+  clobbered attempt note — and still left nothing anyone can re-run); and **(b)** a close whose
+  criteria name a corpus metric must decompose the delta into numerator and denominator and
+  report n, because at n≈10 adding one feature moves a mean by more than most real effects.
+
+- [FEAT-2026-0104/G2] A tracer bullet must stub only the parts the plan named as stubbed, and
+  the units after it are scoped to that same list — so a part stubbed beyond the licence is
+  owned by nobody and ships. Here T06 was licensed to stub "the option text and the
+  recommendation" (parts 5 and 6) and also stubbed part 3; T07's criteria named parts 5 and 6,
+  so the placeholder "(Full decision text is FEAT-2026-0104/T07's; this brief only guarantees
+  the decision point exists.)" reached operator-facing output and passed every gate, because
+  the contract validator only requires each part to be present and non-empty. The drafting
+  move is cheap: the tracer-bullet WU lists the stubs it is allowed to leave, and the
+  follow-up units' criteria are written against that list rather than against part numbers
+  someone remembers.
