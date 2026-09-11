@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0104/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces_driver_helper:
   - format_spinout_escalation_brief
 produces:
   - tests/test_spinout_brief_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-11T02:40:13.993587+00:00
+duration_seconds: 490.232
+cost_usd: 1.568016
+input_tokens: 114
+output_tokens: 22503
 ---
 
 # Wire the spin-out brief end to end

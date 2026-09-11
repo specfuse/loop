@@ -96,6 +96,7 @@ from .closing_requirements import (
     parse_followup_entries,
 )
 from .escalation import (
+    _correlation_marker as _escalation_correlation_marker,
     _PART_HEADINGS as ESCALATION_PART_HEADINGS,
     CREATED_NUMBER_UNKNOWN,
     emit_issue_with_body,
@@ -2990,6 +2991,88 @@ def format_human_unit_brief(
         f"Resume after recording your evidence:\n  {resume_command}",
         "",
         "More on request: the unit's full text, the gate's event log.",
+    ]
+    return "\n".join(lines)
+
+
+def format_spinout_escalation_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    reason: str,
+    wu_max_attempts: int,
+    attempt_outcomes: list,
+    replanned: bool,
+    resume_command: str,
+) -> str:
+    """Render the six-part operator brief for a spun-out unit (FEAT-2026-0104/T06).
+
+    This gate's tracer bullet: wires a real six-part brief onto the
+    attempt-exhaustion halt so `feature_oracle` can observe one, following
+    `format_human_unit_brief`'s pattern — same `ESCALATION_PART_HEADINGS`, so
+    the printed brief and an eventual escalation issue can never disagree on
+    part names — plus the one thing that sibling omits: the
+    `<!-- specfuse:escalation id=... -->` correlation marker, keyed on
+    `wu.wu_id`, so `escalation.validate_escalation_body` accepts this brief.
+    The options text and recommendation are T07's; stubbed here to the
+    thinnest text the oracle can observe rather than invented content.
+    """
+    done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
+    remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    outcomes = ", ".join(
+        f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
+    ) or "(no attempt produced a recorded outcome)"
+    replan_line = (
+        "The automatic re-plan fired before the last attempt: a fresh "
+        "session rewrote the unit body after the earlier failures, and the "
+        "rewritten body still did not pass."
+        if replanned else
+        "The automatic re-plan did not fire during this run."
+    )
+
+    lines = [
+        _escalation_correlation_marker(wu.wu_id),
+        "",
+        f"SPIN-OUT — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is open. Work units finished so far: {done_list}. "
+        f"{wu.wu_id} was dispatched {wu_max_attempts} time(s): {outcomes}. "
+        f"{replan_line}",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        f"{wu.wu_id} exhausted its attempt budget without a passing "
+        f"verification run and has been escalated ({reason}).",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        "A person needs to decide how this unit proceeds. (Full decision "
+        "text is FEAT-2026-0104/T07's; this brief only guarantees the "
+        "decision point exists.)",
+        "",
+        f"Work units still waiting behind it: {remaining}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        f"Every dispatched attempt failed its own verification and the "
+        f"unit's attempt budget ({wu_max_attempts}) is exhausted, so no "
+        f"further automatic attempt is possible.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        "1. **Re-arm the unit** — pros: another automatic pass may succeed "
+        "once whatever blocked it is addressed; cons: repeats work if "
+        "nothing about the unit or its environment changed.",
+        "2. **Abandon the unit** — pros: unblocks the rest of the gate; "
+        "cons: anything depending on this unit is stranded. (Stub — "
+        "FEAT-2026-0104/T07 owns the real option set.)",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        "No recommendation yet — FEAT-2026-0104/T07 owns this part.",
+        "",
+        "Reply with the number of your choice, or prose if none fit:",
+        "1. Re-arm the unit",
+        "2. Abandon the unit",
+        "",
+        f"Resume after deciding:\n  {resume_command}",
     ]
     return "\n".join(lines)
 
@@ -9807,6 +9890,12 @@ def run(
                           f"{wu.unsandboxed_rationale}")
                 attempt_notes: list[tuple[int, str]] = []
                 attempt_outcomes: list[str] = []
+                # Set once a re-plan turn succeeds (below). Unlike wu_events,
+                # never cleared mid-loop by the per-failed-attempt flush/clear
+                # (FEAT-2026-0104/T06) — the exhaustion brief needs to know
+                # whether a re-plan fired at any point in this WU's attempts,
+                # not only in the final one still buffered when it renders.
+                replanned_this_wu = False
                 # Per-failed-attempt (class, signature, full note) — the raw
                 # material `synthesize_replan_brief` reads (FEAT-2026-0104/T03).
                 # Only the "failed" outcome branch below reaches the re-plan
@@ -10832,6 +10921,7 @@ def run(
                             "attempt": attempt,
                             "max_attempts": wu_max_attempts,
                         }))
+                        replanned_this_wu = True
                         failure_note = None
                         print(f"   RE-PLANNED {wu.wu_id} after attempt "
                               f"{attempt}/{wu_max_attempts} — next dispatch "
@@ -10864,10 +10954,25 @@ def run(
                         work_dir, wu.wu_id, attempt_notes)
                     backend.set_wu(wu, "status", "blocked_human")
                     write_cost_to_wu(backend, wu, cum_usage)
+                    _spinout_brief = format_spinout_escalation_brief(
+                        wu=wu,
+                        gate_number=gate.number,
+                        done_wu_ids=sorted(done_ids),
+                        remaining_wu_ids=[
+                            w.wu_id for w in units
+                            if w.wu_id != wu.wu_id
+                            and w.status not in (DONE, "abandoned")],
+                        reason=reason,
+                        wu_max_attempts=wu_max_attempts,
+                        attempt_outcomes=attempt_outcomes,
+                        replanned=replanned_this_wu,
+                        resume_command=resume_command_for(feature_id),
+                    )
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": reason,
                         "attempts": wu_max_attempts,
                         "attempts_usage": attempts_usage,
+                        "message": _spinout_brief,
                     }))
                     flush_events(events_path, wu_events)
                     # Post-dispatch budget breach check (#2174): see the
@@ -10886,8 +10991,7 @@ def run(
                         f"({reason}, {wu_max_attempts} attempts)"
                         f"\n\nFeature: {wu.wu_id}",
                     )
-                    print(f"   BLOCKED after {wu_max_attempts} attempts — "
-                          f"escalated ({reason})")
+                    print(f"\n{_spinout_brief}")
                     blocked = True
 
         if blocked:
