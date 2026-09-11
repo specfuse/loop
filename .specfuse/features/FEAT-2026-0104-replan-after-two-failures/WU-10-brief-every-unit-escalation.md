@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0104/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 4.00
 produces_driver_helper:
   - escalate_unit
 produces:
   - tests/test_brief_covers_every_unit_escalation.py
+duration_seconds: 1068.903
+cost_usd: 4.604066
+input_tokens: 250
+output_tokens: 75717
 ---
 
 # Render the brief at every unit-level escalation, not just attempt exhaustion

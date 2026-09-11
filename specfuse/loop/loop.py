@@ -3075,6 +3075,16 @@ def format_spinout_escalation_brief(
     outcomes = ", ".join(
         f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
     ) or "(no attempt produced a recorded outcome)"
+    # T10 widened this function to every per-unit reason, not just the two
+    # for-else shapes (spinning_detected, all_attempts_zero_token) it was
+    # written for -- those two are the only ones where "the attempt budget is
+    # exhausted" is actually true, so the dispatch count and the why-not-auto
+    # line below both branch on it rather than asserting it unconditionally.
+    dispatch_summary = (
+        f"was dispatched {len(attempt_outcomes)} time(s): {outcomes}"
+        if attempt_outcomes else
+        "was not dispatched — refused or halted before any attempt ran"
+    )
     replan_line = (
         "The automatic re-plan fired before the last attempt, and already "
         "failed: a fresh session rewrote the unit body after the earlier "
@@ -3131,16 +3141,16 @@ def format_spinout_escalation_brief(
     lines = [
         _escalation_correlation_marker(wu.wu_id),
         "",
-        f"SPIN-OUT — {wu.wu_id} ({wu.title})",
+        f"ESCALATED — {wu.wu_id} ({wu.title})",
         "",
         f"## {ESCALATION_PART_HEADINGS[0]}",
         f"Gate {gate_number} is open. Work units finished so far: {done_list}. "
-        f"{wu.wu_id} was dispatched {wu_max_attempts} time(s): {outcomes}. "
+        f"{wu.wu_id} {dispatch_summary}. "
         f"{replan_line}",
         "",
         f"## {ESCALATION_PART_HEADINGS[1]}",
-        f"{wu.wu_id} exhausted its attempt budget without a passing "
-        f"verification run and has been escalated ({reason}).",
+        f"{wu.wu_id} has escalated for a human decision ({reason}) and no "
+        f"further automatic attempt will be dispatched until one is made.",
         "",
         f"## {ESCALATION_PART_HEADINGS[2]}",
         f"Someone must choose how {wu.wu_id} proceeds, because the driver "
@@ -3161,9 +3171,14 @@ def format_spinout_escalation_brief(
         f"Work units still waiting behind it: {remaining}.",
         "",
         f"## {ESCALATION_PART_HEADINGS[3]}",
-        f"Every dispatched attempt failed its own verification and the "
-        f"unit's attempt budget ({wu_max_attempts}) is exhausted, so no "
-        f"further automatic attempt is possible.",
+        (
+            f"Every dispatched attempt failed its own verification and the "
+            f"unit's attempt budget ({wu_max_attempts}) is exhausted, so no "
+            f"further automatic attempt is possible."
+            if reason in ("spinning_detected", "all_attempts_zero_token") else
+            f"No further automatic attempt is available for `{reason}`: "
+            f"{scope_why}."
+        ),
         "",
         f"## {ESCALATION_PART_HEADINGS[4]}",
         option_1,
@@ -3182,6 +3197,37 @@ def format_spinout_escalation_brief(
         f"Resume after deciding:\n  {resume_command}",
     ]
     return "\n".join(lines)
+
+
+def escalate_unit(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_wu_ids: list,
+    remaining_wu_ids: list,
+    reason: str,
+    resume_command: str,
+    wu_max_attempts: int,
+    attempt_outcomes: list,
+    replanned: bool = False,
+) -> str:
+    """Render the six-part operator brief for ANY per-unit `blocked_human`
+    escalation -- the single call every `human_escalation` site keyed on
+    `wu.wu_id` makes for its `message` field (FEAT-2026-0104/T10).
+
+    Thin wrapper over `format_spinout_escalation_brief`, which T06/T07
+    already made reason-generic (it consults `replan_option_applies`, not a
+    hardcoded reason). Widening the brief to every per-unit reason was a
+    matter of calling it from every per-unit site rather than only the
+    attempt-exhaustion one -- this is that one call, named for what it does
+    so a reason added later gets a brief by construction instead of by
+    remembering to wire one in. Gate-level halts (`human_escalation` keyed on
+    `feature_id`) do not call this: a gate-level halt has no single unit to
+    brief about.
+    """
+    return format_spinout_escalation_brief(
+        wu, gate_number, done_wu_ids, remaining_wu_ids, reason,
+        wu_max_attempts, attempt_outcomes, replanned, resume_command,
+    )
 
 
 def halt_for_human_unit(
@@ -7694,12 +7740,21 @@ def _fire_and_verify_terminal_flips(
     feature_dir: Path,
     events_path: Path,
     feature_id: str,
+    gate_number: int,
+    done_wu_ids: list,
 ) -> int:
     """Fire terminal state flips and run the post-pass invariant guard.
 
     Returns 0 on success, 1 when the guard fires. Called from both the
     auto-close path and the normal close-WU path; factored here to avoid
     duplicating the fire+verify block across both branches (FEAT-2026-0018/T04).
+
+    `gate_number`/`done_wu_ids` (FEAT-2026-0104/T10): threaded through so the
+    `post_pass_invariant_failed` escalation below -- a per-unit halt keyed on
+    `close_wu.wu_id` -- can carry the six-part brief like every other one.
+    `close_wu` already passed its own verification (that is why it reached
+    terminal-flip time at all), so this is the one per-unit reason where
+    `attempt_outcomes=["passed"]` is the honest record, not an exhaustion.
     """
     flip_paths = fire_terminal_flips(close_wu, feature_dir, REPO_ROOT)
     if flip_paths:
@@ -7711,11 +7766,17 @@ def _fire_and_verify_terminal_flips(
     head_post = git("rev-parse", "HEAD")
     ok, reason = verify_post_pass_invariants(close_wu, feature_dir, REPO_ROOT, head_post)
     if not ok:
+        message = escalate_unit(
+            close_wu, gate_number, done_wu_ids, [],
+            "post_pass_invariant_failed", resume_command_for(feature_id),
+            resolve_max_attempts(close_wu, load_verification()), ["passed"],
+        )
         flush_events(events_path, [build_event(
             "human_escalation", close_wu.wu_id, {
                 "reason": "post_pass_invariant_failed",
                 "assertion": reason.split(":", 1)[0].strip(),
                 "summary": reason,
+                "message": message,
             })])
         commit_bookkeeping(
             [events_path],
@@ -9938,6 +9999,14 @@ def run(
                 shape_ok, shape_reason = assert_produces_shape(wu)
                 if not shape_ok:
                     backend.set_wu(wu, "status", "blocked_human")
+                    _shape_message = escalate_unit(
+                        wu, gate.number, sorted(done_ids),
+                        [w.wu_id for w in units
+                         if w.wu_id != wu.wu_id
+                         and w.status not in (DONE, "abandoned")],
+                        "produces_shape_invalid", resume_command_for(feature_id),
+                        resolve_max_attempts(wu, load_verification()), [],
+                    )
                     flush_events(events_path, [build_event(
                         "human_escalation", wu.wu_id, {
                             "reason": "produces_shape_invalid",
@@ -9945,6 +10014,7 @@ def run(
                             "attempts": 0,
                             "failure_class": "guard_refusal",
                             "failure_signature": "assert_produces_shape",
+                            "message": _shape_message,
                         })])
                     commit_bookkeeping(
                         [wu.file, events_path],
@@ -10065,12 +10135,23 @@ def run(
                         backend.set_wu(wu, "escalation_reason",
                                        "deterministic_refusal_repeat")
                         write_cost_to_wu(backend, wu, cum_usage)
+                        _drr_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "deterministic_refusal_repeat",
+                            resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event(
                             "human_escalation", wu.wu_id, {
                                 "reason": "deterministic_refusal_repeat",
                                 "blocked_reason": _rsum,
                                 "attempts": attempt - 1,
                                 "attempts_usage": attempts_usage,
+                                "message": _drr_message,
                             }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -10151,11 +10232,21 @@ def run(
                                 "summary": payload.get("message"),
                             },
                         ))
+                        _prep_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "prep_halted", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "prep_halted",
                             "blocked_reason": payload.get("message"),
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _prep_message,
                         }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -10183,11 +10274,21 @@ def run(
                             agent_status="blocked",
                             agent_blocked_reason=payload,
                         ))
+                        _blocked_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "agent_reported_blocked", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "agent_reported_blocked",
                             "blocked_reason": payload,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _blocked_message,
                         }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -10195,6 +10296,7 @@ def run(
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(agent-reported)\n\nFeature: {wu.wu_id}",
                         )
+                        print(f"\n{_blocked_message}")
                         print(f"   BLOCKED by agent — "
                               f"{payload or '(no reason given)'}")
                         blocked = True
@@ -10792,12 +10894,22 @@ def run(
                     ))
                     # T04: halt early when same (class, signature) repeats.
                     if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                        _sig_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "spinning_signature_repeat", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "spinning_signature_repeat",
                             "failure_class": _fc,
                             "failure_signature": _fs,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
+                            "message": _sig_message,
                         }))
                         reset_preserving_events(head_before, events_path,
                                                 untracked_before=untracked_before)
@@ -10957,12 +11069,22 @@ def run(
                         backend.set_wu(wu, "escalation_reason",
                                        "convergence_plateau")
                         write_cost_to_wu(backend, wu, cum_usage)
+                        _plateau_message = escalate_unit(
+                            wu, gate.number, sorted(done_ids),
+                            [w.wu_id for w in units
+                             if w.wu_id != wu.wu_id
+                             and w.status not in (DONE, "abandoned")],
+                            "convergence_plateau", resume_command_for(feature_id),
+                            wu_max_attempts, attempt_outcomes,
+                            replanned_this_wu,
+                        )
                         wu_events.append(build_event(
                             "human_escalation", wu.wu_id, {
                                 "reason": "convergence_plateau",
                                 "attempts": attempt,
                                 "best_findings": convergence.best_findings,
                                 "attempts_usage": attempts_usage,
+                                "message": _plateau_message,
                             }))
                         flush_events(events_path, wu_events)
                         commit_bookkeeping(
@@ -11005,11 +11127,22 @@ def run(
                             backend.set_wu(wu, "escalation_reason",
                                            "replan_unchanged_body")
                             write_cost_to_wu(backend, wu, cum_usage)
+                            _unchanged_message = escalate_unit(
+                                wu, gate.number, sorted(done_ids),
+                                [w.wu_id for w in units
+                                 if w.wu_id != wu.wu_id
+                                 and w.status not in (DONE, "abandoned")],
+                                "replan_unchanged_body",
+                                resume_command_for(feature_id),
+                                wu_max_attempts, attempt_outcomes,
+                                replanned_this_wu,
+                            )
                             wu_events.append(build_event(
                                 "human_escalation", wu.wu_id, {
                                     "reason": "replan_unchanged_body",
                                     "attempts": attempt,
                                     "attempts_usage": attempts_usage,
+                                    "message": _unchanged_message,
                                 }))
                             flush_events(events_path, wu_events)
                             commit_bookkeeping(
@@ -11262,6 +11395,7 @@ def run(
         if _terminal_auto_closed_wu is not None:
             rc = _fire_and_verify_terminal_flips(
                 _terminal_auto_closed_wu, feature_dir, events_path, feature_id,
+                gate.number, sorted(done_ids),
             )
             if rc:
                 return rc
@@ -11271,6 +11405,7 @@ def run(
             # `passed`, roadmap row `done`, archive anchor) observe the flips.
             rc = _fire_and_verify_terminal_flips(
                 close_wu_for_terminal, feature_dir, events_path, feature_id,
+                gate.number, sorted(done_ids),
             )
             if rc:
                 return rc
