@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0104/T09
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 1.50
 produces:

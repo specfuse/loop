@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0104/T07
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 produces_driver_helper:
