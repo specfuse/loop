@@ -38,3 +38,10 @@ command in the close session, not by reading the diff:
 Closing the GitHub issue is a bookkeeping step outside this session's scope —
 the close edits files and runs no `git` or `gh`. Full account in
 `RETROSPECTIVE.md` § "The defect this close found, and what happened to it".
+
+### Documentation and roadmap status reflect what was actually built
+
+PLAN.md and roadmap.md still record `status: active` for FEAT-2026-0104, and GATE-02.md still records `status: open`, even though the close bundle (RETROSPECTIVE.md, commit `bf2fba5 feat: Close the feature`) treats this as the feature's terminal close. Comparably closed features in this repo (e.g. FEAT-2026-0001) carry `status: done` in PLAN.md once closed. The gate's own definition of done requires "Documentation and roadmap status reflect what was actually built," and it does not.
+
+- command: `grep -n "^status:" .specfuse/features/FEAT-2026-0104-replan-after-two-failures/PLAN.md .specfuse/features/FEAT-2026-0104-replan-after-two-failures/GATE-02.md`
+- exit: 0 (output: `PLAN.md:10:status: active`, `GATE-02.md:3:status: open`)
