@@ -104,7 +104,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | done | — | [→ archive](roadmap-archive.md#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
-| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
+| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | active | — | [→ detail](#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
@@ -987,7 +987,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Benefits.** Roughly a third of feature cost and agent time removed; the lessons that matter survive as enforced checks rather than a list nobody reads at dispatch time.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0107"></a>
 ## FEAT-2026-0107 — Single-session mode for small features
