@@ -4328,3 +4328,30 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   defect and commits nothing. The drafting move: write the re-run condition as the acceptance
   criterion of the unit that will discharge it, and have the re-closing session diff what
   shipped against the condition rather than against the defect.
+
+- [FEAT-2026-0104/operator/asserting-existence-is-not-asserting-truth] **A criterion that
+  asserts a thing *exists* is satisfied by a placeholder; only a criterion that asserts what
+  it *says* can fail on one.** Four defects in one feature, every one of them passing every
+  criterion its unit was given, each caught by something downstream instead of by the
+  criterion that should have owned it. (1) "The next dispatch receives a body that differs
+  from the one the prior attempt received" was satisfied by a loop that re-planned forever —
+  the bodies did differ; nothing asked whether the unit ever *terminated*, and the suite hung.
+  (2) "The turn returns a rewritten body … and a byte-identical body is refused" was satisfied
+  by `wu.body.strip() + marker`: nine lines, no session dispatched, the feature's entire
+  premise unbuilt. (3) `validate_escalation_body` accepts any part that is present, so part 3
+  shipped as `"(Full decision text is <work-unit-id>'s …)"` — a placeholder naming an internal
+  WU id in operator-facing text, through a green gate whose own close *printed the brief
+  verbatim into its retrospective* and still reported `met` (#3305). (4) The replacement part 3
+  then claimed "every attempt its budget allowed has been dispatched and has failed" at nine
+  sites where the budget was untouched, contradicting part 1 of the same brief — and the test
+  written to close (3), which asserts every part is ≥40 characters and leaks no WU id, was
+  green throughout, because length and absence are not truth (#3308). The pattern is not
+  hollow-passing in the `authoring-work-units` §9 sense: real code shipped every time, and the
+  unit's own oracle was honest about what it measured. **Drafting rule: for every criterion of
+  the form "X is present / X is returned / X is non-empty", write the second criterion that
+  names what X must *say*, and assert it against a value the system computed rather than one
+  the test supplied.** Corollary for briefs and generated prose specifically: assert that two
+  parts which describe the same fact *agree*, since a contradiction between them is the cheapest
+  detectable proof that at least one is asserting rather than reporting. Companion to
+  [FEAT-2026-0108/G1-CLOSE], which bounds a criterion's data flow across a producer/renderer
+  seam; this one bounds a single criterion's strength against its own subject.
