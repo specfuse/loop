@@ -167,6 +167,25 @@ def strip_forbidden_sections(text: str) -> str:
     return result
 
 
+# The driver, not the close, owns terminal-flip state: `fire_terminal_flips`
+# writes PLAN.md's status, the roadmap row and the gate's own status AFTER a
+# judge returns, and only when the verdict is `met`. So at judge time all three
+# necessarily read un-flipped, on every close of every feature.
+# `GATE.template.md` nevertheless copies a criterion about them into every
+# gate's definition of done, and a judge that reads it literally lowers the
+# verdict -- which guarantees the state stays as found, so a re-close runs a
+# fresh judge against identical evidence and reaches the identical verdict.
+# FEAT-2026-0104 deadlocked there for one close (#3307). Strip the criterion
+# here; `render_judge_prompt` says why, because stripping alone only stops the
+# reminder -- the judge can still go and read the roadmap itself.
+_DRIVER_OWNED_STATUS_CRITERION = re.compile(
+    r"^[ \t]*[-*][ \t]+Documentation and roadmap status[^\n]*\n?", re.M)
+
+
+def _strip_driver_owned_status_criterion(text: str) -> str:
+    return _DRIVER_OWNED_STATUS_CRITERION.sub("", text or "")
+
+
 def _clean_evidence(text: str) -> str:
     return truncate_evidence(strip_forbidden_sections(text or ""))
 
@@ -224,7 +243,8 @@ def build_judge_bundle(
 
     return JudgeBundle(
         gate_number=gate_number,
-        definition_of_done=_clean_evidence(definition_of_done),
+        definition_of_done=_clean_evidence(
+            _strip_driver_owned_status_criterion(definition_of_done)),
         criteria=criteria,
         diff_text=_clean_evidence(diff_text),
         measurements=_clean_evidence(measurements_text),
@@ -272,6 +292,12 @@ did not do this work and have no stake in the answer.
    one. The measurements it recorded are already below.
 5. Change nothing. You run no git command, edit no file, and fix nothing you
    find. You report.
+6. `PLAN.md`'s status, the roadmap row, and this gate's own status are not
+   evidence and are not yours to grade. The driver writes all three after you
+   return, and only if you answer `met` — so while you are looking at them they
+   necessarily read un-flipped, on every close of every feature. Reading one of
+   them as a failure is a verdict that manufactures its own evidence: it keeps
+   them un-flipped, and the next judge sees exactly what you saw.
 
 ## Definition of done (gate {bundle.gate_number})
 
