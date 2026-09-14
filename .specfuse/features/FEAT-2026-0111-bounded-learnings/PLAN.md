@@ -5,7 +5,7 @@ slug: bounded-learnings
 branch: feat/FEAT-2026-0111-bounded-learnings
 roadmap_goal: The rules worth following reach every dispatched session, inside a word budget a lint enforces, chosen by a human with computed weights as evidence.
 autonomy_default: review        # edits the driver and the scaffold's binding block
-status: active
+status: done
 planned_cost_usd: 29.50
 ---
 
