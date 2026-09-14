@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.20.0+umbrella.0.12.2] - 2026-09-14
+
 ### Added
 
 - **`replan` is a valid driver event type**, with payload `{"attempt": <int>, "max_attempts": <int>}`, added to `specfuse/loop/data/schemas/driver-event.schema.json`'s 15-type registry. `gate_eval.evaluate_auto_close` has read this event as check 2 of the auto-close predicate since FEAT-2026-0018 and `docs/methodology.md` has documented it, but nothing emitted it and `.specfuse/scripts/event_type_gate.py` would have failed any feature that did. This feature supplies the emitter; the consumer is unchanged (FEAT-2026-0104)
