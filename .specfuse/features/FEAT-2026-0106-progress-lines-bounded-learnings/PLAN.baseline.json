@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Wire PROGRESS.md end to end from what the driver already receives",
+          "id": "FEAT-2026-0106/T01",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Let a session say what the next unit should know",
+          "id": "FEAT-2026-0106/T02",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Write reflective prose only when the gate went off-plan",
+          "id": "FEAT-2026-0106/T03",
+          "planned_cost_usd": 3.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document what a close now writes, and what it no longer does",
+          "id": "FEAT-2026-0106/T04",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close the feature \u2014 progress lines and conditional reflection",
+          "id": "FEAT-2026-0106/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

@@ -302,6 +302,34 @@ def evaluate_auto_close(feature_dir: Path, gate_id: int) -> AutoCloseDecision:
             predicate_version=PREDICATE_VERSION,
         )
 
+    return _evaluate_predicate_core(feature_dir, gate_id, plan, feature_id)
+
+
+def evaluate_off_plan_signal(feature_dir: Path, gate_id: int) -> AutoCloseDecision:
+    """Same predicate as `evaluate_auto_close`, but never short-circuited by
+    `auto_close_disabled` (FEAT-2026-0106/T03).
+
+    `auto_close_disabled` is an operator's administrative choice to always
+    dispatch a close for ceremony/oracle re-run reasons
+    (`close-discipline.md` — a "load-bearing" close always sets it) and says
+    nothing about whether the gate itself deviated from plan. A caller asking
+    "did this gate go off plan" — as opposed to "is this gate eligible to
+    auto-close" — needs the real blocked/replan/cost-overrun evidence even
+    when that flag is set, so this skips straight to `_evaluate_predicate_core`.
+    """
+    plan = _read_plan_metrics(feature_dir)
+    fm = plan["frontmatter"]
+    feature_id = fm.get("feature_id", feature_dir.name)
+    return _evaluate_predicate_core(feature_dir, gate_id, plan, feature_id)
+
+
+def _evaluate_predicate_core(
+    feature_dir: Path, gate_id: int, plan: dict, feature_id: str,
+) -> AutoCloseDecision:
+    """The v1 predicate itself, shared by `evaluate_auto_close` and
+    `evaluate_off_plan_signal` — everything after the `auto_close_disabled`
+    short-circuit those two apply differently.
+    """
     # Locate target gate in task graph
     gates = plan["gates"]
     target_gate = next((g for g in gates if g.get("gate") == gate_id), None)

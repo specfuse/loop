@@ -104,7 +104,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-2026-0103) |
 | FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | done | — | [→ archive](roadmap-archive.md#feat-2026-0104) |
 | FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
-| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | planned | — | [→ detail](#feat-2026-0106) |
+| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | done | — | [→ archive](roadmap-archive.md#feat-2026-0106) |
 | FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
@@ -975,17 +975,6 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Goal.** Independent units in a gate run concurrently, one git worktree per unit, squashed in dependency order, with shared verification runs deduplicated. The single `.loop.lock` becomes per-unit claims.
 
 **Benefits.** Agent time per gate drops toward the longest unit rather than the sum; the only change that bends the active-time curve for large features.
-
-**Status: planned.**
-
-<a id="feat-2026-0106"></a>
-## FEAT-2026-0106 — Progress lines and a bounded LEARNINGS: retrospectives become optional
-
-**Why.** 713 close, close-intermediate, plan-next, and legacy ceremony units cost 39% of all spend and 28% of agent hours. `LEARNINGS.md` holds 220-361 entries per repo, is loaded whole into planning, and is read by no implementation dispatch. External loops keep per-iteration notes to a few lines and prune.
-
-**Goal.** Each unit appends 1-3 lines to `PROGRESS.md` in the feature folder (what surprised it, what the next unit should know). The terminal close writes a retrospective only on `not_met` or on request. `LEARNINGS.md` is capped at 40 entries via `/learnings-curate`; anything durable is promoted into a rule or a lint where it changes behaviour.
-
-**Benefits.** Roughly a third of feature cost and agent time removed; the lessons that matter survive as enforced checks rather than a list nobody reads at dispatch time.
 
 **Status: planned.**
 

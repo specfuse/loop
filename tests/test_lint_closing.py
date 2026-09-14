@@ -142,6 +142,12 @@ class TestGuardClasses(unittest.TestCase):
             docs = fdir.parents[2] / "docs"
             docs.mkdir()
             (docs / "closing.md").write_text("doc\n")
+            # FEAT-2026-0106/T03: close-e now also requires the gate to have
+            # gone off-plan (reflection_required) — a replan event on the
+            # gate's own close WU is the cheapest off-plan signal to fixture.
+            (fdir / "events.jsonl").write_text(
+                '{"event_type": "replan", "correlation_id": "FEAT-9999/G1-CLOSE"}\n'
+            )
 
             findings, _ = lc.lint_closing(fdir)
             joined = "\n".join(findings)
@@ -159,10 +165,14 @@ class TestGuardClasses(unittest.TestCase):
             docs = fdir.parents[2] / "docs"
             docs.mkdir()
             (docs / "closing.md").write_text("doc\n")
+            # The non-passing attempt alone is not an off-plan signal
+            # (FEAT-2026-0106/T03) — add a replan event on the gate's own
+            # close WU so `reflection_required` fires too.
             (fdir / "events.jsonl").write_text(
                 '{"event_type": "attempt_outcome", "correlation_id": '
                 '"FEAT-9999/G1-T01", "payload": {"outcome": "failed", '
                 '"failure_class": "verification", "failure_signature": "x"}}\n'
+                '{"event_type": "replan", "correlation_id": "FEAT-9999/G1-CLOSE"}\n'
             )
 
             findings, _ = lc.lint_closing(fdir)

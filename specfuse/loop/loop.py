@@ -104,6 +104,7 @@ from .escalation import (
 )
 from .gate_eval import (
     evaluate_auto_close,
+    evaluate_off_plan_signal,
     AutoCloseDecision,
     NON_SUBSTANTIVE_TYPES,
 )
@@ -1842,6 +1843,16 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
     When head_after is 'HEAD', also appends untracked files from
     git ls-files --others --exclude-standard (per [driver/files_changed-guard]
     LEARNINGS). Returns an empty list on any git error.
+
+    Drops `PROGRESS_FILENAME` regardless of basename depth: driver-managed
+    bookkeeping (FEAT-2026-0106/T01), like `events.jsonl`'s existing
+    invisibility to this signal (never written to disk until an attempt's
+    outcome is already known, so it never appears here either). Without this,
+    a guard-refusal attempt's own progress note — written on the `passed`
+    path even when a LATER guard rejects the pass and `retain_on_guard_refusal`
+    keeps the tree — resurfaces as a new untracked file on the NEXT attempt's
+    measurement, breaking `detect_deterministic_refusal_repeat`'s "provably
+    untouched tree" signal (#597) for every retried guard refusal.
     """
     try:
         names = subprocess.run(
@@ -1854,7 +1865,8 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
                 capture_output=True, text=True, check=True,
             ).stdout.strip().splitlines()
             names = names + [f for f in untracked if f]
-        return [f for f in names if f]
+        return [f for f in names
+                if f and Path(f).name != PROGRESS_FILENAME]
     except subprocess.CalledProcessError:
         return []
 
@@ -4679,6 +4691,67 @@ def parse_result_block(stdout: str) -> dict | None:
         # philosophy. Do not broaden those.
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+PROGRESS_FILENAME = "PROGRESS.md"
+
+
+def append_progress_entry(
+    feature_dir: Path, wu_id: str, summary: str, forward_note: str | None = None,
+) -> Path:
+    """Append one line naming *wu_id* to `feature_dir/PROGRESS.md`; return its path.
+
+    Driver-side write (FEAT-2026-0106/T01, PLAN.md "Decisions taken at
+    drafting"): the note cannot be skipped and costs no prompt tokens.
+    Callers pass a fallback summary derived from the attempt record when
+    `parse_result_block` returned None — see `record_progress_entry` — so a
+    dispatched unit always leaves a note even on malformed agent output.
+
+    *forward_note* is FEAT-2026-0106/T02's optional half: the session's own
+    account of what the next unit should know, which `summary` (backward-
+    looking by contract) does not carry. When absent — every project until it
+    adopts the field, and every attempt whose `summary` fell back — this
+    writes exactly the one line T01 wrote, byte-for-byte.
+    """
+    path = feature_dir / PROGRESS_FILENAME
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(f"- **{wu_id}**: {summary}\n")
+        if forward_note:
+            fh.write(f"  - note: {forward_note}\n")
+    return path
+
+
+def record_progress_entry(
+    feature_dir: Path, wu: "WorkUnit", attempt: int, outcome: str,
+) -> Path:
+    """Resolve *wu*'s progress-note text and append it (FEAT-2026-0106/T01).
+
+    Prefers the agent-supplied `summary` field from `wu.result_block` — set
+    by `execute_unit_attempt` on every attempt whose RESULT actually parsed,
+    `passed` or `failed` alike. Falls back to an attempt-record-derived
+    summary (attempt number + outcome) when the block is missing, malformed,
+    or carries no non-empty `summary`: `parse_result_block` degrades to None
+    by design on garbled output, and that must not delete the note.
+    """
+    summary = None
+    forward_note = None
+    if isinstance(wu.result_block, dict):
+        rb_summary = wu.result_block.get("summary")
+        if isinstance(rb_summary, str) and rb_summary.strip():
+            summary = rb_summary.strip()
+        rb_forward_note = wu.result_block.get("forward_note")
+        if isinstance(rb_forward_note, str) and rb_forward_note.strip():
+            forward_note = rb_forward_note.strip()
+    if summary is None:
+        summary = f"attempt {attempt} outcome={outcome}"
+    # Callers must fold the returned path into their own commit_bookkeeping
+    # (or, on the `passed` path, write it BEFORE squash_commit so it rides
+    # the WU's own squash): an extra standalone commit here would shift
+    # `head_tree_hash` past the tree the pinned-build seam already recorded
+    # as "next" (test_pin_honesty_and_integrity), and #150 stops a later
+    # squash's `git add -A` from absorbing this file retroactively once it
+    # is already a pre-existing untracked leftover.
+    return append_progress_entry(feature_dir, wu.wu_id, summary, forward_note)
 
 
 #: Verdict tokens that, in a produced document's heading or on a `Verdict:`
@@ -7966,20 +8039,87 @@ def assert_verdict_well_formed(
     return True, ""
 
 
+#: Reason-string prefixes `evaluate_auto_close` emits for a cost overrun —
+#: literal, not exported constants, so mirrored here rather than re-derived
+#: from `gate_eval.py`'s formatted messages.
+_OFF_PLAN_COST_REASON_PREFIXES = (
+    "per_wu_cost_overrun:",
+    "per_wu_hard_overrun:",
+    "gate_budget_exceeded:",
+    "plan_next_overrun:",
+)
+
+
+#: Reason prefixes `_evaluate_predicate_core` (via `evaluate_off_plan_signal`)
+#: emits when it never reached real WU evidence — PLAN.md has no such gate,
+#: or a WU the graph names is missing on disk. Neither says anything about
+#: whether the gate went off-plan; `reflection_required` fails closed on them
+#: rather than guessing "on plan" from no evidence at all.
+_OFF_PLAN_UNEVALUATED_REASON_PREFIXES = ("gate_not_found:", "wu_file_missing:")
+
+
+def reflection_required(feature_dir: Path, gate_id: int) -> bool:
+    """True when gate *gate_id* deserves a close's reflective prose (FEAT-2026-0106/T03).
+
+    Reads `gate_eval.evaluate_off_plan_signal`'s verdict-independent off-plan
+    signal — a blocked/escalated WU, a `replan` event, or a cost overrun —
+    rather than the close's own `verdict:` claim: the close writes
+    RETROSPECTIVE.md before that verdict is even settled (the judge runs
+    after), and on-plan gates overwhelmingly end `met` anyway, so gating
+    reflection on `met` would demand it on almost every close regardless of
+    whether the gate stayed on plan. `evaluate_off_plan_signal` rather than
+    `evaluate_auto_close` itself, because a *load-bearing* close always sets
+    `auto_close_disabled: true` (`close-discipline.md`) — an administrative
+    choice to always dispatch, unrelated to whether the gate stayed on plan —
+    and `evaluate_auto_close` would short-circuit on that flag before it read
+    any WU evidence at all.
+
+    Fails closed: when the predicate cannot be evaluated at all (no PLAN.md,
+    the gate absent from its graph, or a referenced WU file missing), this
+    returns True rather than guessing "on plan" — the same posture the
+    guards held before this function existed.
+    """
+    try:
+        decision = evaluate_off_plan_signal(Path(feature_dir), gate_id)
+    except OSError:
+        return True
+    if any(
+        reason.startswith(_OFF_PLAN_UNEVALUATED_REASON_PREFIXES)
+        for reason in decision.reasons
+    ):
+        return True
+    metrics = decision.metrics
+    if metrics.get("blocked_human_events") or metrics.get("replan_events"):
+        return True
+    return any(
+        reason.startswith(_OFF_PLAN_COST_REASON_PREFIXES)
+        for reason in decision.reasons
+    )
+
+
 def assert_cost_analysis_section_when_met(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-e) When verdict=='met', RETROSPECTIVE.md must have the registry's
-    COST_ANALYSIS_HEADING header (see closing_requirements.py, requirement close-e).
+    """(close-e) When verdict=='met' AND the gate went off-plan, RETROSPECTIVE.md
+    must have the registry's COST_ANALYSIS_HEADING header (see
+    closing_requirements.py, requirement close-e).
 
     Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
     the agent writes `verdict:` during dispatch and `wu.verdict` from
-    `load_wu` is stale. Independent re-read keeps this assertion robust
-    even if invoked outside the canonical close-d → close-e ordering.
+    `load_wu` is stale.
+
+    `reflection_required` narrows this beyond the plain verdict check
+    (FEAT-2026-0106/T03): on-plan gates end `met` too, and demanding this
+    section on every `met` close regardless of whether the gate stayed on
+    plan is the busywork this narrowing removes — see that function's
+    docstring.
     """
     fm, _ = read_frontmatter(wu.file)
     verdict = fm.get("verdict")
     if verdict != "met":
+        return True, ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is not None and not reflection_required(feature_dir, gate_n):
         return True, ""
     retro = feature_dir / RETROSPECTIVE_FILENAME
     if retro.exists():
@@ -7987,8 +8127,9 @@ def assert_cost_analysis_section_when_met(
             return True, ""
     return (
         False,
-        f"assert_cost_analysis_section_when_met: verdict=met but "
-        f"'## {COST_ANALYSIS_HEADING}' section absent from {RETROSPECTIVE_FILENAME}",
+        f"assert_cost_analysis_section_when_met: verdict=met and gate went "
+        f"off-plan but '## {COST_ANALYSIS_HEADING}' section absent from "
+        f"{RETROSPECTIVE_FILENAME}",
     )
 
 
@@ -8387,11 +8528,14 @@ def assert_failure_class_breakdown_when_failures_present(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
     """(close-f / close-intermediate-d) RETROSPECTIVE.md has the FAILURE_CLASS_HEADING_MARKDOWN
-    heading when non-passing attempt_outcome events exist for the gate.
+    heading when non-passing attempt_outcome events exist for the gate AND the
+    gate went off-plan.
 
     Returns (True, "") when:
     - RETROSPECTIVE.md is absent (assert_retrospective_exists fires first for 'close';
       assert_retrospective_gate_section fires first for 'close-intermediate').
+    - `reflection_required` says the gate stayed on plan (FEAT-2026-0106/T03)
+      — see that function's docstring for what "off-plan" means here.
     - No non-passing attempts exist in events.jsonl for the gate.
     - The heading is present.
 
@@ -8402,6 +8546,8 @@ def assert_failure_class_breakdown_when_failures_present(
         return True, ""
 
     gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is not None and not reflection_required(feature_dir, gate_n):
+        return True, ""
     # Exclude the close WU's OWN non-passing attempts: the breakdown documents
     # SUBSTANTIVE-WU failures, not the close's own stumble. Without this, a
     # failed first close attempt retroactively requires a new subsection in the
@@ -9040,8 +9186,9 @@ def assert_implementation_touched_files(
     every WU already produces. Returns ``(True, "")`` when ``wu.type`` is not
     ``implementation`` (close/plan-next/etc. produce reflective artifacts
     gated by ``assert_closing_deliverables``), or when ``touched`` — after
-    removing the WU's own file and any ``events.jsonl`` entry — still names a
-    file. Otherwise returns ``(False, summary)``: an ``implementation`` WU that
+    removing the WU's own file, any ``events.jsonl`` entry, and the driver's
+    own ``PROGRESS.md`` note — still names a file. Otherwise returns
+    ``(False, summary)``: an ``implementation`` WU that
     produced no deliverable file diff cannot be ``done``.
 
     This closes the zero-deliverable hollow pass from the other side of
@@ -9056,7 +9203,7 @@ def assert_implementation_touched_files(
     wu_name = wu.file.name
     deliverables = [
         t for t in touched
-        if Path(t).name not in (wu_name, "events.jsonl")
+        if Path(t).name not in (wu_name, "events.jsonl", PROGRESS_FILENAME)
     ]
     if deliverables:
         return True, ""
@@ -10166,8 +10313,12 @@ def run(
                                 "message": _drr_message,
                             }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt - 1,
+                            "deterministic_refusal_repeat",
+                        )
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(deterministic_refusal_repeat, "
                             f"attempt {attempt - 1})"
@@ -10303,8 +10454,10 @@ def run(
                             "message": _blocked_message,
                         }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "agent_reported_blocked")
                         commit_bookkeeping(
-                            [wu.file, events_path],
+                            [wu.file, events_path, _progress_path],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(agent-reported)\n\nFeature: {wu.wu_id}",
                         )
@@ -10320,6 +10473,13 @@ def run(
                         # reset.
                         backend.set_wu(wu, "status", DONE)
                         write_cost_to_wu(backend, wu, cum_usage)
+                        # Written BEFORE squash so the note rides the WU's own
+                        # squash commit rather than sitting as a pre-existing
+                        # untracked file a later squash's `git add -A` won't
+                        # pick up (#150), and rather than an extra standalone
+                        # commit that would shift the pinned-build seam's
+                        # "next tree" (test_pin_honesty_and_integrity).
+                        record_progress_entry(feature_dir, wu, attempt, "passed")
                         try:
                             sha = squash_commit(wu, head_before,
                                                 untracked_before=untracked_before)
@@ -10956,8 +11116,10 @@ def run(
                             feat_fm, _gate_dict, feature_dir, gate.number,
                             units, done_ids, wu, events_path,
                         )
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "spinning_signature_repeat")
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(spinning_signature_repeat, attempt {attempt})"
                             f"\n\nFeature: {wu.wu_id}",
@@ -11099,8 +11261,10 @@ def run(
                                 "message": _plateau_message,
                             }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "convergence_plateau")
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(convergence_plateau, attempt {attempt})"
                             f"\n\nFeature: {wu.wu_id}",
@@ -11157,8 +11321,10 @@ def run(
                                     "message": _unchanged_message,
                                 }))
                             flush_events(events_path, wu_events)
+                            _progress_path = record_progress_entry(
+                                feature_dir, wu, attempt, "replan_unchanged_body")
                             commit_bookkeeping(
-                                [wu.file, events_path, *note_paths],
+                                [wu.file, events_path, _progress_path, *note_paths],
                                 f"chore(loop): {wu.wu_id} blocked_human "
                                 f"(replan_unchanged_body, attempt {attempt})"
                                 f"\n\nFeature: {wu.wu_id}",
@@ -11253,8 +11419,14 @@ def run(
                         feat_fm, _gate_dict, feature_dir, gate.number,
                         units, done_ids, wu, events_path,
                     )
+                    _progress_path = (
+                        record_progress_entry(feature_dir, wu, wu_max_attempts, reason)
+                        if not all_zero else None
+                    )
                     commit_bookkeeping(
-                        [wu.file, events_path, *note_paths],
+                        [wu.file, events_path,
+                         *([_progress_path] if _progress_path else []),
+                         *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
                         f"({reason}, {wu_max_attempts} attempts)"
                         f"\n\nFeature: {wu.wu_id}",

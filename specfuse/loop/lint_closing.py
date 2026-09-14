@@ -33,6 +33,7 @@ from .judge import MEASUREMENTS_SECTION
 from .loop import (
     _gate_number_from_wu_id,
     read_gate_feature_oracle,
+    reflection_required,
     summarize_attempt_failure_classes,
 )
 from .lint_plan import _find_task_graph_block, read_frontmatter
@@ -54,6 +55,7 @@ class ClosingContext:
     wbody: str
     _diff_paths: list[str] | None = field(default=None, repr=False)
     _failures_present: bool | None = field(default=None, repr=False)
+    _off_plan: bool | None = field(default=None, repr=False)
 
     def changed_paths(self) -> list[str]:
         if self._diff_paths is None:
@@ -67,6 +69,17 @@ class ClosingContext:
             )
             self._failures_present = summary != creq.NO_FAILURES_SENTINEL
         return self._failures_present
+
+    def off_plan(self) -> bool:
+        """`reflection_required` (FEAT-2026-0106/T03) — mirrors the guard's
+        off-plan signal so a predicted skip here never diverges from the
+        real post-squash guard's decision."""
+        if self._off_plan is None:
+            self._off_plan = (
+                self.gate_num is None
+                or reflection_required(self.feature_dir, self.gate_num)
+            )
+        return self._off_plan
 
 
 def _run_git(repo_root: Path, *args: str) -> str:
@@ -182,11 +195,14 @@ def _check_verdict_well_formed(req: creq.Requirement, ctx: ClosingContext):
 
 
 def _check_cost_analysis_section_when_met(req: creq.Requirement, ctx: ClosingContext):
+    if not ctx.off_plan():
+        return True, ""  # FEAT-2026-0106/T03 — on-plan gates skip reflection
     retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
     if retro.exists() and creq.COST_ANALYSIS_HEADING_RE.search(retro.read_text()):
         return True, ""
     return False, (
-        f"verdict=met but '## {creq.COST_ANALYSIS_HEADING}' section absent from "
+        f"verdict=met and gate went off-plan but "
+        f"'## {creq.COST_ANALYSIS_HEADING}' section absent from "
         f"{creq.RETROSPECTIVE_FILENAME}"
     )
 
@@ -194,6 +210,8 @@ def _check_cost_analysis_section_when_met(req: creq.Requirement, ctx: ClosingCon
 def _check_failure_class_breakdown_when_failures_present(
     req: creq.Requirement, ctx: ClosingContext,
 ):
+    if not ctx.off_plan():
+        return True, ""  # FEAT-2026-0106/T03 — on-plan gates skip reflection
     retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
     if not retro.exists():
         return True, ""  # assert_retrospective_exists / gate-section check fires first
