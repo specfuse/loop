@@ -104,6 +104,7 @@ from .escalation import (
 )
 from .gate_eval import (
     evaluate_auto_close,
+    evaluate_off_plan_signal,
     AutoCloseDecision,
     NON_SUBSTANTIVE_TYPES,
 )
@@ -8038,20 +8039,87 @@ def assert_verdict_well_formed(
     return True, ""
 
 
+#: Reason-string prefixes `evaluate_auto_close` emits for a cost overrun —
+#: literal, not exported constants, so mirrored here rather than re-derived
+#: from `gate_eval.py`'s formatted messages.
+_OFF_PLAN_COST_REASON_PREFIXES = (
+    "per_wu_cost_overrun:",
+    "per_wu_hard_overrun:",
+    "gate_budget_exceeded:",
+    "plan_next_overrun:",
+)
+
+
+#: Reason prefixes `_evaluate_predicate_core` (via `evaluate_off_plan_signal`)
+#: emits when it never reached real WU evidence — PLAN.md has no such gate,
+#: or a WU the graph names is missing on disk. Neither says anything about
+#: whether the gate went off-plan; `reflection_required` fails closed on them
+#: rather than guessing "on plan" from no evidence at all.
+_OFF_PLAN_UNEVALUATED_REASON_PREFIXES = ("gate_not_found:", "wu_file_missing:")
+
+
+def reflection_required(feature_dir: Path, gate_id: int) -> bool:
+    """True when gate *gate_id* deserves a close's reflective prose (FEAT-2026-0106/T03).
+
+    Reads `gate_eval.evaluate_off_plan_signal`'s verdict-independent off-plan
+    signal — a blocked/escalated WU, a `replan` event, or a cost overrun —
+    rather than the close's own `verdict:` claim: the close writes
+    RETROSPECTIVE.md before that verdict is even settled (the judge runs
+    after), and on-plan gates overwhelmingly end `met` anyway, so gating
+    reflection on `met` would demand it on almost every close regardless of
+    whether the gate stayed on plan. `evaluate_off_plan_signal` rather than
+    `evaluate_auto_close` itself, because a *load-bearing* close always sets
+    `auto_close_disabled: true` (`close-discipline.md`) — an administrative
+    choice to always dispatch, unrelated to whether the gate stayed on plan —
+    and `evaluate_auto_close` would short-circuit on that flag before it read
+    any WU evidence at all.
+
+    Fails closed: when the predicate cannot be evaluated at all (no PLAN.md,
+    the gate absent from its graph, or a referenced WU file missing), this
+    returns True rather than guessing "on plan" — the same posture the
+    guards held before this function existed.
+    """
+    try:
+        decision = evaluate_off_plan_signal(Path(feature_dir), gate_id)
+    except OSError:
+        return True
+    if any(
+        reason.startswith(_OFF_PLAN_UNEVALUATED_REASON_PREFIXES)
+        for reason in decision.reasons
+    ):
+        return True
+    metrics = decision.metrics
+    if metrics.get("blocked_human_events") or metrics.get("replan_events"):
+        return True
+    return any(
+        reason.startswith(_OFF_PLAN_COST_REASON_PREFIXES)
+        for reason in decision.reasons
+    )
+
+
 def assert_cost_analysis_section_when_met(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
-    """(close-e) When verdict=='met', RETROSPECTIVE.md must have the registry's
-    COST_ANALYSIS_HEADING header (see closing_requirements.py, requirement close-e).
+    """(close-e) When verdict=='met' AND the gate went off-plan, RETROSPECTIVE.md
+    must have the registry's COST_ANALYSIS_HEADING header (see
+    closing_requirements.py, requirement close-e).
 
     Re-reads frontmatter (same reasoning as `assert_verdict_well_formed`):
     the agent writes `verdict:` during dispatch and `wu.verdict` from
-    `load_wu` is stale. Independent re-read keeps this assertion robust
-    even if invoked outside the canonical close-d → close-e ordering.
+    `load_wu` is stale.
+
+    `reflection_required` narrows this beyond the plain verdict check
+    (FEAT-2026-0106/T03): on-plan gates end `met` too, and demanding this
+    section on every `met` close regardless of whether the gate stayed on
+    plan is the busywork this narrowing removes — see that function's
+    docstring.
     """
     fm, _ = read_frontmatter(wu.file)
     verdict = fm.get("verdict")
     if verdict != "met":
+        return True, ""
+    gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is not None and not reflection_required(feature_dir, gate_n):
         return True, ""
     retro = feature_dir / RETROSPECTIVE_FILENAME
     if retro.exists():
@@ -8059,8 +8127,9 @@ def assert_cost_analysis_section_when_met(
             return True, ""
     return (
         False,
-        f"assert_cost_analysis_section_when_met: verdict=met but "
-        f"'## {COST_ANALYSIS_HEADING}' section absent from {RETROSPECTIVE_FILENAME}",
+        f"assert_cost_analysis_section_when_met: verdict=met and gate went "
+        f"off-plan but '## {COST_ANALYSIS_HEADING}' section absent from "
+        f"{RETROSPECTIVE_FILENAME}",
     )
 
 
@@ -8459,11 +8528,14 @@ def assert_failure_class_breakdown_when_failures_present(
     wu: WorkUnit, feature_dir: Path, repo_root: Path, head_before: str,
 ) -> tuple[bool, str]:
     """(close-f / close-intermediate-d) RETROSPECTIVE.md has the FAILURE_CLASS_HEADING_MARKDOWN
-    heading when non-passing attempt_outcome events exist for the gate.
+    heading when non-passing attempt_outcome events exist for the gate AND the
+    gate went off-plan.
 
     Returns (True, "") when:
     - RETROSPECTIVE.md is absent (assert_retrospective_exists fires first for 'close';
       assert_retrospective_gate_section fires first for 'close-intermediate').
+    - `reflection_required` says the gate stayed on plan (FEAT-2026-0106/T03)
+      — see that function's docstring for what "off-plan" means here.
     - No non-passing attempts exist in events.jsonl for the gate.
     - The heading is present.
 
@@ -8474,6 +8546,8 @@ def assert_failure_class_breakdown_when_failures_present(
         return True, ""
 
     gate_n = _gate_number_from_wu_id(wu.wu_id)
+    if gate_n is not None and not reflection_required(feature_dir, gate_n):
+        return True, ""
     # Exclude the close WU's OWN non-passing attempts: the breakdown documents
     # SUBSTANTIVE-WU failures, not the close's own stumble. Without this, a
     # failed first close attempt retroactively requires a new subsection in the

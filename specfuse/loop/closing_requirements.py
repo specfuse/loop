@@ -281,14 +281,25 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
         ),
         Requirement(
             id="close-e", wu_type="close", phase="pre-squash",
-            description=f"RETROSPECTIVE.md has a '{COST_ANALYSIS_HEADING}' heading",
+            description=(
+                f"RETROSPECTIVE.md has a '{COST_ANALYSIS_HEADING}' heading "
+                "when verdict==met AND gate_eval.reflection_required says "
+                "the gate went off-plan (FEAT-2026-0106/T03) — an on-plan "
+                "close skips this reflective section"
+            ),
             file=RETROSPECTIVE_FILENAME, heading=COST_ANALYSIS_HEADING,
             applies_when="verdict_met",
             enforced_by="assert_cost_analysis_section_when_met",
         ),
         Requirement(
             id="close-f", wu_type="close", phase="pre-squash",
-            description=f"RETROSPECTIVE.md has a '{FAILURE_CLASS_HEADING}' heading",
+            description=(
+                f"RETROSPECTIVE.md has a '{FAILURE_CLASS_HEADING}' heading "
+                "when non-passing attempts are present AND "
+                "gate_eval.reflection_required says the gate went off-plan "
+                "(FEAT-2026-0106/T03) — an on-plan close skips this "
+                "reflective section"
+            ),
             file=RETROSPECTIVE_FILENAME, heading=FAILURE_CLASS_HEADING,
             heading_level=FAILURE_CLASS_HEADING_LEVEL,
             applies_when="failures_present",
@@ -397,7 +408,13 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
         ),
         Requirement(
             id="close-intermediate-d", wu_type="close-intermediate", phase="pre-squash",
-            description=f"RETROSPECTIVE.md has a '{FAILURE_CLASS_HEADING}' heading",
+            description=(
+                f"RETROSPECTIVE.md has a '{FAILURE_CLASS_HEADING}' heading "
+                "when non-passing attempts are present AND "
+                "gate_eval.reflection_required says the gate went off-plan "
+                "(FEAT-2026-0106/T03) — an on-plan close skips this "
+                "reflective section"
+            ),
             file=RETROSPECTIVE_FILENAME, heading=FAILURE_CLASS_HEADING,
             heading_level=FAILURE_CLASS_HEADING_LEVEL,
             applies_when="failures_present",
