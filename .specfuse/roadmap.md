@@ -109,7 +109,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
 | FEAT-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-2026-0110) |
-| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | planned | — | [→ detail](#feat-2026-0111) |
+| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | active | — | [→ detail](#feat-2026-0111) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1003,7 +1003,7 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Provenance and one correction.** Split out of FEAT-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
