@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0111/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 produces:
   - tests/test_distilled_accept_step.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T15:01:34.373076+00:00
+duration_seconds: 138.13
+cost_usd: 0.486376
+input_tokens: 28
+output_tokens: 12150
 ---
 
 # Propose a ranked cut; let a human accept it

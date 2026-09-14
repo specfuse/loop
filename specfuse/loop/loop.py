@@ -361,6 +361,101 @@ def score_learnings_entries(
     return {"entries": scored, "reach_caveat": LEARNINGS_REACH_TIEBREAK_CAVEAT}
 
 
+#: Review prompt carried on every proposed distillate entry (FEAT-2026-0111/T03).
+#: Only 7 of 234 LEARNINGS.md entries name a guard or lint literally, so
+#: whether a rule is already mechanically enforced can't be computed -- it is
+#: surfaced for the human at accept time instead of filtered automatically.
+LEARNINGS_GUARD_REVIEW_PROMPT = (
+    "this may already be enforced by a guard or lint — check before "
+    "spending dispatch words on it"
+)
+
+
+def propose_distilled_learnings(
+    learnings_path: "Path | None" = None,
+    features_dir: "Path | None" = None,
+    word_cap: int = LEARNINGS_DISTILLED_WORD_CAP,
+) -> dict:
+    """Rank `LEARNINGS.md` via `score_learnings_entries` and cut the ranking
+    at *word_cap* words -- the budget the dispatch path actually pays --
+    rather than at an entry count.
+
+    Walks the ranking in order, accumulating each entry's word count; the
+    first entry that would push the running total over *word_cap* and every
+    entry after it (already lower-ranked) go to `cut` instead of `proposed`.
+    Each proposed entry carries the score's own evidence (`cost_usd`, `reach`,
+    `failure_signatures`) plus `word_count` and `guard_review_prompt`
+    (`LEARNINGS_GUARD_REVIEW_PROMPT`) -- everything a human needs to accept,
+    edit, or reject it without re-deriving the score.
+
+    Read-only: nothing here writes to `LEARNINGS_DISTILLED_RULE_PATH`. Only
+    `apply_distilled_decisions` writes, and only on explicit per-entry accept.
+    """
+    scored = score_learnings_entries(learnings_path=learnings_path, features_dir=features_dir)
+
+    proposed: list[dict] = []
+    cut: list[dict] = []
+    running = 0
+    entries = scored["entries"]
+    for i, entry in enumerate(entries):
+        word_count = len(entry["text"].split())
+        if running + word_count > word_cap:
+            cut.extend(entries[i:])
+            break
+        running += word_count
+        proposed.append({
+            **entry,
+            "word_count": word_count,
+            "guard_review_prompt": LEARNINGS_GUARD_REVIEW_PROMPT,
+        })
+
+    return {
+        "proposed": proposed,
+        "cut": cut,
+        "word_cap": word_cap,
+        "reach_caveat": scored["reach_caveat"],
+    }
+
+
+def apply_distilled_decisions(
+    decisions: "list[dict]",
+    *,
+    rules_local_path: "Path | None" = None,
+) -> dict:
+    """Write accepted/edited entries to `LEARNINGS_DISTILLED_RULE_PATH`; the
+    only path by which anything reaches that file (FEAT-2026-0111/T03).
+
+    *decisions* is one dict per reviewed proposal entry: `tag`, `action`
+    (`"accept"`, `"edit"`, or `"reject"`), and `text` -- the original wording
+    for an accept, the human's replacement wording for an edit. A `reject`
+    contributes nothing; a *decisions* list with no `accept`/`edit` entries at
+    all leaves the file untouched -- byte-identical, no line appended.
+
+    Pure and deterministic: no prompt, no stdin read, so it is safe to call
+    from a headless dispatch with no human present -- it writes only what
+    *decisions* explicitly names, never more.
+
+    Returns `{"written": [...], "path": path}`; `written` lists the tags
+    actually appended, empty when nothing was accepted.
+    """
+    path = (
+        rules_local_path if rules_local_path is not None
+        else REPO_ROOT / LEARNINGS_DISTILLED_RULE_PATH
+    )
+
+    to_write = [d for d in decisions if d.get("action") in ("accept", "edit")]
+    if not to_write:
+        return {"written": [], "path": path}
+
+    new_lines = [f"- [{d['tag']}] {d['text']}" for d in to_write]
+
+    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    separator = "" if existing == "" or existing.endswith("\n") else "\n"
+    path.write_text(existing + separator + "\n".join(new_lines) + "\n", encoding="utf-8")
+
+    return {"written": [d["tag"] for d in to_write], "path": path}
+
+
 class ScaffoldVersionSkew(RuntimeError):
     """The working tree's scaffold is newer than the installed one (#2643).
 
