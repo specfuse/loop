@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_binding_block_budget -v -b"
 baseline:
   sha: b1268fa81ac577bb06cd1b107711cadcdf59e1f5

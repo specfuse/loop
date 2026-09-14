@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0111-bounded-learnings
 roadmap_goal: The rules worth following reach every dispatched session, inside a word budget a lint enforces, chosen by a human with computed weights as evidence.
 autonomy_default: review        # edits the driver and the scaffold's binding block
 status: active
-planned_cost_usd: 28.00
+planned_cost_usd: 29.50
 ---
 
 # Plan: Bounded LEARNINGS on the dispatch path
@@ -148,9 +148,12 @@ gates:
       - id: FEAT-2026-0111/T04
         file: WU-04-budget-allocation.md
         depends_on: [FEAT-2026-0111/T01]
+      - id: FEAT-2026-0111/T04H
+        file: WU-04H-sync-packaged-rule-mirrors.md
+        depends_on: [FEAT-2026-0111/T04]
       - id: FEAT-2026-0111/T05
         file: WU-05-document-the-budget.md
-        depends_on: [FEAT-2026-0111/T03, FEAT-2026-0111/T04]
+        depends_on: [FEAT-2026-0111/T03, FEAT-2026-0111/T04, FEAT-2026-0111/T04H]
       # --- closing sequence: 1-WU close (terminal gate, <=8 substantive WUs) ---
       - id: FEAT-2026-0111/G1-CLOSE
         file: WU-90-gate-1-close.md
@@ -159,6 +162,7 @@ gates:
           - FEAT-2026-0111/T02
           - FEAT-2026-0111/T03
           - FEAT-2026-0111/T04
+          - FEAT-2026-0111/T04H
           - FEAT-2026-0111/T05
 ```
 
