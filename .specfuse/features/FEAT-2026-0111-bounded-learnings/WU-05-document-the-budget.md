@@ -1,16 +1,16 @@
 ---
 id: FEAT-2026-0111/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 2.50
 produces:
   - docs/methodology.md
   - .specfuse/rules-local/README.md
-duration_seconds: 1253.119
-cost_usd: 0.884954
-input_tokens: 26
-output_tokens: 4022
+duration_seconds: 786.745
+cost_usd: 0.963139
+input_tokens: 82
+output_tokens: 10916
 ---
 
 # Document the budget, the accept step, and what the weights do not mean

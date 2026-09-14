@@ -654,6 +654,31 @@ feature's `RETROSPECTIVE.md`; only rules that would change how a *future* WU is
 written or executed graduate to `LEARNINGS.md`. This is the human-scale analogue
 of the Ralph loop feeding errors back into the prompt.
 
+### The binding-block word budget (FEAT-2026-0111)
+
+The `.claude/CLAUDE.md` "Specfuse binding rules" block — every `@`-referenced
+file a dispatched work-unit session is held to — is capped at 2,500 words
+(`BINDING_BLOCK_WORD_CAP` in `specfuse/loop/loop.py`), enforced by
+`check_binding_block_budget`. Every rule added to that block, including a
+project-authored entry under `.specfuse/rules-local/`, is counted against this
+one shared cap; a project adding a local rule spends the same allowance the
+loop's own rules already draw from.
+
+`.specfuse/rules-local/learnings-distilled.md` — the LEARNINGS-derived
+distillate wired into the block — carries its own 500-word sub-budget
+(`LEARNINGS_DISTILLED_WORD_CAP`) inside the 2,500-word total. `score_learnings_entries`
+ranks candidate entries and a human accept step (`apply_distilled_decisions`)
+cuts the accepted set to that 500-word sub-budget, not to an entry count.
+
+The ranking's `reach` field — the count of other feature files that cite an
+entry — is **a tiebreaker with an age bias, not a ranking signal**: it counts
+citations in planning documents, and planning agents cite what they have
+already read in `LEARNINGS.md`, so visibility inflates its own count, and it
+favors older entries that have had more features' worth of planning sessions
+in which to be cited. Neither `reach` nor `cost_usd` measures whether a rule
+actually improves a session's work — that is a judgment the accept step still
+has to make by reading the entry, not a property either weight computes.
+
 ## 9. Autonomy
 
 Three levels — `auto`, `review`, `supervised` — set once as a feature default

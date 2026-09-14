@@ -4,3 +4,4 @@
 - **FEAT-2026-0111/T04**: attempt 1 outcome=passed
 - **FEAT-2026-0111/T03**: Added propose_distilled_learnings and apply_distilled_decisions to specfuse/loop/loop.py (rank-and-cut-at-word-budget, write-only-on-explicit-accept) plus tests/test_distilled_accept_step.py.
 - **FEAT-2026-0111/T04H**: attempt 1 outcome=passed
+- **FEAT-2026-0111/T05**: attempt 2 outcome=passed

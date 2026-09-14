@@ -3,18 +3,12 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_binding_block_budget -v -b"
 baseline:
-  sha: b1268fa81ac577bb06cd1b107711cadcdf59e1f5
-  probed_at: 2026-09-14T15:24:45.925491+00:00
-  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:764f3615ab36287de03ddb147c0182b4145e20fb:77e8e3d3023099737fdfe4a1695c0edbbf639e45:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:9bd7bd3ea82793dad908b45e7abb4d4f81f91420:a00f17b4dea92727aa92f2478bef37348e132b4d:b37abd23368ec1eafe7ac27bb03aa41f66a8a5b2:ba4e2ff68ff80b36054d003c5116bc9d9b3d3b1e:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  sha: e471a2f93ef4d0d58c05f57119f344e4f16b89b2
+  probed_at: 2026-09-14T16:05:00.881266+00:00
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:764f3615ab36287de03ddb147c0182b4145e20fb:77e8e3d3023099737fdfe4a1695c0edbbf639e45:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:a00f17b4dea92727aa92f2478bef37348e132b4d:b37abd23368ec1eafe7ac27bb03aa41f66a8a5b2:ba4e2ff68ff80b36054d003c5116bc9d9b3d3b1e:bb2b04901cb4c0b3aab80a95321e8500ba9d52ad:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
   entry_sha: b1268fa81ac577bb06cd1b107711cadcdf59e1f5
   source: attributed:FEAT-2026-0111/T05
-  failing:
-    - gate: tests
-      failure_class: tests
-      failure_signature: "test_packaged_copy_is_byte_identical"
-    - gate: coverage
-      failure_class: other
-      failure_signature: "no_gate_marker"
+  failing: []
 ---
 
 # Gate 1 — the distilled set reaches dispatch, inside an enforced budget
