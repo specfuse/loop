@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.19.0
 started_at: 2026-09-14T01:44:51.329316+00:00
 duration_seconds: 530.494
-cost_usd: 3.361594
-input_tokens: 482
-output_tokens: 41118
+cost_usd: 3.692581
+input_tokens: 508
+output_tokens: 45899
 ---
 
 # Close the feature — progress lines and conditional reflection
