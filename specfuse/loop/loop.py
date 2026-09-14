@@ -8388,10 +8388,68 @@ def reflection_required(feature_dir: Path, gate_id: int) -> bool:
     metrics = decision.metrics
     if metrics.get("blocked_human_events") or metrics.get("replan_events"):
         return True
+    if _gate_has_eventful_history(Path(feature_dir), gate_id):
+        return True
     return any(
         reason.startswith(_OFF_PLAN_COST_REASON_PREFIXES)
         for reason in decision.reasons
     )
+
+
+def _gate_has_eventful_history(feature_dir: Path, gate_id: int) -> bool:
+    """True when this gate's own event log says it did not go as planned (#3318).
+
+    `evaluate_off_plan_signal` reads per-WU evidence: a work unit that blocked,
+    a `replan` event, a unit that overran its estimate. Two things that plainly
+    mean "this gate did not go as planned" are not per-WU and so were invisible
+    to it:
+
+    * a `human_escalation` whose `correlation_id` is the **feature** rather than
+      a work unit — a gate-entry halt such as `preexisting_gate_failure` carries
+      its gate in the payload and belongs to no unit, so
+      `blocked_human_events` never counted it; and
+    * a `judged` event for this gate recording `judge_verdict: not_met` — the
+      gate went round again, which is the thing worth reflecting on even when a
+      later attempt closes `met`.
+
+    FEAT-2026-0111's gate 1 had both, plus an operator-inserted hygiene unit and
+    a re-scoped definition of done, and `reflection_required` returned False with
+    `reasons=[]`.
+
+    Read here rather than in `evaluate_off_plan_signal` deliberately:
+    `evaluate_auto_close` shares that predicate, and whether a gate may
+    auto-close is a different question from whether its close should reflect.
+    Widening the shared core would change auto-close eligibility for every
+    project as a side effect of a reflection fix.
+
+    Fails closed on an unreadable log, matching the caller's own posture: a
+    malformed line is skipped, but an `OSError` returns True rather than
+    guessing "nothing happened".
+    """
+    path = Path(feature_dir) / "events.jsonl"
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        payload = event.get("payload") or {}
+        if payload.get("gate") != gate_id:
+            continue
+        kind = event.get("event_type")
+        if kind == "human_escalation":
+            return True
+        if kind == "judged" and payload.get("judge_verdict") == "not_met":
+            return True
+    return False
 
 
 def assert_cost_analysis_section_when_met(
