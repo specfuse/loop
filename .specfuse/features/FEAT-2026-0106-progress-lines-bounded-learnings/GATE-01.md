@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 feature_oracle: "python3 -m unittest tests.test_progress_lines_end_to_end -v -b"
 baseline:
   sha: fce5a393ff2821a0d50393c7e2c1d0a12b3f03ea

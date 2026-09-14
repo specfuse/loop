@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0106-progress-lines-bounded-learnings
 roadmap_goal: Each dispatched unit leaves a short progress note the next unit can read, and a gate that stayed on-plan closes without writing reflective prose nobody asked for.
 autonomy_default: review        # edits the driver; judge_editing vetoes an auto-arm
                                 # regardless, so review states that up front
-status: active
+status: done
 planned_cost_usd: 16.50
 ---
 
