@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.19.0
 started_at: 2026-09-14T17:55:02.918150+00:00
 duration_seconds: 402.522
-cost_usd: 2.816665
-input_tokens: 482
-output_tokens: 32343
+cost_usd: 3.090019
+input_tokens: 506
+output_tokens: 34045
 ---
 
 # Close the feature — bounded LEARNINGS on the dispatch path
