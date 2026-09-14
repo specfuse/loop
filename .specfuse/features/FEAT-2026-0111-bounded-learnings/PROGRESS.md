@@ -5,3 +5,5 @@
 - **FEAT-2026-0111/T03**: Added propose_distilled_learnings and apply_distilled_decisions to specfuse/loop/loop.py (rank-and-cut-at-word-budget, write-only-on-explicit-accept) plus tests/test_distilled_accept_step.py.
 - **FEAT-2026-0111/T04H**: attempt 1 outcome=passed
 - **FEAT-2026-0111/T05**: attempt 2 outcome=passed
+- **FEAT-2026-0111/G1-CLOSE**: Wrote the FEAT-2026-0111 close (RETROSPECTIVE.md with Measurements, before/after word counts, off-plan analysis, deferred list, contract changes, Cost analysis and Failure-class breakdown; FOLLOW-UPS.md with two measured failures; two LEARNINGS entries; four CHANGELOG Unreleased entries; advisory verdict not_met) and verified the closing lint passes.
+  - note: The distillate's 500-word sub-budget exceeds the 96 words of headroom the 2,500 cap leaves, so populating learnings-distilled.md needs an operator decision on the cap or sub-budget before any accept-step run can land entries.

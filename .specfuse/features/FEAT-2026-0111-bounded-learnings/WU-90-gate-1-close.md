@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0111/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 auto_close_disabled: true
+verdict: not_met
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.19.0
+started_at: 2026-09-14T16:20:24.733138+00:00
+duration_seconds: 683.971
+cost_usd: 3.811248
+input_tokens: 482
+output_tokens: 53780
 ---
 
 # Close the feature — bounded LEARNINGS on the dispatch path
