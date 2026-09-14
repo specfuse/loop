@@ -76,6 +76,20 @@ conclude it — the reason the judge is a fresh session in the first place. A
 close body names what to measure and what evidence counts, never what value to
 write. Naming the verdict in the body is a drafting defect, not a shortcut.
 
+## 1a. Which obligations are conditional (FEAT-2026-0106)
+
+Not every obligation above binds on every close. The reflective sections —
+`## Cost analysis` and `### Failure-class breakdown` — are conditional on
+`gate_eval`'s off-plan signal (a blocked WU, a `replan` event, a cost
+overrun): an on-plan close skips them. Measurements are not conditional on
+anything, for the reason stated in §1 — the judge's evidence bundle slices
+`## Measurements` out of `RETROSPECTIVE.md` regardless of how the gate went,
+so a close that skipped writing them would starve the judge of the evidence
+it needs to reach a verdict at all. `docs/methodology.md` §6 "Ceremony
+proportionality" states the same off-plan signal at the gate-dispatch level
+(whether a close runs at all); this section is the narrower case of a close
+that does run still skipping prose the gate didn't earn.
+
 ## 2. The verdict is binary; unfinished work is tracked, not hedged
 
 The verdict a close records is `met` or `not_met` — there is no partial

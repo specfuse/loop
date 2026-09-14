@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0106/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - docs/methodology.md
   - .specfuse/rules/close-discipline.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T01:23:39.284736+00:00
+duration_seconds: 1071.027
+cost_usd: 1.207067
+input_tokens: 98
+output_tokens: 13633
 ---
 
 # Document what a close now writes, and what it no longer does

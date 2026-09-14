@@ -595,6 +595,18 @@ reflective session. Ceremony proportionality trades reflection only on
 features that stay small **and** on-plan. The `gate_eval.py` predicate is
 the safety net; this rule does not replace it.
 
+**Reflective prose is conditional too (FEAT-2026-0106).** The roadmap once
+asked for a retrospective "only on `not_met` or on request" — superseded,
+for an ordering reason: the close writes `RETROSPECTIVE.md` before the judge
+produces a verdict, so there is nothing to condition on at write time. The
+close instead keys its reflective sections (`## Cost analysis`,
+`### Failure-class breakdown`) on the same off-plan signal named above
+(blocked WU, replan event, cost overrun) rather than on the verdict. Every
+other closing obligation — measurements above all, since the judge's evidence
+bundle depends on them regardless of how the gate went — stays unconditional;
+see [`close-discipline.md`](../.specfuse/rules/close-discipline.md) §1a for
+which is which.
+
 The canonical threshold is **8** (stated here, in `docs/methodology.md`;
 referenced, not re-defined, in `.specfuse/skills/draft-feature/SKILL.md`).
 
