@@ -12,10 +12,8 @@ lists the specific path categories that are off-limits.
 
 ## Secrets
 
-Secrets include API tokens, deploy keys, SSH private keys, OAuth client secrets,
-webhook signing secrets, database passwords, `.env` files, cloud credentials, and
-anything conventionally treated as a credential (see the enumeration in
-[`never-touch.md`](never-touch.md) §2). The posture is strict:
+The full enumeration lives in [`never-touch.md`](never-touch.md) §2. The
+posture here is strict:
 
 - **Never read.** Do not open a secrets file to inspect its contents, not even
   "just to see the format." If a unit's verification needs one, stop and
@@ -41,29 +39,27 @@ Treat suspected-secret values with the same care as confirmed-secret values. A
 ## When a work unit appears to require privileged access
 
 A unit whose acceptance criteria or verification commands appear to require
-reading a secret, editing generated code directly, or any other privileged action
-is almost always a unit-definition problem, not a license to break the rule.
+reading a secret, editing generated code directly, or any other privileged
+action is almost always a unit-definition problem, not license to break the
+rule.
 
-1. **Stop.** Do not attempt the privileged action. Do not attempt to work around
-   the requirement (for example, by running a command that reads the secret
-   implicitly).
-2. **Re-read the unit.** Verify you have understood the step correctly. Often the
-   unit describes how the *human* will verify, with the session doing an
-   upstream-only step.
-3. **If the requirement is genuine, signal blocked.** Name the privilege
-   required (e.g., "verification command requires reading `config/db-prod.env`")
-   as the blocked reason. Work halts and the human decides whether to adjust the
-   unit, run the step out-of-band, or provide a scoped credential. (The signal is
-   surface-specific — a `status: blocked` RESULT on the loop, a `blocked_*`
-   transition on the orchestrator.)
-4. **Do not report the unit complete.** A verification that could not be run is
-   not a verification; a unit whose verification cannot be run is not done (see
-   [`verification-discipline.md`](verification-discipline.md)).
+1. **Stop.** Do not attempt the privileged action, or work around it (e.g. a
+   command that reads the secret implicitly).
+2. **Re-read the unit.** Often it describes how the *human* verifies, with the
+   session doing an upstream-only step.
+3. **If genuine, signal blocked.** Name the privilege required (e.g.
+   "verification command requires reading `config/db-prod.env`") as the
+   blocked reason; the human decides whether to adjust the unit, run the step
+   out-of-band, or provide a scoped credential. (Surface-specific — a
+   `status: blocked` RESULT on the loop, a `blocked_*` transition on the
+   orchestrator.)
+4. **Do not report complete.** A verification that could not be run is not a
+   verification (see [`verification-discipline.md`](verification-discipline.md)).
 
-The common mistake here is to "helpfully" substitute a weaker check for a
-privileged one — "I couldn't run the secret-requiring command, so I inspected the
-diff visually and it looks right." That is a verification-bypass, not a
-verification, and it produces a RESULT block the driver cannot trust.
+The common mistake is substituting a weaker check for a privileged one — "I
+couldn't run the secret-requiring command, so I inspected the diff visually."
+That is a verification-bypass, and it produces a RESULT block the driver
+cannot trust.
 
 ## Authenticated tooling
 

@@ -8,6 +8,7 @@ discovery picks them up.
 @.specfuse/rules/result-contract.md
 @.specfuse/rules/never-touch.md
 @.specfuse/rules/security-boundaries.md
+@.specfuse/rules-local/learnings-distilled.md
 <!-- What a dispatched session is held to, and nothing else: at most 2,500 words
      of binding rules per dispatch (FEAT-2026-0084/T01). Every other rule still
      ships in .specfuse/rules/ and is linked from the three above — the

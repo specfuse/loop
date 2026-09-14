@@ -109,7 +109,8 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
 | FEAT-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-2026-0110) |
-| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | planned | — | [→ detail](#feat-2026-0111) |
+| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-2026-0111) |
+| FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -990,18 +991,20 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.**
 
-<a id="feat-2026-0111"></a>
-## FEAT-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
+<a id="feat-2026-0112"></a>
+## FEAT-2026-0112 — The binding-block word cap: decide what a dispatched session's 2,500 words are spent on
 
-**Why.** `.specfuse/LEARNINGS.md` is append-only by contract: `assert_learnings_appended_or_noop` makes at least one added line the success signal of every close, with "nothing generalizes" as the only way out. That is an unbounded growth rule attached to a file no dispatched work unit reads. This repo carries 232 entries; a consumer measured its own at 219 entries / 5,497 lines / ~167k tokens after four months, with **91 of 219 never cited** by any later feature's PLAN, WU, GATE or RETROSPECTIVE. The planning surfaces that do load it (`/draft-feature`, `/pick-feature`) slice it; every implementation dispatch ignores it entirely.
+**Why.** FEAT-2026-0111 built the machinery to put distilled rules on the dispatch path and then measured that there is no room for them. With the three binding rules trimmed as far as that feature took them, the **effective room for anything new is 96 words** against the 2,500-word cap; `propose_distilled_learnings(word_cap=96)` proposes **0 of 244** entries, and at 500 it proposes 3. The 500-word sub-budget stated in `LEARNINGS_DISTILLED_WORD_CAP`, `docs/methodology.md` and `.specfuse/rules-local/README.md` is unreachable — every distillate from 97 to 500 words fails the total cap first (#3316).
 
-**Goal.** Adopt the design in #3272 rather than re-deriving it. One line per rule in `LEARNINGS.md` carrying a weight bracket, with the evidence staying in the feature's `RETROSPECTIVE.md` where it already lives; weights computed by the driver — **reach** (distinct later features citing the entry's id) and **cost** (dollar figures the entry quotes, plus `events.jsonl` attempt cost by `failure_signature`); a bound on the loaded set enforced as a lint, with re-distillation by weight over the cap; and the distilled file wired onto the dispatch path so sessions actually read it.
+So the question is no longer "how do we distil lessons" — that is built and loop-local. It is **what a dispatched session's 2,500 words should be spent on**, and nothing has ever answered it deliberately: the current allocation is three rules that happen to fill the budget, two of which are core-owned.
 
-**Benefits.** Planning context stops growing without limit, and the rules that earned their place — the consumer's top five entries were cited by 12–15 features each — reach the sessions that need them instead of sitting in a file only two skills open.
+**Goal.** Decide and record the allocation. That means answering, with evidence rather than preference: whether 2,500 is still the right number (it was set because a 7,213-word block was measured being read past — FEAT-2026-0084/T01); whether all of `result-contract`, `never-touch` and `security-boundaries` earn their current share; and what share, if any, a distilled-lessons file should hold. Whatever is decided becomes a stated allocation the lint enforces per file, not a single total that whoever edits last gets to fill.
 
-**Shape — not yet drafted.** #3272 carries six concrete suggestions and a consumer's shipped implementation (a 47-line `rules-local/learnings-distilled.md` in the binding block, `[reach N · $C · sources]` per line). Drafting should start from that issue, not from this row.
+**Benefits.** The dispatch path stops being allocated by accident. FEAT-2026-0111's weights, accept step and lint become usable the moment a share exists for them; today they are correct and idle.
 
-**Provenance and one correction.** Split out of FEAT-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
+**Shape — not drafted.** Two pieces of prior art to start from, not re-derive: #3316 carries the measurement, and FEAT-2026-0111's `PLAN.md` records why the trim stopped where it did. Note that 137 of the 170 words FEAT-2026-0111 trimmed came from `never-touch.md` and `security-boundaries.md`, which are **vendored from `specfuse/methodology/`** — the loop repo cannot decide their content alone, and the #581 baseline guard will halt a future core sync on them by design.
+
+**Scope boundary — deliberately out.** Distillation mechanics: the weights, the accept step and the lint all shipped in FEAT-2026-0111 and are not to be rebuilt. `LEARNINGS.md`'s own append contract.
 
 **Status: planned.**
 

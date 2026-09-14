@@ -1,0 +1,45 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Measure the binding block, and report what could be trimmed",
+          "id": "FEAT-2026-0111/T01",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Rank entries by what failures cost, not by how often they were cited",
+          "id": "FEAT-2026-0111/T02",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Propose a ranked cut; let a human accept it",
+          "id": "FEAT-2026-0111/T03",
+          "planned_cost_usd": 4.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Allocate the budget, and make the cap blocking once the tree can pass it",
+          "id": "FEAT-2026-0111/T04",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document the budget, the accept step, and what the weights do not mean",
+          "id": "FEAT-2026-0111/T05",
+          "planned_cost_usd": 2.5,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close the feature \u2014 bounded LEARNINGS on the dispatch path",
+          "id": "FEAT-2026-0111/G1-CLOSE",
+          "planned_cost_usd": 6.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

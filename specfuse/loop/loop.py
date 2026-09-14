@@ -159,6 +159,303 @@ def resume_command_for(feature_id: str, start: "Path | None" = None) -> str:
     return f"specfuse run --feature {feature_id}"
 
 
+#: Word cap on the `.claude/CLAUDE.md` binding block, `scaffold.py:227`'s
+#: comment made blocking by `check_binding_block_budget` (FEAT-2026-0111/T04).
+BINDING_BLOCK_WORD_CAP = 2500
+
+#: Relative path `binding_block_word_count`'s `files` dict keys the rules-local
+#: distillate on, wired by FEAT-2026-0111/T01.
+LEARNINGS_DISTILLED_RULE_PATH = ".specfuse/rules-local/learnings-distilled.md"
+
+#: Sub-budget for `LEARNINGS_DISTILLED_RULE_PATH` within `BINDING_BLOCK_WORD_CAP`
+#: (FEAT-2026-0111/T04), sized off #3272's hand-curated 47-line distillate.
+#: T03's accept step cuts its ranked proposal at this word count, not at an
+#: entry count.
+LEARNINGS_DISTILLED_WORD_CAP = 500
+
+_BINDING_RULES_HEADING = "## Specfuse binding rules"
+
+
+def binding_block_word_count(claude_md: "Path | None" = None) -> dict:
+    """Word count of every `@`-referenced file in the binding rules block.
+
+    Parses the "## Specfuse binding rules" section of *claude_md* (default
+    `REPO_ROOT/.claude/CLAUDE.md`) for its `@<path>` lines, resolves each path
+    relative to `REPO_ROOT`, and sums each referenced file's word count.
+    Reads the block's actual references rather than a hardcoded file list —
+    a consuming project's block carries `rules-local` lines this repo's own
+    block may not.
+
+    Returns `{"total": int, "cap": BINDING_BLOCK_WORD_CAP,
+    "files": {relpath: word_count, ...}}`, `files` in block order.
+    """
+    path = claude_md if claude_md is not None else REPO_ROOT / ".claude" / "CLAUDE.md"
+    text = path.read_text(encoding="utf-8")
+
+    refs: list[str] = []
+    in_block = False
+    for line in text.splitlines():
+        if line.startswith(_BINDING_RULES_HEADING):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        stripped = line.strip()
+        if stripped.startswith("@"):
+            refs.append(stripped[1:])
+        else:
+            # The block is a contiguous run of `@` lines right after the
+            # heading; anything else (blank line, HTML comment, next
+            # heading) ends it — including a comment's own example `@` text.
+            break
+
+    files: dict[str, int] = {}
+    for rel in refs:
+        target = REPO_ROOT / rel
+        files[rel] = len(target.read_text(encoding="utf-8").split())
+
+    return {"total": sum(files.values()), "cap": BINDING_BLOCK_WORD_CAP, "files": files}
+
+
+def check_binding_block_budget(claude_md: "Path | None" = None) -> dict:
+    """Blocking form of `binding_block_word_count` (FEAT-2026-0111/T04).
+
+    Raises `AssertionError` if the rules-local distillate exceeds
+    `LEARNINGS_DISTILLED_WORD_CAP`, or the block's total exceeds
+    `BINDING_BLOCK_WORD_CAP`. The sub-budget is checked first so a bloated
+    distillate is named directly rather than folded into the generic total
+    failure. Returns the same dict as `binding_block_word_count` on success.
+    """
+    result = binding_block_word_count(claude_md)
+    distilled_count = result["files"].get(LEARNINGS_DISTILLED_RULE_PATH, 0)
+    if distilled_count > LEARNINGS_DISTILLED_WORD_CAP:
+        raise AssertionError(
+            f"{LEARNINGS_DISTILLED_RULE_PATH} is {distilled_count} words, "
+            f"over its {LEARNINGS_DISTILLED_WORD_CAP}-word sub-budget"
+        )
+    if result["total"] > result["cap"]:
+        raise AssertionError(
+            f"binding block is {result['total']} words, over its "
+            f"{result['cap']}-word cap"
+        )
+    return result
+
+
+#: Stated on every `score_learnings_entries` result (FEAT-2026-0111/T02) so the
+#: bias travels with the artifact a human reviews, not only in PLAN.md prose.
+LEARNINGS_REACH_TIEBREAK_CAVEAT = (
+    "reach is a tiebreaker, not the primary signal: it counts citations in "
+    "planning documents, and planning agents cite what they have already read "
+    "in LEARNINGS.md, so visibility inflates its own count. It also favors "
+    "OLDER entries, which have had more features' worth of planning sessions "
+    "in which to be cited."
+)
+
+_LEARNINGS_FEAT_ID_RE = re.compile(r"^(FEAT-\d{4}-\d{4})")
+
+
+def score_learnings_entries(
+    learnings_path: "Path | None" = None,
+    features_dir: "Path | None" = None,
+) -> dict:
+    """Rank `LEARNINGS.md` entries by `failure_signature` attempt-cost.
+
+    Primary signal: `cost_usd`, summed across every non-`passed` `attempt_outcome`
+    event in `events.jsonl` for each feature the entry's `[tag]` names — the cost
+    of the failures the entry describes. Events carry no gate-level attribution
+    (`correlation_id` is a WU id, not a gate id), so attribution is scoped to the
+    named feature as a whole, its finest resolvable grain.
+
+    Tiebreaker: `reach`, the count of *other* files under `features_dir` that cite
+    the entry's tag, **excluding** files under the entry's own feature folder(s) —
+    an entry citing itself from its own feature's files scores zero reach. A tag
+    with no `FEAT-YYYY-NNNN` prefix (e.g. a `meta/...` entry) has no owning
+    folder to exclude and no events to cost, so it scores `cost_usd=0.0` and an
+    unexcluded reach count.
+
+    Returns `{"entries": [...], "reach_caveat": LEARNINGS_REACH_TIEBREAK_CAVEAT}`.
+    Each entry dict carries every input a human needs to disagree with the
+    ranking: `tag`, `text`, `cost_usd`, `reach`, `failure_signatures` (sorted,
+    deduped), and `feature_ids` (the tags' resolved `FEAT-YYYY-NNNN` owners).
+    Sorted by `(-cost_usd, -reach, tag)`.
+    """
+    from .learnings_query import parse_entries
+
+    lpath = learnings_path if learnings_path is not None else REPO_ROOT / LEARNINGS_PATH
+    fdir = features_dir if features_dir is not None else FEATURES_DIR
+
+    raw_entries = parse_entries(lpath.read_text(encoding="utf-8"))
+
+    all_files = [p for p in fdir.rglob("*") if p.is_file()] if fdir.is_dir() else []
+    file_texts: dict[Path, str] = {}
+    for p in all_files:
+        try:
+            file_texts[p] = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+    scored: list[dict] = []
+    for entry in raw_entries:
+        tag = entry["tag"]
+        parts = [p.strip() for p in tag.split(";") if p.strip()]
+
+        feature_ids: list[str] = []
+        for part in parts:
+            m = _LEARNINGS_FEAT_ID_RE.match(part)
+            if m and m.group(1) not in feature_ids:
+                feature_ids.append(m.group(1))
+
+        own_dirs = {
+            d for fid in feature_ids for d in fdir.glob(f"{fid}-*") if d.is_dir()
+        } if fdir.is_dir() else set()
+
+        cost_usd = 0.0
+        failure_signatures: set[str] = set()
+        for fid in feature_ids:
+            for feature_dir in (fdir.glob(f"{fid}-*") if fdir.is_dir() else []):
+                events_path = feature_dir / "events.jsonl"
+                if not events_path.is_file():
+                    continue
+                for line in events_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        continue
+                    if event.get("event_type") != "attempt_outcome":
+                        continue
+                    if not str(event.get("correlation_id", "")).startswith(fid + "/"):
+                        continue
+                    payload = event.get("payload") or {}
+                    if payload.get("outcome") == "passed":
+                        continue
+                    cost_usd += float(payload.get("cost_usd") or 0.0)
+                    sig = payload.get("failure_signature")
+                    if sig:
+                        failure_signatures.add(str(sig))
+
+        cited_files: set[Path] = set()
+        for part in parts:
+            for path, text in file_texts.items():
+                if path in own_dirs or any(
+                    own in path.parents for own in own_dirs
+                ):
+                    continue
+                if part in text:
+                    cited_files.add(path)
+        reach = len(cited_files)
+
+        scored.append({
+            "tag": tag,
+            "text": entry["text"],
+            "cost_usd": round(cost_usd, 2),
+            "reach": reach,
+            "failure_signatures": sorted(failure_signatures),
+            "feature_ids": feature_ids,
+        })
+
+    scored.sort(key=lambda e: (-e["cost_usd"], -e["reach"], e["tag"]))
+
+    return {"entries": scored, "reach_caveat": LEARNINGS_REACH_TIEBREAK_CAVEAT}
+
+
+#: Review prompt carried on every proposed distillate entry (FEAT-2026-0111/T03).
+#: Only 7 of 234 LEARNINGS.md entries name a guard or lint literally, so
+#: whether a rule is already mechanically enforced can't be computed -- it is
+#: surfaced for the human at accept time instead of filtered automatically.
+LEARNINGS_GUARD_REVIEW_PROMPT = (
+    "this may already be enforced by a guard or lint — check before "
+    "spending dispatch words on it"
+)
+
+
+def propose_distilled_learnings(
+    learnings_path: "Path | None" = None,
+    features_dir: "Path | None" = None,
+    word_cap: int = LEARNINGS_DISTILLED_WORD_CAP,
+) -> dict:
+    """Rank `LEARNINGS.md` via `score_learnings_entries` and cut the ranking
+    at *word_cap* words -- the budget the dispatch path actually pays --
+    rather than at an entry count.
+
+    Walks the ranking in order, accumulating each entry's word count; the
+    first entry that would push the running total over *word_cap* and every
+    entry after it (already lower-ranked) go to `cut` instead of `proposed`.
+    Each proposed entry carries the score's own evidence (`cost_usd`, `reach`,
+    `failure_signatures`) plus `word_count` and `guard_review_prompt`
+    (`LEARNINGS_GUARD_REVIEW_PROMPT`) -- everything a human needs to accept,
+    edit, or reject it without re-deriving the score.
+
+    Read-only: nothing here writes to `LEARNINGS_DISTILLED_RULE_PATH`. Only
+    `apply_distilled_decisions` writes, and only on explicit per-entry accept.
+    """
+    scored = score_learnings_entries(learnings_path=learnings_path, features_dir=features_dir)
+
+    proposed: list[dict] = []
+    cut: list[dict] = []
+    running = 0
+    entries = scored["entries"]
+    for i, entry in enumerate(entries):
+        word_count = len(entry["text"].split())
+        if running + word_count > word_cap:
+            cut.extend(entries[i:])
+            break
+        running += word_count
+        proposed.append({
+            **entry,
+            "word_count": word_count,
+            "guard_review_prompt": LEARNINGS_GUARD_REVIEW_PROMPT,
+        })
+
+    return {
+        "proposed": proposed,
+        "cut": cut,
+        "word_cap": word_cap,
+        "reach_caveat": scored["reach_caveat"],
+    }
+
+
+def apply_distilled_decisions(
+    decisions: "list[dict]",
+    *,
+    rules_local_path: "Path | None" = None,
+) -> dict:
+    """Write accepted/edited entries to `LEARNINGS_DISTILLED_RULE_PATH`; the
+    only path by which anything reaches that file (FEAT-2026-0111/T03).
+
+    *decisions* is one dict per reviewed proposal entry: `tag`, `action`
+    (`"accept"`, `"edit"`, or `"reject"`), and `text` -- the original wording
+    for an accept, the human's replacement wording for an edit. A `reject`
+    contributes nothing; a *decisions* list with no `accept`/`edit` entries at
+    all leaves the file untouched -- byte-identical, no line appended.
+
+    Pure and deterministic: no prompt, no stdin read, so it is safe to call
+    from a headless dispatch with no human present -- it writes only what
+    *decisions* explicitly names, never more.
+
+    Returns `{"written": [...], "path": path}`; `written` lists the tags
+    actually appended, empty when nothing was accepted.
+    """
+    path = (
+        rules_local_path if rules_local_path is not None
+        else REPO_ROOT / LEARNINGS_DISTILLED_RULE_PATH
+    )
+
+    to_write = [d for d in decisions if d.get("action") in ("accept", "edit")]
+    if not to_write:
+        return {"written": [], "path": path}
+
+    new_lines = [f"- [{d['tag']}] {d['text']}" for d in to_write]
+
+    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    separator = "" if existing == "" or existing.endswith("\n") else "\n"
+    path.write_text(existing + separator + "\n".join(new_lines) + "\n", encoding="utf-8")
+
+    return {"written": [d["tag"] for d in to_write], "path": path}
+
+
 class ScaffoldVersionSkew(RuntimeError):
     """The working tree's scaffold is newer than the installed one (#2643).
 

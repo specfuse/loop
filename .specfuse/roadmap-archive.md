@@ -43,6 +43,21 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0111"></a>
+## FEAT-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
+
+**Why.** `.specfuse/LEARNINGS.md` is append-only by contract: `assert_learnings_appended_or_noop` makes at least one added line the success signal of every close, with "nothing generalizes" as the only way out. That is an unbounded growth rule attached to a file no dispatched work unit reads. This repo carries 232 entries; a consumer measured its own at 219 entries / 5,497 lines / ~167k tokens after four months, with **91 of 219 never cited** by any later feature's PLAN, WU, GATE or RETROSPECTIVE. The planning surfaces that do load it (`/draft-feature`, `/pick-feature`) slice it; every implementation dispatch ignores it entirely.
+
+**Goal.** Adopt the design in #3272 rather than re-deriving it. One line per rule in `LEARNINGS.md` carrying a weight bracket, with the evidence staying in the feature's `RETROSPECTIVE.md` where it already lives; weights computed by the driver — **reach** (distinct later features citing the entry's id) and **cost** (dollar figures the entry quotes, plus `events.jsonl` attempt cost by `failure_signature`); a bound on the loaded set enforced as a lint, with re-distillation by weight over the cap; and the distilled file wired onto the dispatch path so sessions actually read it.
+
+**Benefits.** Planning context stops growing without limit, and the rules that earned their place — the consumer's top five entries were cited by 12–15 features each — reach the sessions that need them instead of sitting in a file only two skills open.
+
+**Shape — not yet drafted.** #3272 carries six concrete suggestions and a consumer's shipped implementation (a 47-line `rules-local/learnings-distilled.md` in the binding block, `[reach N · $C · sources]` per line). Drafting should start from that issue, not from this row.
+
+**Provenance and one correction.** Split out of FEAT-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
+
+**Status: done.**
+
 <a id="feat-2026-0106"></a>
 ## FEAT-2026-0106 — Progress lines and a bounded LEARNINGS: retrospectives become optional
 

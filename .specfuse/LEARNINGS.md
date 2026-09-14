@@ -4369,3 +4369,40 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   its source (the RESULT block, a committed artifact, a specific event field that is known to
   carry the value) and its sink (a file or frontmatter key the downstream unit is told to
   read). A figure that exists only in a RESULT block does not exist for the next unit.
+
+- [FEAT-2026-0111/G1-CLOSE] **A sub-budget is only a budget if it fits inside the headroom
+  its parent cap leaves; test it on the real tree, not on a fixture holding the child alone.**
+  T04 set a 500-word sub-budget for the rules-local distillate inside a 2,500-word block
+  whose three fixed rules total 2,404 words, so the real room is 96 words. Its test for
+  "exceeding the sub-budget fails before the total does" built a fixture block containing
+  only the distillate and passed. On the real block, every distillate from 97 to 500 words
+  trips the total cap instead, and the ranked proposal at 96 words selects 0 of 244 entries.
+  The docs and README both state the 500-word figure. **Drafting rule:** when a criterion
+  orders two limits ("X fails before Y"), assert it on the production tree with an input
+  sized between the two, and add a criterion that the child limit is ≤ the parent limit
+  minus the parent's other members, as computed at test time.
+
+- [FEAT-2026-0111/G1-CLOSE] **A WU body that orders the full suite in-session gets it run in
+  the background, and the session can end before emitting RESULT.** T01, T04 and T04H each
+  said "the narrow tier is NOT sufficient — run the full suite". T04 and T04H both ended on
+  "running in background; will report RESULT once it completes" and emitted no block. The
+  driver's own re-verification passed them, but `PROGRESS.md` got the fallback line
+  `attempt 1 outcome=passed`. For T04 that is the one unit whose summary carried the
+  feature's central number (the 170-word trim), and the close had to recover it by diffing
+  a pinned build. **Drafting rule:** do not override the dispatch prompt's tiering in a WU
+  body. The driver already runs the broad set once per gate. If a unit genuinely needs a
+  wider module set, name the modules for `narrow_command`, not "the full suite".
+
+- [FEAT-2026-0111/G1-CLOSE] **"On-plan" in the off-plan signal means "no implementation unit
+  overran its estimate", not "the gate went as planned" — check `events.jsonl` before
+  trusting a suppressed reflection.** `evaluate_off_plan_signal` returned `reasons=[]` for a
+  gate that had a feature-level `human_escalation` (`preexisting_gate_failure`), an
+  operator-inserted hygiene unit, a discarded attempt cycle, a `not_met` close and a
+  re-scoped definition of done. The halt's `correlation_id` is the feature ID, so
+  `blocked_human_events` stayed empty. Close units are skipped by the cost checks. The cost
+  checks are one-sided, so units at 0.11–0.39× of estimate read as on-plan exactly as
+  accurate ones would. **Drafting rule:** a close whose reflection is waived still greps
+  `events.jsonl` for feature-scoped `human_escalation` / `baseline_attribution` events and
+  for units absent from `PLAN.baseline.json`. If any exist, write the cost analysis anyway.
+  And do not raise estimates on a "touches the driver" label: here that label over-priced
+  four units by ~5× while the unit that actually failed twice was priced as routine.
