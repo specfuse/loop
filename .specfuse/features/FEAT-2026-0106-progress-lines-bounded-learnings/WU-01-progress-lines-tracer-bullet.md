@@ -1,13 +1,17 @@
 ---
 id: FEAT-2026-0106/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.50
 produces_driver_helper:
   - append_progress_entry
 produces:
   - tests/test_progress_lines_end_to_end.py
+duration_seconds: 3743.873
+cost_usd: 9.130225
+input_tokens: 442
+output_tokens: 148112
 ---
 
 # Wire PROGRESS.md end to end from what the driver already receives

@@ -1842,6 +1842,16 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
     When head_after is 'HEAD', also appends untracked files from
     git ls-files --others --exclude-standard (per [driver/files_changed-guard]
     LEARNINGS). Returns an empty list on any git error.
+
+    Drops `PROGRESS_FILENAME` regardless of basename depth: driver-managed
+    bookkeeping (FEAT-2026-0106/T01), like `events.jsonl`'s existing
+    invisibility to this signal (never written to disk until an attempt's
+    outcome is already known, so it never appears here either). Without this,
+    a guard-refusal attempt's own progress note — written on the `passed`
+    path even when a LATER guard rejects the pass and `retain_on_guard_refusal`
+    keeps the tree — resurfaces as a new untracked file on the NEXT attempt's
+    measurement, breaking `detect_deterministic_refusal_repeat`'s "provably
+    untouched tree" signal (#597) for every retried guard refusal.
     """
     try:
         names = subprocess.run(
@@ -1854,7 +1864,8 @@ def git_diff_names(head_before: str, head_after: str) -> list[str]:
                 capture_output=True, text=True, check=True,
             ).stdout.strip().splitlines()
             names = names + [f for f in untracked if f]
-        return [f for f in names if f]
+        return [f for f in names
+                if f and Path(f).name != PROGRESS_FILENAME]
     except subprocess.CalledProcessError:
         return []
 
@@ -4679,6 +4690,53 @@ def parse_result_block(stdout: str) -> dict | None:
         # philosophy. Do not broaden those.
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+PROGRESS_FILENAME = "PROGRESS.md"
+
+
+def append_progress_entry(feature_dir: Path, wu_id: str, summary: str) -> Path:
+    """Append one line naming *wu_id* to `feature_dir/PROGRESS.md`; return its path.
+
+    Driver-side write (FEAT-2026-0106/T01, PLAN.md "Decisions taken at
+    drafting"): the note cannot be skipped and costs no prompt tokens.
+    Callers pass a fallback summary derived from the attempt record when
+    `parse_result_block` returned None — see `record_progress_entry` — so a
+    dispatched unit always leaves a note even on malformed agent output.
+    """
+    path = feature_dir / PROGRESS_FILENAME
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(f"- **{wu_id}**: {summary}\n")
+    return path
+
+
+def record_progress_entry(
+    feature_dir: Path, wu: "WorkUnit", attempt: int, outcome: str,
+) -> Path:
+    """Resolve *wu*'s progress-note text and append it (FEAT-2026-0106/T01).
+
+    Prefers the agent-supplied `summary` field from `wu.result_block` — set
+    by `execute_unit_attempt` on every attempt whose RESULT actually parsed,
+    `passed` or `failed` alike. Falls back to an attempt-record-derived
+    summary (attempt number + outcome) when the block is missing, malformed,
+    or carries no non-empty `summary`: `parse_result_block` degrades to None
+    by design on garbled output, and that must not delete the note.
+    """
+    summary = None
+    if isinstance(wu.result_block, dict):
+        rb_summary = wu.result_block.get("summary")
+        if isinstance(rb_summary, str) and rb_summary.strip():
+            summary = rb_summary.strip()
+    if summary is None:
+        summary = f"attempt {attempt} outcome={outcome}"
+    # Callers must fold the returned path into their own commit_bookkeeping
+    # (or, on the `passed` path, write it BEFORE squash_commit so it rides
+    # the WU's own squash): an extra standalone commit here would shift
+    # `head_tree_hash` past the tree the pinned-build seam already recorded
+    # as "next" (test_pin_honesty_and_integrity), and #150 stops a later
+    # squash's `git add -A` from absorbing this file retroactively once it
+    # is already a pre-existing untracked leftover.
+    return append_progress_entry(feature_dir, wu.wu_id, summary)
 
 
 #: Verdict tokens that, in a produced document's heading or on a `Verdict:`
@@ -9040,8 +9098,9 @@ def assert_implementation_touched_files(
     every WU already produces. Returns ``(True, "")`` when ``wu.type`` is not
     ``implementation`` (close/plan-next/etc. produce reflective artifacts
     gated by ``assert_closing_deliverables``), or when ``touched`` — after
-    removing the WU's own file and any ``events.jsonl`` entry — still names a
-    file. Otherwise returns ``(False, summary)``: an ``implementation`` WU that
+    removing the WU's own file, any ``events.jsonl`` entry, and the driver's
+    own ``PROGRESS.md`` note — still names a file. Otherwise returns
+    ``(False, summary)``: an ``implementation`` WU that
     produced no deliverable file diff cannot be ``done``.
 
     This closes the zero-deliverable hollow pass from the other side of
@@ -9056,7 +9115,7 @@ def assert_implementation_touched_files(
     wu_name = wu.file.name
     deliverables = [
         t for t in touched
-        if Path(t).name not in (wu_name, "events.jsonl")
+        if Path(t).name not in (wu_name, "events.jsonl", PROGRESS_FILENAME)
     ]
     if deliverables:
         return True, ""
@@ -10166,8 +10225,12 @@ def run(
                                 "message": _drr_message,
                             }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt - 1,
+                            "deterministic_refusal_repeat",
+                        )
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(deterministic_refusal_repeat, "
                             f"attempt {attempt - 1})"
@@ -10303,8 +10366,10 @@ def run(
                             "message": _blocked_message,
                         }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "agent_reported_blocked")
                         commit_bookkeeping(
-                            [wu.file, events_path],
+                            [wu.file, events_path, _progress_path],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(agent-reported)\n\nFeature: {wu.wu_id}",
                         )
@@ -10320,6 +10385,13 @@ def run(
                         # reset.
                         backend.set_wu(wu, "status", DONE)
                         write_cost_to_wu(backend, wu, cum_usage)
+                        # Written BEFORE squash so the note rides the WU's own
+                        # squash commit rather than sitting as a pre-existing
+                        # untracked file a later squash's `git add -A` won't
+                        # pick up (#150), and rather than an extra standalone
+                        # commit that would shift the pinned-build seam's
+                        # "next tree" (test_pin_honesty_and_integrity).
+                        record_progress_entry(feature_dir, wu, attempt, "passed")
                         try:
                             sha = squash_commit(wu, head_before,
                                                 untracked_before=untracked_before)
@@ -10956,8 +11028,10 @@ def run(
                             feat_fm, _gate_dict, feature_dir, gate.number,
                             units, done_ids, wu, events_path,
                         )
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "spinning_signature_repeat")
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(spinning_signature_repeat, attempt {attempt})"
                             f"\n\nFeature: {wu.wu_id}",
@@ -11099,8 +11173,10 @@ def run(
                                 "message": _plateau_message,
                             }))
                         flush_events(events_path, wu_events)
+                        _progress_path = record_progress_entry(
+                            feature_dir, wu, attempt, "convergence_plateau")
                         commit_bookkeeping(
-                            [wu.file, events_path, *note_paths],
+                            [wu.file, events_path, _progress_path, *note_paths],
                             f"chore(loop): {wu.wu_id} blocked_human "
                             f"(convergence_plateau, attempt {attempt})"
                             f"\n\nFeature: {wu.wu_id}",
@@ -11157,8 +11233,10 @@ def run(
                                     "message": _unchanged_message,
                                 }))
                             flush_events(events_path, wu_events)
+                            _progress_path = record_progress_entry(
+                                feature_dir, wu, attempt, "replan_unchanged_body")
                             commit_bookkeeping(
-                                [wu.file, events_path, *note_paths],
+                                [wu.file, events_path, _progress_path, *note_paths],
                                 f"chore(loop): {wu.wu_id} blocked_human "
                                 f"(replan_unchanged_body, attempt {attempt})"
                                 f"\n\nFeature: {wu.wu_id}",
@@ -11253,8 +11331,14 @@ def run(
                         feat_fm, _gate_dict, feature_dir, gate.number,
                         units, done_ids, wu, events_path,
                     )
+                    _progress_path = (
+                        record_progress_entry(feature_dir, wu, wu_max_attempts, reason)
+                        if not all_zero else None
+                    )
                     commit_bookkeeping(
-                        [wu.file, events_path, *note_paths],
+                        [wu.file, events_path,
+                         *([_progress_path] if _progress_path else []),
+                         *note_paths],
                         f"chore(loop): {wu.wu_id} blocked_human "
                         f"({reason}, {wu_max_attempts} attempts)"
                         f"\n\nFeature: {wu.wu_id}",
