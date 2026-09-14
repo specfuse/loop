@@ -109,6 +109,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
 | FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
 | FEAT-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-2026-0110) |
+| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | planned | — | [→ detail](#feat-2026-0111) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -986,6 +987,21 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 **Goal.** For features of up to three units, one session works the PLAN as a checklist (one unit per iteration, Ralph style); the driver verifies once with the feature oracle and the full gate set at the end; the only human touchpoints are the plan and the PR. Correlation ids, the squash commit, and the event log are kept.
 
 **Benefits.** Small features finish in the time of one prompt; the full loop is reserved for features that need decomposition.
+
+**Status: planned.**
+
+<a id="feat-2026-0111"></a>
+## FEAT-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
+
+**Why.** `.specfuse/LEARNINGS.md` is append-only by contract: `assert_learnings_appended_or_noop` makes at least one added line the success signal of every close, with "nothing generalizes" as the only way out. That is an unbounded growth rule attached to a file no dispatched work unit reads. This repo carries 232 entries; a consumer measured its own at 219 entries / 5,497 lines / ~167k tokens after four months, with **91 of 219 never cited** by any later feature's PLAN, WU, GATE or RETROSPECTIVE. The planning surfaces that do load it (`/draft-feature`, `/pick-feature`) slice it; every implementation dispatch ignores it entirely.
+
+**Goal.** Adopt the design in #3272 rather than re-deriving it. One line per rule in `LEARNINGS.md` carrying a weight bracket, with the evidence staying in the feature's `RETROSPECTIVE.md` where it already lives; weights computed by the driver — **reach** (distinct later features citing the entry's id) and **cost** (dollar figures the entry quotes, plus `events.jsonl` attempt cost by `failure_signature`); a bound on the loaded set enforced as a lint, with re-distillation by weight over the cap; and the distilled file wired onto the dispatch path so sessions actually read it.
+
+**Benefits.** Planning context stops growing without limit, and the rules that earned their place — the consumer's top five entries were cited by 12–15 features each — reach the sessions that need them instead of sitting in a file only two skills open.
+
+**Shape — not yet drafted.** #3272 carries six concrete suggestions and a consumer's shipped implementation (a 47-line `rules-local/learnings-distilled.md` in the binding block, `[reach N · $C · sources]` per line). Drafting should start from that issue, not from this row.
+
+**Provenance and one correction.** Split out of FEAT-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
 
 **Status: planned.**
 
