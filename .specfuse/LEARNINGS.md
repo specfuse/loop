@@ -4355,3 +4355,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   detectable proof that at least one is asserting rather than reporting. Companion to
   [FEAT-2026-0108/G1-CLOSE], which bounds a criterion's data flow across a producer/renderer
   seam; this one bounds a single criterion's strength against its own subject.
+
+- [FEAT-2026-0106/G1-CLOSE] **Measure an agent-supplied field from what the agent returned,
+  never from the driver's event log, and when a criterion asks a unit to "record" a figure a
+  later unit's escalation trigger reads, name the durable surface the figure lands on.** T01
+  was asked how often a real agent emits RESULT `summary:`. It counted `summary` on
+  `attempt_outcome` events and reported `0/1`, but those events never carry the agent's
+  `summary`, and the session transcripts show 5 of 5 attempts emitted one. The plan's 8% corpus
+  figure came from the same surface. Worse, T02's escalation trigger ("stop if T01's recorded
+  rate says agents rarely emit RESULT fields") could not be evaluated: the figure lived only in
+  T01's RESULT block, which nothing persisted, so T02 had nothing to read. Read literally, the
+  `0/1` would have fired the trigger. **Drafting rule:** a measurement criterion names both
+  its source (the RESULT block, a committed artifact, a specific event field that is known to
+  carry the value) and its sink (a file or frontmatter key the downstream unit is told to
+  read). A figure that exists only in a RESULT block does not exist for the next unit.
