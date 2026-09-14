@@ -1,11 +1,10 @@
 ---
 id: FEAT-2026-0111/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 6.00
 auto_close_disabled: true
-verdict: not_met
 model: opus
 effort: high
 gate_set: plannext

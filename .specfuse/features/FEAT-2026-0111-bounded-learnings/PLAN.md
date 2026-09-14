@@ -118,6 +118,39 @@ that only fires on an **on-plan** gate, and it has never fired, because its own
 gate went off-plan on cost. Honest estimates are what make this run a test of
 that feature rather than another blind one.
 
+## Gate 1 was re-scoped once
+
+The first close recorded `not_met` and the judge agreed (`disagreed: false`,
+the close and the judge reaching the same verdict independently). Two findings,
+#3315 and #3316, and the second is the one that mattered:
+
+**The effective room for the distilled set is 96 words, not the 500 that
+`LEARNINGS_DISTILLED_WORD_CAP`, `docs/methodology.md` and
+`.specfuse/rules-local/README.md` all state.** Every distillate between 97 and
+500 words fails the *total* 2,500-word cap before the sub-budget is reached, so
+the sub-budget is unreachable on the real tree. Measured against the corpus,
+`propose_distilled_learnings(word_cap=96)` proposes **0 of 244** entries;
+at 500 it proposes 3.
+
+The machinery works. There is nowhere to put anything in it. Closing that gap
+needs a decision on the 2,500-word cap — which `GATE-01.md` already named as
+"the blocking question this gate may not answer" and which no work unit is
+authorized to take.
+
+**Operator decision, in their words:** "re-scope it, I'd rather not touch the
+cap yet".
+
+So gate 1's definition of done drops the human-accepted-content clause and the
+sub-budget clause, and the cap question moves to its own roadmap row carrying
+#3316's measurement. What remains — the lint, the weights, the accept step, the
+wiring — is real, loop-local, and useful independent of where the cap lands.
+
+**Stated plainly because it is the uncomfortable part:** revising a definition
+of done after the gate ran is the move that erodes a methodology, and it is
+being made deliberately rather than by drift. The alternative on the table was
+to leave the feature open and decide the cap first; the operator chose
+otherwise and the reason above is theirs.
+
 ## Scope boundary — deliberately out
 
 - **#3272 suggestion #5**, stopping `close-b` from rewarding volume. It changes

@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_binding_block_budget -v -b"
 baseline:
   sha: e471a2f93ef4d0d58c05f57119f344e4f16b89b2
@@ -20,14 +20,34 @@ broad_run:
 
 ## Definition of done
 
-`.specfuse/rules-local/learnings-distilled.md` is loaded by the binding block;
-its content was accepted by a human rather than generated unattended; and the
-whole block — distilled file included — is under 2,500 words and stays there
-because a lint says so.
+**Re-scoped after the first close, 2026-09-14 — see PLAN.md § "Gate 1 was
+re-scoped once".** The original wording required the distilled file's content
+to be human-accepted and gave it a 500-word sub-budget. The close measured the
+effective room at **96 words** against a 2,500-word cap, at which
+`propose_distilled_learnings` proposes 0 of 244 entries. Both clauses are
+therefore unsatisfiable without a decision on the cap itself, which the
+operator has chosen not to take yet. They are removed rather than quietly
+failed, and the cap question carries its own roadmap row.
 
-The `feature_oracle` is red today on both counts: the block is at 2,574 words
-and no distilled file exists. T01 is the tracer bullet that makes it runnable;
-T02–T04 make each part correct.
+What this gate delivers:
+
+- A binding-block word lint that resolves the block's actual `@` references,
+  is blocking, and passes on this tree.
+- Per-entry weights with `failure_signature` attempt-cost primary and citation
+  reach as a tiebreaker, with reach's age bias stated in the output and
+  self-citation excluded.
+- An accept step that ranks a proposal against a word budget and writes
+  nothing without an explicit accept, proven by negative observation.
+- `.specfuse/rules-local/learnings-distilled.md` wired into the binding block
+  and counted by the lint.
+
+**Explicitly not delivered, and not a failure of this gate:** the *content* of
+the distilled set. There is no room for it at the current cap, and putting a
+placeholder's worth of words on every dispatch would cost more than it returns.
+
+The `feature_oracle` remains the proof that the path is wired and counted. It
+does not assert what the file says — the close said so plainly, and with the
+content clause removed that is now the honest scope rather than a gap.
 
 Also required, as for every gate:
 
