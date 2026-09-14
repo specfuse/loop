@@ -1,117 +1,109 @@
 # FEAT-2026-0111 — bounded LEARNINGS on the dispatch path
 
 One gate, six implementation units (five planned, plus hygiene unit T04H
-inserted after a halt), one terminal close. T01 built the word counter and
-wired a stub distillate. T02 built the weights and T03 the accept step. T04
-trimmed the three binding rules and made the cap blocking. T04H re-synced the
-packaged rule mirrors T04 left stale, and T05 documented the budget. Every unit
-passed. T05 needed three dispatched attempts across two attempt cycles.
+inserted after a halt), one terminal close, now on its second run. T01 built
+the word counter and wired a stub distillate. T02 built the weights and T03 the
+accept step. T04 trimmed the three binding rules and made the cap blocking.
+T04H re-synced the packaged rule mirrors T04 left stale, and T05 documented the
+budget. Every implementation unit is `done`.
 
-**Two facts to read first.**
-
-1. **The binding block went from 2,574 to 2,461 words.** That is 170 words
-   trimmed from the three rules and 57 added by the distillate. **None of those
-   57 words is a LEARNINGS entry.** The distillate is still T01's placeholder;
-   no human accepted anything into it, and nothing outside the tests calls the
-   accept step.
-2. **The distillate's 500-word sub-budget cannot be spent.** With the trimmed
-   rules at 2,404 words, the block has 96 words of room. Any distillate from 97
-   to 500 words fails the total cap first, and the ranked proposal at 96 words
-   selects 0 of 244 entries.
-
-Both are measured below, and both are recorded in `FOLLOW-UPS.md`.
+The first close recorded `not_met`, and the judge agreed independently
+(`judged` event, 16:32:19, `disagreed: false`, 3 findings). Two measured
+failures went to `FOLLOW-UPS.md` and were filed as #3315 and #3316. The operator
+then re-scoped gate 1 ("re-scope it, I'd rather not touch the cap yet"). The
+definition of done in `GATE-01.md` dropped the human-accepted-content clause and
+the 500-word sub-budget clause, and the cap question moved to roadmap row
+FEAT-2026-0112. No code changed between the two closes. The driver re-pinned at
+17:50 (`cdc742c`) and ran the broad set again at 17:55 (`ok: true`,
+`failing: []`). This retrospective measures against the **re-scoped**
+definition, and it keeps the removed clauses' measurements in view because the
+removal is the part a reviewer should weigh.
 
 ## Measurements
 
-All commands ran fresh in this close session, from the working tree at gate 1's
-head, sandboxed, with no git. Per the dispatch contract, this session did not
-run the full suite, coverage, or any `tier: broad` gate. Those figures come
-from the driver's once-per-gate broad run, cited by log.
+Every command below ran fresh in this close session, from the working tree,
+with the repository venv and no git. Following the dispatch contract, this
+session ran no full suite, coverage or `tier: broad` gate. Those results come
+from the driver's broad run and are cited, not re-run.
 
 ### feature_oracle: PASS
 
 | Oracle | Command | Result | Exit |
 |---|---|---|---|
-| Gate `feature_oracle` (narrow) | `python3 -m unittest tests.test_binding_block_budget -v -b` | `Ran 5 tests`, `OK` | 0 |
-| All test modules this gate produced or named | `python3 -m unittest tests.test_binding_block_budget tests.test_learnings_weights tests.test_distilled_accept_step tests.test_binding_block_allocation tests.test_result_block_audience tests.test_scaffold_data_in_sync -b` | `Ran 40 tests`, `OK` | 0 |
-| Symbol check (§9) | `python3 -c "from specfuse.loop.loop import binding_block_word_count, check_binding_block_budget, score_learnings_entries, propose_distilled_learnings, apply_distilled_decisions"` | imports | 0 |
-| Mirrors byte-identical (T04H) | `cmp .specfuse/rules/<f>.md specfuse/loop/data/rules/<f>.md` for all three | identical | 0 ×3 |
-| Narrow tier for `close` (`plannext`: `plan-lint`) | `python3 .specfuse/scripts/lint_plan.py <feature_dir>` | `structurally valid`; one WARN: 24 acceptance criteria across the gate, above 20 | 0 |
-| Closing lint | `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | see the end of this section | — |
+| Gate `feature_oracle` | `python3 -m unittest tests.test_binding_block_budget -v -b` | `Ran 5 tests`, `OK` | 0 |
+| Every test module the gate produced or named | `python3 -m unittest tests.test_binding_block_budget tests.test_learnings_weights tests.test_distilled_accept_step tests.test_binding_block_allocation tests.test_result_block_audience tests.test_scaffold_data_in_sync -b` | `Ran 40 tests`, `OK` | 0 |
+| Live count, blocking form | `check_binding_block_budget()` | returns `total 2461, cap 2500`, no raise | 0 |
+| Narrow tier for `close` (`plannext`: `plan-lint`) | `python3 .specfuse/scripts/lint_plan.py <feature_dir>` | `structurally valid`; WARN: 24 acceptance criteria across the gate, above 20 | 0 |
+| Closing lint | `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | reported in this close's RESULT block | — |
+
+Before this session wrote anything, the closing lint exited 1 with `close-b`,
+`close-c` and `close-d` unmet. The first close's `LEARNINGS.md` lines and
+retrospective were already committed, so nothing showed in the working tree
+yet, and the re-arm had cleared `verdict:`.
 
 **Driver broad run, cited and not re-run.** `broad_run_result` at
-`2026-09-14T16:20:24Z` recorded `ok: true, failing: []`, on the tree in
-`GATE-01.md`'s `broad_run:` block. The logs are in `work/gate-logs/`.
-`tests-20260914T161954053406Z.log` shows `Ran 3986 tests in 207.616s`,
-`OK (skipped=3)`. `coverage-20260914T161956329337Z.log` shows `TOTAL … 93%`
-against `--fail-under=90`. `leak-scan-20260914T162010746243Z.log` shows
-`leak-scan: clean`, and `lint-…161954104522Z.log` shows `All checks passed!`.
+`2026-09-14T17:55:02Z` recorded `ok: true, failing: []` on the tree in
+`GATE-01.md`'s `broad_run:` block. That run's logs are the `*20260914T1754*` and
+`*20260914T1755*` files in `work/gate-logs/`.
+
+### Definition of done, criterion by criterion (re-scoped)
+
+| Criterion (`GATE-01.md`) | Measured |
+|---|---|
+| Lint resolves the block's actual `@` references | `binding_block_word_count()` returns the four files listed in `.claude/CLAUDE.md`'s block, in block order, including `.specfuse/rules-local/learnings-distilled.md` |
+| …is blocking | `check_binding_block_budget` raises `AssertionError` over cap (probe below: 97 words gives `binding block is 2501 words, over its 2500-word cap`). It is enforced by `tests.test_binding_block_allocation` under the `tests` gate. |
+| …and passes on this tree | 2,461 ≤ 2,500, no raise |
+| Weights: cost primary, reach tiebreaker, age bias stated in output, self-citation excluded | `score_learnings_entries()` on the live corpus returns 246 entries, and its `reach_caveat` names the tiebreaker role and the older-entry bias. Ordering and self-citation exclusion are covered by `tests.test_learnings_weights` (in the 40 above). |
+| Accept step ranks against a word budget and writes nothing without explicit accept, by negative observation | `propose_distilled_learnings(word_cap=96)` gives 0 proposed / 246 cut; `word_cap=500` gives 3 / 243. Byte-identity on decline is in `tests.test_distilled_accept_step` (in the 40 above). |
+| Distilled file wired into the block and counted | listed at 57 words in `files` |
+| Every implementation WU `done` | T01, T02, T03, T04, T04H, T05 frontmatter: `status: done` |
+| Retrospective exists; lessons promoted | this file; one new `LEARNINGS.md` entry from this close (below) |
+| Per-criterion state (§5) | no `GATE-01-CRITERIA.md` in the feature folder, so `close-l` does not apply |
 
 ### Binding block word count: before and after
 
-**Before: 2,574 words.** Two independent sources agree on it. The first is the
-pre-feature pinned driver build `a9374296` (pinned before T01; its
-`data/rules/` mirrors were in sync with canonical until T04). Counting its
-files with Python's `str.split()`, the same tokenizer `binding_block_word_count`
-uses, gives:
+**Before: 2,574 words. After: 2,461 words. Net −113.**
 
-| File | Before (pin `a9374296`) | T01's recorded count (`PROGRESS.md`) | After (`binding_block_word_count()`) | Δ |
-|---|---|---|---|---|
-| `.specfuse/rules/result-contract.md` | 1,078 | 1,078 | 1,045 | −33 |
-| `.specfuse/rules/never-touch.md` | 639 | 639 | 576 | −63 |
-| `.specfuse/rules/security-boundaries.md` | 857 | 857 | 783 | −74 |
-| `.specfuse/rules-local/learnings-distilled.md` | absent | 57 (stub) | 57 | +57 |
-| **Total** | **2,574** (74 over) | 2,631 | **2,461** (39 under) | **−113** |
+The "before" figure comes from the pre-feature pinned build `a9374296`, pinned
+at 14:39 before T01 dispatched. Its `data/rules/` mirrors were counted with
+`str.split()`, the same tokenizer `binding_block_word_count` uses. That pin has
+no `binding_block_word_count` (`grep -c "def binding_block_word_count"` = 0; the
+current pin `cdc742c` has 1), which confirms it predates the feature. T01's own
+per-file count in `PROGRESS.md` matches it file by file.
 
-The second source is T01's own count, which matches the pin file by file. The
-pin also carries none of the five new symbols (`grep -c "def <symbol>"` = 0 for
-each), which confirms it predates the feature. The "after" row is also
-`check_binding_block_budget()`'s return value (no raise). The three packaged
-mirrors are byte-identical to it.
+| File | Before (pin `a9374296`) | After (canonical and packaged mirror, both counted) | Δ |
+|---|---|---|---|
+| `.specfuse/rules/result-contract.md` | 1,078 | 1,045 | −33 |
+| `.specfuse/rules/never-touch.md` | 639 | 576 | −63 |
+| `.specfuse/rules/security-boundaries.md` | 857 | 783 | −74 |
+| **Three binding rules** | **2,574** (74 over the cap) | **2,404** | **−170** |
+| `.specfuse/rules-local/learnings-distilled.md` | absent, no `@` line | 57 | +57 |
+| **Block total** | **2,574** | **2,461** (39 under) | **−113** |
 
-**What was trimmed.** From `diff <pin>/data/rules/<f>.md .specfuse/rules/<f>.md`:
-rewording and de-duplication only. No numbered rule, section or prohibition
-disappeared.
+**What was trimmed.** Rewording and de-duplication only, per the first close's
+diff against the pin. No numbered rule, section or prohibition disappeared, and
+this session's reading of the three current files agrees. `result-contract.md`
+tightened its audience paragraph, Verify step 3, the failing-check paragraph,
+rule 7 and closing obligations 1–4. `never-touch.md` folded §1's generated-dir
+bullets and compressed §2's "must not" list. `security-boundaries.md` replaced
+its restated secrets enumeration with a pointer to `never-touch.md` §2 and
+compressed escalation steps 1–4. **137 of the 170 words came from
+`never-touch.md` and `security-boundaries.md`, which are vendored from core**,
+and which T01 had said held "no clearly-safe cut … without a human call".
 
-- `result-contract.md` (−33). Tightened the audience paragraph, Verify step 3,
-  the failing-check paragraph, rule 7 and closing obligations 1–4. T01 had named
-  the closing-obligations section (~180 words) as the densest candidate. T04
-  took 33 words from this whole file.
-- `never-touch.md` (−63). The §1 generated-directory paragraph and its three
-  bullets became two bullets. The §2 enumeration and "must not" bullets were
-  compressed.
-- `security-boundaries.md` (−74). The restated secrets enumeration became a
-  pointer to `never-touch.md` §2. Escalation steps 1–4 and the "common mistake"
-  paragraph were compressed.
+**What the distilled file cost: 57 words, 2.3% of the block, and none of them is
+accepted content.** The file is still T01's placeholder. With the rules at
+2,404 words, the cap leaves 96 words for a distillate, and the stub uses 57 of
+them.
 
-137 of the 170 words came from the two files that T01 had said held "no
-clearly-safe cut … without a human call". Both are core-owned (T04H's body).
+### The sub-budget probe (re-run; this clause is now out of the definition of done)
 
-**Who saw the headroom before the trim.** T01's Do-not-touch says trimming is
-"T04's, after a human has seen the number". `events.jsonl` shows T01
-`task_completed` at `14:47:35`, T02 at `14:51:42`, and T04 `task_started` at
-`14:51:42`. Between them there is no halt, no `human_escalation` event and no
-`awaiting_review`. No `GATE-01-REVIEW.md` exists in the feature folder. The
-driver ran from T01 to T04 with no stop at which a human could have seen the
-number.
-
-**What the distilled file cost: 57 words, 2.3% of the block, and none of them
-is accepted content.** The file reads `# Distilled LEARNINGS (stub)` /
-"Placeholder for the human-accepted, weight-ranked distillate …". A `grep` over
-`specfuse/`, `scripts/`, `.specfuse/scripts/` and `plugins/` finds no caller of
-`propose_distilled_learnings` or `apply_distilled_decisions` outside their
-definitions. Only `tests/test_distilled_accept_step.py` calls them.
-`check_binding_block_budget`'s only caller is
-`tests/test_binding_block_allocation.py`. The cap is held in this repository by
-the `tests` gate. It is not a lint script, and no consumer project enforces it.
-`scaffold.py` is byte-identical to the pin's, so the scaffold writes neither the
-`@` line nor the check into consumer blocks.
-
-### The sub-budget probe
-
-`check_binding_block_budget` ran against a temp copy of the real
-`.claude/CLAUDE.md` and three trimmed rules, with a synthetic distillate of N
-words:
+`check_binding_block_budget` ran against a temp copy of `.claude/CLAUDE.md` and
+the three current rules, with `loop.REPO_ROOT` pointed at the copy and a
+synthetic distillate of N words. The counter resolves `@` paths against
+`REPO_ROOT`, not against the `claude_md` argument. A first run without the patch
+read the real tree and passed every N at 2,461, which is worth knowing before
+reusing this probe.
 
 ```
 96  PASS total 2500
@@ -121,159 +113,134 @@ words:
 501 FAIL .specfuse/rules-local/learnings-distilled.md is 501 words, over its 500-word sub-budget
 ```
 
-T04's criterion says "exceeding it fails before the total does". That holds
-only in `test_sub_budget_failure_is_named_before_the_total_failure`'s fixture,
-whose block contains the distillate alone.
-
-**Corpus probe of the weights (T02/T03).** `score_learnings_entries()` on the
-live `LEARNINGS.md` returns 244 scored entries under 144 distinct tags. 118
-carry cost > 0, 112 carry at least one matched `failure_signatures` value (46%,
-the share T02's escalation trigger asked about), and 158 have reach > 0. The
-plan's "82 of 133" is on a different counting unit and an older corpus, so the
-two are not directly comparable. `propose_distilled_learnings(word_cap=96)`
-proposes **0** entries (244 cut). `word_cap=500` proposes **3** (241 cut).
+Unchanged since the first close. The 500-word sub-budget is still unreachable
+on the real tree, and `LEARNINGS_DISTILLED_WORD_CAP`, `docs/methodology.md` and
+`.specfuse/rules-local/README.md` still state 500. The re-scope removed the
+criterion but did not change the stated number. #3316 and FEAT-2026-0112 carry
+it.
 
 ### Off-plan signal for gate 1, computed here
 
-`gate_eval.evaluate_off_plan_signal(feature_dir, 1)`:
+`gate_eval.evaluate_off_plan_signal(Path(feature_dir), 1)`:
 
 ```
 auto=True, reasons=[]
 per_wu_cost: T01 0.823196, T02 1.021311, T03 0.486376, T04 1.368262,
-             T04H 0.186327, T05 0.963139, G1-CLOSE 0.0
-gate_total_cost=4.848611, blocked_human_events=[], replan_events=[]
+             T04H 0.186327, T05 0.963139, G1-CLOSE 4.022428
+gate_total_cost=8.871039, blocked_human_events=[], replan_events=[], warnings=[]
 ```
 
-`loop.reflection_required(feature_dir, 1)` returns `False`. The close is
-running on pin `1f9d987`, where `grep -c "def reflection_required"` = 1, so the
-FEAT-2026-0106 mechanism is present in the build that will judge this close.
+`loop.reflection_required(Path(feature_dir), 1)` returns `False`.
+`_gate_number_from_wu_id("FEAT-2026-0111/G1-CLOSE")` returns `1`, so the close-e
+guard does consult it for this close. For `…/T05` it returns `None`.
 
-**Negative observation, both directions.** Both runs used a temp copy of the
-feature folder, with `verdict: met` written into the close and no
-`## Cost analysis` section:
+**Negative observation, both directions.** Each run used a temp copy of the
+feature folder, with `verdict: met` written into the close and the
+`## Cost analysis` heading renamed away:
 
-- **A, as-is (on-plan).** `reflection_required` = `False`, and
+- **A, as-is.** `reasons=[]`, `reflection_required` = `False`, and
   `assert_cost_analysis_section_when_met` returns `(True, '')`. The section is
-  not demanded.
-- **B, T01's cost forced to $19.00.** Reasons become
+  waived.
+- **B, T01's `cost_usd` forced to 19.00.** Reasons become
   `per_wu_cost_overrun: T01 actual=$19.00 planned=$6.00 ratio=3.17x` and
   `per_wu_hard_overrun: …`. `reflection_required` = `True`, and the guard
-  refuses with `verdict=met and gate went off-plan but '## Cost analysis'
-  section absent`.
+  returns `(False, "… verdict=met and gate went off-plan but '## Cost analysis'
+  section absent from RETROSPECTIVE.md")`.
 
-### PROGRESS.md: what it held, and where the rest came from
-
-`PROGRESS.md` exists (unlike FEAT-2026-0106's close) and has six entries. Three
-are agent summaries: T01 with a `note:`, then T02 and T03. Three are fallback
-lines: T04, T04H and T05, each `attempt N outcome=passed`. The dispatched
-sessions' local transcripts show why. T04's final message is "Full test suite
-running unsandboxed in background; will report RESULT once it completes." and
-T04H's is "Will get notified when background suite finishes." Neither emitted a
-RESULT block. T05's final attempt emitted a block with no `summary:` the driver
-parsed. Both T04 and T04H bodies told the unit to run the full suite.
-
-| What this close needed | Did `PROGRESS.md` carry it? | Where it actually came from |
-|---|---|---|
-| Per-file "before" word counts | **yes**, T01's note, exact match | cross-checked against pin `a9374296` |
-| Size and location of the trim | no, T04's line is a fallback | `diff` against pin `a9374296` |
-| Which trimmed files are core-owned | no, T04H's line is a fallback | T04H's WU body |
-| Why T05 failed and the gate halted | no, T05's line is a fallback | `events.jsonl` |
-| Costs, off-plan verdict | not its job | `events.jsonl`, `gate_eval` |
-
-Transcript profile of the dispatched sessions (tool calls / `unittest discover`
-invocations): T01 33/3, T02 43/0, T03 15/0, T04 57/2, T04H 6/1, T05 43/6, 18/1
-and 28/0 across its three attempts.
-
-### Closing lint
-
-`python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` was run after
-this file, `FOLLOW-UPS.md`, the `LEARNINGS.md` entries, the `CHANGELOG.md`
-entries and `verdict:` were all written. Its exit code is reported in this
-close's RESULT block. Before any of them existed, the same command exited 1
-with close-a, close-b, close-c and close-d unmet.
+**What the signal does not read.** In `gate_eval.py`, the per-WU ratio checks
+skip `close` and `close-intermediate` units (`_CLOSING_TYPES`), with a ceiling
+of 1.5× (`PER_WU_COST_RATIO_CEILING`) and a hard ratio of 2.0×. `events.jsonl`
+line 21 is a `human_escalation` (`preexisting_gate_failure`, 15:28:53), yet the
+computed `blocked_human_events` is `[]`. Its `correlation_id` is the feature ID,
+not a unit ID. So none of the following moved the signal: that halt, the
+inserted T04H, T05's discarded attempt cycle, a close that recorded `not_met`,
+or the definition-of-done re-scope.
 
 ## Was reflection suppressed for this gate? What that means for FEAT-2026-0106
 
-**The gate stayed on-plan.** `evaluate_off_plan_signal` returned no reasons,
-with no blocked-human event, no `replan` and no cost overrun. This is the first
-real gate on which `reflection_required` returned `False`, on a build that
-carries it.
+**The gate stayed on-plan by the mechanism's definition.** `reasons=[]`, and
+`reflection_required` returns `False` on a live gate whose pinned build carries
+the function (`grep -c "def reflection_required"` = 1 in both `a9374296` and
+`cdc742c`). This is the first time that has happened on a real gate. Probes A
+and B show the guard waiving and demanding the section correctly.
 
-**The guard's suppression worked, and probe A/B above shows it both ways.
-Reflection was not suppressed in practice on this close, for two reasons.**
+**Reflection was not suppressed in practice, on either close.** This WU's body
+lists a `## Cost analysis` section as an acceptance criterion, so the plan
+author opted back into the prose the guard would waive. The section below
+exists because the body asked for it, not because a guard required it.
 
-1. This close's own WU body requires a `## Cost analysis` section as an
-   acceptance criterion. The plan author opted back into the prose the guard
-   would have waived.
-2. The advisory verdict here is `not_met`, and `close-e` applies only on `met`.
-   So the guard never had a `met` close to waive on this gate.
+**What that means for FEAT-2026-0106: the mechanism works as coded, and this
+gate is a weak test of whether it should.** Two findings:
 
-**What that means for FEAT-2026-0106.** The mechanism is now observed firing
-correctly on a live gate, not only in tests. The question FEAT-2026-0106 left
-open, whether `PROGRESS.md` carries enough to replace reflection, is only
-partly answered, and the answer is "not on this gate". It carried the one number
-the drafting of T04 depended on. It carried nothing about the trim itself, the
-core-owned files or the halt, because half its entries were fallback lines.
+- **"On-plan" here means "no implementation unit overran its estimate". It does
+  not mean the gate went as planned.** This gate had a feature-level halt, an
+  operator-inserted unit, a discarded attempt cycle, a `not_met` close and a
+  re-scoped definition of done, and the signal saw none of them (see "What the
+  signal does not read"). A gate this eventful being classed as needing no
+  reflection is the opposite of what FEAT-2026-0106 set out to decide.
+- **It is one-sided on cost.** Units came in at 0.11×–0.39× of estimate. Nothing
+  distinguishes accurate estimates from padded ones, so a plan that over-prices
+  every unit suppresses reflection indefinitely. Close spend is excluded too, so
+  no amount of close re-work flips it.
 
-Two findings qualify "on-plan":
-
-- **The predicate is one-sided.** It fires on overruns only. This gate's units
-  came in at 11–39% of estimate, and nothing in the signal distinguishes "on
-  plan" from "padded by 3–9×". A plan that over-prices every unit will suppress
-  reflection indefinitely.
-- **A re-armed cycle's cost is invisible to it.** T05's first attempt cycle
-  ($0.884954, failed on T04's stale mirrors) was discarded at the re-arm.
-  `per_wu_cost` reads T05 at $0.963139, and so does T05's frontmatter.
-  `events.jsonl` has $1.848093 for T05. Here the gap did not change the verdict.
-
-One more observation for whoever maintains `close-f`. The dispatch skeleton's
-`summarize_attempt_failure_classes(feature_dir, 1, …)` returns
-`(no non-passing attempts in scope)` for this gate, although `events.jsonl`
-holds two failed T05 attempts. `_gate_number_from_wu_id("FEAT-2026-0111/T05")`
-returns `None`, so `T`-numbered units are filtered out of the gate scope, and no
-`RETROSPECTIVE.md` skeleton was pre-created for this close.
+**Did `PROGRESS.md` carry enough?** No, not on its own. It now has eight lines.
+T01's note carried the exact per-file "before" counts, and the first close's
+`note:` carried the 96-word finding the re-scope rested on. Those are the two
+figures this feature turns on, and both arrived. T04, T04H and T05 are fallback
+lines (`attempt N outcome=passed`), so the trim's size and location, the
+core-owned files and T05's failures are absent. The halt, T04H's insertion and
+the re-scope are recorded only in `events.jsonl`, `PLAN.md` and `GATE-01.md`,
+because `PROGRESS.md` logs unit outcomes and none of those is a unit outcome.
 
 ## Deferred verification
 
 Criteria this close did not verify in-loop, each with the reason and where it
 is actually checked:
 
-- **"Fails on HEAD before this unit's edits" (T01, T02, T03, T04 red-test
-  halves).** Re-running a test at a pre-feature commit needs a checkout, and a
-  close session runs no git. Partial evidence: pin `a9374296` defines none of
-  the five symbols, so each module would fail at import. Fully checkable only
-  by a reviewer running each module at the branch's merge-base with `main`.
-- **T04H: "the commit message names the two core-owned files, the 137 words …
-  and that a future core sync will halt".** Needs `git log`, which a close
-  cannot run. It is checked at PR review against commit `e471a2f`. The 137
-  figure itself is verified here: never-touch −63 plus security-boundaries −74.
-- **T04H/T05: full suite green; T05: `leak_scan.py --all` exits 0.** These are
-  `tier: broad` and belong to the driver. They are cited from the 16:20 broad
-  run logs above, not re-run.
-- **The designed halt on the next core sync** (`never-touch.md`,
-  `security-boundaries.md` vs core's baseline, #581). It can only be observed
-  with a core checkout present. It is checked on the next
-  `scripts/sync-scaffold.sh` run with core as a sibling.
-- **`GATE-01.md` arming §4: "apply [the severity flip] locally and paste the
-  failing set into `GATE-01-REVIEW.md` before arming".** That file does not
-  exist in the feature folder. It was an arming-time human step, and no in-loop
+- **The red-test-first halves of T01–T04 ("fails on HEAD before this unit's
+  edits").** Re-running at a pre-feature commit needs a checkout, and a close
+  runs no git. This session verified partial evidence: pin `a9374296` lacks
+  `binding_block_word_count`. The first close found none of the five new symbols
+  in that pin. A reviewer checks this by running each module at the branch's
+  merge-base with `main`.
+- **T04H's commit message** ("names the two core-owned files, the 137 words …
+  and that a future core sync will halt"). This needs `git log`. It is checked at
+  PR review. The 137 figure is verified above (−63 plus −74).
+- **Full suite, coverage, bandit, leak-scan and the bats suites.** These are
+  `tier: broad` and belong to the driver. They are cited from the 17:55
+  `broad_run_result`, not re-run.
+- **The designed halt on the next core sync** for `never-touch.md` and
+  `security-boundaries.md` (#581 baseline guard). It is observable only with a
+  core checkout present, and is checked on the next `scripts/sync-scaffold.sh`
+  run with core as a sibling.
+- **`GATE-01.md` arming §4, "paste the failing set into `GATE-01-REVIEW.md`
+  before arming".** No such file exists in the feature folder. It was an
+  arming-time human step, not part of the definition of done, and no in-loop
   surface checks it.
-- **"Anything this gate writes to the scaffold's own block must not clobber a
-  consumer's `@` lines" (`GATE-01.md`).** Verified vacuously: `scaffold.py` is
-  byte-identical to pin `a9374296`'s, so this gate wrote nothing to the
-  scaffold's block. The only `@` line added is in this repository's own
+- **"Anything it writes to the scaffold's own block must not clobber a
+  consumer's `@` lines."** This is vacuous if `specfuse/loop/scaffold.py` is
+  unchanged from pin `a9374296`. That comparison is reported in this close's
+  RESULT block. The only `@` line this feature added is in this repository's own
   `.claude/CLAUDE.md`.
+- **Enforcement beyond this repository.** The cap is blocking only through this
+  repository's `tests` gate. No driver path, lint script or `specfuse upgrade`
+  step calls `check_binding_block_budget`, so consumers get the helper, not the
+  check. This is stated in `CHANGELOG.md`, and no gate criterion asks for more.
+- **Removed from the definition of done, not deferred:** human-accepted
+  distillate content (#3315) and a reachable sub-budget (#3316). Both stay open
+  in `FOLLOW-UPS.md` and FEAT-2026-0112.
 
 ## Consumer-visible contract changes
 
-Three additions and one change. Nothing was renamed, and no configuration key
-changed. All four are appended to `CHANGELOG.md`'s `Unreleased` section with
-this feature's ID.
+Three additions and one change. Nothing was renamed or removed, and no
+configuration key changed. The first close appended all four to `CHANGELOG.md`'s
+`Unreleased` section with this feature's ID. Nothing has changed since, so this
+close adds no further entries.
 
 1. **added:** `binding_block_word_count`, `check_binding_block_budget`,
    `BINDING_BLOCK_WORD_CAP` (2,500) and `LEARNINGS_DISTILLED_WORD_CAP` (500) in
-   `specfuse.loop.loop`. Enforced only by this repository's tests; consumers get
-   the helper, not the check.
+   `specfuse.loop.loop`. They are enforced only by this repository's tests;
+   consumers get the helper, not the check.
 2. **added:** `score_learnings_entries`, `propose_distilled_learnings` and
    `apply_distilled_decisions`. Python API only; no skill or CLI.
 3. **added:** budget documentation in `docs/methodology.md` and the seeded
@@ -287,86 +254,101 @@ this feature's ID.
 ## Cost analysis
 
 **Budget of record.** `PLAN.baseline.json` totals **$28.00**: T01 $6.00, T02
-$4.00, T03 $4.50, T04 $5.00, T05 $2.50 and G1-CLOSE $6.00. `PLAN.md` now says
-$29.50, which adds T04H's $1.50 from the re-arm. Actuals are summed from
-`events.jsonl` `attempt_outcome.cost_usd` and cross-checked against
-`task_completed.cost_usd`, WU frontmatter, and `gate_eval`'s `per_wu_cost`.
+$4.00, T03 $4.50, T04 $5.00, T05 $2.50 and G1-CLOSE $6.00. `PLAN.md` says
+$29.50, which adds T04H's $1.50. Actuals are summed from `events.jsonl`
+`attempt_outcome.cost_usd` and cross-checked against `task_completed.cost_usd`,
+WU frontmatter and `gate_eval`'s `per_wu_cost`.
 
-| WU | Planned | Actual (events) | Frontmatter / `gate_eval` | Actual ÷ planned | Attempts | Wall |
-|---|---|---|---|---|---|---|
-| T01 counter + stub (driver) | $6.00 | $0.823196 | $0.823196 | 0.14× | 1 | 486.9s |
-| T02 weights (driver) | $4.00 | $1.021311 | $1.021311 | 0.26× | 1 | 245.9s |
-| T03 accept step (driver) | $4.50 | $0.486376 | $0.486376 | 0.11× | 1 | 138.1s |
-| T04 allocation + trim (driver) | $5.00 | $1.368262 | $1.368262 | 0.27× | 1 | 592.1s |
-| T04H mirror sync (not in baseline) | $1.50 | $0.186327 | $0.186327 | 0.12× | 1 | 512.2s |
-| T05 docs, surviving cycle | $2.50 | $0.963139 | $0.963139 | 0.39× | 2 | 786.7s |
-| T05 docs, discarded first cycle | — | $0.884954 | **not counted** | — | 1 | 1253.1s |
-| **Implementation** | **$22.00** baseline / $23.50 | **$5.733566** | $4.848611 | **0.26×** / 0.24× | 7 | |
-| G1-CLOSE (this unit) | $6.00 | not yet in `events.jsonl` | — | — | — | — |
+| WU | Planned | Actual (`events.jsonl`) | `gate_eval` / frontmatter | Actual ÷ planned | Attempts |
+|---|---|---|---|---|---|
+| T01 counter + stub (driver) | $6.00 | $0.823196 | $0.823196 | 0.14× | 1 |
+| T02 weights (driver) | $4.00 | $1.021311 | $1.021311 | 0.26× | 1 |
+| T03 accept step (driver) | $4.50 | $0.486376 | $0.486376 | 0.11× | 1 |
+| T04 allocation + trim (driver) | $5.00 | $1.368262 | $1.368262 | 0.27× | 1 |
+| T04H mirror sync (not in baseline) | $1.50 | $0.186327 | $0.186327 | 0.12× | 1 |
+| T05 docs, surviving cycle | $2.50 | $0.963139 | $0.963139 | 0.39× | 2 |
+| T05 docs, discarded first cycle | — | $0.884954 | **not counted** | — | 1 |
+| **Implementation** | **$22.00** baseline / $23.50 | **$5.733566** | $4.848611 | **0.26×** | 8 |
+| G1-CLOSE, first close attempt | $6.00 | $4.022428 | $4.022428 | 0.67× | 1 |
+| Judge on the first close | — | $0.211180 | **not counted** | — | — |
+| G1-CLOSE, this re-close | (same $6.00) | not yet in `events.jsonl` | — | — | — |
+| **Recorded so far** | **$28.00** | **$9.967174** | $8.871039 | **0.36×** | |
 
-**Reconciliation.** Frontmatter, `task_completed` and `gate_eval` agree on
-every unit to six decimals. T05's surviving cycle sums exactly:
-$0.4671766 + $0.4959626 = $0.9631392. **The one variance between ledgers is
-$0.884954.** That was T05's first attempt cycle, 15:03–15:24, which failed with
+**Reconciliation.** Frontmatter, `task_completed` and `gate_eval` agree on every
+unit to six decimals. T05's surviving cycle sums exactly:
+$0.4671766 + $0.4959626 = $0.9631392. **The two ledgers differ by $1.096134,
+made of exactly two items.** One is T05's discarded first cycle ($0.884954), and
+the other is the judge ($0.211180). $8.871039 + $0.884954 + $0.211180 =
+$9.967173, which matches to rounding. The T05 cycle failed on
 `test_packaged_copy_is_byte_identical` because T04 had not re-synced the
-packaged rule mirrors. The driver then halted `preexisting_gate_failure` and
-attributed the failure to T05, although T04 caused it. The operator inserted
-T04H and re-armed T05, and the re-arm dropped that cycle from frontmatter and
-from `gate_eval`. It remains only in `events.jsonl`. Including it,
-implementation spend is $5.73 of the $28.00 plan (20.5%) before the close.
+packaged mirrors. The driver halted `preexisting_gate_failure` and attributed
+the failure to T05, the operator inserted T04H, and the re-arm dropped that
+cycle from frontmatter. The judge's cost rides on the `judged` event, not on an
+`attempt_outcome` for any unit. Neither item is an error, but `gate_eval`
+understates real spend by 11%.
 
-**Was the $5–6 correction for driver-touching units enough? It overshot.**
-T01–T04 were planned at $19.50 and cost $3.70 (19.0%), with every unit between
-0.11× and 0.27×. FEAT-2026-0106's comparable units cost $9.13 against $3.50 and
-$6.13 against $3.50. The obvious explanations don't account for the difference:
+This re-close's own cost is unknown to this session. With $9.97 recorded, the
+feature stays inside the $28.00 plan unless this attempt costs more than
+$18.03. G1-CLOSE's frontmatter still carries the first attempt's $4.022428 with
+no `cumulative_cost_usd`, so whether the driver adds or overwrites is visible
+only after this attempt.
 
-- **Not the model.** Every implementation attempt in both features ran
-  `sonnet` / `medium`, per `attempt_outcome.model`.
-- **Not "touches the driver".** All four T01–T04 units edited `loop.py`, and
-  each raised a `driver_staleness_detected` event.
-- **What did differ is session length and rework, visible in cache-read
-  tokens.** FEAT-2026-0106's T01 read 13.5M + 17.0M across two attempts,
-  including one full attempt lost to an `E741` lint refusal. Its T03 read 21.0M
-  over 125 tool calls. Here the driver units read 0.8M–3.9M over 15–57 tool
-  calls, with no failed attempt and at most 3 full-suite runs each.
+**Was the $5–6 correction for driver-touching units enough? It overshot, by
+roughly 5×.** T01–T04 were planned at $19.50 and cost $3.699145 (19.0%), with
+every unit between 0.11× and 0.27×. The corrected estimates were each above
+FEAT-2026-0106's actuals ($9.13 and $6.13 against $3.50, which is 2.61× and
+1.75×), while this feature's driver units cost less than the $3.50 default they
+replaced. The "driver-touching" label did not predict cost in either direction.
+What differed was rework. None of T01–T04 had a failed attempt, and their
+sessions read 0.81M–3.91M cache tokens (`attempt_outcome.cache_read_input_tokens`).
+The only non-passing attempts in this gate are T05's two mirror-sync failures,
+on a unit priced at $2.50 and not labelled risky. Across both features,
+actual/planned spans 0.11× to 2.61× per unit. A plan-time label moved the
+estimate without capturing the variable that moves cost.
 
-Across both features, per-unit actual/planned spans 0.11× to 2.61×. The
-"driver-touching" label moved the estimate but did not predict the cost.
-Whether an attempt fails and has to replay its context predicts it far better,
-and no plan-time label captures that.
+Mechanically, the over-estimate is what kept the gate on-plan. With 1.5×
+ceilings and actuals at 0.11–0.39×, no unit could have tripped the signal short
+of a four- to thirteen-fold miss. That makes "on-plan" here a property of the
+estimates as much as of the work.
 
-**The halt cost wall clock, not dollars.** The pin at 14:39 to the broad run at
-16:20 took 101 minutes. About 20 of those, from the 15:28 halt to the 15:49
-re-pin, were the operator inserting T04H. Four `driver_staleness_detected`
-events fired, all `halted: false`.
+**Wall clock.** From the pin at 14:39 to the first broad run at 16:20 took 101
+minutes. About 20 of those, from the 15:28 halt to the 15:49 re-pin, went to
+inserting T04H. From the first close's end at 16:32 to the re-pin at 17:50 took
+78 minutes of operator time on the re-scope. All four `driver_staleness_detected`
+events were `halted: false`.
 
 ### Failure-class breakdown
 
 | Failure class | Signature | Unit | Attempts | Cost | Cause |
 |---|---|---|---|---|---|
-| `tests` | `test_packaged_copy_is_byte_identical` | T05 (first cycle) | 1 | $0.884954 | T04 trimmed `.specfuse/rules/` without running `scripts/sync-scaffold.sh`; the `coverage` gate reported `no_gate_marker` behind it |
+| `tests` | `test_packaged_copy_is_byte_identical` | T05 (first cycle) | 1 | $0.884954 | T04 edited `.specfuse/rules/` without running `scripts/sync-scaffold.sh`; `coverage` reported `no_gate_marker` behind it |
 | `tests` | `test_package_data_matches_canonical` | T05 (second cycle, attempt 1) | 1 | $0.467177 | T05's own doc edits were not mirrored to `specfuse/loop/data/docs/`; fixed in attempt 2 |
 
-Both are the same class: a canonical edit with no packaged-mirror sync.
-FEAT-2026-0106's T02 forward note ("run `sync-scaffold.sh` after any rules
-edit") and T04 note (`sync-scaffold.sh` has no `docs/` stage) described both
-halves one feature earlier. Neither note reached this feature's drafting.
+Both are one class: a canonical edit with no packaged-mirror sync. The close
+units' spend is excluded because neither close attempt failed. The first close
+passed its guards, and only its verdict was `not_met`.
 
 ## Retrospective
 
-- **The instrument works, and it measured its own feature short.** The counter,
-  the blocking check and the trim are real, and the mirrors and docs are
-  consistent with them. The feature's goal, "the rules worth following reach
-  every dispatched session", has not happened: zero LEARNINGS entries reach
-  dispatch. Under the current cap, zero whole entries could, without a human
-  editing them shorter at the accept step.
-- **The plan's loud uncertainty resolved without the stop it asked for.**
-  `PLAN.md` and `GATE-01.md` both said a human decides where the trim comes
-  from. The driver ran T01 → T04 without a halt, and T04 took most of the trim
-  from the two files T01 flagged as needing a human call. The trim is rewording
-  and reads as defensible. The decision point the plan named was still skipped,
-  because nothing in the task graph made it a stop: there was no `type: human`
-  unit and no gate boundary.
-- **Lessons promoted** to `.specfuse/LEARNINGS.md`: the nested-budget rule, and
-  the rule against ordering the full suite in a WU body, which lost two RESULT
-  blocks here.
+- **The instrument works and measured its own feature short. The re-scope made
+  that the honest scope, not a pass.** The counter, blocking check, weights,
+  accept step and trim are real and consistent with their docs. Zero LEARNINGS
+  entries reach dispatch, and under the current cap zero whole entries could.
+  The roadmap goal, "the rules worth following reach every dispatched session",
+  is not delivered by this feature. FEAT-2026-0112 owns the decision that would
+  let it be.
+- **The definition of done was revised after the gate ran.** `PLAN.md` records
+  this deliberately, with the operator's reason, and the removed clauses stay
+  tracked (#3315, #3316) rather than dropped. Whether to accept that is the
+  reviewer's call. The measurements above are unchanged either way.
+- **The plan's named decision point was skipped.** `PLAN.md` and `GATE-01.md`
+  said a human decides where the trim comes from. The driver ran T01 → T04 with
+  no halt, because nothing in the task graph made it a stop. T04 took most of
+  the trim from the two core-owned files T01 had flagged.
+- **FEAT-2026-0106's reflection gate got its first on-plan gate, and the gate
+  showed what "on-plan" misses.** The lesson promoted to `.specfuse/LEARNINGS.md`
+  from this close is that feature-level halts, inserted units, discarded cycles,
+  close outcomes and re-scopes are all outside the signal. A gate can be as
+  eventful as this one and still read as needing no reflection. The first
+  close's two lessons (nested budgets; don't order the full suite in a WU body)
+  stand.

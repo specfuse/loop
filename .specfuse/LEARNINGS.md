@@ -4392,3 +4392,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a pinned build. **Drafting rule:** do not override the dispatch prompt's tiering in a WU
   body. The driver already runs the broad set once per gate. If a unit genuinely needs a
   wider module set, name the modules for `narrow_command`, not "the full suite".
+
+- [FEAT-2026-0111/G1-CLOSE] **"On-plan" in the off-plan signal means "no implementation unit
+  overran its estimate", not "the gate went as planned" — check `events.jsonl` before
+  trusting a suppressed reflection.** `evaluate_off_plan_signal` returned `reasons=[]` for a
+  gate that had a feature-level `human_escalation` (`preexisting_gate_failure`), an
+  operator-inserted hygiene unit, a discarded attempt cycle, a `not_met` close and a
+  re-scoped definition of done. The halt's `correlation_id` is the feature ID, so
+  `blocked_human_events` stayed empty. Close units are skipped by the cost checks. The cost
+  checks are one-sided, so units at 0.11–0.39× of estimate read as on-plan exactly as
+  accurate ones would. **Drafting rule:** a close whose reflection is waived still greps
+  `events.jsonl` for feature-scoped `human_escalation` / `baseline_attribution` events and
+  for units absent from `PLAN.baseline.json`. If any exist, write the cost analysis anyway.
+  And do not raise estimates on a "touches the driver" label: here that label over-priced
+  four units by ~5× while the unit that actually failed twice was priced as routine.
