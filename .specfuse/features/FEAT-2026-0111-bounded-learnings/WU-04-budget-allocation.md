@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0111/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces:
   - tests/test_binding_block_allocation.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T14:51:42.026158+00:00
+duration_seconds: 592.108
+cost_usd: 1.368262
+input_tokens: 98
+output_tokens: 26750
 ---
 
 # Allocate the budget, and make the cap blocking once the tree can pass it
@@ -52,3 +61,17 @@ headroom implied turns out to require cutting something an implementation
 session depends on. Shipping a smaller block that drops a binding contract is
 worse than shipping nothing, and which contract may shrink is an operator
 decision.
+
+## Flag-scope table (`planning-discipline.md` §3)
+
+The flag is `check_binding_block_budget`'s severity: measured-only before this
+unit, blocking (raises `AssertionError`) after. Every path the block's `@`
+lines reference today, and whether the new blocking check covers it:
+
+| Code path | Gated by the new blocking check? | Why |
+|---|---|---|
+| `.specfuse/rules/result-contract.md` | yes | Summed into `binding_block_word_count`'s `total`; `check_binding_block_budget` raises if `total > cap`. |
+| `.specfuse/rules/never-touch.md` | yes | Same total-cap path as above. |
+| `.specfuse/rules/security-boundaries.md` | yes | Same total-cap path as above. |
+| `.specfuse/rules-local/learnings-distilled.md` | yes, twice | Counted into `total` like the three above, and checked separately against its own `LEARNINGS_DISTILLED_WORD_CAP` sub-budget first, so a bloated distillate is named directly. |
+| A consumer project's own `@.specfuse/rules-local/<rule>.md` lines | yes, by the same total-cap path | `binding_block_word_count` reads the block's actual `@` references, not a hardcoded list, so any rules-local import a project adds is summed and capped identically. Only the one line this repo names above resolves against `LEARNINGS_DISTILLED_WORD_CAP` specifically — a project's *other* `rules-local` files are covered by the total cap only, not by that sub-budget. |

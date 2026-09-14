@@ -13,15 +13,15 @@ driver re-runs verification itself, and that is what decides done.
 ## Who reads it — emit it only when something does
 
 This block is a **machine interface**, not a report. Emit it when a program is
-on the other end: a work-unit session the driver dispatched (always), or a skill
-invoked **non-interactively** from a calling program that parses the outcome
-(`fix-bug` under `autofix_invoke` is the live example).
+on the other end: a work-unit session the driver dispatched (always), or a
+skill invoked **non-interactively** from a calling program that parses the
+outcome (`fix-bug` under `autofix_invoke` is the live example).
 
-Do **not** emit it on an interactive run. A human who typed `/pick-feature` has
-no parser; the block lands as a slab to scroll past, which is the verbosity
-[`human-output.md`](human-output.md) exists to prevent — report to them per that
-rule instead. When in doubt, look at who invoked you: a slash command typed by a
-person is interactive; a `claude -p` dispatch is not.
+Do **not** emit it on an interactive run — a human who typed `/pick-feature`
+has no parser, and the block lands as a slab to scroll past, the verbosity
+[`human-output.md`](human-output.md) exists to prevent. Report to them per
+that rule instead. When in doubt: a slash command typed by a person is
+interactive; a `claude -p` dispatch is not.
 
 ## The cycle: state intent, act, verify, report
 
@@ -33,25 +33,25 @@ cycle; this file is normative on how the loop surface reports step 4.
    the unit is not what you thought it was.
 2. **Act.** Stay inside that scope. "While I was here I also fixed X" is drift;
    the work unit's **Do not touch** section is binding.
-3. **Verify.** Re-read what you produced — the Write/Edit tool reports the
-   action it took, not the property you wanted — and run the work unit's own
-   verification commands, in declared order, with full output. On the loop
-   that set is the **per-attempt (narrow) tier**: the unit type's gates minus
-   any declaring `tier: broad`, with `tests` through its `narrow_command` over
-   the unit's `produces:` test modules. The full suite, coverage and every
-   `tier: broad` gate are the driver's, once per gate — running them in-session
-   buys nothing the driver does not re-run. "I assume the
-   tests still pass" is not a verification. A behavioural claim needs a run, not
-   a reading of the source; a rule-or-severity claim needs a **negative
-   observation**, the rule seen rejecting a purpose-built bad input.
+3. **Verify.** Re-read what you produced — Write/Edit reports the action taken,
+   not the property you wanted — and run the work unit's own verification
+   commands, in declared order, with full output. On the loop that set is the
+   **per-attempt (narrow) tier**: the unit type's gates minus any declaring
+   `tier: broad`, with `tests` through its `narrow_command` over the unit's
+   `produces:` test modules. The full suite, coverage and every `tier: broad`
+   gate are the driver's, once per gate — running them in-session buys nothing
+   the driver does not re-run. "I assume the tests still pass" is not
+   verification. A behavioural claim needs a run, not a source reading; a
+   rule-or-severity claim needs a **negative observation** — the rule seen
+   rejecting a purpose-built bad input.
 4. **Report.** Report only what verification confirmed.
 
-A failing check leaves you in one of three situations: correctable locally (fix
-the cause, re-run the **whole narrow tier** from the top), spinning (three fresh
-attempts is the driver's budget — emit `status: blocked` with the evidence
-rather than guessing), or fundamentally blocked (a spec ambiguity, generated
-code that must change, a missing dependency — emit `status: blocked` naming the
-boundary).
+A failing check leaves you in one of three situations: correctable locally
+(fix the cause, re-run the **whole narrow tier** from the top), spinning
+(three fresh attempts is the driver's budget — emit `status: blocked` with
+evidence rather than guessing), or fundamentally blocked (spec ambiguity,
+generated code that must change, a missing dependency — emit `status: blocked`
+naming the boundary).
 
 ## Format
 
@@ -102,29 +102,29 @@ never required by any guard. Omit it and nothing changes: the driver's
 7. **A "pre-existing" failure claim cites the commit it was measured on.**
    Calling a failure pre-existing is a claim about a *different* commit —
    typically the merge-base — and nothing observed on your own branch
-   establishes it. Name the command and the commit, give the numbers from both
-   sides, and emit `status: blocked` rather than asserting a baseline you could
-   not measure: a mass of errors sharing one signature (network refused,
-   unresolvable build dependencies) is a report about where the suite ran, not
-   about the repository (#2075).
+   establishes it. Name the command and commit, give the numbers from both
+   sides, and emit `status: blocked` rather than asserting an unmeasured
+   baseline: a mass of errors sharing one signature (network refused,
+   unresolvable build dependencies) reports where the suite ran, not the
+   repository (#2075).
 
 ## Closing obligations for implementation WUs (FEAT-2026-0049)
 
 1. **Diff against `produces:` first.** Every path in the WU's `produces:` list
    must show a working-tree change, or the RESULT must justify each unchanged
-   path under `produces_unchanged:` — the entry spelled as `produces:` spells
-   it, plus the command and output showing the deliverable already holds. The
-   driver reads that list: a justified entry passes and is recorded on the
-   attempt as `produces_justified`; an unjustified one, or a blank
-   justification, is refused (#198, #3268, outcome `produces_not_in_diff`).
-   Silence on an unchanged deliverable is not a valid close.
-2. **A plan-level contradiction is `blocked`, not `complete`.** If the plan
-   cannot be delivered as written, put the finding in `blocked_reason`; never
-   write it into a gate document and close `complete`.
+   path under `produces_unchanged:` — spelled as `produces:` spells it, plus
+   the command and output showing the deliverable already holds. The driver
+   reads that list: a justified entry passes and is recorded on the attempt as
+   `produces_justified`; an unjustified one, or a blank justification, is
+   refused (#198, #3268, outcome `produces_not_in_diff`). Silence on an
+   unchanged deliverable is not a valid close.
+2. **A plan-level contradiction is `blocked`, not `complete`.** Put the
+   finding in `blocked_reason`; never write it into a gate document and close
+   `complete`.
 3. **Every `evidence:` cites an executed command** and its observed exit
-   code/output. Reading source, grepping for a string, or citing another WU's
+   code/output. Reading source, grepping a string, or citing another WU's
    RESULT is not verification.
-4. **Analysis without edits is not a silent attempt.** Say so explicitly and end
+4. **Analysis without edits is not a silent attempt.** Say so and end
    `blocked` rather than spending the attempt on prose.
 
 The driver's whole cycle — re-verify, commit, advance the dependency frontier,

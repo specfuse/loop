@@ -7,50 +7,47 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 Three categories of path are off-limits to every work-unit session, regardless of
 unit type. If a unit's acceptance criteria or verification commands appear to
-require modifying something in this list, that is an escalation condition, not a
+require modifying something in this list, that is an escalation condition, not
 license to proceed — signal blocked per
 [`verification-discipline.md`](verification-discipline.md), naming the
-boundary. (How "blocked" is signalled is surface-specific — a `status: blocked`
+boundary. (How "blocked" is signalled is surface-specific: a `status: blocked`
 RESULT on the loop, a `blocked_*` transition on the orchestrator.)
 
 ## 1. Generated code directories
 
-Any path under a generated directory — `_generated/`, `gen-src/`, or whatever the
-repo declares as its generated tree — is off-limits. Generators own those files
-end-to-end; an edit there is silently overwritten on the next regeneration and
-leaves no trace of why.
+Any path under a generated directory — `_generated/`, `gen-src/`, or whatever
+the repo declares as its generated tree — is off-limits. Generators own those
+files end-to-end; an edit there is silently overwritten on regeneration,
+leaving no trace of why.
 
-- The canonical names are `_generated/` and `gen-src/`, but the repo's own
-  declaration (in its README, a `specfuse.yaml`, or equivalent config) is
-  authoritative. If your repo's generated directory uses a different name, treat
-  that name with identical prohibition.
-- The rule applies to every file under the directory, recursively. Creating a new
-  file inside a generated directory is still a write to that directory.
-- The rule applies regardless of whether the file currently exists.
+- Canonical names are `_generated/` and `gen-src/`, but the repo's own
+  declaration (README, `specfuse.yaml`, equivalent config) is authoritative;
+  a differently-named generated directory gets identical treatment.
+- Applies to every file under the directory recursively, including a new file
+  created there, and regardless of whether the file currently exists.
 
-When a generated file is wrong, the response is to change the spec or the generator
-that produced it, not the file itself. If that is outside this unit's boundary,
-signal blocked with the spec/generator change named.
+When a generated file is wrong, change the spec or generator that produced
+it, not the file itself. If that is outside this unit's boundary, signal
+blocked with the spec/generator change named.
 
 ## 2. Secrets and credentials
 
 Secrets include, at minimum: API tokens, deploy keys, SSH private keys, OAuth
-client secrets, webhook signing secrets, database passwords, `.env` files, cloud
-credentials (AWS, GCP, Azure), and any file conventionally holding a credential
+client secrets, webhook signing secrets, database passwords, `.env` files,
+cloud credentials (AWS, GCP, Azure), and any file conventionally holding one
 (`*.pem`, `*.key`, `id_rsa*`, `credentials.json`, `.npmrc` tokens, `gh auth`
 tokens).
 
 You must not:
 
-- Read the contents of a secrets file. If a unit requires one, see
+- Read a secrets file's contents. If a unit requires one, see
   [`security-boundaries.md`](security-boundaries.md) for the escalation path.
-- Write any value that looks like a credential into the RESULT block, the event
-  log, a commit, or any artifact you produce — whether the value came from a real
-  secret or was invented.
-- Echo the contents of environment variables that hold secrets. Reference them by
-  name (`$GITHUB_TOKEN`) over reading their values.
-- Commit secret files to the repo under any circumstance, including as examples
-  or fixtures.
+- Write anything credential-looking into the RESULT block, event log, a
+  commit, or any produced artifact — whether real or invented.
+- Echo secret-holding environment variables. Reference by name
+  (`$GITHUB_TOKEN`) over reading their values.
+- Commit secret files under any circumstance, including as examples or
+  fixtures.
 
 ## 3. `.git/` internals
 

@@ -160,9 +160,18 @@ def resume_command_for(feature_id: str, start: "Path | None" = None) -> str:
 
 
 #: Word cap on the `.claude/CLAUDE.md` binding block, `scaffold.py:227`'s
-#: comment made blocking (FEAT-2026-0111). Not yet enforced as a hard failure
-#: anywhere — `binding_block_word_count` only measures against it.
+#: comment made blocking by `check_binding_block_budget` (FEAT-2026-0111/T04).
 BINDING_BLOCK_WORD_CAP = 2500
+
+#: Relative path `binding_block_word_count`'s `files` dict keys the rules-local
+#: distillate on, wired by FEAT-2026-0111/T01.
+LEARNINGS_DISTILLED_RULE_PATH = ".specfuse/rules-local/learnings-distilled.md"
+
+#: Sub-budget for `LEARNINGS_DISTILLED_RULE_PATH` within `BINDING_BLOCK_WORD_CAP`
+#: (FEAT-2026-0111/T04), sized off #3272's hand-curated 47-line distillate.
+#: T03's accept step cuts its ranked proposal at this word count, not at an
+#: entry count.
+LEARNINGS_DISTILLED_WORD_CAP = 500
 
 _BINDING_RULES_HEADING = "## Specfuse binding rules"
 
@@ -206,6 +215,30 @@ def binding_block_word_count(claude_md: "Path | None" = None) -> dict:
         files[rel] = len(target.read_text(encoding="utf-8").split())
 
     return {"total": sum(files.values()), "cap": BINDING_BLOCK_WORD_CAP, "files": files}
+
+
+def check_binding_block_budget(claude_md: "Path | None" = None) -> dict:
+    """Blocking form of `binding_block_word_count` (FEAT-2026-0111/T04).
+
+    Raises `AssertionError` if the rules-local distillate exceeds
+    `LEARNINGS_DISTILLED_WORD_CAP`, or the block's total exceeds
+    `BINDING_BLOCK_WORD_CAP`. The sub-budget is checked first so a bloated
+    distillate is named directly rather than folded into the generic total
+    failure. Returns the same dict as `binding_block_word_count` on success.
+    """
+    result = binding_block_word_count(claude_md)
+    distilled_count = result["files"].get(LEARNINGS_DISTILLED_RULE_PATH, 0)
+    if distilled_count > LEARNINGS_DISTILLED_WORD_CAP:
+        raise AssertionError(
+            f"{LEARNINGS_DISTILLED_RULE_PATH} is {distilled_count} words, "
+            f"over its {LEARNINGS_DISTILLED_WORD_CAP}-word sub-budget"
+        )
+    if result["total"] > result["cap"]:
+        raise AssertionError(
+            f"binding block is {result['total']} words, over its "
+            f"{result['cap']}-word cap"
+        )
+    return result
 
 
 #: Stated on every `score_learnings_entries` result (FEAT-2026-0111/T02) so the
