@@ -7,6 +7,10 @@ planned_cost_usd: 2.50
 produces:
   - docs/methodology.md
   - .specfuse/rules-local/README.md
+duration_seconds: 1253.119
+cost_usd: 0.884954
+input_tokens: 26
+output_tokens: 4022
 ---
 
 # Document the budget, the accept step, and what the weights do not mean
