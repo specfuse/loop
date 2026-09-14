@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0111/T04H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/data/rules/result-contract.md
   - specfuse/loop/data/rules/never-touch.md
   - specfuse/loop/data/rules/security-boundaries.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T15:49:10.248618+00:00
+duration_seconds: 512.21
+cost_usd: 0.186327
+input_tokens: 14
+output_tokens: 1088
 ---
 
 # Sync the packaged rule mirrors, and record that two are core-owned
