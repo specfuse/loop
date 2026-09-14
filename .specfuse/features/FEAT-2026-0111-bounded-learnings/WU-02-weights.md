@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0111/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces_driver_helper:
   - score_learnings_entries
 produces:
   - tests/test_learnings_weights.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T14:47:35.887160+00:00
+duration_seconds: 245.933
+cost_usd: 1.021311
+input_tokens: 64
+output_tokens: 22236
 ---
 
 # Rank entries by what failures cost, not by how often they were cited

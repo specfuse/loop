@@ -208,6 +208,126 @@ def binding_block_word_count(claude_md: "Path | None" = None) -> dict:
     return {"total": sum(files.values()), "cap": BINDING_BLOCK_WORD_CAP, "files": files}
 
 
+#: Stated on every `score_learnings_entries` result (FEAT-2026-0111/T02) so the
+#: bias travels with the artifact a human reviews, not only in PLAN.md prose.
+LEARNINGS_REACH_TIEBREAK_CAVEAT = (
+    "reach is a tiebreaker, not the primary signal: it counts citations in "
+    "planning documents, and planning agents cite what they have already read "
+    "in LEARNINGS.md, so visibility inflates its own count. It also favors "
+    "OLDER entries, which have had more features' worth of planning sessions "
+    "in which to be cited."
+)
+
+_LEARNINGS_FEAT_ID_RE = re.compile(r"^(FEAT-\d{4}-\d{4})")
+
+
+def score_learnings_entries(
+    learnings_path: "Path | None" = None,
+    features_dir: "Path | None" = None,
+) -> dict:
+    """Rank `LEARNINGS.md` entries by `failure_signature` attempt-cost.
+
+    Primary signal: `cost_usd`, summed across every non-`passed` `attempt_outcome`
+    event in `events.jsonl` for each feature the entry's `[tag]` names — the cost
+    of the failures the entry describes. Events carry no gate-level attribution
+    (`correlation_id` is a WU id, not a gate id), so attribution is scoped to the
+    named feature as a whole, its finest resolvable grain.
+
+    Tiebreaker: `reach`, the count of *other* files under `features_dir` that cite
+    the entry's tag, **excluding** files under the entry's own feature folder(s) —
+    an entry citing itself from its own feature's files scores zero reach. A tag
+    with no `FEAT-YYYY-NNNN` prefix (e.g. a `meta/...` entry) has no owning
+    folder to exclude and no events to cost, so it scores `cost_usd=0.0` and an
+    unexcluded reach count.
+
+    Returns `{"entries": [...], "reach_caveat": LEARNINGS_REACH_TIEBREAK_CAVEAT}`.
+    Each entry dict carries every input a human needs to disagree with the
+    ranking: `tag`, `text`, `cost_usd`, `reach`, `failure_signatures` (sorted,
+    deduped), and `feature_ids` (the tags' resolved `FEAT-YYYY-NNNN` owners).
+    Sorted by `(-cost_usd, -reach, tag)`.
+    """
+    from .learnings_query import parse_entries
+
+    lpath = learnings_path if learnings_path is not None else REPO_ROOT / LEARNINGS_PATH
+    fdir = features_dir if features_dir is not None else FEATURES_DIR
+
+    raw_entries = parse_entries(lpath.read_text(encoding="utf-8"))
+
+    all_files = [p for p in fdir.rglob("*") if p.is_file()] if fdir.is_dir() else []
+    file_texts: dict[Path, str] = {}
+    for p in all_files:
+        try:
+            file_texts[p] = p.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+    scored: list[dict] = []
+    for entry in raw_entries:
+        tag = entry["tag"]
+        parts = [p.strip() for p in tag.split(";") if p.strip()]
+
+        feature_ids: list[str] = []
+        for part in parts:
+            m = _LEARNINGS_FEAT_ID_RE.match(part)
+            if m and m.group(1) not in feature_ids:
+                feature_ids.append(m.group(1))
+
+        own_dirs = {
+            d for fid in feature_ids for d in fdir.glob(f"{fid}-*") if d.is_dir()
+        } if fdir.is_dir() else set()
+
+        cost_usd = 0.0
+        failure_signatures: set[str] = set()
+        for fid in feature_ids:
+            for feature_dir in (fdir.glob(f"{fid}-*") if fdir.is_dir() else []):
+                events_path = feature_dir / "events.jsonl"
+                if not events_path.is_file():
+                    continue
+                for line in events_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        event = json.loads(line)
+                    except ValueError:
+                        continue
+                    if event.get("event_type") != "attempt_outcome":
+                        continue
+                    if not str(event.get("correlation_id", "")).startswith(fid + "/"):
+                        continue
+                    payload = event.get("payload") or {}
+                    if payload.get("outcome") == "passed":
+                        continue
+                    cost_usd += float(payload.get("cost_usd") or 0.0)
+                    sig = payload.get("failure_signature")
+                    if sig:
+                        failure_signatures.add(str(sig))
+
+        cited_files: set[Path] = set()
+        for part in parts:
+            for path, text in file_texts.items():
+                if path in own_dirs or any(
+                    own in path.parents for own in own_dirs
+                ):
+                    continue
+                if part in text:
+                    cited_files.add(path)
+        reach = len(cited_files)
+
+        scored.append({
+            "tag": tag,
+            "text": entry["text"],
+            "cost_usd": round(cost_usd, 2),
+            "reach": reach,
+            "failure_signatures": sorted(failure_signatures),
+            "feature_ids": feature_ids,
+        })
+
+    scored.sort(key=lambda e: (-e["cost_usd"], -e["reach"], e["tag"]))
+
+    return {"entries": scored, "reach_caveat": LEARNINGS_REACH_TIEBREAK_CAVEAT}
+
+
 class ScaffoldVersionSkew(RuntimeError):
     """The working tree's scaffold is newer than the installed one (#2643).
 
