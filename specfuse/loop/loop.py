@@ -159,6 +159,55 @@ def resume_command_for(feature_id: str, start: "Path | None" = None) -> str:
     return f"specfuse run --feature {feature_id}"
 
 
+#: Word cap on the `.claude/CLAUDE.md` binding block, `scaffold.py:227`'s
+#: comment made blocking (FEAT-2026-0111). Not yet enforced as a hard failure
+#: anywhere — `binding_block_word_count` only measures against it.
+BINDING_BLOCK_WORD_CAP = 2500
+
+_BINDING_RULES_HEADING = "## Specfuse binding rules"
+
+
+def binding_block_word_count(claude_md: "Path | None" = None) -> dict:
+    """Word count of every `@`-referenced file in the binding rules block.
+
+    Parses the "## Specfuse binding rules" section of *claude_md* (default
+    `REPO_ROOT/.claude/CLAUDE.md`) for its `@<path>` lines, resolves each path
+    relative to `REPO_ROOT`, and sums each referenced file's word count.
+    Reads the block's actual references rather than a hardcoded file list —
+    a consuming project's block carries `rules-local` lines this repo's own
+    block may not.
+
+    Returns `{"total": int, "cap": BINDING_BLOCK_WORD_CAP,
+    "files": {relpath: word_count, ...}}`, `files` in block order.
+    """
+    path = claude_md if claude_md is not None else REPO_ROOT / ".claude" / "CLAUDE.md"
+    text = path.read_text(encoding="utf-8")
+
+    refs: list[str] = []
+    in_block = False
+    for line in text.splitlines():
+        if line.startswith(_BINDING_RULES_HEADING):
+            in_block = True
+            continue
+        if not in_block:
+            continue
+        stripped = line.strip()
+        if stripped.startswith("@"):
+            refs.append(stripped[1:])
+        else:
+            # The block is a contiguous run of `@` lines right after the
+            # heading; anything else (blank line, HTML comment, next
+            # heading) ends it — including a comment's own example `@` text.
+            break
+
+    files: dict[str, int] = {}
+    for rel in refs:
+        target = REPO_ROOT / rel
+        files[rel] = len(target.read_text(encoding="utf-8").split())
+
+    return {"total": sum(files.values()), "cap": BINDING_BLOCK_WORD_CAP, "files": files}
+
+
 class ScaffoldVersionSkew(RuntimeError):
     """The working tree's scaffold is newer than the installed one (#2643).
 

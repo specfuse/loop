@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0111/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 produces_driver_helper:
   - binding_block_word_count
 produces:
   - tests/test_binding_block_budget.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T14:39:28.699725+00:00
+duration_seconds: 486.945
+cost_usd: 0.823196
+input_tokens: 54
+output_tokens: 12757
 ---
 
 # Measure the binding block, and report what could be trimmed
