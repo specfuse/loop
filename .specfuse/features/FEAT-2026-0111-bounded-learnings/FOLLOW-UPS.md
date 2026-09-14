@@ -6,6 +6,8 @@ it.
 
 ### The distilled set's content was accepted by a human
 
+**Tracked as #3315.**
+
 **Criterion (`GATE-01.md` definition of done).** "`.specfuse/rules-local/learnings-distilled.md`
 is loaded by the binding block; its content was accepted by a human rather than
 generated unattended; and the whole block — distilled file included — is under
@@ -37,6 +39,8 @@ place of the placeholder, and `python3 -m unittest tests.test_binding_block_allo
 exits 0 on that tree.
 
 ### The sub-budget fails before the total does
+
+**Tracked as #3316.**
 
 **Criterion (T04).** "The distilled file has its own stated sub-budget, and
 exceeding it fails before the total does, so the failure names the right
