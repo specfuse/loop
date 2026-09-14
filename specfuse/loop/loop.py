@@ -241,6 +241,45 @@ def check_binding_block_budget(claude_md: "Path | None" = None) -> dict:
     return result
 
 
+def binding_block_advisory(claude_md: "Path | None" = None) -> str | None:
+    """A one-line report when the binding block is over budget, or None (#3320).
+
+    `check_binding_block_budget` shipped in FEAT-2026-0111/T04 with **no
+    caller** — its only callers were its own tests, so the cap it describes as
+    enforcement enforced exactly as much as the comment it replaced. This is
+    that caller.
+
+    Advisory rather than blocking, on measurement rather than preference.
+    Across 17 real projects carrying a binding block on 2026-09-14, **15 were
+    over the cap** — the generator at 12,187 words against 2,500, nearly 5x.
+    Wiring the check as a gate would have failed almost every consuming project
+    on upgrade for a condition none of them introduced, which is the
+    unsatisfiable-predicate defect `planning-discipline.md` §2 names: a rule
+    that fires on inputs already in their intended final state. #3320 said not
+    to ship a blocking form before that was measured across consumers.
+
+    That every project is over says something the cap's own evidence
+    anticipated: it was set because a 7,213-word block was measured being read
+    past (FEAT-2026-0084/T01), and most projects are now past that. Whether the
+    answer is a bigger cap or smaller rules is FEAT-2026-0112's to decide, and
+    this line exists so the number is visible while it is undecided.
+
+    Never raises: a missing or unreadable CLAUDE.md returns None. A driver that
+    refuses to dispatch because it could not count words would be a worse
+    failure than the one this reports.
+    """
+    try:
+        check_binding_block_budget(claude_md)
+    except AssertionError as over:
+        return (
+            f"   NOTE: {over}. Every dispatched session pays for this block; "
+            f"see FEAT-2026-0112 for the allocation decision."
+        )
+    except (OSError, ValueError):
+        return None
+    return None
+
+
 #: Stated on every `score_learnings_entries` result (FEAT-2026-0111/T02) so the
 #: bias travels with the artifact a human reviews, not only in PLAN.md prose.
 LEARNINGS_REACH_TIEBREAK_CAVEAT = (
@@ -10165,6 +10204,11 @@ def run(
         units = [load_wu(feature_dir, ref) for ref in gate.refs]
         print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
               f"({len(units)} work units) ==")
+        # #3320: the binding-block budget check had no caller. Reported once per
+        # gate and never blocking -- 15 of 17 measured projects are over the cap.
+        _binding_note = binding_block_advisory()
+        if _binding_note:
+            print(_binding_note)
 
         # Arm check: a gate plan-next drafted starts with draft WUs. Don't execute drafts.
         drafts = [u for u in units if u.status == "draft"]
