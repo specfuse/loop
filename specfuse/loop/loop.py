@@ -4695,7 +4695,9 @@ def parse_result_block(stdout: str) -> dict | None:
 PROGRESS_FILENAME = "PROGRESS.md"
 
 
-def append_progress_entry(feature_dir: Path, wu_id: str, summary: str) -> Path:
+def append_progress_entry(
+    feature_dir: Path, wu_id: str, summary: str, forward_note: str | None = None,
+) -> Path:
     """Append one line naming *wu_id* to `feature_dir/PROGRESS.md`; return its path.
 
     Driver-side write (FEAT-2026-0106/T01, PLAN.md "Decisions taken at
@@ -4703,10 +4705,18 @@ def append_progress_entry(feature_dir: Path, wu_id: str, summary: str) -> Path:
     Callers pass a fallback summary derived from the attempt record when
     `parse_result_block` returned None — see `record_progress_entry` — so a
     dispatched unit always leaves a note even on malformed agent output.
+
+    *forward_note* is FEAT-2026-0106/T02's optional half: the session's own
+    account of what the next unit should know, which `summary` (backward-
+    looking by contract) does not carry. When absent — every project until it
+    adopts the field, and every attempt whose `summary` fell back — this
+    writes exactly the one line T01 wrote, byte-for-byte.
     """
     path = feature_dir / PROGRESS_FILENAME
     with path.open("a", encoding="utf-8") as fh:
         fh.write(f"- **{wu_id}**: {summary}\n")
+        if forward_note:
+            fh.write(f"  - note: {forward_note}\n")
     return path
 
 
@@ -4723,10 +4733,14 @@ def record_progress_entry(
     by design on garbled output, and that must not delete the note.
     """
     summary = None
+    forward_note = None
     if isinstance(wu.result_block, dict):
         rb_summary = wu.result_block.get("summary")
         if isinstance(rb_summary, str) and rb_summary.strip():
             summary = rb_summary.strip()
+        rb_forward_note = wu.result_block.get("forward_note")
+        if isinstance(rb_forward_note, str) and rb_forward_note.strip():
+            forward_note = rb_forward_note.strip()
     if summary is None:
         summary = f"attempt {attempt} outcome={outcome}"
     # Callers must fold the returned path into their own commit_bookkeeping
@@ -4736,7 +4750,7 @@ def record_progress_entry(
     # as "next" (test_pin_honesty_and_integrity), and #150 stops a later
     # squash's `git add -A` from absorbing this file retroactively once it
     # is already a pre-existing untracked leftover.
-    return append_progress_entry(feature_dir, wu.wu_id, summary)
+    return append_progress_entry(feature_dir, wu.wu_id, summary, forward_note)
 
 
 #: Verdict tokens that, in a produced document's heading or on a `Verdict:`

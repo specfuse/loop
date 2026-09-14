@@ -59,6 +59,7 @@ boundary).
 ```result
 status: complete | blocked        # complete = "I believe acceptance criteria are met"
 summary: <one sentence on what changed>
+forward_note: <optional — one sentence on what the NEXT unit should know>
 files_changed:
   - path/to/file
 acceptance_criteria:
@@ -71,6 +72,13 @@ produces_unchanged:               # optional — closing obligation 1 below
     justification: <the command you ran and its output showing the deliverable already holds>
 ```
 ````
+
+`summary` is backward-looking by this contract's own definition — one sentence
+on what changed. `forward_note` is the other half: what surprised you, or what
+the next unit should know, that `summary` does not capture. It is optional and
+never required by any guard. Omit it and nothing changes: the driver's
+`PROGRESS.md` entry is exactly what it would have written without this field
+(FEAT-2026-0106/T02).
 
 ## Rules
 

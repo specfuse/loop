@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0106/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - tests/test_progress_forward_note.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.19.0
+started_at: 2026-09-14T00:52:28.240792+00:00
+duration_seconds: 595.426
+cost_usd: 0.83384
+input_tokens: 60
+output_tokens: 11537
 ---
 
 # Let a session say what the next unit should know
