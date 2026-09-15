@@ -10042,6 +10042,105 @@ def ready(units: list[WorkUnit], done_ids: set[str]) -> list[WorkUnit]:
             if u.status in DISPATCHABLE and all(d in done_ids for d in u.depends_on)]
 
 
+def describe_stranded_units(
+    stranded: "list[WorkUnit]", *, gate_number: int,
+    abandoned_ids: "set[str] | None" = None,
+) -> str:
+    """Explain why a gate halted, naming the cause that applies (#3323).
+
+    The halt used to print one sentence for every non-`done`, non-`abandoned`
+    unit — "This usually means one of their dependencies was abandoned" — with
+    a single special case for a `human`-type unit at `blocked_human`
+    (FEAT-2026-0085/T04). Reported from a real run whose feature had no
+    abandoned unit at all: the operator was sent to inspect a dependency graph
+    that was correct, for a cause that did not apply.
+
+    Three causes, and they are not interchangeable:
+
+    * a non-`human` unit at `blocked_human` escalated and is waiting on a
+      re-arm — the reason is stamped in its frontmatter and belongs in the
+      message;
+    * a unit left `in_progress` was interrupted mid-attempt (a killed driver
+      leaves it there), and needs resetting rather than diagnosing;
+    * a `pending` unit whose dependency really was abandoned is the original
+      message, kept verbatim for the one case it was right about.
+
+    Everything else `pending` is *downstream* of one of those. It is attributed
+    to the unit blocking it rather than listed as its own problem — a list of
+    six ids, five of which are merely waiting, is what made the original
+    message hard to act on.
+
+    `escalation_reason` is re-read from frontmatter rather than taken from the
+    `WorkUnit`: the driver stamps it via `backend.set_wu` at escalation time
+    and the in-memory object predates that write.
+    """
+    abandoned_ids = abandoned_ids or set()
+    blocked, interrupted, waiting_on_abandoned, other = [], [], [], []
+    for wu in stranded:
+        if wu.status == "blocked_human":
+            blocked.append(wu)
+        elif wu.status == "in_progress":
+            interrupted.append(wu)
+        elif any(d in abandoned_ids for d in (wu.depends_on or [])):
+            waiting_on_abandoned.append(wu)
+        else:
+            other.append(wu)
+
+    cause_ids = {wu.wu_id for wu in blocked + interrupted + waiting_on_abandoned}
+    lines = [f"\nGate {gate_number} halted: {len(stranded)} work unit(s) "
+             f"never became ready."]
+
+    for wu in blocked:
+        reason = ""
+        try:
+            fm, _ = read_frontmatter(wu.file)
+            reason = fm.get("escalation_reason") or ""
+        except OSError:
+            pass
+        detail = f" ({reason})" if reason else ""
+        lines.append(
+            f"\n  {wu.wu_id} is blocked_human{detail}. Fix the cause, then "
+            f"re-arm it with /unblock-wu and re-run.")
+        lines.append(_downstream_line(wu.wu_id, other, cause_ids))
+
+    for wu in interrupted:
+        lines.append(
+            f"\n  {wu.wu_id} was left in_progress by an interrupted run — a "
+            f"driver killed mid-attempt does not move it to an outcome. Reset "
+            f"it to pending with attempts: 0 and re-run.")
+        lines.append(_downstream_line(wu.wu_id, other, cause_ids))
+
+    if waiting_on_abandoned:
+        ids = ", ".join(wu.wu_id for wu in waiting_on_abandoned)
+        blockers = ", ".join(sorted(abandoned_ids))
+        lines.append(
+            f"\n  {ids} depend on an abandoned unit ({blockers}); abandoning a "
+            f"WU strands anything that still depends on it. Fix PLAN.md's "
+            f"dependency graph (or un-abandon the blocking WU) and re-run.")
+
+    unattributed = [wu for wu in other
+                    if not any(d in cause_ids for d in (wu.depends_on or []))]
+    if unattributed and not (blocked or interrupted or waiting_on_abandoned):
+        ids = ", ".join(wu.wu_id for wu in unattributed)
+        lines.append(
+            f"\n  {ids} never became ready and no blocked, interrupted or "
+            f"abandoned dependency explains it. Check PLAN.md's dependency "
+            f"graph.")
+
+    return "".join(line for line in lines if line)
+
+
+def _downstream_line(cause_id: str, others: "list[WorkUnit]",
+                     cause_ids: "set[str]") -> str:
+    """The units waiting behind *cause_id*, named as waiting rather than broken."""
+    behind = [wu.wu_id for wu in others
+              if cause_id in (wu.depends_on or [])]
+    if not behind:
+        return ""
+    return f"\n      Waiting behind it: {', '.join(behind)}."
+
+
+
 def run(
     feature_arg: str | None,
     dry_run: bool,
@@ -11862,15 +11961,13 @@ def run(
                 ))
             return 1
         if stranded:
-            stranded_ids = ", ".join(u.wu_id for u in stranded)
-            print(
-                f"\nGate {gate.number} halted: {len(stranded)} work unit(s) "
-                f"never became ready — {stranded_ids}. This usually means "
-                f"one of their dependencies was abandoned; abandoning a WU "
-                f"strands anything that still depends on it. Fix PLAN.md's "
-                f"dependency graph (or un-abandon the blocking WU) and "
-                f"re-run."
-            )
+            # #3323: name the cause that applies rather than always blaming an
+            # abandoned dependency. `units` is this gate's full set, so the
+            # abandoned ids come from it.
+            print(describe_stranded_units(
+                stranded, gate_number=gate.number,
+                abandoned_ids={u.wu_id for u in units if u.status == "abandoned"},
+            ))
             return 1
 
         if dry_run:
