@@ -147,6 +147,9 @@ NON_JUDGE_MODULES = {
     "gh_features.py": "reads GitHub feature issues; supplies input, judges none",
     "heartbeat.py": "liveness reporting",
     "labels.py": "label registry and provisioning; a projection of a verdict",
+    "learnings_distil.py": "operator surface that ranks LEARNINGS "
+        "entries against the distillate budget and applies a human's "
+        "per-entry decisions; grants no verdict and no gate reads it",
     "learnings_query.py": "reads LEARNINGS.md for planning context",
     "lint_monitoring.py": "lints monitoring.yml, which no arm/close/merge "
         "verdict reads",

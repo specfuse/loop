@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **`python3 -m specfuse.loop.learnings_distil` — an operator surface for the LEARNINGS distillation accept step.** FEAT-2026-0111/T03 built `propose_distilled_learnings` and `apply_distilled_decisions` — a ranked proposal cut at the distillate word budget, and a writer that only writes what a human explicitly accepted — and shipped them with no caller: their only callers were their own tests, so the step existed and nobody could run it. Two steps, deliberately separate. Bare, it ranks the corpus and prints each entry's evidence (cost, reach, matched failure signatures, word count) plus the guard review prompt, and **writes nothing** — read-only by construction rather than convention, since it never touches the output path. With `--apply decisions.json` it applies one object per reviewed entry (`tag`, `action` of accept/edit/reject, `text`), writing only what is accepted or edited and leaving the file byte-identical when nothing is. Neither half prompts or reads stdin, so both are safe headless: a human's judgement arrives as a decisions file rather than as an interactive answer the module could fabricate. Shape follows `learnings_query`, the loop's existing operator-facing module CLI. Note while FEAT-2026-0112 is open: at the binding block's current budget very little fits, so a real run proposes few entries — a fact about the cap, not this surface, and the ranking is worth reading on its own for curating `LEARNINGS.md` itself. (#3315)
+
 ## [0.20.0+umbrella.0.12.2] - 2026-09-14
 
 ### Added
