@@ -137,6 +137,9 @@ NON_JUDGE_MODULES = {
     "adopt_feature.py": "scaffolds a feature folder from a GitHub issue",
     "build_provenance.py": "warns when the running build is not the working "
         "tree's; prints a diagnostic and changes no verdict",
+    "caller_check.py": "reports public symbols whose only callers are "
+        "tests; a hygiene report, grants no verdict and no arm/close/"
+        "merge decision reads it",
     "changelog.py": "parses and stamps CHANGELOG.md; no gate reads it",
     "decisions_format.py": "parses DECISIONS.md into entries; not on the "
         "arm/close/merge judge path — T02/T03 own the lint that reads it",
