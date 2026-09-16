@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An upgrade no longer imports the same core rule twice when a project points at `methodology/rules/`.** Four core-owned rules are written into a repo by two writers at two paths — the loop into `.specfuse/rules/`, the umbrella into `.specfuse/methodology/rules/`. `_backfill_rule_imports` matched only the `@.specfuse/rules/` prefix, so a CLAUDE.md pointed at methodology's copies got the loop's lines re-inserted beside them on the next upgrade and kept **both**; every dispatched session then paid for those rules twice, measured downstream at 3900 words against a 2500-word binding-block cap. A `methodology/rules/<name>.md` import now satisfies `rules/<name>.md`, so the set converges instead of accumulating — which is what the retire/backfill pair exists to do, in that function's own words: make `wire_claude` "converge on `_RULES_BLOCK` instead of only ever growing". The project keeps whichever path it chose; a repo on the default loop paths is byte-unchanged, and a rule absent under *both* paths is still backfilled, since a binding rule that silently stops being loaded is the one failure this function cannot allow. **Which path should own those four rules is not decided here** — that is #3332's open question and specfuse/loop#2270's before it, and the obvious answer is wrong: repointing `_RULES_BLOCK` at `methodology/rules/` breaks a standalone loop install, which writes nothing under that prefix. (#3332)
+
 ## [0.20.1+umbrella.0.12.3] - 2026-09-15
 
 ### Added
