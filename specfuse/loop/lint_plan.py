@@ -495,6 +495,59 @@ def lint_close_verdict_not_predecided(feature_dir: Path) -> list[str]:
     return errs
 
 
+def wu_frontmatter_errors(wfm: dict, wfile: str) -> list[str]:
+    """Lint counterparts for the invariants `load_wu` raises `ValueError` on (#3331).
+
+    `specfuse lint <feature-dir>` is the gate that must exit 0 before arming or
+    dispatching, so a folder it passes must dispatch. It did not check the
+    pairing `load_wu` enforces between `unsandboxed` and `unsandboxed_rationale`,
+    and the failure surfaced as a traceback at `specfuse run` instead of an
+    error at authoring time.
+
+    The report guessed the miss was a class rather than one case. Sweeping
+    `load_wu`'s eight invariants against a folder that lints clean found five
+    with no counterpart: this pairing, plus the type checks on
+    `iterate_on_failure`, `extra_gates`, `prep` and `oracles`. The other three
+    (`effort`, `produces`, `produces_driver_helper`) already exit non-zero, but
+    only incidentally — a scalar there fails YAML parsing before `load_wu`'s own
+    check is reached, so they are left to that rather than double-reported.
+
+    Wording follows the driver's, so an operator who has seen one message
+    recognises the other.
+    """
+    errs: list[str] = []
+
+    if bool(wfm.get("unsandboxed", False)) and not str(
+            wfm.get("unsandboxed_rationale", "") or "").strip():
+        errs.append(
+            f"{wfile}: `unsandboxed: true` requires a non-empty "
+            f"`unsandboxed_rationale` in the same frontmatter. Sandbox-escape "
+            f"is auditable; the rationale is the audit signal."
+        )
+
+    raw_iterate = wfm.get("iterate_on_failure")
+    if raw_iterate is not None and not isinstance(raw_iterate, bool):
+        errs.append(
+            f"{wfile}: `iterate_on_failure` must be a boolean, "
+            f"got {type(raw_iterate).__name__!r}"
+        )
+
+    for key in ("extra_gates", "prep", "oracles"):
+        raw = wfm.get(key)
+        if raw is None:
+            continue
+        if isinstance(raw, str):
+            continue
+        if isinstance(raw, list) and all(isinstance(x, str) for x in raw):
+            continue
+        errs.append(
+            f"{wfile}: `{key}` must be a string or list of strings, "
+            f"got {type(raw).__name__!r}"
+        )
+
+    return errs
+
+
 def read_frontmatter(path: Path) -> tuple[dict, str]:
     lines = path.read_text().splitlines()
     if not lines or not FM.match(lines[0]):
@@ -1926,6 +1979,9 @@ def _lint_impl(feature_dir: Path) -> list[str]:
                     f"{wfile}: invalid effort '{_effort}' — must be one of "
                     f"{sorted(VALID_EFFORT)}"
                 )
+            # #3331: the invariants load_wu raises on, so a folder this lint
+            # passes actually dispatches.
+            errs.extend(wu_frontmatter_errors(wfm, wfile))
             types_in_order.append(wfm.get("type"))
 
             # Dispatchable WUs must have the five mandatory prompt sections
