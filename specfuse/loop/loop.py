@@ -10300,7 +10300,18 @@ def run(
                     f"\n\nFeature: {feature_id}",
                 )
 
-        units = [load_wu(feature_dir, ref) for ref in gate.refs]
+        # #3331: a malformed unit is an authoring error, not a crash. `load_wu`
+        # raises ValueError with a message that already says what is wrong and
+        # why; printing it beats a stack trace whose last frame is a list
+        # comprehension. `specfuse lint` now reports the same invariants, so
+        # this path is the backstop rather than the first notice.
+        try:
+            units = [load_wu(feature_dir, ref) for ref in gate.refs]
+        except ValueError as malformed:
+            print(f"\nGate {gate.number} cannot start: {malformed}")
+            print("Run `specfuse lint` on this feature to see every such "
+                  "problem at once.")
+            return 1
         print(f"== {feature_id} — Gate {gate.number} [{gate.status}] "
               f"({len(units)} work units) ==")
         # #3320: the binding-block budget check had no caller. Reported once per
