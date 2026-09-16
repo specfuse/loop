@@ -315,6 +315,22 @@ def _rule_import_lines() -> list[str]:
     ]
 
 
+def _rule_basename(line: str) -> str:
+    """The rule filename an `@`-import names, whichever directory carries it.
+
+    `@.specfuse/rules/never-touch.md` and
+    `@.specfuse/methodology/rules/never-touch.md` both yield `never-touch.md`,
+    which is what lets `_backfill_rule_imports` treat one as satisfying the
+    other (#3332). Returns "" for a line that is not a rule import, so a
+    project's own `rules-local` entries and its prose are never matched.
+    """
+    stripped = line.strip()
+    for prefix in ("@.specfuse/methodology/rules/", "@.specfuse/rules/"):
+        if stripped.startswith(prefix):
+            return stripped[len(prefix):]
+    return ""
+
+
 def _backfill_rule_imports(existing: str) -> str:
     """Reconcile a project's rule imports with `_RULES_BLOCK`.
 
@@ -342,7 +358,21 @@ def _backfill_rule_imports(existing: str) -> str:
         if ln.strip() not in retired
     ]
     present = {ln.strip() for ln in lines}
-    missing = [ln for ln in _rule_import_lines() if ln not in present]
+    # The same four core-owned rules are written twice into a repo: by the loop
+    # into `.specfuse/rules/` and by the umbrella into
+    # `.specfuse/methodology/rules/` (#3332, and specfuse/loop#2270 before it).
+    # Which path should own them is an open decision and is NOT settled here.
+    # What must hold either way is that a project already importing one does not
+    # get the other inserted beside it: matching on the `rules/` prefix alone
+    # made an upgrade re-add the loop path to a CLAUDE.md pointed at
+    # methodology's, leaving both imported and every dispatched session paying
+    # for those rules twice. That is precisely the growth the retire/backfill
+    # pair exists to prevent — see this function's own docstring.
+    satisfied = {_rule_basename(ln) for ln in present if _rule_basename(ln)}
+    missing = [
+        ln for ln in _rule_import_lines()
+        if ln not in present and _rule_basename(ln) not in satisfied
+    ]
 
     last = max(
         (i for i, ln in enumerate(lines) if ln.strip().startswith("@.specfuse/rules/")),
