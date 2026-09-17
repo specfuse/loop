@@ -9,7 +9,10 @@ Public contract:
   `refused`, `could_not_proceed`, `completed`. No fourth member.
 - `build_invocation(...)` -- given an issue number, a repository, and a working
   directory, returns the argv and prompt text for a headless `fix-bug` session.
-  It returns them; it does not run them.
+  It returns them; it does not run them. The slash command it dispatches is
+  `DEFAULT_COMMAND` -- the plugin-qualified `/specfuse:fix-bug` -- overridable
+  through the `command` keyword for a project whose skill resolves under a
+  different spelling.
 - `classify_outcome(...)` -- given a completed session's result text, returns
   exactly one member of `OUTCOMES`. Fails closed to `could_not_proceed` on
   anything it cannot classify.
@@ -26,6 +29,17 @@ argv this module builds.
 
 OUTCOMES = ("refused", "could_not_proceed", "completed")
 
+#: The slash command this lane dispatches. The skill ships in the
+#: `specfuse@specfuse` plugin, where it is addressed `/specfuse:fix-bug`; the
+#: bare `/fix-bug` resolves only in a repository that carries its own
+#: project-level `.claude/skills/fix-bug/`, which `specfuse upgrade` reports as
+#: unmanaged and which the packaging docs no longer prescribe. Dispatching the
+#: bare form parked 55 triaged bugs on 2026-09-17 -- every one came back
+#: `Unknown command: /fix-bug` and was labelled `needs-human` for a defect that
+#: had nothing to do with it (#3342). A caller whose project-level copy is the
+#: one that resolves passes `command=` rather than editing this default.
+DEFAULT_COMMAND = "/specfuse:fix-bug"
+
 _SAFETY_FLOOR = (
     "Safety floor (binding, not a judgement call): you must NOT merge a pull "
     "request, enable auto-merge, or push to a protected branch under any "
@@ -34,7 +48,8 @@ _SAFETY_FLOOR = (
 )
 
 
-def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="medium"):
+def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="medium",
+                     command=DEFAULT_COMMAND):
     """Build argv and prompt text for a headless `fix-bug` session.
 
     Returns a `(argv, prompt)` tuple. `argv` follows the loop driver's own
@@ -48,7 +63,7 @@ def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="me
         "--effort", effort,
     ]
     prompt = (
-        f"/fix-bug {issue_number}\n\n"
+        f"{command} {issue_number}\n\n"
         f"Repository: {repo}\n"
         f"Working directory: {working_dir}\n"
         f"Issue number: {issue_number}\n\n"
