@@ -651,13 +651,29 @@ def run_agent(
         budget_kwargs = {}
         if pause_marker is not None:
             budget_kwargs["pause_marker"] = pause_marker
+        # #3340: agent-policy.yml declared budgets that nothing read, so a plain
+        # run was uncapped while the policy said otherwise. A flag still wins --
+        # it is the narrower, more deliberate statement for one run.
+        _tokens = agent_policy.resolve_max_tokens(max_tokens, policy_path)
+        _items = agent_policy.resolve_max_items(max_items, policy_path)
+
+        def _source(flag, resolved):
+            if flag is not None:
+                return "flag"
+            return "policy" if resolved is not None else "none"
+
         budget = RunBudget(
             clock=clock,
             max_minutes=max_minutes,
-            max_tokens=max_tokens,
-            max_items=max_items,
+            max_tokens=_tokens,
+            max_items=_items,
             **budget_kwargs,
         )
+        report(agent_policy.describe_budget_sources(
+            max_minutes=(max_minutes, "flag" if max_minutes is not None else "none"),
+            max_tokens=(_tokens, _source(max_tokens, _tokens)),
+            max_items=(_items, _source(max_items, _items)),
+        ))
 
         items_completed = 0
         escalations = []

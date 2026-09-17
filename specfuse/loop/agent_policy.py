@@ -242,6 +242,70 @@ def bug_lane_ci_wait_seconds(path: str | Path | None = None) -> int:
     return minutes * 60
 
 
+def _positive_int_budget(path: "str | Path | None", key: str) -> "int | None":
+    """`budgets.<key>` when it is a usable positive int, else None (#3340).
+
+    Defensive for the same reason `bug_lane_ci_wait_seconds` is: a malformed
+    override must not become a cap. Zero or a negative would end a run before
+    it dispatched anything, and a bool is an int in Python — `max_items: true`
+    would otherwise cap the run at one item.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return None
+    budgets = policy.get("budgets") if isinstance(policy, dict) else None
+    if not isinstance(budgets, dict):
+        return None
+    value = budgets.get(key)
+    if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        return value
+    return None
+
+
+def resolve_max_tokens(flag: "int | None",
+                       path: "str | Path | None" = None) -> "int | None":
+    """The run's token cap: the flag if given, else `budgets.max_tokens_per_run`.
+
+    The flag wins because it is the narrower, more deliberate statement — an
+    operator typing `--max-tokens` for one run should not have to edit the
+    policy file to be heard.
+    """
+    if flag is not None:
+        return flag
+    return _positive_int_budget(path, "max_tokens_per_run")
+
+
+def resolve_max_items(flag: "int | None",
+                      path: "str | Path | None" = None) -> "int | None":
+    """The run's item cap, from the flag or `budgets.max_items_per_day`.
+
+    NOTE THE SEMANTICS, which #3340 flags and this does not fix: the policy key
+    is named *per_day* and is applied here *per run*. Enforcing it across runs
+    within a day needs state that survives a process, which is a feature rather
+    than this fix. Applied per-run it is a strictly tighter bound than the name
+    promises — a day of runs can still exceed it — so it caps the unbounded-run
+    risk without claiming the daily accounting the name implies.
+    """
+    if flag is not None:
+        return flag
+    return _positive_int_budget(path, "max_items_per_day")
+
+
+def describe_budget_sources(**caps) -> str:
+    """One line naming each effective cap and where it came from (#3340).
+
+    A run that is capped and does not say so is only marginally better than one
+    that is not capped: the operator cannot tell which of the two they have.
+    Each value is a `(value, source)` pair, source being `flag`, `policy` or
+    `none`.
+    """
+    parts = []
+    for name, (value, source) in sorted(caps.items()):
+        parts.append(f"{name}={'unbounded' if value is None else value} ({source})")
+    return "budgets: " + ", ".join(parts)
+
+
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:
     """Validate *path* (default ``.specfuse/agent-policy.yml``); return findings.
 
