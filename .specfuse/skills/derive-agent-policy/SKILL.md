@@ -151,6 +151,30 @@ controls:
 1. `preempt` (bool) — do bugs jump the feature queue?
 2. `min_severity` (`low`|`medium`|`high`|`critical`) — floor for the bug lane
    to act automatically.
+2b. `severity_aliases` — **conditional, and PROPOSED rather than asked cold.**
+   Severity is read from a `severity:<value>` label, and a label outside those
+   four values reads as *absent*; with a floor above `low`, an absent severity
+   fails closed and the issue is skipped. So before asking Q2, read the repo's
+   own labels (`gh label list`) and look for `severity:*` labels whose word is
+   not one of the four. If there are none, do not raise this key at all — an
+   absent `severity_aliases` is the normal state. If there are, show the
+   operator the labels you found **with their descriptions**, propose a
+   mapping, and let them correct it:
+
+   ```
+   This repo defines severity:major ("Wrong behavior / missing element") and
+   severity:minor ("Cosmetic / suboptimal"). Neither word is one of the four
+   severity values, so with a floor above `low` the bug lane will skip every
+   issue carrying them. Proposed: major → high, minor → low. Correct?
+   ```
+
+   The mapping is the operator's, never inferred silently: propose from the
+   label's own description and stop for their answer, the same posture as any
+   other asked field. A word already in the vocabulary may not be aliased —
+   the validator reports it as an ERROR, because the vocabulary wins and the
+   alias would never apply. #3349 is the measured case: 22 bug-marked issues
+   in one repo skipped under a `medium` floor because its labels were spelled
+   `major` and `minor`.
 3. `automerge` (`"off"`|`"on"`) — may the bug lane merge without a human
    review?
 
@@ -200,6 +224,9 @@ rules:
   bugs:
     preempt: true                # ASKED — Q1
     min_severity: low            # ASKED — Q2
+    # severity_aliases:          # ASKED — Q2b, ONLY when the repo has
+    #   major: high              # `severity:*` labels outside the four values;
+    #   minor: low               # omit the key entirely otherwise
     automerge: "off"             # ASKED — Q3
     test_paths:                  # PROPOSED from evidence, or shipped default
       - tests/
@@ -259,6 +286,7 @@ rather than draft it.
 ## Asked (no repo evidence exists for these)
 - Q1 preempt → A: <answer>
 - Q2 min_severity → A: <answer>
+- Q2b severity_aliases → A: <answer, or `n/a — no out-of-vocabulary severity labels`>
 - Q3 automerge → A: <answer>
 - Q4 gate_review → A: <answer>
 - Q5 wip_limit → A: <answer>

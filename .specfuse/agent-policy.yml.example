@@ -28,6 +28,18 @@ rules:
   bugs:
     preempt: true                # bool — bugs jump the feature queue when true
     min_severity: low            # low | medium | high | critical
+    # OPTIONAL — what THIS repo's own `severity:*` labels mean, when they are
+    # not spelled the way the four values above are spelled (#3349). Severity
+    # is read from a `severity:<value>` label; a label outside the vocabulary
+    # reads as ABSENT, and with a floor above `low` an absent severity fails
+    # closed, so the issue is skipped. Nothing is inferred — a repo labelling
+    # `severity:major` gets it skipped under a `medium` floor until it says
+    # here what `major` means. Keys are your label words, values must be one
+    # of the four. Aliasing a word that is already a severity value is an
+    # ERROR: the vocabulary wins and the alias would never apply.
+    # severity_aliases:
+    #   major: high
+    #   minor: low
     automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
     max_diff_lines: 150          # OPTIONAL int > 0 — merge-eligibility size cap; defaults to 150
     max_merges_per_day: 3        # OPTIONAL int > 0 — rolling 24h auto-merge cap; defaults to 3
