@@ -13,7 +13,7 @@ returned `[]` no matter what the session wrote, so the presence gate refused
 the WU every attempt with a byte-identical error and spun it to
 `spinning_detected`.
 
-Note the asymmetry this closed: `assert_produces_in_diff` tests literal
+Note the asymmetry this closed: `unmatched_produces` tests literal
 equality *before* falling back to `fnmatch`, so the same bracketed path
 already passed the diff cross-check. The two guards' shared literal/glob
 contract was true only for paths without brackets.
@@ -29,6 +29,23 @@ from tests._loop_loader import load_loop
 from tests._workspace import integration_workspace
 
 loop = load_loop()
+
+
+def _produces_in_diff(wu, touched):
+    """The (ok, summary) shape `assert_produces_in_diff` used to return (#3328).
+
+    That wrapper was superseded by `resolve_produces_refusal` (#3268) and
+    removed; `unmatched_produces` is the shared core both called, and is what
+    ships. These assertions exercise the core directly through this shim.
+    """
+    unmatched = loop.unmatched_produces(wu, touched)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
 
 #: A route path in the shape every bracket-routing framework produces.
 BRACKET_PATH = "src/app/api/jobs/[id]/approve/route.ts"
@@ -178,7 +195,7 @@ class TestBothGuardsAgreeOnBracketPaths(_RestoresCwd):
     def test_diff_cross_check_accepts_the_bracket_path(self):
         """Already true on HEAD via the literal-equality branch; asserted here
         so the pair cannot drift back apart."""
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu([BRACKET_PATH]), [BRACKET_PATH],
         )
         self.assertTrue(ok, summary)
@@ -191,7 +208,7 @@ class TestBothGuardsAgreeOnBracketPaths(_RestoresCwd):
             wu = _make_wu([BRACKET_PATH])
             presence_ok, presence_summary = loop.assert_declared_deliverables(wu)
             self.assertTrue(presence_ok, presence_summary)
-            diff_ok, diff_summary = loop.assert_produces_in_diff(wu, [BRACKET_PATH])
+            diff_ok, diff_summary = _produces_in_diff(wu, [BRACKET_PATH])
             self.assertTrue(diff_ok, diff_summary)
 
 

@@ -28,12 +28,14 @@ from specfuse.loop import caller_check
 
 
 #: Symbols with no in-tree non-test caller when this guard landed (2026-09-15).
+#: `assert_produces_in_diff` left on 2026-09-17 — it was dead rather than
+#: umbrella-reached, and was removed (#3328), which is what this baseline is
+#: for: an entry leaving it is the guard doing its job.
 #: Most are reached from the umbrella repo or by a runner this check cannot see.
 BASELINE = {
     "all_requirements",
     "annotate_if_quiet",
     "append_entry",
-    "assert_produces_in_diff",
     "build_azure_transport",
     "census",
     "code_gate_names",

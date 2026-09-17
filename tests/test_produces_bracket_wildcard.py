@@ -38,6 +38,23 @@ from tests._workspace import integration_workspace
 
 loop = load_loop()
 
+
+def _produces_in_diff(wu, touched):
+    """The (ok, summary) shape `assert_produces_in_diff` used to return (#3328).
+
+    That wrapper was superseded by `resolve_produces_refusal` (#3268) and
+    removed; `unmatched_produces` is the shared core both called, and is what
+    ships. These assertions exercise the core directly through this shim.
+    """
+    unmatched = loop.unmatched_produces(wu, touched)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
+
 _MIXED = "src/app/[id]/*.ts"
 
 
@@ -123,7 +140,7 @@ class TestBothGuardsAgreeOnMixedEntry(_RestoresCwd):
     """Unlike #1181, the diff half failed here too — pin them together."""
 
     def test_diff_cross_check_matches(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu([_MIXED]), ["src/app/[id]/route.ts"],
         )
         self.assertTrue(ok, summary)
@@ -135,11 +152,11 @@ class TestBothGuardsAgreeOnMixedEntry(_RestoresCwd):
             wu = _make_wu([_MIXED])
             presence_ok, presence_summary = loop.assert_declared_deliverables(wu)
             self.assertTrue(presence_ok, presence_summary)
-            diff_ok, diff_summary = loop.assert_produces_in_diff(wu, touched)
+            diff_ok, diff_summary = _produces_in_diff(wu, touched)
             self.assertTrue(diff_ok, diff_summary)
 
     def test_diff_check_still_refuses_an_unmatched_entry(self):
-        ok, _ = loop.assert_produces_in_diff(_make_wu([_MIXED]), ["src/other/a.ts"])
+        ok, _ = _produces_in_diff(_make_wu([_MIXED]), ["src/other/a.ts"])
         self.assertFalse(ok)
 
 

@@ -133,7 +133,7 @@ class TestBoldPreamble(unittest.TestCase):
         self.assertIn("FEAT-2026-0099/T04", joined)
         self.assertIn("src/main/java/Reconciler.java", joined)
         self.assertIn("src/main/**", joined)
-        self.assertIn("assert_produces_in_diff", joined)
+        self.assertIn("produces diff check", joined)
 
 
 class TestProhibitionScoping(unittest.TestCase):

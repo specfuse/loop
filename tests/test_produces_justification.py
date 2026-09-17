@@ -8,7 +8,7 @@
 WU's ``produces:`` list must show a working-tree change, *or the RESULT must
 justify each unchanged path with the command and output showing the
 deliverable already holds*. The driver never read that justification —
-``assert_produces_in_diff`` was diff-only — so an author's prediction of a
+``unmatched_produces`` was diff-only — so an author's prediction of a
 file the unit turned out not to need refused correct work: 20
 ``produces_not_in_diff`` outcomes in one consumer over twelve days, several
 on attempts that had touched fifteen or more files.
