@@ -306,6 +306,84 @@ def describe_budget_sources(**caps) -> str:
     return "budgets: " + ", ".join(parts)
 
 
+#: `SEVERITY_VALUES` as a ranking, lowest first (#3339). The set says which
+#: values are legal; a floor needs to know which are *higher*. Kept beside it
+#: and pinned equal by test, so a value added to one and not the other is a
+#: failure rather than an unfilterable severity.
+SEVERITY_ORDER = ("low", "medium", "high", "critical")
+
+#: Severity is read from a `severity:<value>` label. Nothing defined a source
+#: before #3339: the triage marker carries `category` and `confidence` only.
+SEVERITY_LABEL_PREFIX = "severity:"
+
+
+def severity_from_labels(labels) -> "str | None":
+    """The severity a `severity:<value>` label declares, or None (#3339).
+
+    Only values in `SEVERITY_VALUES` are read. `severity:minor` exists in the
+    wild and is not in the vocabulary; mapping it to `low` would be inventing
+    policy on an operator's behalf, so it reads as absent and the caller's
+    fail-closed rule decides what that means.
+    """
+    for label in labels or ():
+        text = str(label).strip().lower()
+        if text.startswith(SEVERITY_LABEL_PREFIX):
+            value = text[len(SEVERITY_LABEL_PREFIX):].strip()
+            if value in SEVERITY_VALUES:
+                return value
+    return None
+
+
+def meets_severity_floor(severity: "str | None",
+                         floor: "str | None") -> "tuple[bool, str]":
+    """Whether *severity* clears *floor*, and why not when it does not (#3339).
+
+    Two rules, and the second is the one that keeps this safe to ship:
+
+    * **No floor admits everything.** A deployment that never declared
+      `min_severity` behaves exactly as it did, including for unlabelled
+      issues. This change cannot quietly stop an existing lane advertising.
+    * **With a floor, unreadable severity fails closed.** The issue names this
+      as the safe default. It does mean a repo that declares a floor and labels
+      nothing advertises nothing — which is why the refusal carries a reason
+      the run reports, so an empty lane is explained rather than mysterious.
+    """
+    if floor is None:
+        return True, ""
+    if SEVERITY_ORDER.index(floor) == 0:
+        # A floor at the bottom of the vocabulary excludes nothing: no severity
+        # is below `low`. Failing closed on unlabelled issues here would read an
+        # operator's "accept everything" as "accept nothing" -- which is exactly
+        # what it did to this repo's own policy (`min_severity: low`, no
+        # severity labels anywhere) before this branch existed.
+        return True, ""
+    if severity is None:
+        return False, (
+            f"no severity label (floor is {floor}); add a "
+            f"`{SEVERITY_LABEL_PREFIX}<{'|'.join(SEVERITY_ORDER)}>` label"
+        )
+    if SEVERITY_ORDER.index(severity) < SEVERITY_ORDER.index(floor):
+        return False, f"severity {severity} is below the {floor} floor"
+    return True, ""
+
+
+def resolve_min_severity(path: "str | Path | None" = None) -> "str | None":
+    """`rules.bugs.min_severity`, or None when unset or unusable (#3339).
+
+    An unknown value resolves to None rather than to a floor: the validator
+    already reports it as an ERROR, and guessing a floor from a typo would
+    filter on something the operator did not ask for.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return None
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    value = bugs.get("min_severity") if isinstance(bugs, dict) else None
+    return value if value in SEVERITY_VALUES else None
+
+
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:
     """Validate *path* (default ``.specfuse/agent-policy.yml``); return findings.
 
