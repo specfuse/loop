@@ -5,7 +5,7 @@
 """Unified declared-deliverables / produces-in-diff contract (FEAT-2026-0055/T03).
 
 Before this WU, `assert_declared_deliverables` (presence gate, FEAT-2026-0022/T02)
-accepted only literal paths, while `assert_produces_in_diff` (#198) accepted
+accepted only literal paths, while `unmatched_produces` (#198) accepted
 literal paths and fnmatch globs. A directory passed the presence gate (it
 "exists") but always failed the diff cross-check, and a glob passed the diff
 cross-check but never satisfied the literal-only presence gate — a WU author
@@ -28,6 +28,26 @@ from tests._loop_loader import load_loop
 from tests._workspace import integration_workspace
 
 loop = load_loop()
+
+
+def _produces_in_diff(wu, touched):
+    """The (ok, summary) shape `unmatched_produces` used to return (#3328).
+
+    That wrapper was superseded by `resolve_produces_refusal` (#3268) and
+    removed; `unmatched_produces` is the shared core both called, and is what
+    ships. These tests kept its semantics — literal match, fnmatch globs,
+    leading `./` on either side — and were the only coverage of them, so they
+    now exercise the core directly through this shim rather than being deleted
+    with the wrapper.
+    """
+    unmatched = loop.unmatched_produces(wu, touched)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
 
 
 class _RestoresCwd(unittest.TestCase):
@@ -127,22 +147,22 @@ class TestUnifiedSemantics(_RestoresCwd):
 
 
 class TestProducesInDiffUnchanged(unittest.TestCase):
-    """assert_produces_in_diff's own behavior must not shift."""
+    """unmatched_produces' own behavior must not shift."""
 
     def test_literal_match_passes(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/rule.py"]), ["src/rule.py"])
         self.assertTrue(ok, summary)
 
     def test_glob_match_passes(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/*.py"]), ["src/rule.py"])
         self.assertTrue(ok, summary)
 
     def test_directory_entry_never_matches_diff(self):
         """A directory entry was never a valid diff-match form either — the
         diff lists files, never a bare directory path."""
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src"]), ["src/rule.py"])
         self.assertFalse(ok)
         self.assertIn("src", summary)
@@ -157,7 +177,7 @@ class TestAcceptedImpliesAcceptedByDiff(_RestoresCwd):
         wu = _make_wu(produces)
         presence_ok, _ = loop.assert_declared_deliverables(wu)
         if presence_ok:
-            diff_ok, diff_summary = loop.assert_produces_in_diff(wu, touched)
+            diff_ok, diff_summary = _produces_in_diff(wu, touched)
             self.assertTrue(
                 diff_ok,
                 f"{produces} passed declared-deliverables but failed "

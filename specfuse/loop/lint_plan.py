@@ -1387,7 +1387,7 @@ def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
     surface) falls inside its own Do-not-touch section's paths.
 
     A structural deadlock, not a review nit: the WU cannot both deliver the
-    path and honor its own boundary, and `assert_produces_in_diff` only
+    path and honor its own boundary, and `unmatched_produces` only
     catches this AFTER a full dispatch attempt — the cost FEAT-2026-0066/T04
     paid (3 attempts + an operator re-arm) for a conjunction this lint makes
     un-armable up front. See FEAT-2026-0070 (earlier-enforcer-names-the-
@@ -1433,7 +1433,7 @@ def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
                         f"ERROR: {wfile}: {wid} declares produces path "
                         f"{p_s!r}, which its own Do-not-touch section "
                         f"forbids via {pat!r}. This is a structural "
-                        f"deadlock — assert_produces_in_diff would refuse "
+                        f"deadlock — the produces diff check would refuse "
                         f"it after a full dispatch attempt. Drop the path "
                         f"from produces, narrow the Do-not-touch pattern, "
                         f"or add an explicit 'except' carve-out. See "
@@ -1467,7 +1467,7 @@ def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
                                 f"produces_driver_helper surface {surface!r}, "
                                 f"which its own Do-not-touch section forbids "
                                 f"via {pat!r}. This is a structural deadlock — "
-                                f"assert_produces_in_diff would refuse it "
+                                f"the produces diff check would refuse it "
                                 f"after a full dispatch attempt. Drop/narrow "
                                 f"the boundary, or add an explicit 'except' "
                                 f"carve-out. See FEAT-2026-0066/T04, "
@@ -2142,7 +2142,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
             # exception: a genuine root-level deliverable (package.json,
             # pyproject.toml) resolves from the repo root and passes presence in
             # the plain form. Warning there sent authors to './package.json',
-            # which `assert_produces_in_diff` then rejected — the two guards
+            # which the produces diff check then rejected — the two guards
             # were mutually exclusive for a root file. So the warn is suppressed
             # when the bare path IS a real file at the repo root, using the
             # presence gate's own oracle (cwd-relative resolution: the driver

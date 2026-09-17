@@ -7,7 +7,7 @@
 The deliverable-presence gate (FEAT-2026-0022/T02) is presence-only, so a WU
 whose ``produces:`` paths are pre-existing files it was supposed to MODIFY
 passes it without touching them — the FEAT-2026-0049/T06 done-without-
-delivering shape. ``assert_produces_in_diff`` requires every ``produces:``
+delivering shape. ``unmatched_produces`` requires every ``produces:``
 entry to match at least one path in the WU's actual squash diff (literal or
 glob); an unmatched entry refuses the pass with outcome
 ``produces_not_in_diff``, rolls back the squash, and retries within budget.
@@ -28,6 +28,26 @@ from tests._loop_loader import load_loop
 from tests._workspace import integration_workspace
 
 loop = load_loop()
+
+
+def _produces_in_diff(wu, touched):
+    """The (ok, summary) shape `unmatched_produces` used to return (#3328).
+
+    That wrapper was superseded by `resolve_produces_refusal` (#3268) and
+    removed; `unmatched_produces` is the shared core both called, and is what
+    ships. These tests kept its semantics — literal match, fnmatch globs,
+    leading `./` on either side — and were the only coverage of them, so they
+    now exercise the core directly through this shim rather than being deleted
+    with the wrapper.
+    """
+    unmatched = loop.unmatched_produces(wu, touched)
+    if unmatched:
+        return False, (
+            "declared produces path(s) not in this WU's squash diff: "
+            + ", ".join(unmatched)
+        )
+    return True, ""
+
 
 
 def _make_wu(produces: list, wu_type: str = "implementation",
@@ -70,21 +90,21 @@ def _read_events(events_path: Path) -> list:
 
 
 class TestAssertProducesInDiffUnit(unittest.TestCase):
-    """Direct unit tests of assert_produces_in_diff."""
+    """Direct unit tests of unmatched_produces, via the shim above."""
 
     def test_empty_produces_opts_out(self):
-        ok, summary = loop.assert_produces_in_diff(_make_wu([]), [])
+        ok, summary = _produces_in_diff(_make_wu([]), [])
         self.assertTrue(ok)
         self.assertEqual(summary, "")
 
     def test_literal_match_passes(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/rule.py"]), ["src/rule.py", "docs/GATE-02.md"])
         self.assertTrue(ok)
         self.assertEqual(summary, "")
 
     def test_glob_match_passes(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/*.py"]), ["src/rule.py"])
         self.assertTrue(ok)
         self.assertEqual(summary, "")
@@ -92,13 +112,13 @@ class TestAssertProducesInDiffUnit(unittest.TestCase):
     def test_untouched_entry_reported(self):
         """The T06 shape: produces names an existing file, the diff touches
         only gate docs — the entry must be named in the refusal."""
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/rule.py"]), ["docs/GATE-02.md"])
         self.assertFalse(ok)
         self.assertIn("src/rule.py", summary)
 
     def test_all_unmatched_entries_named(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["src/rule.py", "src/flags.py"]), ["docs/GATE-02.md"])
         self.assertFalse(ok)
         self.assertIn("src/rule.py", summary)
@@ -115,27 +135,27 @@ class TestAssertProducesInDiffDotSlash(unittest.TestCase):
     """
 
     def test_dot_slash_entry_matches_bare_touched_path(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["./package.json"]), ["package.json"])
         self.assertTrue(ok, summary)
         self.assertEqual(summary, "")
 
     def test_bare_entry_matches_dot_slash_touched_path(self):
         """Normalization is symmetric — neither side's spelling decides."""
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["package.json"]), ["./package.json"])
         self.assertTrue(ok, summary)
         self.assertEqual(summary, "")
 
     def test_dot_slash_glob_matches(self):
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["./src/*.py"]), ["src/rule.py"])
         self.assertTrue(ok, summary)
 
     def test_dot_slash_entry_still_reported_when_untouched(self):
         """Normalization must not weaken the check: a `./` entry the diff
         never touched still fails, named in its original spelling."""
-        ok, summary = loop.assert_produces_in_diff(
+        ok, summary = _produces_in_diff(
             _make_wu(["./package.json"]), ["docs/GATE-02.md"])
         self.assertFalse(ok)
         self.assertIn("./package.json", summary)

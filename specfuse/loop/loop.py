@@ -843,7 +843,7 @@ class WorkUnit:
     evidence: str = ""
     # INTERNAL, never frontmatter: the parsed RESULT block of the attempt
     # `execute_unit_attempt` just ran, so guards that fire after the squash
-    # (`assert_produces_in_diff`'s site in run()) can read what the agent
+    # (`resolve_produces_refusal`'s site in run()) can read what the agent
     # claimed — the per-path `produces_unchanged:` justification the contract
     # promises to honour (#3268). None until a session has run.
     result_block: "dict | None" = None
@@ -9620,7 +9620,7 @@ def produces_is_glob(path: str) -> bool:
     """True when *path* should be matched as a glob rather than a literal.
 
     One rule, so `assert_declared_deliverables`' presence check and
-    `assert_produces_in_diff`'s cross-check classify an entry identically —
+    `resolve_produces_refusal`'s cross-check classify an entry identically —
     the unified literal/glob contract (FEAT-2026-0055/T03) claims they do,
     and for a bracketed path they did not: `glob.glob` read `[id]` as a
     character class and returned nothing however the file was spelled on
@@ -9683,7 +9683,7 @@ def produces_shape_error(path: str) -> "str | None":
             f"declared deliverable is a directory: {path} — directories "
             "are not valid produces: entries under the unified "
             "literal/glob contract (a directory always passed presence "
-            "while failing assert_produces_in_diff's diff match); declare "
+            "while failing the produces diff match); declare "
             "the specific file(s) or a glob instead"
         )
     return None
@@ -9710,7 +9710,7 @@ def assert_produces_shape(wu: WorkUnit) -> tuple[bool, str]:
 
 def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     """Deliverable-presence gate (FEAT-2026-0022/T02), unified with
-    ``assert_produces_in_diff``'s literal/glob contract (FEAT-2026-0055/T03).
+    ``unmatched_produces``' literal/glob contract (FEAT-2026-0055/T03).
 
     Returns ``(True, "")`` when ``wu.produces`` is empty — the opt-out: an
     undeclared ``produces:`` means no gate, exactly as ``verify_files_changed``'s
@@ -9723,13 +9723,13 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
       presence gate.
     - **Glob** (contains a glob metacharacter): at least one existing,
       non-empty file must match, via ``glob.glob`` (same pattern syntax
-      ``assert_produces_in_diff`` matches against the squash diff with
+      ``unmatched_produces`` matches against the squash diff with
       ``fnmatch.fnmatch``, so a pattern that satisfies one satisfies the other).
 
     A path that is, or resolves to, a directory is refused outright with an
     ``ERROR``-worthy message naming the unified contract: directories were
     never valid produces: entries (a directory always passed this presence
-    gate while failing ``assert_produces_in_diff``'s diff match — the
+    gate while failing ``unmatched_produces``' diff match — the
     literal-vs-glob split this WU exists to close); the refusal now says why
     instead of silently passing one gate and failing the other.
 
@@ -9766,35 +9766,6 @@ def assert_declared_deliverables(wu: WorkUnit) -> tuple[bool, str]:
     return True, ""
 
 
-def assert_produces_in_diff(
-    wu: WorkUnit, touched: list[str],
-) -> tuple[bool, str]:
-    """Cross-check declared ``produces:`` entries against the squash diff (#198).
-
-    ``assert_declared_deliverables`` is presence-only, so a WU whose
-    ``produces:`` paths are pre-existing files it was supposed to MODIFY passes
-    it without touching them — the FEAT-2026-0049/T06 shape: ``done`` touching
-    only gate docs while both declared src/main deliverables (existing files)
-    sat unchanged. Every ``produces:`` entry must match at least one path in
-    *touched* (the squash's changed-path list), literally or as a glob.
-    Opt-out mirrors the presence gate: empty ``produces:`` never fires.
-    Returns (False, summary) naming every unmatched entry.
-
-    A leading ``./`` is stripped from both sides before comparing (#259).
-    ``git diff --name-only`` emits repo-root paths bare (``package.json``), so
-    a ``produces:`` entry spelled ``./package.json`` matched nothing even when
-    the WU genuinely edited that file — it failed identically every attempt and
-    spun to a ``spinning_detected`` block. Both spellings name the same path;
-    neither side's spelling should decide the outcome. Unmatched entries are
-    still reported in the author's original spelling.
-    """
-    unmatched = unmatched_produces(wu, touched)
-    if unmatched:
-        return False, (
-            "declared produces path(s) not in this WU's squash diff: "
-            + ", ".join(unmatched)
-        )
-    return True, ""
 
 
 def unmatched_produces(wu: WorkUnit, touched: list[str]) -> list[str]:

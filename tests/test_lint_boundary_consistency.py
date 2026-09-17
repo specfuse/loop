@@ -125,7 +125,7 @@ class TestProducesBoundary(unittest.TestCase):
         self.assertIn("FEAT-2026-0099/T04", joined)
         self.assertIn("src/main/Foo.java", joined)
         self.assertIn("src/main/**", joined)
-        self.assertIn("assert_produces_in_diff", joined)
+        self.assertIn("produces diff check", joined)
 
     def test_carveout_except_suppresses_match(self):
         """0066/T04's re-armed body: an explicit 'except' carve-out on the
@@ -174,7 +174,7 @@ class TestProducesBoundary(unittest.TestCase):
         self.assertIn("ERROR", joined)
         self.assertIn("produces_driver_helper", joined)
         self.assertIn("src/main/Helper.java", joined)
-        self.assertIn("assert_produces_in_diff", joined)
+        self.assertIn("produces diff check", joined)
 
     def test_clean_when_produces_outside_do_not_touch(self):
         """produces path outside the Do-not-touch pattern -> no ERROR (the
