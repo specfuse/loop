@@ -42,7 +42,7 @@ import inspect
 import subprocess
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence
 
@@ -222,6 +222,84 @@ class RunSummary:
     #: #3179 reported -- is a finished fix whose only trace is a console line
     #: about a branch belonging to a different issue.
     wip_refs: tuple = ()
+    #: Issue numbers that gained a `bug` triage marker during this run and
+    #: were never dispatched (#3338). The refresh below normally empties this
+    #: -- a bug triaged at item 3 is dispatched at item 4 -- so a non-empty
+    #: value means the run ended first (a cap, a pause) or the refresh could
+    #: not read the listing. Either way the operator needs to be told to
+    #: re-run, because a triage-only run otherwise looks like a bug lane that
+    #: declined everything.
+    newly_triaged_bugs_undispatched: tuple = ()
+
+
+def _bug_marked_numbers(snapshot: AgentSnapshot) -> set:
+    """Issue numbers whose body carries a `bug` triage marker right now."""
+    return {issue.number for issue in snapshot.issues if issue.triage_category == "bug"}
+
+
+def _refresh_snapshot(
+    previous: AgentSnapshot,
+    *,
+    runner: Callable,
+    repo: str,
+    policy_path: Optional[str],
+    features_root: Optional[Path],
+    report: Callable[[str], None],
+) -> AgentSnapshot:
+    """Re-gather the snapshot between items, keeping any section a fresh read
+    could not produce (#3338).
+
+    The run used to gather once, before the loop, and hand that one value to
+    every provider on every pass. That made a provider's output invisible to
+    the next provider within the same run: `TriageProvider.execute` writes a
+    `bug` marker into an issue body, `BugsProvider.advertise` reads the marker
+    off `snapshot.issues`, and the snapshot between them never moved -- so a
+    run triaged 72 issues, marked 55 of them `bug`, and dispatched the bug
+    lane against none. The same staleness applies to any provider whose work
+    unblocks another's: an answered escalation drops the `needs-human` label
+    the bug lane filters on, and a driver run changes the feature folders
+    `snapshot.features` was read from.
+
+    The snapshot is still a value the selector reads rather than a set of
+    calls it issues -- the refresh happens BETWEEN iterations, so within one
+    `_select_next` nothing moves underneath it.
+
+    **A failed section keeps its previous contents rather than blanking.**
+    `gather_snapshot` reports an unreadable section as empty with an error
+    set, which is the right shape for a run's opening read and exactly the
+    wrong one mid-run: a transient `gh` failure would silently retire every
+    remaining item in a lane as "drained". So a section that errors here and
+    did not error before is carried forward from the previous snapshot and
+    the failure is reported.
+    """
+    try:
+        fresh = gather_snapshot(
+            runner,
+            repo,
+            policy_path=policy_path,
+            features_root=features_root,
+        )
+    except Exception as exc:  # noqa: BLE001 - a refresh must never end a run
+        report(
+            f"snapshot refresh failed — {type(exc).__name__}: {exc} "
+            f"(the previous snapshot still stands)"
+        )
+        return previous
+
+    carried = {}
+    for section, error_field, value_field in (
+        ("issues", "issues_error", "issues"),
+        ("PRs", "prs_error", "prs"),
+    ):
+        fresh_error = getattr(fresh, error_field)
+        if fresh_error and not getattr(previous, error_field):
+            report(
+                f"snapshot refresh: {section} unreadable — {fresh_error} "
+                f"(the previous listing still stands)"
+            )
+            carried[value_field] = getattr(previous, value_field)
+            carried[error_field] = getattr(previous, error_field)
+    return replace(fresh, **carried) if carried else fresh
 
 
 def _resolve_bugs_preempt(policy_path: Optional[str]) -> bool:
@@ -675,10 +753,17 @@ def run_agent(
             max_items=(_items, _source(max_items, _items)),
         ))
 
+        # #3338: what was already marked `bug` before any item ran. The
+        # difference against the final snapshot is what this run's own triage
+        # produced, which is what the summary owes the operator when the run
+        # ends before dispatching it.
+        bugs_marked_at_start = _bug_marked_numbers(snapshot)
+
         items_completed = 0
         escalations = []
         wip_refs = []
         handled_ids = set()
+        snapshot_stale = False
         disabled_providers: set = set()
         unisolated_providers: set = set()
         stop_reason = STOP_DRAINED
@@ -700,6 +785,17 @@ def run_agent(
             if not budget.may_start_next_item():
                 stop_reason = STOP_CAP
                 break
+
+            if snapshot_stale:
+                snapshot = _refresh_snapshot(
+                    snapshot,
+                    runner=runner,
+                    repo=repo,
+                    policy_path=policy_path,
+                    features_root=features_root,
+                    report=report,
+                )
+                snapshot_stale = False
 
             action, a, b = _select_next(
                 providers,
@@ -740,6 +836,12 @@ def run_agent(
                 report=report,
                 unisolated=unisolated_providers,
             )
+            # The item ran; whatever it changed in the repo is not in the
+            # snapshot the next pass would otherwise select from. Set here
+            # rather than on the success path so a failed or escalated item --
+            # both of which can still have written labels, comments or an
+            # escalation issue before stopping -- refreshes too.
+            snapshot_stale = True
             if tree is not None and tree.wip_ref:
                 wip_refs.append(tree.wip_ref)
             if failure is not None:
@@ -802,6 +904,41 @@ def run_agent(
                     f"{reason}"
                 )
 
+        # A run that stopped on a cap or a pause broke out of the loop before
+        # the top-of-iteration refresh, so the snapshot in hand is the one the
+        # last item already invalidated. Refresh once here, or the count below
+        # is computed against a view that predates this run's own triage and
+        # reports nothing outstanding when the whole point is that something
+        # is.
+        if snapshot_stale:
+            snapshot = _refresh_snapshot(
+                snapshot,
+                runner=runner,
+                repo=repo,
+                policy_path=policy_path,
+                features_root=features_root,
+                report=report,
+            )
+            snapshot_stale = False
+
+        # #3338: a bug this run marked and never dispatched. With the refresh
+        # above in place the usual answer is none -- the marker is written at
+        # one item and dispatched at the next -- so a non-empty set means the
+        # run ran out of budget or the listing went unreadable, and the
+        # operator has to be told rather than left reading a triage-only run
+        # as a bug lane that declined everything.
+        newly_triaged = sorted(
+            number
+            for number in _bug_marked_numbers(snapshot) - bugs_marked_at_start
+            if f"bug-{number}" not in handled_ids
+        )
+        if newly_triaged:
+            report(
+                f"{len(newly_triaged)} issue(s) newly triaged as bug and not "
+                f"dispatched in this run — re-run to fix them: "
+                + ", ".join(f"#{number}" for number in newly_triaged)
+            )
+
         report(
             f"run finished — {stop_reason} after "
             f"{budget.elapsed_minutes:.2f} minutes"
@@ -815,6 +952,7 @@ def run_agent(
             tokens_spent=budget.tokens_spent,
             escalations=tuple(escalations),
             wip_refs=tuple(wip_refs),
+            newly_triaged_bugs_undispatched=tuple(newly_triaged),
         )
     finally:
         lock_fd.close()
@@ -835,6 +973,14 @@ def _format_summary(summary: RunSummary) -> str:
     for ref in summary.wip_refs:
         lines.append(
             f"    uncommitted work committed on: {ref} (git show {ref})"
+        )
+    if summary.newly_triaged_bugs_undispatched:
+        numbers = ", ".join(
+            f"#{number}" for number in summary.newly_triaged_bugs_undispatched
+        )
+        lines.append(
+            f"    {len(summary.newly_triaged_bugs_undispatched)} newly triaged "
+            f"as bug, not dispatched — re-run to fix them: {numbers}"
         )
     return "\n".join(lines)
 
