@@ -10,7 +10,7 @@ feature folder, the WU file, the event log, the branch, and the commit history.
 This rule defines the format, the surfaces the ID must appear on, how the next ID
 is chosen, and what to do when you see — or are about to produce — a malformed one.
 
-`methodology.md` §1 (the gate-cycle canonical, in this shared substrate set) is
+The loop's `docs/methodology.md` §1 (the gate-cycle canonical, owned by the loop) is
 normative on the correlation-ID scheme; this file is the operational reference
 every session reads before emitting an ID.
 
