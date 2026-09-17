@@ -27,9 +27,23 @@ from specfuse.agent.drafting_answers import AnswerGateResult, OUTCOME_FALLBACK
 from specfuse.agent.invoke import build_claude_argv
 from specfuse.loop.loop import parse_result_block
 
-__all__ = ("DraftingInvokeError", "build_invocation", "read_result")
+__all__ = (
+    "DraftingInvokeError",
+    "DEFAULT_COMMAND",
+    "build_invocation",
+    "read_result",
+)
 
 _DEFAULT_WORKING_DIR = "."
+
+#: The slash command this lane dispatches. The skill ships in the
+#: `specfuse@specfuse` plugin, where it is addressed `/specfuse:draft-feature`;
+#: the bare `/draft-feature` resolves only in a repository carrying its own
+#: project-level `.claude/skills/draft-feature/`. Same defect, same lane shape
+#: as `autofix_invoke.DEFAULT_COMMAND` -- see #3342, where the bare spelling
+#: made every dispatched item fail with `Unknown command`. A caller whose
+#: project-level copy is the one that resolves passes `command=`.
+DEFAULT_COMMAND = "/specfuse:draft-feature"
 
 
 class DraftingInvokeError(Exception):
@@ -44,9 +58,10 @@ def build_invocation(
     working_dir: str = _DEFAULT_WORKING_DIR,
     model: str = "sonnet",
     effort: str = "medium",
+    command: str = DEFAULT_COMMAND,
 ):
-    """Build argv and prompt text for a headless `/draft-feature` session
-    against one `draft_ready` answer gate result.
+    """Build argv and prompt text for a headless `/specfuse:draft-feature`
+    session against one `draft_ready` answer gate result.
 
     Returns a `(argv, prompt)` tuple; runs nothing. Raises
     `DraftingInvokeError` if `gate_result.outcome` is `OUTCOME_FALLBACK` --
@@ -76,7 +91,7 @@ def build_invocation(
         assumption_lines = "(none -- every question was answered)"
 
     prompt = (
-        f"/draft-feature {feature_id}\n\n"
+        f"{command} {feature_id}\n\n"
         f"Working directory: {working_dir}\n\n"
         "The interview's answer gate has already run and returned "
         "draft_ready. Every question's effective answer -- given or "
