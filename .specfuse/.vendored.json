@@ -1,7 +1,7 @@
 {
-  "rules/correlation-ids.md": "5657a0959d0a3c66b87f46cca9220f31836e685dea33ad09f0d9b488b09e144f",
-  "rules/never-touch.md": "60d590668cffeb759d7706d927e85e2d7d11b8aaacc648741a54de20faf3bfc2",
-  "rules/security-boundaries.md": "c6d4cdeb4aa1dfa16eca295bc07d5899e90155eef3d5fed57d1ad9338fc7e7e6",
+  "rules/correlation-ids.md": "2b1fc7fd7ea7f84ec58cbf76653a424cec4bcc33d5815906881483b70bd1c7de",
+  "rules/never-touch.md": "29ab8df55275c1874004ba263cb4d89a4e438a9d679fac867803d1d1411e98a6",
+  "rules/security-boundaries.md": "0f7a6d6afa520214a483929ec949c3558ac71b5c9298b955c1196646c908130c",
   "rules/verification-discipline.md": "c005663ea5417840980df4ea98dc6d788e98119bbe0195178d13a2d0799c7771",
   "schemas/event.schema.json": "e5767027863eeb428b85a01b6cbfb368b6a45bb5fa4866533e362b6bb0b7ee5a",
   "schemas/events/initiative_created.schema.json": "961bd517d1e7594ff0820fdfb466adcc6f413f156465835485eba1a267fed233",

@@ -7,10 +7,12 @@ single-repo with a driver script; the orchestrator runs it multi-repo with
 agents and a polling loop — but the *concepts* defined here mean the same thing
 on both surfaces.
 
-> **Authoring note.** While the gate cycle is being proven, the loop is its
-> near-term author: the loop runs real features first, and what it learns
-> revises these contracts before they are folded into the orchestrator's frozen
-> baselines. See [`concepts/architecture-addendum-gates-and-iterative-planning.md`](concepts/architecture-addendum-gates-and-iterative-planning.md)
+> **Ownership.** This document is owned by the loop (specfuse/specfuse#137).
+> Core carried a copy that had become a stale snapshot of this one — no lines of
+> its own, and wrong wherever this text had since been corrected — and deletes
+> it in favour of linking here. The loop runs real features first, and what it
+> learns revises these contracts; the orchestrator's frozen baselines follow
+> this document rather than the other way round. See [`concepts/architecture-addendum-gates-and-iterative-planning.md`](concepts/architecture-addendum-gates-and-iterative-planning.md)
 > for how the cycle maps onto the orchestrator's state machine and agent roles.
 
 ---
