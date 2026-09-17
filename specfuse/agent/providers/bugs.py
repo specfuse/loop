@@ -27,7 +27,12 @@ from specfuse.agent.run import (
     _default_runner,
 )
 from specfuse.agent.state import AgentSnapshot
-from specfuse.loop.agent_policy import bug_lane_ci_wait_seconds
+from specfuse.loop.agent_policy import (
+    bug_lane_ci_wait_seconds,
+    meets_severity_floor,
+    resolve_min_severity,
+    severity_from_labels,
+)
 from specfuse.loop.bug_lane import REASON_CI_PENDING
 from specfuse.loop.bug_lane_run import (
     OUTCOME_AUTOMERGE_OFF,
@@ -615,21 +620,40 @@ class BugsProvider:
         working_dir: str = ".",
         policy_path: Any = None,
         now: Optional[float] = None,
+        report: Optional[Callable[[str], None]] = None,
     ):
         self._repo = repo
         self._runner = runner
         self._working_dir = working_dir
         self._policy_path = policy_path
         self._now = now
+        # Optional so every existing construction site keeps working; a
+        # severity skip with nowhere to report is dropped rather than raising
+        # (#3339). run() passes its own reporter.
+        self._report = report or (lambda _message: None)
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         items = []
+        # #3339: `rules.bugs.min_severity` was validated and read by nothing, so
+        # a declared floor did not stop `/fix-bug` dispatching on minor issues.
+        # Resolved once per advertise rather than per issue -- the policy does
+        # not change mid-pass, and re-reading it per issue would make an empty
+        # lane cost one file read per open issue.
+        floor = resolve_min_severity(self._policy_path)
         for issue in snapshot.issues:
             if issue.triage_category != "bug":
                 continue
             if _HUMAN_OWNED_LABELS.intersection(issue.labels or ()):
                 continue
             if _has_open_pr(snapshot, issue.number):
+                continue
+            ok, why = meets_severity_floor(
+                severity_from_labels(issue.labels), floor)
+            if not ok:
+                # Reported, not silent: with a floor set and nothing labelled,
+                # the lane advertises nothing, and an operator needs to see why
+                # rather than conclude the lane is broken.
+                self._report(f"bug #{issue.number} skipped — {why}")
                 continue
             items.append(
                 ActionItem(

@@ -877,6 +877,9 @@ def default_providers(
             repo=repo,
             runner=runner,
             policy_path=policy_path,
+            # #3339: a severity skip must reach the operator, or a lane that
+            # advertises nothing looks broken rather than filtered.
+            report=reporter,
         ),
         FeatureProvider(
             repo=repo,
