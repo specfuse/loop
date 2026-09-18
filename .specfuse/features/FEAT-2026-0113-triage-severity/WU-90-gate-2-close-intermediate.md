@@ -1,14 +1,17 @@
 ---
 id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 4.50
 auto_close_disabled: true
 oracle_env: macos_local
 oracles:
-  - recent-commits
-  - diff-stat
+  # A verification.yml SET name, not a gate name (docs/methodology.md §2,
+  # `oracles` — "a verification.yml set run before dispatch"). The set is
+  # `oracles:` and it holds `recent-commits` and `diff-stat`; naming the
+  # gate instead halted this unit pre-dispatch as a CONFIGURATION ERROR.
+  - oracles
 duration_seconds: 0.003
 ---
 
