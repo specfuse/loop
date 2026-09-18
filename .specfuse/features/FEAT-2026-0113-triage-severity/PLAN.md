@@ -140,6 +140,9 @@ gates:
       - id: FEAT-2026-0113/T07H
         file: WU-07H-console-script-provenance.md
         depends_on: [FEAT-2026-0113/T07]
+      - id: FEAT-2026-0113/T08H
+        file: WU-08H-limit-bounds-candidates.md
+        depends_on: [FEAT-2026-0113/T08, FEAT-2026-0113/T10]
       - id: FEAT-2026-0113/T09
         file: WU-09-backfill-write-path.md
         depends_on: [FEAT-2026-0113/T07H, FEAT-2026-0113/T08]
@@ -153,7 +156,7 @@ gates:
         depends_on: [FEAT-2026-0113/T10]
       - id: FEAT-2026-0113/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: [FEAT-2026-0113/T07H, FEAT-2026-0113/T07, FEAT-2026-0113/T08, FEAT-2026-0113/T09, FEAT-2026-0113/T10, FEAT-2026-0113/T11]
+        depends_on: [FEAT-2026-0113/T08H, FEAT-2026-0113/T07H, FEAT-2026-0113/T07, FEAT-2026-0113/T08, FEAT-2026-0113/T09, FEAT-2026-0113/T10, FEAT-2026-0113/T11]
 ```
 
 ## Notes
