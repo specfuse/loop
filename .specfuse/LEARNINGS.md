@@ -4490,3 +4490,46 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   assertions it is permitted to replace, and the close must diff the shared file between the two
   units' commits rather than trusting "extends, does not rewrite" — that sentence is a wish, not
   a guard. A shared `produces:` entry is the signal; there is no other.
+
+- [FEAT-2026-0113/G3-CLOSE] **A walking skeleton is deleted as a *unit*, not as a symbol, and a
+  public-symbol ratchet cannot tell you when you have finished.** Gate 3's tracer bullet was one
+  public function (`backfill_severity`) plus two private helpers it alone used (`_find_issue`,
+  `_STUB_SEVERITY`). The caller ratchet failed the once-per-gate broad run on the public one, a
+  hygiene unit was inserted to remove it, that unit checked coverage properly before deleting
+  (#3328's ruling) and removed exactly what the ratchet named — and left both private helpers
+  behind, dead, in the shipped module. Nothing can catch that: `caller_check` reports public
+  symbols whose only callers are tests, by design, so a private helper orphaned by a deletion is
+  invisible to it, and coverage stayed above its floor because dead code is simply never
+  executed. **Drafting rule:** when a unit's job is "remove the tracer bullet", its criteria name
+  the *whole* skeleton — every symbol the walking-skeleton unit introduced and no later unit
+  adopted — and assert each one's absence, rather than inheriting the scope from whatever the
+  ratchet happened to flag. The tracer-bullet unit is where that list should be written down, at
+  the moment it is still obvious which symbols are scaffolding.
+
+- [FEAT-2026-0113/G3-CLOSE] **A criterion whose claim is function-scoped and whose oracle is
+  module-scoped passes or fails for reasons unrelated to the claim.** T09's criterion 4 read "the
+  write path neither lists nor classifies" and proved it with `grep -c '"issue", "list"'` over the
+  whole file. The write path genuinely neither lists nor classifies; the grep returned `1`
+  anyway, because a sibling function introduced by an earlier unit in the same gate sat next door
+  in the same module. The criterion was recorded green by the unit that ran it and measured red by
+  the close, and neither reading tells you anything about the write path. **Drafting rule:** scope
+  the oracle to the thing the claim is about — a grep bounded to the function body, an argv
+  assertion over the call sequence the function actually issues, or an import-graph check — and
+  reserve whole-file greps for whole-file claims ("this module defines the classifier exactly
+  once"). A file-scoped grep in a module more than one unit writes to is measuring the gate's
+  drafting order, not the code.
+
+- [FEAT-2026-0113/G3-CLOSE] **An authorised, coverage-checked deletion can still hollow out the
+  gate's own `feature_oracle`.** Gate 2's lesson was the unauthorised case: a later unit silently
+  deleted an earlier unit's assertions and nothing noticed. Gate 3 did everything that lesson
+  asks — the deletion was its own dispatched unit, its body named the surviving assertion, its
+  criteria required that survivor to be *shown running* rather than assumed — and the gate's
+  `feature_oracle` still ended up passing on two structural tests, with the end-to-end half of the
+  milestone its own `GATE-NN.md` declares it drives no longer asserted anywhere in that module.
+  The authorisation asked "is this behaviour covered somewhere?", which is the right question for
+  deleting a test and the wrong one for deleting *from the module a `feature_oracle` names*.
+  **Drafting rule:** a unit that edits or deletes tests in the module a gate's `feature_oracle`
+  points at carries one extra criterion — after this unit, the `feature_oracle` still asserts the
+  gate's Definition of done, named clause by clause — and the close re-reads the oracle's surviving
+  test list against that definition rather than only reading its exit code. A green oracle is not
+  evidence that the oracle still asks the question.

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0113/G3-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
@@ -12,6 +12,16 @@ oracles:
   # CONFIGURATION ERROR; the set is `oracles`, holding recent-commits and
   # diff-stat.
   - oracles
+model: opus
+effort: high
+gate_set: plannext
+verdict: not_met
+driver_version: 0.20.1
+started_at: 2026-09-18T12:00:12.151470+00:00
+duration_seconds: 1089.082
+cost_usd: 9.523845
+input_tokens: 146
+output_tokens: 81823
 ---
 
 # G3-CLOSE — terminal close

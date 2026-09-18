@@ -26,3 +26,5 @@
 - **FEAT-2026-0113/T10**: Added run_backfill (T10) to specfuse/agent/severity_backfill.py -- rubric read once, each candidate classified via triage_invoke.build_invocation/classify_severity, writes only under apply=True via apply_severity_backfill (T09) -- and rewired the CLI (--repo/--limit/--apply, no issue arg) to drive it; new tests/test_severity_backfill_run.py covers the run shape.
 - **FEAT-2026-0113/T08H**: attempt 1 outcome=passed
 - **FEAT-2026-0113/T10H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/G3-CLOSE**: Terminal close for FEAT-2026-0113 gate 3 — 37 criteria re-verified fresh (36 pass, T09#4 fail), the 31-stranded-issues question answered "reachable, not routable" on T11's live evidence, and three findings recorded with follow-ups.
+  - note: The gate's `feature_oracle` exits 0 while asserting only two structural tests; a green oracle is not evidence the oracle still asks the gate's declared question. Any future unit editing tests in a `feature_oracle`'s module should re-read the surviving test list against the gate's Definition of done.
