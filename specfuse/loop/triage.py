@@ -26,7 +26,7 @@ import re
 from typing import Callable, Optional
 
 from specfuse.loop.agent_policy import SEVERITY_LABEL_PREFIX
-from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
+from specfuse.loop.escalation import CATEGORY_LABELS, NEEDS_HUMAN_LABEL
 from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, has_finding_marker
 
 # Closed. A sixth category is a scope change, not a code change -- see
@@ -349,3 +349,59 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
         row["already_structured"] = has_finding_marker(body)
         untriaged.append(row)
     return untriaged
+
+
+def list_severity_backfill_candidates(
+    runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT
+) -> list:
+    """Return already-marked, severity-less open issues a backfill run may
+    amend.
+
+    The inverse of `list_untriaged`'s exclusion: a marked issue is normally
+    done and skipped, but one whose marker carries no `severity=` field is
+    exactly what a backfill exists to touch. Reuses the exclusions the normal
+    triage path already applies rather than re-deriving them -- a harvester
+    finding (`has_finding_marker`) and an agent-authored escalation (any
+    label in `escalation.CATEGORY_LABELS`) are both left alone. An issue
+    whose marker names a category outside `CATEGORIES`, carries no marker at
+    all, or already carries `severity=` is not a candidate.
+    """
+    issues = _list_open_issues(runner, repo, limit=limit)
+    candidates = []
+    for issue in issues:
+        body = issue.get("body") or ""
+        fields = parse_marker_fields(body)
+        if fields is None:
+            continue
+        if fields.get("severity"):
+            continue
+        category = fields.get("category")
+        if category not in CATEGORIES:
+            continue
+        if has_finding_marker(body):
+            continue
+        existing_labels = {label.get("name") for label in issue.get("labels") or []}
+        if existing_labels & CATEGORY_LABELS:
+            continue
+        candidates.append(issue)
+        if len(candidates) >= limit:
+            break
+    return candidates
+
+
+def amend_marker_severity(body: str, severity: str) -> str:
+    """Replace `body`'s existing triage marker in place with one that also
+    carries `severity`, keeping `category=`/`confidence=` unchanged.
+
+    Returns `body` unchanged, by string equality, when it carries no marker
+    or its marker already carries a `severity=` field -- there is nothing to
+    amend in either case. Rendered through `render_marker` rather than a
+    fourth marker literal, so the two template strings stay the only place a
+    marker's shape is spelled out.
+    """
+    fields = parse_marker_fields(body)
+    if fields is None or fields.get("severity"):
+        return body
+    match = _MARKER_RE.search(body)
+    new_marker = render_marker(fields.get("category"), fields.get("confidence"), severity)
+    return body[: match.start()] + new_marker + body[match.end() :]

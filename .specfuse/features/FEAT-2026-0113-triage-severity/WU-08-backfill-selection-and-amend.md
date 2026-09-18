@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/triage.py
   - tests/test_severity_backfill_marker.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:09:04.697210+00:00
+duration_seconds: 104.236
+cost_usd: 0.523399
+input_tokens: 42
+output_tokens: 7321
 ---
 
 # T08 — which issues a backfill may touch, and how a marker is amended
