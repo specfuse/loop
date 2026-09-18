@@ -62,9 +62,8 @@ CATEGORY_LABEL_MAP = {
 }
 
 _MARKER_TEMPLATE = "<!-- specfuse:triage category={category} confidence={confidence} -->"
-_MARKER_RE = re.compile(
-    r"<!-- specfuse:triage category=(?P<category>\S+) confidence=(?P<confidence>\S+) -->"
-)
+_MARKER_RE = re.compile(r"<!-- specfuse:triage (?P<fields>.*?) -->")
+_MARKER_FIELD_RE = re.compile(r"(\S+)=(\S+)")
 
 
 def route_for(category: str) -> str:
@@ -116,13 +115,27 @@ def render_marker(category: str, confidence: str) -> str:
     return _MARKER_TEMPLATE.format(category=category, confidence=confidence)
 
 
-def parse_marker(body: str) -> Optional[tuple]:
-    """Return the `(category, confidence)` pair carried by `body`'s triage
-    marker, or `None` if `body` carries none."""
+def parse_marker_fields(body: str) -> Optional[dict]:
+    """Return every `key=value` field carried by `body`'s triage marker as a
+    dict, or `None` if `body` carries none.
+
+    Scans the fields as `key=value` pairs rather than a fixed sequence, so
+    field order and field count don't decide whether a marker is seen at
+    all -- a marker carrying an extra field (e.g. `severity=`) still parses.
+    """
     match = _MARKER_RE.search(body or "")
     if match is None:
         return None
-    return (match.group("category"), match.group("confidence"))
+    return dict(_MARKER_FIELD_RE.findall(match.group("fields")))
+
+
+def parse_marker(body: str) -> Optional[tuple]:
+    """Return the `(category, confidence)` pair carried by `body`'s triage
+    marker, or `None` if `body` carries none."""
+    fields = parse_marker_fields(body)
+    if fields is None:
+        return None
+    return (fields["category"], fields["confidence"])
 
 
 def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:

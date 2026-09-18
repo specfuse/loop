@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - tests/test_marker_dual_shape.py
   - specfuse/loop/triage.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T00:29:02.882691+00:00
+duration_seconds: 34.528
+cost_usd: 0.292826
+input_tokens: 20
+output_tokens: 3485
 ---
 
 # T01 — the marker reader accepts both shapes
