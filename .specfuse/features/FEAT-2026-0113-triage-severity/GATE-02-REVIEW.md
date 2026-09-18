@@ -33,11 +33,17 @@ dependencies; the shape is a layer per unit, joined by the last:
 | `T05` | `WU-05-classify-severity-fails-closed.md` | the prompt carries the rubric; the reader fails closed | T03, T04 |
 | `T06` | `WU-06-run-records-severity-end-to-end.md` | `TriageProvider.execute` wiring + the gate's `feature_oracle` | T05 |
 
-**No unit is a tracer bullet, deliberately** (`/authoring-work-units` §14). The gate's
-`feature_oracle` is red until `T06` lands, because T03–T05 each ship a complete,
-separately-tested layer and T06 is the wiring that joins them. That means no unit in
-this gate is permitted to stub anything — T06's body says so in its own words, so the
-constraint travels with the unit rather than living only here.
+**~~No unit is a tracer bullet, deliberately~~ — WITHDRAWN, see the arm-checkpoint
+addendum at the end of this file.** This paragraph originally argued the gate's
+`feature_oracle` could stay red until `T06` landed, because T03–T05 each ship a
+complete, separately-tested layer. That reasoning collided with the driver: the
+oracle is appended to **every** attempt's gate list (`loop.py`, "the `feature_oracle`
+append below is untiered — it runs on every attempt regardless, by FEAT-2026-0101's
+contract"), so T03 and T04 each failed twice on a `ModuleNotFoundError` for T06's
+test file, which both were forbidden to create. `FEAT-2026-0113/T02H` is the walking
+skeleton that resolves it. What survives from the paragraph is the part that was
+right: **T02H is the only unit in this gate permitted to stub anything**; T03–T06
+each ship a complete layer and a stub in any of them is a hollow pass.
 
 **Where the `feature_oracle` sits, and why.** `GATE-02.md` left this to the drafting
 agent: `apply_triage` or one level up. It is one level up —
@@ -281,3 +287,37 @@ empty description takes the shipped definition **for that value only**.
 - **Q5** (an empty label description) — **dissolved.** It falls back to the shipped
   definition for that value; nothing escalates, and no repository-authored
   description is overwritten.
+
+
+### Second arm-checkpoint correction (2026-09-18): the gate had no walking skeleton
+
+T03 and T04 both escalated `spinning_signature_repeat` — two attempts each, one
+identical signature across all four:
+
+```
+ERROR: test_triage_severity_end_to_end (unittest.loader._FailedTest...)
+ModuleNotFoundError: No module named 'tests.test_triage_severity_end_to_end'
+```
+
+The module is T06's `produces:` file and sits in both units' Do-not-touch lists.
+Neither could create it; neither could pass. $3.06 spent proving it twice.
+
+**Cause.** This review argued no tracer bullet was needed. The driver appends the
+gate's `feature_oracle` to every attempt's gate list, untiered, so a gate whose
+oracle is red until its last unit fails every unit before it. The methodology's
+walking-skeleton rule exists for exactly this: the gate's first implementation unit
+wires the thinnest path end to end and turns the oracle green, so later units have a
+real oracle to run against.
+
+**Resolution.** `FEAT-2026-0113/T02H` — "tracer bullet: the gate oracle exists and
+runs green" — inserted as gate 2's first unit, with T03 and T04 re-armed behind it.
+It creates `tests/test_triage_severity_end_to_end.py` asserting the run-level `gh`
+argv sequence issued **today** (marker before category label), adds no severity
+assertion, and touches no source file. T06 extends that module rather than
+rewriting it, and the baseline it pins is what T06's non-interference assertion
+compares against.
+
+**For the close:** gate 2's retrospective should record this as a planning defect
+caught by the driver rather than by review, and the durable-lesson candidate is
+that a gate's `feature_oracle` must be green from its first unit onward, because
+the driver runs it on every attempt regardless of which unit is dispatched.

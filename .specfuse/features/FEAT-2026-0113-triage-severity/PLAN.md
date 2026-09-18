@@ -103,12 +103,15 @@ gates:
   - gate: 2
     file: GATE-02.md
     work_units:
+      - id: FEAT-2026-0113/T02H
+        file: WU-02H-oracle-tracer-bullet.md
+        depends_on: []
       - id: FEAT-2026-0113/T03
         file: WU-03-severity-rubric-reader.md
-        depends_on: []
+        depends_on: [FEAT-2026-0113/T02H]
       - id: FEAT-2026-0113/T04
         file: WU-04-marker-then-label-write-path.md
-        depends_on: []
+        depends_on: [FEAT-2026-0113/T02H]
       - id: FEAT-2026-0113/T05
         file: WU-05-classify-severity-fails-closed.md
         depends_on: [FEAT-2026-0113/T03, FEAT-2026-0113/T04]
@@ -118,7 +121,7 @@ gates:
       # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
       - id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
         file: WU-90-gate-2-close-intermediate.md
-        depends_on: [FEAT-2026-0113/T03, FEAT-2026-0113/T04, FEAT-2026-0113/T05, FEAT-2026-0113/T06]
+        depends_on: [FEAT-2026-0113/T02H, FEAT-2026-0113/T03, FEAT-2026-0113/T04, FEAT-2026-0113/T05, FEAT-2026-0113/T06]
       - id: FEAT-2026-0113/G2-PLAN
         file: WU-91-gate-2-plan-next.md
         depends_on: [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE]

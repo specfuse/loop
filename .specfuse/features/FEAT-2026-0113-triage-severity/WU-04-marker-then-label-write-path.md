@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/T04
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 produces:
