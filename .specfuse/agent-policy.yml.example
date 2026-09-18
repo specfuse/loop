@@ -62,7 +62,14 @@ rules:
 
 budgets:
   max_tokens_per_run: 2000000    # int > 0
-  max_open_prs: 3                # int > 0
+  max_open_prs: 3                # int > 0 — ceiling on OPEN PRs in the repo
+                                 # (all of them, matching what the proposal
+                                 # measured), above which `specfuse agent`
+                                 # stops starting items that would open
+                                 # another: bug and finding-autofix. Feature
+                                 # items still run — the driver opens no PR.
+                                 # Re-checked each item, so a merge mid-run
+                                 # lifts it.
   max_items_per_day: 10          # int > 0
 
 escalation:

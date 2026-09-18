@@ -294,6 +294,27 @@ def resolve_max_items(flag: "int | None",
     return _positive_int_budget(path, "max_items_per_day")
 
 
+def resolve_max_open_prs(path: "str | Path | None" = None) -> "int | None":
+    """`budgets.max_open_prs`, or None when unset or unusable (#3340).
+
+    The ceiling on how many pull requests may be open in the repository before
+    the lanes that open more stop dispatching. Required by the schema, proposed
+    from evidence by `policy_proposals`, reported on by `policy_review` — and,
+    until now, read by nothing that could act on it, so a policy declaring it
+    beside `automerge: "on"` described a ceiling that did not exist.
+
+    No flag counterpart: unlike the token and item caps there is no
+    `--max-open-prs`, because this is a property of the repository's state
+    rather than of one run's appetite.
+
+    Defensive in the same shape as `resolve_max_tokens`: a malformed, zero,
+    negative or boolean value resolves to unbounded rather than to a cap. A cap
+    of 0 would suppress every pull-request-opening lane permanently, which is
+    never what a typo means.
+    """
+    return _positive_int_budget(path, "max_open_prs")
+
+
 def describe_budget_sources(**caps) -> str:
     """One line naming each effective cap and where it came from (#3340).
 
