@@ -9,3 +9,5 @@
 - **FEAT-2026-0113/T03**: attempt 2 outcome=spinning_signature_repeat
 - **FEAT-2026-0113/T04**: attempt 2 outcome=spinning_signature_repeat
 - **FEAT-2026-0113/T02H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T03**: extracted `list_existing_labels` from `provision_labels` and added `read_severity_rubric`/`DEFAULT_SEVERITY_RUBRIC`/`SEVERITY_LABEL_SPECS` to specfuse/loop/labels.py, plus tests/test_severity_rubric.py.
+  - note: test_caller_check_ratchet.py needed read_severity_rubric added to BASELINE (no production caller until T04/T05/T06 wire it) — that's an edit outside produces:, flagged here for visibility.
