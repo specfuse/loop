@@ -1028,7 +1028,7 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 
 **Risk accepted deliberately.** This has an agent assigning the value that gates unattended merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the rubric is the operator's, low confidence fails closed, the label stays visible and human-overridable, and `max_open_prs` (#3351) plus `max_diff_lines` cap blast radius regardless. Autonomy is `review` rather than `auto` for this reason — a wrong arm on a marker format change orphans every issue written under it.
 
-**Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Registering `severity:*` in `LABEL_REGISTRY`: severity labels are repo-owned, and a repo that has not defined them is opting out.
+**Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
 
 **Status: active.**
 

@@ -8,15 +8,23 @@ feature_oracle: "python3 -m unittest tests.test_triage_severity_end_to_end -v -b
 
 ## Definition of done
 
-A triage run against an issue in a repository that defines `severity:*` labels
-records a severity in the marker and projects the `severity:<value>` label, marker
-first; the same run in a repository that defines none issues the identical `gh`
-write sequence it issues today. Defining the labels is how a project opts in;
-`LABEL_REGISTRY` gains no `severity:*` entry, so not defining them is how it opts out.
+A triage run records a severity in the marker and projects the `severity:<value>`
+label, marker first — in **both** repository shapes, which is the revision this gate
+took at its arm checkpoint. Where the repository defines its own `severity:*`
+labels, its descriptions are the rubric and specfuse creates nothing. Where it
+defines none, specfuse's published `DEFAULT_SEVERITY_RUBRIC` is the rubric and the
+four labels are provisioned on first use.
+
+The contract that replaced the old opt-out is **non-interference**: a repository
+declaring its own severity scheme gets zero `gh label create` calls and none of its
+descriptions overwritten. Reading label-absence as "this project opted out" was the
+original draft and is withdrawn — it made the feature inert by default, which is the
+failure #3352 measured. The degradation path remains: a label listing that cannot be
+read leaves the run classifying and writing exactly as it does today.
 
 The `feature_oracle` above is **run-level, not `apply_triage`-level**, which is the
 question this gate left to its drafting agent. `apply_triage` never reads a label
-rubric, so it cannot observe the opt-out half of the milestone at all;
+rubric, so it cannot observe which repository shape it is in;
 `TriageProvider.execute` is the one place a run both reads the repository's labels
 and applies a decision. `FEAT-2026-0113/T06` is the unit that turns it green, and
 `GATE-02-REVIEW.md` carries the rest of the drafting rationale.

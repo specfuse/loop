@@ -145,9 +145,26 @@ gates:
   existing triage call so no extra session is dispatched; write marker then label per
   the precedence above; a low-confidence severity writes **no** label and fails closed
   to a human, the same shape `apply_triage` already uses when `auto=True` downgrades a
-  low-confidence category to `question`. A repository that has defined no `severity:*`
-  labels gets no severity classification and behaves byte-identically to today —
-  defining the labels is how a project opts in.
+  low-confidence category to `question`.
+
+  **Rubric source — revised at the gate-2 arm checkpoint.** The rubric has two
+  sources and the repository always wins. A repository defining any `severity:*`
+  label supplies the rubric through its own label descriptions, and specfuse
+  provisions nothing there — so a project already labelling `severity:major` /
+  `severity:minor` is never handed a second overlapping set. A repository defining
+  **none** gets specfuse's published `DEFAULT_SEVERITY_RUBRIC` and the four labels
+  provisioned on first use, through the same `gh label create … --force` shape
+  #3244 established — required rather than cosmetic, since `gh issue edit
+  --add-label` fails against a label that does not exist.
+
+  The draft originally read label-absence as an opt-out. That made the feature inert
+  by default: a repository that never invented its own severity labels would get no
+  severity forever, so `min_severity` would keep stranding exactly the issues #3352
+  measured. The reasoning conflated two things — **where the floor sits**
+  (`rules.bugs.min_severity`) must be the operator's, since it gates unattended
+  merges, but **what `high` means** need not be; severity schemes in wide use ship
+  vendor-written definitions and let the operator pick the threshold against them.
+  Only the first constraint is load-bearing, and it is untouched by either branch.
 - **Gate 3's sketch, not its plan.** The 31 measured issues are already marked, so the
   marker's idempotency means nothing revisits them. Backfill re-reads already-marked
   issues carrying no severity field, under an explicit mode rather than on every run.
@@ -155,7 +172,9 @@ gates:
   as stranded, which is the problem that motivated it.
 - **Risk accepted deliberately.** This puts an agent on the value that gates unattended
   merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the
-  rubric is the operator's own label descriptions, low confidence fails closed, the
+  rubric is a written definition per value — the operator's own words where they
+  defined labels, specfuse's published defaults where they did not — the floor
+  itself stays the operator's in both branches, low confidence fails closed, the
   label stays visible and human-overridable, and `max_open_prs` (#3351) plus
   `max_diff_lines` cap blast radius regardless. `autonomy_default: review` is set for
   the same reason — a wrong arm on a marker format change orphans every issue written
@@ -196,8 +215,12 @@ was taken by this draft, not made by them, and is here for the gate-1 reviewer:
   introduce behaviour.
 - **`judge_disabled` is not set.** Every gate-1 criterion is judgable from the gate's
   diff and a test run.
-- **No `severity:*` entry is added to `LABEL_REGISTRY`.** Severity labels are
-  repo-owned, and not defining them is how a project opts out.
+- **Severity labels are provisioned only into a repository that defines none.**
+  Revised at the gate-2 arm checkpoint: the original assumption ("repo-owned, and
+  not defining them is how a project opts out") made the feature inert by default
+  and is withdrawn. The four specs live as their own named collection rather than
+  being folded into `LABEL_REGISTRY`'s existing entries, so no existing caller of
+  `provision_labels` starts creating severity labels as a side effect.
 - **Planned costs:** gate 1 — T01 $3.00, T01H $1.00, T02 $2.00. Gate 2 (drafted by
   `G1-PLAN`) — T03 $3.00, T04 $3.00, T05 $2.50, T06 $3.00. The closing units take
   the floors `planning-discipline.md` §5 sets rather than a guess — $4.50

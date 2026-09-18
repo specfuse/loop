@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/G2-PLAN
 type: plan-next
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 6.00
 oracle_env: macos_local
@@ -31,7 +31,10 @@ in practice.
    variation.
 4. The drafted units state how a backfill run bounds its blast radius — what
    selects the issues it touches, and what stops it re-writing a marker that
-   already carries a severity.
+   already carries a severity. Label provisioning is gate 2's, is idempotent, and
+   is not re-derived here: a backfill in a repository that declares no scheme finds
+   the four labels already present, and one in a repository that declares its own
+   still creates nothing.
 5. Gate 1's carried residual is resolved or explicitly re-carried: no oracle in
    this feature has yet read a real issue body outside this repository, and gate 3
    is the first surface that reads already-marked issues.
@@ -43,7 +46,9 @@ operator's, in gate 3 as in gate 2.
 **Verification.** `specfuse lint .specfuse/features/FEAT-2026-0113-triage-severity`
 exits 0.
 
-**Escalation triggers.** If gate 2's retrospective says the opt-out equality did
-not hold, do not draft a backfill on top of it — escalate instead, since a
-backfill amends markers in bulk and the write path it amends them with must be
-known safe first.
+**Escalation triggers.** If gate 2's retrospective says the non-interference
+assertion did not hold — a repository declaring its own `severity:*` scheme had a
+label created or a description overwritten — do not draft a backfill on top of it.
+Escalate instead: a backfill amends markers in bulk, and the write path it amends
+them with must be known safe first. Same stop if provisioning ran anywhere other
+than the declares-none branch.

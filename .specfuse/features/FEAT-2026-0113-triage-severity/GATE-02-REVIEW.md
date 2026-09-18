@@ -210,3 +210,74 @@ feature's risk acceptance rests on the rubric being the operator's own words.
   Gate 1 carried this as a stated residual rather than a deferred criterion; gate 2's
   drafted oracles are all injected-runner tests, so it is still carried. Gate 3 is the
   first surface that reads already-marked issues and is where a live-corpus check belongs.
+
+---
+
+## Arm-checkpoint decisions (2026-09-17, operator-directed)
+
+**This section is an addendum, not a rewrite.** Everything above records what
+`G1-PLAN` drafted and the questions it raised, and it is left standing as that
+record. Where the text above and this section disagree, **this section wins** — a
+close reading the review for gate 2's contract must read to the end of the file.
+
+### The opt-out contract is withdrawn; non-interference replaces it
+
+The operator challenged the premise that a repository defining no `severity:*`
+labels has "opted out". The challenge held. The draft's reasoning conflated two
+things:
+
+- **where the floor sits** (`rules.bugs.min_severity`) must be the operator's,
+  because that is the decision gating unattended merges; and
+- **what `high` means** — which need not be, and in every severity scheme in wide
+  use is not: vendors publish definitions and operators choose thresholds against
+  them.
+
+Only the first is load-bearing. Applying the constraint to both made the feature
+**inert by default**: a repository that never invented its own severity labels
+would get no severity forever, so `min_severity` would keep stranding exactly the
+issues #3352 measured. A feature whose motivation is autonomous operation cannot
+have "does nothing unless you did undocumented setup" as its default.
+
+There is also a mechanical reason the old shape could not stand: `gh issue edit
+--add-label severity:high` fails against a label that does not exist, so writing
+severity requires provisioning it (#3244).
+
+**Replacement contract — two rubric sources, the repository always wins:**
+
+| Repository declares | Rubric | Provisioning |
+| --- | --- | --- |
+| any `severity:*` label | its own descriptions | **none** — nothing created, nothing overwritten |
+| no `severity:*` label | specfuse's `DEFAULT_SEVERITY_RUBRIC` | four labels, `gh label create … --force`, once per run |
+
+No mixing in either direction. A `severity:*` label the repository defined with an
+empty description takes the shipped definition **for that value only**.
+
+### What changed, by file
+
+| Surface | Change |
+| --- | --- |
+| `GATE-02.md` | definition of done rewritten — severity recorded in both shapes; contract is non-interference |
+| `T03` | 4 → 7 criteria: two rubric sources, empty-description fallback, conditional provisioning asserted by argv, fail-soft creation |
+| `T05` | rubric is whatever T03 returns; empty rubric reclassified as a **degradation path**, not a configuration; new assertion that this module holds no copy of the default definitions |
+| `T06` | retitled; criterion 2 replaced by non-interference (zero `gh label create`, no description rewritten); new 2b asserts provisioning precedes the first `--add-label`; criterion 3 extended to bound provisioning per run |
+| `G2-CLOSE-INTERMEDIATE` | criteria 1/4/5 and the escalation trigger re-pointed at non-interference; second durable-lesson candidate added |
+| `G2-PLAN` | escalation trigger re-pointed; criterion 4 notes provisioning is gate 2's and idempotent |
+| `PLAN.md`, `roadmap.md` | premise and scope boundary corrected; the withdrawn assumption recorded rather than deleted |
+
+### Open questions, re-answered
+
+- **Q1** (T03's placement) — unchanged, left in gate 2. The ratchet concern was
+  already resolved by `provision_labels` calling the extracted helper.
+- **Q2** (aliases do not widen the rubric) — left as drafted, and now less likely
+  to bite: a repository defining `severity:major` is on the repository-wins branch
+  and supplies its own descriptions. Still a real asymmetry; **carry it forward as
+  a follow-up issue rather than silence.**
+- **Q3** (one `confidence`, not two) — left as drafted. Note the consequence
+  plainly: a `low`-confidence triage yields no severity even where the classifier
+  named one plausibly, so the stranded backlog is unstranded only where the
+  classifier is confident.
+- **Q4** (an extra read for opted-out repositories) — **moot.** There is no
+  opted-out branch, and every run uses the rubric it reads.
+- **Q5** (an empty label description) — **dissolved.** It falls back to the shipped
+  definition for that value; nothing escalates, and no repository-authored
+  description is overwritten.

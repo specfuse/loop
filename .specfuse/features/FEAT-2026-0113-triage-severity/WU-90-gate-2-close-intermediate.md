@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 4.50
 auto_close_disabled: true
@@ -23,10 +23,13 @@ what a verdict may and may not assert.
 **Acceptance criteria.**
 
 1. `RETROSPECTIVE.md` carries a `## Gate 2` section recording what gate 2 proved
-   per criterion, and — the load-bearing one — **whether the opt-out equality in
-   T06 criterion 2 actually held**: the measured `gh` argv sequence for a
-   repository defining no `severity:*` label, against the sequence today's code
-   issues. A repository that opted out and saw a write change is what stops gate 3.
+   per criterion, and — the load-bearing one — **whether T06 criterion 2's
+   non-interference assertion actually held**: the measured `gh` argv sequence for a
+   repository that declares its own `severity:*` scheme, showing zero
+   `gh label create` calls and no description rewritten. A repository whose own
+   labels were disturbed is what stops gate 3. Record alongside it that the
+   provisioning branch created its labels **before** the first `--add-label`
+   (criterion 2b), since a label applied before it exists fails (#3244).
 2. That section includes a `## Cost analysis` heading, reconciled against each
    unit's `planned_cost_usd` and the per-attempt records in `events.jsonl`, not
    estimated.
@@ -36,12 +39,22 @@ what a verdict may and may not assert.
    Gate 1 carried a residual here worth re-stating or retiring: no oracle in this
    feature has yet read a real issue body outside this repository.
 4. The consumer-visible contract changes are enumerated, and `CHANGELOG.md` gains
-   the entry gate 1 deliberately deferred to the gate that ships the write path —
-   the three-field marker, the `severity:<value>` projection, and the fact that
-   defining `severity:*` labels is the opt-in.
+   the entry gate 1 deliberately deferred to the gate that ships the write path:
+   the three-field marker, the `severity:<value>` projection, and the two rubric
+   sources — a repository's own label descriptions where it declares a scheme, and
+   specfuse's published `DEFAULT_SEVERITY_RUBRIC` plus provisioned labels where it
+   declares none. State plainly that a repository declaring its own scheme has
+   nothing created or overwritten, since that is the property an existing consumer
+   will check first.
 5. Any durable rule this gate surfaced is promoted to `.specfuse/LEARNINGS.md`.
-   Candidate visible at draft time: an opt-out proved by argv equality rather than
-   by prose is a different and much stronger claim than "behaves equivalently".
+   Two candidates visible at draft time. First: a non-interference contract proved
+   by argv over the whole call sequence is a different and much stronger claim than
+   "behaves equivalently" in prose. Second, from this gate's own arm checkpoint: a
+   safety constraint stated over a *bundle* ("the rubric must be the operator's")
+   can be strictly wider than the constraint that is actually load-bearing ("the
+   floor must be the operator's"), and the wider version shipped a feature that was
+   inert by default — worth a rule about separating the decision that gates an
+   action from the definition it is measured against.
 6. `specfuse lint --closing` exits 0 before this unit reports `complete`.
 
 **Do not touch.** Any source file under `specfuse/` — this unit closes a gate, it
@@ -53,8 +66,9 @@ sealed history. Other features' folders.
 session per `close-discipline.md` §1 and its verdict recorded in
 `## Measurements`.
 
-**Escalation triggers.** If criterion 1's answer is that a repository defining no
-`severity:*` label saw any write change, stop and escalate rather than recording
-it and closing green — that finding invalidates the gate's definition of done and
-gate 3 has no premise to build on. Likewise if the marker's two-field form is no
-longer byte-identical.
+**Escalation triggers.** If criterion 1's answer is that a repository declaring its
+own `severity:*` scheme had a label created, or any description of its own
+overwritten, stop and escalate rather than recording it and closing green — that
+finding invalidates the gate's definition of done and gate 3 has no premise to
+build on. Likewise if provisioning ran anywhere other than the declares-none
+branch, or if the marker's two-field form is no longer byte-identical.

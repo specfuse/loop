@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/T05
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 2.50
 produces:
@@ -21,9 +21,19 @@ headless classification session per issue and reads its answer back through
 second session: one dispatched session per issue is the constraint `PLAN.md`'s
 gate-2 sketch sets, and a second one would double the per-issue cost of triage.
 
-The rubric is T03's reader — the operator's own `severity:*` label descriptions —
-not a definition specfuse ships. That is what makes the classification a technical
-judgment against *this* repository's declared meaning rather than an imported one.
+The rubric is whatever T03's reader returns, and this unit does not care which of
+its two branches produced it: a repository that defines its own `severity:*` labels
+supplies its own descriptions, and one that defines none gets specfuse's published
+`DEFAULT_SEVERITY_RUBRIC`. Either way the prompt carries a written definition per
+value, and the classification is a technical judgment against a stated meaning
+rather than against the model's own notion of "high".
+
+**The empty rubric is no longer the opt-out and no longer the normal case.** T03's
+revision means `{}` now arrives only when the label listing itself failed — an
+absent `gh` binary, a non-zero exit, unparseable output. So criterion 1 below is a
+degradation path, not a supported configuration, and it must still hold: a run that
+cannot read labels classifies exactly as it does today rather than inventing a
+rubric.
 
 `classify_result` keeps its `(category, confidence)` return type and its caller in
 `specfuse/agent/providers/triage.py:255`; severity is reached through a new
@@ -33,12 +43,16 @@ split gate 1 landed for the same reason.
 **Acceptance criteria.**
 
 1. `tests/test_triage_severity_classify.py::SeverityPrompt::test_prompt_unchanged_when_rubric_is_empty`
-   fails on HEAD before this unit runs and passes after: given an empty rubric, the
-   prompt string is byte-identical to the one built today, asserted by string
-   equality.
-2. Given a non-empty rubric, the prompt names each severity value beside that
-   repository's own label description, and asks for the marker in the three-field
-   form `render_marker` now emits.
+   fails on HEAD before this unit runs and passes after: given an empty rubric —
+   which after T03's revision means only that the label listing failed — the prompt
+   string is byte-identical to the one built today, asserted by string equality.
+   This is the degradation path, not an opt-out.
+2. Given a non-empty rubric, the prompt names each severity value beside the
+   definition the rubric carries for it, and asks for the marker in the three-field
+   form `render_marker` now emits. The prompt is built from the rubric mapping
+   alone and holds no copy of the shipped default, so a repository's own wording
+   and specfuse's reach the session through the same single path — asserted by
+   grepping this module for any `SEVERITY_VALUES` definition text.
 3. `classify_result` returns `(category, confidence)` unchanged for every input it
    handles today; the new fields reader is additive and returns the severity the
    session named only when that value is a key of the rubric it was given.
@@ -64,9 +78,9 @@ and a symbol check for the new fields reader
 absent from the files you edited, emit `status: blocked`.
 
 **Escalation triggers.** If carrying the rubric into the prompt appears to need a
-second dispatched session, stop — one session per issue is this gate's
-constraint, and a second is a re-scope, not an implementation detail. If a
-repository defines a `severity:*` label whose description is empty, do not
-substitute a specfuse-authored definition for it: that entry is undefined, and if
-that leaves an otherwise-defining repository with nothing to classify against,
-escalate rather than shipping a default rubric.
+second dispatched session, stop — one session per issue is this gate's constraint,
+and a second is a re-scope, not an implementation detail. If this unit appears to
+need its own copy of the default definitions, stop: `DEFAULT_SEVERITY_RUBRIC` is
+T03's to own and this unit reads it only through the rubric it is handed — two
+copies of a published definition is the drift `[FEAT-2026-0041/G1-CLOSE/
+one-renderer-two-callers]` names.
