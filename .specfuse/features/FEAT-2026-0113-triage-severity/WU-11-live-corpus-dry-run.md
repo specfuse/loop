@@ -32,7 +32,7 @@ prints. Nothing in this unit amends a marker.
 
 **Acceptance criteria.**
 
-1. `specfuse-agent --backfill-severity --repo <OWNER/NAME> --limit 5` is run
+1. `specfuse-backfill-severity --repo <OWNER/NAME> --limit 5` is run
    against the repository where `PLAN.md`'s 31 stranded issues were measured, and
    its printed selection is pasted into `GATE-03-REVIEW.md` under a
    `## Live-corpus dry run` heading, with issue numbers and the marker line each
