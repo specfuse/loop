@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T01H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 produces:
   - specfuse/loop/triage.py
   - tests/test_marker_dual_shape.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T00:40:04.120128+00:00
+duration_seconds: 48.918
+cost_usd: 0.293139
+input_tokens: 26
+output_tokens: 2632
 ---
 
 # T01H — `parse_marker` fails closed on a marker missing a field

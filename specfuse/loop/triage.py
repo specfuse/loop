@@ -135,7 +135,11 @@ def parse_marker(body: str) -> Optional[tuple]:
     fields = parse_marker_fields(body)
     if fields is None:
         return None
-    return (fields["category"], fields["confidence"])
+    category = fields.get("category")
+    confidence = fields.get("confidence")
+    if not category or not confidence:
+        return None
+    return (category, confidence)
 
 
 def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:

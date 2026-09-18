@@ -39,5 +39,18 @@ class DualShapeMarker(unittest.TestCase):
         )
 
 
+class FailsClosed(unittest.TestCase):
+    def test_a_marker_missing_a_required_field_reads_as_absent(self):
+        bodies = [
+            "<!-- specfuse:triage category=bug -->",
+            "<!-- specfuse:triage confidence=high -->",
+            "<!-- specfuse:triage category=bug confidence= -->",
+            "<!-- specfuse:triage category= confidence=high -->",
+        ]
+        for body in bodies:
+            with self.subTest(body=body):
+                self.assertIsNone(parse_marker(body))
+
+
 if __name__ == "__main__":
     unittest.main()
