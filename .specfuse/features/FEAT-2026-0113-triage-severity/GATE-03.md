@@ -1,6 +1,6 @@
 ---
 gate: 3
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_severity_backfill_end_to_end -v -b"
 baseline:
   sha: 2ad6947f2f37e4817881cfad478733154fa4d245
