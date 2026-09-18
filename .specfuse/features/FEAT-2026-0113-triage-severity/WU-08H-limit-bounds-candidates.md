@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0113/T08H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/triage.py
   - specfuse/agent/severity_backfill.py
   - tests/test_severity_backfill_limit.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:36:07.523315+00:00
+duration_seconds: 124.275
+cost_usd: 0.706654
+input_tokens: 50
+output_tokens: 12262
 ---
 
 # T08H — `--limit` bounds candidates, and a zero-candidate run says so

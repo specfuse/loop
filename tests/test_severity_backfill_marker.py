@@ -98,7 +98,9 @@ class BackfillSelection(unittest.TestCase):
 
         self.assertEqual([], result)
 
-    def test_limit_bounds_fetch_and_result(self):
+    def test_limit_bounds_the_result_not_the_listing(self):
+        # `limit` bounds how many candidates come back, not the `gh issue
+        # list` window -- [FEAT-2026-0113/T08H/limit-bounds-candidates].
         body = render_marker("bug", "high") + "\n\nSomething broke."
         runner = _StubRunner([
             _list_result([{"number": i, "title": "candidate", "body": body, "labels": []} for i in range(5)])
@@ -106,10 +108,10 @@ class BackfillSelection(unittest.TestCase):
 
         result = list_severity_backfill_candidates(runner, _REPO, limit=2)
 
-        self.assertLessEqual(len(result), 2)
+        self.assertEqual(len(result), 2)
         self.assertIn("--limit", runner.calls[0])
         limit_index = runner.calls[0].index("--limit")
-        self.assertEqual(runner.calls[0][limit_index + 1], "2")
+        self.assertNotEqual(runner.calls[0][limit_index + 1], "2")
 
     def test_issues_a_single_listing_call(self):
         body = render_marker("bug", "high") + "\n\nSomething broke."

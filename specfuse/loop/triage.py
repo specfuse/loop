@@ -351,11 +351,37 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
     return untriaged
 
 
+#: The `gh issue list` window size a backfill page grows by. Deliberately
+#: not `limit` itself -- criterion 2 of
+#: `[FEAT-2026-0113/T08H/limit-bounds-candidates]`: a small `limit` must not
+#: shrink the listing window, since candidates cluster in the oldest issues
+#: and a stranded backlog is old by construction.
+_BACKFILL_PAGE_SIZE = DEFAULT_LIST_LIMIT
+
+
+def _is_backfill_candidate(issue: dict) -> bool:
+    body = issue.get("body") or ""
+    fields = parse_marker_fields(body)
+    if fields is None:
+        return False
+    if fields.get("severity"):
+        return False
+    category = fields.get("category")
+    if category not in CATEGORIES:
+        return False
+    if has_finding_marker(body):
+        return False
+    existing_labels = {label.get("name") for label in issue.get("labels") or []}
+    if existing_labels & CATEGORY_LABELS:
+        return False
+    return True
+
+
 def list_severity_backfill_candidates(
     runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT
 ) -> list:
-    """Return already-marked, severity-less open issues a backfill run may
-    amend.
+    """Return up to `limit` already-marked, severity-less open issues a
+    backfill run may amend.
 
     The inverse of `list_untriaged`'s exclusion: a marked issue is normally
     done and skipped, but one whose marker carries no `severity=` field is
@@ -365,28 +391,28 @@ def list_severity_backfill_candidates(
     label in `escalation.CATEGORY_LABELS`) are both left alone. An issue
     whose marker names a category outside `CATEGORIES`, carries no marker at
     all, or already carries `severity=` is not a candidate.
+
+    `limit` bounds how many *candidates* are returned, not how many open
+    issues are listed -- `[FEAT-2026-0113/T08H/limit-bounds-candidates]`.
+    The underlying `gh issue list` window grows in `_BACKFILL_PAGE_SIZE`
+    steps, each page re-listing from the start (`gh`'s own listing has no
+    cursor), until `limit` candidates are found or the repository's open
+    issues are exhausted (a page shorter than the window it asked for).
     """
-    issues = _list_open_issues(runner, repo, limit=limit)
-    candidates = []
-    for issue in issues:
-        body = issue.get("body") or ""
-        fields = parse_marker_fields(body)
-        if fields is None:
-            continue
-        if fields.get("severity"):
-            continue
-        category = fields.get("category")
-        if category not in CATEGORIES:
-            continue
-        if has_finding_marker(body):
-            continue
-        existing_labels = {label.get("name") for label in issue.get("labels") or []}
-        if existing_labels & CATEGORY_LABELS:
-            continue
-        candidates.append(issue)
-        if len(candidates) >= limit:
-            break
-    return candidates
+    candidates: list = []
+    window = _BACKFILL_PAGE_SIZE
+    scanned = 0
+    while True:
+        issues = _list_open_issues(runner, repo, limit=window)
+        for issue in issues[scanned:]:
+            if _is_backfill_candidate(issue):
+                candidates.append(issue)
+                if len(candidates) >= limit:
+                    return candidates
+        scanned = len(issues)
+        if len(issues) < window:
+            return candidates
+        window += _BACKFILL_PAGE_SIZE
 
 
 def amend_marker_severity(body: str, severity: str) -> str:

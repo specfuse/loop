@@ -177,6 +177,16 @@ def run_backfill(
 
     candidates = triage.list_severity_backfill_candidates(runner, repo, limit=limit)
 
+    if not candidates:
+        return {
+            "rubric": rubric,
+            "candidates": [],
+            "rows": [],
+            "reason": (
+                f"no severity-backfill candidates found in {repo} under limit={limit}"
+            ),
+        }
+
     rows = []
     decisions = []
     for issue in candidates:
