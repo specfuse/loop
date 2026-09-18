@@ -262,3 +262,358 @@ breakdown is recorded here:
 
 One blocked attempt in four, and it was the gate's highest-value attempt. No
 attempt in this gate failed for a reason worth preventing.
+
+## Gate 2
+
+**What the gate set out to prove.** A triage run records a severity — marker
+first, `severity:<value>` label second — in **both** repository shapes, and a
+repository that declares its own `severity:*` scheme is left alone: nothing
+created, no description rewritten. The rubric comes from the repository's own
+label descriptions where it has them, and from specfuse's published
+`DEFAULT_SEVERITY_RUBRIC` (with the four labels provisioned) where it has none.
+
+Five units ran: T02H (inserted mid-gate) wired the thinnest end-to-end path so
+the gate's `feature_oracle` existed at all; T03 extracted the label listing and
+added `read_severity_rubric` + `DEFAULT_SEVERITY_RUBRIC`; T04 extended
+`render_marker` / `apply_triage` to the third field and the projected label; T05
+carried the rubric into the one classification session and made the reader fail
+closed without a readable value; T06 wired it through `TriageProvider.execute`
+and turned the oracle green on both shapes. All five are `status: done`.
+Measurements are in `## Measurements — gate 2`; cost is reconciled in
+`### Cost analysis` below. Per-criterion oracle, kind and state for all 25
+acceptance criteria are in `GATE-02-CRITERIA.md`.
+
+### The load-bearing question: was a repository's own severity scheme disturbed?
+
+**No. Zero `gh label create` calls and zero label-description writes against any
+repository that declares a `severity:*` scheme of its own.** This is the property
+gate 3 has no premise without, so it was measured by argv over the whole call
+sequence in this session — an independent probe driving `TriageProvider.execute`
+with an injected runner, not a re-reading of T06's assertions:
+
+**Case A — repository declares the four specfuse-shaped labels, all described:**
+
+```
+1. gh label list --json name,color,description --limit 1000 --repo o/r
+2. claude  [classification session]
+3. gh issue edit 101 --repo o/r --body <marker: category=bug confidence=high severity=high>
+4. gh issue edit 101 --repo o/r --add-label triage:bug,severity:high
+```
+
+`gh label create` calls: **0**. argv containing `--description`: **0**. Marker
+(3) precedes label (4).
+
+**Case B — repository declares a scheme that is not specfuse's:**
+`severity:critical` / `severity:major` / `severity:minor`, all three described,
+which is the measured real-world case `T06`'s escalation trigger names. Identical
+shape to case A: **0** creates, **0** `--description` argv, marker before label.
+
+The rubric-reader level was probed separately, because non-interference has to
+hold for scheme shapes the run-level test does not enumerate:
+
+| Repository's own `severity:*` labels | Rubric returned | `gh label create` calls |
+|---|---|---|
+| `low`/`medium`/`high`/`critical`, all described | its own four descriptions | **0** |
+| `critical`/`major`/`minor`, all described | `{critical: "Prod down."}` | **0** |
+| `high` described **empty**, `low` described | shipped text for `high` only, its own `low` kept | **0** |
+| only `severity:major` (no value in `SEVERITY_VALUES`) | `{}` | **0** |
+| none at all | full `DEFAULT_SEVERITY_RUBRIC` | 4 |
+
+The branch test is `name.startswith("severity:")`, not membership in
+`SEVERITY_VALUES` — so the last declares-own row is the interesting one: a
+repository whose whole scheme lies outside specfuse's vocabulary gets an **empty
+rubric and no severity recorded**, and is still not touched. That is inert for
+that repository but safe, and it is the correct precedence: not disturbing an
+operator's labels outranks recording a severity. It is worth carrying into gate 3
+as a known coverage hole rather than a defect — `rules.bugs.severity_aliases`
+(#3349) already exists as the operator's declared mapping for exactly those
+labels, and nothing in this gate reads it.
+
+**Criterion 2b — provisioning precedes the first `--add-label`.** Measured on the
+declares-none branch (case C), where a label applied before it exists fails
+(#3244):
+
+```
+1. gh label list …
+2. gh label create severity:low      --force --color c2e0c6 --description …
+3. gh label create severity:medium   --force --color fbca04 --description …
+4. gh label create severity:high     --force --color d93f0b --description …
+5. gh label create severity:critical --force --color b60205 --description …
+6. claude  [classification session]
+7. gh issue edit 103 --repo o/r --body <marker: … severity=high>
+8. gh issue edit 103 --repo o/r --add-label triage:bug,severity:high
+```
+
+All four creates precede the single `--add-label`, every one carries `--force`,
+and the ordering holds at run scope and not merely per issue: over three
+untriaged issues (case E) the sequence is **one** `gh label list`, **four**
+`gh label create`, then three marker/label pairs — 14 calls, no second listing
+and no repeated create.
+
+**The degradation path still produces today's sequence byte for byte.** With the
+listing failing (case D): `gh label list` (fails) → `claude` → `gh issue edit
+--body <marker: category=bug confidence=high>` → `gh issue edit --add-label
+triage:bug`. No `severity=` in the marker, no `severity:` in the label argument,
+zero creates, no raise.
+
+**Escalation triggers: none fired.** No label was created against a
+declares-its-own repository; no description it authored was overwritten;
+provisioning ran only on the declares-none branch; and the two-field marker is
+still byte-identical — `render_marker` over the full `CATEGORIES` × `CONFIDENCES`
+cross-product (10 shapes) matches the literal
+`<!-- specfuse:triage category={c} confidence={f} -->` with **0** mismatches.
+
+### The gate's own finding: T06 deleted an assertion T02H was dispatched to add
+
+T02H's body states that T06 "extends this module with the severity assertions its
+own criteria name; it does not rewrite the harness." **It rewrote the harness.**
+T02H shipped one test, `test_execute_writes_marker_then_label_in_order`, in class
+`TestTriageSeverityEndToEnd`; at HEAD the class is `SeverityEndToEnd` and that
+test name does not exist. The diff is +172/−39, not additive.
+
+The substance mostly survived — `test_failing_label_listing_degrades_to_todays_write_sequence`
+carries the same severity-free case — with one exception that matters. T02H
+asserted the **order** of today's sequence structurally (`marker_call, label_call
+= edit_calls`, then per-call `--body`/`--add-label` exclusivity). The surviving
+test asserts contents and counts and **not order**. Ordering is still asserted at
+HEAD, but only on the severity-*carrying* paths (`assertLess` at lines 134 and
+188). So the precedence claim for a run that records no severity — the
+degradation path, the one an operator on a broken `gh` actually gets — has no
+test pinning it any more. The behaviour is correct: case D above measures marker
+before label. The *assertion* is gone.
+
+Nothing caught this. T02H's criteria were recorded green at T02H's tree; the
+full suite stayed green because the replacement tests pass; and `produces:`
+matching cannot see it, because the file is legitimately in T06's `produces:`
+list too. This is the gate's most transferable lesson and is promoted below.
+
+### Per-criterion result
+
+All 25 criteria across T02H (5), T03 (7), T04 (5), T05 (4) and T06 (4) are
+`state: pass`, each against an oracle re-run fresh in this session.
+`GATE-02-CRITERIA.md` carries the oracle, `kind`, `state`, proving SHA and
+attempt for each; the summary:
+
+| Unit | Criteria | Result | Proved by |
+|---|---|---|---|
+| T02H | #1–#5 | 5/5 pass | `git cat-file -e` at the pre-unit tree for the red-before claim; the T02H blob for what it shipped; the module green at HEAD. #3's ordering assertion is proved at T02H's tree and re-measured at HEAD by argv, not by a surviving test — see the finding above |
+| T03 | #1–#7 | 7/7 pass | `tests.test_severity_rubric` (10 cases); `grep -c '"label", "list"'` → `1`; the five-row rubric table above; `test_provision_labels` + `test_label_provisioning_runner_contract` unedited and green |
+| T04 | #1–#5 | 5/5 pass | `tests.test_triage_severity_write` (7 cases); `render_marker` 10-shape byte-equality; case D's argv identical to today's; `tests.test_triage_apply` green unedited |
+| T05 | #1–#4 | 4/4 pass | `tests.test_triage_severity_classify` (12 cases); `grep -c` for default-definition text in `triage_invoke.py` → **0**, with `DEFAULT_SEVERITY_RUBRIC` defined at `labels.py:347` and nowhere else |
+| T06 | #1–#4 | 4/4 pass | the gate `feature_oracle` (5 cases); the independent argv probe, cases A/B/C/D/E |
+
+Every `kind` is `narrow`: each oracle is a named test module or nodeid, a
+countable grep over a fixed file set, a bounded diff, or an enumerated argv
+probe over a closed case set. The full suite, coverage and the `tier: broad`
+gates are the driver's once-per-gate broad run and are cited below, not re-run
+here.
+
+### Deferred verification
+
+`(nothing — every acceptance criterion was verified in-loop)`
+
+All 25 criteria were verified in this session against a command with an observed
+exit code. Three things are worth stating alongside that, none of them a deferred
+criterion:
+
+- **Gate 1's residual is re-stated, not retired.** No oracle in this feature has
+  yet read a real issue body outside this repository. Gate 2 made it *larger*
+  rather than smaller: every gate-2 oracle injects a runner, so the `gh label
+  list` JSON, the classification answer and every write are all authored by the
+  test. What has never been exercised is a live `gh` against a real repository's
+  label set. Gate 3's backfill mode is the first surface that reads
+  already-marked issues, and it remains where a live-corpus check belongs.
+- **A repository whose scheme lies entirely outside `SEVERITY_VALUES` records no
+  severity.** Verified in-loop (the `{}` row above) and behaving as designed; it
+  is a scope statement for gate 3, not an unverified criterion.
+- **The broad tier ran, and it was the driver that ran it.** Per the dispatch
+  contract this session ran no full suite, no coverage and no `tier: broad`
+  gate. The broad run is cited below, including the one that failed.
+
+### Consumer-visible contract changes
+
+Three additions and one behaviour change, all in the write path; no removal, no
+rename, nothing an existing consumer depends on is broken:
+
+- **`added`** — `specfuse.loop.labels.read_severity_rubric(target, *, runner,
+  repo)` returning `{severity_value: description}`, and the published
+  `specfuse.loop.labels.DEFAULT_SEVERITY_RUBRIC` / `SEVERITY_LABEL_SPECS` it
+  falls back to.
+- **`added`** — `render_marker(category, confidence, severity=...)` emits a third
+  `severity=<value>` field; the two-field call is byte-identical to before.
+- **`changed`** — a triage run now writes `severity=` into the marker and
+  projects a `severity:<value>` label, marker first.
+- **`changed`** — a repository that declares **no** `severity:*` label has the
+  four labels provisioned on first use, `gh label create … --force`, once per
+  run.
+
+**A repository that declares its own `severity:*` scheme has nothing created and
+nothing overwritten** — that is the property an existing consumer will check
+first, it is the contract that replaced the withdrawn opt-out, and it is measured
+by argv above rather than asserted in prose. `CHANGELOG.md`'s `Unreleased`
+section gains the corresponding entry, which is the one gate 1 deliberately
+deferred to the gate that ships the write path.
+
+### What gate 3 should know before it is armed
+
+1. **The classifier and the floor read different vocabularies.** The rubric is
+   built only for values in `agent_policy.SEVERITY_VALUES`, while
+   `rules.bugs.severity_aliases` (#3349) exists precisely so a floor can read
+   `severity:major`. A repository on an aliased scheme is therefore readable by
+   the floor and invisible to the classifier. Gate 3's backfill will meet those
+   repositories first, since they are the ones with the most unlabelled history.
+2. **Backfill's idempotency key is the marker, and it is now three-field.** Every
+   issue marked before this gate carries a two-field marker that parses fine and
+   records no severity. Backfill must amend the marker before adding the label,
+   per `PLAN.md`'s Record precedence — a backfill unit that labels first is wrong
+   rather than a variant.
+3. **The listing is once per `execute` run, and backfill is a different run
+   shape.** Provisioning is bounded per run, not per issue; a backfill mode that
+   re-enters `execute` per issue would re-list per issue. The bound is asserted
+   in `test_listing_and_provisioning_happen_once_per_run`, which only covers the
+   normal path.
+4. **Do not trust a same-gate sibling's promise not to rewrite your tests.** See
+   the T02H/T06 finding above; the drafting consequence is the promoted rule.
+
+### Lessons promoted
+
+Three durable rules went to `.specfuse/LEARNINGS.md`, tagged
+`[FEAT-2026-0113/G2-CLOSE-INTERMEDIATE]`: (1) a non-interference contract proved
+by argv over the whole call sequence is a categorically stronger claim than
+"behaves equivalently" in prose, and is the shape to reach for whenever a feature
+promises not to touch something an operator owns; (2) a safety constraint stated
+over a *bundle* can be strictly wider than the constraint that is load-bearing —
+here "the rubric must be the operator's" instead of "the floor must be the
+operator's", which shipped a feature inert by default; (3) a later unit in the
+same gate can silently delete an earlier unit's assertions, and nothing in the
+loop notices.
+
+Two draft-time candidates were **not** promoted. The oracle-ordering deadlock
+that cost this gate four attempts is already covered by `authoring-work-units`
+§14 (tracer bullet) — the rule existed and the gate was drafted against it
+anyway, which is a drafting-review problem, not a missing rule. And the caller
+ratchet's reverse direction is `caller_check`'s documented behaviour, not a
+lesson.
+
+### Cost analysis
+
+Reconciled against each unit's `planned_cost_usd` and the `attempt_outcome`
+records in `events.jsonl` — not estimated. Ten attempts are on record for gate 2
+before this close's own dispatch.
+
+| Unit | Planned | Attempts | Actual | Ratio | Note |
+|---|---|---|---|---|---|
+| `T02H` | $2.00 | 1 (passed) | $0.314276 | 0.16× | 38.3 s; inserted mid-gate, after the deadlock |
+| `T03` | $3.00 | 3 (failed, failed, passed) | $2.902027 | 0.97× | $0.839038 + $0.879547 discarded, $1.183442 passed; 655.6 s total |
+| `T04` | $3.00 | 3 (failed, failed, passed) | $2.030093 | 0.68× | $0.556754 + $0.780525 discarded, $0.692815 passed; 362.3 s total |
+| `T05` | $2.50 | 1 (passed) | $0.470493 | 0.19× | 80.4 s |
+| `T06` | $3.00 | 1 (passed) | $0.822717 | 0.27× | 163.2 s |
+| **Gate 2 implementation** | **$13.50** | **9** | **$6.539607** | **0.48×** | |
+| `G2-CLOSE-INTERMEDIATE` | $4.50 | 1 prep-halt ($0.00) + this one | — | — | the halt cost nothing; see below |
+| `G2-PLAN` | $6.00 | not started | — | — | |
+| Feature total (planned) | $43.50 | | | | gate 1 actual $1.615569 + two closing units |
+
+**Reconciliation.**
+
+- **Gate 2 came in at 48% of plan, and 47% of what it spent was discarded.**
+  $3.055863 of the $6.539607 went to four attempts that produced nothing kept:
+  T03 attempts 1–2 and T04 attempts 1–2, all four failing on the identical
+  signature `ERROR: test_triage_severity_end_to_end
+  (unittest.loader._FailedTest.test_triage_severity_end_to_end)`. Both units
+  escalated `spinning_signature_repeat` at attempt 2, correctly. Neither could
+  ever have passed: the gate's `feature_oracle` names a module that was T06's
+  `produces:` file and was in both units' Do-not-touch lists, and `verify()` runs
+  the `feature_oracle` untiered on every attempt. That is a **drafting** defect
+  priced at $3.06 — a gate whose oracle is red until its last unit lands, against
+  a driver that runs the oracle on every attempt.
+- **The fix was a tracer bullet, and it cost $0.31.** T02H wired the thinnest
+  end-to-end path and turned the oracle green before any unit that had to be
+  verified against it. T03 and T04 then passed first try on re-arm. The ratio is
+  the argument for `authoring-work-units` §14 in one line: $0.31 spent up front
+  would have saved $3.06.
+- **Gate 2's whole unit set is absent from `PLAN.baseline.json`.** The baseline
+  records `{"gate": 2, "work_units": []}` — gate 2 was drafted by `G1-PLAN` after
+  the snapshot. Anyone reconciling this feature from the baseline alone will be
+  $13.50 short on plan for gate 2 and will read the arm predicate's
+  `budget_projection` "within 2.0× baseline planned total $20.50" against a
+  planned total that never included this gate. The projection still came in
+  clean ($32.57 against a $41.00 cap), but it was clean against the wrong
+  denominator.
+- **The prep halt cost $0.00 and one dispatch cycle.** The close's first dispatch
+  halted before the session started: the WU declared `oracles: [recent-commits]`,
+  a *gate* name, where the key takes a `verification.yml` **set** name
+  (`oracles`). `duration_seconds: 0.003`, `cost_usd: 0.0`. Cheap, and caught by
+  the driver rather than by a session burning context on it.
+- **One out-of-loop commit sits inside this gate's range.** The gate-2 broad run
+  failed on `test_the_baseline_has_not_silently_shrunk`; `1a6a0d7` removed
+  `read_severity_rubric` from the caller ratchet's `BASELINE`. This is the
+  ratchet's reverse direction working as designed — T03 added the entry
+  correctly (the symbol landed ahead of its callers by design) and T06 gave it a
+  caller, at which point a `BASELINE` entry must be removed or it becomes a stale
+  waiver. Net effect across the gate is zero: `git diff 8169640..HEAD --
+  tests/test_caller_check_ratchet.py` is empty. No unit could reasonably have
+  caught it — T03 had no caller yet, and the symbol only became reachable at T06.
+
+### Failure-class breakdown
+
+`summarize_attempt_failure_classes` reports gate 2's four non-passing attempts
+under `failure_class: other`, which is accurate to the driver's classifier and
+uninformative as a summary. The real breakdown:
+
+| Class | Count | Detail |
+|---|---|---|
+| Oracle-unsatisfiable-by-construction | 4 | T03 attempts 1–2, T04 attempts 1–2. One signature across all four: the gate's `feature_oracle` named a module no dispatched unit was permitted to create. $3.055863. Resolved by inserting `FEAT-2026-0113/T02H`. |
+| `spinning_signature_repeat` escalations | 2 | T03 and T04, both at attempt 2. The driver stopped each unit at the right point; neither agent could have fixed the cause from inside its own boundary. |
+| Broad-run gate failure | 1 | `broad_run_gate_failure` at gate 2: `tests` (`test_the_baseline_has_not_silently_shrunk`) and `coverage` (`no_gate_marker`, a consequence of the suite failing). Fixed out of loop by `1a6a0d7`; the re-run is clean. |
+| Prep halt | 1 | `G2-CLOSE-INTERMEDIATE` attempt 1, `prep_halted`, $0.00 — a malformed `oracles:` key, fixed in `f13dd80`. |
+| Verification failure | 0 | No attempt was refused by the driver's re-verification. |
+| Guard refusal | 0 | No `produces_not_in_diff`, no closing-deliverable refusal. |
+
+Four of gate 2's nine implementation attempts failed, and all four failed for the
+same preventable reason. Unlike gate 1 — where the one blocked attempt bought the
+gate's most valuable finding — none of these bought anything. The gate's real
+finding (T06 deleting T02H's assertion) was found by this close, not by an
+attempt.
+
+## Measurements — gate 2
+
+Every command below ran fresh in this close session, from the working tree, with
+the repository venv (`.venv/bin/python`) and no git mutation. Working-tree source
+state equals `4ad0253647b8f5c461a1b56723549a802138c1c0` — the only uncommitted
+changes are this close's own artifacts, nothing under `specfuse/` or `tests/`.
+Per the dispatch contract this session ran no full suite, no coverage and no
+`tier: broad` gate.
+
+### feature_oracle: PASS
+
+| Oracle | Command | Result | Exit |
+|---|---|---|---|
+| Gate `feature_oracle` | `python3 -m unittest tests.test_triage_severity_end_to_end -v -b` | `Ran 5 tests`, `OK` | 0 |
+| T03's module | `python3 -m unittest tests.test_severity_rubric -v -b` | `Ran 10 tests`, `OK` | 0 |
+| T04's module | `python3 -m unittest tests.test_triage_severity_write -v -b` | `Ran 7 tests`, `OK` | 0 |
+| T05's module | `python3 -m unittest tests.test_triage_severity_classify -v -b` | `Ran 12 tests`, `OK` | 0 |
+| Gate 1's module, unregressed | `python3 -m unittest tests.test_marker_dual_shape -v -b` | `Ran 11 tests`, `OK` | 0 |
+| T03's unedited neighbours + the ratchet | `python3 -m unittest tests.test_provision_labels tests.test_label_provisioning_runner_contract tests.test_caller_check_ratchet -b` | `Ran 28 tests`, `OK` | 0 |
+| Triage write path + skill contract | `python3 -m unittest tests.test_triage tests.test_triage_apply tests.test_triage_skill_contract tests.test_triage_skips_agent_escalations -b` | `Ran 40 tests`, `OK` | 0 |
+| Provider, dial, invocation usage | `python3 -m unittest tests.test_agent_provider_triage tests.test_agent_policy_triage_dial tests.test_agent_invoke_usage -b` | `Ran 16 tests`, `OK` | 0 |
+| Downstream marker readers | `python3 -m unittest tests.test_bug_lane_run tests.test_agent_state -b` | `Ran 36 tests`, `OK` | 0 |
+| **Non-interference, by argv** | independent probe: `TriageProvider.execute` with an injected runner, five cases (A/B/C/D/E) | declares-own: **0** creates, **0** `--description`; declares-none: 4 creates all before the first `--add-label`; 3 issues: 1 listing, 4 creates | 0 |
+| Rubric-reader branch table | `read_severity_rubric` over five label-set shapes | as tabulated above; **0** creates on every declares-own shape | 0 |
+| Two-field marker byte-identity | `render_marker` over `CATEGORIES` × `CONFIDENCES` vs. the literal | 10 shapes, **0** mismatches; three-field form parses to `{'category','confidence','severity'}` | 0 |
+| T03#2 single-listing-site | `grep -c '"label", "list"' specfuse/loop/labels.py` | `1` | 0 |
+| T05#2 no second copy of the defaults | `grep -c "Minor impact\|Moderate impact\|Major impact\|Severe impact\|DEFAULT_SEVERITY_RUBRIC" specfuse/agent/triage_invoke.py` | `0` (negative observation) | 1 |
+| `DEFAULT_SEVERITY_RUBRIC` definition sites | `grep -rn DEFAULT_SEVERITY_RUBRIC --include="*.py" specfuse/` | defined once, `specfuse/loop/labels.py:347` | 0 |
+| T02H red-before | `git cat-file -e 8169640:tests/test_triage_severity_end_to_end.py` | `ABSENT` at the pre-unit tree | 1 |
+| T02H harness rewrite | `git diff --stat 3f1c2f7 a9ca8f1 -- tests/test_triage_severity_end_to_end.py` | +172/−39; class renamed, T02H's test name absent at HEAD | 0 |
+| Ratchet net effect | `git diff --stat 8169640..HEAD -- tests/test_caller_check_ratchet.py` | empty — added by T03, removed by `1a6a0d7` | 0 |
+| Gate 2 source scope | `git diff --stat 8169640..HEAD -- specfuse/ tests/` | 4 source files, 4 test files, +955/−37 | 0 |
+| Narrow tier for `close-intermediate` (`gate_set: plannext`) | `python3 .specfuse/scripts/lint_plan.py <feature_dir>` | reported in this close's RESULT block | — |
+| Closing lint | `python3 .specfuse/scripts/lint_plan.py <feature_dir> --closing` | reported in this close's RESULT block | — |
+
+**Driver broad runs, cited and not re-run.** Two `broad_run_result` events exist
+for gate 2. The first, `2026-09-18T02:46:19.667559+00:00`, recorded `ok: false`
+with `tests` failing on `test_the_baseline_has_not_silently_shrunk` and
+`coverage` failing as a consequence. After `1a6a0d7`, the second,
+`2026-09-18T02:56:51.893745+00:00`, recorded `ok: true`, `failing: []`, over the
+18-tree digest pinned in `GATE-02.md`'s `broad_run:` block — the tree this close
+runs against.

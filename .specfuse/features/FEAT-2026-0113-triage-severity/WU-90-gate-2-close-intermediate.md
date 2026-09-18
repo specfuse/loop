@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
 auto_close_disabled: true
 oracle_env: macos_local
@@ -12,7 +12,15 @@ oracles:
   # `oracles:` and it holds `recent-commits` and `diff-stat`; naming the
   # gate instead halted this unit pre-dispatch as a CONFIGURATION ERROR.
   - oracles
-duration_seconds: 0.003
+duration_seconds: 732.113
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.20.1
+started_at: 2026-09-18T02:59:55.394564+00:00
+cost_usd: 6.006714
+input_tokens: 106
+output_tokens: 51411
 ---
 
 # G2-CLOSE-INTERMEDIATE — close gate 2

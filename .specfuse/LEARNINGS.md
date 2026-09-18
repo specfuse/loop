@@ -4435,3 +4435,58 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   issue written under the new shape scans as unseen. Note also that a grep for `parse_marker`
   hits `loop/promotion.py`, which defines its *own* reader over `specfuse:promoted` and is not
   a triage caller — scoping a unit off that grep scopes it wrong.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A "we don't touch your X" promise is only worth the
+  argv sequence that proves it.** Gate 2 replaced a withdrawn opt-out with a non-interference
+  contract — a repository declaring its own `severity:*` labels gets nothing created and no
+  description rewritten — and the criterion was written as an assertion over the **whole**
+  recorded call sequence (`gh label create` count is 0, no argv anywhere contains
+  `--description`), not as "the run behaves equivalently" or "no label appears to change". The
+  two are not the same claim: "behaves equivalently" is satisfied by any test that does not
+  happen to look, while an argv assertion fails the moment a call appears that the contract
+  forbids, including one a future unit adds for an unrelated reason. **Drafting rule:** when a
+  feature promises not to touch something an operator owns — their labels, their config file,
+  their branch protection, their generated output — write the criterion as an assertion over
+  the complete observed call/write sequence with an explicit count of the forbidden operation,
+  and drive it from the caller that can actually see both branches. Prose equivalence is not a
+  criterion. Also probe the branch predicate directly, not only through the run: here the
+  declares-own test is `name.startswith("severity:")`, which is deliberately *wider* than
+  membership in the tool's own vocabulary, and only a direct probe of the reader shows that a
+  repository whose scheme shares no value with that vocabulary is left inert-but-untouched —
+  the correct precedence, and invisible from the run-level test alone.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **Separate the decision that gates an action from the
+  definition it is measured against; a safety constraint stated over the bundle ships a feature
+  that is inert by default.** The draft reasoned "severity policy must be the operator's" and
+  applied it to the whole bundle, concluding that a repository which had not invented its own
+  `severity:*` labels had opted out. That made the feature do nothing for exactly the
+  repositories it was built for — the motivating measurement was 31 issues stranded under a
+  floor because nothing wrote severity, and every one of those repositories was in the
+  opted-out branch. Unpicked, the bundle is two things: **where the floor sits**
+  (`rules.bugs.min_severity`, the decision gating unattended merges) must be the operator's,
+  and **what `high` means** need not be — every severity scheme in wide use ships vendor
+  definitions and lets the operator choose a threshold against them. Only the first is
+  load-bearing, and it is untouched either way. **Drafting rule:** when a plan justifies a
+  default with "that's the operator's call", name the specific decision that is theirs and
+  check whether the constraint you are about to write is wider than it. Then ask the inert-case
+  question outright — "what does a repository that did none of the optional setup get?" If the
+  answer is "nothing", the constraint is too wide, and no amount of correct implementation
+  fixes it. This one was caught at the arm checkpoint by an operator challenging the premise,
+  which is the checkpoint working; it was not caught by any criterion, because every criterion
+  was written downstream of the premise.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A later unit in the same gate can delete an earlier
+  unit's assertions, and nothing in the loop notices.** T02H was inserted as the gate's tracer
+  bullet and shipped one test pinning the pre-feature `gh` argv sequence, order asserted
+  structurally. Its body stated that the unit extending the module "does not rewrite the
+  harness". That unit rewrote it: +172/−39, the class renamed, T02H's test name absent at HEAD.
+  Most of the substance survived in a replacement test, but the ordering assertion for the
+  *severity-free* path — the degradation path an operator on a broken `gh` actually gets — did
+  not. Nothing flagged it: T02H's criteria were recorded green at T02H's tree, the suite stayed
+  green because the replacement passes, and the `produces:`-vs-diff guard cannot see it because
+  the file is legitimately in both units' `produces:` lists. The per-gate criteria artifact then
+  records a green with no test behind it. **Drafting rule:** when two units in one gate declare
+  the same file in `produces:`, the later unit's body must say which of the earlier unit's
+  assertions it is permitted to replace, and the close must diff the shared file between the two
+  units' commits rather than trusting "extends, does not rewrite" — that sentence is a wish, not
+  a guard. A shared `produces:` entry is the signal; there is no other.
