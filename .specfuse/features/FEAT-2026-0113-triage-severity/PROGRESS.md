@@ -8,3 +8,4 @@
   - note: PLAN.md's "three callers of parse_marker" is stale — gate 1's retrospective found six sites across five modules, and that corrected list is written into T04's Do-not-touch, not into PLAN.md.
 - **FEAT-2026-0113/T03**: attempt 2 outcome=spinning_signature_repeat
 - **FEAT-2026-0113/T04**: attempt 2 outcome=spinning_signature_repeat
+- **FEAT-2026-0113/T02H**: attempt 1 outcome=passed

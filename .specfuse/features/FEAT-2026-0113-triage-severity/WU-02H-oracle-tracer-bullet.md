@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0113/T02H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - tests/test_triage_severity_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T02:30:09.188047+00:00
+duration_seconds: 38.301
+cost_usd: 0.314276
+input_tokens: 18
+output_tokens: 3800
 ---
 
 # T02H — tracer bullet: the gate oracle exists and runs green
