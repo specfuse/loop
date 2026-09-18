@@ -21,3 +21,4 @@
 - **FEAT-2026-0113/T07**: Added specfuse/agent/severity_backfill.py (standalone --apply mode, marker-before-label write order, local _amend_marker stub, injected _STUB_SEVERITY), registered specfuse-backfill-severity in pyproject.toml's [project.scripts] (no other change to that file), and added tests/test_severity_backfill_end_to_end.py covering all four acceptance criteria.
   - note: T09 deletes _amend_marker (specfuse/agent/severity_backfill.py) once it switches the call site to triage.amend_marker_severity (T08); T10 replaces _STUB_SEVERITY with the real classification session.
 - **FEAT-2026-0113/T08**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T07H**: attempt 1 outcome=passed

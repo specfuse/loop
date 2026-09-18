@@ -150,6 +150,7 @@ class TestEveryConsoleScriptIsWired(unittest.TestCase):
         "specfuse/loop/events_stats.py",
         "specfuse/agent/run.py",
         "specfuse/monitor/cli.py",
+        "specfuse/agent/severity_backfill.py",
     )
 
     def test_each_entry_point_calls_the_check(self):

@@ -37,6 +37,7 @@ import subprocess
 from typing import Callable, Optional
 
 from specfuse.loop import triage
+from specfuse.loop.build_provenance import warn_if_out_of_tree
 
 #: Stands in for T10's classification session (gate 3, walking skeleton).
 _STUB_SEVERITY = "medium"
@@ -158,6 +159,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Optional[list] = None) -> int:
+    warn_if_out_of_tree()
     args = build_parser().parse_args(argv)
     report = backfill_severity(_default_runner, args.repo, args.issue, apply=args.apply)
     print(json.dumps(report))

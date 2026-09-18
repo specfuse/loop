@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T07H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 produces:
   - specfuse/agent/severity_backfill.py
   - tests/test_build_provenance.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:23:35.736919+00:00
+duration_seconds: 30.206
+cost_usd: 0.256693
+input_tokens: 18
+output_tokens: 2338
 ---
 
 # T07H — the backfill console script calls `warn_if_out_of_tree()`
