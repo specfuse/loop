@@ -151,12 +151,15 @@ gates:
         depends_on: [FEAT-2026-0113/T09]
       # type: human — the driver halts here and dispatches nothing. Placed
       # before the close on purpose (close-discipline.md §2).
+      - id: FEAT-2026-0113/T10H
+        file: WU-10H-remove-dead-tracer-path.md
+        depends_on: [FEAT-2026-0113/T10]
       - id: FEAT-2026-0113/T11
         file: WU-11-live-corpus-dry-run.md
         depends_on: [FEAT-2026-0113/T10]
       - id: FEAT-2026-0113/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: [FEAT-2026-0113/T08H, FEAT-2026-0113/T07H, FEAT-2026-0113/T07, FEAT-2026-0113/T08, FEAT-2026-0113/T09, FEAT-2026-0113/T10, FEAT-2026-0113/T11]
+        depends_on: [FEAT-2026-0113/T10H, FEAT-2026-0113/T08H, FEAT-2026-0113/T07H, FEAT-2026-0113/T07, FEAT-2026-0113/T08, FEAT-2026-0113/T09, FEAT-2026-0113/T10, FEAT-2026-0113/T11]
 ```
 
 ## Notes
