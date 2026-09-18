@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/G3-CLOSE
 type: close
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
@@ -43,6 +43,16 @@ honestly or recorded as `not_met` with `FOLLOW-UPS.md`.
 4. Gate 1's carried residual is recorded as discharged or re-carried by name: no
    oracle in gates 1 and 2 read a real issue body outside this repository, and
    `T11` is the unit placed to change that.
+5. **`specfuse/agent/severity_backfill.py` is diffed between the commits of the
+   three units that declare it** — `T07`, `T09`, `T10` — and the retrospective
+   states, per pair, which of the earlier unit's assertions the later one
+   replaced. This is gate 2's own durable lesson applied to gate 3: a shared
+   `produces:` entry is the signal, "extends, does not rewrite" is a wish rather
+   than a guard, and a per-gate criteria artifact can otherwise record a green
+   with no test behind it. `T09`'s `grep -c "def _amend_marker"` returning `0` is
+   evidence for one pair and not for the others; the diff is what covers the
+   rest.
+6. `specfuse lint --closing` exits 0 before this unit reports `complete`.
 
 **Do not touch.** Gate 1's and gate 2's work units, their files, and
 `GATE-01-CRITERIA.md` / `GATE-02-CRITERIA.md` — a terminal close reports on them

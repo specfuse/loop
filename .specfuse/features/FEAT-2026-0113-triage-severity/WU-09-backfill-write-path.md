@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/T09
 type: implementation
-status: draft
+status: pending
 attempts: 0
 planned_cost_usd: 3.00
 produces:
@@ -65,8 +65,9 @@ whose marked-issue branch stays exactly as it is; backfill is a second write
 path, not a new branch in the first one. The label-repair branch
 (`[FEAT-2026-0045/T01/marker-label-desync]`): an issue whose marker already
 carries a severity but whose `severity:<value>` label is missing is gate 2's
-repair case and is out of scope here. `specfuse/agent/run.py` (T07's flag branch
-is complete). `specfuse/loop/labels.py` and `specfuse/agent/triage_invoke.py`
+repair case and is out of scope here. `specfuse/agent/run.py` — the conductor is not edited by
+any unit in this gate (the Q1 arm-checkpoint decision; T07's criterion 2 asserts an
+empty diff on it), so there is nothing here to extend or complete. `specfuse/loop/labels.py` and `specfuse/agent/triage_invoke.py`
 (gate 2's). `rules.bugs.min_severity`.
 
 **Verification.** The narrow tier for `implementation` — the `code` gates in
