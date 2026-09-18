@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 4.50
 auto_close_disabled: true
@@ -9,6 +9,7 @@ oracle_env: macos_local
 oracles:
   - recent-commits
   - diff-stat
+duration_seconds: 0.003
 ---
 
 # G2-CLOSE-INTERMEDIATE — close gate 2
