@@ -44,6 +44,8 @@ __all__ = (
     "validate_agent_policy",
     "main",
     "SEVERITY_VALUES",
+    "read_severity_label",
+    "resolve_severity_aliases",
     "AUTOMERGE_VALUES",
     "GATE_REVIEW_VALUES",
     "PROVIDER_VALUES",
@@ -317,25 +319,42 @@ SEVERITY_ORDER = ("low", "medium", "high", "critical")
 SEVERITY_LABEL_PREFIX = "severity:"
 
 
-def severity_from_labels(labels) -> "str | None":
-    """The severity a `severity:<value>` label declares, or None (#3339).
+def read_severity_label(labels, aliases=None) -> "tuple[str | None, str | None]":
+    """`(severity, aliased_from)` for the first readable `severity:<value>`
+    label, or `(None, None)` (#3339, #3349).
 
-    Only values in `SEVERITY_VALUES` are read. `severity:minor` exists in the
-    wild and is not in the vocabulary; mapping it to `low` would be inventing
-    policy on an operator's behalf, so it reads as absent and the caller's
-    fail-closed rule decides what that means.
+    A value in `SEVERITY_VALUES` reads directly and `aliased_from` is None. A
+    value outside it reads only when *aliases* maps it to a vocabulary value,
+    in which case `aliased_from` is the label's own word — so a caller can say
+    which of the operator's labels a decision came from rather than reporting
+    a rank the label does not literally carry.
+
+    **The vocabulary always wins over an alias.** An alias is a way to make an
+    unknown word readable, never a way to redefine `severity:high`.
+
+    `severity:minor` exists in the wild and is not in the vocabulary. #3339
+    refused to map it to `low` on its own, and that refusal stands: nothing
+    here infers a mapping. The only reason an out-of-vocabulary label reads at
+    all is that an operator declared what it means.
     """
+    aliases = aliases or {}
     for label in labels or ():
         text = str(label).strip().lower()
-        if text.startswith(SEVERITY_LABEL_PREFIX):
-            value = text[len(SEVERITY_LABEL_PREFIX):].strip()
-            if value in SEVERITY_VALUES:
-                return value
-    return None
+        if not text.startswith(SEVERITY_LABEL_PREFIX):
+            continue
+        value = text[len(SEVERITY_LABEL_PREFIX):].strip()
+        if value in SEVERITY_VALUES:
+            return value, None
+        mapped = aliases.get(value)
+        if mapped in SEVERITY_VALUES:
+            return mapped, value
+    return None, None
+
 
 
 def meets_severity_floor(severity: "str | None",
-                         floor: "str | None") -> "tuple[bool, str]":
+                         floor: "str | None",
+                         via: "str | None" = None) -> "tuple[bool, str]":
     """Whether *severity* clears *floor*, and why not when it does not (#3339).
 
     Two rules, and the second is the one that keeps this safe to ship:
@@ -360,10 +379,19 @@ def meets_severity_floor(severity: "str | None",
     if severity is None:
         return False, (
             f"no severity label (floor is {floor}); add a "
-            f"`{SEVERITY_LABEL_PREFIX}<{'|'.join(SEVERITY_ORDER)}>` label"
+            f"`{SEVERITY_LABEL_PREFIX}<{'|'.join(SEVERITY_ORDER)}>` label, or "
+            f"declare what this repo's own labels mean under "
+            f"`rules.bugs.severity_aliases`"
         )
     if SEVERITY_ORDER.index(severity) < SEVERITY_ORDER.index(floor):
-        return False, f"severity {severity} is below the {floor} floor"
+        # `via` names the operator's own label when an alias produced this
+        # rank (#3349). Reporting the rank alone would read as a label the
+        # issue does not carry, and an operator checking the issue would not
+        # find it.
+        source = f"severity {severity}"
+        if via:
+            source = f"severity {severity} (via `{SEVERITY_LABEL_PREFIX}{via}`)"
+        return False, f"{source} is below the {floor} floor"
     return True, ""
 
 
@@ -382,6 +410,38 @@ def resolve_min_severity(path: "str | Path | None" = None) -> "str | None":
     bugs = rules.get("bugs") if isinstance(rules, dict) else None
     value = bugs.get("min_severity") if isinstance(bugs, dict) else None
     return value if value in SEVERITY_VALUES else None
+
+
+def resolve_severity_aliases(path: "str | Path | None" = None) -> dict:
+    """`rules.bugs.severity_aliases` as `{label_word: severity}` (#3349).
+
+    Empty when the key is absent, unusable, or names nothing legal — so a
+    deployment that never declared it behaves exactly as it did before this
+    key existed. Entries are filtered rather than raised on: the validator
+    already reports a bad target as an ERROR, and a single typo should not
+    discard the mappings beside it.
+
+    Keys are lower-cased to match how `read_severity_label` reads a label; a
+    key that is itself in `SEVERITY_VALUES` is dropped, since the vocabulary
+    wins there and keeping it would suggest otherwise.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return {}
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    raw = bugs.get("severity_aliases") if isinstance(bugs, dict) else None
+    if not isinstance(raw, dict):
+        return {}
+    resolved = {}
+    for key, value in raw.items():
+        word = str(key).strip().lower()
+        if not word or word in SEVERITY_VALUES:
+            continue
+        if value in SEVERITY_VALUES:
+            resolved[word] = value
+    return resolved
 
 
 def validate_agent_policy(path: str | Path | None = None) -> list[str]:
@@ -517,6 +577,28 @@ def _check_rules_bugs(bugs: object) -> list[str]:
             f"ERROR: 'rules.bugs.min_severity' has unknown value "
             f"{min_severity!r} — must be one of {sorted(SEVERITY_VALUES)}"
         )
+
+    if "severity_aliases" in bugs:
+        aliases = bugs["severity_aliases"]
+        if not isinstance(aliases, dict):
+            findings.append(
+                f"ERROR: 'rules.bugs.severity_aliases' must be a mapping of "
+                f"label word to severity (got {aliases!r})"
+            )
+        else:
+            for key, value in aliases.items():
+                word = str(key).strip().lower()
+                if word in SEVERITY_VALUES:
+                    findings.append(
+                        f"ERROR: 'rules.bugs.severity_aliases' aliases "
+                        f"{key!r}, which is already a severity value — the "
+                        f"vocabulary wins and the alias would never apply"
+                    )
+                elif value not in SEVERITY_VALUES:
+                    findings.append(
+                        f"ERROR: 'rules.bugs.severity_aliases.{key}' points at "
+                        f"{value!r} — must be one of {sorted(SEVERITY_VALUES)}"
+                    )
 
     automerge = bugs.get("automerge")
     if automerge not in AUTOMERGE_VALUES:

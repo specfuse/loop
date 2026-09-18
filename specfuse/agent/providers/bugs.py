@@ -30,8 +30,9 @@ from specfuse.agent.state import AgentSnapshot
 from specfuse.loop.agent_policy import (
     bug_lane_ci_wait_seconds,
     meets_severity_floor,
+    read_severity_label,
     resolve_min_severity,
-    severity_from_labels,
+    resolve_severity_aliases,
 )
 from specfuse.loop.bug_lane import REASON_CI_PENDING
 from specfuse.loop.bug_lane_run import (
@@ -640,6 +641,10 @@ class BugsProvider:
         # not change mid-pass, and re-reading it per issue would make an empty
         # lane cost one file read per open issue.
         floor = resolve_min_severity(self._policy_path)
+        # #3349: what this repo's own `severity:*` labels mean, when they are
+        # not spelled the way `SEVERITY_ORDER` spells them. Resolved beside the
+        # floor and for the same reason -- the policy does not change mid-pass.
+        aliases = resolve_severity_aliases(self._policy_path)
         for issue in snapshot.issues:
             if issue.triage_category != "bug":
                 continue
@@ -647,8 +652,8 @@ class BugsProvider:
                 continue
             if _has_open_pr(snapshot, issue.number):
                 continue
-            ok, why = meets_severity_floor(
-                severity_from_labels(issue.labels), floor)
+            severity, via = read_severity_label(issue.labels, aliases)
+            ok, why = meets_severity_floor(severity, floor, via=via)
             if not ok:
                 # Reported, not silent: with a floor set and nothing labelled,
                 # the lane advertises nothing, and an operator needs to see why

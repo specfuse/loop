@@ -44,16 +44,19 @@ class SeverityRank(unittest.TestCase):
 class SeverityFromLabels(unittest.TestCase):
 
     def test_a_severity_label_is_read(self):
-        self.assertEqual("high", agent_policy.severity_from_labels(
+        self.assertEqual(("high", None), agent_policy.read_severity_label(
             ["bug", "severity:high"]))
 
     def test_an_unknown_severity_value_is_not_read(self):
         # `severity:minor` is real in the wild and is NOT in the vocabulary.
         # Guessing a mapping would be inventing policy; it reads as absent.
-        self.assertIsNone(agent_policy.severity_from_labels(["severity:minor"]))
+        # #3349 added the one way it can read: an operator declaring what the
+        # word means under `rules.bugs.severity_aliases`. With no aliases
+        # passed, this is unchanged.
+        self.assertEqual((None, None), agent_policy.read_severity_label(["severity:minor"]))
 
     def test_no_severity_label_reads_as_absent(self):
-        self.assertIsNone(agent_policy.severity_from_labels(["bug", "triage"]))
+        self.assertEqual((None, None), agent_policy.read_severity_label(["bug", "triage"]))
 
 
 class MeetsFloor(unittest.TestCase):
