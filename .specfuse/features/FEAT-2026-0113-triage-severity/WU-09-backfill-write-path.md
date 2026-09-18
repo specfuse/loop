@@ -7,6 +7,10 @@ planned_cost_usd: 3.00
 produces:
   - specfuse/agent/severity_backfill.py
   - tests/test_severity_backfill_apply.py
+duration_seconds: 177.054
+cost_usd: 0.688403
+input_tokens: 32
+output_tokens: 18277
 ---
 
 # T09 — the backfill write path: marker amended first, label projected second

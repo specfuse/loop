@@ -1,7 +1,20 @@
 ---
 gate: 3
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_severity_backfill_end_to_end -v -b"
+baseline:
+  sha: 2ad6947f2f37e4817881cfad478733154fa4d245
+  probed_at: 2026-09-18T11:13:46.301258+00:00
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1243e6b0132b414c07fe5cbe686e160a4037550a:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:1e7eddd5a3fb006c5435e947cd08d29e4f2b3d83:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:68aa52d59df9de92481bf5033d40ba0435e4000f:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:93ee36315be5a8a103cff62f2d5f68e591030cf5:97bcab1bc7244262cec901f46035f51dfdd07278:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d07e72b6db906e22e1c0961f3f89c84f5c1f32a6:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:e72cd2d47186e8a0ff1f9158e04f1749f9f874e5
+  entry_sha: 2ad6947f2f37e4817881cfad478733154fa4d245
+  source: attributed:FEAT-2026-0113/T09
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "test_the_declared_console_scripts_match_the_wired_set"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 3 — backfill for issues already marked
