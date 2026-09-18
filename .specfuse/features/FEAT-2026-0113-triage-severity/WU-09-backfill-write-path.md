@@ -1,16 +1,21 @@
 ---
 id: FEAT-2026-0113/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/agent/severity_backfill.py
   - tests/test_severity_backfill_apply.py
-duration_seconds: 177.054
-cost_usd: 0.688403
-input_tokens: 32
-output_tokens: 18277
+duration_seconds: 139.928
+cost_usd: 0.738902
+input_tokens: 50
+output_tokens: 13741
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:24:06.115581+00:00
 ---
 
 # T09 — the backfill write path: marker amended first, label projected second

@@ -147,7 +147,7 @@ class SeverityBackfill(unittest.TestCase):
 
         import specfuse.agent.severity_backfill as mod
 
-        self.assertTrue(hasattr(mod, "_amend_marker"))
+        self.assertFalse(hasattr(mod, "_amend_marker"))
 
 
 if __name__ == "__main__":

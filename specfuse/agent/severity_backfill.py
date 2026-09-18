@@ -19,10 +19,12 @@ unattended run uses.
 
 - selection breadth -- takes a single issue number rather than T08's
   predicate over the whole open-issue listing;
-- the marker amendment -- `_amend_marker` below, which T08's
-  `amend_marker_severity` (`specfuse.loop.triage`) replaces and T09 deletes;
 - classification -- `_STUB_SEVERITY` stands in for T10's classification
   session.
+
+The marker amendment itself is `specfuse.loop.triage.amend_marker_severity`
+(T08); `apply_severity_backfill` below (T09) is the bulk, decision-list write
+path T10 will drive.
 
 **Not stubbed:** the write order. The marker's `severity=` field is
 authoritative and is written before the `severity:<value>` label, mirroring
@@ -47,19 +49,74 @@ def _default_runner(argv: list, check: bool = False):
     return subprocess.run(argv, check=check, capture_output=True, text=True)
 
 
-def _amend_marker(body: str, category: str, confidence: str, severity: str) -> str:
-    """Replace *body*'s two-field triage marker with the three-field form
-    carrying *severity*.
+def apply_severity_backfill(runner: Callable, repo: str, decisions: list) -> list:
+    """Record each decision in `decisions` against its GitHub issue, marker
+    first, label second.
 
-    Stub: assumes *body* carries the marker in exactly the form
-    `triage.render_marker(category, confidence)` renders it, with no other
-    fields. `specfuse.loop.triage.amend_marker_severity` (T08) is the real
-    amendment this is stood in for; T09 deletes this function when it
-    switches the call site over (§9).
+    Each decision is a mapping carrying `number`, `body` (the issue's
+    current body, as read at selection time) and `severity`. Mirrors
+    `specfuse.loop.triage.apply_triage`'s shape: the marker write is the
+    idempotency key, so a decision whose body already carries a
+    `severity=` field produces no `gh` calls at all and is reported
+    `skipped` on its row -- this is what bounds a repeat run over the same
+    candidates. A failed marker write leaves the label unwritten; a failed
+    label write is recorded on the row and never raised, leaving the
+    amended marker in place -- the marker is the authoritative record, the
+    label a projection re-derived from it (`PLAN.md`'s "Record
+    precedence").
     """
-    old_marker = triage.render_marker(category, confidence)
-    new_marker = triage.render_marker(category, confidence, severity)
-    return body.replace(old_marker, new_marker, 1)
+    results = []
+    for decision in decisions:
+        number = decision["number"]
+        body = decision.get("body") or ""
+        severity = decision["severity"]
+
+        fields = triage.parse_marker_fields(body)
+        if fields is None or fields.get("severity"):
+            results.append(
+                {
+                    "number": number,
+                    "skipped": True,
+                    "marker_written": False,
+                    "label_written": False,
+                }
+            )
+            continue
+
+        row = {
+            "number": number,
+            "severity": severity,
+            "skipped": False,
+        }
+
+        new_body = triage.amend_marker_severity(body, severity)
+        try:
+            runner(
+                ["gh", "issue", "edit", str(number), "--repo", repo, "--body", new_body],
+                check=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - recorded, not raised
+            row["marker_written"] = False
+            row["marker_error"] = str(exc)
+            row["label_written"] = False
+            results.append(row)
+            continue
+        row["marker_written"] = True
+
+        label = triage.severity_label_for(severity)
+        try:
+            runner(
+                ["gh", "issue", "edit", str(number), "--repo", repo, "--add-label", label],
+                check=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - label failure never raises
+            row["label_written"] = False
+            row["label_error"] = str(exc)
+        else:
+            row["label_written"] = True
+
+        results.append(row)
+    return results
 
 
 def _find_issue(runner: Callable, repo: str, issue_number: int) -> Optional[dict]:
@@ -127,7 +184,7 @@ def backfill_severity(
             "would_set_severity": chosen_severity,
         }
 
-    new_body = _amend_marker(body, category, confidence, chosen_severity)
+    new_body = triage.amend_marker_severity(body, chosen_severity)
     runner(
         ["gh", "issue", "edit", str(issue_number), "--repo", repo, "--body", new_body],
         check=True,

@@ -22,3 +22,4 @@
   - note: T09 deletes _amend_marker (specfuse/agent/severity_backfill.py) once it switches the call site to triage.amend_marker_severity (T08); T10 replaces _STUB_SEVERITY with the real classification session.
 - **FEAT-2026-0113/T08**: attempt 1 outcome=passed
 - **FEAT-2026-0113/T07H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T09**: attempt 1 outcome=passed
