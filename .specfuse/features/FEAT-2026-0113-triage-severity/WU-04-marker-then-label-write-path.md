@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0113/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/triage.py
@@ -10,10 +10,15 @@ produces:
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: other
 escalation_failure_signature: "ERROR: test_triage_severity_end_to_end (unittest.loader._FailedTest.test_triage_severity_end_to_end)"
-duration_seconds: 226.322
-cost_usd: 1.337279
-input_tokens: 90
-output_tokens: 22570
+duration_seconds: 135.998
+cost_usd: 0.692815
+input_tokens: 48
+output_tokens: 13053
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T02:35:12.615648+00:00
 ---
 
 # T04 — the write path records severity: marker first, label second

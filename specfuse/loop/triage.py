@@ -25,6 +25,7 @@ import json
 import re
 from typing import Callable, Optional
 
+from specfuse.loop.agent_policy import SEVERITY_LABEL_PREFIX
 from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
 from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, has_finding_marker
 
@@ -62,6 +63,10 @@ CATEGORY_LABEL_MAP = {
 }
 
 _MARKER_TEMPLATE = "<!-- specfuse:triage category={category} confidence={confidence} -->"
+_MARKER_TEMPLATE_WITH_SEVERITY = (
+    "<!-- specfuse:triage category={category} confidence={confidence} "
+    "severity={severity} -->"
+)
 _MARKER_RE = re.compile(r"<!-- specfuse:triage (?P<fields>.*?) -->")
 _MARKER_FIELD_RE = re.compile(r"(\S+)=(\S+)")
 
@@ -105,14 +110,26 @@ def labels_for(category: str) -> tuple:
     return (label,)
 
 
-def render_marker(category: str, confidence: str) -> str:
-    """Render the triage marker for `category`/`confidence`.
+def render_marker(category: str, confidence: str, severity: Optional[str] = None) -> str:
+    """Render the triage marker for `category`/`confidence`, plus `severity`
+    as a third field when given.
 
     Mirrors `monitor/issues.py`'s `_MARKER_TEMPLATE` convention: an
     HTML-comment marker embedded in the issue body, parsed back by
-    `parse_marker`.
+    `parse_marker`/`parse_marker_fields`. The two-field form is
+    byte-identical to what this rendered before `severity` existed -- every
+    marker already written in the wild is read against that exact string.
     """
-    return _MARKER_TEMPLATE.format(category=category, confidence=confidence)
+    if severity is None:
+        return _MARKER_TEMPLATE.format(category=category, confidence=confidence)
+    return _MARKER_TEMPLATE_WITH_SEVERITY.format(
+        category=category, confidence=confidence, severity=severity
+    )
+
+
+def severity_label_for(value: str) -> str:
+    """Return `value`'s projected `severity:<value>` label."""
+    return f"{SEVERITY_LABEL_PREFIX}{value}"
 
 
 def parse_marker_fields(body: str) -> Optional[dict]:
@@ -202,7 +219,10 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         marker = parse_marker(body)
         if marker is not None:
             marked_category, _marked_confidence = marker
+            marked_severity = (parse_marker_fields(body) or {}).get("severity")
             target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
+            if marked_severity:
+                target_labels = tuple(target_labels) + (severity_label_for(marked_severity),)
             existing_labels = {
                 label.get("name") for label in decision.get("labels") or []
             }
@@ -235,6 +255,8 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         if auto and confidence != "high":
             applied_category = "question"
 
+        severity = decision.get("severity")
+
         row = {
             "number": number,
             "category": applied_category,
@@ -242,8 +264,11 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
             "route": route_for(applied_category),
             "skipped": False,
         }
+        if severity:
+            row["severity"] = severity
 
-        new_body = f"{body}\n\n{render_marker(applied_category, confidence)}" if body else render_marker(applied_category, confidence)
+        marker = render_marker(applied_category, confidence, severity)
+        new_body = f"{body}\n\n{marker}" if body else marker
         try:
             runner(
                 ["gh", "issue", "edit", str(number), "--repo", repo, "--body", new_body],
@@ -257,12 +282,16 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
             continue
         row["marker_written"] = True
 
+        labels_to_add = list(labels_for(applied_category))
+        if severity:
+            labels_to_add.append(severity_label_for(severity))
+
         try:
             runner(
                 [
                     "gh", "issue", "edit", str(number),
                     "--repo", repo,
-                    "--add-label", ",".join(labels_for(applied_category)),
+                    "--add-label", ",".join(labels_to_add),
                 ],
                 check=True,
             )
