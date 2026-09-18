@@ -13,6 +13,8 @@ otherwise survive only as retrospective prose.
 
 ### T09 criterion 4 is not met: the backfill module still contains a `gh issue list` call site, now dead
 
+**Tracked as #3358.**
+
 **Criterion, verbatim (FEAT-2026-0113/T09, acceptance criterion 4):**
 
 > The write path neither lists nor classifies: `grep -c '"issue", "list"'` and
@@ -80,6 +82,8 @@ declines to look at underscore-prefixed names.
 
 ### The gate 3 `feature_oracle` passes while asserting only half the milestone it declares
 
+**Tracked as #3359.**
+
 **Not an acceptance criterion — a finding this close measured.** `GATE-03.md` declares:
 
 ```yaml
@@ -122,6 +126,8 @@ re-pointed at a command that does assert the pair, with the change recorded in
 gate's feature-level oracle is the outcome this entry exists to prevent.
 
 ### The measured 31 are selectable but not classifiable, and backfill can contradict a human-applied severity once the rubric widens
+
+**Tracked as #3360.**
 
 **Not an acceptance criterion — the feature's motivating question, answered `not yet`.**
 `PLAN.md` opened on 31 bug-marked issues carrying a marker and no severity label,
