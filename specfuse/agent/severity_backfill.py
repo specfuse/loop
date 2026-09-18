@@ -23,12 +23,6 @@ closed exactly as it does there; and nothing is written unless the caller passes
 `apply=True`. `apply_severity_backfill` (T09) is the bulk, decision-list write
 path `run_backfill` drives for the candidates that classified cleanly.
 
-`backfill_severity` (T07) is gate 3's tracer bullet: a single-issue path, still
-used by `GATE-03.md`'s `feature_oracle`, that stands in `_STUB_SEVERITY` for a
-classification session. `run_backfill` does not call it and does not share its
-stub -- the two coexist because the oracle that proved the write order end to
-end is not rewritten out from under itself.
-
 The marker amendment itself is `specfuse.loop.triage.amend_marker_severity`
 (T08). The write order -- marker before label -- is `apply_severity_backfill`'s
 (T09), mirroring `specfuse.loop.triage.apply_triage`'s own marker-first
@@ -239,61 +233,6 @@ def _find_issue(runner: Callable, repo: str, issue_number: int) -> Optional[dict
         if issue.get("number") == issue_number:
             return issue
     return None
-
-
-def backfill_severity(
-    runner: Callable,
-    repo: str,
-    issue_number: int,
-    *,
-    apply: bool = False,
-    severity: Optional[str] = None,
-) -> dict:
-    """Amend one marked, severity-less issue with a severity, marker first.
-
-    Returns a report dict, never raises. `apply=False` (the default) reports
-    what would happen without writing -- GATE-03.md Q2. *severity* overrides
-    `_STUB_SEVERITY` for callers that already know the value (tests, T10's
-    eventual switch-over); omitted, the stub value is used.
-    """
-    issue = _find_issue(runner, repo, issue_number)
-    if issue is None:
-        return {"number": issue_number, "amended": False, "reason": "issue not found"}
-
-    body = issue.get("body") or ""
-    fields = triage.parse_marker_fields(body)
-    if fields is None:
-        return {"number": issue_number, "amended": False, "reason": "no triage marker"}
-
-    category = fields.get("category")
-    confidence = fields.get("confidence")
-    if not category or not confidence:
-        return {"number": issue_number, "amended": False, "reason": "incomplete triage marker"}
-
-    if fields.get("severity"):
-        return {"number": issue_number, "amended": False, "reason": "already has severity"}
-
-    chosen_severity = severity or _STUB_SEVERITY
-
-    if not apply:
-        return {
-            "number": issue_number,
-            "amended": False,
-            "reason": "dry run",
-            "would_set_severity": chosen_severity,
-        }
-
-    new_body = triage.amend_marker_severity(body, chosen_severity)
-    runner(
-        ["gh", "issue", "edit", str(issue_number), "--repo", repo, "--body", new_body],
-        check=True,
-    )
-    label = triage.severity_label_for(chosen_severity)
-    runner(
-        ["gh", "issue", "edit", str(issue_number), "--repo", repo, "--add-label", label],
-        check=True,
-    )
-    return {"number": issue_number, "amended": True, "severity": chosen_severity}
 
 
 def build_parser() -> argparse.ArgumentParser:

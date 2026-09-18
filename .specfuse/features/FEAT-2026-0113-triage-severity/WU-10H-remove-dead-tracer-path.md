@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T10H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/agent/severity_backfill.py
   - tests/test_severity_backfill_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:54:18.073078+00:00
+duration_seconds: 69.162
+cost_usd: 0.462125
+input_tokens: 36
+output_tokens: 6109
 ---
 
 # T10H — remove `backfill_severity`, the superseded tracer-bullet path
