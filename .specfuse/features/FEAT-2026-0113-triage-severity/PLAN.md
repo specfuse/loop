@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0113-triage-severity
 roadmap_goal: Triage assigns a severity, so `min_severity` routes instead of stranding
 autonomy_default: review
 status: active
-planned_cost_usd: 43.50
+planned_cost_usd: 58.50
 ---
 
 # Plan: Triage assigns a severity
@@ -128,11 +128,29 @@ gates:
   - gate: 3
     file: GATE-03.md
     work_units:
-      # Scaffolded now so lint reads gate 1 as non-terminal.
-      # G2's plan-next fills in the substantive WUs above this entry.
+      # Drafted by FEAT-2026-0113/G2-PLAN. A layer per unit, serialised: T07 is
+      # the walking skeleton that turns the gate's feature_oracle green and is
+      # the only unit here permitted to stub (/authoring-work-units §14).
+      - id: FEAT-2026-0113/T07
+        file: WU-07-backfill-walking-skeleton.md
+        depends_on: []
+      - id: FEAT-2026-0113/T08
+        file: WU-08-backfill-selection-and-amend.md
+        depends_on: [FEAT-2026-0113/T07]
+      - id: FEAT-2026-0113/T09
+        file: WU-09-backfill-write-path.md
+        depends_on: [FEAT-2026-0113/T08]
+      - id: FEAT-2026-0113/T10
+        file: WU-10-backfill-run-shape.md
+        depends_on: [FEAT-2026-0113/T09]
+      # type: human — the driver halts here and dispatches nothing. Placed
+      # before the close on purpose (close-discipline.md §2).
+      - id: FEAT-2026-0113/T11
+        file: WU-11-live-corpus-dry-run.md
+        depends_on: [FEAT-2026-0113/T10]
       - id: FEAT-2026-0113/G3-CLOSE
         file: WU-90-gate-3-close.md
-        depends_on: []
+        depends_on: [FEAT-2026-0113/T07, FEAT-2026-0113/T08, FEAT-2026-0113/T09, FEAT-2026-0113/T10, FEAT-2026-0113/T11]
 ```
 
 ## Notes
@@ -168,11 +186,31 @@ gates:
   merges, but **what `high` means** need not be; severity schemes in wide use ship
   vendor-written definitions and let the operator pick the threshold against them.
   Only the first constraint is load-bearing, and it is untouched by either branch.
-- **Gate 3's sketch, not its plan.** The 31 measured issues are already marked, so the
-  marker's idempotency means nothing revisits them. Backfill re-reads already-marked
-  issues carrying no severity field, under an explicit mode rather than on every run.
-  Without it this feature classifies new issues and leaves the measured backlog exactly
-  as stranded, which is the problem that motivated it.
+- **Gate 3 (backfill) was drafted by `FEAT-2026-0113/G2-PLAN`** from what gate 2's
+  retrospective learned about the write path in practice — four substantive units
+  (T07 the walking skeleton, T08 selection and in-place marker amendment, T09 the
+  write path, T10 the run shape) plus a `type: human` unit (T11) and the terminal
+  close. The drafting decisions and the questions left open for the arming reviewer
+  are in `GATE-03-REVIEW.md`, not restated here.
+
+  **Gate 3's sketch, as it stood at plan time.** The 31 measured issues are already
+  marked, so the marker's idempotency means nothing revisits them. Backfill re-reads
+  already-marked issues carrying no severity field, under an explicit mode rather than
+  on every run. Without it this feature classifies new issues and leaves the measured
+  backlog exactly as stranded, which is the problem that motivated it.
+
+  **What the draft fixed that the sketch left open.** The explicit mode is
+  `specfuse-agent --backfill-severity`, reachable only from `main()`'s own flag
+  branch — `default_providers` gains nothing, so no conductor run can enter it.
+  Writes need `--apply`; without it the run prints its selection and writes nothing,
+  which is the form T11 runs against a real repository. The selection is the inverse
+  of `list_untriaged`'s exclusion (marker present, no `severity=` field), minus the
+  exclusions the normal path already applies, bounded by `--limit`. The stop
+  condition is the marker read one field deeper: an issue already carrying
+  `severity=` is not a candidate and is never written. Label provisioning is not
+  re-derived — backfill calls gate 2's `read_severity_rubric`, whose declares-none
+  branch already provisions idempotently and whose declares-own branch creates
+  nothing.
 - **Risk accepted deliberately.** This puts an agent on the value that gates unattended
   merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the
   rubric is a written definition per value — the operator's own words where they
@@ -225,11 +263,16 @@ was taken by this draft, not made by them, and is here for the gate-1 reviewer:
   being folded into `LABEL_REGISTRY`'s existing entries, so no existing caller of
   `provision_labels` starts creating severity labels as a side effect.
 - **Planned costs:** gate 1 — T01 $3.00, T01H $1.00, T02 $2.00. Gate 2 (drafted by
-  `G1-PLAN`) — T03 $3.00, T04 $3.00, T05 $2.50, T06 $3.00. The closing units take
-  the floors `planning-discipline.md` §5 sets rather than a guess — $4.50
-  `close-intermediate`, $6.00 `plan-next`, per gate — and the gate-3 terminal close
-  is scaffolded at its $5.00 floor. Feature total $43.50. Gate 1's implementation
-  came in at 0.27× its estimate (`RETROSPECTIVE.md`); gate 2's estimates are
-  deliberately left at the same scale rather than re-anchored on one gate of
-  under-run, since `planning-discipline.md` §5's own lesson is that a floor is a
-  distribution question.
+  `G1-PLAN`) — T02H $2.00, T03 $3.00, T04 $3.00, T05 $2.50, T06 $3.00. Gate 3
+  (drafted by `G2-PLAN`) — T07 $3.00, T08 $3.00, T09 $3.00, T10 $3.50, T11 $0.50.
+  The closing units take the floors `planning-discipline.md` §5 sets rather than a
+  guess — $4.50 `close-intermediate`, $6.00 `plan-next`, per gate — and the gate-3
+  terminal close sits at its $5.00 floor. Feature total **$58.50**, revised from
+  the $43.50 drafted at plan time: $2.00 for the mid-gate `T02H` insertion and
+  $13.00 for gate 3's five units, which were unestimated while gate 3 was
+  skeletal. Gates 1 and 2 both came in well under estimate
+  (`RETROSPECTIVE.md`); gate 3's units are deliberately left at the same scale
+  rather than re-anchored on two gates of under-run, since
+  `planning-discipline.md` §5's own lesson is that a floor is a distribution
+  question. T11 is a `type: human` unit and spends no agent budget; its $0.50
+  stands in for the operator's time, since a zero would read as unestimated.

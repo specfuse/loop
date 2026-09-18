@@ -1,10 +1,19 @@
 ---
 id: FEAT-2026-0113/G2-PLAN
 type: plan-next
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 oracle_env: macos_local
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.20.1
+started_at: 2026-09-18T03:12:07.705969+00:00
+duration_seconds: 807.28
+cost_usd: 6.310338
+input_tokens: 110
+output_tokens: 62622
 ---
 
 # G2-PLAN — draft gate 3

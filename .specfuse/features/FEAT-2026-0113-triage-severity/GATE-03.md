@@ -1,6 +1,7 @@
 ---
 gate: 3
 status: open
+feature_oracle: "python3 -m unittest tests.test_severity_backfill_end_to_end -v -b"
 ---
 
 # Gate 3 — backfill for issues already marked
@@ -15,7 +16,20 @@ Without this gate the feature classifies new issues and leaves the 31 measured
 stranded issues exactly as they are — the marker is their idempotency key and it is
 already written, so nothing else will ever revisit them.
 
-`feature_oracle` is set by the drafting agent.
+The `feature_oracle` above drives the backfill mode end to end over an injected
+runner: an open issue whose body carries a two-field triage marker and whose
+labels are complete — the shape `list_untriaged` excludes and nothing revisits —
+is re-read under `--backfill-severity --apply`, its marker amended with
+`severity=` and the `severity:<value>` label projected after it; and the same
+repository under a conductor run with no flag is left untouched, asserted by
+argv. Both halves are in one module because the milestone is the pair: a backfill
+that runs, and a normal run that does not.
+
+`FEAT-2026-0113/T07` is the walking skeleton that turns it green and is the only
+unit in this gate permitted to stub (`/authoring-work-units` §14). The oracle is
+appended to every attempt's gate list, so a gate whose oracle module lands last
+fails every earlier unit on `ModuleNotFoundError` — gate 2 paid four attempts for
+that ordering and `GATE-03-REVIEW.md` records the correction.
 
 ## Arming discipline (see `.specfuse/rules/planning-discipline.md`)
 
