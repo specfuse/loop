@@ -38,11 +38,17 @@ from specfuse.agent.run import (
 )
 from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.agent.state import AgentSnapshot
-from specfuse.agent.triage_invoke import build_invocation, classify_result
+from specfuse.agent.triage_invoke import build_invocation, classify_result, classify_severity
 from specfuse.loop.escalation import CATEGORY_LABELS
+from specfuse.loop.labels import read_severity_rubric
 from specfuse.loop.triage import CATEGORIES, apply_triage, list_untriaged
 
 _ITEM_ID_PREFIX = "triage-"
+
+#: Sentinel distinguishing "not fetched yet this run" from "fetched, empty
+#: rubric" -- `read_severity_rubric` legitimately returns `{}` on the
+#: degradation path (FEAT-2026-0113/T06), so `None`/`{}` can't do double duty.
+_RUBRIC_UNSET = object()
 
 
 def _triage_options() -> list:
@@ -181,9 +187,22 @@ class TriageProvider:
         self._policy_path = policy_path
         self._rows: dict = {}
         self._auto = False
+        self._rubric: Any = _RUBRIC_UNSET
+
+    def _rubric_for_run(self) -> dict:
+        """The repository's severity rubric, read at most once per run
+        (FEAT-2026-0113/T06 criterion 3) -- fetched lazily on the first
+        `execute()` call after an `advertise()`, so a run that classifies
+        nothing issues no `gh label list` at all."""
+        if self._rubric is _RUBRIC_UNSET:
+            self._rubric = read_severity_rubric(
+                self._working_dir, runner=self._runner, repo=self._repo
+            )
+        return self._rubric
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         self._auto = snapshot.triage_auto
+        self._rubric = _RUBRIC_UNSET
         rows = list_untriaged(self._runner, self._repo)
 
         self._rows = {}
@@ -249,7 +268,10 @@ class TriageProvider:
                 ),
             )
 
-        argv, prompt = build_invocation(number, title, body, self._repo, self._working_dir)
+        rubric = self._rubric_for_run()
+        argv, prompt = build_invocation(
+            number, title, body, self._repo, self._working_dir, rubric=rubric
+        )
         invoked = run_claude(argv, prompt, runner=self._runner)
         spend = usage_spend(invoked.usage)
         classification = classify_result(invoked.text)
@@ -305,12 +327,14 @@ class TriageProvider:
                 ),
             )
 
+        severity = classify_severity(invoked.text, rubric)
         decisions = [
             {
                 "number": number,
                 "body": body,
                 "category": category,
                 "confidence": confidence,
+                "severity": severity,
             }
         ]
         results = apply_triage(self._runner, self._repo, decisions, auto=self._auto)

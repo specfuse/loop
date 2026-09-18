@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/agent/providers/triage.py
   - tests/test_triage_severity_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T02:38:49.341086+00:00
+duration_seconds: 163.178
+cost_usd: 0.822717
+input_tokens: 40
+output_tokens: 14943
 ---
 
 # T06 — a run records severity, and never disturbs a repository's own severity labels
