@@ -8,6 +8,7 @@ produces no writes at all.
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from specfuse.agent.severity_backfill import apply_severity_backfill
 from specfuse.loop.triage import render_marker
@@ -111,3 +112,31 @@ class BackfillApply(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WritePathIssuesNoListing(unittest.TestCase):
+    """T09 criterion 4, enforced rather than only asserted at close (#3358).
+
+    The backfill write path does not list issues: selection is
+    `triage.list_severity_backfill_candidates`' job. **Only the listing half of
+    that criterion is enforced here.** Its `run_claude` half held at T09's own
+    tree and T10 then deliberately added classification to this module, so
+    asserting it now would pin a property the gate intentionally changed.
+    The criterion was a grep the close re-derived, and it was
+    measured failing at T09's own tree and again at HEAD — a dead `_find_issue`
+    helper left behind when `T10H` removed the `backfill_severity` tracer path
+    it served. The caller ratchet does not catch it because the ratchet checks
+    public symbols and this one is underscore-prefixed.
+    """
+
+    SUBJECT = Path(__file__).resolve().parents[1] / "specfuse/agent/severity_backfill.py"
+
+    def test_the_write_path_module_issues_no_gh_issue_list(self):
+        text = self.SUBJECT.read_text(encoding="utf-8")
+        self.assertEqual(
+            text.count('"issue", "list"'), 0,
+            "the backfill module must not list issues; selection is "
+            "triage.list_severity_backfill_candidates' job. Asserted on the "
+            "count so the failure names the defect rather than dumping the "
+            "module.",
+        )

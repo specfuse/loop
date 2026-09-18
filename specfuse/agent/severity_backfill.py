@@ -32,7 +32,6 @@ sequence.
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 from typing import Callable, Optional
 
@@ -210,29 +209,6 @@ def run_backfill(
                 row.update(result)
 
     return {"rubric": rubric, "candidates": candidates, "rows": rows, "reason": None}
-
-
-def _find_issue(runner: Callable, repo: str, issue_number: int) -> Optional[dict]:
-    result = runner(
-        [
-            "gh", "issue", "list",
-            "--repo", repo,
-            "--state", "open",
-            "--limit", "100",
-            "--json", "number,body,labels",
-        ],
-        check=False,
-    )
-    if result.returncode != 0 or not result.stdout:
-        return None
-    try:
-        issues = json.loads(result.stdout)
-    except ValueError:
-        return None
-    for issue in issues:
-        if issue.get("number") == issue_number:
-            return issue
-    return None
 
 
 def build_parser() -> argparse.ArgumentParser:
