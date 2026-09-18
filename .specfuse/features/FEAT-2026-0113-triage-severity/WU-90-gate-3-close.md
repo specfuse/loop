@@ -19,9 +19,9 @@ verdict: not_met
 driver_version: 0.20.1
 started_at: 2026-09-18T12:00:12.151470+00:00
 duration_seconds: 1089.082
-cost_usd: 9.523845
-input_tokens: 146
-output_tokens: 81823
+cost_usd: 9.713348
+input_tokens: 150
+output_tokens: 82149
 ---
 
 # G3-CLOSE — terminal close
