@@ -83,6 +83,15 @@ KIND_ESCALATION_ANSWER = "escalation-answer"
 KIND_FINDING_DIAGNOSE = "finding-diagnose"
 KIND_FINDING_AUTOFIX = "finding-autofix"
 
+#: The item kinds that open a pull request, and so the ones
+#: `budgets.max_open_prs` gates (#3340). Both dispatch a headless
+#: `/specfuse:fix-bug`, whose `completed` contract is an opened PR.
+#: `KIND_FEATURE` is deliberately absent: `FeatureProvider` runs the driver,
+#: which runs gates and commits — `/wrap-feature` opens that PR, interactively,
+#: outside any agent run. These are the same two kinds `_select_next` already
+#: ranks together in its bug tier.
+PR_OPENING_KINDS = frozenset({KIND_BUG, KIND_FINDING_AUTOFIX})
+
 
 class AgentLockHeldError(RuntimeError):
     """Another agent process already holds `.specfuse/.agent.lock`.
@@ -429,6 +438,7 @@ def _select_next(
     handled_ids: set,
     disabled: Optional[set] = None,
     on_advertise_error: Optional[Callable[[object, Exception], None]] = None,
+    suppressed_kinds: "frozenset | None" = None,
 ):
     """Return `("execute", provider, item)`, `("escalate", item, reason)`,
     or `("drained", None, None)`.
@@ -449,6 +459,10 @@ def _select_next(
     invocation and every shipped behaviour of the command became reachable
     only by passing `--features-root` explicitly. That fix normalised the one
     cause; the structural gap stayed, and there are six providers now.
+
+    *suppressed_kinds* names kinds this pass must not start. It is how
+    `budgets.max_open_prs` is enforced (#3340): at the cap, the kinds that
+    open a pull request advertise as usual and are simply not selected.
 
     A provider that raises is added to *disabled* and skipped for the rest of
     the run, with *on_advertise_error* called once for it. Excluding it
@@ -471,6 +485,12 @@ def _select_next(
             continue
         for item in advertised:
             if item.item_id in handled_ids:
+                continue
+            if suppressed_kinds and item.kind in suppressed_kinds:
+                # Not escalated and not marked handled: a suppressed kind is
+                # work the run declines to start right now, not work that
+                # failed. Leaving it unhandled means a later pass picks it up
+                # if the condition lifts -- a PR merged mid-run frees a slot.
                 continue
             candidates.append((provider, item))
 
@@ -734,6 +754,10 @@ def run_agent(
         # it is the narrower, more deliberate statement for one run.
         _tokens = agent_policy.resolve_max_tokens(max_tokens, policy_path)
         _items = agent_policy.resolve_max_items(max_items, policy_path)
+        # #3340's remaining half: the key was required, proposed and reviewed,
+        # and read by nothing that could act on it. No flag counterpart -- this
+        # is a property of the repository's state, not of one run's appetite.
+        _open_pr_cap = agent_policy.resolve_max_open_prs(policy_path)
 
         def _source(flag, resolved):
             if flag is not None:
@@ -751,6 +775,7 @@ def run_agent(
             max_minutes=(max_minutes, "flag" if max_minutes is not None else "none"),
             max_tokens=(_tokens, _source(max_tokens, _tokens)),
             max_items=(_items, _source(max_items, _items)),
+            max_open_prs=(_open_pr_cap, "policy" if _open_pr_cap is not None else "none"),
         ))
 
         # #3338: what was already marked `bug` before any item ran. The
@@ -765,6 +790,11 @@ def run_agent(
         handled_ids = set()
         snapshot_stale = False
         disabled_providers: set = set()
+        #: Whether the open-PR ceiling is currently engaged. Held across passes
+        #: only so the report fires on each transition rather than every pass:
+        #: `snapshot.prs` is re-read between items (#3338), so a PR merged
+        #: mid-run genuinely lifts this and the operator should see both edges.
+        open_prs_suppressed = False
         unisolated_providers: set = set()
         stop_reason = STOP_DRAINED
 
@@ -797,6 +827,28 @@ def run_agent(
                 )
                 snapshot_stale = False
 
+            # A failed PR listing leaves `snapshot.prs` empty with
+            # `prs_error` set. That reads as zero here, deliberately: the cap
+            # must not fire on a number the run could not measure, and #3338's
+            # refresh already carries the previous listing forward when it can.
+            suppressed_kinds = frozenset()
+            if _open_pr_cap is not None and len(snapshot.prs) >= _open_pr_cap:
+                suppressed_kinds = PR_OPENING_KINDS
+                if not open_prs_suppressed:
+                    report(
+                        f"max_open_prs reached — {len(snapshot.prs)} open PR(s) "
+                        f"at a cap of {_open_pr_cap}; not starting "
+                        f"{', '.join(sorted(PR_OPENING_KINDS))} items until one "
+                        f"closes"
+                    )
+                    open_prs_suppressed = True
+            elif open_prs_suppressed:
+                report(
+                    f"max_open_prs cleared — {len(snapshot.prs)} open PR(s) "
+                    f"against a cap of {_open_pr_cap}"
+                )
+                open_prs_suppressed = False
+
             action, a, b = _select_next(
                 providers,
                 snapshot,
@@ -804,6 +856,7 @@ def run_agent(
                 handled_ids,
                 disabled=disabled_providers,
                 on_advertise_error=_provider_failed_to_advertise,
+                suppressed_kinds=suppressed_kinds,
             )
 
             if action == "drained":
