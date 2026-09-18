@@ -69,40 +69,36 @@ class SeverityBackfill(unittest.TestCase):
         )
         self.assertEqual(diff.stdout, "")
 
-    @_NEEDS_MAIN
-    def test_pyproject_registers_exactly_one_new_console_script_no_dependency_change(self):
+    def test_pyproject_registers_the_backfill_console_script(self):
+        """The Q1 arm-checkpoint decision, as a merge-independent invariant.
+
+        This replaces a test that compared `[project.scripts]` against `main`
+        and asserted the entry was *added*. That claim is only true while the
+        feature is unmerged: once it lands on `main` the difference is empty
+        and the test is permanently red. It was written for the arm checkpoint,
+        where the question was "does this PR add exactly one script and smuggle
+        no dependency with it" — a question with no meaning after the merge,
+        because there is no baseline left to diff.
+
+        What survives the merge is the decision itself: the backfill is its own
+        console script pointing at its own module, and `specfuse-agent` is not
+        it. The no-dependency-change half is not reconstructable here and was
+        checked where it mattered, in review of the PR that introduced it.
+        """
         pyproject_text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-
-        show = subprocess.run(
-            ["git", "show", "main:pyproject.toml"],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
+        match = re.search(r"\[project\.scripts\]\n(.*?)\n\n", pyproject_text, re.DOTALL)
+        self.assertIsNotNone(match, "pyproject.toml declares no [project.scripts] block")
+        scripts = dict(
+            (line.split("=", 1)[0].strip(), line.split("=", 1)[1].strip().strip('"'))
+            for line in match.group(1).splitlines()
+            if "=" in line and not line.strip().startswith("#")
         )
-        self.assertEqual(show.returncode, 0)
-        main_text = show.stdout
-
-        def scripts_block(text: str) -> str:
-            match = re.search(r"\[project\.scripts\]\n(.*?)\n\n", text, re.DOTALL)
-            return match.group(1) if match else ""
-
-        head_scripts = set(scripts_block(pyproject_text).splitlines())
-        main_scripts = set(scripts_block(main_text).splitlines())
-        added = head_scripts - main_scripts
-        removed = main_scripts - head_scripts
-
-        self.assertEqual(removed, set())
         self.assertEqual(
-            added,
-            {'specfuse-backfill-severity = "specfuse.agent.severity_backfill:main"'},
+            scripts.get("specfuse-backfill-severity"),
+            "specfuse.agent.severity_backfill:main",
         )
-
-        def dependencies_block(text: str) -> str:
-            match = re.search(r"dependencies\s*=\s*\[.*?\]", text, re.DOTALL)
-            return match.group(0) if match else ""
-
-        self.assertEqual(dependencies_block(pyproject_text), dependencies_block(main_text))
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertNotEqual(
+            scripts.get("specfuse-agent"),
+            "specfuse.agent.severity_backfill:main",
+            "the conductor must not point at the backfill (GATE-03.md, Q1)",
+        )
