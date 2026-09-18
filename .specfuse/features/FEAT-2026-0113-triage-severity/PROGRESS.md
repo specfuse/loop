@@ -1,0 +1,30 @@
+- **FEAT-2026-0113/T01**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T02**: attempt 1 outcome=agent_reported_blocked
+- **FEAT-2026-0113/T01H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T02**: attempt 1 outcome=passed
+- **FEAT-2026-0113/G1-CLOSE-INTERMEDIATE**: Closed gate 1 — wrote RETROSPECTIVE.md's Gate 1 / Measurements / Cost analysis sections, recorded per-criterion oracle state for all 19 criteria in GATE-01-CRITERIA.md, and promoted one durable rule to .specfuse/LEARNINGS.md.
+  - note: PLAN.md understates parse_marker's blast radius — the tree has six call sites across five modules (agent/state.py, agent/triage_invoke.py, loop/triage.py x2, bug_lane_run.py, bug_lane_state.py), not the three the plan names, and agent/providers/triage.py is not a caller at all. loop/promotion.py greps like one but owns a separate specfuse:promoted marker. Gate 2 must scope from the tree, not the plan.
+- **FEAT-2026-0113/G1-PLAN**: Gate 2 is drafted — four substantive draft WUs plus its closing pair wired into PLAN.md's graph, GATE-02.md's feature_oracle set at run level, and GATE-02-REVIEW.md written with five explicit open questions.
+  - note: PLAN.md's "three callers of parse_marker" is stale — gate 1's retrospective found six sites across five modules, and that corrected list is written into T04's Do-not-touch, not into PLAN.md.
+- **FEAT-2026-0113/T03**: attempt 2 outcome=spinning_signature_repeat
+- **FEAT-2026-0113/T04**: attempt 2 outcome=spinning_signature_repeat
+- **FEAT-2026-0113/T02H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T03**: extracted `list_existing_labels` from `provision_labels` and added `read_severity_rubric`/`DEFAULT_SEVERITY_RUBRIC`/`SEVERITY_LABEL_SPECS` to specfuse/loop/labels.py, plus tests/test_severity_rubric.py.
+  - note: test_caller_check_ratchet.py needed read_severity_rubric added to BASELINE (no production caller until T04/T05/T06 wire it) — that's an edit outside produces:, flagged here for visibility.
+- **FEAT-2026-0113/T04**: render_marker gains an optional third severity= field (byte-identical two-field output preserved) and apply_triage writes marker before severity:<value> label on both the new-decision and repair paths, failing label writes recorded not raised.
+- **FEAT-2026-0113/T05**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T06**: TriageProvider.execute now reads the repository's severity rubric once per run (lazy-cached on advertise), threads it through classification, records severity in the marker before the label, and provisions the four default labels only when the repository defines none.
+- **FEAT-2026-0113/G2-CLOSE-INTERMEDIATE**: Gate 2's close writes the RETROSPECTIVE `## Gate 2` section (non-interference measured by argv, cost reconciled from events.jsonl, deferred-verification list, contract enumeration), fills all 25 entries of GATE-02-CRITERIA.md, promotes three durable rules to LEARNINGS.md, and adds the deferred CHANGELOG entry for the write path.
+  - note: Gate 3 (backfill) should know three things this close measured: (1) a repository whose severity scheme shares no value with SEVERITY_VALUES gets an empty rubric and no severity — untouched but inert, and `rules.bugs.severity_aliases` already holds the operator's mapping that nothing reads; (2) the once-per-run listing/provisioning bound is asserted only for the normal path, and a backfill mode re-entering `execute` per issue would re-list per issue; (3) T06 deleted an assertion T02H was dispatched to add — diff a shared `produces:` file between the two units' commits rather than trusting a body that says "extends, does not rewrite".
+- **FEAT-2026-0113/G2-PLAN**: Drafted gate 3 (backfill) as five work units plus its terminal close, set GATE-03.md's feature_oracle, and wrote GATE-03-REVIEW.md.
+  - note: The arming reviewer's cheapest wins are Q2 (dry-run default) and Q3 (`--limit` default) — both change what an operator's first command does and are cheaper to settle before T10 dispatches. Gate 2's deleted-assertion finding is unsolved at the loop level: when arming T09/T10, read what their test edits remove, not only what they add.
+- **FEAT-2026-0113/T07**: Added specfuse/agent/severity_backfill.py (standalone --apply mode, marker-before-label write order, local _amend_marker stub, injected _STUB_SEVERITY), registered specfuse-backfill-severity in pyproject.toml's [project.scripts] (no other change to that file), and added tests/test_severity_backfill_end_to_end.py covering all four acceptance criteria.
+  - note: T09 deletes _amend_marker (specfuse/agent/severity_backfill.py) once it switches the call site to triage.amend_marker_severity (T08); T10 replaces _STUB_SEVERITY with the real classification session.
+- **FEAT-2026-0113/T08**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T07H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T09**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T10**: Added run_backfill (T10) to specfuse/agent/severity_backfill.py -- rubric read once, each candidate classified via triage_invoke.build_invocation/classify_severity, writes only under apply=True via apply_severity_backfill (T09) -- and rewired the CLI (--repo/--limit/--apply, no issue arg) to drive it; new tests/test_severity_backfill_run.py covers the run shape.
+- **FEAT-2026-0113/T08H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T10H**: attempt 1 outcome=passed
+- **FEAT-2026-0113/G3-CLOSE**: Terminal close for FEAT-2026-0113 gate 3 — 37 criteria re-verified fresh (36 pass, T09#4 fail), the 31-stranded-issues question answered "reachable, not routable" on T11's live evidence, and three findings recorded with follow-ups.
+  - note: The gate's `feature_oracle` exits 0 while asserting only two structural tests; a green oracle is not evidence the oracle still asks the gate's declared question. Any future unit editing tests in a `feature_oracle`'s module should re-read the surviving test list against the gate's Definition of done.

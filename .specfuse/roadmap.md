@@ -111,6 +111,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-2026-0110) |
 | FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-2026-0111) |
 | FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
+| FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1007,6 +1008,29 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Scope boundary — deliberately out.** Distillation mechanics: the weights, the accept step and the lint all shipped in FEAT-2026-0111 and are not to be rebuilt. `LEARNINGS.md`'s own append contract.
 
 **Status: planned.**
+
+<a id="feat-2026-0113"></a>
+## FEAT-2026-0113 — Triage assigns a severity, so `min_severity` routes instead of stranding
+
+**Why.** Triage classifies an issue into a category (`bug | feature | duplicate | question | wontfix`) and a confidence, and assesses no severity. Nothing else in the loop does either — `severity:*` is not in `labels.LABEL_REGISTRY`, and the triage marker carries `category` and `confidence` only.
+
+That was survivable while `rules.bugs.min_severity` was unread. It is not now. #3339 made the floor enforce, #3349 let an operator declare what their own labels mean — and both only reach issues that carry a severity label, which nothing writes. Measured on a consumer repository (2026-09-17), of 56 bug-marked, non-human-owned issues, **31 carry no severity label at all**. Every one was triaged as `bug` by the agent, left unlabelled, and fails closed under a `medium` floor **permanently**: the marker is the idempotency key and it is already written, so nothing re-triages them. For a loop meant to run unattended, the triage step produces a classification deliberately insufficient to route what it classified (#3352).
+
+**Goal.** Triage assesses severity alongside category, against a rubric the operator authored, and records it where both the repair path and the bug lane can read it. Two decisions stay separate and only the first is automated: **severity-as-labelled is a technical classification** (the consumer repo's own labels define it as "Does not compile / runtime crash" / "Wrong behavior / missing element" / "Cosmetic / suboptimal" — observable properties of an issue body), while **where the floor sits stays the operator's** (`min_severity` is untouched by this feature).
+
+**Benefits.** The 31 stranded issues become routable, and future triaged bugs arrive with the field the lane needs rather than requiring a human pass the loop never asks for. A project that has not defined `severity:*` labels sees no change at all.
+
+**Shape — three gates.**
+
+1. **The dual-shape marker reader, no behaviour change.** `_MARKER_RE` is positionally anchored (`confidence=(?P<confidence>\S+) -->`), so appending a field makes it fail to match entirely and every new marker would scan as untriaged and be re-triaged on every run — the orphaning the published-marker contract explicitly warns about. The reader becomes a key/value scan inside the marker; `parse_marker` keeps its `(category, confidence)` contract for its existing callers. Nothing writes severity in this gate. Landed alone so backward compatibility is proved before anything depends on it.
+2. **Classification and the write path.** Rubric read from the operator's own `gh label list` descriptions — authored where the labels are authored, so it cannot drift from them, and no new policy key. Severity folded into the existing triage call (same body, same session, no extra dispatch). Low confidence on severity writes **no** severity label, failing closed to a human — the same shape `apply_triage` already uses when `auto=True` downgrades a low-confidence category to `question`. `apply_triage`'s "marker present, label missing" repair re-derives severity from the marker.
+3. **Backfill.** Re-read already-marked issues carrying no severity label, under an explicit mode rather than on every run. Without this the feature classifies new issues and leaves the measured backlog exactly as stranded, which is the problem that motivated it.
+
+**Risk accepted deliberately.** This has an agent assigning the value that gates unattended merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the rubric is the operator's, low confidence fails closed, the label stays visible and human-overridable, and `max_open_prs` (#3351) plus `max_diff_lines` cap blast radius regardless. Autonomy is `review` rather than `auto` for this reason — a wrong arm on a marker format change orphans every issue written under it.
+
+**Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
+
+**Status: active.**
 
 ## Notes
 

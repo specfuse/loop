@@ -25,7 +25,8 @@ import json
 import re
 from typing import Callable, Optional
 
-from specfuse.loop.escalation import NEEDS_HUMAN_LABEL
+from specfuse.loop.agent_policy import SEVERITY_LABEL_PREFIX
+from specfuse.loop.escalation import CATEGORY_LABELS, NEEDS_HUMAN_LABEL
 from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, has_finding_marker
 
 # Closed. A sixth category is a scope change, not a code change -- see
@@ -62,9 +63,12 @@ CATEGORY_LABEL_MAP = {
 }
 
 _MARKER_TEMPLATE = "<!-- specfuse:triage category={category} confidence={confidence} -->"
-_MARKER_RE = re.compile(
-    r"<!-- specfuse:triage category=(?P<category>\S+) confidence=(?P<confidence>\S+) -->"
+_MARKER_TEMPLATE_WITH_SEVERITY = (
+    "<!-- specfuse:triage category={category} confidence={confidence} "
+    "severity={severity} -->"
 )
+_MARKER_RE = re.compile(r"<!-- specfuse:triage (?P<fields>.*?) -->")
+_MARKER_FIELD_RE = re.compile(r"(\S+)=(\S+)")
 
 
 def route_for(category: str) -> str:
@@ -106,23 +110,53 @@ def labels_for(category: str) -> tuple:
     return (label,)
 
 
-def render_marker(category: str, confidence: str) -> str:
-    """Render the triage marker for `category`/`confidence`.
+def render_marker(category: str, confidence: str, severity: Optional[str] = None) -> str:
+    """Render the triage marker for `category`/`confidence`, plus `severity`
+    as a third field when given.
 
     Mirrors `monitor/issues.py`'s `_MARKER_TEMPLATE` convention: an
     HTML-comment marker embedded in the issue body, parsed back by
-    `parse_marker`.
+    `parse_marker`/`parse_marker_fields`. The two-field form is
+    byte-identical to what this rendered before `severity` existed -- every
+    marker already written in the wild is read against that exact string.
     """
-    return _MARKER_TEMPLATE.format(category=category, confidence=confidence)
+    if severity is None:
+        return _MARKER_TEMPLATE.format(category=category, confidence=confidence)
+    return _MARKER_TEMPLATE_WITH_SEVERITY.format(
+        category=category, confidence=confidence, severity=severity
+    )
+
+
+def severity_label_for(value: str) -> str:
+    """Return `value`'s projected `severity:<value>` label."""
+    return f"{SEVERITY_LABEL_PREFIX}{value}"
+
+
+def parse_marker_fields(body: str) -> Optional[dict]:
+    """Return every `key=value` field carried by `body`'s triage marker as a
+    dict, or `None` if `body` carries none.
+
+    Scans the fields as `key=value` pairs rather than a fixed sequence, so
+    field order and field count don't decide whether a marker is seen at
+    all -- a marker carrying an extra field (e.g. `severity=`) still parses.
+    """
+    match = _MARKER_RE.search(body or "")
+    if match is None:
+        return None
+    return dict(_MARKER_FIELD_RE.findall(match.group("fields")))
 
 
 def parse_marker(body: str) -> Optional[tuple]:
     """Return the `(category, confidence)` pair carried by `body`'s triage
     marker, or `None` if `body` carries none."""
-    match = _MARKER_RE.search(body or "")
-    if match is None:
+    fields = parse_marker_fields(body)
+    if fields is None:
         return None
-    return (match.group("category"), match.group("confidence"))
+    category = fields.get("category")
+    confidence = fields.get("confidence")
+    if not category or not confidence:
+        return None
+    return (category, confidence)
 
 
 def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:
@@ -185,7 +219,10 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         marker = parse_marker(body)
         if marker is not None:
             marked_category, _marked_confidence = marker
+            marked_severity = (parse_marker_fields(body) or {}).get("severity")
             target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
+            if marked_severity:
+                target_labels = tuple(target_labels) + (severity_label_for(marked_severity),)
             existing_labels = {
                 label.get("name") for label in decision.get("labels") or []
             }
@@ -218,6 +255,8 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
         if auto and confidence != "high":
             applied_category = "question"
 
+        severity = decision.get("severity")
+
         row = {
             "number": number,
             "category": applied_category,
@@ -225,8 +264,11 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
             "route": route_for(applied_category),
             "skipped": False,
         }
+        if severity:
+            row["severity"] = severity
 
-        new_body = f"{body}\n\n{render_marker(applied_category, confidence)}" if body else render_marker(applied_category, confidence)
+        marker = render_marker(applied_category, confidence, severity)
+        new_body = f"{body}\n\n{marker}" if body else marker
         try:
             runner(
                 ["gh", "issue", "edit", str(number), "--repo", repo, "--body", new_body],
@@ -240,12 +282,16 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
             continue
         row["marker_written"] = True
 
+        labels_to_add = list(labels_for(applied_category))
+        if severity:
+            labels_to_add.append(severity_label_for(severity))
+
         try:
             runner(
                 [
                     "gh", "issue", "edit", str(number),
                     "--repo", repo,
-                    "--add-label", ",".join(labels_for(applied_category)),
+                    "--add-label", ",".join(labels_to_add),
                 ],
                 check=True,
             )
@@ -303,3 +349,85 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
         row["already_structured"] = has_finding_marker(body)
         untriaged.append(row)
     return untriaged
+
+
+#: The `gh issue list` window size a backfill page grows by. Deliberately
+#: not `limit` itself -- criterion 2 of
+#: `[FEAT-2026-0113/T08H/limit-bounds-candidates]`: a small `limit` must not
+#: shrink the listing window, since candidates cluster in the oldest issues
+#: and a stranded backlog is old by construction.
+_BACKFILL_PAGE_SIZE = DEFAULT_LIST_LIMIT
+
+
+def _is_backfill_candidate(issue: dict) -> bool:
+    body = issue.get("body") or ""
+    fields = parse_marker_fields(body)
+    if fields is None:
+        return False
+    if fields.get("severity"):
+        return False
+    category = fields.get("category")
+    if category not in CATEGORIES:
+        return False
+    if has_finding_marker(body):
+        return False
+    existing_labels = {label.get("name") for label in issue.get("labels") or []}
+    if existing_labels & CATEGORY_LABELS:
+        return False
+    return True
+
+
+def list_severity_backfill_candidates(
+    runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT
+) -> list:
+    """Return up to `limit` already-marked, severity-less open issues a
+    backfill run may amend.
+
+    The inverse of `list_untriaged`'s exclusion: a marked issue is normally
+    done and skipped, but one whose marker carries no `severity=` field is
+    exactly what a backfill exists to touch. Reuses the exclusions the normal
+    triage path already applies rather than re-deriving them -- a harvester
+    finding (`has_finding_marker`) and an agent-authored escalation (any
+    label in `escalation.CATEGORY_LABELS`) are both left alone. An issue
+    whose marker names a category outside `CATEGORIES`, carries no marker at
+    all, or already carries `severity=` is not a candidate.
+
+    `limit` bounds how many *candidates* are returned, not how many open
+    issues are listed -- `[FEAT-2026-0113/T08H/limit-bounds-candidates]`.
+    The underlying `gh issue list` window grows in `_BACKFILL_PAGE_SIZE`
+    steps, each page re-listing from the start (`gh`'s own listing has no
+    cursor), until `limit` candidates are found or the repository's open
+    issues are exhausted (a page shorter than the window it asked for).
+    """
+    candidates: list = []
+    window = _BACKFILL_PAGE_SIZE
+    scanned = 0
+    while True:
+        issues = _list_open_issues(runner, repo, limit=window)
+        for issue in issues[scanned:]:
+            if _is_backfill_candidate(issue):
+                candidates.append(issue)
+                if len(candidates) >= limit:
+                    return candidates
+        scanned = len(issues)
+        if len(issues) < window:
+            return candidates
+        window += _BACKFILL_PAGE_SIZE
+
+
+def amend_marker_severity(body: str, severity: str) -> str:
+    """Replace `body`'s existing triage marker in place with one that also
+    carries `severity`, keeping `category=`/`confidence=` unchanged.
+
+    Returns `body` unchanged, by string equality, when it carries no marker
+    or its marker already carries a `severity=` field -- there is nothing to
+    amend in either case. Rendered through `render_marker` rather than a
+    fourth marker literal, so the two template strings stay the only place a
+    marker's shape is spelled out.
+    """
+    fields = parse_marker_fields(body)
+    if fields is None or fields.get("severity"):
+        return body
+    match = _MARKER_RE.search(body)
+    new_marker = render_marker(fields.get("category"), fields.get("confidence"), severity)
+    return body[: match.start()] + new_marker + body[match.end() :]

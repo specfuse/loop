@@ -4406,3 +4406,130 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   for units absent from `PLAN.baseline.json`. If any exist, write the cost analysis anyway.
   And do not raise estimates on a "touches the driver" label: here that label over-priced
   four units by ~5× while the unit that actually failed twice was priced as routine.
+
+- [FEAT-2026-0113/G1-CLOSE-INTERMEDIATE] **Loosening a published marker's reader and making it
+  fail closed are the same edit; a gate that asks only for tolerance ships a fail-open sweep.**
+  `triage.parse_marker` was positionally anchored, so a marker carrying a third field failed to
+  match at all. T01 replaced the anchor with a `key=value` field scan and satisfied every one of
+  its seven criteria — including "byte-identical behaviour for a two-field marker". It was not
+  byte-identical for a *malformed* one: three shapes the anchor had safely rejected as `None`
+  (`category=bug` with no `confidence`, `confidence=` empty, `category=` empty) now raised
+  `KeyError`, and `parse_marker` is called on every open issue from six call sites across five
+  modules, so one malformed marker raises out of a whole sweep. The malformed literal was
+  already in the tree. No criterion asked, and the full suite stayed green because that literal
+  is never fed to the reader. It cost a blocked attempt ($0.53, 33% of the gate's
+  implementation spend) for the next unit's corpus to find it. **Drafting rule:** when a unit
+  widens a parser over a published format, pair every "X still parses" criterion with an
+  explicit "a marker the reader cannot fully understand reads as *absent*, and never raises"
+  criterion, spelled as a lookup that cannot raise rather than a `try/except` — an exception
+  swallowed is a different contract from a value that was never there. And check the caller
+  count from the tree, not from the plan: the plan said three, the tree had six.
+  **This generalizes past triage.** The codebase ships ten `_MARKER_TEMPLATE`-convention
+  published markers (`specfuse:finding`, `specfuse:autofix-attempt`, `specfuse:question`,
+  `specfuse:answered-escalation`, `specfuse:promoted`, `specfuse:sla-repinged`,
+  `specfuse:escalation`, `specfuse:triage`, `specfuse:followup`, `specfuse:bug-automerge`) and
+  after this gate `specfuse:triage` is the only one read by a field scan; the other nine are
+  positionally anchored. `specfuse:autofix-attempt` is the one to watch — it is the only other
+  multi-field marker (`fingerprint=(?P<fingerprint>\S+) at=(?P<at>[0-9.]+)`) and therefore
+  carries triage's exact latent defect: adding a field breaks the match entirely, and every
+  issue written under the new shape scans as unseen. Note also that a grep for `parse_marker`
+  hits `loop/promotion.py`, which defines its *own* reader over `specfuse:promoted` and is not
+  a triage caller — scoping a unit off that grep scopes it wrong.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A "we don't touch your X" promise is only worth the
+  argv sequence that proves it.** Gate 2 replaced a withdrawn opt-out with a non-interference
+  contract — a repository declaring its own `severity:*` labels gets nothing created and no
+  description rewritten — and the criterion was written as an assertion over the **whole**
+  recorded call sequence (`gh label create` count is 0, no argv anywhere contains
+  `--description`), not as "the run behaves equivalently" or "no label appears to change". The
+  two are not the same claim: "behaves equivalently" is satisfied by any test that does not
+  happen to look, while an argv assertion fails the moment a call appears that the contract
+  forbids, including one a future unit adds for an unrelated reason. **Drafting rule:** when a
+  feature promises not to touch something an operator owns — their labels, their config file,
+  their branch protection, their generated output — write the criterion as an assertion over
+  the complete observed call/write sequence with an explicit count of the forbidden operation,
+  and drive it from the caller that can actually see both branches. Prose equivalence is not a
+  criterion. Also probe the branch predicate directly, not only through the run: here the
+  declares-own test is `name.startswith("severity:")`, which is deliberately *wider* than
+  membership in the tool's own vocabulary, and only a direct probe of the reader shows that a
+  repository whose scheme shares no value with that vocabulary is left inert-but-untouched —
+  the correct precedence, and invisible from the run-level test alone.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **Separate the decision that gates an action from the
+  definition it is measured against; a safety constraint stated over the bundle ships a feature
+  that is inert by default.** The draft reasoned "severity policy must be the operator's" and
+  applied it to the whole bundle, concluding that a repository which had not invented its own
+  `severity:*` labels had opted out. That made the feature do nothing for exactly the
+  repositories it was built for — the motivating measurement was 31 issues stranded under a
+  floor because nothing wrote severity, and every one of those repositories was in the
+  opted-out branch. Unpicked, the bundle is two things: **where the floor sits**
+  (`rules.bugs.min_severity`, the decision gating unattended merges) must be the operator's,
+  and **what `high` means** need not be — every severity scheme in wide use ships vendor
+  definitions and lets the operator choose a threshold against them. Only the first is
+  load-bearing, and it is untouched either way. **Drafting rule:** when a plan justifies a
+  default with "that's the operator's call", name the specific decision that is theirs and
+  check whether the constraint you are about to write is wider than it. Then ask the inert-case
+  question outright — "what does a repository that did none of the optional setup get?" If the
+  answer is "nothing", the constraint is too wide, and no amount of correct implementation
+  fixes it. This one was caught at the arm checkpoint by an operator challenging the premise,
+  which is the checkpoint working; it was not caught by any criterion, because every criterion
+  was written downstream of the premise.
+
+- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A later unit in the same gate can delete an earlier
+  unit's assertions, and nothing in the loop notices.** T02H was inserted as the gate's tracer
+  bullet and shipped one test pinning the pre-feature `gh` argv sequence, order asserted
+  structurally. Its body stated that the unit extending the module "does not rewrite the
+  harness". That unit rewrote it: +172/−39, the class renamed, T02H's test name absent at HEAD.
+  Most of the substance survived in a replacement test, but the ordering assertion for the
+  *severity-free* path — the degradation path an operator on a broken `gh` actually gets — did
+  not. Nothing flagged it: T02H's criteria were recorded green at T02H's tree, the suite stayed
+  green because the replacement passes, and the `produces:`-vs-diff guard cannot see it because
+  the file is legitimately in both units' `produces:` lists. The per-gate criteria artifact then
+  records a green with no test behind it. **Drafting rule:** when two units in one gate declare
+  the same file in `produces:`, the later unit's body must say which of the earlier unit's
+  assertions it is permitted to replace, and the close must diff the shared file between the two
+  units' commits rather than trusting "extends, does not rewrite" — that sentence is a wish, not
+  a guard. A shared `produces:` entry is the signal; there is no other.
+
+- [FEAT-2026-0113/G3-CLOSE] **A walking skeleton is deleted as a *unit*, not as a symbol, and a
+  public-symbol ratchet cannot tell you when you have finished.** Gate 3's tracer bullet was one
+  public function (`backfill_severity`) plus two private helpers it alone used (`_find_issue`,
+  `_STUB_SEVERITY`). The caller ratchet failed the once-per-gate broad run on the public one, a
+  hygiene unit was inserted to remove it, that unit checked coverage properly before deleting
+  (#3328's ruling) and removed exactly what the ratchet named — and left both private helpers
+  behind, dead, in the shipped module. Nothing can catch that: `caller_check` reports public
+  symbols whose only callers are tests, by design, so a private helper orphaned by a deletion is
+  invisible to it, and coverage stayed above its floor because dead code is simply never
+  executed. **Drafting rule:** when a unit's job is "remove the tracer bullet", its criteria name
+  the *whole* skeleton — every symbol the walking-skeleton unit introduced and no later unit
+  adopted — and assert each one's absence, rather than inheriting the scope from whatever the
+  ratchet happened to flag. The tracer-bullet unit is where that list should be written down, at
+  the moment it is still obvious which symbols are scaffolding.
+
+- [FEAT-2026-0113/G3-CLOSE] **A criterion whose claim is function-scoped and whose oracle is
+  module-scoped passes or fails for reasons unrelated to the claim.** T09's criterion 4 read "the
+  write path neither lists nor classifies" and proved it with `grep -c '"issue", "list"'` over the
+  whole file. The write path genuinely neither lists nor classifies; the grep returned `1`
+  anyway, because a sibling function introduced by an earlier unit in the same gate sat next door
+  in the same module. The criterion was recorded green by the unit that ran it and measured red by
+  the close, and neither reading tells you anything about the write path. **Drafting rule:** scope
+  the oracle to the thing the claim is about — a grep bounded to the function body, an argv
+  assertion over the call sequence the function actually issues, or an import-graph check — and
+  reserve whole-file greps for whole-file claims ("this module defines the classifier exactly
+  once"). A file-scoped grep in a module more than one unit writes to is measuring the gate's
+  drafting order, not the code.
+
+- [FEAT-2026-0113/G3-CLOSE] **An authorised, coverage-checked deletion can still hollow out the
+  gate's own `feature_oracle`.** Gate 2's lesson was the unauthorised case: a later unit silently
+  deleted an earlier unit's assertions and nothing noticed. Gate 3 did everything that lesson
+  asks — the deletion was its own dispatched unit, its body named the surviving assertion, its
+  criteria required that survivor to be *shown running* rather than assumed — and the gate's
+  `feature_oracle` still ended up passing on two structural tests, with the end-to-end half of the
+  milestone its own `GATE-NN.md` declares it drives no longer asserted anywhere in that module.
+  The authorisation asked "is this behaviour covered somewhere?", which is the right question for
+  deleting a test and the wrong one for deleting *from the module a `feature_oracle` names*.
+  **Drafting rule:** a unit that edits or deletes tests in the module a gate's `feature_oracle`
+  points at carries one extra criterion — after this unit, the `feature_oracle` still asserts the
+  gate's Definition of done, named clause by clause — and the close re-reads the oracle's surviving
+  test list against that definition rather than only reading its exit code. A green oracle is not
+  evidence that the oracle still asks the question.
