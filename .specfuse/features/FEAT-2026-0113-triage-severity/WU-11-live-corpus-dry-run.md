@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0113/T11
 type: human
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 0.50
 ---
