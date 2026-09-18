@@ -6,3 +6,4 @@
   - note: PLAN.md understates parse_marker's blast radius — the tree has six call sites across five modules (agent/state.py, agent/triage_invoke.py, loop/triage.py x2, bug_lane_run.py, bug_lane_state.py), not the three the plan names, and agent/providers/triage.py is not a caller at all. loop/promotion.py greps like one but owns a separate specfuse:promoted marker. Gate 2 must scope from the tree, not the plan.
 - **FEAT-2026-0113/G1-PLAN**: Gate 2 is drafted — four substantive draft WUs plus its closing pair wired into PLAN.md's graph, GATE-02.md's feature_oracle set at run level, and GATE-02-REVIEW.md written with five explicit open questions.
   - note: PLAN.md's "three callers of parse_marker" is stale — gate 1's retrospective found six sites across five modules, and that corrected list is written into T04's Do-not-touch, not into PLAN.md.
+- **FEAT-2026-0113/T03**: attempt 2 outcome=spinning_signature_repeat

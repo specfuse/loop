@@ -1,12 +1,19 @@
 ---
 id: FEAT-2026-0113/T03
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/labels.py
   - tests/test_severity_rubric.py
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: other
+escalation_failure_signature: "ERROR: test_triage_severity_end_to_end (unittest.loader._FailedTest.test_triage_severity_end_to_end)"
+duration_seconds: 390.928
+cost_usd: 1.718585
+input_tokens: 106
+output_tokens: 34634
 ---
 
 # T03 — extract the label listing, and read the severity rubric from it
