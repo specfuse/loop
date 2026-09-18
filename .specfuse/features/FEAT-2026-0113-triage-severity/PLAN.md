@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0113-triage-severity
 roadmap_goal: Triage assigns a severity, so `min_severity` routes instead of stranding
 autonomy_default: review
 status: active
-planned_cost_usd: 21.50
+planned_cost_usd: 43.50
 ---
 
 # Plan: Triage assigns a severity
@@ -102,7 +102,26 @@ gates:
         depends_on: [FEAT-2026-0113/G1-CLOSE-INTERMEDIATE]
   - gate: 2
     file: GATE-02.md
-    work_units: []
+    work_units:
+      - id: FEAT-2026-0113/T03
+        file: WU-03-severity-rubric-reader.md
+        depends_on: []
+      - id: FEAT-2026-0113/T04
+        file: WU-04-marker-then-label-write-path.md
+        depends_on: []
+      - id: FEAT-2026-0113/T05
+        file: WU-05-classify-severity-fails-closed.md
+        depends_on: [FEAT-2026-0113/T03, FEAT-2026-0113/T04]
+      - id: FEAT-2026-0113/T06
+        file: WU-06-run-records-severity-end-to-end.md
+        depends_on: [FEAT-2026-0113/T05]
+      # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
+      - id: FEAT-2026-0113/G2-CLOSE-INTERMEDIATE
+        file: WU-90-gate-2-close-intermediate.md
+        depends_on: [FEAT-2026-0113/T03, FEAT-2026-0113/T04, FEAT-2026-0113/T05, FEAT-2026-0113/T06]
+      - id: FEAT-2026-0113/G2-PLAN
+        file: WU-91-gate-2-plan-next.md
+        depends_on: [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE]
   - gate: 3
     file: GATE-03.md
     work_units:
@@ -115,9 +134,12 @@ gates:
 
 ## Notes
 
-- **Gate 2 (classification and the write path)** and **gate 3 (backfill)** are
-  deliberately skeletal. Gate 1's `plan-next` drafts gate 2 from what gate 1's
-  retrospective actually learned about the marker's shape in the wild.
+- **Gate 3 (backfill)** is deliberately skeletal; gate 2's `plan-next` drafts it.
+  **Gate 2 was drafted by `FEAT-2026-0113/G1-PLAN`** from what gate 1's
+  retrospective learned about the marker's shape in the wild — four substantive
+  units (T03 rubric reader, T04 write path, T05 classification, T06 the run) plus
+  its closing pair. The drafting decisions and the questions left open for the
+  arming reviewer are in `GATE-02-REVIEW.md`, not restated here.
 - **Gate 2's sketch, not its plan.** Extract a label reader from `labels.py`; read the
   rubric from each `severity:*` label's own `description`; fold severity into the
   existing triage call so no extra session is dispatched; write marker then label per
@@ -176,7 +198,12 @@ was taken by this draft, not made by them, and is here for the gate-1 reviewer:
   diff and a test run.
 - **No `severity:*` entry is added to `LABEL_REGISTRY`.** Severity labels are
   repo-owned, and not defining them is how a project opts out.
-- **Planned costs:** T01 $3.00, T01H $1.00, T02 $2.00. The closing units take the floors
-  `planning-discipline.md` §5 sets rather than a guess — $4.50
-  `close-intermediate`, $6.00 `plan-next` — and the gate-3 terminal close is
-  scaffolded at its $5.00 floor. Feature total $21.50.
+- **Planned costs:** gate 1 — T01 $3.00, T01H $1.00, T02 $2.00. Gate 2 (drafted by
+  `G1-PLAN`) — T03 $3.00, T04 $3.00, T05 $2.50, T06 $3.00. The closing units take
+  the floors `planning-discipline.md` §5 sets rather than a guess — $4.50
+  `close-intermediate`, $6.00 `plan-next`, per gate — and the gate-3 terminal close
+  is scaffolded at its $5.00 floor. Feature total $43.50. Gate 1's implementation
+  came in at 0.27× its estimate (`RETROSPECTIVE.md`); gate 2's estimates are
+  deliberately left at the same scale rather than re-anchored on one gate of
+  under-run, since `planning-discipline.md` §5's own lesson is that a floor is a
+  distribution question.

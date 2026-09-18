@@ -1,19 +1,29 @@
 ---
 gate: 2
 status: open
+feature_oracle: "python3 -m unittest tests.test_triage_severity_end_to_end -v -b"
 ---
 
 # Gate 2 — triage classifies severity and writes it
 
 ## Definition of done
 
-Drafted by gate 1's `plan-next`. The milestone: a triage run against an issue in a
-repository that defines `severity:*` labels records a severity in the marker and
-projects the label; the same run in a repository that defines none behaves
-byte-identically to today.
+A triage run against an issue in a repository that defines `severity:*` labels
+records a severity in the marker and projects the `severity:<value>` label, marker
+first; the same run in a repository that defines none issues the identical `gh`
+write sequence it issues today. Defining the labels is how a project opts in;
+`LABEL_REGISTRY` gains no `severity:*` entry, so not defining them is how it opts out.
 
-`feature_oracle` is set by the drafting agent, not now — gate 1's retrospective is
-what will say whether the end-to-end proof belongs at `apply_triage` or one level up.
+The `feature_oracle` above is **run-level, not `apply_triage`-level**, which is the
+question this gate left to its drafting agent. `apply_triage` never reads a label
+rubric, so it cannot observe the opt-out half of the milestone at all;
+`TriageProvider.execute` is the one place a run both reads the repository's labels
+and applies a decision. `FEAT-2026-0113/T06` is the unit that turns it green, and
+`GATE-02-REVIEW.md` carries the rest of the drafting rationale.
+
+Standard gate obligations (retrospective, lessons, docs, next-gate drafting,
+per-criterion state and the narrow/broad oracle contract) are as
+`close-discipline.md` §5 defines them; they are not restated here.
 
 ## Arming discipline (see `.specfuse/rules/planning-discipline.md`)
 
