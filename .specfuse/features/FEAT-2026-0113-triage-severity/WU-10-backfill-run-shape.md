@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/agent/severity_backfill.py
   - tests/test_severity_backfill_run.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:26:26.170715+00:00
+duration_seconds: 193.462
+cost_usd: 1.124219
+input_tokens: 60
+output_tokens: 20302
 ---
 
 # T10 — a backfill run: rubric once, classify each, write only under `--apply`

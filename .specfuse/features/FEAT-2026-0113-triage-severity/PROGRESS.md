@@ -23,3 +23,4 @@
 - **FEAT-2026-0113/T08**: attempt 1 outcome=passed
 - **FEAT-2026-0113/T07H**: attempt 1 outcome=passed
 - **FEAT-2026-0113/T09**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T10**: Added run_backfill (T10) to specfuse/agent/severity_backfill.py -- rubric read once, each candidate classified via triage_invoke.build_invocation/classify_severity, writes only under apply=True via apply_severity_backfill (T09) -- and rewired the CLI (--repo/--limit/--apply, no issue arg) to drive it; new tests/test_severity_backfill_run.py covers the run shape.

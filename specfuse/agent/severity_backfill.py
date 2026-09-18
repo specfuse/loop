@@ -1,34 +1,38 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""`specfuse-backfill-severity` -- amend one already-marked issue with a
-severity, for issues the normal triage path will never revisit
-(FEAT-2026-0113/T07, gate 3's walking skeleton).
+"""`specfuse-backfill-severity` -- amend already-marked, severity-less issues
+with a severity, for issues the normal triage path will never revisit
+(FEAT-2026-0113).
 
 A triaged issue's marker is its idempotency key (`specfuse.loop.triage`'s
 module docstring): once written it is never revisited by a normal run, so an
 issue marked before `severity` existed is stranded there permanently. This
-module is the maintenance mode that re-reads one such issue, amends its
-marker, and projects the `severity:<value>` label -- deliberately not part of
-`specfuse-agent`'s own run (`specfuse/agent/run.py` is not edited by this
+module is the maintenance mode that re-reads such issues, amends their
+markers, and projects the `severity:<value>` label -- deliberately not part
+of `specfuse-agent`'s own run (`specfuse/agent/run.py` is not edited by this
 gate at all; see `GATE-03.md`'s arm-checkpoint Q1). A separate console
 script is one deliberate command away, not one argv typo on the binary an
 unattended run uses.
 
-**Stubbed here, and only here** (this unit is gate 3's tracer bullet,
-`/authoring-work-units` §14):
+`run_backfill` (T10) is the real run shape: `triage.list_severity_backfill_candidates`
+(T08) selects the open, marked, severity-less issues; `labels.read_severity_rubric`
+is read exactly once per run; each candidate is classified through
+`triage_invoke.build_invocation` + `triage_invoke.classify_severity` -- the same
+classifier a fresh triage uses, so a low-confidence or out-of-rubric answer fails
+closed exactly as it does there; and nothing is written unless the caller passes
+`apply=True`. `apply_severity_backfill` (T09) is the bulk, decision-list write
+path `run_backfill` drives for the candidates that classified cleanly.
 
-- selection breadth -- takes a single issue number rather than T08's
-  predicate over the whole open-issue listing;
-- classification -- `_STUB_SEVERITY` stands in for T10's classification
-  session.
+`backfill_severity` (T07) is gate 3's tracer bullet: a single-issue path, still
+used by `GATE-03.md`'s `feature_oracle`, that stands in `_STUB_SEVERITY` for a
+classification session. `run_backfill` does not call it and does not share its
+stub -- the two coexist because the oracle that proved the write order end to
+end is not rewritten out from under itself.
 
 The marker amendment itself is `specfuse.loop.triage.amend_marker_severity`
-(T08); `apply_severity_backfill` below (T09) is the bulk, decision-list write
-path T10 will drive.
-
-**Not stubbed:** the write order. The marker's `severity=` field is
-authoritative and is written before the `severity:<value>` label, mirroring
-`specfuse.loop.triage.apply_triage`'s own marker-first sequence.
+(T08). The write order -- marker before label -- is `apply_severity_backfill`'s
+(T09), mirroring `specfuse.loop.triage.apply_triage`'s own marker-first
+sequence.
 """
 
 from __future__ import annotations
@@ -37,6 +41,10 @@ import argparse
 import json
 import subprocess
 from typing import Callable, Optional
+
+from specfuse.agent.invoke import run_claude
+from specfuse.agent.triage_invoke import build_invocation, classify_severity
+from specfuse.loop.labels import read_severity_rubric
 
 from specfuse.loop import triage
 from specfuse.loop.build_provenance import warn_if_out_of_tree
@@ -117,6 +125,87 @@ def apply_severity_backfill(runner: Callable, repo: str, decisions: list) -> lis
 
         results.append(row)
     return results
+
+
+def run_backfill(
+    runner: Callable,
+    repo: str,
+    working_dir: str = ".",
+    *,
+    apply: bool = False,
+    limit: int = triage.DEFAULT_LIST_LIMIT,
+    model: str = "sonnet",
+    effort: str = "medium",
+) -> dict:
+    """Select, classify, and (only under `apply=True`) write severities for
+    every open, marked, severity-less issue in `repo` -- the real run shape
+    T07's single-issue tracer bullet stood in for.
+
+    The rubric is read exactly once, before any candidate is even selected:
+    an empty rubric (`labels.read_severity_rubric`'s degradation path, or a
+    repository whose whole `severity:*` scheme lies outside
+    `agent_policy.SEVERITY_VALUES`) makes the run a no-op -- `reason` is set,
+    `rows` is empty, and neither a candidate listing nor a `claude`
+    invocation nor a `gh issue edit` call is ever issued, because there is
+    nothing a classification could be checked against.
+
+    Each candidate is classified through the same `triage_invoke.build_invocation`
+    + `classify_severity` pair a fresh triage uses -- fails closed to `None`
+    on a missing field, an out-of-rubric value, or a `confidence` that is not
+    `high`. Only candidates that classify cleanly become decisions;
+    `apply_severity_backfill` (T09) is the one call site that ever writes,
+    and only when `apply=True`. A row that failed to classify carries no
+    `severity` and is never handed to that call, so it issues zero
+    `gh issue edit` calls regardless of `apply`.
+
+    Returns `{"rubric": ..., "candidates": [...], "rows": [...], "reason":
+    <str | None>}`. Each row is `{"number", "classified", "severity"}` plus,
+    once `apply_severity_backfill` has run over it, that function's own
+    `skipped`/`marker_written`/`label_written` fields.
+    """
+    rubric = read_severity_rubric(working_dir, runner=runner, repo=repo)
+    if not rubric:
+        return {
+            "rubric": {},
+            "candidates": [],
+            "rows": [],
+            "reason": (
+                "the repository's severity rubric is empty -- nothing for a "
+                "classification to be checked against"
+            ),
+        }
+
+    candidates = triage.list_severity_backfill_candidates(runner, repo, limit=limit)
+
+    rows = []
+    decisions = []
+    for issue in candidates:
+        number = issue.get("number")
+        title = issue.get("title", "")
+        body = issue.get("body") or ""
+
+        argv, prompt = build_invocation(
+            number, title, body, repo, working_dir, model=model, effort=effort, rubric=rubric
+        )
+        invoked = run_claude(argv, prompt, runner=runner)
+        severity = classify_severity(invoked.text, rubric)
+
+        if severity is None:
+            rows.append({"number": number, "classified": False, "severity": None})
+            continue
+
+        rows.append({"number": number, "classified": True, "severity": severity})
+        decisions.append({"number": number, "body": body, "severity": severity})
+
+    if apply and decisions:
+        write_results = apply_severity_backfill(runner, repo, decisions)
+        by_number = {result["number"]: result for result in write_results}
+        for row in rows:
+            result = by_number.get(row["number"])
+            if result is not None:
+                row.update(result)
+
+    return {"rubric": rubric, "candidates": candidates, "rows": rows, "reason": None}
 
 
 def _find_issue(runner: Callable, repo: str, issue_number: int) -> Optional[dict]:
@@ -201,25 +290,41 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="specfuse-backfill-severity",
         description=(
-            "Amend one already-marked, severity-less issue with a severity, "
+            "Amend every open, marked, severity-less issue with a severity, "
             "marker first, label projected after."
         ),
     )
-    parser.add_argument("issue", type=int, help="the issue number to backfill")
     parser.add_argument("--repo", required=True, help="OWNER/NAME")
+    parser.add_argument(
+        "--limit", type=int, default=triage.DEFAULT_LIST_LIMIT,
+        help="maximum number of candidates to select",
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="write the amendment; default is a dry run that reports intent only",
+        help="write the amendments; default is a dry run that reports intent only",
     )
     return parser
+
+
+def _print_run_report(report: dict) -> None:
+    if report["reason"] is not None:
+        print(report["reason"])
+        return
+    for row in report["rows"]:
+        if not row["classified"]:
+            print(f"#{row['number']}: no usable classification, skipped")
+            continue
+        print(f"#{row['number']}: severity={row['severity']}")
 
 
 def main(argv: Optional[list] = None) -> int:
     warn_if_out_of_tree()
     args = build_parser().parse_args(argv)
-    report = backfill_severity(_default_runner, args.repo, args.issue, apply=args.apply)
-    print(json.dumps(report))
+    report = run_backfill(
+        _default_runner, args.repo, apply=args.apply, limit=args.limit
+    )
+    _print_run_report(report)
     return 0
 
 
