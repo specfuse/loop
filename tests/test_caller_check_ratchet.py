@@ -46,10 +46,6 @@ BASELINE = {
     "list_promoted",
     "migrate_legacy",
     "ratified_after_override",
-    # FEAT-2026-0113/T03: read_severity_rubric lands in gate 2 ahead of its
-    # callers by design — T04 (write path), T05 (triage_invoke), T06
-    # (providers/triage) wire it in later units of this same feature.
-    "read_severity_rubric",
     "released_section_drift",
     "stamp_release",
     "sweep_arm_predicate",
