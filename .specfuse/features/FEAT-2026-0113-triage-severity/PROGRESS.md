@@ -1,1 +1,2 @@
 - **FEAT-2026-0113/T01**: attempt 1 outcome=passed
+- **FEAT-2026-0113/T02**: attempt 1 outcome=agent_reported_blocked

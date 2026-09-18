@@ -1,11 +1,15 @@
 ---
 id: FEAT-2026-0113/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 2.00
 produces:
   - tests/test_marker_dual_shape.py
+duration_seconds: 125.878
+cost_usd: 0.529971
+input_tokens: 30
+output_tokens: 13410
 ---
 
 # T02 — prove the reader against every marker shape that exists
