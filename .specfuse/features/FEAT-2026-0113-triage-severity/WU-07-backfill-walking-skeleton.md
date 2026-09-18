@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0113/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/agent/severity_backfill.py
   - pyproject.toml
   - tests/test_severity_backfill_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T11:06:12.897307+00:00
+duration_seconds: 171.625
+cost_usd: 0.865191
+input_tokens: 46
+output_tokens: 13720
 ---
 
 # T07 — the backfill mode exists end to end, for one issue
