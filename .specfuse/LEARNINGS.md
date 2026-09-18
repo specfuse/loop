@@ -4406,3 +4406,32 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   for units absent from `PLAN.baseline.json`. If any exist, write the cost analysis anyway.
   And do not raise estimates on a "touches the driver" label: here that label over-priced
   four units by ~5× while the unit that actually failed twice was priced as routine.
+
+- [FEAT-2026-0113/G1-CLOSE-INTERMEDIATE] **Loosening a published marker's reader and making it
+  fail closed are the same edit; a gate that asks only for tolerance ships a fail-open sweep.**
+  `triage.parse_marker` was positionally anchored, so a marker carrying a third field failed to
+  match at all. T01 replaced the anchor with a `key=value` field scan and satisfied every one of
+  its seven criteria — including "byte-identical behaviour for a two-field marker". It was not
+  byte-identical for a *malformed* one: three shapes the anchor had safely rejected as `None`
+  (`category=bug` with no `confidence`, `confidence=` empty, `category=` empty) now raised
+  `KeyError`, and `parse_marker` is called on every open issue from six call sites across five
+  modules, so one malformed marker raises out of a whole sweep. The malformed literal was
+  already in the tree. No criterion asked, and the full suite stayed green because that literal
+  is never fed to the reader. It cost a blocked attempt ($0.53, 33% of the gate's
+  implementation spend) for the next unit's corpus to find it. **Drafting rule:** when a unit
+  widens a parser over a published format, pair every "X still parses" criterion with an
+  explicit "a marker the reader cannot fully understand reads as *absent*, and never raises"
+  criterion, spelled as a lookup that cannot raise rather than a `try/except` — an exception
+  swallowed is a different contract from a value that was never there. And check the caller
+  count from the tree, not from the plan: the plan said three, the tree had six.
+  **This generalizes past triage.** The codebase ships ten `_MARKER_TEMPLATE`-convention
+  published markers (`specfuse:finding`, `specfuse:autofix-attempt`, `specfuse:question`,
+  `specfuse:answered-escalation`, `specfuse:promoted`, `specfuse:sla-repinged`,
+  `specfuse:escalation`, `specfuse:triage`, `specfuse:followup`, `specfuse:bug-automerge`) and
+  after this gate `specfuse:triage` is the only one read by a field scan; the other nine are
+  positionally anchored. `specfuse:autofix-attempt` is the one to watch — it is the only other
+  multi-field marker (`fingerprint=(?P<fingerprint>\S+) at=(?P<at>[0-9.]+)`) and therefore
+  carries triage's exact latent defect: adding a field breaks the match entirely, and every
+  issue written under the new shape scans as unseen. Note also that a grep for `parse_marker`
+  hits `loop/promotion.py`, which defines its *own* reader over `specfuse:promoted` and is not
+  a triage caller — scoping a unit off that grep scopes it wrong.

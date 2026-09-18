@@ -1,9 +1,18 @@
 ---
 id: FEAT-2026-0113/G1-CLOSE-INTERMEDIATE
 type: close-intermediate
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.50
+model: opus
+effort: high
+gate_set: plannext
+driver_version: 0.20.1
+started_at: 2026-09-18T00:48:20.669292+00:00
+duration_seconds: 510.568
+cost_usd: 4.117851
+input_tokens: 76
+output_tokens: 39899
 ---
 
 # G1-CLOSE-INTERMEDIATE — close gate 1
