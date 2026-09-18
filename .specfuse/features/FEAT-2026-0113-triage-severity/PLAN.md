@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0113-triage-severity
 roadmap_goal: Triage assigns a severity, so `min_severity` routes instead of stranding
 autonomy_default: review
 status: active
-planned_cost_usd: 20.50
+planned_cost_usd: 21.50
 ---
 
 # Plan: Triage assigns a severity
@@ -87,13 +87,16 @@ gates:
       - id: FEAT-2026-0113/T01
         file: WU-01-dual-shape-marker-reader.md
         depends_on: []
+      - id: FEAT-2026-0113/T01H
+        file: WU-01H-parse-marker-fails-closed.md
+        depends_on: [FEAT-2026-0113/T01]
       - id: FEAT-2026-0113/T02
         file: WU-02-marker-corpus-and-round-trip.md
-        depends_on: [FEAT-2026-0113/T01]
+        depends_on: [FEAT-2026-0113/T01H]
       # --- closing sequence: 2-WU intermediate (non-terminal gate) ---
       - id: FEAT-2026-0113/G1-CLOSE-INTERMEDIATE
         file: WU-90-gate-1-close-intermediate.md
-        depends_on: [FEAT-2026-0113/T01, FEAT-2026-0113/T02]
+        depends_on: [FEAT-2026-0113/T01, FEAT-2026-0113/T01H, FEAT-2026-0113/T02]
       - id: FEAT-2026-0113/G1-PLAN
         file: WU-91-gate-1-plan-next.md
         depends_on: [FEAT-2026-0113/G1-CLOSE-INTERMEDIATE]
@@ -136,6 +139,21 @@ gates:
   the same reason — a wrong arm on a marker format change orphans every issue written
   under it.
 
+## Mid-gate insertions
+
+- **`FEAT-2026-0113/T01H` (hygiene, inserted after T02 escalated).** T02 reported
+  `agent_reported_blocked`: T01's tolerant reader made `parse_marker` raise
+  `KeyError` on a marker missing `confidence`, where the anchored regex it
+  replaced returned `None` — a regression against T01's own "byte-identical"
+  criterion, and a fail-open one, since `parse_marker`'s three callers sweep
+  every open issue. T02 obeyed its Do-not-touch clause and escalated rather than
+  patching a sibling unit's code. T01H carries the fix as its own dispatched and
+  verified unit; T02 re-runs unmodified behind it and its corpus is what proves
+  the fix. This is `authoring-work-units` §7's hygiene pattern, chosen over
+  re-arming a `done` T01 or widening T02's boundary — the boundary is what
+  produced the correct escalation, and eroding it teaches the next unit to patch
+  quietly instead of reporting.
+
 ## Assumptions (drafted under the interview's escape hatch)
 
 The operator asked for recommendations on every remaining decision. Each choice below
@@ -158,7 +176,7 @@ was taken by this draft, not made by them, and is here for the gate-1 reviewer:
   diff and a test run.
 - **No `severity:*` entry is added to `LABEL_REGISTRY`.** Severity labels are
   repo-owned, and not defining them is how a project opts out.
-- **Planned costs:** T01 $3.00, T02 $2.00. The closing units take the floors
+- **Planned costs:** T01 $3.00, T01H $1.00, T02 $2.00. The closing units take the floors
   `planning-discipline.md` §5 sets rather than a guess — $4.50
   `close-intermediate`, $6.00 `plan-next` — and the gate-3 terminal close is
-  scaffolded at its $5.00 floor. Feature total $20.50.
+  scaffolded at its $5.00 floor. Feature total $21.50.
