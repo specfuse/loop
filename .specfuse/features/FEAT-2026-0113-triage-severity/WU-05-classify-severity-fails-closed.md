@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0113/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/agent/triage_invoke.py
   - tests/test_triage_severity_classify.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.20.1
+started_at: 2026-09-18T02:37:28.781871+00:00
+duration_seconds: 80.429
+cost_usd: 0.470493
+input_tokens: 26
+output_tokens: 9232
 ---
 
 # T05 — the classification session assesses severity, and fails closed without one

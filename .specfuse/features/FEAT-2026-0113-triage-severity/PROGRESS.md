@@ -12,3 +12,4 @@
 - **FEAT-2026-0113/T03**: extracted `list_existing_labels` from `provision_labels` and added `read_severity_rubric`/`DEFAULT_SEVERITY_RUBRIC`/`SEVERITY_LABEL_SPECS` to specfuse/loop/labels.py, plus tests/test_severity_rubric.py.
   - note: test_caller_check_ratchet.py needed read_severity_rubric added to BASELINE (no production caller until T04/T05/T06 wire it) — that's an edit outside produces:, flagged here for visibility.
 - **FEAT-2026-0113/T04**: render_marker gains an optional third severity= field (byte-identical two-field output preserved) and apply_triage writes marker before severity:<value> label on both the new-decision and repair paths, failing label writes recorded not raised.
+- **FEAT-2026-0113/T05**: attempt 1 outcome=passed
