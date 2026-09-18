@@ -1,8 +1,9 @@
 ---
 id: FEAT-2026-0113/T11
 type: human
-status: blocked_human
+status: done
 attempts: 0
+evidence: "Ran the read-only dry run (--apply not passed) as 'python3 -m specfuse.agent.severity_backfill --repo clabonte/generator --limit 5' on 2026-09-18 — module form, since T07's console script is not on PATH until a reinstall. Selected 5 candidates (#1902 #1895 #1893 #1883 #1876), every one carrying a triage marker with no severity= field; #1883 classified severity=critical, the other four returned no usable classification against this repository's single-entry rubric. Selection and per-row markers pasted into GATE-03-REVIEW.md under '## Live-corpus dry run'. This run found the two defects T08H then fixed: --limit bounded the gh issue list window rather than the candidate count (--limit 5 gave 0 candidates, --limit 100 gave 74, --limit 200 gave 84, against 191 open issues), and a zero-candidate run printed nothing. Finding carried to the close and recorded as a prerequisite on issue 3355: #1902 #1895 #1893 already carry a human-applied severity label, so backfill would contradict a person's judgment once a fuller rubric exists."
 planned_cost_usd: 0.50
 ---
 

@@ -287,3 +287,71 @@ it. See the residual section below.
 
 `(empty — `FEAT-2026-0113/T11` fills this in. Do not arm `G3-CLOSE` past an empty
 section here without recording the residual as re-carried.)`
+
+---
+
+## Live-corpus dry run (T11, 2026-09-18)
+
+Read-only. `--apply` not passed; no write of any kind was issued.
+
+```
+$ python3 -m specfuse.agent.severity_backfill --repo clabonte/generator --limit 5
+#1902: no usable classification, skipped
+#1895: no usable classification, skipped
+#1893: no usable classification, skipped
+#1883: severity=critical
+#1876: no usable classification, skipped
+EXIT=0
+```
+
+Invoked as the module rather than the `specfuse-backfill-severity` console
+script: the script was registered by T07 this morning and is not on PATH until a
+reinstall. Same entry point, same `main()`.
+
+### Selection, with the marker each row was selected on
+
+| Issue | Marker | Existing `severity:*` label | Title |
+| --- | --- | --- | --- |
+| #1902 | `category=bug confidence=high` | **`severity:minor`** | One multi-group regen writes several test-support CHANGE… |
+| #1895 | `category=bug confidence=high` | **`severity:major`** | Dart conditional-read fake fabricates `"fake-etag"`… |
+| #1893 | `category=bug confidence=high` | **`severity:major`** | Generated trigger ActivitySource names have no stable pr… |
+| #1883 | `category=bug confidence=high` | *(none)* | Generated TypeScript package.json crashes a fresh `npm i`… |
+| #1876 | `category=feature confidence=high` | *(none)* | Optimistic concurrency for keyless singleton operati… |
+
+Every selected issue carries a triage marker with **no `severity=` field**, which
+is the predicate's stated contract. Confirmed.
+
+### This run is the one that found T08H's two defects
+
+The first invocation of this exact command returned **zero rows and printed
+nothing**. `--limit` bounded the `gh issue list` window rather than the candidate
+count, and the five newest issues carry no triage marker at all. Measured:
+`--limit 5` → 0 candidates, `--limit 100` → 74, `--limit 200` → 84, against 191
+open issues. The default of 100 silently ignored the oldest 91. `T08H` fixed
+both that and the silent zero-candidate report; this table is the post-fix run.
+
+### Finding carried to the close: three selected issues already carry a human-assigned severity
+
+#1902, #1895 and #1893 carry `severity:minor` / `severity:major` / `severity:major`
+— labels a person applied — while their markers carry no `severity=`. The
+predicate selects on the **marker**, so a human-labelled issue is a backfill
+candidate.
+
+Today that is masked: the rubric for this repository has a single entry
+(`critical`, the only one of its three labels inside `SEVERITY_VALUES`), so all
+three resolved to "no usable classification, skipped" and nothing was
+contradicted.
+
+**It stops being masked the moment #3355 lands.** With a fuller rubric the
+classifier could answer `high` for an issue a person labelled `minor`, and the
+write path would amend the marker and add `severity:high` alongside the human's
+`severity:minor` — two severities on one issue, the agent's silently winning at
+the floor because `read_severity_label` returns the first it recognises.
+
+The shape of the fix is reconciliation rather than re-classification: an issue
+whose label already states a severity should have its marker written **from that
+label**, not from a fresh classification. That is a different operation from
+backfilling an unlabelled issue and is not what any unit in this gate builds.
+
+Recorded here rather than acted on: it is latent under the current rubric, and
+#3355 is what makes it live.
