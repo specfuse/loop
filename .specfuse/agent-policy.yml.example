@@ -29,7 +29,20 @@ rules:
     preempt: true                # bool — bugs jump the feature queue when true
     min_severity: low            # low | medium | high | critical
     # OPTIONAL — what THIS repo's own `severity:*` labels mean, when they are
-    # not spelled the way the four values above are spelled (#3349). Severity
+    # not spelled the way the four values above are spelled (#3349).
+    #
+    # A DEFAULT TABLE IS ALREADY SHIPPED (#3355), so most repos need nothing
+    # here: blocker/urgent -> critical, major -> high, normal/moderate ->
+    # medium, minor/trivial -> low. Anything declared below EXTENDS that table
+    # and overrides it key by key, so you only write the words it does not
+    # already know, or the ones your project means differently.
+    #
+    # Deliberately NOT shipped: P0/P1, S1/S2, sev1/sev2. Those encode PRIORITY,
+    # a different axis from severity, and the mapping varies per organisation —
+    # declare them here if your repo uses them, because that is a judgment
+    # about your own scheme.
+    #
+    # Severity
     # is read from a `severity:<value>` label; a label outside the vocabulary
     # reads as ABSENT, and with a floor above `low` an absent severity fails
     # closed, so the issue is skipped. Nothing is inferred — a repo labelling

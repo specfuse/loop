@@ -46,6 +46,7 @@ __all__ = (
     "SEVERITY_VALUES",
     "read_severity_label",
     "resolve_severity_aliases",
+    "DEFAULT_SEVERITY_ALIASES",
     "AUTOMERGE_VALUES",
     "GATE_REVIEW_VALUES",
     "PROVIDER_VALUES",
@@ -339,6 +340,37 @@ SEVERITY_ORDER = ("low", "medium", "high", "critical")
 #: before #3339: the triage marker carries `category` and `confidence` only.
 SEVERITY_LABEL_PREFIX = "severity:"
 
+#: Word synonyms for `SEVERITY_VALUES`, shipped so every operator does not
+#: hand-write the same six lines (#3355).
+#:
+#: #3339 declined to map `severity:minor` to `low`, calling it "inventing policy
+#: on an operator's behalf". That was too wide, and the same conflation was
+#: caught once already at FEAT-2026-0113's gate-2 arm checkpoint: **where the
+#: floor sits** (`rules.bugs.min_severity`) is the operator's decision because it
+#: gates unattended action, but **what an English word means** is a published
+#: vocabulary. Specfuse already ships one of those in `DEFAULT_SEVERITY_RUBRIC`.
+#:
+#: **Numbered and lettered schemes are deliberately absent, and that exclusion is
+#: load-bearing rather than an oversight.** `P0`/`P1`, `S1`/`S2` and `sev1`/`sev2`
+#: encode **priority**, a different axis from severity -- `P0` commonly means
+#: "drop everything" irrespective of how severe the defect is -- and the mapping
+#: varies per organisation. An operator whose repository uses them declares them
+#: under `rules.bugs.severity_aliases`, because that is a real judgment about
+#: their own scheme and belongs to them.
+#:
+#: An explicit in-vocabulary label always wins: `read_severity_label` checks
+#: `SEVERITY_VALUES` before it consults any alias, so nothing here can redefine
+#: `severity:high`.
+DEFAULT_SEVERITY_ALIASES = {
+    "blocker": "critical",
+    "urgent": "critical",
+    "major": "high",
+    "normal": "medium",
+    "moderate": "medium",
+    "minor": "low",
+    "trivial": "low",
+}
+
 
 def read_severity_label(labels, aliases=None) -> "tuple[str | None, str | None]":
     """`(severity, aliased_from)` for the first readable `severity:<value>`
@@ -436,11 +468,18 @@ def resolve_min_severity(path: "str | Path | None" = None) -> "str | None":
 def resolve_severity_aliases(path: "str | Path | None" = None) -> dict:
     """`rules.bugs.severity_aliases` as `{label_word: severity}` (#3349).
 
-    Empty when the key is absent, unusable, or names nothing legal — so a
-    deployment that never declared it behaves exactly as it did before this
-    key existed. Entries are filtered rather than raised on: the validator
-    already reports a bad target as an ERROR, and a single typo should not
-    discard the mappings beside it.
+    **Returns `DEFAULT_SEVERITY_ALIASES` extended and overridden by whatever the
+    policy declares, key by key** (#3355). An absent, unusable, or
+    nothing-legal key therefore resolves to the shipped table rather than to an
+    empty map — that is the behaviour change #3355 exists to make, and the
+    reason a repository labelling `severity:major` now reads without any
+    operator configuration at all.
+
+    An operator-declared entry wins over a shipped one for the same word, so a
+    project whose `major` genuinely means `critical` says so and is believed.
+    Entries are filtered rather than raised on: the validator already reports a
+    bad target as an ERROR, and a single typo should not discard the mappings
+    beside it — including the shipped ones.
 
     Keys are lower-cased to match how `read_severity_label` reads a label; a
     key that is itself in `SEVERITY_VALUES` is dropped, since the vocabulary
@@ -449,13 +488,13 @@ def resolve_severity_aliases(path: "str | Path | None" = None) -> dict:
     try:
         policy = load_policy(path)
     except (FileNotFoundError, OSError):
-        return {}
+        return dict(DEFAULT_SEVERITY_ALIASES)
     rules = policy.get("rules") if isinstance(policy, dict) else None
     bugs = rules.get("bugs") if isinstance(rules, dict) else None
     raw = bugs.get("severity_aliases") if isinstance(bugs, dict) else None
     if not isinstance(raw, dict):
-        return {}
-    resolved = {}
+        return dict(DEFAULT_SEVERITY_ALIASES)
+    resolved = dict(DEFAULT_SEVERITY_ALIASES)
     for key, value in raw.items():
         word = str(key).strip().lower()
         if not word or word in SEVERITY_VALUES:
