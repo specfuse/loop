@@ -344,14 +344,29 @@ def add_guardrail_label(
 _CLOSES_RE = r"\bcloses\s+#{number}\b"
 
 
-def pr_closes_issue(body: str, issue_number: int) -> bool:
-    """Whether *body* cites `closes #issue_number`, case-insensitively.
+def pr_closes_issue(body: str, issue_number: int, *, title: str = "") -> bool:
+    """Whether *body* or *title* cites `closes #issue_number`, case-insensitively.
 
     One predicate, shared with `specfuse.agent.providers.bugs`, so the lane's
     "which PR fixes this issue" and selection's "does this issue already have
     a PR" cannot disagree about what the linkage is.
+
+    **The title counts too (#3366).** `/specfuse:fix-bug`'s own `gh pr create`
+    example puts `(closes #<n>)` in the title while its body template opens
+    with `Closes #<n>.`, and GitHub closes an issue from either — so a PR that
+    satisfies the title and not the body is correct to every human and to
+    GitHub, and was invisible here. A completed fix for clabonte/generator#1916
+    escalated `pr_not_found` on exactly that: real fix, pushed branch, PR with a
+    regression test, and no guardrail ever evaluated it.
+
+    `title` is keyword-only and defaults empty, so a caller that predates this
+    is unaffected rather than silently changed.
     """
-    return re.search(_CLOSES_RE.format(number=issue_number), body or "", re.IGNORECASE) is not None
+    pattern = _CLOSES_RE.format(number=issue_number)
+    for haystack in (body or "", title or ""):
+        if re.search(pattern, haystack, re.IGNORECASE) is not None:
+            return True
+    return False
 
 
 #: `/fix-bug` headless mode's own RESULT block, when it opened a PR, carries
@@ -409,7 +424,9 @@ def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Option
             "--repo", repo,
             "--state", "open",
             "--limit", str(_PR_LIST_LIMIT),
-            "--json", "number,body",
+            # title as well as body: the reference is valid in either and
+            # /fix-bug's own example puts it in the title (#3366).
+            "--json", "number,body,title",
         ],
         check=False,
     )
@@ -425,7 +442,9 @@ def _find_pr_for_issue(runner: Callable, repo: str, issue_number: int) -> Option
     for row in rows:
         if not isinstance(row, dict):
             continue
-        if pr_closes_issue(row.get("body") or "", issue_number):
+        if pr_closes_issue(
+            row.get("body") or "", issue_number, title=row.get("title") or ""
+        ):
             number = row.get("number")
             if isinstance(number, int) and not isinstance(number, bool):
                 return number

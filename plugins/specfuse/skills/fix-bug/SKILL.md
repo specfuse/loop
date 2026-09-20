@@ -207,9 +207,17 @@ predicted. Re-checking here closes that gap.
   through, so `fix-bug` is where the entry is written or it is dropped.
   Include the `CHANGELOG.md` change in the same commit as the fix.
 - `git push -u origin fix/issue-<#>-<short-slug>`.
-- `gh pr create --title "fix(<scope>): <summary> (closes #<#>)" --body <markdown-body>`.
-  PR body sections: Root cause, Fix, Tests, Verification. Reference
-  the issue explicitly so the merge auto-closes it.
+- `gh pr create --title "fix(<scope>): <summary>" --body <markdown-body>`.
+  PR body sections: Root cause, Fix, Tests, Verification. **The body MUST
+  open with `Closes #<issue-number>.`** — one place, not two.
+  **Do NOT put `(closes #<#>)` in the title.** GitHub closes the issue from
+  either, so a title-only reference looks correct to a human and to GitHub
+  while leaving the body without it. That is #3366: a completed fix for
+  clabonte/generator#1916 — real fix, pushed branch, PR with a regression
+  test, reported `completed` — escalated `pr_not_found`, because the title
+  carried the reference and the body did not. The lane now matches either
+  (so already-shipped skill versions are fine), but one canonical home is
+  what stops the two drifting again.
 - Probe `gh auth status` once before any `gh` step — per LEARNINGS
   `[FEAT-2026-0014/T01/gh-claudeP-broken]`, gh can be unreliable; if
   it fails, print the exact `gh pr create` command for the operator.
