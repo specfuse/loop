@@ -54,6 +54,24 @@ rules:
     #   major: high
     #   minor: low
     automerge: "off"             # "off" | "on" — enforcement is FEAT-2026-0048's
+    # OPTIONAL — the check(s) that must be PRESENT and PASSING before the bug
+    # lane may auto-merge (#3373). Absent means any `success` conclusion is
+    # accepted, which is the pre-existing behaviour.
+    #
+    # READ THIS IF YOUR PR JOB IS A FAST LANE. The lane's CI guardrail is only
+    # as strong as the check your PR job actually runs. A repo whose PR job
+    # excludes a test group — a `regression` tag guarding committed
+    # expectations, say — gives a `success` that CANNOT FAIL on that class of
+    # defect, and `automerge: "on"` then merges it. That happened: a bug-lane
+    # PR left `main` red for an hour, every guardrail green.
+    #
+    # The fast-lane/nightly split assumes every change already passed the full
+    # gate set before its PR opened. True for driver work-unit PRs. NOT true
+    # for bug-lane PRs, where a headless session picks its own tests.
+    #
+    # Name the complete check here so the lane waits for the right green:
+    # required_checks:
+    #   - full-suite
     max_diff_lines: 150          # OPTIONAL int > 0 — merge-eligibility size cap; defaults to 150
     max_merges_per_day: 3        # OPTIONAL int > 0 — rolling 24h auto-merge cap; defaults to 3
     # Path prefixes accepted as test-first evidence by the bug lane's merge
