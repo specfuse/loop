@@ -707,6 +707,125 @@ def init(
 _INSTALLED_PLUGINS_REL = os.path.join(".claude", "plugins", "installed_plugins.json")
 
 
+def dispatched_skill_commands() -> dict:
+    """`{lane label: slash command}` for every lane that dispatches one (#3347).
+
+    Read from each lane's own `DEFAULT_COMMAND` rather than re-listed here, so a
+    third lane is covered by adding the constant and nothing else. A lane whose
+    module cannot be imported is omitted rather than raising: `doctor` is a
+    read-only diagnosis and must not fail because an unrelated import does.
+
+    `specfuse.monitor.autofix_invoke` is deliberately held to zero top-level
+    imports by its own test, so it cannot import a resolver; the constant stays
+    a literal there and this function reads it. That direction is the contract.
+    """
+    def _read(label: str, importer):
+        try:
+            return importer()
+        except Exception as exc:  # noqa: BLE001 - a diagnosis never fails on an import
+            # Surfaced, not swallowed: a lane whose module will not import is
+            # itself a finding, and "could not be checked" must not read the
+            # same as "checked and fine". `None` routes it through the same
+            # reporting path as an unresolvable command.
+            return None, f"{label}'s module could not be imported — {type(exc).__name__}: {exc}"
+
+    def _autofix():
+        from specfuse.monitor import autofix_invoke
+
+        return autofix_invoke.DEFAULT_COMMAND, ""
+
+    def _drafting():
+        from specfuse.agent import drafting_invoke
+
+        return drafting_invoke.DEFAULT_COMMAND, ""
+
+    commands: dict = {}
+    for label, importer in (("bug lane", _autofix), ("drafting lane", _drafting)):
+        command, problem = _read(label, importer)
+        commands[label] = command if not problem else problem
+    return {k: v for k, v in commands.items() if v}
+
+
+def _plugin_is_installed(manifest_path) -> bool:
+    path = Path(manifest_path)
+    if not path.exists():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        entries = data.get("plugins", {}).get(_PLUGIN_KEY, [])
+        return bool(entries)
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return False
+
+
+def _plugin_is_enabled(target_path: Path) -> bool:
+    settings = target_path / ".claude" / "settings.json"
+    if not settings.exists():
+        return False
+    try:
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        return data.get("enabledPlugins", {}).get(_PLUGIN_KEY) is True
+    except (json.JSONDecodeError, AttributeError, TypeError):
+        return False
+
+
+def resolve_slash_command(
+    command: str,
+    target: "str | Path",
+    *,
+    plugins_manifest_path: "str | Path | None" = None,
+) -> tuple:
+    """Whether *command* resolves in *target*, and why not (#3347).
+
+    Returns `(resolves, reason)`. `reason` is empty on success and names the
+    missing piece otherwise, so the caller can print something an operator can
+    act on instead of "it did not work".
+
+    Two spellings, checked against what actually makes each one resolvable:
+
+    * `/<plugin>:<skill>` needs the plugin **installed** (present in the
+      cross-process `installed_plugins.json`) **and enabled** for this project
+      (`.claude/settings.json`'s `enabledPlugins`). Either one missing is a
+      different fix, so they are reported separately.
+    * `/<skill>` needs a project-level `.claude/skills/<skill>/SKILL.md`. That
+      copy is what `specfuse upgrade` reports as unmanaged and the packaging
+      docs no longer prescribe — its absence is the normal state, and the bare
+      form failing is #3342.
+
+    This performs no `claude` invocation: it reads files. A resolution that
+    needs the real client to answer is not a preflight.
+    """
+    target_path = Path(target)
+    if plugins_manifest_path is None:
+        plugins_manifest_path = Path(os.path.expanduser("~")) / _INSTALLED_PLUGINS_REL
+
+    name = command.lstrip("/")
+    if ":" in name:
+        plugin, _, skill = name.partition(":")
+        if not _plugin_is_installed(plugins_manifest_path):
+            return False, (
+                f"plugin {plugin!r} is not installed — no entry for "
+                f"{_PLUGIN_KEY!r} in {plugins_manifest_path}; install it, or "
+                f"dispatch the bare /{skill} against a project-level skill"
+            )
+        if not _plugin_is_enabled(target_path):
+            return False, (
+                f"plugin {plugin!r} is installed but not enabled for this "
+                f"project — add {_PLUGIN_KEY!r} to enabledPlugins in "
+                f".claude/settings.json (a driver run also corrects this)"
+            )
+        return True, ""
+
+    skill_file = target_path / ".claude" / "skills" / name / "SKILL.md"
+    if skill_file.exists():
+        return True, ""
+    return False, (
+        f"no project-level .claude/skills/{name}/SKILL.md, so the bare "
+        f"/{name} resolves nowhere — dispatch the plugin-qualified form "
+        f"instead (this is #3342)"
+    )
+
+
 def doctor(
     target: str | Path,
     *,
@@ -797,6 +916,39 @@ def doctor(
             " (installed_plugins.json absent or unreadable)."
         )
 
+    # #3347: nothing checked, before a run, that the slash commands the headless
+    # lanes dispatch actually resolve here. #3342 is what that cost — a lane
+    # dispatched a command resolving nowhere, and the first thing to notice was
+    # the run, after it had escalated 55 issues for a defect unrelated to any
+    # of them.
+    dispatched_commands: dict = {}
+    for label, command in dispatched_skill_commands().items():
+        if not command.startswith("/"):
+            # `dispatched_skill_commands` returns the problem text in place of
+            # a command when a lane's module will not import.
+            resolves, why = False, command
+        else:
+            resolves, why = resolve_slash_command(
+                command, target_path, plugins_manifest_path=resolved_manifest
+            )
+        dispatched_commands[label] = {
+            "command": command,
+            "resolves": resolves,
+            "why": why,
+        }
+
+    unresolvable = [
+        (label, entry) for label, entry in dispatched_commands.items()
+        if not entry["resolves"]
+    ]
+    for label, entry in unresolvable:
+        action_parts.append(
+            f"The {label} dispatches {entry['command']}, which resolves "
+            f"nowhere in this project: {entry['why']}. Every item that lane "
+            f"dispatches would fail with `Unknown command` and be escalated "
+            f"(#3342)."
+        )
+
     if action_parts:
         recommended_action = " ".join(action_parts)
     else:
@@ -808,6 +960,7 @@ def doctor(
         "scaffold_status": scaffold_status,
         "plugin_config_drift": plugin_config_drift,
         "installed_plugin_version": installed_plugin_version,
+        "dispatched_commands": dispatched_commands,
         "recommended_action": recommended_action,
     }
 
