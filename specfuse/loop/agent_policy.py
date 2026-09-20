@@ -46,6 +46,7 @@ __all__ = (
     "SEVERITY_VALUES",
     "read_severity_label",
     "resolve_severity_aliases",
+    "resolve_required_checks",
     "DEFAULT_SEVERITY_ALIASES",
     "AUTOMERGE_VALUES",
     "GATE_REVIEW_VALUES",
@@ -293,6 +294,45 @@ def resolve_max_items(flag: "int | None",
     if flag is not None:
         return flag
     return _positive_int_budget(path, "max_items_per_day")
+
+
+def resolve_required_checks(path: "str | Path | None" = None) -> tuple:
+    """`rules.bugs.required_checks` as a tuple of check names, or `()` (#3373).
+
+    The names that must be **present and passing** before the bug lane may
+    auto-merge. Empty when absent or unusable, so a deployment that never
+    declared it behaves exactly as before: any `success` conclusion is accepted.
+
+    Why it exists. `evaluate_merge_guardrails` accepted any `success`, and a
+    repository whose PR job is a deliberate fast lane — excluding a test group
+    that guards committed expectations — gave a `success` that **could not
+    fail** on that class of defect. A bug-lane PR merged under `automerge: "on"`
+    and left `main` red for an hour.
+
+    The split those repositories rely on assumes every change already passed
+    the full gate set before its PR opened. That holds for driver work-unit
+    PRs and does **not** hold for bug-lane PRs, where a headless session
+    chooses which tests to run. This key is how a repository points the lane at
+    the complete check rather than the fast one.
+
+    A string is accepted as a one-element list — the common single-check case —
+    and anything else unusable resolves to `()`. Requiring nothing is the
+    pre-existing behaviour; inventing a requirement from a malformed value
+    would block every merge on a typo.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return ()
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    raw = bugs.get("required_checks") if isinstance(bugs, dict) else None
+    if isinstance(raw, str):
+        name = raw.strip()
+        return (name,) if name else ()
+    if not isinstance(raw, list):
+        return ()
+    return tuple(str(n).strip() for n in raw if str(n).strip())
 
 
 def resolve_max_open_prs(path: "str | Path | None" = None) -> "int | None":

@@ -38,6 +38,7 @@ from typing import Any, Callable, Optional
 
 from specfuse.loop.agent_policy import (
     bug_lane_ci_wait_seconds,
+    resolve_required_checks,
     bug_lane_limits,
     resolve_bug_automerge,
 )
@@ -197,7 +198,40 @@ _BUCKET_PENDING = "pending"
 _CI_FAILING = "fail"
 
 
-def _read_ci_conclusion_once(runner: Callable, repo: str, pr_number: int) -> str:
+def _required_checks_verdict(rows: list, required) -> str:
+    """`""` when every required check is present and passing, else why not.
+
+    A required check that **never ran** is the case #3373 is about: the
+    repository's PR job was green and the check that would have caught the
+    defect was not in the list at all. It is not a failure — nothing failed —
+    and it is equally not the green the operator asked the lane to require.
+
+    A required check that was **skipped** is treated the same way. Skipping is
+    not a failure in general, which is why `_BUCKETS_OK` tolerates it, but a
+    check an operator named as required and that did not run cannot establish
+    what it was required to establish.
+    """
+    if not required:
+        return ""
+    by_name = {}
+    for row in rows:
+        name = row.get("name")
+        if isinstance(name, str):
+            by_name[name] = str(row.get("bucket") or "").lower()
+    for name in required:
+        bucket = by_name.get(name)
+        if bucket is None:
+            return f"required check never ran: {name}"
+        if bucket == _BUCKET_PENDING:
+            return _CI_PENDING
+        if bucket != "pass":
+            return f"required check not passing: {name} ({bucket})"
+    return ""
+
+
+def _read_ci_conclusion_once(
+    runner: Callable, repo: str, pr_number: int, required=()
+) -> str:
     """One `gh pr checks` read, mapped through `bucket`.
 
     `_CI_PENDING` when any check is queued or running, or when no check is
@@ -244,6 +278,14 @@ def _read_ci_conclusion_once(runner: Callable, repo: str, pr_number: int) -> str
 
     if _BUCKET_PENDING in buckets:
         return _CI_PENDING
+
+    # #3373: the operator's own list, checked before the aggregate verdict.
+    # A repository whose PR job deliberately excludes a test group can point
+    # the lane at the complete check instead of the fast one.
+    verdict = _required_checks_verdict(rows, required)
+    if verdict:
+        return verdict
+
     if buckets <= _BUCKETS_OK:
         return "success"
     return _CI_FAILING
@@ -258,6 +300,7 @@ def pr_ci_conclusion(
     clock: Callable = time.monotonic,
     deadline_seconds: float = CI_WAIT_SECONDS,
     poll_seconds: float = CI_POLL_SECONDS,
+    required_checks=(),
 ) -> str:
     """Wait for `pr_number`'s CI to reach a conclusion, then return it.
 
@@ -284,7 +327,9 @@ def pr_ci_conclusion(
     """
     started = clock()
     while True:
-        conclusion = _read_ci_conclusion_once(runner, repo, pr_number)
+        conclusion = _read_ci_conclusion_once(
+            runner, repo, pr_number, required_checks
+        )
         if conclusion != _CI_PENDING:
             return conclusion
         if clock() - started >= deadline_seconds:
@@ -720,6 +765,11 @@ def run_bug_lane(
     ci_conclusion = pr_ci_conclusion(
         runner, repo, pr_number,
         sleep=ci_sleep, clock=ci_clock, deadline_seconds=deadline_seconds,
+        # #3373: the checks this repository says must be green before the lane
+        # may merge unattended. Empty unless declared, so behaviour is
+        # unchanged for anyone who has not pointed the lane at a complete
+        # check.
+        required_checks=resolve_required_checks(policy_path),
     )
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)
 
