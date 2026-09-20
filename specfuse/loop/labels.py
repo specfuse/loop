@@ -445,7 +445,29 @@ def read_severity_rubric(
         _ensure_severity_labels(target, runner=runner, repo=repo)
         return dict(DEFAULT_SEVERITY_RUBRIC)
 
+    # A repository's own word for a severity counts too (#3355). Its labels are
+    # resolved through `resolve_severity_aliases` -- the shipped table extended
+    # by whatever the policy declares -- so a project labelling `severity:major`
+    # contributes a `high` entry described in its own words, with no operator
+    # configuration at all. Measured: before this, `clabonte/generator`
+    # (`critical`/`major`/`minor`) yielded a ONE-entry rubric and a classifier
+    # that could answer `critical` or nothing.
+    #
+    # In-vocabulary labels are applied last and unconditionally, so an explicit
+    # `severity:high` always wins over a `severity:major` aliased onto the same
+    # value. Two labels aliasing onto one value is the operator's own ambiguity
+    # and the first read wins; the vocabulary is what removes it.
+    aliases = agent_policy.resolve_severity_aliases()
+
     rubric: dict = {}
+    for name, description in severity_items.items():
+        word = name[len(agent_policy.SEVERITY_LABEL_PREFIX):]
+        if word in agent_policy.SEVERITY_VALUES:
+            continue
+        mapped = aliases.get(word.strip().lower())
+        if mapped in agent_policy.SEVERITY_VALUES and mapped not in rubric:
+            rubric[mapped] = description.strip() or DEFAULT_SEVERITY_RUBRIC[mapped]
+
     for name, description in severity_items.items():
         value = name[len(agent_policy.SEVERITY_LABEL_PREFIX):]
         if value not in agent_policy.SEVERITY_VALUES:

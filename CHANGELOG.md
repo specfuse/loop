@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **`DEFAULT_SEVERITY_ALIASES`, a shipped table of severity word synonyms — `rules.bugs.severity_aliases` now extends and overrides it rather than being the only source.** #3339 declined to map `severity:minor` to `low`, calling it "inventing policy on an operator's behalf". That was too wide, and the same conflation was caught once already at FEAT-2026-0113's gate-2 arm checkpoint: **where the floor sits** (`rules.bugs.min_severity`) is the operator's decision because it gates unattended action, but **what an English word means** is a published vocabulary — and `DEFAULT_SEVERITY_RUBRIC` already shipped one. The table is `blocker`/`urgent` → `critical`, `major` → `high`, `normal`/`moderate` → `medium`, `minor`/`trivial` → `low`. **`P0`/`S1`/`sev1` are deliberately excluded and that exclusion is load-bearing**: those encode *priority*, a different axis — `P0` commonly means "drop everything" regardless of severity — and the mapping varies per organisation, so an operator whose repo uses them declares them. An explicit in-vocabulary label always wins; an alias can never redefine `severity:high`. `read_severity_rubric` resolves aliased labels too, so a repository's own word contributes a rubric entry **described in its own prose** — measured on a consumer repository labelling `critical`/`major`/`minor`, whose rubric went from **one entry to three** and whose dispatchable bug count rose by **12 with no configuration at all**. **Note the upgrade behaviour**: `resolve_severity_aliases` now returns a non-empty map for every project, so a repository labelling `severity:major` under a `medium` floor goes from *skipped* to *dispatchable* on upgrade. That is the intent, and it means the bug lane can begin acting on issues a previous release filtered out. (#3355)
+
 ## [0.21.0+umbrella.0.15.0] - 2026-09-18
 
 ### Added

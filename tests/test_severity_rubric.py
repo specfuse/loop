@@ -96,19 +96,29 @@ class SeverityRubric(unittest.TestCase):
     def test_repository_defining_its_own_scheme_gets_zero_create_calls(self):
         # `severity:major` alone is not in SEVERITY_VALUES, but its presence
         # still declares the repository's own namespace -- specfuse must not
-        # provision anything alongside it.
+        # provision anything alongside it. That is this test's actual subject
+        # and it is unchanged.
         runner = _StubRunner(entries=[("severity:major", "Company-specific major")])
 
         rubric = read_severity_rubric("/tmp/repo", runner=runner)
 
         create_calls = [c for c in runner.calls if c[:3] == ["gh", "label", "create"]]
         self.assertEqual(create_calls, [])
-        self.assertEqual(rubric, {})
 
-    def test_repository_scheme_never_gets_specfuse_authored_values(self):
-        # `severity:major` is not in SEVERITY_VALUES, so it contributes nothing
-        # to the rubric; the repository still defines a real severity value
-        # (`severity:low`) so specfuse contributes nothing either.
+        # CHANGED BY #3355: the rubric was `{}` here, because `major` was
+        # unreadable. The shipped alias table now resolves it to `high` using
+        # the REPOSITORY'S OWN description -- no label is created and nothing
+        # specfuse authored is introduced, so the non-interference contract
+        # this test guards is intact.
+        self.assertEqual(rubric, {"high": "Company-specific major"})
+
+    def test_repository_scheme_never_gets_specfuse_authored_descriptions(self):
+        # Renamed and re-asserted for #3355. `severity:major` now contributes a
+        # `high` entry via the shipped alias table, so the rubric is larger than
+        # it was -- but every DESCRIPTION in it is still the repository's own.
+        # That is what "never gets specfuse-authored values" was protecting: the
+        # keys are specfuse's published vocabulary by construction, since the
+        # classifier answers in it; the prose must never be.
         runner = _StubRunner(
             entries=[
                 ("severity:major", "Company-specific major"),
@@ -118,7 +128,17 @@ class SeverityRubric(unittest.TestCase):
 
         rubric = read_severity_rubric("/tmp/repo", runner=runner)
 
-        self.assertEqual(rubric, {"low": "Barely worth mentioning"})
+        self.assertEqual(
+            rubric,
+            {"high": "Company-specific major", "low": "Barely worth mentioning"},
+        )
+        for value, description in rubric.items():
+            with self.subTest(value=value):
+                self.assertNotEqual(
+                    description, DEFAULT_SEVERITY_RUBRIC[value],
+                    "a repository that described this value must not have had "
+                    "specfuse's wording substituted for its own",
+                )
 
     def test_empty_description_gets_shipped_definition_for_that_value_only(self):
         runner = _StubRunner(

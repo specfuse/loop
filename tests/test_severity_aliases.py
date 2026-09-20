@@ -24,6 +24,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from specfuse.loop.agent_policy import (
+    DEFAULT_SEVERITY_ALIASES,
     meets_severity_floor,
     read_severity_label,
     resolve_severity_aliases,
@@ -118,17 +119,32 @@ class ResolvingFromPolicy(unittest.TestCase):
         self._tmp = TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
 
-    def test_absent_key_resolves_to_no_aliases(self):
-        self.assertEqual(resolve_severity_aliases(self._write(_policy())), {})
-
-    def test_a_declared_map_resolves(self):
+    def test_absent_key_resolves_to_the_shipped_table(self):
+        # Was `{}` until #3355. An absent key now resolves to
+        # DEFAULT_SEVERITY_ALIASES: that is the behaviour change #3355 exists
+        # to make, not a regression against #3349's contract.
         self.assertEqual(
-            resolve_severity_aliases(self._write(_policy(_ALIASES))),
-            {"major": "high", "minor": "low"},
+            resolve_severity_aliases(self._write(_policy())),
+            DEFAULT_SEVERITY_ALIASES,
         )
 
-    def test_a_missing_file_resolves_to_no_aliases(self):
-        self.assertEqual(resolve_severity_aliases("/nonexistent/agent-policy.yml"), {})
+    def test_a_declared_map_extends_rather_than_replaces_the_shipped_table(self):
+        # #3355: declared entries merge over the shipped ones key by key. This
+        # policy declares exactly what the table already says, so the result is
+        # the table — asserted as a superset relation plus the declared values,
+        # so the test does not re-pin the whole table's contents here.
+        resolved = resolve_severity_aliases(self._write(_policy(_ALIASES)))
+        self.assertEqual(resolved.get("major"), "high")
+        self.assertEqual(resolved.get("minor"), "low")
+        self.assertTrue(set(DEFAULT_SEVERITY_ALIASES).issubset(resolved))
+
+    def test_a_missing_file_resolves_to_the_shipped_table(self):
+        # Same #3355 change: a project with no policy file at all still reads
+        # `severity:major`, which is the point.
+        self.assertEqual(
+            resolve_severity_aliases("/nonexistent/agent-policy.yml"),
+            DEFAULT_SEVERITY_ALIASES,
+        )
 
 
 class ValidatingTheMap(unittest.TestCase):
@@ -210,14 +226,18 @@ class TheBugLaneAdvertisesAnAliasedIssue(unittest.TestCase):
             features=(),
         )
 
-    def test_without_the_alias_the_issue_is_skipped_as_unlabelled(self):
+    def test_without_declared_aliases_the_shipped_table_still_reads_the_label(self):
+        # INVERTED BY #3355, deliberately. Before it, a `severity:major` issue
+        # with no operator config read as unlabelled and was skipped; this test
+        # asserted that skip. The shipped table now resolves `major` to `high`,
+        # which clears a `medium` floor, so the issue is advertised with no
+        # configuration at all. That is the measured outcome the issue was filed
+        # for: `clabonte/generator`'s 12 `severity:major` bugs become eligible
+        # without anyone editing its policy file.
         reports = []
         items = self._provider("", reports).advertise(self._snapshot())
-        self.assertEqual(list(items), [])
-        self.assertTrue(
-            any("no severity label" in line for line in reports),
-            f"the skip must still be explained, got {reports!r}",
-        )
+        self.assertEqual([item.item_id for item in items], ["bug-7"])
+        self.assertEqual(reports, [])
 
     def test_with_the_alias_the_issue_is_advertised(self):
         reports = []
