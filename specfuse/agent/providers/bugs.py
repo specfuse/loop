@@ -284,8 +284,46 @@ def _rationale_block(rationale: str) -> str:
 
 
 def _fix_bug_stopped_payload(
-    issue_number: int, outcome: str, rationale: str = ""
+    issue_number: int, outcome: str, rationale: str = "",
+    *, outcome_named: bool = True,
 ) -> EscalationPayload:
+    """The halt brief for a `/fix-bug` session that stopped without a PR.
+
+    `outcome_named` is whether the session actually said one of the outcome
+    words (#3343). When it did not, `classify_outcome` failed closed to
+    `could_not_proceed` and **nothing about a refusal is established** — the
+    session may never have started. Defaults True so a caller predating this
+    keeps today's text rather than silently getting the weaker claim.
+    """
+    if outcome_named:
+        why_not_auto = (
+            "`/fix-bug`'s own refusal or precondition check stopped the run "
+            "before a PR existed; the bug lane never reached a guardrail or "
+            "merge decision on this path."
+        )
+        recommendation = (
+            "Read `/fix-bug`'s own reasoning first -- a `refused` outcome "
+            "usually means the fix is feature-scoped, which points at "
+            "promoting rather than forcing a bug-sized fix. Re-running the "
+            "lane unchanged will reach the same outcome."
+        )
+    else:
+        why_not_auto = (
+            "The session produced **no outcome marker at all**, so nothing "
+            "about this issue is established -- `classify_outcome` fails "
+            "closed to `could_not_proceed` for output naming no outcome, "
+            "which covers both a real refusal and a session that never "
+            "started. Its output above is the evidence for which happened. "
+            "Do not read this as `/fix-bug` having judged the issue."
+        )
+        recommendation = (
+            "Check the runner's own setup before touching this issue -- a "
+            "session that named no outcome usually did not run at all (a "
+            "command that does not resolve, a missing binary, an auth "
+            "failure), and that cause is identical for every issue in the "
+            "queue. Promoting this to a feature on the strength of this "
+            "escalation would be acting on a judgement nobody made."
+        )
     return EscalationPayload(
         target_issue=issue_number,
         done_so_far=(
@@ -301,11 +339,7 @@ def _fix_bug_stopped_payload(
             "Whether a human should fix this bug directly, promote it to a "
             "feature, or close it."
         ),
-        why_not_auto=(
-            "`/fix-bug`'s own refusal or precondition check stopped the run "
-            "before a PR existed; the bug lane never reached a guardrail or "
-            "merge decision on this path."
-        ),
+        why_not_auto=why_not_auto,
         options=[
             ("Fix it by hand", "unblocks the issue directly", "costs a human's time"),
             (
@@ -319,12 +353,7 @@ def _fix_bug_stopped_payload(
                 "loses whatever the report was pointing at",
             ),
         ],
-        recommendation=(
-            "Read `/fix-bug`'s own reasoning first -- a `refused` outcome "
-            "usually means the fix is feature-scoped, which points at "
-            "promoting rather than forcing a bug-sized fix. Re-running the "
-            "lane unchanged will reach the same outcome."
-        ),
+        recommendation=recommendation,
         category="blocked-wu",
     )
 
@@ -734,7 +763,8 @@ class BugsProvider:
                     detail = f"{detail} — {commits} committed on `{wip_ref}`, unpushed"
                 else:
                     escalation = _fix_bug_stopped_payload(
-                        issue_number, result.outcome, result.stop_rationale
+                        issue_number, result.outcome, result.stop_rationale,
+                        outcome_named=result.outcome_named,
                     )
         elif result.outcome == OUTCOME_AUTOMERGE_OFF:
             escalation = _automerge_off_payload(issue_number, result.pr_number)

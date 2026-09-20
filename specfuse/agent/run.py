@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import re
 import subprocess
 import sys
 import time
@@ -82,6 +83,40 @@ KIND_TRIAGE = "triage"
 KIND_ESCALATION_ANSWER = "escalation-answer"
 KIND_FINDING_DIAGNOSE = "finding-diagnose"
 KIND_FINDING_AUTOFIX = "finding-autofix"
+
+#: The run stopped because the same failure kept recurring — its cause is the
+#: run's environment, not any one item (#3343).
+STOP_RUN_LEVEL_FAILURE = "run_level_failure"
+
+#: How many consecutive escalations sharing one cause before the run stops.
+#:
+#: Small on purpose. The measured case is what sets it: a headless command that
+#: did not resolve produced 55 `could_not_proceed` escalations — 55 comments,
+#: 55 `needs-human` labels, 16 minutes, one defect in the runner's own setup.
+#: `needs-human` is in `_HUMAN_OWNED_LABELS`, so the lane then skips every one
+#: of those issues, and a single setup defect removes the whole bug queue from
+#: automation until a human clears the labels by hand. Three is enough evidence
+#: that the cause is not item-specific and cheap enough to be wrong about.
+IDENTICAL_FAILURE_LIMIT = 3
+
+#: Digits are what make two instances of one cause look different: the issue
+#: number in "issue #1916: Unknown command" changes per item and the cause does
+#: not. Replaced wholesale rather than parsed — a signature is for comparison,
+#: never for display.
+_FAILURE_DIGITS_RE = re.compile(r"#?\d+")
+
+
+def failure_signature(item: "ActionItem", outcome: "ActionOutcome") -> str:
+    """A comparable stand-in for "this failed the same way as that" (#3343).
+
+    Kind plus the escalation detail with per-item numbers flattened, so two
+    issues failing on the same missing command match while a genuinely
+    different cause does not. Deliberately coarse: the breaker's job is to
+    notice a *repeated environmental* failure, and a signature that is too
+    precise never fires — which is the state that cost 55 escalations.
+    """
+    detail = (outcome.detail or "").strip().lower()
+    return f"{item.kind}|{_FAILURE_DIGITS_RE.sub('N', detail)}"
 
 #: The item kinds that open a pull request, and so the ones
 #: `budgets.max_open_prs` gates (#3340). Both dispatch a headless
@@ -795,6 +830,12 @@ def run_agent(
         #: `snapshot.prs` is re-read between items (#3338), so a PR merged
         #: mid-run genuinely lifts this and the operator should see both edges.
         open_prs_suppressed = False
+        #: (signature, consecutive count) for the run-level failure breaker
+        #: (#3343). Reset by an escalation with a different cause and by any
+        #: completed item — a run making progress is not in the state this
+        #: breaker exists to stop.
+        last_failure_signature = None
+        consecutive_identical_failures = 0
         unisolated_providers: set = set()
         stop_reason = STOP_DRAINED
 
@@ -925,6 +966,8 @@ def run_agent(
                 )
             budget.record_tokens(outcome.spend)
             if outcome.status == STATUS_COMPLETED:
+                last_failure_signature = None
+                consecutive_identical_failures = 0
                 items_completed += 1
                 report(
                     f"{item.item_id} completed in {_took(clock, item_started)} — "
@@ -956,6 +999,38 @@ def run_agent(
                     f"{item.item_id} escalated after {_took(clock, item_started)} — "
                     f"{reason}"
                 )
+
+                # #3343: an escalation whose cause keeps repeating is not about
+                # the item. Counted here rather than in a provider, because only
+                # the run can see that the SAME thing failed N times.
+                signature = failure_signature(item, outcome)
+                if signature == last_failure_signature:
+                    consecutive_identical_failures += 1
+                else:
+                    last_failure_signature = signature
+                    consecutive_identical_failures = 1
+
+                if consecutive_identical_failures >= IDENTICAL_FAILURE_LIMIT:
+                    run_reason = (
+                        f"{consecutive_identical_failures} consecutive items "
+                        f"failed with the same cause, so the cause is this "
+                        f"run's environment rather than any one item. Stopped "
+                        f"rather than working the rest of the queue: every "
+                        f"further item would add an escalation and a "
+                        f"human-owned label for a defect that has nothing to "
+                        f"do with it. Last item {item.item_id}; shared cause: "
+                        f"{reason}"
+                    )
+                    # Recorded against the run, not an issue: no target_issue
+                    # and no per-item label, so this stop removes nothing
+                    # further from automation. The items already escalated
+                    # above keep their own records.
+                    escalations.append(
+                        Escalation(item_id="run:identical-failures", reason=run_reason)
+                    )
+                    report(f"run stopped — {run_reason}")
+                    stop_reason = STOP_RUN_LEVEL_FAILURE
+                    break
 
         # A run that stopped on a cap or a pause broke out of the loop before
         # the top-of-iteration refresh, so the snapshot in hand is the one the

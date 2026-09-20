@@ -56,6 +56,7 @@ from specfuse.loop.triage import parse_marker
 from specfuse.monitor.autofix_invoke import (
     build_invocation,
     classify_outcome,
+    outcome_was_named,
     extract_stop_rationale,
 )
 
@@ -147,6 +148,14 @@ class BugLaneResult:
     #: was throwing it away, so three refusals in one run were three
     #: identical escalations saying only which word came back.
     stop_rationale: str = ""
+    #: Whether the session actually named one of `OUTCOMES`, as opposed to
+    #: `classify_outcome` failing closed to `could_not_proceed` for output
+    #: naming none (#3343). Defaults True so a caller constructing a result by
+    #: hand keeps today's escalation wording; only the real dispatch path sets
+    #: it from the session's own text. "The skill refused" and "the session
+    #: never started" are different situations with different fixes, and the
+    #: escalation asserted the first for 55 issues when the second was true.
+    outcome_named: bool = True
     #: `(branch, commit_count)` when a stopped run left committed work behind
     #: that no remote has. `None` when the stop really did leave nothing --
     #: the two are not distinguishable from the outcome constant alone, and
@@ -664,6 +673,7 @@ def run_bug_lane(
             pr_number=extract_pr_number(session_output),
             unpushed_work=unpushed_work_for_issue(runner, issue_number),
             stop_rationale=extract_stop_rationale(session_output),
+            outcome_named=outcome_was_named(session_output),
         )
 
     # The session's own account first (#3180) -- it never re-discovers what it
