@@ -220,6 +220,24 @@ class ActionOutcome:
     #: same shape as `NON_JUDGE_MODULES` and
     #: `DEPENDENCY_MANIFEST_NAMED_UNCOVERED`.
     escalation_waived: str = ""
+    #: Whether this escalation could have an environmental cause (#3372).
+    #:
+    #: Only an outcome reached WITHOUT reading the item can be about the run's
+    #: environment: a dispatch that failed, a session that produced no outcome
+    #: marker, a crash. An outcome reached BY reading the item is a judgement
+    #: about that item — `/fix-bug`'s `refused` says the work is not bug-sized,
+    #: `ci_not_green` and `pr_not_found` are facts about that issue's PR — and
+    #: three in a row says the queue holds three such issues, not that anything
+    #: is broken.
+    #:
+    #: #3343's breaker counted every escalation and stopped a run that was
+    #: working: two fixes merged, one held on red CI, six correctly declined,
+    #: 19 items never reached, and an escalation asserting an environment
+    #: cause a human then had to disprove.
+    #:
+    #: **Defaults False so a provider must opt in.** A provider that says
+    #: nothing never trips the breaker, rather than tripping it by omission.
+    environmental: bool = False
 
 
 class ActionProvider(Protocol):
@@ -1003,12 +1021,22 @@ def run_agent(
                 # #3343: an escalation whose cause keeps repeating is not about
                 # the item. Counted here rather than in a provider, because only
                 # the run can see that the SAME thing failed N times.
-                signature = failure_signature(item, outcome)
-                if signature == last_failure_signature:
-                    consecutive_identical_failures += 1
+                #
+                # #3372: but only an outcome the provider marks `environmental`
+                # can have an environmental cause. A per-item judgement —
+                # `refused`, `ci_not_green`, `pr_not_found` — RESETS the count
+                # rather than being ignored: a lane still reaching verdicts on
+                # items is not one whose environment is broken.
+                if not outcome.environmental:
+                    last_failure_signature = None
+                    consecutive_identical_failures = 0
                 else:
-                    last_failure_signature = signature
-                    consecutive_identical_failures = 1
+                    signature = failure_signature(item, outcome)
+                    if signature == last_failure_signature:
+                        consecutive_identical_failures += 1
+                    else:
+                        last_failure_signature = signature
+                        consecutive_identical_failures = 1
 
                 if consecutive_identical_failures >= IDENTICAL_FAILURE_LIMIT:
                     run_reason = (

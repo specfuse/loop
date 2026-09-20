@@ -788,7 +788,18 @@ class BugsProvider:
                 label_written=result.label_written,
             )
 
-        return ActionOutcome(status=STATUS_ESCALATED, detail=detail, escalation=escalation)
+        # #3372: only a session that produced NO outcome marker can have an
+        # environmental cause — a dispatch that failed, an empty result, a
+        # crash. `outcome_named` is exactly that distinction, already carried
+        # from the session's own text (#3343). A `refused` is `/fix-bug`
+        # reading the issue and judging it out of scope; three of those say the
+        # queue holds three feature-scoped issues, not that anything is broken.
+        return ActionOutcome(
+            status=STATUS_ESCALATED,
+            detail=detail,
+            escalation=escalation,
+            environmental=not result.outcome_named,
+        )
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:
         return None
