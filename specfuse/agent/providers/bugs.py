@@ -91,7 +91,10 @@ def _has_open_pr(snapshot: AgentSnapshot, issue_number: int) -> bool:
     lane's "which PR fixes this issue" are the same question, and two copies
     of the answer is how they drift.
     """
-    return any(pr_closes_issue(pr.body or "", issue_number) for pr in snapshot.prs)
+    return any(
+        pr_closes_issue(pr.body or "", issue_number, title=pr.title or "")
+        for pr in snapshot.prs
+    )
 
 
 def _pr_ref(pr_number: Optional[int]) -> str:
