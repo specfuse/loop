@@ -91,6 +91,29 @@ def classify_outcome(result_text):
     return found[0]
 
 
+def outcome_was_named(result_text) -> bool:
+    """Whether the session actually named one of `OUTCOMES` (#3343).
+
+    `classify_outcome` fails closed to `could_not_proceed` for empty output,
+    output naming no outcome, and output naming more than one -- which is the
+    right reduction and loses a distinction the escalation text needs.
+
+    "The skill ran and reported `could_not_proceed`" and "the session produced
+    no usable outcome at all" are different situations with different fixes:
+    the first points at the issue, the second at the runner's setup. The
+    measured run stated the first for 55 issues when the second was true --
+    the headless command did not resolve, so the skill never ran, and every
+    escalation recommended promoting a bug to a feature on the strength of a
+    missing command.
+
+    Read from the same text by the same rule as `classify_outcome`, so the two
+    cannot disagree about what "named" means.
+    """
+    if not result_text or not result_text.strip():
+        return False
+    return len([outcome for outcome in OUTCOMES if outcome in result_text]) == 1
+
+
 #: How much of the session's own words to carry. Long enough for a paragraph
 #: of reasoning, short enough that an escalation stays readable.
 STOP_RATIONALE_LIMIT = 700

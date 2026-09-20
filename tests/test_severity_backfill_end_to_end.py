@@ -13,7 +13,6 @@ marker before projecting the label.
 from __future__ import annotations
 
 import re
-import subprocess
 import sys
 import unittest
 
@@ -23,51 +22,34 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-def _main_ref_available() -> bool:
-    """Whether a local `main` ref exists to diff against.
-
-    CI checks out a single branch with no local `main`, so `git diff main` and
-    `git show main:<path>` exit 128 there. Two tests below compare against it;
-    both must **skip** rather than pass vacuously, which is exactly what the
-    `git diff` one did before this guard: a failed git command yields empty
-    stdout, and the assertion was on stdout alone, so T07's criterion-2 claim
-    that `specfuse/agent/run.py` is untouched proved nothing on CI while
-    reporting green.
-    """
-    probe = subprocess.run(
-        ["git", "rev-parse", "--verify", "main"],
-        cwd=REPO_ROOT, check=False, capture_output=True, text=True,
-    )
-    return probe.returncode == 0
-
-
-_NEEDS_MAIN = unittest.skipUnless(
-    _main_ref_available(),
-    "no local `main` ref (shallow/single-branch checkout) — this assertion "
-    "compares against main and would pass vacuously rather than prove anything",
-)
-
-
 class SeverityBackfill(unittest.TestCase):
-    @_NEEDS_MAIN
     def test_the_conductor_cannot_reach_the_backfill(self):
+        """The Q1 decision as a durable invariant, not a branch-scoped diff.
+
+        This asserted `git diff main -- specfuse/agent/run.py` was empty —
+        FEAT-2026-0113/T07's criterion 2, "this gate does not edit the
+        conductor". That was true of **that gate** and is not an invariant of
+        the repository: #3343 legitimately edits `run.py` to add the run-level
+        failure breaker, and the assertion failed on work that has nothing to
+        do with the backfill.
+
+        A test comparing HEAD against `main` asserts a property of the branch,
+        not of the code: it passes for the branch's whole life and then fails
+        forever after merge, or — as here — fails the first time anyone
+        touches the file for an unrelated reason.
+
+        What survives is the claim worth keeping: the conductor holds no
+        reference to the backfill, so no flag, branch or import in it can
+        reach that mode. True on any branch, before or after any merge.
+        """
         run_py = REPO_ROOT / "specfuse" / "agent" / "run.py"
         text = run_py.read_text(encoding="utf-8")
-        self.assertEqual(text.count("severity_backfill"), 0)
-
-        diff = subprocess.run(
-            ["git", "diff", "main", "--", "specfuse/agent/run.py"],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
         self.assertEqual(
-            diff.returncode, 0,
-            "git diff against main must succeed; an errored diff yields empty "
-            "stdout and would make the assertion below vacuous",
+            text.count("severity_backfill"), 0,
+            "specfuse-backfill-severity is a separate console script "
+            "(GATE-03.md, arm-checkpoint Q1): a bulk issue-mutating mode must "
+            "not be reachable from the binary an unattended run uses",
         )
-        self.assertEqual(diff.stdout, "")
 
     def test_pyproject_registers_the_backfill_console_script(self):
         """The Q1 arm-checkpoint decision, as a merge-independent invariant.
