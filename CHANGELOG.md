@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The identical-failure breaker no longer counts `refused`, which is a per-item judgement rather than an environment fault.** #3343's breaker counted *every* escalation. Measured: a run worked 10 of 29 items — **two fixes merged, one held back on red CI, six issues correctly declined as feature-scoped** — and the breaker stopped the remaining 19, writing an escalation asserting "the cause is this run's environment" about a lane that was working. A human then had to disprove it. The distinction #3343 failed to draw: some outcomes are reached **without reading the item** (a dispatch that failed, a session that produced no outcome marker, a crash) and some are reached **by reading it** — `/fix-bug`'s `refused` says the work is not bug-sized, and `ci_not_green` / `pr_not_found` are facts about that issue's PR. Only the first kind can be environmental. `ActionOutcome` gains `environmental`, **defaulting `False` so a provider must opt in** — a provider that says nothing never trips the breaker, failing safe toward not stopping a working run. `BugsProvider` sets it from `outcome_named`, the distinction #3343 itself introduced and then did not connect. **A per-item judgement resets the count rather than being ignored**: a lane still reaching verdicts is not one whose environment is broken, so the breaker now fires only on an unbroken run of genuine faults — which is what the original 55-item incident was. (#3372)
+
 ## [0.22.0+umbrella.0.15.0] - 2026-09-20
 
 ### Fixed

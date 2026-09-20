@@ -62,6 +62,10 @@ class _AlwaysFailsTheSameWay:
             status=STATUS_ESCALATED,
             detail=self._template.format(n=number),
             escalation=None,
+            # The #3342 scenario these tests model — a dispatched command that
+            # did not resolve — is environmental, and since #3372 a provider
+            # must say so for the breaker to count it.
+            environmental=True,
             escalation_waived="test double: the escalation trace is not this test's subject",
         )
 
@@ -150,6 +154,7 @@ class TheBreakerStopsTheRun(unittest.TestCase):
                 return ActionOutcome(
                     status=STATUS_ESCALATED,
                     detail=f"could_not_proceed: {words[len(self.executed) - 1]}",
+                    environmental=True,
                     escalation_waived="test double",
                 )
 
@@ -210,3 +215,111 @@ class TheTemplateStopsAssertingARefusal(unittest.TestCase):
             "the promote-to-feature advice must not appear when the skill "
             "never ran — that is what would have promoted 55 bugs",
         )
+
+
+class OnlyEnvironmentalFailuresCount(unittest.TestCase):
+    """#3372: the breaker counted `refused`, which is a per-item judgement.
+
+    `/fix-bug` refuses when it reads an issue and decides the work is not
+    bug-sized — SKILL.md: "Refuses if the work is large/complex/risky and
+    proposes promoting to a feature instead". Three in a row means the queue
+    holds three feature-scoped issues, which is unremarkable in a backlog.
+
+    Measured: a run worked 10 of 29 items — two fixes merged, one held on red
+    CI, six declined — and the breaker stopped the remaining 19, reporting
+    "the cause is this run's environment" about a lane that was working.
+
+    The distinction #3343 failed to draw: some outcomes are reached WITHOUT
+    reading the item (dispatch failed, no session ran) and some are reached BY
+    reading it. Only the first can be environmental.
+    """
+
+    def _provider(self, outcomes):
+        """outcomes: list of (detail, environmental)."""
+        seq = list(outcomes)
+
+        class _Scripted:
+            def __init__(self):
+                self.executed = []
+                self._items = [
+                    ActionItem(item_id=f"bug-{i}", kind="bug", summary="", queue_key=None)
+                    for i in range(1, len(seq) + 1)
+                ]
+
+            def advertise(self, snapshot):
+                return tuple(i for i in self._items if i.item_id not in self.executed)
+
+            def execute(self, item):
+                detail, env = seq[len(self.executed)]
+                self.executed.append(item.item_id)
+                return ActionOutcome(
+                    status=STATUS_ESCALATED, detail=detail,
+                    environmental=env,
+                    escalation_waived="test double",
+                )
+
+            def reconcile(self, item, outcome):
+                return None
+
+        return _Scripted()
+
+    def test_consecutive_refusals_never_stop_the_run(self):
+        provider = self._provider([("refused", False)] * 6)
+        summary = _run(provider, [])
+        self.assertEqual(len(provider.executed), 6)
+        self.assertNotEqual(summary.stop_reason, STOP_RUN_LEVEL_FAILURE)
+
+    def test_consecutive_environmental_failures_still_stop_it(self):
+        provider = self._provider([("could_not_proceed: Unknown command", True)] * 9)
+        summary = _run(provider, [])
+        self.assertEqual(len(provider.executed), IDENTICAL_FAILURE_LIMIT)
+        self.assertEqual(summary.stop_reason, STOP_RUN_LEVEL_FAILURE)
+
+    def test_a_per_item_judgement_between_them_resets_the_count(self):
+        # A lane that successfully judges an item in between is not one whose
+        # environment is broken.
+        provider = self._provider([
+            ("could_not_proceed: Unknown command", True),
+            ("could_not_proceed: Unknown command", True),
+            ("refused", False),
+            ("could_not_proceed: Unknown command", True),
+            ("could_not_proceed: Unknown command", True),
+        ])
+        summary = _run(provider, [])
+        self.assertEqual(len(provider.executed), 5)
+        self.assertNotEqual(summary.stop_reason, STOP_RUN_LEVEL_FAILURE)
+
+    def test_environmental_defaults_false_so_a_provider_must_opt_in(self):
+        # Fail-safe direction: a provider that says nothing never trips the
+        # breaker, rather than tripping it by omission.
+        self.assertFalse(ActionOutcome(status=STATUS_ESCALATED, detail="x").environmental)
+
+
+class TheProviderActuallySetsIt(unittest.TestCase):
+    """Without this the breaker never fires in production and #3372's fix
+    would be one hollow guard replacing another."""
+
+    def _run_execute(self, *, outcome_named: bool, outcome: str):
+        from unittest.mock import patch
+        from specfuse.agent.providers.bugs import BugsProvider
+        from specfuse.loop.bug_lane_run import BugLaneResult
+
+        provider = BugsProvider(repo="acme/widget", runner=lambda *a, **k: None)
+        item = ActionItem(item_id="bug-7", kind="bug", summary="", queue_key=None)
+        result = BugLaneResult(
+            outcome=outcome, reason=None, pr_number=None,
+            stop_rationale="whatever", outcome_named=outcome_named,
+        )
+        with patch("specfuse.agent.providers.bugs.run_bug_lane", return_value=result), \
+             patch("specfuse.agent.providers.bugs._wip_ref_for_item", return_value=None):
+            return provider.execute(item)
+
+    def test_a_session_that_named_no_outcome_is_environmental(self):
+        self.assertTrue(self._run_execute(outcome_named=False, outcome="could_not_proceed").environmental)
+
+    def test_a_refusal_the_session_named_is_not(self):
+        self.assertFalse(self._run_execute(outcome_named=True, outcome="refused").environmental)
+
+    def test_a_named_could_not_proceed_is_not_either(self):
+        # The skill ran, read the issue, and could not proceed on ITS terms.
+        self.assertFalse(self._run_execute(outcome_named=True, outcome="could_not_proceed").environmental)
