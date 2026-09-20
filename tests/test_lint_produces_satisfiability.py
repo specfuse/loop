@@ -116,7 +116,12 @@ class TestProducesSatisfiability(unittest.TestCase):
         self.assertIn("FEAT-2026-0099/T04", out)
         self.assertIn("FEAT-2026-0099/T03", out)
         self.assertIn("src/widget.py", out)
-        self.assertIn("Drop the path, or state the incremental edit", out)
+        # #3354: the old wording offered an escape the guard never implemented
+        # ("state the incremental edit in the body"), so an author who followed
+        # it saw the warning persist and reasonably concluded they had done it
+        # wrong. The message now says what is true.
+        self.assertIn("EDITS the file", out)
+        self.assertIn("does not clear", out)
 
     def test_incremental_edit_chain_still_warns(self):
         """0066 T03->T05 shape: a later WU incrementally edits a path an
@@ -146,7 +151,12 @@ class TestProducesSatisfiability(unittest.TestCase):
         self.assertIn("FEAT-2026-0099/T05", out)
         self.assertIn("FEAT-2026-0099/T03", out)
         self.assertIn("src/shared.py", out)
-        self.assertIn("incremental edit this WU makes to it in the body", out)
+        # The message must not promise an escape the guard does not implement
+        # (#3354): there is no body scan, so "state the incremental edit in the
+        # body" read as a way to clear the warning, and it never was.
+        self.assertIn("does not clear", out)
+        self.assertIn("nothing here reads the body", out)
+        self.assertNotIn("Drop the path, or state", out)
 
     def test_clean_feature_no_warn(self):
         """Distinct produces paths across WUs never clash — no WARN."""

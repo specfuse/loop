@@ -1031,8 +1031,11 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
             print(
                 f"WARN: {wfile}: {wid} declares produces path {p!r}, but "
                 f"done WU {done_wid} ({done_wfile}) already delivered it. "
-                f"Drop the path, or state the incremental edit this WU makes "
-                f"to it in the body."
+                f"Re-declaring it is correct when this WU EDITS the file "
+                f"rather than creating it — say so in the body so a reviewer "
+                f"can tell the two apart. Drop the path if this WU does not "
+                f"touch it. This warning is advisory either way and does not "
+                f"clear: nothing here reads the body."
             )
 
 
@@ -1448,7 +1451,12 @@ def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
                         f"this pattern's scope ambiguous without semantic "
                         f"judgment this lint does not have. Confirm by hand "
                         f"before arming, or reword the boundary to name the "
-                        f"protected surface unambiguously."
+                        f"surfaces it protects rather than the file this WU "
+                        f"also produces — e.g. 'the `foo` and `bar` function "
+                        f"bodies and every other definition in it except "
+                        f"`baz`'. A hygiene unit editing a file it must "
+                        f"otherwise protect is the normal shape here, and "
+                        f"naming surfaces is what clears this (#3357)."
                     )
 
             pdh_raw = wfm.get("produces_driver_helper")

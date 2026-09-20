@@ -127,6 +127,32 @@ class TestProducesBoundary(unittest.TestCase):
         self.assertIn("src/main/**", joined)
         self.assertIn("produces diff check", joined)
 
+    def test_ambiguous_boundary_warn_names_the_rewording_that_works(self):
+        """#3357: the WARN told an author to "reword the boundary" and never
+        said what a working rewording looks like — and the shape that trips it
+        is every hygiene unit, which by definition edits a file it must also
+        protect most of.
+
+        Unlike the produces-collision warning (#3354/#1041), this escape is
+        real: naming surfaces instead of the file clears it. The message has to
+        say so, or the advice is unactionable.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            feat = _build_feature(Path(tmp), [{
+                "id": "FEAT-2026-0099/T05H", "file": "WU-05H.md",
+                "type": "implementation", "status": "pending",
+                "do_not_touch": (
+                    "- `helper_a` and every other function in "
+                    "`src/module.py` (owned by T05)."
+                ),
+                "produces": "src/module.py",
+            }])
+            out, _ = _lint_stdout(feat)
+        self.assertIn("WARN", out)
+        self.assertIn("src/module.py", out)
+        self.assertIn("name the surfaces", out)
+        self.assertIn("except", out)
+
     def test_carveout_except_suppresses_match(self):
         """0066/T04's re-armed body: an explicit 'except' carve-out on the
         same bullet suppresses the match — lints clean."""
