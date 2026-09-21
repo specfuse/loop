@@ -212,8 +212,8 @@ predicted. Re-checking here closes that gap.
   open with `Closes #<issue-number>.`** — one place, not two.
   **Do NOT put `(closes #<#>)` in the title.** GitHub closes the issue from
   either, so a title-only reference looks correct to a human and to GitHub
-  while leaving the body without it. That is #3366: a completed fix for
-  clabonte/generator#1916 — real fix, pushed branch, PR with a regression
+  while leaving the body without it. That is #3366: a completed fix on a
+  downstream consumer repo — real fix, pushed branch, PR with a regression
   test, reported `completed` — escalated `pr_not_found`, because the title
   carried the reference and the body did not. The lane now matches either
   (so already-shipped skill versions are fine), but one canonical home is
