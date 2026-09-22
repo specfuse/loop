@@ -402,11 +402,75 @@ def _ensure_severity_labels(target, *, runner, repo=None) -> list:
     return failed
 
 
+def severity_label_projection(label_names, *, aliases: Optional[dict] = None) -> dict:
+    """`{severity_value: label_name}` for the values a repository spells in its
+    own word (#3353), given the `severity:*` labels it defines.
+
+    `severity_aliases` (#3349) are honoured by the `min_severity` floor, which
+    reads an aliased label through `read_severity_label`. The classifier
+    FEAT-2026-0113 added answers in the published vocabulary instead, so the
+    write path projected `severity:high` at a repository whose issues all say
+    `severity:major` -- both spellings in circulation, and nothing reporting
+    the asymmetry.
+
+    This is the write-side half. The classifier is deliberately left answering
+    in the vocabulary so the marker's `severity=` field stays comparable across
+    repositories; only the *label* takes the repository's own word.
+
+    Pure over *label_names* rather than listing them itself, so the one caller
+    that needs both this and `read_severity_rubric` pays for a single
+    `gh label list` -- the once-per-run listing that run is asserted on.
+
+    Entries appear only where the projection actually differs, so an empty
+    result means "write the vocabulary label" and callers need no special case.
+    Two bounds keep it honest:
+
+    * **A label the repository does not define is never projected.** The
+      shipped `DEFAULT_SEVERITY_ALIASES` name words (`blocker`, `urgent`,
+      `trivial`) most repositories have never created; projecting one would
+      write a label that does not exist.
+    * **An in-vocabulary label always wins.** A repository defining both
+      `severity:high` and `severity:major` gets no entry for `high` -- the same
+      precedence `read_severity_rubric` applies when it builds the rubric.
+
+    Two aliases onto one value is the operator's own ambiguity. The lowest
+    label name sorts first, so a run is at least reproducible; defining the
+    vocabulary label is what removes the ambiguity.
+    """
+    prefix = agent_policy.SEVERITY_LABEL_PREFIX
+    try:
+        severity_names = sorted(
+            name for name in label_names if name.startswith(prefix)
+        )
+    except TypeError:
+        return {}
+
+    in_vocabulary = {
+        name[len(prefix):] for name in severity_names
+        if name[len(prefix):] in agent_policy.SEVERITY_VALUES
+    }
+
+    aliases = aliases if aliases is not None else agent_policy.resolve_severity_aliases()
+    projection: dict = {}
+    for name in severity_names:
+        word = name[len(prefix):]
+        if word in agent_policy.SEVERITY_VALUES:
+            continue
+        mapped = aliases.get(word.strip().lower())
+        if mapped not in agent_policy.SEVERITY_VALUES:
+            continue
+        if mapped in in_vocabulary or mapped in projection:
+            continue
+        projection[mapped] = name
+    return projection
+
+
 def read_severity_rubric(
     target: str | Path,
     *,
     runner: Optional[Callable] = None,
     repo: Optional[str] = None,
+    existing: Optional[list] = None,
 ) -> dict:
     """`{severity_value: description}` from the repo's own `severity:*` labels,
     or specfuse's `DEFAULT_SEVERITY_RUBRIC` when it has defined none (#3352).
@@ -428,7 +492,11 @@ def read_severity_rubric(
     """
     runner = runner if runner is not None else _default_runner
 
-    existing, _reason = list_existing_labels(target, runner=runner, repo=repo)
+    # `existing` lets a caller that already listed the repository's labels pass
+    # them in rather than pay for a second `gh label list` (#3353). Absent, the
+    # listing happens here exactly as it always did.
+    if existing is None:
+        existing, _reason = list_existing_labels(target, runner=runner, repo=repo)
     if existing is None:
         return {}
 

@@ -37,7 +37,11 @@ from typing import Callable, Optional
 
 from specfuse.agent.invoke import run_claude
 from specfuse.agent.triage_invoke import build_invocation, classify_severity
-from specfuse.loop.labels import read_severity_rubric
+from specfuse.loop.labels import (
+    list_existing_labels,
+    read_severity_rubric,
+    severity_label_projection,
+)
 
 from specfuse.loop import triage
 from specfuse.loop.build_provenance import warn_if_out_of_tree
@@ -50,7 +54,13 @@ def _default_runner(argv: list, check: bool = False):
     return subprocess.run(argv, check=check, capture_output=True, text=True)
 
 
-def apply_severity_backfill(runner: Callable, repo: str, decisions: list) -> list:
+def apply_severity_backfill(
+    runner: Callable,
+    repo: str,
+    decisions: list,
+    *,
+    label_projection: "dict | None" = None,
+) -> list:
     """Record each decision in `decisions` against its GitHub issue, marker
     first, label second.
 
@@ -65,6 +75,13 @@ def apply_severity_backfill(runner: Callable, repo: str, decisions: list) -> lis
     amended marker in place -- the marker is the authoritative record, the
     label a projection re-derived from it (`PLAN.md`'s "Record
     precedence").
+
+    `label_projection` maps a vocabulary value to the label this repository
+    spells it with (`labels.severity_label_projection`, #3353). The marker
+    always records the vocabulary value, so it stays comparable across
+    repositories; only the label takes the operator's own word. Absent or
+    missing a value, the vocabulary label is written -- the behaviour before
+    the projection existed.
     """
     results = []
     for decision in decisions:
@@ -104,7 +121,9 @@ def apply_severity_backfill(runner: Callable, repo: str, decisions: list) -> lis
             continue
         row["marker_written"] = True
 
-        label = triage.severity_label_for(severity)
+        label = (label_projection or {}).get(
+            severity, triage.severity_label_for(severity)
+        )
         try:
             runner(
                 ["gh", "issue", "edit", str(number), "--repo", repo, "--add-label", label],
@@ -156,7 +175,14 @@ def run_backfill(
     once `apply_severity_backfill` has run over it, that function's own
     `skipped`/`marker_written`/`label_written` fields.
     """
-    rubric = read_severity_rubric(working_dir, runner=runner, repo=repo)
+    # One `gh label list` feeds both the rubric and the write-side
+    # projection (#3353): the once-per-run listing this run is asserted on.
+    existing, _listing_reason = list_existing_labels(
+        working_dir, runner=runner, repo=repo
+    )
+    rubric = read_severity_rubric(
+        working_dir, runner=runner, repo=repo, existing=existing
+    )
     if not rubric:
         return {
             "rubric": {},
@@ -201,7 +227,14 @@ def run_backfill(
         decisions.append({"number": number, "body": body, "severity": severity})
 
     if apply and decisions:
-        write_results = apply_severity_backfill(runner, repo, decisions)
+        # A property of the repository's label set, not of any one issue
+        # (#3353) -- derived from the listing already read above.
+        projection = severity_label_projection(
+            [item.get("name", "") for item in (existing or [])]
+        )
+        write_results = apply_severity_backfill(
+            runner, repo, decisions, label_projection=projection
+        )
         by_number = {result["number"]: result for result in write_results}
         for row in rows:
             result = by_number.get(row["number"])

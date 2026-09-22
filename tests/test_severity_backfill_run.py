@@ -222,5 +222,65 @@ class BackfillRun(unittest.TestCase):
         self.assertEqual([], label_create_calls)
 
 
+class AliasedSchemeWritesTheRepositorysOwnLabel(unittest.TestCase):
+    """End to end for #3353: a repository whose severity labels are its own
+    words gets those words written back, not the vocabulary spelling.
+
+    The unit tests for `severity_label_projection` prove the mapping; this
+    proves the wiring, which is where the defect actually lived -- the
+    projection existed nowhere and `apply_severity_backfill` wrote
+    `severity_label_for(value)` unconditionally.
+    """
+
+    ALIASED_LABELS = [
+        {"name": "severity:major", "description": "Wrong behavior."},
+        {"name": "severity:minor", "description": "Cosmetic."},
+    ]
+
+    def test_the_label_written_is_the_repositorys_word(self):
+        candidates = [_candidate(1)]
+        runner, calls = _make_runner(
+            candidates=candidates,
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1: _marker(1, "bug", "high", "high")},
+        )
+
+        report = run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual({"high", "low"}, set(report["rubric"]))
+
+        label_calls = [c for c in _issue_edit_calls(calls) if "--add-label" in c]
+        self.assertEqual(1, len(label_calls))
+        written = label_calls[0][label_calls[0].index("--add-label") + 1]
+        self.assertEqual("severity:major", written)
+
+    def test_the_marker_still_records_the_vocabulary_value(self):
+        candidates = [_candidate(1)]
+        runner, calls = _make_runner(
+            candidates=candidates,
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1: _marker(1, "bug", "high", "high")},
+        )
+
+        run_backfill(runner, _REPO, apply=True)
+
+        body_calls = [c for c in _issue_edit_calls(calls) if "--body" in c]
+        self.assertEqual(1, len(body_calls))
+        body = body_calls[0][body_calls[0].index("--body") + 1]
+        self.assertIn("severity=high", body)
+
+    def test_the_listing_is_still_read_exactly_once(self):
+        candidates = [_candidate(1)]
+        runner, calls = _make_runner(
+            candidates=candidates,
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1: _marker(1, "bug", "high", "high")},
+        )
+
+        run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual(1, len(_label_list_calls(calls)))
+
+
 if __name__ == "__main__":
     unittest.main()
