@@ -232,9 +232,14 @@ gates:
 
             # FEAT-2026-0109/T01: the driver no longer probes the `code` set
             # at gate entry, so this scenario is now reached via a genuine
-            # verification failure — attribution (which reuses
-            # format_preexisting_gate_failure, exactly as the old gate-entry
-            # probe did) then finds the tree pre-broken via probe_baseline.
+            # verification failure — attribution then finds the tree
+            # pre-broken via probe_baseline.
+            #
+            # It reuses format_preexisting_gate_failure but NOT its wording:
+            # "exactly as the old gate-entry probe did" was the assumption
+            # #3330 defect 2 disproved. Removing the gate-entry probe left
+            # attribution as the only caller, so claims that were true only
+            # of that probe became false everywhere they were shown.
             def fake_dispatch(wu, failure_note, cost_tracking=True):
                 write_stub_deliverable(wu)
                 return "```result\nstatus: complete\n```\n"
@@ -253,8 +258,16 @@ gates:
             message = escalations[0]["payload"]["message"]
             self.assertIn("tests", message)
             self.assertIn("test_widget_render_fails", message)
-            self.assertIn("No work unit caused this failure", message)
-            self.assertIn("Zero work units were dispatched", message)
+            # These two assertions used to require the opposite (#3330
+            # defect 2). They pinned the fresh-gate claims -- "No work unit
+            # caused this failure", "Zero work units were dispatched" -- onto
+            # the attribution path, where a unit demonstrably WAS dispatched:
+            # this very test dispatches one and fails its verification to get
+            # here. The message now names that unit instead.
+            self.assertNotIn("No work unit caused this failure", message)
+            self.assertNotIn("Zero work units were dispatched", message)
+            self.assertIn("FEAT-2026-8910/T01", message)
+            self.assertIn("WAS dispatched", message)
             self.assertIn("FEAT-2026-0052", message)
 
 

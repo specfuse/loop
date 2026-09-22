@@ -6485,6 +6485,7 @@ def baseline_evidence_diffstat(feat_fm: dict) -> "str | None":
 def format_preexisting_gate_failure(
     gate_number: int, failing_gates: list[dict], feat_fm: dict,
     done_unit_ids: "list[str] | None" = None,
+    attributed_to: "str | None" = None,
 ) -> str:
     """Render the `preexisting_gate_failure` halt as a message a non-expert
     operator can act on without reading driver source (FEAT-2026-0051/T03).
@@ -6497,6 +6498,22 @@ def format_preexisting_gate_failure(
     defer the feature. There is no "proceed anyway" option in v1: the waiver
     is future work tracked as FEAT-2026-0052, never offered here as if it
     already existed.
+
+    `attributed_to` names the work unit whose failed attempt triggered the
+    probe (#3330 defect 2). This message was written for a gate-entry probe,
+    where "zero work units were dispatched" was true; FEAT-2026-0109/T01 then
+    removed that probe, leaving attribution as the only path that renders it --
+    and on that path a unit *was* dispatched and its failure is what caused the
+    re-run. Left unsaid, every fresh-gate claim here is false exactly when the
+    message is shown.
+
+    The proof is softened on every path (#3371). A `git diff --stat` compares
+    TRACKED files, so it cannot see a check's gitignored inputs; `git reset
+    --hard` restores tracked files and leaves ignored ones behind, which is how
+    a failed attempt's own build output ends up failing the probe that is
+    supposed to exonerate it. Stating "the failure predates this feature" from
+    that diff reads as conclusive and cost one reported incident a bisect
+    across three commits.
     """
     # A RESUMED gate -- one where work units already ran and committed -- has a
     # baseline that INCLUDES this feature's own landed work, so the fresh-gate
@@ -6505,8 +6522,17 @@ def format_preexisting_gate_failure(
     # that a previous unit of the same gate had added two commits earlier.
     done_unit_ids = list(done_unit_ids or [])
     resumed = bool(done_unit_ids)
+    attributed = bool(attributed_to) and not resumed
 
-    if resumed:
+    if attributed:
+        lines = [
+            f"Gate {gate_number} is blocked: the automated checks it depends "
+            f"on failed on a probe the driver ran AFTER {attributed_to}'s "
+            f"attempt failed and its changes were reset.",
+            "",
+            "Failing check(s) found by that probe:",
+        ]
+    elif resumed:
         lines = [
             f"Gate {gate_number} is blocked: the automated checks it depends on "
             f"are failing, and this gate has ALREADY LANDED WORK.",
@@ -6526,7 +6552,14 @@ def format_preexisting_gate_failure(
             f"(signature: {g['failure_signature']})"
         )
     lines.append("")
-    if resumed:
+    if attributed:
+        lines.append(
+            f"{attributed_to} WAS dispatched and its attempt failed. The "
+            f"driver then reset the tree and re-ran the checks to ask whether "
+            f"the failure predated that attempt; the result above is what "
+            f"that probe found."
+        )
+    elif resumed:
         lines.append(
             f"{len(done_unit_ids)} work unit(s) in this gate are already `done` "
             f"and committed, so the baseline these checks measured includes this "
@@ -6554,12 +6587,16 @@ def format_preexisting_gate_failure(
             )
         else:
             lines.append(
-                "Proof the failing check(s)' input files are unchanged vs "
-                "the integration branch (so the failure predates this "
-                "feature; the diff below is the feature's own plan/scaffold "
-                "files, not code the failing check(s) read):"
+                "The failing check(s)' TRACKED input files are unchanged vs "
+                "the integration branch (the diff below is the feature's own "
+                "plan/scaffold files, not code the failing check(s) read):"
             )
         lines.append(diffstat)
+    elif attributed:
+        lines.append(
+            "Base-tree comparison unavailable (no integration branch could "
+            "be resolved, or the comparison itself failed)."
+        )
     else:
         lines.append(
             "Base-tree comparison unavailable (no integration branch could "
@@ -6567,9 +6604,41 @@ def format_preexisting_gate_failure(
             "check(s) above were still measured before any work unit ran, "
             "so the conclusion stands even without this proof."
         )
+    if not resumed:
+        # The limit of the proof above, stated wherever it is offered (#3371).
+        # A tracked diff is consistent with BOTH "pre-existing" and "left
+        # behind by this run", so naming what it cannot see is the difference
+        # between a reader checking `out/` first and bisecting the branch.
+        lines.append("")
+        lines.append(
+            "What that comparison does NOT cover: untracked and gitignored "
+            "paths. `git reset --hard` restores tracked files and leaves "
+            "ignored ones in place, so a check that reads a build or output "
+            "directory (`out/`, `target/`, generated-code trees, caches) can "
+            "fail on state this feature's own failed attempt produced. The "
+            "diff above cannot distinguish that from pre-existing breakage."
+        )
     lines.append("")
     lines.append("What to do next:")
-    if resumed:
+    if attributed:
+        lines.append(
+            "  1. Check for leftover untracked/ignored state from the reset "
+            "attempt FIRST — it is the cheapest to rule out and the most "
+            "likely cause. `git status --ignored --short` and `git clean -ndX` "
+            "list what survived; if a listed path feeds a failing check, that "
+            "is your answer."
+        )
+        lines.append(
+            "  2. Only if the tree is clean of those is this pre-existing "
+            "debt — confirm by running the failing check(s) on the "
+            "integration branch in a fresh checkout before assuming it."
+        )
+        lines.append(
+            f"  3. If it was leftover state, remove it and re-run; "
+            f"{attributed_to} is back at its previous attempt count and will "
+            f"be retried."
+        )
+    elif resumed:
         lines.append(
             "  1. Find which of this gate's landed work units introduced the "
             "failing check, and fix it ON THIS BRANCH. `git log -S<signature> "
@@ -11685,7 +11754,8 @@ def run(
                                         gate.number, _attr_failing, feat_fm,
                                         done_unit_ids=[
                                             u.wu_id for u in units
-                                            if u.status == "done"]))
+                                            if u.status == "done"],
+                                        attributed_to=wu.wu_id))
                                 wu_events.append(build_event(
                                     "human_escalation", feature_id, {
                                         "reason": "preexisting_gate_failure",
