@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.22.2+umbrella.0.15.0] - 2026-09-21
+
 ### Fixed
 
 - **`max_items_per_day` says that it is applied per run.** The key is named for a day and enforced per run — holding it across runs needs state that survives a process, which is a feature rather than a fix — and `resolve_max_items` recorded that honestly in a docstring, which is not a surface an operator reads. A run printing `max_items=62 (policy)` against a key named `per_day` invited the reading the name suggests, and that reading is the unsafe one: a day of runs can exceed the number the operator believes they set. The opening line now reads `max_items=62 (policy per run)` — only this cap is annotated, since only this one has a name promising something wider than it delivers — and `/specfuse:derive-agent-policy` states it where the value is proposed, so the operator is told before they choose the number rather than after. This closes the last open expectation on #3340; budget resolution from policy, the `max_open_prs` gate and the effective-caps line shipped earlier. (#3340)
