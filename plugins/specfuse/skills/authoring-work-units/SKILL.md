@@ -101,6 +101,21 @@ target (whose `depends_on` gains it and whose status returns to `pending`), and 
 blocked WU's boundary and never fix it out-of-loop; either erodes the per-WU contract or
 the audit trail.
 
+**Word this unit's own Do not touch by naming surfaces, not the file.** A hygiene WU has
+to declare the broken file in `produces:` *and* protect nearly all of it, so a boundary
+written as a file path collides with its own deliverable — `lint_plan` WARNs, and the
+warning is correct. This is the normal shape here, not an edge case, so expect it and
+write past it:
+
+> In `<module>`, the protected surfaces are the **`foo` and `bar` function bodies and
+> every other definition in it except `baz`**.
+
+Not `"every other function in <module>"`. Read literally that forbids editing the one
+function the unit exists to fix — which is what `FEAT-2026-0113/T08H` shipped. It passed
+only because the acceptance criteria named the target unambiguously, so the boundary and
+the criteria contradicted each other and only the criteria were load-bearing. Naming the
+surfaces clears the warning and, the part that matters, removes the contradiction.
+
 ## 8. Cross-surface contract values — verify against the source, never invent
 
 A criterion naming a value owned by **another system** (a label name, an API field, an
