@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The attribution halt no longer claims nothing was dispatched.** `format_preexisting_gate_failure` was written for a gate-entry probe, where "Zero work units were dispatched for this gate" was true. FEAT-2026-0109/T01 removed that probe, leaving attribution as the **only** path that renders the message — and there a unit was dispatched, its attempt failed, and the driver reset the tree and re-ran the checks. Every fresh-gate claim was therefore false exactly when it was shown. The message now names the attributing unit, says the probe ran after its reset, and points the operator at leftover state first. The proof is softened wherever it appears: a `git diff --stat` compares **tracked** files, so it can neither see a check's gitignored inputs nor distinguish pre-existing breakage from output this feature's own failed attempt left behind — `git reset --hard` restores tracked files and leaves ignored ones in place. In the reported incident the checks failed on exactly that, and the message read as conclusive enough to cost a bisect across three commits. (#3330)
+
 ## [0.22.2+umbrella.0.15.0] - 2026-09-21
 
 ### Fixed
