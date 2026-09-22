@@ -248,6 +248,14 @@ budgets:
   max_items_per_day: <value>     # PROPOSED from evidence, or shipped default
 ```
 
+**Say what `max_items_per_day` actually bounds.** Despite the name, it is
+applied **per run**: enforcing it across runs within a day needs state that
+survives a process, which the driver does not keep (#3340). Per run it is a
+strictly tighter bound than the name promises for any single run, but a day of
+runs can exceed it. Tell the operator this when you propose the value — they
+are choosing a number, and the number means something narrower than the key
+they are writing it under. The run's own opening `budgets:` line repeats it.
+
 Every value here traces to `propose_policy_defaults`'s evidence string
 (reproduced in the reconciliation report) or, where that function returned no
 proposal, to `.specfuse/agent-policy.yml.example`'s shipped default — labeled

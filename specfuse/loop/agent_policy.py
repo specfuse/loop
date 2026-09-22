@@ -363,10 +363,21 @@ def describe_budget_sources(**caps) -> str:
     that is not capped: the operator cannot tell which of the two they have.
     Each value is a `(value, source)` pair, source being `flag`, `policy` or
     `none`.
+
+    `max_items` carries an explicit `per run` (#3340). The policy key it comes
+    from is named `max_items_per_day` and is applied per run -- enforcing it
+    across a day needs state that survives a process. Printing `max_items=62
+    (policy)` against that key invites the reading the name suggests, and the
+    wrong reading is the unsafe one: a day of runs can exceed the number the
+    operator believes they set. Only this cap is annotated, because only this
+    one has a name promising something wider than it delivers; an unset cap
+    prints `unbounded` and needs no qualifier.
     """
     parts = []
     for name, (value, source) in sorted(caps.items()):
-        parts.append(f"{name}={'unbounded' if value is None else value} ({source})")
+        rendered = "unbounded" if value is None else str(value)
+        qualifier = " per run" if name == "max_items" and value is not None else ""
+        parts.append(f"{name}={rendered} ({source}{qualifier})")
     return "budgets: " + ", ".join(parts)
 
 
