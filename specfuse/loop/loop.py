@@ -2244,6 +2244,34 @@ def untracked_paths() -> set[str]:
     return {line.strip() for line in out.splitlines() if line.strip()}
 
 
+def ignored_paths() -> set[str]:
+    """Repo-relative paths git reports as IGNORED, file by file.
+
+    Twin of :func:`untracked_paths`, snapshotted per-WU at dispatch so the
+    attempt-failure path can tell "this ignored file was already here" from
+    "this attempt produced it" (#3330). A `git reset --hard` restores tracked
+    content and leaves ignored files in place, so without this the baseline
+    attribution probe measures the failed attempt's own build output and
+    reports the failure as pre-existing.
+
+    `--ignored` is deliberately paired with `ls-files` rather than read off
+    `git status --porcelain --ignored`: status collapses a wholly-ignored
+    directory to a single entry, so `!! out/` is byte-identical before and
+    after an attempt adds files underneath it. That is precisely the reported
+    case -- `out/` already existed and the attempt wrote 11 new files into it --
+    and a snapshot diff over the status listing would have seen nothing.
+
+    Can be large on a repository carrying vendored dependency trees, so it is
+    called only on the failure path that actually probes, where it is cheap
+    beside the full gate-set run it precedes.
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "--others", "--ignored", "--exclude-standard"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    return {line.strip() for line in out.splitlines() if line.strip()}
+
+
 def _tracked_dirty_paths() -> set[str]:
     """Paths with TRACKED, uncommitted changes (staged or unstaged), repo-relative.
 
@@ -3787,10 +3815,70 @@ def _clean_attempt_untracked(
             continue
 
 
+#: Ignored path prefixes the attempt-ignored clean never deletes. `work/` holds
+#: the per-attempt verify-output notes `persist_attempt_notes` writes (#168) --
+#: gitignored, and written AFTER the reset, so at the next attempt's reset they
+#: look exactly like the build output this clean exists to remove. The snapshot
+#: is taken once per WU rather than per attempt, so without this keep-list
+#: attempt 2 would delete attempt 1's evidence.
+IGNORED_CLEAN_KEEP_PREFIXES = ("work/", ".specfuse/")
+
+
+def _clean_attempt_ignored(
+    ignored_before: "set[str] | frozenset[str]", events_path: Path,
+) -> None:
+    """Delete gitignored files that appeared since the *ignored_before* snapshot.
+
+    Defect 1 of #3330. `_clean_attempt_untracked` above deliberately leaves
+    ignored paths alone, and that carve-out is load-bearing -- the driver's own
+    gitignored `work/` notes have to survive the reset. But it also leaves the
+    failed attempt's build output on disk, and the baseline attribution probe
+    then runs against it: in the reported incident a unit's own generated files
+    failed the probe, and the driver concluded the failure predated the feature
+    and halted a green branch.
+
+    Only files that appeared SINCE the snapshot are removed, which is what makes
+    this safe for the expensive case raised on #3371: a build cache present at
+    dispatch is in the snapshot and is never touched. Only what this attempt
+    produced goes.
+
+    Never deletes: paths in *ignored_before*, anything under
+    `IGNORED_CLEAN_KEEP_PREFIXES`, *events_path*, or a per-criterion close-state
+    file -- the same exclusions its untracked twin honours.
+
+    Best-effort: any git or filesystem error is swallowed, reverting to the old
+    leftover behaviour rather than crashing the run.
+    """
+    try:
+        root = Path(git("rev-parse", "--show-toplevel"))
+        candidates = ignored_paths() - set(ignored_before)
+    except (subprocess.CalledProcessError, OSError):
+        return
+    try:
+        keep = events_path.resolve()
+    except OSError:
+        keep = None
+    for rel in sorted(candidates):
+        if any(rel.startswith(p) or f"/{p}" in rel
+               for p in IGNORED_CLEAN_KEEP_PREFIXES):
+            continue
+        target = root / rel
+        try:
+            if keep is not None and target.resolve() == keep:
+                continue
+            if criteria_state.CRITERIA_FILENAME_RE.match(target.name):
+                continue
+            if target.is_file() or target.is_symlink():
+                target.unlink()
+        except OSError:
+            continue
+
+
 def reset_preserving_events(
     head_before: str,
     events_path: Path,
     untracked_before: "set[str] | frozenset[str] | None" = None,
+    ignored_before: "set[str] | frozenset[str] | None" = None,
 ) -> None:
     """`git reset --hard <head_before>` without losing events.jsonl content.
 
@@ -3828,6 +3916,12 @@ def reset_preserving_events(
     nothing untracked" and delete the entire untracked working tree; `None`
     means "no snapshot available, do not clean" and preserves the pre-#162
     behavior for callers that cannot supply one.
+
+    `ignored_before` (#3330 defect 1) does the same for GITIGNORED paths, and
+    is supplied by the one call site whose reset is followed by the baseline
+    attribution probe. Same inert-on-`None` contract. It is not passed on every
+    reset: the listing it diffs walks ignored trees, which is cheap beside the
+    gate-set run the probe performs and not worth paying where nothing probes.
     """
     saved = events_path.read_text() if events_path.is_file() else None
     git("reset", "--hard", head_before)
@@ -3835,6 +3929,8 @@ def reset_preserving_events(
         events_path.write_text(saved)
     if untracked_before is not None:
         _clean_attempt_untracked(untracked_before, events_path)
+    if ignored_before is not None:
+        _clean_attempt_ignored(ignored_before, events_path)
 
 
 def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
@@ -10740,6 +10836,13 @@ def run(
                 # (#150). Captured here, not inside squash_commit, because by
                 # then the agent's own new files are indistinguishable from it.
                 untracked_before = untracked_paths()
+                # Ignored counterpart (#3330 defect 1), taken in the same
+                # breath: only the attempt-failure reset that precedes the
+                # baseline attribution probe consumes it, but it has to be
+                # captured HERE, before the agent runs, or the attempt's own
+                # build output is already indistinguishable from what was
+                # on disk when it started.
+                ignored_before = ignored_paths()
                 _is_rearm = detect_rearm_dispatch(wu)
                 if _is_rearm:
                     fold_cumulative_on_rearm(wu, backend)
@@ -11715,9 +11818,15 @@ def run(
                                 untracked_before=untracked_before)
                             print("   no FINDINGS metric — reset to base")
                     else:
+                        # `ignored_before` is passed HERE and nowhere else: this
+                        # is the one reset whose tree is then measured by the
+                        # attribution probe below, so it is the one place where
+                        # the attempt's own gitignored output would be read as
+                        # pre-existing breakage (#3330 defect 1).
                         reset_preserving_events(
                             head_before, events_path,
-                            untracked_before=untracked_before)
+                            untracked_before=untracked_before,
+                            ignored_before=ignored_before)
                         # Retroactive baseline attribution (FEAT-2026-0109/T01):
                         # decide, right after the reset above restores the
                         # tree the unit was dispatched against, whether this
