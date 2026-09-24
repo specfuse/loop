@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A red-on-base command that cannot run no longer reads as red.** The probe returned `code != 0`, so a shell exiting **127** (command not found) or **126** (not executable) was read as "the test failed at the base" — which *permits* the merge. Fail-open, in the one guardrail whose entire job is to be harder to satisfy than the other six. Surfaced by turning the check on for a real repository whose command is a committed script: the probe's worktree is the **base** tree, so on any PR whose merge base predates that script the file is absent, `sh` exits 127, and a test that actually passes at the base was reported as red. POSIX reserves 126 and 127 for the shell's own failure to run the command, so neither says anything about the test; both now resolve to unverified, which declines. The two declining reasons already separated "the check said no" from "the check never ran" — the exit-code reading collapsed them toward the permissive side. (#3403)
+
 ## [0.23.2+umbrella.0.15.0] - 2026-09-24
 
 ### Fixed
