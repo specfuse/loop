@@ -308,8 +308,8 @@ wall-clock limit on the whole invocation, a foreground gate run that exceeds
 it surfaces as this skill's own `could_not_proceed` (Step 6's row in the
 mapping table below) — never as a silent stop with no recorded outcome.
 
-**The closed outcome set** (no fourth outcome exists; a headless run always
-ends in exactly one of these):
+**The closed outcome set** (a headless run always ends in exactly one of
+these):
 
 - **`refused`** — the skill's existing refusal criteria (Step 2's feature
   indicators, the Step 6.5 diff self-check finding one of those same
@@ -322,6 +322,32 @@ ends in exactly one of these):
   falsifiable failing test (Step 4), a gate failure that would otherwise
   require an operator decision (Step 6/Step 9), or an operational
   precondition such as `gh auth status` failing (Step 7).
+- **`needs_decision`** — two or more defensible fixes exist and the issue
+  does not determine which. Reach for this when the candidate fixes differ in
+  **who they affect**, not in how big they are: a runtime behaviour change
+  versus a generator-only change, an API contract change versus a test change,
+  two artifacts that disagree where either could be the one that is wrong.
+  This is NOT `refused`: `refused` says the work is too large and sends the
+  operator to `/draft-feature`, which is the wrong instruction for a question
+  whose answer is usually one line.
+
+  The recorded reason carries **the options themselves** — what each one would
+  change, and who would notice — in the six-part operator framing
+  (`.specfuse/rules/operator-escalation.md`), so the operator answers a
+  question rather than starting a diagnosis. Name the evidence for each
+  option, including any decision already recorded elsewhere in the repository
+  that bears on it.
+
+  The asymmetry is deliberate. Over-use costs throughput and produces an
+  escalation a human reads; under-use merges a wrong fix and closes the issue
+  behind it. When genuinely unsure whether a direction is a decision, it is.
+  Measured: a lane session made a generated service block on a soft-delete
+  archive, reversing a decision a feature gate had explicitly recorded and
+  making any aggregate with a child permanently un-archivable. It was coherent
+  work with a passing test, it passed all six merge guardrails, and it reached
+  `eligible`. The session was not wrong to be uncertain — it had no way to say
+  so.
+
 - **`completed`** — the fix ran end-to-end: failing test authored and
   verified red on unchanged code, fix applied, all gates green, the Step
   6.5 diff self-check found no Step 2 indicator against the actual diff,
@@ -359,6 +385,13 @@ mapping stays honest as the method above evolves:
 | Step 9 RESULT `status: blocked` — issue isn't a bug (feature-scoped) | refusal criterion | `refused` |
 | Step 9 RESULT `status: blocked` — repro can't reduce to a failing test | precondition missing | `could_not_proceed` |
 | Step 9 RESULT `status: blocked` — gate failure requiring operator decision | precondition missing | `could_not_proceed` |
+| Step 5 — two or more defensible fixes, and the issue does not say which | direction is a decision | `needs_decision` |
+| Step 2 — the issue reports a symptom and leaves the fix location open, and the candidate locations differ in who they affect | direction is a decision | `needs_decision` |
+
+`needs_decision` weakens nothing either: it is an additional way to stop, never
+a way to proceed. A run that would previously have picked a direction and
+reported `completed` now stops before the branch is pushed, so no PR exists for
+the guardrails to evaluate and no issue is closed behind a fix nobody chose.
 
 No refusal path is weakened or removed for headless mode: every criterion in
 Step 2 and "When to break the rules" still fires exactly as written, and
