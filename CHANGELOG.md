@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three registered labels could not be created in any repository.** `gh label create` rejects a description over 100 characters with `HTTP 422 — description is too long`, and `bug-lane:ci-pending` (101), `bug-lane:test-not-red-on-base` (108) and `bug-lane:red-on-base-unverified` (125) were all over it. `provision_labels` reports the failure and carries on — right for a repository being briefly unreachable, wrong for a spec that can never be created anywhere — so `ci-pending` had been failing in every repository since it shipped, and nothing noticed because the consequence appears later and elsewhere: a declining bug-lane path applies a label that was never created, which is #1420 arriving through the one door its regression test does not watch. That test asserts every declining reason **has** a spec; a new one asserts the spec is one GitHub will **accept**. Surfaced by a real upgrade: `label provisioning — created [], failed [...]`. (#3397)
+
 ## [0.23.0+umbrella.0.15.0] - 2026-09-24
 
 ### Added

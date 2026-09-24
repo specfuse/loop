@@ -194,8 +194,8 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         name=bug_lane.DECLINE_LABELS[bug_lane.REASON_CI_PENDING],
         colour="fbca04",
         description=(
-            "Bug-lane auto-merge declined: CI was still pending at the "
-            "deadline; re-run the lane once it concludes"
+            "Bug-lane auto-merge declined: CI still pending at the deadline; "
+            "re-run once it concludes"
         ),
         consumer="loop/bug_lane_run.py",
     ),
@@ -203,8 +203,8 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         name=bug_lane.DECLINE_LABELS[bug_lane.REASON_TEST_NOT_RED_ON_BASE],
         colour="fbca04",
         description=(
-            "Bug-lane auto-merge declined: the PR's new test passes at the "
-            "merge base, so it proves nothing about the fix"
+            "Bug-lane auto-merge declined: the new test passes at the merge "
+            "base, so it proves nothing"
         ),
         consumer="loop/bug_lane_run.py",
     ),
@@ -213,7 +213,7 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         colour="fbca04",
         description=(
             "Bug-lane auto-merge declined: the red-on-base check was required "
-            "and could not be run; declare rules.bugs.red_on_base_command"
+            "and could not be run"
         ),
         consumer="loop/bug_lane_run.py",
     ),
