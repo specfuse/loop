@@ -642,6 +642,23 @@ def _timed_out_payload(issue_number: int, elapsed_seconds: float) -> EscalationP
     )
 
 
+def _dispatch_profile_note(profile) -> str:
+    """` [dispatched opus/high via diagnosis:large]`, or empty (#3391).
+
+    Appended to every bug-lane item's `detail` so the run log states what each
+    item cost and why. The proposal's closing point was that without it the
+    effect of selecting a model by `fix_scope` is unmeasurable; a dial nobody
+    can evaluate is worse than no dial, because it looks like evidence.
+
+    Empty for a result carrying no profile, so a caller predating this reads
+    exactly as it did.
+    """
+    if not profile or len(profile) != 3:
+        return ""
+    model, effort, source = profile
+    return f" [dispatched {model}/{effort} via {source}]"
+
+
 class BugsProvider:
     """`ActionProvider` over the bug lane."""
 
@@ -727,6 +744,13 @@ class BugsProvider:
                 spend=0,
             )
 
+        # #3391: state which model this item was dispatched with and where
+        # that came from. Without this line nobody can tell afterwards whether
+        # selecting by `fix_scope` helped, which makes the dial unmeasurable
+        # and therefore unevaluable — the one point the proposal called out as
+        # mattering most.
+        profile_note = _dispatch_profile_note(result.dispatch_profile)
+
         if result.outcome == OUTCOME_MERGED:
             # `run_bug_lane` (`specfuse/loop/bug_lane_run.py`, T04's file) does
             # not surface the headless `/fix-bug` session's usage envelope on
@@ -734,7 +758,9 @@ class BugsProvider:
             # change there, out of this WU's reach (`specfuse/loop/` is
             # off-limits except what T01 declares). Explicit `spend=0` rather
             # than a value this module cannot actually measure.
-            return ActionOutcome(status=STATUS_COMPLETED, detail=result.reason or "", spend=0)
+            return ActionOutcome(
+                status=STATUS_COMPLETED,
+                detail=f"{result.reason or ''}{profile_note}", spend=0)
 
         detail = result.reason if result.reason is not None else result.outcome
 
@@ -796,7 +822,7 @@ class BugsProvider:
         # queue holds three feature-scoped issues, not that anything is broken.
         return ActionOutcome(
             status=STATUS_ESCALATED,
-            detail=detail,
+            detail=f"{detail}{profile_note}",
             escalation=escalation,
             environmental=not result.outcome_named,
         )

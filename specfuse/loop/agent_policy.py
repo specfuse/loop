@@ -335,6 +335,57 @@ def resolve_required_checks(path: "str | Path | None" = None) -> tuple:
     return tuple(str(n).strip() for n in raw if str(n).strip())
 
 
+#: What each `fix_scope` costs to dispatch, as `(model, effort)` (#3391).
+#:
+#: `small` is the historical default, so an issue diagnosed as a small fix is
+#: dispatched exactly as every bug was before this existed. `large` is the only
+#: entry that spends more: a fix whose direction has consequences is where a
+#: cheaper session produced coherent, wrong work.
+#:
+#: `external` deliberately keeps the cheap profile. The fix lives outside this
+#: repository, so the session's job is to recognise that and stop — paying for
+#: a stronger model to reach the same refusal buys nothing.
+DEFAULT_MODEL_BY_FIX_SCOPE = {
+    "small": ("sonnet", "medium"),
+    "large": ("opus", "high"),
+    "external": ("sonnet", "medium"),
+}
+
+
+def resolve_model_by_fix_scope(path: "str | Path | None" = None) -> dict:
+    """`rules.bugs.model_by_fix_scope` merged over `DEFAULT_MODEL_BY_FIX_SCOPE`.
+
+    A deployment chooses what each scope costs it: `large: [sonnet, high]` for
+    one that would rather not spend on Opus, and so on. Merged rather than
+    replaced, so naming one scope does not silently drop the others.
+
+    Every unusable value falls back to the shipped pair for that scope rather
+    than raising or disabling dispatch — an unreadable policy must not decide
+    that no bug can be worked on. An unknown scope name is ignored: it is a
+    typo, and inventing a profile for it would route nothing while looking
+    configured.
+    """
+    resolved = dict(DEFAULT_MODEL_BY_FIX_SCOPE)
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return resolved
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    raw = bugs.get("model_by_fix_scope") if isinstance(bugs, dict) else None
+    if not isinstance(raw, dict):
+        return resolved
+    for scope, value in raw.items():
+        if scope not in resolved:
+            continue
+        if not isinstance(value, (list, tuple)) or len(value) != 2:
+            continue
+        model, effort = (str(v).strip() for v in value)
+        if model and effort:
+            resolved[scope] = (model, effort)
+    return resolved
+
+
 def resolve_max_open_prs(path: "str | Path | None" = None) -> "int | None":
     """`budgets.max_open_prs`, or None when unset or unusable (#3340).
 

@@ -41,6 +41,7 @@ from specfuse.loop.agent_policy import (
     resolve_required_checks,
     bug_lane_limits,
     resolve_bug_automerge,
+    resolve_model_by_fix_scope,
 )
 from specfuse.loop.bug_lane import (
     DECLINE_LABELS,
@@ -54,6 +55,8 @@ from specfuse.loop.bug_lane import (
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.labels import provision_labels
 from specfuse.loop.triage import parse_marker
+from specfuse.monitor.diagnosis import DiagnosisParseError
+from specfuse.monitor.diagnosis import parse as parse_diagnosis
 from specfuse.monitor.autofix_invoke import (
     build_invocation,
     classify_outcome,
@@ -155,6 +158,12 @@ class BugLaneResult:
     #: was throwing it away, so three refusals in one run were three
     #: identical escalations saying only which word came back.
     stop_rationale: str = ""
+    #: `(model, effort, source)` this issue was dispatched with, and where that
+    #: profile came from -- `diagnosis:<fix_scope>` or `default` (#3391).
+    #: Carried so a run can state it per item: without that line nobody can
+    #: tell afterwards whether selecting the model by scope helped, which
+    #: would make the dial unmeasurable and therefore unevaluable.
+    dispatch_profile: tuple = ()
     #: Whether the session actually named one of `OUTCOMES`, as opposed to
     #: `classify_outcome` failing closed to `could_not_proceed` for output
     #: naming none (#3343). Defaults True so a caller constructing a result by
@@ -664,6 +673,7 @@ def _declined(
     working_dir: str,
     *,
     evidence: tuple = (),
+    dispatch_profile: tuple = (),
 ) -> BugLaneResult:
     """Label the PR with *reason* (best-effort) and return the declined result."""
     # The public label name, never the raw reason constant (#1420): the
@@ -681,7 +691,74 @@ def _declined(
         pr_number=pr_number,
         label_written=label_written,
         evidence=evidence,
+        dispatch_profile=dispatch_profile,
     )
+
+
+def dispatch_profile_for(
+    runner: Callable, repo: str, issue_number: int, policy_path: Any = None,
+) -> tuple:
+    """`(model, effort, source)` for one issue's `/fix-bug` dispatch (#3391).
+
+    Every bug was dispatched at `sonnet`/`medium` — `build_invocation`'s
+    defaults, never overridden — whether it was a one-line template fix or a
+    change whose direction has architectural consequences. Of seven bugs a run
+    dispatched, the two that produced correct fixes had issues already carrying
+    a diagnosis that named the file and the shape of the fix; the two closed on
+    review as wrong reported a symptom and left the fix location open.
+
+    The signal read here is `fix_scope`, from the `/diagnose-issue` comment
+    `specfuse.monitor.diagnosis.parse` recovers. That is deliberate: the
+    alternative proposal was an `effort=` field triage guesses from issue text
+    in about eight seconds, and effort is a property of the codebase rather
+    than of the report — the issue in that run that *read* as most mechanical
+    was the one whose correct fix required knowing where a seed value came
+    from. `fix_scope` rests on something a tool produced.
+
+    `source` names where the profile came from (`diagnosis:<scope>` or
+    `default`) so the run can say it. Without that line nobody can tell
+    afterwards whether the dial helped, which makes the whole change
+    unmeasurable.
+
+    Never raises. An unreadable issue, an absent diagnosis and a malformed
+    marker all resolve to the historical default, so this can only ever spend
+    more deliberately — never refuse to dispatch.
+    """
+    profiles = resolve_model_by_fix_scope(policy_path)
+    default = profiles["small"]
+    try:
+        result = runner(
+            ["gh", "issue", "view", str(issue_number), "--repo", repo,
+             "--json", "body,comments"],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a diagnostic read never stops a dispatch
+        return (*default, "default")
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return (*default, "default")
+    try:
+        payload = json.loads(result.stdout)
+    except ValueError:
+        return (*default, "default")
+    if not isinstance(payload, dict):
+        return (*default, "default")
+
+    bodies = [payload.get("body") or ""]
+    for comment in payload.get("comments") or []:
+        if isinstance(comment, dict):
+            bodies.append(comment.get("body") or "")
+
+    for body in bodies:
+        try:
+            diagnosis = parse_diagnosis(body)
+        except DiagnosisParseError:
+            continue
+        if diagnosis is None:
+            continue
+        scope = getattr(diagnosis, "fix_scope", None)
+        if scope in profiles:
+            return (*profiles[scope], f"diagnosis:{scope}")
+    return (*default, "default")
 
 
 def run_bug_lane(
@@ -706,7 +783,13 @@ def run_bug_lane(
     always accurate) and merges only when the dial is `on` *and* the
     guardrails are eligible -- the module's single merge call site.
     """
-    argv, prompt = build_invocation(issue_number, repo, working_dir)
+    model, effort, profile_source = dispatch_profile_for(
+        runner, repo, issue_number, policy_path
+    )
+    _profile = (model, effort, profile_source)
+    argv, prompt = build_invocation(
+        issue_number, repo, working_dir, model=model, effort=effort
+    )
     invocation = runner(argv + [prompt], check=False)
     session_output = getattr(invocation, "stdout", "") or ""
     outcome = classify_outcome(session_output)
@@ -725,6 +808,7 @@ def run_bug_lane(
             unpushed_work=unpushed_work_for_issue(runner, issue_number),
             stop_rationale=extract_stop_rationale(session_output),
             outcome_named=outcome_was_named(session_output),
+            dispatch_profile=_profile
         )
 
     # The session's own account first (#3180) -- it never re-discovers what it
@@ -737,7 +821,9 @@ def run_bug_lane(
         pr_lookup_sleep(PR_LOOKUP_RETRY_SECONDS)
         pr_number = _find_pr_for_issue(runner, repo, issue_number)
     if pr_number is None:
-        return BugLaneResult(outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND, pr_number=None)
+        return BugLaneResult(
+            outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND,
+            pr_number=None, dispatch_profile=_profile)
 
     changed_files, diff_lines = _pr_changed_files_and_diff_lines(runner, repo, pr_number)
     limits = bug_lane_limits(policy_path)
@@ -761,6 +847,7 @@ def run_bug_lane(
             evidence=_evidence_for(
                 shape.reason, changed_files, diff_lines, limits,
             ),
+            dispatch_profile=_profile,
         )
 
     deadline_seconds = (
@@ -797,7 +884,9 @@ def run_bug_lane(
             check=True,
         )
         record_merge(runner, repo, pr_number, at=time.time() if now is None else now)
-        return BugLaneResult(outcome=OUTCOME_MERGED, reason=decision.reason, pr_number=pr_number)
+        return BugLaneResult(
+            outcome=OUTCOME_MERGED, reason=decision.reason,
+            pr_number=pr_number, dispatch_profile=_profile)
 
     if decision.eligible:
         # Eligible but not merged: the dial is the only thing in the way, and
@@ -805,7 +894,8 @@ def run_bug_lane(
         # declining reason to project, and `DECLINE_LABELS` deliberately has no
         # entry for `REASON_ELIGIBLE`.
         return BugLaneResult(
-            outcome=OUTCOME_AUTOMERGE_OFF, reason=decision.reason, pr_number=pr_number
+            outcome=OUTCOME_AUTOMERGE_OFF, reason=decision.reason,
+            pr_number=pr_number, dispatch_profile=_profile,
         )
 
     # Reaching here means `decision.eligible` is False, so the reason is a real
@@ -814,4 +904,5 @@ def run_bug_lane(
     return _declined(
         runner, repo, pr_number, decision.reason, working_dir,
         evidence=_evidence_for(decision.reason, changed_files, diff_lines, limits),
+        dispatch_profile=_profile,
     )
