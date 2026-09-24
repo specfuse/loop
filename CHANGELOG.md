@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.23.2+umbrella.0.15.0] - 2026-09-24
+
 ### Fixed
 
 - **The red-on-base probe runs the operator's command through a shell.** It used `shlex.split` and no shell, so it could not express any command using a pipe, `||`, `$(...)` or an inline environment override — which is every real one. The gate commands in `verification.yml` are run with `shell=True` for exactly this stated reason, and the probe runs the same kind of operator-authored string. Caught turning the guardrail on for a Maven repository, which needs `$(...)` just to turn changed file paths into the class names `-Dtest=` accepts: enabling it there would have declined **every** merge as `red_on_base_unverified` while looking correctly configured. The command now goes to `sh -c` (through the injected runner, so it stays testable without executing anything) and each substituted path is `shlex.quote`d — unquoted, a path containing a space became two arguments and one containing `;` ended the command. The template is POSIX shell; no Windows spelling is invented. (#3400)
