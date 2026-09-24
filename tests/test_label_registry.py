@@ -15,7 +15,7 @@ _COLOUR_RE = re.compile(r"^[0-9a-f]{6}$")
 
 
 class TestLabelRegistry(unittest.TestCase):
-    def test_registry_has_exactly_fourteen_entries(self):
+    def test_registry_entry_count_is_deliberate(self):
         # Seven at FEAT-2026-0071; the eighth is the harvester's finding label,
         # added by #300 after `gh issue create` rejected it on a fresh repository.
         # The ninth is FEAT-2026-0042/T02's autofix-failed label, registered
@@ -34,11 +34,18 @@ class TestLabelRegistry(unittest.TestCase):
         # The twenty-fourth is FEAT-2026-0108/T04's ci-pending label (#3177):
         # a pending-at-deadline CI run declines as its own reason rather than
         # being folded into ci-not-green.
+        # The twenty-fifth and twenty-sixth are #3377's red-on-base declines:
+        # the PR's new test passes at the merge base, and the check was
+        # required but could not be run — kept distinct because "the check
+        # said no" and "the check never ran" need different fixes.
+        #
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
         # tests/test_label_registry_covers_consumers.py, which discovers every
         # label constant in the package and asserts each is declared here.
-        self.assertEqual(len(LABEL_REGISTRY), 24)
+        # The method name carried a literal number until #3377 and had already
+        # drifted from the assertion twice; it no longer names one.
+        self.assertEqual(len(LABEL_REGISTRY), 26)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
