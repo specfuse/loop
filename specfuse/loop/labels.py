@@ -199,6 +199,24 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         ),
         consumer="loop/bug_lane_run.py",
     ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_TEST_NOT_RED_ON_BASE],
+        colour="fbca04",
+        description=(
+            "Bug-lane auto-merge declined: the PR's new test passes at the "
+            "merge base, so it proves nothing about the fix"
+        ),
+        consumer="loop/bug_lane_run.py",
+    ),
+    LabelSpec(
+        name=bug_lane.DECLINE_LABELS[bug_lane.REASON_RED_ON_BASE_UNVERIFIED],
+        colour="fbca04",
+        description=(
+            "Bug-lane auto-merge declined: the red-on-base check was required "
+            "and could not be run; declare rules.bugs.red_on_base_command"
+        ),
+        consumer="loop/bug_lane_run.py",
+    ),
 )
 
 

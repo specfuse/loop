@@ -46,6 +46,15 @@ REASON_UNTRACEABLE = "untraceable_provenance"
 REASON_DAILY_CAP_REACHED = "daily_cap_reached"
 REASON_ELIGIBLE = "eligible"
 REASON_UNREADABLE_INPUT = "unreadable_input"
+#: The PR's own new test passed at the merge base, so it proves nothing about
+#: the fix — it asserts pre-existing behaviour, or tests something adjacent to
+#: the defect (#3377).
+REASON_TEST_NOT_RED_ON_BASE = "test_not_red_on_base"
+#: The red-on-base check was required and could not be run. Deliberately
+#: distinct from the reason above: "the check said no" and "the check never
+#: ran" are different situations with different fixes, and collapsing them is
+#: exactly how a guard comes to report clean because it could not look.
+REASON_RED_ON_BASE_UNVERIFIED = "red_on_base_unverified"
 
 # Public label names for the declining reasons (#1420). The REASON_* values above
 # are internal identifiers and must not double as labels: they are snake_case
@@ -66,6 +75,8 @@ DECLINE_LABELS = {
     REASON_DAILY_CAP_REACHED: "bug-lane:daily-cap-reached",
     REASON_UNREADABLE_INPUT: "bug-lane:unreadable-input",
     REASON_CI_PENDING: "bug-lane:ci-pending",
+    REASON_TEST_NOT_RED_ON_BASE: "bug-lane:test-not-red-on-base",
+    REASON_RED_ON_BASE_UNVERIFIED: "bug-lane:red-on-base-unverified",
 }
 
 PROVENANCE_KINDS = ("triaged_issue", "diagnosed_finding")
@@ -155,6 +166,11 @@ def evaluate_merge_guardrails(
     # as before #1418. An explicitly malformed value still fails closed —
     # omission means "use the default", not "skip the guardrail".
     test_paths: Any = (_TESTS_PREFIX,),
+    # #3377. Off by default: a deployment that has not declared how to run the
+    # check would otherwise have every merge declined on upgrade, which is a
+    # silent automerge shutdown rather than a guardrail.
+    require_red_on_base: Any = False,
+    red_on_base: Any = None,
     state_reader: MergeCapStateReader,
 ) -> MergeDecision:
     """Decide whether a bug-lane PR may auto-merge.
@@ -167,6 +183,25 @@ def evaluate_merge_guardrails(
     `state_reader` answers the rolling-24h merge-count question T03 owns the
     storage for. Any failure to evaluate an input returns
     `eligible=False`.
+
+    `red_on_base` is the one guardrail that measures whether the PR *works*
+    rather than what shape it has (#3377). Every other check here reads the
+    form of the diff; a PR can satisfy all of them and still not fix the thing
+    the issue reported. Audited on one consumer repository: seven lane PRs
+    passed all six form checks and four were incomplete for the issue they
+    claimed to close, two of them merging unattended and closing the issue
+    behind a symptom that still reproduced.
+
+    The caller runs the PR's own added test at the merge base and passes the
+    verdict here: `True` means it failed there (so it measures something the
+    fix changed), `False` means it passed there and therefore proves nothing.
+    Evaluated last, after every cheap check, because it is the only one whose
+    input costs a test run to produce.
+
+    Its limit, stated rather than implied: this catches "the test proves
+    nothing", not "the test proves the wrong thing". A test red on base for a
+    reason unrelated to the reported symptom still passes. Closing that needs
+    the issue to carry a machine-readable reproduction.
     """
     # The two checks that precede the CI read keep their own inline form, so
     # the CI check stays exactly where it was in the sequence and no declining
@@ -211,6 +246,15 @@ def evaluate_merge_guardrails(
         return _decline(REASON_UNREADABLE_INPUT)
     if merge_count >= max_merges:
         return _decline(REASON_DAILY_CAP_REACHED)
+
+    # Last, so the two test runs its input costs are only ever paid by a PR
+    # that has already cleared everything cheaper.
+    if require_red_on_base is True:
+        if red_on_base is True:
+            return MergeDecision(eligible=True, reason=REASON_ELIGIBLE)
+        if red_on_base is False:
+            return _decline(REASON_TEST_NOT_RED_ON_BASE)
+        return _decline(REASON_RED_ON_BASE_UNVERIFIED)
 
     return MergeDecision(eligible=True, reason=REASON_ELIGIBLE)
 

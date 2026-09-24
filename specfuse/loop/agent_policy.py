@@ -386,6 +386,44 @@ def resolve_model_by_fix_scope(path: "str | Path | None" = None) -> dict:
     return resolved
 
 
+def resolve_require_red_on_base(path: "str | Path | None" = None) -> bool:
+    """`rules.bugs.require_red_on_base` — must a new test be proven red on the
+    merge base before the lane may merge unattended (#3377)?
+
+    `False` unless explicitly `true`. Defaulting on would decline every merge
+    for any deployment that has not also declared how to run the check, which
+    is a silent automerge shutdown rather than a guardrail — and the reason a
+    deployment turns this on is precisely to bring unattended merging *back*
+    on evidence.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return False
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    return (bugs.get("require_red_on_base") if isinstance(bugs, dict) else None) is True
+
+
+def resolve_red_on_base_command(path: "str | Path | None" = None) -> str:
+    """`rules.bugs.red_on_base_command` — the operator's own test command, with
+    a `{tests}` placeholder (#3377).
+
+    Empty when absent or unusable, which leaves the check unverifiable and so
+    declines the merge when it is required. That is deliberate: a guessed
+    command that silently matched no tests would exit non-zero, read as "red on
+    base", and wave every PR through — strictly worse than the gap it closes.
+    """
+    try:
+        policy = load_policy(path)
+    except (FileNotFoundError, OSError):
+        return ""
+    rules = policy.get("rules") if isinstance(policy, dict) else None
+    bugs = rules.get("bugs") if isinstance(rules, dict) else None
+    raw = bugs.get("red_on_base_command") if isinstance(bugs, dict) else None
+    return raw.strip() if isinstance(raw, str) else ""
+
+
 def resolve_max_open_prs(path: "str | Path | None" = None) -> "int | None":
     """`budgets.max_open_prs`, or None when unset or unusable (#3340).
 

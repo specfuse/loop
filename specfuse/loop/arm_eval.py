@@ -98,6 +98,7 @@ JUDGE_MODULES = tuple(
         "bug_lane.py",           # the merge-guardrail verdict
         "bug_lane_run.py",       # holds the single `gh pr merge` call site
         "bug_lane_state.py",     # the rolling merge cap a guardrail reads
+        "red_on_base.py",        # produces the red-on-base verdict a merge guardrail reads (#3377)
         "upgrade_merge_gate.py",  # the scaffold-upgrade merge gate
         # The dials, budgets and command sets a verdict is measured against.
         "agent_policy.py",       # automerge dial, diff/merge caps, test paths

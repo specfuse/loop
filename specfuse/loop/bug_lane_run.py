@@ -31,6 +31,7 @@ failure -- leaves the PR open, optionally labelled with the declining reason.
 from __future__ import annotations
 
 import json
+import tempfile
 import re
 import time
 from dataclasses import dataclass
@@ -42,6 +43,8 @@ from specfuse.loop.agent_policy import (
     bug_lane_limits,
     resolve_bug_automerge,
     resolve_model_by_fix_scope,
+    resolve_require_red_on_base,
+    resolve_red_on_base_command,
 )
 from specfuse.loop.bug_lane import (
     DECLINE_LABELS,
@@ -54,6 +57,7 @@ from specfuse.loop.bug_lane import (
 )
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.labels import provision_labels
+from specfuse.loop.red_on_base import select_test_files, test_was_red_on_base
 from specfuse.loop.triage import parse_marker
 from specfuse.monitor.diagnosis import DiagnosisParseError
 from specfuse.monitor.diagnosis import parse as parse_diagnosis
@@ -695,6 +699,32 @@ def _declined(
     )
 
 
+def _merge_base_sha(runner: Callable, repo: str, pr_number: int) -> str:
+    """The commit the PR is measured against, or `""` (#3377).
+
+    `baseRefOid` is the tip of the base branch as GitHub sees it now, which is
+    what the PR would merge into — the tree the fix was written against, and so
+    the tree its new test must fail on. An empty string makes the probe decline
+    rather than guess a commit.
+    """
+    try:
+        result = runner(
+            ["gh", "pr", "view", str(pr_number), "--repo", repo,
+             "--json", "baseRefOid"],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a lookup failure declines, never raises
+        return ""
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return ""
+    try:
+        payload = json.loads(result.stdout)
+    except ValueError:
+        return ""
+    sha = payload.get("baseRefOid") if isinstance(payload, dict) else None
+    return sha.strip() if isinstance(sha, str) else ""
+
+
 def dispatch_profile_for(
     runner: Callable, repo: str, issue_number: int, policy_path: Any = None,
 ) -> tuple:
@@ -866,6 +896,21 @@ def run_bug_lane(
     )
     state_reader = GitHubMergeCapState(runner=runner, repo=repo, now=now)
 
+    # #3377: the only guardrail that asks whether the change works rather than
+    # what shape it has. Computed here and not inside the predicate, which
+    # stays pure — and only when the deployment asked for it, since it costs a
+    # test run.
+    require_red = resolve_require_red_on_base(policy_path)
+    red_on_base = None
+    if require_red:
+        red_on_base = test_was_red_on_base(
+            runner,
+            base_sha=_merge_base_sha(runner, repo, pr_number),
+            test_files=select_test_files(changed_files, limits["test_paths"]),
+            command_template=resolve_red_on_base_command(policy_path),
+            worktree_root=tempfile.gettempdir(),
+        )
+
     decision = evaluate_merge_guardrails(
         changed_files=changed_files,
         ci_conclusion=ci_conclusion,
@@ -874,6 +919,8 @@ def run_bug_lane(
         provenance=provenance,
         max_merges_per_day=limits["max_merges_per_day"],
         test_paths=limits["test_paths"],
+        require_red_on_base=require_red,
+        red_on_base=red_on_base,
         state_reader=state_reader,
     )
     dial = resolve_bug_automerge(policy_path)
