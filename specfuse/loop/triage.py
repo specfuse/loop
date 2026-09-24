@@ -25,7 +25,11 @@ import json
 import re
 from typing import Callable, Optional
 
-from specfuse.loop.agent_policy import SEVERITY_LABEL_PREFIX
+from specfuse.loop.agent_policy import (
+    SEVERITY_LABEL_PREFIX,
+    SEVERITY_VALUES,
+    read_severity_label,
+)
 from specfuse.loop.escalation import CATEGORY_LABELS, NEEDS_HUMAN_LABEL
 from specfuse.monitor.issues import DEFAULT_LIST_LIMIT, has_finding_marker
 
@@ -357,6 +361,88 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
 #: shrink the listing window, since candidates cluster in the oldest issues
 #: and a stranded backlog is old by construction.
 _BACKFILL_PAGE_SIZE = DEFAULT_LIST_LIMIT
+
+
+#: What a backfill run should do with one candidate's severity (#3360).
+SEVERITY_CLASSIFY = "classify"
+SEVERITY_RECONCILE = "reconcile"
+SEVERITY_SKIP = "skip"
+
+
+def _severity_label_names(labels) -> list:
+    """The `severity:*` label names on an issue, however `labels` is shaped.
+
+    `gh issue list --json ...,labels` yields `{"name": ...}` mappings; callers
+    holding bare strings are accepted too so the decision below stays testable
+    without a fixture shape.
+    """
+    names = []
+    for label in labels or ():
+        name = label.get("name") if isinstance(label, dict) else label
+        text = str(name or "").strip().lower()
+        if text.startswith(SEVERITY_LABEL_PREFIX):
+            names.append(text)
+    return names
+
+
+def severity_decision(labels, aliases: Optional[dict] = None) -> tuple:
+    """`(action, severity, reason)` for one backfill candidate (#3360).
+
+    A candidate is selected on its MARKER -- already triaged, no `severity=`
+    field. That predicate never looked at the issue's labels, so an issue a
+    person had already labelled `severity:minor` was still a candidate: it got
+    a fresh classification, and the write path added a second severity label
+    beside the human's. `read_severity_label` then returns whichever it
+    recognises first, which is the agent silently overriding a person at the
+    `min_severity` floor.
+
+    So the label is consulted first, and when it states a severity the marker is
+    written FROM it:
+
+    * `SEVERITY_RECONCILE` -- the labels agree on one value. The issue stops
+      being stranded *and* the person's judgement is what gets recorded. No
+      classification session is spent, and no label is written, because the
+      label is already there and is the source.
+    * `SEVERITY_CLASSIFY` -- no `severity:*` label at all. The original path.
+    * `SEVERITY_SKIP` -- the labels resolve to more than one value (the
+      operator's own ambiguity), or a `severity:*` label is present that
+      nothing can read. Classifying either would put a second, readable label
+      beside one a human chose, which is the collision in a different spelling.
+
+    This was latent when FEAT-2026-0113 closed: the measured repository's
+    `critical`/`major`/`minor` scheme yielded a one-entry rubric, so the
+    classifier failed closed on exactly the issues that would have collided.
+    Shipping the default alias table (#3355) made that scheme readable, which
+    removed the mask rather than the hazard.
+    """
+    names = _severity_label_names(labels)
+    if not names:
+        return (SEVERITY_CLASSIFY, None, None)
+
+    resolved = set()
+    unreadable = []
+    for name in names:
+        value, _aliased_from = read_severity_label([name], aliases)
+        if value in SEVERITY_VALUES:
+            resolved.add(value)
+        else:
+            unreadable.append(name)
+
+    if len(resolved) > 1:
+        return (
+            SEVERITY_SKIP,
+            None,
+            f"labels resolve to more than one severity ({', '.join(sorted(resolved))}) "
+            f"— the marker is left alone rather than picking one",
+        )
+    if not resolved:
+        return (
+            SEVERITY_SKIP,
+            None,
+            f"carries {', '.join(sorted(unreadable))}, which no vocabulary value "
+            f"or alias reads — a person's judgement this run cannot interpret",
+        )
+    return (SEVERITY_RECONCILE, resolved.pop(), None)
 
 
 def _is_backfill_candidate(issue: dict) -> bool:
