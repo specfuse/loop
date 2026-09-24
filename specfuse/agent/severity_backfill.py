@@ -43,7 +43,7 @@ from specfuse.loop.labels import (
     severity_label_projection,
 )
 
-from specfuse.loop import triage
+from specfuse.loop import agent_policy, triage
 from specfuse.loop.build_provenance import warn_if_out_of_tree
 
 #: Stands in for T10's classification session (gate 3, walking skeleton).
@@ -105,6 +105,7 @@ def apply_severity_backfill(
             "number": number,
             "severity": severity,
             "skipped": False,
+            "severity_source": decision.get("severity_source", "classifier"),
         }
 
         new_body = triage.amend_marker_severity(body, severity)
@@ -120,6 +121,16 @@ def apply_severity_backfill(
             results.append(row)
             continue
         row["marker_written"] = True
+
+        if decision.get("severity_source") == "label":
+            # Reconciled (#3360): the label IS the source of this severity, so
+            # it is already on the issue. Writing one would at best re-apply
+            # what is there and at worst add a second spelling beside the
+            # person's, which is the collision this path exists to avoid.
+            row["label_written"] = False
+            row["label_skipped_reason"] = "severity read from the issue's own label"
+            results.append(row)
+            continue
 
         label = (label_projection or {}).get(
             severity, triage.severity_label_for(severity)
@@ -206,12 +217,39 @@ def run_backfill(
             ),
         }
 
+    aliases = agent_policy.resolve_severity_aliases()
+
     rows = []
     decisions = []
     for issue in candidates:
         number = issue.get("number")
         title = issue.get("title", "")
         body = issue.get("body") or ""
+
+        # The label is consulted BEFORE any classification session (#3360): an
+        # issue a person already labelled must have its marker written from
+        # that label, never from a fresh opinion about it. This also means a
+        # reconciled issue costs no `claude` invocation at all.
+        action, labelled_severity, reason = triage.severity_decision(
+            issue.get("labels"), aliases)
+
+        if action == triage.SEVERITY_SKIP:
+            rows.append({
+                "number": number, "classified": False, "severity": None,
+                "severity_source": "label", "skipped_reason": reason,
+            })
+            continue
+
+        if action == triage.SEVERITY_RECONCILE:
+            rows.append({
+                "number": number, "classified": True,
+                "severity": labelled_severity, "severity_source": "label",
+            })
+            decisions.append({
+                "number": number, "body": body,
+                "severity": labelled_severity, "severity_source": "label",
+            })
+            continue
 
         argv, prompt = build_invocation(
             number, title, body, repo, working_dir, model=model, effort=effort, rubric=rubric
@@ -220,11 +258,14 @@ def run_backfill(
         severity = classify_severity(invoked.text, rubric)
 
         if severity is None:
-            rows.append({"number": number, "classified": False, "severity": None})
+            rows.append({"number": number, "classified": False, "severity": None,
+                         "severity_source": "classifier"})
             continue
 
-        rows.append({"number": number, "classified": True, "severity": severity})
-        decisions.append({"number": number, "body": body, "severity": severity})
+        rows.append({"number": number, "classified": True, "severity": severity,
+                     "severity_source": "classifier"})
+        decisions.append({"number": number, "body": body, "severity": severity,
+                          "severity_source": "classifier"})
 
     if apply and decisions:
         # A property of the repository's label set, not of any one issue
@@ -271,7 +312,19 @@ def _print_run_report(report: dict) -> None:
         return
     for row in report["rows"]:
         if not row["classified"]:
-            print(f"#{row['number']}: no usable classification, skipped")
+            # A refusal to overwrite a person is not a classification failure,
+            # and #3360's re-run condition is read off these lines: it asks for
+            # zero rows the run would contradict, which is unanswerable if both
+            # print the same sentence.
+            reason = row.get("skipped_reason")
+            if reason:
+                print(f"#{row['number']}: left alone — {reason}")
+            else:
+                print(f"#{row['number']}: no usable classification, skipped")
+            continue
+        if row.get("severity_source") == "label":
+            print(f"#{row['number']}: severity={row['severity']} "
+                  f"(reconciled from its own label, not classified)")
             continue
         print(f"#{row['number']}: severity={row['severity']}")
 

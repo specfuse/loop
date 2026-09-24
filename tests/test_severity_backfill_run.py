@@ -282,5 +282,103 @@ class AliasedSchemeWritesTheRepositorysOwnLabel(unittest.TestCase):
         self.assertEqual(1, len(_label_list_calls(calls)))
 
 
+class HumanAppliedSeverityIsReconciledNotReDecided(unittest.TestCase):
+    """End to end for #3360: the live collision the close named.
+
+    `#1902`, `#1895` and `#1893` carry `severity:minor` / `severity:major`
+    applied by a person, with no `severity=` in their markers. The selection
+    predicate reads the marker, so they are candidates. They were masked only
+    because that repository's scheme yielded a one-entry rubric -- and #3355
+    removed the mask, so a run today would classify them and write a second
+    severity label beside the human's.
+    """
+
+    ALIASED_LABELS = [
+        {"name": "severity:critical", "description": "Drop everything."},
+        {"name": "severity:major", "description": "Wrong behavior."},
+        {"name": "severity:minor", "description": "Cosmetic."},
+    ]
+
+    def _labelled_candidate(self, number: int, *label_names) -> dict:
+        issue = _candidate(number)
+        issue["labels"] = [{"name": n} for n in label_names]
+        return issue
+
+    def test_no_classification_session_is_spent_on_a_labelled_issue(self):
+        runner, calls = _make_runner(
+            candidates=[self._labelled_candidate(1902, "severity:minor")],
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1902: _marker(1902, "bug", "high", "critical")},
+        )
+
+        run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual(
+            [], _claude_calls(calls),
+            "the label already states the severity — classifying it spends "
+            "money to produce an opinion that must then be discarded",
+        )
+
+    def test_the_marker_records_the_humans_severity(self):
+        runner, calls = _make_runner(
+            candidates=[self._labelled_candidate(1902, "severity:minor")],
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1902: _marker(1902, "bug", "high", "critical")},
+        )
+
+        report = run_backfill(runner, _REPO, apply=True)
+
+        body_calls = [c for c in _issue_edit_calls(calls) if "--body" in c]
+        self.assertEqual(1, len(body_calls))
+        body = body_calls[0][body_calls[0].index("--body") + 1]
+        self.assertIn("severity=low", body)
+        self.assertNotIn("severity=critical", body)
+        self.assertEqual("label", report["rows"][0]["severity_source"])
+
+    def test_no_second_label_is_written_beside_the_humans(self):
+        runner, calls = _make_runner(
+            candidates=[self._labelled_candidate(1902, "severity:minor")],
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={1902: _marker(1902, "bug", "high", "critical")},
+        )
+
+        run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual(
+            [], [c for c in _issue_edit_calls(calls) if "--add-label" in c],
+            "the label is the source of this severity and is already on the "
+            "issue; writing one can only duplicate or contradict it",
+        )
+
+    def test_contradictory_labels_leave_the_issue_alone(self):
+        runner, calls = _make_runner(
+            candidates=[self._labelled_candidate(
+                7, "severity:minor", "severity:critical")],
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={7: _marker(7, "bug", "high", "critical")},
+        )
+
+        report = run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual([], _issue_edit_calls(calls))
+        self.assertEqual([], _claude_calls(calls))
+        self.assertFalse(report["rows"][0]["classified"])
+        self.assertIn("more than one", report["rows"][0]["skipped_reason"])
+
+    def test_an_unlabelled_issue_is_still_classified(self):
+        # The reconciliation path must not swallow the feature's actual job.
+        runner, calls = _make_runner(
+            candidates=[_candidate(42)],
+            label_rows=self.ALIASED_LABELS,
+            claude_answers={42: _marker(42, "bug", "high", "critical")},
+        )
+
+        report = run_backfill(runner, _REPO, apply=True)
+
+        self.assertEqual(1, len(_claude_calls(calls)))
+        self.assertEqual("classifier", report["rows"][0]["severity_source"])
+        self.assertEqual("critical", report["rows"][0]["severity"])
+
+
 if __name__ == "__main__":
     unittest.main()
