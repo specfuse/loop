@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.22.3+umbrella.0.15.0] - 2026-09-23
+
 ### Fixed
 
 - **FEAT-2026-0113's gate-3 `feature_oracle` asserts the milestone it declares.** The gate's Definition of done is a pair — a marked, severity-less issue re-read under `--apply` has its marker amended and the `severity:<value>` label projected **after** it, and the conductor reaches the mode not at all — but the module named as the oracle held only the second half. `T10H` removed the tracer-bullet function the first half drove and deleted the test with it; the behaviour stayed covered by a unit test, so what was lost was not coverage but the gate's own feature-level question having an asserting command. Measured: reversing the write order left the declared oracle reporting **OK**. The restored assertion drives `main()` through argv, so the listing, the classification and the write order are all inside what is measured — the difference between a feature oracle and a second unit test — and it catches both a duplicated label write and a pure ordering inversion with identical call counts. The module's docstring, which claimed the half it had stopped asserting, now says what it checks. (#3359)
