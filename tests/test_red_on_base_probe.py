@@ -248,5 +248,47 @@ class TheCommandGetsAShell(unittest.TestCase):
         self.assertIn("'tests/c;d.py'", seen["argv"][2])
 
 
+class ACommandThatCannotRunIsUnverified(unittest.TestCase):
+    """127 is the shell saying it could not run the command, not a verdict.
+
+    Reading it as "red on base" is fail-OPEN, in the one guardrail whose whole
+    job is to be harder to satisfy than the other six.
+
+    Measured on a real repository: the operator's command was a committed
+    script, the probe's worktree is the BASE tree, and on every PR whose merge
+    base predates that script the file is simply absent. `sh` exits 127 and the
+    merge proceeded on the strength of a command that never ran.
+    """
+
+    def _tmp(self) -> Path:
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return Path(tmp.name)
+
+    def _verdict_for(self, exit_code):
+        def runner(argv, **kw):
+            if argv[:2] == ["git", "worktree"]:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            return SimpleNamespace(returncode=exit_code, stdout="", stderr="")
+
+        return test_was_red_on_base(
+            runner, base_sha="abc123", test_files=["tests/test_a.py"],
+            command_template="./scripts/probe.sh {tests}",
+            worktree_root=self._tmp(),
+        )
+
+    def test_command_not_found_is_unverified(self):
+        self.assertIsNone(self._verdict_for(127))
+
+    def test_command_not_executable_is_unverified(self):
+        self.assertIsNone(self._verdict_for(126))
+
+    def test_an_ordinary_test_failure_is_still_red(self):
+        self.assertIs(True, self._verdict_for(1))
+
+    def test_a_pass_is_still_not_red(self):
+        self.assertIs(False, self._verdict_for(0))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

@@ -52,6 +52,12 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 
+#: POSIX reserves these for the shell's own failure to run the command: 126 is
+#: "found but not executable", 127 is "not found". Neither says anything about
+#: the test, so neither may be read as a verdict on it (#3403).
+_COULD_NOT_EXECUTE = frozenset({126, 127})
+
+
 def select_test_files(changed_files: Any, test_paths: Any) -> list:
     """The changed files that live under a declared test root.
 
@@ -125,6 +131,19 @@ def test_was_red_on_base(
             return None
         code = getattr(result, "returncode", None)
         if not isinstance(code, int):
+            return None
+        if code in _COULD_NOT_EXECUTE:
+            # The shell could not run the command at all. That is "the check
+            # never ran", not "the test failed" -- and the difference is the
+            # whole point of keeping those two declining reasons apart.
+            #
+            # Measured: an operator whose command is a committed script hits
+            # this on every PR whose merge base predates that script. The
+            # worktree is the BASE tree, so the script is simply absent there,
+            # `sh` exits 127, and reading that as red would let the merge
+            # through on the strength of a command that never ran. Fail-open,
+            # in the one guardrail whose entire job is to be harder to satisfy
+            # than the others.
             return None
         # Non-zero at the base is the proof we want: the test the PR adds does
         # not hold on the tree the fix was written against.
