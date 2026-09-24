@@ -27,6 +27,13 @@ Three deliberate constraints:
 * **Never guess the command.** The operator declares it. A guessed command that
   silently matched no tests would exit non-zero, read as "red on base", and
   wave every PR through -- strictly worse than the gap it was meant to close.
+* **Run it through a shell.** Operator-authored commands use pipes, `||`, `$(...)`
+  and inline environment overrides, exactly as the gate commands in
+  `verification.yml` do -- `_run_gate_set` runs those with `shell=True` for the
+  same stated reason. A first cut of this module used `shlex.split` and no
+  shell, which could not express the command of the very repository it was
+  built for: every merge would have declined `red_on_base_unverified` while
+  looking configured.
 * **Fail closed.** Every unknown returns `None`, which the guardrail reads as
   unverified and declines. An unverifiable claim is not a satisfied one.
 
@@ -77,9 +84,16 @@ def test_was_red_on_base(
     """`True` if *test_files* fail at *base_sha*, `False` if they pass, else `None`.
 
     `command_template` is the operator's own command with a `{tests}`
-    placeholder -- `pytest {tests}`, `mvn -q test -Dtest={tests}`, whatever the
-    repository actually uses. Absent, this returns `None` and the merge
-    declines: see the module docstring on why guessing is worse than the gap.
+    placeholder, run through `sh -c` so pipes, `||` and `$(...)` all work --
+    a Maven repository needs `$(...)` just to turn the changed file paths into
+    the class names `-Dtest=` accepts. Absent, this returns `None` and the
+    merge declines: see the module docstring on why guessing is worse than the
+    gap.
+
+    `sh -c` rather than `subprocess(shell=True)` so the command still arrives
+    through the injected runner as an argv, which is what makes this testable
+    without executing anything. It also means the template is POSIX shell; a
+    Windows runner would need its own spelling, and none is invented here.
 
     `None` means "could not establish", never "fine". A worktree that will not
     create, a runner that raises, no declared command and no test file in the
@@ -103,9 +117,10 @@ def test_was_red_on_base(
         return None
 
     try:
-        rendered = command_template.replace("{tests}", " ".join(files))
+        rendered = command_template.replace(
+            "{tests}", " ".join(shlex.quote(p) for p in files))
         try:
-            result = runner(shlex.split(rendered), cwd=str(root), check=False)
+            result = runner(["sh", "-c", rendered], cwd=str(root), check=False)
         except Exception:  # noqa: BLE001 - same reason as above
             return None
         code = getattr(result, "returncode", None)

@@ -178,5 +178,75 @@ class TheProbe(unittest.TestCase):
             self.assertNotIn("reset", argv)
 
 
+class TheCommandGetsAShell(unittest.TestCase):
+    """Operator commands use shell features; the probe must provide them.
+
+    The first cut of this module ran `shlex.split(rendered)` with no shell. It
+    passed every test above, because none of them used a shell feature — and it
+    could not express the command of the repository it was built for. A Maven
+    project needs `$(...)` just to turn changed file paths into the class names
+    `-Dtest=` accepts, so turning the guardrail on there would have declined
+    every merge as `red_on_base_unverified` while looking configured.
+    """
+
+    def _tmp(self) -> Path:
+        tmp = TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return Path(tmp.name)
+
+    def _capture(self, template):
+        seen = {}
+
+        def runner(argv, **kw):
+            if argv[:2] == ["git", "worktree"]:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            seen["argv"] = list(argv)
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+        test_was_red_on_base(
+            runner, base_sha="abc123", test_files=["src/test/java/FooTest.java"],
+            command_template=template, worktree_root=self._tmp(),
+        )
+        return seen["argv"]
+
+    def test_the_command_is_handed_to_a_shell(self):
+        argv = self._capture("pytest {tests}")
+
+        self.assertEqual(["sh", "-c"], argv[:2])
+        self.assertEqual(3, len(argv), "the whole command is one shell string")
+
+    def test_shell_syntax_survives_intact(self):
+        template = (
+            './mvnw test -Dtest=$(echo "{tests}" | sed -E "s@.*/([^/]+)\\.java@\\1@")'
+            ' || { echo failed; exit 1; }'
+        )
+
+        argv = self._capture(template)
+
+        self.assertIn("$(", argv[2])
+        self.assertIn("||", argv[2])
+        self.assertIn("|", argv[2])
+
+    def test_a_path_needing_quoting_is_quoted(self):
+        seen = {}
+
+        def runner(argv, **kw):
+            if argv[:2] == ["git", "worktree"]:
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
+            seen["argv"] = list(argv)
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+
+        test_was_red_on_base(
+            runner, base_sha="abc", test_files=["tests/a b.py", "tests/c;d.py"],
+            command_template="pytest {tests}", worktree_root=self._tmp(),
+        )
+
+        # Unquoted, `a b.py` would become two arguments and `c;d.py` would end
+        # the command — a path the repository controls must not be able to do
+        # either.
+        self.assertIn("'tests/a b.py'", seen["argv"][2])
+        self.assertIn("'tests/c;d.py'", seen["argv"][2])
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
