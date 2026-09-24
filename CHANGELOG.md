@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.23.0+umbrella.0.15.0] - 2026-09-24
+
 ### Added
 
 - **The bug lane can require proof that a PR's new test was red on the merge base.** Its six guardrails all measured the **form** of a PR — a test file is touched, CI is green, the diff is small, no judge path, traceable provenance, under the daily cap — and none measured whether the symptom the issue reported stopped reproducing. Audited on one consumer repository: **seven lane PRs passed all six, four were incomplete for the issue they claimed to close**, and two of those merged unattended and closed the issue behind a symptom that still reproduced. A test that passes at the merge base proves nothing about the fix — it asserts behaviour that already held, or tests something adjacent to the defect. `rules.bugs.require_red_on_base` turns the check on and `rules.bugs.red_on_base_command` declares how to run it; the probe runs in an isolated `git worktree`, never the live tree the lane is working in, and never guesses a command, because one that silently matched no tests would exit non-zero, read as red-on-base, and wave every PR through. Off by default: turning it on for a deployment that has not declared the command would decline every merge on upgrade, which is a silent automerge shutdown rather than a guardrail. "The check said no" and "the check never ran" decline under separate reasons and separate labels. Its limit is stated rather than implied — it catches "the test proves nothing", not "the test proves the wrong thing". (#3377)
