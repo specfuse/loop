@@ -27,7 +27,18 @@ sites do (FEAT-2026-0108/T01's escalation note). The caller
 argv this module builds.
 """
 
-OUTCOMES = ("refused", "could_not_proceed", "completed")
+#: `needs_decision` (#3390) is the fourth, added because the other three are
+#: all about the *session*: it was too big (`refused`), something it needed was
+#: missing (`could_not_proceed`), or it worked (`completed`). None covers a fix
+#: that is small and feasible where **which** fix is right is a decision the
+#: issue does not make. Faced with that and unable to ask, a headless session
+#: picked — and one such pick reversed a decision a feature gate had recorded,
+#: passed all six merge guardrails, and reached `eligible`.
+#:
+#: No member may contain another as a substring: `classify_outcome` matches by
+#: substring and requires exactly one hit, so a containing pair would make
+#: every session naming the longer one read as unclassifiable.
+OUTCOMES = ("refused", "could_not_proceed", "completed", "needs_decision")
 
 #: The slash command this lane dispatches. The skill ships in the
 #: `specfuse@specfuse` plugin, where it is addressed `/specfuse:fix-bug`; the

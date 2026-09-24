@@ -84,6 +84,7 @@ CORRELATION_ID = "FEAT-2026-0048/T04"
 
 OUTCOME_REFUSED = "refused"
 OUTCOME_COULD_NOT_PROCEED = "could_not_proceed"
+OUTCOME_NEEDS_DECISION = "needs_decision"
 OUTCOME_MERGED = "merged"
 OUTCOME_DECLINED = "declined"
 
@@ -96,7 +97,12 @@ OUTCOME_DECLINED = "declined"
 #: when the guardrails had passed and the dial was the only thing in the way.
 OUTCOME_AUTOMERGE_OFF = "automerge_off"
 
-_ESCALATING_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
+#: `needs_decision` escalates like the other two: the session opened no PR,
+#: so there is nothing for the guardrails to evaluate, and what the operator
+#: owes is an answer rather than a review (#3390).
+_ESCALATING_OUTCOMES = (
+    OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED, OUTCOME_NEEDS_DECISION,
+)
 
 _CI_UNKNOWN = "unknown"
 #: Checks exist but have not concluded yet -- internal to this module; never

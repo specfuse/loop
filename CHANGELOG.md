@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **`/specfuse:fix-bug` can say the direction is a decision, not only that the work is too big.** The skill had one way to decline — `refused`, keyed on size and risk — and no outcome for a fix that is small where **which** fix is correct is a decision the issue does not make. A headless session cannot ask, so it picked. Measured: a lane session made a generated service block on a soft-delete archive, reversing a decision a feature gate had explicitly recorded and making any aggregate with a child permanently un-archivable; it was coherent work with a passing test, it passed all six merge guardrails, and it reached `eligible`. `needs_decision` joins the outcome set and escalates like the other two stopping outcomes — the session opens no PR, so nothing is merged and no issue is closed behind a fix nobody chose. It is deliberately not `refused`, whose remedy is `/draft-feature`: the wrong instruction for a question whose answer is usually one line. The skill tells a session to reach for it when candidate fixes differ in **who they affect** rather than in size, and to carry the options themselves into the escalation so the operator answers a question instead of starting a diagnosis. (#3390)
+
 ## [0.22.3+umbrella.0.15.0] - 2026-09-23
 
 ### Fixed

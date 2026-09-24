@@ -23,19 +23,28 @@ def _outcomes_from_skill():
     match = re.search(r"## Headless mode(.*?)\n## ", text, re.DOTALL)
     section = match.group(1)
     bullets = re.findall(r"\*\*`([a-z_]+)`\*\*", section)
-    # The section states the three outcomes as the first three such bullets.
+    # Every distinct bolded-code bullet in the section, with no cap. The cap
+    # used to be a literal 3 — it encoded the very count this guard exists to
+    # verify, so adding `needs_decision` (#3390) made the guard report the
+    # skill as missing `completed` rather than reporting the real difference.
     seen = []
     for name in bullets:
         if name not in seen:
             seen.append(name)
-        if len(seen) == 3:
-            break
     return tuple(seen)
 
 
 class TestAutofixInvoke(unittest.TestCase):
     def test_outcomes_matches_skill_headless_section(self):
-        self.assertEqual(OUTCOMES, _outcomes_from_skill())
+        # Compared as sets: which outcomes exist is the invariant, the order
+        # they are presented in is a prose choice. Pinning the order made the
+        # guard fail on an edit that changed nothing about the contract.
+        self.assertEqual(
+            set(OUTCOMES), set(_outcomes_from_skill()),
+            "the skill's headless section and OUTCOMES must name the same set "
+            "— a session can only report an outcome the skill told it about, "
+            "and the lane can only classify one OUTCOMES contains",
+        )
 
     def test_subject_runs_nothing_itself(self):
         text = _SUBJECT_PATH.read_text(encoding="utf-8")
