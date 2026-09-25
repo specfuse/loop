@@ -9488,6 +9488,15 @@ def capture_gate_diff(
     return "\n\n".join(parts)
 
 
+def _is_relative_to(path: Path, other: Path) -> bool:
+    """`Path.is_relative_to`, tolerant of paths that do not resolve."""
+    try:
+        path.relative_to(other)
+    except ValueError:
+        return False
+    return True
+
+
 def write_judge_followups(
     feature_dir: Path, gate_number: int, findings: list,
 ) -> Path:
@@ -9644,6 +9653,32 @@ def judge_close(
             feature_dir, gate_number, result.findings)
         payload["lowered"] = True
         payload["verdict"] = "not_met"
+        # Say WHERE the findings went (#3406). They are written verbatim to
+        # FOLLOW-UPS.md above and committed below, but the event said only
+        # `findings: N` with `reason: null` — so a reader of events.jsonl had
+        # nothing pointing out of it. One operator searched events.jsonl,
+        # `work/` and for a repository-level judge artifact, concluded the text
+        # did not exist, and priced a third close at ~$12 to re-derive a
+        # finding that was sitting in a committed file.
+        #
+        # The criteria go in; the finding TEXT deliberately does not. It is
+        # already recorded verbatim in one place, and copying it into a second
+        # invites the two to disagree — `write_judge_followups` exists so the
+        # judge's words are not reformatted by the driver.
+        payload["findings_path"] = str(
+            Path(followups).relative_to(Path(feature_dir).parent.parent)
+            if _is_relative_to(Path(followups), Path(feature_dir).parent.parent)
+            else Path(followups)
+        )
+        payload["finding_criteria"] = [
+            f.criterion for f in result.findings if getattr(f, "criterion", None)
+        ]
+        _named = ", ".join(payload["finding_criteria"]) or "no named criterion"
+        payload["reason"] = (
+            f"judge lowered the verdict on {payload['findings']} finding(s) "
+            f"({_named}); the judge's own words are in "
+            f"{payload['findings_path']}"
+        )
         commit_bookkeeping(
             [wu.file, followups],
             f"chore(loop): {wu.wu_id} judge lowered verdict to not_met"
