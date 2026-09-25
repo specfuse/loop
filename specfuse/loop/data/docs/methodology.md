@@ -759,7 +759,17 @@ when and how these get created.
 | State backend  | WU / GATE file frontmatter          | GitHub issue labels + feature registry |
 | Dispatch       | driver shells out (`claude -p`)     | inbox files + polling loop             |
 | Branch / merge | one branch, squash per WU            | branch + PR per task, merge watcher    |
-| Spec front-end | optional; task graph authored directly | spec-first (specs agent + codegen)  |
+| Spec front-end | one of: **none** (task graph authored directly), **consumed** (specs authored upstream, the loop implements against a handoff manifest), or **authored** (the spec tree is the deliverable — work units author spec files) | spec-first (specs agent + codegen), from a dossier **or** from an upstream handoff manifest |
+
+The loop's spec front-end is three-valued because a repository whose entire
+deliverable **is** the spec tree fits neither of the two values this row
+carried before (#3407): it is not "optional", and the task graph is not
+"authored directly" — the work units author spec files. One consumer carried
+that third case in about forty lines of project `CLAUDE.md` because the row
+could not express it. In the **authored** mode the work-unit contract picks up
+two constraints that do not apply to code units — see
+`authoring-work-units` §6 (the whole tree validates) and §12 (a structural
+assertion substitutes for the red test).
 
 Everything above those rows — the unit hierarchy, ownership split, WU contract,
 verification-as-oracle, the gate cycle, plan-next, LEARNINGS, and autonomy — is

@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Changed
+
+- **Work units whose deliverable is a validated tree get the two rules they were missing.** A repository whose deliverable *is* a spec tree runs the loop with units that author spec files, and those fail differently from code units — a consumer decomposed them the way code units are decomposed and lost $5.37 (3 attempts, `files_touched: []` on all three) and $29.30 (6 refused attempts, abandoned). Neither was an ordinary authoring mistake; both were toolchain atomicity constraints. `authoring-work-units` §6 now carries the constraint that cuts **against** sizing: where the artifact is validated as a whole, some units are indivisible regardless of size, because a `$ref` to a schema that does not exist yet breaks the bundle and there is no partial state to hand on. §9 spells out the structural assertion — enumerate the identifiers the unit declares, assert each resolves in the **regenerated** artifact, not in the files the unit just wrote. §12 refuses "no test framework" as an exemption and sends it to that substitute: exempting reads like the refactor case and is nothing like it, since nothing else is asserting the unit did its job, and it would remove the cheapest hollow-pass guard for a whole class of repository. `docs/methodology.md` §10's spec-front-end row becomes three-valued (*none* / *consumed* / *authored*) — one consumer carried the third case in ~40 lines of project `CLAUDE.md` because the row could not express it. Both rules are stated for any validated-tree deliverable, not specs alone. (#3407)
+
 ## [0.23.3+umbrella.0.15.0] - 2026-09-24
 
 ### Fixed
