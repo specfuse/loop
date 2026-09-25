@@ -89,6 +89,29 @@ re-plan is a recovery the driver performs mid-flight, not a workflow to design
 units around. Seeing one fire is a signal to shrink or re-scope the WU next
 time, not a mechanism to lean on.
 
+**Where the deliverable is a validated tree, some units are indivisible.** The
+rules above all push one way — smaller, fewer criteria, shorter body. This one
+pushes back, and it wins where the two conflict. A work unit whose output is
+part of a shared artifact that is validated as a whole — a spec bundle, a
+Terraform plan, a schema registry — **must leave that whole artifact
+validating**.
+
+A code WU may leave a partial state: a failing test is a legitimate thing to
+hand the next unit. One of these may not. A `$ref` to a schema that does not
+exist yet breaks the bundle, and a broken bundle fails every validation layer
+at once, so there is no intermediate state to hand on. When the toolchain
+couples two edits — a child's `belongsTo` needs the parent's `hasMany`, a
+snapshot's fields are validated against the entity its label names — they go in
+**one unit** or the gate cannot pass, whatever the sizing rules above would
+otherwise say.
+
+Decompose along what validates independently, not along what reads as one
+topic. *Prevents:* a consumer's spec gate that split a parent entity from its
+children (3 attempts, `files_touched: []` on all three, $5.37) and reshaped an
+entity without its snapshot (6 refused attempts, abandoned, $29.30). Neither was
+an authoring mistake in the ordinary sense; both were atomicity constraints the
+rules did not name.
+
 ## 7. Hygiene work units — when a blocked WU points outside its scope
 
 When a WU's verification cannot pass because of a pre-existing bug in a path its
@@ -146,6 +169,26 @@ Two halves of one pre-flight, both done while authoring, close that:
 the gate green on the unchanged tree; and FEAT-2026-0013's ship-fail-fail cycle, ~$10
 re-attacking one `integration_workspace()` duplicate at a time.
 
+**The structural assertion — this pre-flight where there is no test framework.**
+A repository whose deliverable is a validated tree has no unit test to make red,
+and its whole-suite validator cannot show a given WU did its job either: it was
+green before the unit ran and it is green after. The same two halves still work,
+against identifiers instead of symbols.
+
+- **Enumerate what the WU declares.** The operationIds, schema names, event
+  names, scope tokens — whatever the tree's own vocabulary is. A WU whose author
+  cannot list them is under-specified, exactly as above.
+- **Assert each resolves in the REGENERATED artifact.** Rebuild the bundle and
+  look for the identifier there, not in the source files the unit just wrote.
+  Asserting against its own output is the hollow pass this section exists to
+  stop: the file says what the agent put in it either way. Carry the same
+  trigger — *"If [identifier] is absent from the regenerated bundle, emit
+  `status: blocked` — do not claim complete."*
+
+This is the substitute §12 sends you here for, and it is the spec analogue of
+the red→green transition: before the unit, the identifier does not resolve;
+after it, it does.
+
 ## 10. Helper-duplication pre-flight
 
 Folded into §9's first bullet.
@@ -174,6 +217,21 @@ nodeid, mocha `--grep`, JUnit `--tests`), never the full suite (§4).
 oracle), migrations whose oracle is row counts or schema shape, and `docs` / `lessons` /
 `retrospective` / `close` / `plan-next`. Write `Red-test exempt: <reason>`; an exemption
 with no reason is the violation.
+
+**"No test framework" is NOT one of those reasons — it takes a substitute.** A
+repository whose deliverable is a validated tree has no unit test to name here,
+and the temptation is to write `Red-test exempt: no test framework` and move on.
+That reads like the refactor case and is nothing like it: a refactor is covered
+because the existing suite is already asserting the behaviour, while here
+**nothing** is asserting that this unit did its job. The whole-suite validator
+was green before the unit ran and is green after, so exempting removes the
+cheapest hollow-pass guard the loop has, for an entire class of repository.
+
+Use the **structural assertion** in §9 instead: enumerate the identifiers the WU
+declares and assert each resolves in the regenerated artifact, with §9's
+`status: blocked` trigger. Same three bullets, same red→green shape — before the
+unit the identifier does not resolve, after it, it does. Write
+`Red-test substitute: structural assertion (§9)` rather than an exemption.
 
 ## 13. `produces:` — declare named-file deliverables so the driver enforces them
 
@@ -227,6 +285,21 @@ graduates once it is reusable, durable, and would change how a future WU is writ
 and graduating means finding it a home, not appending here.
 
 ## Version
+
+**v0.12.** Work units whose deliverable is a validated tree (#3407). §6 gains the
+constraint that cuts against sizing — some units are indivisible because the shared
+artifact cannot validate in between; §9 spells out the structural assertion
+(enumerate the identifiers, assert each resolves in the REGENERATED artifact); §12
+refuses "no test framework" as an exemption and sends it to that substitute instead,
+because exempting removes the cheapest hollow-pass guard for a whole class of repo.
+Evidence: a consumer's spec gate lost $5.37 and $29.30 to units split the way code
+units are. Numbers unchanged, nothing renumbered.
+
+Note on the line budget below: v0.11 claimed the skill "holds to 200 lines itself".
+It was already 236 when this edit began and is 294 after it. The claim is recorded
+here as stale rather than repeated — the 30-45 line budget it prescribes for a WU is
+the load-bearing half, and the skill's own length is a separate question nobody has
+re-decided.
 
 **v0.11.** Diet (FEAT-2026-0084/T02): the skill prescribes a 30-45 line WU and
 holds to 200 lines itself. §2, §6, §9, §12 and §13 stay in full; §1, §3, §4, §5, §7 and
