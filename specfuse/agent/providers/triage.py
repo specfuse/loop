@@ -40,7 +40,11 @@ from specfuse.agent.invoke import run_claude, usage_spend
 from specfuse.agent.state import AgentSnapshot
 from specfuse.agent.triage_invoke import build_invocation, classify_result, classify_severity
 from specfuse.loop.escalation import CATEGORY_LABELS
-from specfuse.loop.labels import read_severity_rubric
+from specfuse.loop.labels import (
+    list_existing_labels,
+    read_severity_rubric,
+    severity_label_projection,
+)
 from specfuse.loop.triage import CATEGORIES, apply_triage, list_untriaged
 
 _ITEM_ID_PREFIX = "triage-"
@@ -188,6 +192,7 @@ class TriageProvider:
         self._rows: dict = {}
         self._auto = False
         self._rubric: Any = _RUBRIC_UNSET
+        self._projection: Any = _RUBRIC_UNSET
 
     def _rubric_for_run(self) -> dict:
         """The repository's severity rubric, read at most once per run
@@ -195,14 +200,40 @@ class TriageProvider:
         `execute()` call after an `advertise()`, so a run that classifies
         nothing issues no `gh label list` at all."""
         if self._rubric is _RUBRIC_UNSET:
-            self._rubric = read_severity_rubric(
-                self._working_dir, runner=self._runner, repo=self._repo
-            )
+            self._read_labels_once()
         return self._rubric
+
+    def _projection_for_run(self) -> dict:
+        """`{canonical value: the label this repository spells it with}` (#3386).
+
+        Triage wrote canonical labels a repository may never have defined; the
+        write failed, and because the bug lane reads severity from the label
+        rather than the marker, triage removed from the lane the issues it had
+        just classified for it. Derived from the same listing as the rubric —
+        one `gh label list` per run, which is the invariant that accessor
+        already carried."""
+        if self._projection is _RUBRIC_UNSET:
+            self._read_labels_once()
+        return self._projection
+
+    def _read_labels_once(self) -> None:
+        existing, _reason = list_existing_labels(
+            self._working_dir, runner=self._runner, repo=self._repo
+        )
+        self._rubric = read_severity_rubric(
+            self._working_dir, runner=self._runner, repo=self._repo,
+            existing=existing,
+        )
+        try:
+            names = [item["name"] for item in (existing or [])]
+        except (TypeError, KeyError):
+            names = []
+        self._projection = severity_label_projection(names)
 
     def advertise(self, snapshot: AgentSnapshot) -> Sequence[ActionItem]:
         self._auto = snapshot.triage_auto
         self._rubric = _RUBRIC_UNSET
+        self._projection = _RUBRIC_UNSET
         rows = list_untriaged(self._runner, self._repo)
 
         self._rows = {}
@@ -250,7 +281,9 @@ class TriageProvider:
                     "labels": row.get("labels") or [],
                 }
             ]
-            results = apply_triage(self._runner, self._repo, decisions, auto=self._auto)
+            results = apply_triage(
+                self._runner, self._repo, decisions, auto=self._auto,
+                label_projection=self._projection_for_run())
             row_result = results[0]
             if row_result.get("label_written"):
                 return ActionOutcome(
@@ -337,7 +370,9 @@ class TriageProvider:
                 "severity": severity,
             }
         ]
-        results = apply_triage(self._runner, self._repo, decisions, auto=self._auto)
+        results = apply_triage(
+            self._runner, self._repo, decisions, auto=self._auto,
+            label_projection=self._projection_for_run())
         row_result = results[0]
 
         if row_result.get("skipped"):
