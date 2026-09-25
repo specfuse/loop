@@ -182,7 +182,10 @@ def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:
         return []
 
 
-def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = False) -> list:
+def apply_triage(
+    runner: Callable, repo: str, decisions: list, *,
+    auto: bool = False, label_projection: "dict | None" = None,
+) -> list:
     """Record each decision in `decisions` against its GitHub issue.
 
     Each decision is a mapping carrying at least `number`, `body` (the
@@ -195,6 +198,18 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
     marker. But a marker with no matching label on the issue (the label
     write failed on an earlier pass, e.g. because the label did not exist
     yet) is not fully idempotent -- it is missing its projection, so this
+    `label_projection` maps a canonical severity value to the label this
+    repository actually spells it with (`labels.severity_label_projection`,
+    #3386). Without it `severity_aliases` was one-directional: the bug lane
+    translated a repository's own words inbound while triage wrote canonical
+    words outbound, which that repository may never have defined. The write then
+    failed, and since the lane reads severity from the LABEL rather than the
+    marker, triage removed from the lane the very issues it had just classified
+    for it. The marker always records the canonical value, so it stays
+    comparable across repositories; only the label takes the operator's word.
+    Absent, or missing a value, the canonical label is written — the behaviour
+    before the projection existed.
+
     retries only the label write. `decision["labels"]` (as returned by
     `gh issue list --json ...,labels`, i.e. a list of `{"name": ...}`
     mappings) is what `labels` is checked against; a decision with no
@@ -226,7 +241,10 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
             marked_severity = (parse_marker_fields(body) or {}).get("severity")
             target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
             if marked_severity:
-                target_labels = tuple(target_labels) + (severity_label_for(marked_severity),)
+                target_labels = tuple(target_labels) + (
+                    (label_projection or {}).get(
+                        marked_severity, severity_label_for(marked_severity)),
+                )
             existing_labels = {
                 label.get("name") for label in decision.get("labels") or []
             }
@@ -288,7 +306,9 @@ def apply_triage(runner: Callable, repo: str, decisions: list, *, auto: bool = F
 
         labels_to_add = list(labels_for(applied_category))
         if severity:
-            labels_to_add.append(severity_label_for(severity))
+            labels_to_add.append(
+                (label_projection or {}).get(
+                    severity, severity_label_for(severity)))
 
         try:
             runner(
