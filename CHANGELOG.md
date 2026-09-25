@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.24.0+umbrella.0.15.0] - 2026-09-25
+
 ### Fixed
 
 - **A run that could not read the queue no longer reports `drained`.** When the snapshot's issue listing failed, the run treated it as empty, found no candidates and stopped with `drained` — exit 0, zero attempted, zero escalated — with **nine dispatchable bugs in the queue**. `drained` means "worked through everything there was"; here it meant "could not see anything", and the summary, which is the part an operator reads and the only part automation parses, rendered them identically. A nightly run whose credentials broke looked like a quiet backlog. An unreadable issue listing now refuses the run under its own stop reason `snapshot_unreadable`, following `dirty_tree`'s precedent — nothing was budgeted because nothing was dispatched — with one escalation carrying which listing failed, and a **non-zero exit** so a scheduled run's status is self-describing without its log. Outcomes, `drained` included, keep exit 0. An unreadable **PR** listing still does not refuse: `max_open_prs` deliberately declines to fire on a number it could not measure, so the run now states that the cap is unenforced for that run rather than leaving it in the log. Whether that case should refuse too is a decision, not a defect, and is left open. (#3392)
