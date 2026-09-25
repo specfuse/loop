@@ -76,6 +76,13 @@ STATUS_ESCALATED = "escalated"
 #: (FEAT-2026-0108/T02). Not one of `budget.py`'s stop reasons -- nothing was
 #: budgeted, because nothing was dispatched.
 STOP_DIRTY_TREE = "dirty_tree"
+#: The run could not read the queue it was meant to work through (#3392).
+#: Distinct from `STOP_DRAINED`, which means the opposite: a drained run saw
+#: everything there was and finished it. Reported identically, they are
+#: indistinguishable in the summary — the part an operator reads and the only
+#: part automation parses — so a nightly run whose credentials broke looks like
+#: a quiet backlog.
+STOP_SNAPSHOT_UNREADABLE = "snapshot_unreadable"
 
 KIND_BUG = "bug"
 KIND_FEATURE = "feature"
@@ -706,6 +713,43 @@ def _refuse_dirty_tree(reason: str, report: Callable[[str], None]) -> RunSummary
     )
 
 
+def _refuse_unreadable_snapshot(reason: str, *, report) -> "RunSummary":
+    """Refuse a run whose issue listing failed, rather than draining it (#3392).
+
+    Every provider that matters reads `snapshot.issues`, so a run without it
+    can do nothing except mislead. Shaped like `_refuse_dirty_tree`: zero
+    attempted, zero completed, one escalation carrying the reason, and a
+    distinct stop reason so the summary cannot be mistaken for a healthy run
+    against an empty queue.
+
+    Refusing is the conservative direction here for the same reason it is
+    there. A blind run that dispatches nothing has cost nothing; a blind run
+    reported as `drained` costs the operator their belief that the queue is
+    empty.
+    """
+    report(f"run refused to start — {reason}")
+    return RunSummary(
+        items_attempted=0,
+        items_completed=0,
+        items_escalated=1,
+        stop_reason=STOP_SNAPSHOT_UNREADABLE,
+        elapsed_minutes=0.0,
+        tokens_spent=0,
+        escalations=(Escalation(item_id="run:snapshot", reason=reason),),
+    )
+
+
+def exit_code_for(stop_reason: str) -> int:
+    """The process exit code a run ending in *stop_reason* should report.
+
+    Non-zero only for a refusal — a run that did not happen. Every outcome,
+    including `drained`, keeps 0: those are runs that ran. Narrow on purpose,
+    so a new stop reason does not silently become a failing exit code for
+    whatever automation is watching.
+    """
+    return 1 if stop_reason == STOP_SNAPSHOT_UNREADABLE else 0
+
+
 def _dirty_tree_reason(paths) -> str:
     shown = ", ".join(paths[:10])
     if len(paths) > 10:
@@ -798,6 +842,31 @@ def run_agent(
         ):
             if error:
                 report(f"snapshot: {section} unreadable — {error}")
+
+        # #3392: an unreadable issue listing is not an empty queue. Every
+        # provider that matters reads `snapshot.issues`, so continuing here
+        # finds no candidates and stops with `drained` — "worked through
+        # everything there was" reported for "could not see anything". Measured
+        # with nine dispatchable bugs in the queue at the time.
+        if snapshot.issues_error:
+            return _refuse_unreadable_snapshot(
+                f"the issue listing failed, so the queue could not be read: "
+                f"{snapshot.issues_error}",
+                report=report,
+            )
+
+        # The PR listing failing is NOT a refusal: `max_open_prs` deliberately
+        # reads an unreadable listing as zero rather than firing on a number
+        # the run could not measure. But that leaves the cap silently disabled
+        # for this run, so the summary says so rather than the operator finding
+        # it in the log. Whether it should refuse instead is a live question
+        # (#3392 item 3) and not decided here.
+        if snapshot.prs_error:
+            report(
+                "snapshot: max_open_prs is NOT enforced this run — the PR "
+                "listing could not be read, so the cap has no number to "
+                "measure against"
+            )
 
         budget_kwargs = {}
         if pause_marker is not None:
@@ -1294,7 +1363,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         worktree.restore_branch(started_on, report=_default_reporter)
 
     print(_format_summary(summary))
-    return 0
+    # #3392: a refusal exits non-zero so a scheduled run's exit status is
+    # self-describing without its log. Outcomes — `drained` included — keep 0.
+    return exit_code_for(summary.stop_reason)
 
 
 if __name__ == "__main__":
