@@ -5,7 +5,7 @@ slug: produces-amendable-at-the-guard
 branch: feat/FEAT-2026-0114-produces-amendable-at-the-guard
 roadmap_goal: An attempt that passed verification but did not touch a declared `produces:` path amends the declaration in its RESULT and passes, and an identical refusal never runs a third time.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 22.00
 ---
 
@@ -94,16 +94,21 @@ gates:
       - id: FEAT-2026-0114/T02
         file: WU-02-repair-note-and-refusal-history.md
         depends_on: [FEAT-2026-0114/T01]
+      # hygiene (gate 1 broad run, 2026-09-26): T02's YAML example pushed the
+      # key names past the excerpt head; T02H names both keys first.
+      - id: FEAT-2026-0114/T02H
+        file: WU-02H-excerpt-names-both-keys.md
+        depends_on: [FEAT-2026-0114/T02]
       - id: FEAT-2026-0114/T03
         file: WU-03-dropped-deliverables-reach-the-judge.md
         depends_on: [FEAT-2026-0114/T01]
       - id: FEAT-2026-0114/T04
         file: WU-04-document-the-contract.md
-        depends_on: [FEAT-2026-0114/T02, FEAT-2026-0114/T03]
+        depends_on: [FEAT-2026-0114/T02, FEAT-2026-0114/T02H, FEAT-2026-0114/T03]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0114/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0114/T01, FEAT-2026-0114/T02, FEAT-2026-0114/T03, FEAT-2026-0114/T04]
+        depends_on: [FEAT-2026-0114/T01, FEAT-2026-0114/T02, FEAT-2026-0114/T02H, FEAT-2026-0114/T03, FEAT-2026-0114/T04]
 ```
 
 ## Scope boundary — explicitly OUT

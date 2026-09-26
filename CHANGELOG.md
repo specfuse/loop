@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **A justified attempt can amend its own `produces:` declaration.** A RESULT block may now drop a declared `produces:` path under `produces_amended:` with a reason, when the attempt passed verification but solved the unit elsewhere; the unit’s `produces:` is rewritten without the dropped path, the drop is recorded as `produces_dropped:` and shown to the judge, and a second identical `produces_not_in_diff` refusal now records into `refusal_history` so a third dispatch never happens. `defaults.produces_amendable: false` in `verification.yml` restores today’s refusal. (FEAT-2026-0114)
+
 ## [0.25.0+umbrella.0.15.0] - 2026-09-26
 
 ### Fixed

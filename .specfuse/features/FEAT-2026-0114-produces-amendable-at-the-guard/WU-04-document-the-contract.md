@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0114/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - .specfuse/rules/result-contract.md
@@ -12,6 +12,15 @@ produces:
   - specfuse/loop/data/docs/methodology.md
   - .specfuse/verification.yml.example
   - specfuse/loop/data/verification.yml.example
+duration_seconds: 1168.046
+cost_usd: 1.630024
+input_tokens: 60
+output_tokens: 7881
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T15:31:20.693600+00:00
 ---
 
 # Document `produces_amended:` where the sessions and the authors read

@@ -37,7 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from . import criteria_state
+from . import _miniyaml, criteria_state
 from ._wu_sections import slice_wu_section
 from .criteria_state import CriterionStateEntry
 
@@ -62,6 +62,10 @@ REDACTION_MARKER = "[redacted: the close's own prose, which the judge does not r
 RETROSPECTIVE_FILENAME = "RETROSPECTIVE.md"
 DEFINITION_OF_DONE_SECTION = "Definition of done"
 MEASUREMENTS_SECTION = "Measurements"
+DROPPED_PRODUCES_SECTION = "Deliverables dropped by amendment"
+
+_FRONTMATTER_DELIM_RE = re.compile(r"^---\s*$")
+_GRAPH_BLOCK_RE = re.compile(r"```ya?ml\s*\n(.*?)\n```", re.DOTALL)
 
 _JUDGE_RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
 _VERDICT_LINE_RE = re.compile(r"(?m)^\s*verdict:\s*(.*?)\s*$")
@@ -84,6 +88,7 @@ class JudgeBundle:
     criteria: list[CriterionStateEntry]
     diff_text: str
     measurements: str
+    produces_dropped: str
 
 
 @dataclass(frozen=True)
@@ -204,6 +209,82 @@ def _read_text(path: Path) -> str:
         return ""
 
 
+def _read_frontmatter(path: Path) -> dict:
+    """Parse *path*'s frontmatter block, or `{}` for an absent/malformed file.
+
+    A trimmed-down `loop.read_frontmatter`: this module cannot import `loop`
+    (`loop.py` imports `judge`, so the reverse would be a cycle), and the only
+    thing needed here is the parsed mapping, not `loop`'s line-numbered errors.
+    """
+    try:
+        lines = path.read_text().splitlines()
+    except (FileNotFoundError, NotADirectoryError, IsADirectoryError):
+        return {}
+    if not lines or not _FRONTMATTER_DELIM_RE.match(lines[0]):
+        return {}
+    j = 1
+    while j < len(lines) and not _FRONTMATTER_DELIM_RE.match(lines[j]):
+        j += 1
+    if j >= len(lines):
+        return {}
+    try:
+        return _miniyaml.parse("\n".join(lines[1:j])) or {}
+    except _miniyaml.MiniYAMLError:
+        return {}
+
+
+def collect_produces_dropped(
+    feature_dir: Path, gate_number: int,
+) -> list[tuple[str, str, str]]:
+    """Return `(unit_id, path, reason)` for every `produces_dropped:` entry a
+    unit in gate *gate_number*'s graph carries, in `PLAN.md` ref order.
+
+    Reads `PLAN.md`'s `gates` graph to find the gate's work-unit refs, then
+    each ref's own file for its `produces_dropped:` frontmatter — the same
+    list `apply_produces_amendment` (FEAT-2026-0114/T01) writes. A missing
+    `PLAN.md`, an unmatched gate, or a ref file that is absent or carries no
+    drops all yield fewer entries, not an exception: an amendment record is
+    optional evidence, like every other artifact this module reads.
+    """
+    feature_dir = Path(feature_dir)
+    body = _read_text(feature_dir / "PLAN.md")
+    m = _GRAPH_BLOCK_RE.search(body)
+    if not m:
+        return []
+    try:
+        graph = _miniyaml.parse(m.group(1)) or {}
+    except _miniyaml.MiniYAMLError:
+        return []
+
+    gate = next(
+        (g for g in graph.get("gates", []) if g.get("gate") == gate_number), None)
+    if gate is None:
+        return []
+
+    results: list[tuple[str, str, str]] = []
+    for ref in gate.get("work_units", []) or []:
+        ref_file = ref.get("file")
+        if not ref_file:
+            continue
+        unit_id = ref.get("id", ref_file)
+        wu_fm = _read_frontmatter(feature_dir / ref_file)
+        for entry in wu_fm.get("produces_dropped") or []:
+            if not isinstance(entry, dict):
+                continue
+            path = entry.get("path")
+            reason = entry.get("reason")
+            if not isinstance(path, str) or not path.strip():
+                continue
+            results.append((unit_id, path.strip(), (reason or "").strip()))
+    return results
+
+
+def _render_produces_dropped(dropped: list[tuple[str, str, str]]) -> str:
+    if not dropped:
+        return "(none)"
+    return "\n".join(f"- {unit_id}: `{path}` — {reason}" for unit_id, path, reason in dropped)
+
+
 def build_judge_bundle(
     feature_dir: Path,
     gate_number: int,
@@ -241,6 +322,8 @@ def build_judge_bundle(
     # evidence rather than silently dropping it. Either way it is stripped.
     measurements_text = sliced.strip() if sliced.strip() else source
 
+    dropped = collect_produces_dropped(feature_dir, gate_number)
+
     return JudgeBundle(
         gate_number=gate_number,
         definition_of_done=_clean_evidence(
@@ -248,6 +331,7 @@ def build_judge_bundle(
         criteria=criteria,
         diff_text=_clean_evidence(diff_text),
         measurements=_clean_evidence(measurements_text),
+        produces_dropped=_clean_evidence(_render_produces_dropped(dropped)),
     )
 
 
@@ -315,6 +399,10 @@ did not do this work and have no stake in the answer.
 ## Measurements recorded by the close
 
 {bundle.measurements or "(none recorded)"}
+
+## {DROPPED_PRODUCES_SECTION}
+
+{bundle.produces_dropped}
 
 ## Your answer
 

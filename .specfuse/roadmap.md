@@ -112,7 +112,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-2026-0111) |
 | FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
-| FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | planned | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ detail](#feat-2026-0114) |
+| FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
 | FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | planned | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ detail](#feat-2026-0115) |
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | planned | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
@@ -1035,21 +1035,6 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
 
 **Status: active.**
-
-<a id="feat-2026-0114"></a>
-## FEAT-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
-
-**Why.** `produces:` is written before anyone has seen the solution. When the solution lands elsewhere, `resolve_produces_refusal` refuses the pass with `produces_not_in_diff` and the unit has no way to say the plan named the wrong file. The 2026-09-26 impact assessment found this the single largest mechanical spinner after the review's changes: five of the six units since 2026-09-10 that failed three times with an identical signature failed on this guard, across two repositories. Attempt 1 did verified work; attempts 2 and 3 changed nothing; the operator edited `produces:` by hand; the re-arm passed on the identical tree. Two defects compound it: the produces site is the one guard that never records into `refusal_history`, so the deterministic-refusal short-circuit cannot end it after two; and the repair note names `produces_unchanged:` without showing its shape (used in zero of nine repair attempts).
-
-**Goal.** A RESULT block may drop a declared path with a reason under `produces_amended:`; the driver rewrites the unit's `produces:`, records `produces_dropped:` on the unit and `produces_amended` on the event, and the judge sees every drop. The guard records its refusals so the second identical one is the last, and the repair note carries both escape hatches' YAML verbatim. Drop only, never add; an implementation unit may not amend itself to nothing. Kill switch `defaults.produces_amendable: false`.
-
-**Benefits.** The guard stops costing a human wait per plan-time misprediction. Baseline to beat: 6 units with repeated `produces_not_in_diff` in 16 days, all ending `blocked_human`.
-
-**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode from the assessment's evidence; defaulted decisions are recorded in `PLAN.md`.
-
-**Scope boundary — deliberately out.** Adding paths from a RESULT; `produces_unchanged:` semantics; a planning-time lint for hedged declarations; the other three guard sites.
-
-**Status: planned.**
 
 <a id="feat-2026-0115"></a>
 ## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human

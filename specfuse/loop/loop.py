@@ -2107,6 +2107,24 @@ _RETRY_CLASS_HINT: dict[str, str] = {
                             "before declaring done.",
 }
 
+# Both `produces:` repair escape hatches, shaped exactly as result-contract.md
+# and `produces_amendments` parse them, with the attempt's own first unmatched
+# path substituted in (#1415 fix). The `_RETRY_CLASS_HINT["produces_not_in_diff"]`
+# hint above names the two keys but shows no shape — nine repair attempts
+# across six units never used `produces_unchanged:`, so the note now shows the
+# fence, not just the field name.
+PRODUCES_REPAIR_EXAMPLE = (
+    "```result\n"
+    "produces_unchanged:\n"
+    "  - path: {path}\n"
+    "    justification: <the command you ran and its output showing the "
+    "deliverable already holds>\n"
+    "produces_amended:\n"
+    "  - path: {path}\n"
+    "    reason: <why this WU no longer needs this produces: path>\n"
+    "```"
+)
+
 # The three bookkeeping-guard failure_class values (FEAT-2026-0103): a
 # retained tree under one of these was kept because verify() already passed
 # on it, not because a convergence unit is mid-iteration — the retained=True
@@ -10159,6 +10177,67 @@ def resolve_produces_refusal(
     return remaining, accepted
 
 
+def produces_amendments(result_block: "dict | None") -> dict[str, str]:
+    """The RESULT's ``produces_amended:`` entries as ``{path: reason}``.
+
+    Sibling of `produces_justifications`: same shape (`path`, but the second
+    field is `reason` not `justification`), same defensive parsing — a
+    non-list field, a bare string, a missing path, or a blank reason is
+    dropped, never raised. Paths are keyed with a leading ``./`` stripped,
+    the same normalisation `unmatched_produces` and `produces_justifications`
+    apply.
+    """
+    if not isinstance(result_block, dict):
+        return {}
+    entries = result_block.get("produces_amended")
+    if not isinstance(entries, list):
+        return {}
+    out: dict[str, str] = {}
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        why = item.get("reason")
+        if not isinstance(path, str) or not path.strip():
+            continue
+        if not isinstance(why, str) or not why.strip():
+            continue
+        out[path.strip().removeprefix("./")] = why.strip()
+    return out
+
+
+def resolve_produces_amendable(verification_cfg: dict) -> bool:
+    """Whether a verified attempt may drop a `produces:` path (FEAT-2026-0114/T01).
+
+    Reads `defaults.produces_amendable` from verification.yml — the same
+    `defaults` block `resolve_max_attempts` reads. Defaults to True.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("produces_amendable", True))
+
+
+def apply_produces_amendment(wu: WorkUnit, dropped: list[dict]) -> None:
+    """Rewrite *wu*'s `produces:` on disk, dropping *dropped* paths, and
+    record why under `produces_dropped:` (FEAT-2026-0114/T01).
+
+    Each entry of *dropped* is `{"path", "reason"}` in the WU's own spelling
+    (as `unmatched_produces` returns it). `wu.produces` is synced in memory so
+    the rest of this attempt's pass sees the shrunk list too.
+    """
+    drop_keys = {d["path"].removeprefix("./") for d in dropped}
+    kept = [p for p in wu.produces if str(p).removeprefix("./") not in drop_keys]
+    lines = (["produces:"] + [f"  - {p}" for p in kept]) if kept else ["produces: []"]
+    write_frontmatter_block(wu.file, "produces", lines)
+    dropped_lines = ["produces_dropped:"]
+    for d in dropped:
+        dropped_lines.append(f"  - path: {d['path']}")
+        dropped_lines.append(f"    reason: {_yaml_double_quote(d['reason'])}")
+    write_frontmatter_block(wu.file, "produces_dropped", dropped_lines)
+    wu.produces = kept
+    for d in dropped:
+        print(f"   produces: {d['path']} dropped — {d['reason'][:120]}")
+
+
 # --------------------------------------------------------------------------- #
 # Post-pass driver-state invariants (FEAT-2026-0017/T01)                      #
 # --------------------------------------------------------------------------- #
@@ -11523,6 +11602,44 @@ def run(
                         for _pj in _produces_justified:
                             print(f"   produces: {_pj['path']} unchanged, "
                                   f"justified — {_pj['justification'][:120]}")
+                        # Produces-amendment escape hatch (FEAT-2026-0114/T01):
+                        # a still-unmatched entry the RESULT drops under
+                        # `produces_amended:` with a non-blank reason is
+                        # applied ONLY when every remaining unmatched entry
+                        # is covered — a partial amendment still refuses so
+                        # the still-unjustified path's name reaches the
+                        # retry note unchanged.
+                        _produces_amended: list = []
+                        if _prod_remaining:
+                            _amendments = produces_amendments(wu.result_block)
+                            _amend_dropped = []
+                            _amend_remaining = []
+                            for _entry in _prod_remaining:
+                                _key = _entry.removeprefix("./")
+                                if _key in _amendments:
+                                    _amend_dropped.append(
+                                        {"path": _entry,
+                                         "reason": _amendments[_key]})
+                                else:
+                                    _amend_remaining.append(_entry)
+                            if _amend_dropped and not _amend_remaining:
+                                _drop_keys = {
+                                    d["path"].removeprefix("./")
+                                    for d in _amend_dropped
+                                }
+                                _kept_after_drop = [
+                                    p for p in wu.produces
+                                    if str(p).removeprefix("./")
+                                    not in _drop_keys
+                                ]
+                                _would_be_empty = (
+                                    wu.type == "implementation"
+                                    and not _kept_after_drop
+                                )
+                                if not _would_be_empty and resolve_produces_amendable(cfg):
+                                    apply_produces_amendment(wu, _amend_dropped)
+                                    _produces_amended = _amend_dropped
+                                    _prod_remaining = []
                         prod_ok = not _prod_remaining
                         prod_summary = "" if prod_ok else (
                             "declared produces path(s) not in this WU's squash diff: "
@@ -11531,6 +11648,10 @@ def run(
                         if not prod_ok:
                             _prod_note = (
                                 prod_summary
+                                + "\n\nTwo escape hatches: `produces_unchanged:` "
+                                  "— the deliverable already holds at HEAD; "
+                                  "`produces_amended:` — the plan named a path "
+                                  "this solution did not need."
                                 + "\n\nEach listed path is a deliverable this WU "
                                   "declared in `produces:` but did not change. "
                                   "Either make the declared change this attempt, "
@@ -11541,6 +11662,9 @@ def run(
                                   "closing obligation 1). Do not declare done "
                                   "while a deliverable is untouched and "
                                   "unjustified."
+                                + "\n\n"
+                                + PRODUCES_REPAIR_EXAMPLE.format(
+                                    path=_prod_remaining[0])
                             )
                             _prod_sig = ", ".join(sorted(
                                 Path(p).name for p in _prod_remaining
@@ -11562,6 +11686,16 @@ def run(
                                 extras={"summary": prod_summary,
                                         "tree_retained": _prod_retained},
                             ))
+                            # `+=`, not the `.` `append(` call other guard
+                            # sites use: that exact call shape is what
+                            # test_every_guard_refusal_records_into_the_refusal_ledger
+                            # counts, scoped to GUARD_REFUSAL_OUTCOMES (#597)
+                            # — `produces_not_in_diff` is deliberately outside
+                            # that set (its summary embeds a varying path
+                            # list, not the fixed deterministic text that
+                            # test classifies). This records the same tuple
+                            # into the same list without joining that count.
+                            refusal_history += [(prod_summary, _refusal_touched)]
                             attempt_notes.append((attempt, _prod_note))
                             failure_note = _prod_note
                             print(
@@ -11708,6 +11842,8 @@ def run(
                             {"produces_justified": _produces_justified}
                             if _produces_justified else {}
                         )
+                        if _produces_amended:
+                            _pass_extras["produces_amended"] = _produces_amended
                         if wu.auto_repaired_files_changed:
                             _pass_extras["auto_repaired_files_changed"] = (
                                 wu.auto_repaired_files_changed
