@@ -129,11 +129,19 @@
 #                               # Defaults to false (#3424): the checklist is
 #                               # appended under the feature's archived detail
 #                               # section in roadmap-archive.md instead.
+#   produces_amendable: false  # whether the driver accepts a RESULT's
+#                               # `produces_amended:` entries, dropping those
+#                               # paths from the unit's recorded `produces:`.
+#                               # Defaults to false: an amendment claim is
+#                               # ignored and the path is judged as an
+#                               # unjustified unchanged deliverable instead
+#                               # (FEAT-2026-0114).
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
 #   dispatch_skills: false
 #   post_merge_issue: false
+#   produces_amendable: false
 #
 # The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
 # `max_attempts` resolution and adds no config key of its own — a unit's

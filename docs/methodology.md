@@ -127,6 +127,9 @@ it mostly does not need. Author-set unless marked driver-owned.
   `attempts`, `cost_usd`, `input_tokens`, `output_tokens`, `duration_seconds`,
   `cumulative_*`, `re_arm_count`, `re_arm_history`, `folded_through_re_arm`,
   `model`/`effort` as resolved, `gate_set`, `driver_version`, `started_at`.
+- `produces_dropped` — driver-owned. Written when a RESULT's `produces_amended:`
+  entries are accepted (`defaults.produces_amendable: true`): the paths dropped
+  from this unit's recorded `produces:` (`.specfuse/rules/result-contract.md`).
 
 ## 3. Work unit types
 
@@ -467,6 +470,13 @@ terminal close no longer files PLAN.md's `## Post-merge checklist` as a
 actioned); `auto_archive_feature` appends it under the feature's archived
 detail section in `roadmap-archive.md`. `defaults.post_merge_issue: true` in
 `verification.yml` restores the issue.
+
+**A RESULT may amend the plan, never add to it (FEAT-2026-0114).** A session's
+`produces_amended:` entry claims a planned `produces:` path the solution did
+not need; `defaults.produces_amendable: true` in `verification.yml` lets the
+driver accept it, dropping the path into `produces_dropped` on the unit.
+Default `false` — an unrecognized amendment is judged as an unjustified
+unchanged deliverable (`.specfuse/rules/result-contract.md`).
 
 **Closing sessions run on sonnet (#3425).** `close`, `close-intermediate`
 and `plan-next` default to `sonnet` at effort `high`, the same model as the

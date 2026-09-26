@@ -67,9 +67,12 @@ acceptance_criteria:
     met: true | false
     evidence: <how you know — a test name, a behavior, a line reference>
 blocked_reason: <present only when status is blocked>
-produces_unchanged:               # optional — closing obligation 1 below
+produces_unchanged:                # optional — obligation 1 below
   - path: <a produces: entry, verbatim>
     justification: <the command you ran and its output showing the deliverable already holds>
+produces_amended:                 # optional — obligation 1 below
+  - path: <a produces: entry, verbatim>
+    justification: <why the plan named it but the solution didn't need it>
 ```
 ````
 
@@ -112,11 +115,13 @@ never required by any guard. Omit it and nothing changes: the driver's
 
 1. **Diff against `produces:` first.** Every path in the WU's `produces:` list
    must show a working-tree change, or the RESULT must justify each unchanged
-   path under `produces_unchanged:` — spelled as `produces:` spells it, plus
-   the command and output showing the deliverable already holds. The driver
-   reads that list: a justified entry passes and is recorded on the attempt as
-   `produces_justified`; an unjustified one, or a blank justification, is
-   refused (#198, #3268, outcome `produces_not_in_diff`). Silence on an
+   path under `produces_unchanged:` (deliverable already held) or
+   `produces_amended:` (the plan named a path the solution didn't need — drop
+   only, never add) — spelled as `produces:` spells it, plus the proving
+   command and output. The driver reads that list: a justified entry passes
+   and is recorded on the attempt as `produces_justified`; an unjustified one,
+   or a blank justification, is refused (#198, #3268, outcome
+   `produces_not_in_diff`). Silence on an
    unchanged deliverable is not a valid close.
 2. **A plan-level contradiction is `blocked`, not `complete`.** Put the
    finding in `blocked_reason`; never write it into a gate document and close

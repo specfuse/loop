@@ -254,6 +254,12 @@ empty, recording `deliverable_missing`; a body-level `test -s` is advisory.
 *Prevents:* the zero-deliverable and partial-bundle hollow passes the
 no-code-written guard left open (`[FEAT-2026-0020/G2/hollow-pass-presence-gates]`).
 
+Don't hedge a `produces:` entry against your own uncertainty. If unsure a path
+will change, leave it out rather than listing it "just in case" — the runtime
+`produces_amended:` mechanism (`.specfuse/rules/result-contract.md`) exists to
+let a session correct the plan when it turns out to be wrong, not to absorb
+declarations an author never committed to in the first place.
+
 ## 14. Tracer bullet — stubs permitted only in the unit that turns the oracle green
 
 A gate's `feature_oracle` (`docs/methodology.md` §2.1) is red on the tree until
