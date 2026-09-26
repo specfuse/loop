@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0117/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces_driver_helper:
   - derive_criterion_covers
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/criteria_state.py
   - tests/test_carried_green_invalidated_by_diff.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T18:52:24.056021+00:00
+duration_seconds: 534.972
+cost_usd: 1.91564
+input_tokens: 106
+output_tokens: 51124
 ---
 
 # A carried green is invalidated when the gate diff touches a path it covers

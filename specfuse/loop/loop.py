@@ -56,6 +56,7 @@ import subprocess
 import sys
 import threading
 import time
+import types
 from dataclasses import dataclass, field, replace as _dataclass_replace
 from pathlib import Path
 
@@ -5429,6 +5430,54 @@ def precreate_dispatch_skeleton(wu: WorkUnit, feature_dir: Path) -> None:
         _precreate_criteria_state_stub(feature_dir, gate_n, wu.attempts)
 
 
+def invalidate_carried_entries(
+    entries: "list[criteria_state.CriterionStateEntry]", touched_paths: "set[str] | list[str]",
+) -> "list[criteria_state.CriterionStateEntry]":
+    """Reset a carried-forward entry whose `covers` intersects *touched_paths*
+    (FEAT-2026-0117/T02, #3313).
+
+    Runs in `_precreate_criteria_state_stub` right after T01's
+    `reset_stale_criteria_entries` (and this function's own `covers`
+    backfill). An entry with `carried_from_attempt` set whose `covers` names
+    a path in *touched_paths* (from `git_diff_names(proved_at_sha, "HEAD")`)
+    resets to `unverified` exactly like a stale reset, plus `invalidated_by`
+    naming the touched path — a carry-forward that survived a code change to
+    the thing it measured would be worse than no carry-forward at all. A
+    `carried_from_attempt` entry with an empty `covers` — nothing left to
+    check a diff against, whether because it predates this field or because
+    neither its WU's `produces:` nor its oracle command yielded a path — is
+    reset the same way, with no `invalidated_by`: an entry with no `covers`
+    is never carried.
+    """
+    touched = set(touched_paths)
+    refreshed = []
+    for entry in entries:
+        if not entry.carried_from_attempt:
+            refreshed.append(entry)
+            continue
+        if not entry.covers:
+            refreshed.append(_dataclass_replace(
+                entry, oracle=None, kind=None, state="unverified",
+                proved_at_sha=None, attempt=None, carried_from_attempt=None,
+                invalidated_by=None,
+            ))
+            continue
+        hit = next((p for p in entry.covers if p in touched), None)
+        if hit:
+            entry = _dataclass_replace(
+                entry,
+                oracle=None,
+                kind=None,
+                state="unverified",
+                proved_at_sha=None,
+                attempt=None,
+                carried_from_attempt=None,
+                invalidated_by=hit,
+            )
+        refreshed.append(entry)
+    return refreshed
+
+
 def _precreate_criteria_state_stub(
     feature_dir: Path, gate_n: int, current_attempt: "int | None" = None,
 ) -> None:
@@ -5481,6 +5530,9 @@ def _precreate_criteria_state_stub(
     # criteria cannot be re-extracted (a WU edited since, an unparseable body)
     # still has stale entries to clear, and returning early would leave the
     # gate in exactly the state that cannot progress.
+    wu_criteria = extract_wu_criteria(feature_dir, gate_n)
+    wc_by_sub_id = {wc.sub_id: wc for wc in wu_criteria if wc.status == "ok"}
+
     stale_reset = False
     if current_attempt is not None:
         carry_narrow = criteria_state.resolve_carry_forward_narrow_greens(load_verification())
@@ -5489,8 +5541,42 @@ def _precreate_criteria_state_stub(
         stale_reset = refreshed != existing
         existing = refreshed
 
+        # Backfill `covers` onto any entry that predates this field, or that
+        # T01's reset just carried forward without it (FEAT-2026-0117/T02):
+        # `invalidate_carried_entries` below can only compare a diff against
+        # paths it actually knows about.
+        backfilled = []
+        for entry in existing:
+            if not entry.covers:
+                wc = wc_by_sub_id.get(entry.criterion_id.split("#", 1)[0])
+                produces = wc.produces if wc is not None else []
+                covers = criteria_state.derive_criterion_covers(
+                    types.SimpleNamespace(produces=produces), entry.oracle)
+                if covers:
+                    entry = _dataclass_replace(entry, covers=covers)
+            backfilled.append(entry)
+        if backfilled != existing:
+            stale_reset = True
+        existing = backfilled
+
+        # Invalidate a carried green whose covered paths appear in the gate
+        # diff since it was proved (#3313): a carry-forward that survives a
+        # code change to the thing it measured is worse than none.
+        proved_shas = {
+            e.proved_at_sha for e in existing
+            if e.carried_from_attempt and e.proved_at_sha
+        }
+        if proved_shas:
+            touched: set[str] = set()
+            for sha in proved_shas:
+                touched.update(git_diff_names(sha, "HEAD"))
+            invalidated = invalidate_carried_entries(existing, touched)
+            if invalidated != existing:
+                stale_reset = True
+            existing = invalidated
+
     fresh: list[tuple[str, str]] = []
-    for wc in extract_wu_criteria(feature_dir, gate_n):
+    for wc in wu_criteria:
         if wc.status != "ok":
             continue
         for ordinal, criterion in enumerate(wc.criteria, start=1):
@@ -5512,6 +5598,12 @@ def _precreate_criteria_state_stub(
             state="unverified",
             proved_at_sha=None,
             attempt=None,
+            covers=criteria_state.derive_criterion_covers(
+                types.SimpleNamespace(
+                    produces=wc_by_sub_id[cid.split("#", 1)[0]].produces
+                ),
+                None,
+            ),
         )
         for cid, criterion in fresh
         if cid not in existing_ids
@@ -5568,6 +5660,17 @@ def format_reverification_worklist(wu: WorkUnit, feature_dir: Path) -> str:
             lines.append(
                 f"- `{entry.criterion_id}` — oracle: `{entry.oracle}` — "
                 f"proved on attempt `{entry.attempt}`"
+            )
+        lines.append("")
+
+    invalidated = [e for e in worklist.reverify if e.invalidated_by]
+    if invalidated:
+        lines.append("### Re-verify — invalidated by a covered-path change")
+        lines.append("")
+        for entry in invalidated:
+            lines.append(
+                f"- `{entry.criterion_id}` — invalidated by change to "
+                f"`{entry.invalidated_by}`"
             )
         lines.append("")
 
@@ -8766,6 +8869,10 @@ class WUCriteria:
     criteria: list[str]
     status: str
     wu_type: str | None = None
+    #: The WU's own `produces:` frontmatter list — empty for `"missing"`/
+    #: `"unparseable"`/`"skipped"` status. Feeds `derive_criterion_covers`
+    #: (FEAT-2026-0117/T02); not used by `build_autoclose_pass_summary`.
+    produces: list[str] = field(default_factory=list)
 
 
 def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]:
@@ -8806,7 +8913,10 @@ def extract_wu_criteria(feature_dir: Path, gate_number: int) -> list[WUCriteria]
         sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
         ac_text = _wu_sections.slice_acceptance_criteria(body)
         criteria = [m.group(1).strip() for m in _DEBT_AC_ITEM_RE.finditer(ac_text)]
-        results.append(WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok", wu_type))
+        produces = [str(p) for p in (fm.get("produces") or [])]
+        results.append(
+            WUCriteria(wu_id, ref["file"], sub_id, criteria, "ok", wu_type, produces)
+        )
     return results
 
 

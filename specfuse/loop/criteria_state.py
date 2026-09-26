@@ -20,7 +20,8 @@ FEAT-2026-0056/PLAN.md and GATE-01.md for the design this module encodes.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
 #: An oracle's scope classification. `narrow` oracles (a scoped test nodeid,
@@ -44,6 +45,8 @@ _FIELD_PATTERNS = {
     "carried_from_attempt": re.compile(
         r"^- \*\*carried_from_attempt:\*\*\s*`?([^`\n]+)`?", re.MULTILINE
     ),
+    "covers": re.compile(r"^- \*\*covers:\*\*\s*(.+)$", re.MULTILINE),
+    "invalidated_by": re.compile(r"^- \*\*invalidated_by:\*\*\s*(.+)$", re.MULTILINE),
 }
 
 
@@ -62,6 +65,16 @@ class CriterionStateEntry:
     #: entry's narrow green past the attempt cycle that proved it — the
     #: attempt number it was carried FROM, not the current attempt.
     carried_from_attempt: Optional[str] = None
+    #: Paths this criterion's proof depends on — its producing WU's
+    #: `produces:` plus its oracle's test file, when derivable
+    #: (`derive_criterion_covers`, FEAT-2026-0117/T02). Empty when never
+    #: seeded with a `- **covers:**` line: an entry the skeleton step hasn't
+    #: backfilled yet, or one predating this field.
+    covers: list = field(default_factory=list)
+    #: Set by `invalidate_carried_entries` when a re-close's gate diff
+    #: touches a path this (formerly carried) entry `covers` — names that
+    #: path, not the whole diff.
+    invalidated_by: Optional[str] = None
 
 
 #: Matches `GATE-NN-CRITERIA.md` basenames (any `NN`), and nothing else —
@@ -105,6 +118,8 @@ def parse_criteria_state(text: str) -> list[CriterionStateEntry]:
         start = m.end()
         end = headings[i + 1].start() if i + 1 < len(headings) else len(text)
         block = text[start:end]
+        covers_raw = _extract_field(block, "covers")
+        covers = [c.strip() for c in covers_raw.split(",") if c.strip()] if covers_raw else []
         entries.append(
             CriterionStateEntry(
                 criterion_id=criterion_id,
@@ -115,6 +130,8 @@ def parse_criteria_state(text: str) -> list[CriterionStateEntry]:
                 proved_at_sha=_extract_field(block, "proved_at_sha"),
                 attempt=_extract_field(block, "attempt"),
                 carried_from_attempt=_extract_field(block, "carried_from_attempt"),
+                covers=covers,
+                invalidated_by=_extract_field(block, "invalidated_by"),
             )
         )
     return entries
@@ -209,6 +226,11 @@ def build_reverification_worklist(
     fail` or `state: unverified`, and every `broad` entry regardless of
     state — goes to `reverify`. Fail-safe default: unclassifiable entries
     land in `reverify`, never in `carry_forward`.
+
+    `covers` plays no part in this partition — a `carried_from_attempt`
+    entry with an empty `covers` is kept out of `carry_forward` by
+    `loop.invalidate_carried_entries` resetting it to `unverified` before
+    this runs (FEAT-2026-0117/T02), not by a check here.
     """
     carry_forward: list[CriterionStateEntry] = []
     reverify: list[CriterionStateEntry] = []
@@ -264,5 +286,63 @@ def render_criteria_state(entries: list[CriterionStateEntry]) -> str:
             lines.append(f"- **attempt:** `{entry.attempt}`")
         if entry.carried_from_attempt is not None:
             lines.append(f"- **carried_from_attempt:** `{entry.carried_from_attempt}`")
+        if entry.covers:
+            lines.append(f"- **covers:** {', '.join(entry.covers)}")
+        if entry.invalidated_by is not None:
+            lines.append(f"- **invalidated_by:** {entry.invalidated_by}")
         blocks.append("\n".join(lines) + "\n")
     return "\n".join(blocks)
+
+
+_UNITTEST_ORACLE_RE = re.compile(r"-m\s+unittest\s+([\w.]+)")
+_MAVEN_DTEST_RE = re.compile(r"-Dtest=([A-Za-z_][A-Za-z0-9_]*)")
+
+
+def _unittest_module_path(oracle_command: str) -> "Optional[str]":
+    """`tests.foo_bar[.TestX.test_y]` -> `tests/foo_bar.py`, the file the
+    unittest oracle actually runs regardless of which class/method suffix it
+    names. Tries the longest dotted prefix that exists on disk first, so a
+    package (`tests/foo_bar/__init__` style) is not required; falls back to
+    the full dotted-to-slash mapping when nothing on disk matches yet."""
+    m = _UNITTEST_ORACLE_RE.search(oracle_command)
+    if not m:
+        return None
+    parts = m.group(1).split(".")
+    for i in range(len(parts), 0, -1):
+        candidate = "/".join(parts[:i]) + ".py"
+        if Path(candidate).is_file():
+            return candidate
+    return "/".join(parts) + ".py"
+
+
+def _maven_test_class_path(oracle_command: str) -> "Optional[str]":
+    """`-Dtest=FooBarTest` -> its `src/test/**/FooBarTest.java`, only when
+    one actually exists — unlike the unittest case, a Maven class name gives
+    no reliable package-to-path mapping without a filesystem lookup."""
+    m = _MAVEN_DTEST_RE.search(oracle_command)
+    if not m:
+        return None
+    root = Path("src/test")
+    if not root.is_dir():
+        return None
+    matches = sorted(root.rglob(f"{m.group(1)}.java"))
+    return str(matches[0]) if matches else None
+
+
+def derive_criterion_covers(wu, oracle_command: "Optional[str]") -> list:
+    """Paths a criterion's proof depends on (FEAT-2026-0117/T02): its
+    producing WU's `produces:` plus the test file its oracle command names,
+    when derivable. Feeds a seeded entry's `- **covers:**` line so a re-close
+    can tell whether a later diff touched what a carried green actually
+    measured — see `invalidate_carried_entries` in `loop.py`.
+
+    *wu* is anything with a `.produces` list (a `WorkUnit`, or a duck-typed
+    stand-in built from a WU read off disk); *oracle_command* is the entry's
+    recorded `oracle`, or `None` before a close has run it.
+    """
+    covers = list(getattr(wu, "produces", None) or [])
+    if oracle_command:
+        test_path = _unittest_module_path(oracle_command) or _maven_test_class_path(oracle_command)
+        if test_path and test_path not in covers:
+            covers.append(test_path)
+    return covers
