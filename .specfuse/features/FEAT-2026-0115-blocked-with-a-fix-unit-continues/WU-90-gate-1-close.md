@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.25.0
 started_at: 2026-09-26T17:24:07.889592+00:00
 duration_seconds: 551.591
-cost_usd: 2.503567
-input_tokens: 122
-output_tokens: 42257
+cost_usd: 2.767209
+input_tokens: 134
+output_tokens: 44096
 ---
 
 # Close gate 1 — a block that names its fix unit continues the gate
