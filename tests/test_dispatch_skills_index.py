@@ -7,6 +7,8 @@ for it (#3423).
 `defaults.dispatch_skills` from verification.yml and `execute_unit_attempt`
 threads it through.
 """
+import contextlib
+import io
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -36,11 +38,23 @@ class ResolverReadsTheDefaultsBlock(unittest.TestCase):
 
 
 class DispatchCmdCarriesTheFlag(unittest.TestCase):
-    def _cmd(self, **kw):
+    def _cmd(self, supported: bool = True, **kw):
         fake_proc = mock.MagicMock(stdout="ignored", returncode=0)
-        with mock.patch.object(loop.subprocess, "run", return_value=fake_proc) as run:
+        with mock.patch.object(loop, "claude_supports_flag", return_value=supported), \
+             mock.patch.object(loop.subprocess, "run", return_value=fake_proc) as run:
             loop.dispatch(_wu(), failure_note=None, cost_tracking=False, **kw)
         return run.call_args[0][0]
+
+    def test_unsupported_cli_omits_the_flag_and_warns_once(self):
+        # #3432: an older CLI must not fail every dispatch on an unknown option.
+        loop._FLAG_WARNED.discard("--disable-slash-commands")
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            first = self._cmd(supported=False)
+            second = self._cmd(supported=False)
+        self.assertNotIn("--disable-slash-commands", first)
+        self.assertNotIn("--disable-slash-commands", second)
+        self.assertEqual(buf.getvalue().count("does not accept --disable-slash-commands"), 1)
 
     def test_default_disables_slash_commands_after_dash_p(self):
         cmd = self._cmd()
@@ -54,7 +68,8 @@ class DispatchCmdCarriesTheFlag(unittest.TestCase):
     def test_composes_with_the_sandbox_escape(self):
         fake_proc = mock.MagicMock(stdout="ignored", returncode=0)
         wu = _wu(unsandboxed=True, unsandboxed_rationale="needs gh")
-        with mock.patch.object(loop.subprocess, "run", return_value=fake_proc) as run:
+        with mock.patch.object(loop, "claude_supports_flag", return_value=True), \
+             mock.patch.object(loop.subprocess, "run", return_value=fake_proc) as run:
             loop.dispatch(wu, failure_note=None, cost_tracking=False)
         cmd = run.call_args[0][0]
         self.assertIn("--dangerously-skip-permissions", cmd)
@@ -64,3 +79,27 @@ class DispatchCmdCarriesTheFlag(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProbeReadsTheHelpText(unittest.TestCase):
+    def setUp(self):
+        loop.claude_supports_flag.cache_clear()
+
+    def tearDown(self):
+        loop.claude_supports_flag.cache_clear()
+
+    def test_flag_in_help_output_is_supported_and_cached(self):
+        fake = mock.MagicMock(stdout="Usage: claude\n  --disable-slash-commands  Disable all skills\n", stderr="")
+        with mock.patch.object(loop.subprocess, "run", return_value=fake) as run:
+            self.assertTrue(loop.claude_supports_flag("--disable-slash-commands"))
+            self.assertTrue(loop.claude_supports_flag("--disable-slash-commands"))
+        self.assertEqual(run.call_count, 1)
+
+    def test_flag_absent_or_cli_broken_is_not_supported(self):
+        fake = mock.MagicMock(stdout="Usage: claude\n  --model <m>\n", stderr="")
+        with mock.patch.object(loop.subprocess, "run", return_value=fake):
+            self.assertFalse(loop.claude_supports_flag("--disable-slash-commands"))
+        loop.claude_supports_flag.cache_clear()
+        with mock.patch.object(loop.subprocess, "run", side_effect=OSError("no claude")):
+            self.assertFalse(loop.claude_supports_flag("--disable-slash-commands"))
+
