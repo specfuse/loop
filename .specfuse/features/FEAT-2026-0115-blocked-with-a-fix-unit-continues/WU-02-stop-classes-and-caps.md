@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0115/T02
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 produces_driver_helper:
@@ -9,6 +9,13 @@ produces_driver_helper:
 produces:
   - specfuse/loop/loop.py
   - tests/test_fix_unit_insertion_refused.py
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: "ERROR: test_fix_unit_insertion_refused (unittest.loader._FailedTest.test_fix_unit_insertion_refused)"
+duration_seconds: 359.74
+cost_usd: 1.258667
+input_tokens: 72
+output_tokens: 26952
 ---
 
 # The arm predicate's stop classes and two caps decide whether the draft is inserted
