@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0114/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.25.0
+started_at: 2026-09-26T15:55:13.733600+00:00
+verdict: met
+duration_seconds: 382.756
+cost_usd: 1.757938
+input_tokens: 78
+output_tokens: 31162
 ---
 
 # Close gate 1 — amend `produces:` at the guard

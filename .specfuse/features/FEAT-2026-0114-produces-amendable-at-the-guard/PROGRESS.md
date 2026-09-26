@@ -5,3 +5,4 @@
 - **FEAT-2026-0114/T02H**: attempt 1 outcome=passed
 - **FEAT-2026-0114/T04**: Documented `produces_amended:`, `produces_dropped:`, and `defaults.produces_amendable` across result-contract.md, docs/methodology.md, the authoring-work-units skill (plugins source + mirror), and verification.yml.example — synced all data/ mirrors, then trimmed result-contract.md prose to keep the binding block at exactly 2500/2500 words after the addition.
   - note: sync-scaffold.sh does not mirror docs/ (only .specfuse/ <-> specfuse/loop/data/ and plugins/skills/ -> .specfuse/skills/) so docs/methodology.md's specfuse/loop/data/docs/ copy needed a manual cp; also authoring-work-units/SKILL.md's canonical source is plugins/specfuse/skills/, not .specfuse/skills/ directly — editing .specfuse/ there gets overwritten on next sync.
+- **FEAT-2026-0114/G1-CLOSE**: attempt 1 outcome=passed
