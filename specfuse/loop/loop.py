@@ -4807,7 +4807,7 @@ def format_reverification_worklist(wu: WorkUnit, feature_dir: Path) -> str:
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
              cost_tracking: bool = True, *,
-             dispatch_skills: bool = False) -> tuple[str, dict | None]:
+             dispatch_skills: bool | None = None) -> tuple[str, dict | None]:
     """Run a fresh agent session for this WU.
 
     When `cost_tracking` is True (default), requests JSON output from
@@ -4827,6 +4827,14 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
     cmd = resolve_claude_cmd(cmd)
+    if dispatch_skills is None:
+        # Resolved here rather than threaded through execute_unit_attempt:
+        # every test fake of dispatch() takes the three positional arguments
+        # and nothing else, and the yaml read is nothing next to a session.
+        try:
+            dispatch_skills = resolve_dispatch_skills(load_verification())
+        except Exception:  # noqa: BLE001 - an unreadable config keeps the default
+            dispatch_skills = False
     if not dispatch_skills:
         # #3423: a dispatched unit invokes no skill, so the skills index is
         # fixed context paid on every turn. `defaults.dispatch_skills: true`
@@ -7205,8 +7213,7 @@ def execute_unit_attempt(
     if worklist_section:
         wu.body = wu.body + "\n\n" + worklist_section
     if dispatch_fn is None:
-        result = dispatch(wu, failure_note, cost_tracking,
-                          dispatch_skills=resolve_dispatch_skills(cfg))
+        result = dispatch(wu, failure_note, cost_tracking)
     else:
         result = dispatch_fn(wu, failure_note)
     if isinstance(result, tuple):
