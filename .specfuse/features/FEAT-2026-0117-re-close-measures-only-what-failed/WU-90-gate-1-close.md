@@ -1,10 +1,14 @@
 ---
 id: FEAT-2026-0117/G1-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
+duration_seconds: 591.147
+cost_usd: 1.597012
+input_tokens: 74
+output_tokens: 27173
 ---
 
 # Close gate 1 — a re-close measures only what failed
