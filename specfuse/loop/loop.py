@@ -665,10 +665,12 @@ def claude_supports_flag(flag: str) -> bool:
         proc = subprocess.run(
             resolve_claude_cmd(["claude", "--help"]), capture_output=True,
             text=True, check=False, timeout=30,
+            env=child_env_without_pin_marker(),
         )
     except Exception:  # noqa: BLE001 - a missing or broken CLI is "no"
         return False
-    return flag in ((proc.stdout or "") + (proc.stderr or ""))
+    out = "".join(s for s in (proc.stdout, proc.stderr) if isinstance(s, str))
+    return flag in out
 
 
 _FLAG_WARNED: set[str] = set()
