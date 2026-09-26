@@ -42,6 +42,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import fnmatch
+import functools
 import glob
 import hashlib
 import inspect
@@ -650,6 +651,34 @@ def resolve_dispatch_skills(verification_cfg: dict) -> bool:
     """
     project = (verification_cfg or {}).get("defaults") or {}
     return bool(project.get("dispatch_skills", False))
+
+
+@functools.lru_cache(maxsize=None)
+def claude_supports_flag(flag: str) -> bool:
+    """Whether the installed Claude Code CLI accepts *flag* (#3432).
+
+    Probed once per driver run from `claude --help`. A CLI that cannot be run
+    reads as not supporting anything: the dispatch then omits the flag and
+    fails on its own terms, not on an unknown option.
+    """
+    try:
+        proc = subprocess.run(
+            resolve_claude_cmd(["claude", "--help"]), capture_output=True,
+            text=True, check=False, timeout=30,
+        )
+    except Exception:  # noqa: BLE001 - a missing or broken CLI is "no"
+        return False
+    return flag in ((proc.stdout or "") + (proc.stderr or ""))
+
+
+_FLAG_WARNED: set[str] = set()
+
+
+def _warn_flag_unsupported(flag: str, consequence: str) -> None:
+    if flag in _FLAG_WARNED:
+        return
+    _FLAG_WARNED.add(flag)
+    print(f"   WARN: this Claude Code CLI does not accept {flag}; {consequence}")
 
 
 def resolve_post_merge_issue(verification_cfg: dict) -> bool:
@@ -4861,7 +4890,12 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
         # #3423: a dispatched unit invokes no skill, so the skills index is
         # fixed context paid on every turn. `defaults.dispatch_skills: true`
         # in verification.yml restores it (resolve_dispatch_skills).
-        cmd.insert(2, "--disable-slash-commands")
+        if claude_supports_flag("--disable-slash-commands"):
+            cmd.insert(2, "--disable-slash-commands")
+        else:
+            _warn_flag_unsupported(
+                "--disable-slash-commands",
+                "the skills index stays in the session prompt (#3432)")
     if wu.unsandboxed:
         # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
         # emitted in run()'s attempt loop; rationale lives in WU frontmatter.

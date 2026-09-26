@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **An older Claude Code CLI no longer fails every dispatch on `--disable-slash-commands`.** The flag was passed unconditionally; the driver now probes `claude --help` once per run and omits it, with one warning, when the CLI does not accept it. (#3432)
+
 ### Changed
 
 - **Dispatched sessions no longer read every rule file before acting.** The preamble opened with "Read `.specfuse/rules/` in full": ten files, 11,573 words, fetched by tool call at the start of every session on top of the 2,461 words `.claude/CLAUDE.md` already injects, then carried in every later turn's cache read. The binding block is the contract; the preamble now says so and a session reads a further rule file only when its unit body names it, as close and plan-next bodies already do. (#3422)
