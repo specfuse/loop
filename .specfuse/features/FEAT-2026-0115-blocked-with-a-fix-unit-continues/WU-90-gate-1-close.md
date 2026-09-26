@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0115/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.25.0
+started_at: 2026-09-26T17:24:07.889592+00:00
+duration_seconds: 551.591
+cost_usd: 2.503567
+input_tokens: 122
+output_tokens: 42257
 ---
 
 # Close gate 1 — a block that names its fix unit continues the gate

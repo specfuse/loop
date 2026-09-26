@@ -5,3 +5,4 @@
 - **FEAT-2026-0115/T04**: attempt 3 outcome=passed
 - **FEAT-2026-0115/T04**: attempt 3 outcome=spinning_detected
 - **FEAT-2026-0115/T04**: attempt 1 outcome=passed
+- **FEAT-2026-0115/G1-CLOSE**: attempt 1 outcome=passed
