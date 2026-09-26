@@ -112,6 +112,10 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-2026-0111) |
 | FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
+| FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | planned | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ detail](#feat-2026-0114) |
+| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | planned | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ detail](#feat-2026-0115) |
+| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | planned | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
+| FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1031,6 +1035,66 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
 
 **Status: active.**
+
+<a id="feat-2026-0114"></a>
+## FEAT-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
+
+**Why.** `produces:` is written before anyone has seen the solution. When the solution lands elsewhere, `resolve_produces_refusal` refuses the pass with `produces_not_in_diff` and the unit has no way to say the plan named the wrong file. The 2026-09-26 impact assessment found this the single largest mechanical spinner after the review's changes: five of the six units since 2026-09-10 that failed three times with an identical signature failed on this guard, across two repositories. Attempt 1 did verified work; attempts 2 and 3 changed nothing; the operator edited `produces:` by hand; the re-arm passed on the identical tree. Two defects compound it: the produces site is the one guard that never records into `refusal_history`, so the deterministic-refusal short-circuit cannot end it after two; and the repair note names `produces_unchanged:` without showing its shape (used in zero of nine repair attempts).
+
+**Goal.** A RESULT block may drop a declared path with a reason under `produces_amended:`; the driver rewrites the unit's `produces:`, records `produces_dropped:` on the unit and `produces_amended` on the event, and the judge sees every drop. The guard records its refusals so the second identical one is the last, and the repair note carries both escape hatches' YAML verbatim. Drop only, never add; an implementation unit may not amend itself to nothing. Kill switch `defaults.produces_amendable: false`.
+
+**Benefits.** The guard stops costing a human wait per plan-time misprediction. Baseline to beat: 6 units with repeated `produces_not_in_diff` in 16 days, all ending `blocked_human`.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode from the assessment's evidence; defaulted decisions are recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Adding paths from a RESULT; `produces_unchanged:` semantics; a planning-time lint for hedged declarations; the other three guard sites.
+
+**Status: planned.**
+
+<a id="feat-2026-0115"></a>
+## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
+
+**Why.** Agent-reported blocks are 45% of human waits on driver >= 0.19 and 48% of the idle that follows an escalation. Thirty of thirty-four came from one consumer repository; seventeen from one feature whose QA unit carried the trigger "if a finding is a generator defect, record it and block: the fix is a new unit before T18". The session obeyed, ten times: it diagnosed, drafted the fix unit, and stopped, and each stop waited hours for a human to flip a draft to `pending`, re-arm, and restart. `REPLAN_OPTION_SCOPE` does not even offer re-planning for this reason. FEAT-2026-0104's re-plan turn is the wrong tool: it rewrites a body and may not author units.
+
+**Goal.** A blocked RESULT may carry `blocked_next: {kind: fix_unit, file, id}` naming a drafted unit. Under `autonomy_default: auto`, the driver validates the draft with the plan-next draft lint and the arm predicate's stop classes (`judge_editing`, `decision_class_paths`, `drift_caps`, `missing_provenance`), inserts it ahead of the blocked unit, re-arms the blocked unit behind it, emits `fix_unit_inserted`, and continues. Two insertions per unit, the gate's `cost_budget_usd`, and any veto class refuse and fall back to today's escalation with the class named; under `review` the brief says the fix is drafted and one command arms it. `evaluate_auto_close` reads the event as off-plan, like `replan`.
+
+**Benefits.** The largest wait class disappears for the blocks the session already solved. Baseline: 34 `agent_reported_blocked` escalations, 51 idle hours, in 16 days.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Blocks without `blocked_next:` (no free-text parsing); the re-plan turn; gate-end arming and `plan-next`; parallel dispatch.
+
+**Status: planned.**
+
+<a id="feat-2026-0116"></a>
+## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
+
+**Why.** The spinning family is a third of human waits on driver >= 0.19 and 41% of post-escalation idle. #3414: two attempts, two different failing Maven tests, one signature, `"Tests"`, because the post-processed report prints `FAIL: Tests run: …` and the unittest regex takes the first word; $19.15 discarded, one attempt of budget unused. Package-qualified surefire lines miss the regex; pytest, vitest, dotnet and dart have no parser; the exhaustion escalation carries no signature at all (12 of 25 spinning escalations record `None`).
+
+**Goal.** For `failure_class: tests`, the signature is the sorted set of failing test ids extracted per runner from the report and the persisted full log, carried on the event as `failing_tests`; the repeat detector compares sets, so a changed set is progress and an equal set is a repeat (excerpt match as fallback when no set extracts); every spinning-family escalation carries the last attempt's evidence. `replay_spin.py` replays the rule over the corpus so the close can say how many past repeats were false.
+
+**Benefits.** The detector fires on real loops only. Baseline: 7 `spinning_signature_repeat` and 12 `spinning_detected` escalations in 16 days.
+
+**Shape.** Single gate, three units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Non-`tests` classes' signatures; the re-arm reproduction gate; a per-project granularity knob.
+
+**Status: planned.**
+
+<a id="feat-2026-0117"></a>
+## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
+
+**Why.** Close cost per feature doubled after the review (median $6 to $14) and the judge is not why ($0.46 per close); the re-runs are. 64% of post-review features close a gate twice or more, 39% three or more, and every re-close re-measures every criterion (#3313: FEAT-2026-0104 spent $31.47 closing against $17 building). `close-discipline.md` §§1, 5 already permit carrying a `narrow` green forward and the artifact exists (`GATE-NN-CRITERIA.md`, seeded by the driver, filled by the close, partitioned by `build_reverification_worklist`); what breaks the chain is the re-arm, whose skeleton step resets every entry with `attempt > current` (#3279) regardless of kind, and the worklist never checks `proved_at_sha` against the tree.
+
+**Goal.** A re-armed close keeps `narrow`/`pass` entries (`carried_from_attempt`), invalidates any whose driver-seeded `covers:` paths appear in the gate diff since `proved_at_sha`, re-measures broad entries and the `feature_oracle` as §1 binds, states `carried forward: N criteria, re-measured: M` in `## Measurements`, and shows the judge each carried entry with its sha. Kill switch `defaults.carry_forward_narrow_greens: false`.
+
+**Benefits.** The second close costs a fraction of the first. Target: median close cost per feature back under $8.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Caching the `feature_oracle` or broad gates across closes (a rule change); automatic re-arm after a judge lowering.
+
+**Status: planned.**
 
 ## Notes
 
