@@ -22,7 +22,7 @@ loop = load_loop()
 class TestCloseIntermediateInDicts(unittest.TestCase):
 
     def test_close_intermediate_in_model_by_type(self):
-        self.assertEqual(loop.MODEL_BY_TYPE["close-intermediate"], "opus")
+        self.assertEqual(loop.MODEL_BY_TYPE["close-intermediate"], "sonnet")
 
     def test_close_intermediate_in_effort_by_type(self):
         self.assertEqual(loop.EFFORT_BY_TYPE["close-intermediate"], "high")
@@ -52,5 +52,5 @@ class TestLoadWuCloseIntermediate(unittest.TestCase):
                    "depends_on": []}
             wu = loop.load_wu(Path(tmp), ref)
             self.assertEqual(wu.type, "close-intermediate")
-            self.assertEqual(wu.model, "opus")
+            self.assertEqual(wu.model, "sonnet")
             self.assertEqual(wu.effort, "high")

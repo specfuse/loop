@@ -687,9 +687,16 @@ MODEL_BY_TYPE = {
     "retrospective":     "sonnet",
     "lessons":           "sonnet",
     "docs":              "sonnet",
-    "plan-next":         "opus",
-    "close":             "opus",
-    "close-intermediate": "opus",
+    # #3425: closing sessions on sonnet. Opus was 56% of all spend while
+    # implementation ran on sonnet; the judge (JUDGE_MODEL, itself sonnet,
+    # lower-only, ~$0.46 per close) is the independent check on a close's
+    # measurements and lowered 9 of 54 verdicts correctly, so the close does
+    # not need a bigger model than the session that checks it. A unit's own
+    # `model:` still overrides; `judged` events carry `close_model` so
+    # agreement can be split by model.
+    "plan-next":         "sonnet",
+    "close":             "sonnet",
+    "close-intermediate": "sonnet",
 }
 EFFORT_BY_TYPE = {
     "implementation":    "medium",
@@ -9660,6 +9667,7 @@ def judge_close(
     payload: dict = {
         "gate": gate_number,
         "close_verdict": close_verdict,
+        "close_model": getattr(wu, "model", None),
         "judge_verdict": None,
         "verdict": close_verdict,
         "lowered": False,
