@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0115/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 7.00
 produces_driver_helper:
   - parse_blocked_next
@@ -12,6 +12,15 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/data/schemas/driver-event.schema.json
   - tests/test_fix_unit_insertion_e2e.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T16:07:55.668902+00:00
+duration_seconds: 704.898
+cost_usd: 3.486723
+input_tokens: 168
+output_tokens: 62635
 ---
 
 # A blocked RESULT that names a drafted fix unit is inserted and the gate continues

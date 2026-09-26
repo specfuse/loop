@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "A blocked RESULT that names a drafted fix unit is inserted and the gate continues",
+          "id": "FEAT-2026-0115/T01",
+          "planned_cost_usd": 7.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The arm predicate's stop classes and two caps decide whether the draft is inserted",
+          "id": "FEAT-2026-0115/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "An inserted unit is off-plan for auto-close, and the brief says why insertion did not happen",
+          "id": "FEAT-2026-0115/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document `blocked_next:` where the sessions and the authors read",
+          "id": "FEAT-2026-0115/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 a block that names its fix unit continues the gate",
+          "id": "FEAT-2026-0115/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

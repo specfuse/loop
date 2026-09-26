@@ -43,6 +43,33 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0115"></a>
+## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
+
+**Why.** Agent-reported blocks are 45% of human waits on driver >= 0.19 and 48% of the idle that follows an escalation. Thirty of thirty-four came from one consumer repository; seventeen from one feature whose QA unit carried the trigger "if a finding is a generator defect, record it and block: the fix is a new unit before T18". The session obeyed, ten times: it diagnosed, drafted the fix unit, and stopped, and each stop waited hours for a human to flip a draft to `pending`, re-arm, and restart. `REPLAN_OPTION_SCOPE` does not even offer re-planning for this reason. FEAT-2026-0104's re-plan turn is the wrong tool: it rewrites a body and may not author units.
+
+**Goal.** A blocked RESULT may carry `blocked_next: {kind: fix_unit, file, id}` naming a drafted unit. Under `autonomy_default: auto`, the driver validates the draft with the plan-next draft lint and the arm predicate's stop classes (`judge_editing`, `decision_class_paths`, `drift_caps`, `missing_provenance`), inserts it ahead of the blocked unit, re-arms the blocked unit behind it, emits `fix_unit_inserted`, and continues. Two insertions per unit, the gate's `cost_budget_usd`, and any veto class refuse and fall back to today's escalation with the class named; under `review` the brief says the fix is drafted and one command arms it. `evaluate_auto_close` reads the event as off-plan, like `replan`.
+
+**Benefits.** The largest wait class disappears for the blocks the session already solved. Baseline: 34 `agent_reported_blocked` escalations, 51 idle hours, in 16 days.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Blocks without `blocked_next:` (no free-text parsing); the re-plan turn; gate-end arming and `plan-next`; parallel dispatch.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+Observable only across repositories and over time (`close-discipline.md` §2).
+
+- [ ] Over the next ten features closed in this repo and the generator, count
+      `human_escalation` events with `reason: agent_reported_blocked` per
+      feature (baseline 1.21 per feature on driver >= 0.19, 3.26 in the
+      generator) and `fix_unit_inserted` events, and the share of blocks that
+      carried `blocked_next:`.
+- [ ] For every insertion, whether the terminal close or judge found the
+      inserted unit's work wanting (a finding naming its id).
+
 <a id="feat-2026-0114"></a>
 ## FEAT-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
 

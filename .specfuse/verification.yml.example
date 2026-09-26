@@ -136,12 +136,20 @@
 #                               # ignored and the path is judged as an
 #                               # unjustified unchanged deliverable instead
 #                               # (FEAT-2026-0114).
+#   fix_unit_insertion: true   # whether a blocked RESULT's `blocked_next:`
+#                               # may insert its drafted fix unit instead of
+#                               # escalating. Defaults to true (FEAT-2026-0115).
+#   max_fix_units_per_unit: 2  # cap on `fix_unit_inserted` insertions per
+#                               # blocked unit before it escalates instead
+#                               # (FEAT-2026-0115). Defaults to 2.
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
 #   dispatch_skills: false
 #   post_merge_issue: false
 #   produces_amendable: false
+#   fix_unit_insertion: true
+#   max_fix_units_per_unit: 2
 #
 # The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
 # `max_attempts` resolution and adds no config key of its own — a unit's

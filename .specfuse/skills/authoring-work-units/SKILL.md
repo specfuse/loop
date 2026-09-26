@@ -69,6 +69,10 @@ pre-existing unrelated state, a reasoned `status: blocked` with the evidence is 
 right move ([`../../rules/result-contract.md`](../../rules/result-contract.md)).
 *Prevents:* a doubtful pass that spends the gate's trust budget.
 
+When a trigger takes the form "block; the fix is a new unit," say the blocked
+session drafts that fix unit itself and names it in `blocked_next:` — the block
+costs no extra wait for a human or a later session to author it.
+
 ## 6. Sizing — one WU = one focused session's work
 
 A WU is crafted to land in a single fresh-session pass; the Ralph property (fresh

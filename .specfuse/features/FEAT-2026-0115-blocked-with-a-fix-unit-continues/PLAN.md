@@ -5,7 +5,7 @@ slug: blocked-with-a-fix-unit-continues
 branch: feat/FEAT-2026-0115-blocked-with-a-fix-unit-continues
 roadmap_goal: When a session reports `status: blocked` and hands the driver a drafted fix unit, the driver validates the draft, inserts it ahead of the blocked unit and keeps the gate running, so a defect the session already diagnosed costs no human wait.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 23.00
 ---
 
