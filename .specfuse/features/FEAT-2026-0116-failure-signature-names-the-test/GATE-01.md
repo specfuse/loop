@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_failure_signature_names_the_test -v -b"
 cost_budget_usd: 35.00
 baseline:
@@ -10,6 +10,14 @@ baseline:
   entry_sha: 8cd8e4508c82f73ac2fdbb883900d49117239f7d
   source: attributed:FEAT-2026-0116/T01
   failing: []
+broad_run:
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1164a5e093576c14cf2476fd8b809247ef2672c5:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:20416d5069e1abc4f39e755ecf525f09240a5199:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:32d472c085a48d546000431d0cac5b1117fb7802:45fc1aec6b9cb8bfc5073ad076dacada7201b19e:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:7d6ae5b2325e3c5c7c68771242767939deda2e5e:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d664745f3d8e8d366a9f5029d78452efa5fda16f:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  ran_at: 2026-09-26T18:12:27.321563+00:00
+  ok: false
+  failing:
+    - gate: security
+      failure_class: security
+      failure_signature: "Total lines skipped (#nosec): 0"
 ---
 
 # Gate 1 — the failure signature names the failing test
