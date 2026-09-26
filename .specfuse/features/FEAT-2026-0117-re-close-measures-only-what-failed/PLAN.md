@@ -94,16 +94,21 @@ gates:
       - id: FEAT-2026-0117/T02H
         file: WU-02H-tests-restore-the-working-directory.md
         depends_on: [FEAT-2026-0117/T02]
+      # hygiene 2 (same probe): the e2e helpers restored patches in insertion
+      # order, leaving the first fake dispatch installed for later modules.
+      - id: FEAT-2026-0117/T02H2
+        file: WU-02H2-patches-restored-in-reverse.md
+        depends_on: [FEAT-2026-0117/T02H]
       - id: FEAT-2026-0117/T03
         file: WU-03-carried-and-re-measured-on-the-close-and-the-judge.md
         depends_on: [FEAT-2026-0117/T01]
       - id: FEAT-2026-0117/T04
         file: WU-04-document-the-contract.md
-        depends_on: [FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T03]
+        depends_on: [FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T02H2, FEAT-2026-0117/T03]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0117/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0117/T01, FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T03, FEAT-2026-0117/T04]
+        depends_on: [FEAT-2026-0117/T01, FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T02H2, FEAT-2026-0117/T03, FEAT-2026-0117/T04]
 ```
 
 ## Scope boundary — explicitly OUT
