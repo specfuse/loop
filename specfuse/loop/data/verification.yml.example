@@ -124,10 +124,16 @@
 #                               # is fixed context paid on every turn (#3423).
 #                               # Set true for a project whose units call
 #                               # `/skill-name` in-session.
+#   post_merge_issue: false     # whether a `met` terminal close files PLAN.md's
+#                               # `## Post-merge checklist` as a tracked issue.
+#                               # Defaults to false (#3424): the checklist is
+#                               # appended under the feature's archived detail
+#                               # section in roadmap-archive.md instead.
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
 #   dispatch_skills: false
+#   post_merge_issue: false
 #
 # The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
 # `max_attempts` resolution and adds no config key of its own — a unit's
