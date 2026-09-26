@@ -1,11 +1,20 @@
 ---
 id: FEAT-2026-0116/T01H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/loop.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T18:13:12.416870+00:00
+duration_seconds: 250.114
+cost_usd: 0.161311
+input_tokens: 14
+output_tokens: 1120
 ---
 
 # The signature hash tail is not a security hash

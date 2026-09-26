@@ -2474,7 +2474,7 @@ def signature_from_failing_tests(ids: "list[str]") -> str:
     joined = ", ".join(ids)
     if len(joined) <= 100:
         return joined
-    digest = hashlib.sha1(joined.encode("utf-8")).hexdigest()[:8]
+    digest = hashlib.sha1(joined.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
     suffix = "…" + digest
     head = joined[:100 - len(suffix)]
     return head + suffix
