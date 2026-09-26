@@ -118,9 +118,16 @@
 #                               # attempt repairs the retained tree in place
 #                               # instead of re-authoring from scratch. Set to
 #                               # false to restore the pre-0.18 discard behaviour.
+#   dispatch_skills: false      # whether a dispatched session loads the
+#                               # project's skills index. Defaults to false:
+#                               # a work unit invokes no skill, and the index
+#                               # is fixed context paid on every turn (#3423).
+#                               # Set true for a project whose units call
+#                               # `/skill-name` in-session.
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
+#   dispatch_skills: false
 #
 # The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
 # `max_attempts` resolution and adds no config key of its own — a unit's
