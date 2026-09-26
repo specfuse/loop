@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.25.0+umbrella.0.15.0] - 2026-09-26
+
 ### Fixed
 
 - **An older Claude Code CLI no longer fails every dispatch on `--disable-slash-commands`.** The flag was passed unconditionally; the driver now probes `claude --help` once per run and omits it, with one warning, when the CLI does not accept it. (#3432)
