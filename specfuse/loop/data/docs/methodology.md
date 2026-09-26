@@ -391,11 +391,18 @@ after v2+ revisions ship.
 Every dispatched attempt emits exactly one `attempt_outcome` event to
 `events.jsonl`. The payload carries a standardized set of fields:
 `outcome`, `failure_class`, `failure_signature`, `failure_excerpt`,
-`cost_usd`, `duration_seconds`, `attempt`, and `re_arm_count`. For
-the field-by-field schema see
+`failing_tests`, `cost_usd`, `duration_seconds`, `attempt`, and
+`re_arm_count`. For the field-by-field schema see
 `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/PLAN.md`
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
+
+`failing_tests` is the sorted, de-duplicated list of failing test ids
+`extract_failing_tests` recognised in the gate report (empty when no
+runner-recognised per-test id was found); for `failure_class: tests`,
+`detect_spinning_signature_repeat` treats two non-empty `failing_tests`
+sets as the same failure iff they are equal as sets, ahead of the
+`(failure_class, failure_signature)` comparison (FEAT-2026-0116).
 
 `outcome` taxonomy, as `loop.py` actually emits it — thirteen values,
 bound to the emitter by `tests/test_attempt_outcome_contract.py`:

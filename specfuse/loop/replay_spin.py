@@ -171,15 +171,116 @@ def format_report(result: dict, driver_source: str, max_attempts) -> str:
     return "\n".join(lines)
 
 
+def replay_with_failing_sets(events_paths: "list[Path]") -> dict:
+    """Re-judge historical `spinning_signature_repeat` escalations under the
+    failing-set rule `detect_spinning_signature_repeat` gained in
+    FEAT-2026-0116/T02.
+
+    Old events predate the `failing_tests` payload field (bootstrap gap) and
+    the full gate log they came from is long gone, so the only surviving
+    evidence is each attempt's `failure_excerpt` — capped at 500 chars by
+    `extract_failure_excerpt` at emission time. This re-derives a failing set
+    from that excerpt with today's `extract_failing_tests` rather than
+    inventing a fresher source, and the returned `note` says so explicitly:
+    a truncated excerpt can legitimately fail to name a test the full log
+    would have, and that is a fact about the evidence, not a bug here.
+
+    For each `human_escalation` event with reason
+    `spinning_signature_repeat`, compares the failing sets re-derived from
+    the two `attempt_outcome` events immediately preceding it on the same
+    work unit (the attempt that tripped the halt, and the one before it).
+    `would_fire` is True when both sets are non-empty and equal, False when
+    both are non-empty and differ, and None (`classified: False`) when
+    either excerpt named no recognisable test id — the new rule cannot form
+    an opinion from evidence that thin, so this refuses to guess one.
+    """
+    from specfuse.loop.loop import extract_failing_tests
+
+    features: dict = {}
+    for path in events_paths:
+        feature_name = path.parent.name
+        per_wu_history: dict = {}
+        escalations = []
+        for line in path.read_text(errors="replace").splitlines():
+            try:
+                event = json.loads(line)
+            except ValueError:
+                continue
+            wu_id = event.get("correlation_id", "")
+            payload = event.get("payload") or {}
+            if event.get("event_type") == "attempt_outcome":
+                excerpt = payload.get("failure_excerpt") or ""
+                failing_set = set(extract_failing_tests(excerpt.splitlines()))
+                per_wu_history.setdefault(wu_id, []).append({
+                    "attempt": payload.get("attempt"),
+                    "failing_set": failing_set,
+                })
+            elif (event.get("event_type") == "human_escalation"
+                  and payload.get("reason") == "spinning_signature_repeat"):
+                history = per_wu_history.get(wu_id, [])
+                current = history[-1]["failing_set"] if history else set()
+                prior = history[-2]["failing_set"] if len(history) >= 2 else set()
+                classified = bool(current) and bool(prior)
+                would_fire = (current == prior) if classified else None
+                escalations.append({
+                    "wu_id": wu_id,
+                    "attempt": payload.get("attempts"),
+                    "fired_historically": True,
+                    "classified": classified,
+                    "would_fire": would_fire,
+                })
+        if escalations:
+            features[feature_name] = escalations
+    return {
+        "features": features,
+        "note": ("failing sets re-derived from each attempt's 500-char "
+                 "failure_excerpt persisted at emission time -- the full "
+                 "gate log behind old events is not retained, so an "
+                 "unclassified escalation may simply have had its failing "
+                 "test id truncated out of the excerpt."),
+    }
+
+
+def format_failing_sets_report(result: dict) -> str:
+    lines = [result["note"], ""]
+    if not result["features"]:
+        lines.append("no spinning_signature_repeat escalations found")
+        return "\n".join(lines)
+    for feature_name, escalations in sorted(result["features"].items()):
+        lines.append(feature_name)
+        for esc in escalations:
+            if not esc["classified"]:
+                verdict = "unclassified (no recognisable test id in excerpt)"
+            elif esc["would_fire"]:
+                verdict = "would_fire"
+            else:
+                verdict = "would_not_fire"
+            lines.append(f"  {esc['wu_id']}  attempt {esc['attempt']}  "
+                         f"fired historically -> {verdict}")
+    return "\n".join(lines)
+
+
 def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Replay a work unit's recorded attempts through the "
                     "current failure-signature parser.")
     parser.add_argument("feature_dir",
-                        help="path to a .specfuse/features/FEAT-... folder")
+                        help="path to a .specfuse/features/FEAT-... folder, "
+                             "or (with --failing-sets) a folder containing "
+                             "one such folder per feature")
     parser.add_argument("wu", nargs="?", default=None,
                         help="work-unit suffix to filter on, e.g. T04")
+    parser.add_argument("--failing-sets", action="store_true",
+                        help="replay historical spinning_signature_repeat "
+                             "escalations under the failing-set rule across "
+                             "every events.jsonl found under feature_dir")
     args = parser.parse_args(argv)
+
+    if args.failing_sets:
+        events_paths = sorted(Path(args.feature_dir).glob("*/events.jsonl"))
+        result = replay_with_failing_sets(events_paths)
+        print(format_failing_sets_report(result))
+        return 0 if result["features"] else 1
 
     from specfuse.loop import loop as driver
 

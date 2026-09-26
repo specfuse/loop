@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0116/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - replay_with_failing_sets
@@ -11,6 +11,15 @@ produces:
   - tests/test_replay_spin_failing_sets.py
   - docs/methodology.md
   - specfuse/loop/data/docs/methodology.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T18:05:01.444360+00:00
+duration_seconds: 183.257
+cost_usd: 0.853835
+input_tokens: 56
+output_tokens: 15440
 ---
 
 # Replay the new rule over the corpus, and document the field
