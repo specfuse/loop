@@ -3,6 +3,13 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_failure_signature_names_the_test -v -b"
 cost_budget_usd: 35.00
+baseline:
+  sha: 8cd8e4508c82f73ac2fdbb883900d49117239f7d
+  probed_at: 2026-09-26T17:40:41.245423+00:00
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:20416d5069e1abc4f39e755ecf525f09240a5199:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:45fc1aec6b9cb8bfc5073ad076dacada7201b19e:4acc6dfc5e8cece358c167d876515eba4a39a500:560c0be20a8e47a0c76f567ff4bce78a94bed00f:5ff66b6e4d8a264f23709ea60706111a4c59ed11:662a4042ebada7ecfb668af3ebbaf7002ce2d4b3:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:a122d1db4fd063b79f10e884eb141d8209a59054:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d664745f3d8e8d366a9f5029d78452efa5fda16f:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  entry_sha: 8cd8e4508c82f73ac2fdbb883900d49117239f7d
+  source: attributed:FEAT-2026-0116/T01
+  failing: []
 ---
 
 # Gate 1 — the failure signature names the failing test
