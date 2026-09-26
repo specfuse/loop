@@ -114,7 +114,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
 | FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
 | FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
-| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | planned | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
+| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | active | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -1049,7 +1049,7 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 
 **Scope boundary — deliberately out.** Non-`tests` classes' signatures; the re-arm reproduction gate; a per-project granularity knob.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0117"></a>
 ## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
