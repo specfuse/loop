@@ -222,6 +222,17 @@ green would be an unsound coverage claim; it re-runs on every close attempt.
 inferred by a reader, the same posture §2 already takes on the hedged-record
 `kind:`. `specfuse lint --closing` is the check.
 
+**A carried `narrow` green is invalidated when the criterion's covered paths
+changed since it was proved.** Each entry may carry a driver-seeded `covers:`
+— the path(s) its oracle actually exercises. On a re-close, a carried entry's
+`narrow` green is invalidated (re-measured, not trusted) when the gate diff
+since that entry's `proved_at_sha` touches a path in its `covers:`. A
+criterion with no derivable `covers:` is never carried — it re-measures on
+every close attempt, the same as a `broad` entry. A carried entry also
+carries `carried_from_attempt`, the attempt number whose run proved it. A
+re-close's `## Measurements` states how much of the gate's state was inherited
+versus fresh: `carried forward: N criteria, re-measured: M`.
+
 ## Split with project-local rules
 
 These are the generic obligations. The concrete grounding — which command is

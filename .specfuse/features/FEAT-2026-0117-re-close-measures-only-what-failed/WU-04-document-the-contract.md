@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0117/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - .specfuse/rules/close-discipline.md
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/data/docs/methodology.md
   - .specfuse/verification.yml.example
   - specfuse/loop/data/verification.yml.example
+duration_seconds: 344.854
+cost_usd: 0.692671
+input_tokens: 46
+output_tokens: 7470
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T19:28:16.256225+00:00
 ---
 
 # Document the carry-forward rule where closes and authors read it

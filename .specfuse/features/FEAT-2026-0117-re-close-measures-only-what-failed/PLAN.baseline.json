@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "A re-armed close keeps the narrow greens the first close proved",
+          "id": "FEAT-2026-0117/T01",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A carried green is invalidated when the gate diff touches a path it covers",
+          "id": "FEAT-2026-0117/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "The close states what it carried; the judge sees it",
+          "id": "FEAT-2026-0117/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Document the carry-forward rule where closes and authors read it",
+          "id": "FEAT-2026-0117/T04",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 a re-close measures only what failed",
+          "id": "FEAT-2026-0117/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

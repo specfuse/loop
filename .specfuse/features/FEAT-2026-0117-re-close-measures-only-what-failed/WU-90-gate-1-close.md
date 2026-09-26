@@ -1,10 +1,35 @@
 ---
 id: FEAT-2026-0117/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
+verdict: met
 planned_cost_usd: 5.00
 auto_close_disabled: true
+duration_seconds: 324.404
+cost_usd: 1.949675
+input_tokens: 100
+output_tokens: 26757
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-09-26T19:49:05+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 1.597012
+    prior_duration_seconds: 591.147
+    reason: "The close was right: T02H's events were missing because an operator git checkout discarded them mid-run. Restored from the unit's driver-stamped frontmatter (marked restored in the payload); nothing else changed."
+cumulative_cost_usd: 1.597012
+cumulative_duration_seconds: 591.147
+cumulative_input_tokens: 74
+cumulative_output_tokens: 27173
+cumulative_attempts: 1
+folded_through_re_arm: 1
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.25.0
+started_at: 2026-09-26T19:49:06.452425+00:00
 ---
 
 # Close gate 1 — a re-close measures only what failed

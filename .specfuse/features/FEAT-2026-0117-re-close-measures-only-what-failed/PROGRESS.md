@@ -1,0 +1,9 @@
+- **FEAT-2026-0117/T01**: attempt 1 outcome=passed
+- **FEAT-2026-0117/T02**: attempt 1 outcome=passed
+- **FEAT-2026-0117/T03**: attempt 1 outcome=passed
+- **FEAT-2026-0117/T02H**: attempt 1 outcome=passed
+- **FEAT-2026-0117/T02H2**: attempt 1 outcome=passed
+- **FEAT-2026-0117/T04**: attempt 1 outcome=passed
+- **FEAT-2026-0117/G1-CLOSE**: Re-ran the feature_oracle and all 19 gate-1 criteria oracles fresh (all PASS) and recorded per-criterion state in GATE-01-CRITERIA.md, but cost reconciliation (criterion 3) cannot be built — events.jsonl has no event at all for FEAT-2026-0117/T02H, which reports status:done.
+  - note: WU-02H-tests-restore-the-working-directory.md's frontmatter (started_at, duration_seconds: 35.798, cost_usd: 0.180382, attempts: 1) has the numbers events.jsonl is missing — a fix could backfill the missing task_started/attempt_outcome/task_completed triplet for T02H from that frontmatter, or the cost-analysis check could fall back to WU frontmatter when events.jsonl is silent for a done WU.
+- **FEAT-2026-0117/G1-CLOSE**: attempt 1 outcome=passed

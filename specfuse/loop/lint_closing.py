@@ -345,6 +345,40 @@ def check_feature_oracle_verdict_recorded(req: creq.Requirement, ctx: ClosingCon
     )
 
 
+def check_carry_summary_recorded(req: creq.Requirement, ctx: ClosingContext):
+    """The `## Measurements` carry-accounting line, when the criteria
+    artifact carries anything forward (T03).
+
+    Scoped by `applies_when="criteria_artifact_present"`, same as close-l:
+    a gate with no `GATE-NN-CRITERIA.md` imposes no requirement here. Among
+    gates that do have one, only a criteria file with a `carried_from_attempt`
+    entry adds the obligation — `creq.carry_summary_is_required` is the same
+    predicate `render_carry_summary`'s caller uses, so lint and the close
+    agree on when the line is owed.
+    """
+    if ctx.gate_num is None:
+        return None
+    path = ctx.feature_dir / criteria_state.criteria_filename(ctx.gate_num)
+    if not path.is_file():
+        return None
+    entries = criteria_state.parse_criteria_state(path.read_text())
+    if not creq.carry_summary_is_required(entries):
+        return True, ""
+    retro = ctx.feature_dir / creq.RETROSPECTIVE_FILENAME
+    if not retro.exists():
+        return True, ""  # assert_retrospective_exists already covers this
+    retro_text = retro.read_text()
+    section = slice_wu_section(retro_text, MEASUREMENTS_SECTION) or retro_text
+    expected = creq.render_carry_summary(entries)
+    if expected in section:
+        return True, ""
+    return False, (
+        f"gate {ctx.gate_num} carries a criterion forward but "
+        f"{creq.RETROSPECTIVE_FILENAME}'s '{MEASUREMENTS_SECTION}' section "
+        f"has no {expected!r} line"
+    )
+
+
 def _check_followups_recorded(req: creq.Requirement, ctx: ClosingContext):
     if ctx.wfm.get("verdict") != "not_met":
         return None
@@ -426,6 +460,7 @@ _CHECKS = {
     "check_criteria_state_well_formed": check_criteria_state_well_formed,
     "assert_followups_recorded": _check_followups_recorded,
     "check_feature_oracle_verdict_recorded": check_feature_oracle_verdict_recorded,
+    "check_carry_summary_recorded": check_carry_summary_recorded,
 }
 
 

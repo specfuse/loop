@@ -335,13 +335,36 @@ def build_judge_bundle(
     )
 
 
+#: Heading for the carried-entries sub-list `_render_criteria` appends
+#: (FEAT-2026-0117/T03) — named so a judge who does not trust a carried
+#: green can find its `proved_at_sha` without re-reading the full list above.
+CARRIED_ENTRIES_HEADING = "Carried forward from a previous attempt"
+
+
+def _render_carried_entries(carried: list[CriterionStateEntry]) -> str:
+    lines = [f"### {CARRIED_ENTRIES_HEADING}", ""]
+    for entry in carried:
+        line = (
+            f"- **{entry.criterion_id}** — proved_at_sha: "
+            f"`{entry.proved_at_sha or '(none)'}`"
+        )
+        if entry.covers:
+            line += f", covers: {', '.join(entry.covers)}"
+        lines.append(line)
+    return "\n".join(lines) + "\n"
+
+
 def _render_criteria(criteria: list[CriterionStateEntry]) -> str:
     if not criteria:
         return (
             "No per-criterion state was recorded for this gate. Judge from the "
             "definition of done, the diff, and the measurements below.\n"
         )
-    return criteria_state.render_criteria_state(criteria)
+    rendered = criteria_state.render_criteria_state(criteria)
+    carried = [c for c in criteria if c.carried_from_attempt is not None]
+    if carried:
+        rendered += "\n" + _render_carried_entries(carried)
+    return rendered
 
 
 def render_judge_prompt(bundle: JudgeBundle) -> str:

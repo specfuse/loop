@@ -142,6 +142,13 @@
 #   max_fix_units_per_unit: 2  # cap on `fix_unit_inserted` insertions per
 #                               # blocked unit before it escalates instead
 #                               # (FEAT-2026-0115). Defaults to 2.
+#   carry_forward_narrow_greens: true  # whether a re-close may carry forward a
+#                               # prior attempt's `narrow` GATE-NN-CRITERIA.md
+#                               # green instead of re-measuring it. Defaults to
+#                               # true. A carried green still invalidates when
+#                               # the gate diff since its `proved_at_sha`
+#                               # touches a path in its `covers:` — see
+#                               # `.specfuse/rules/close-discipline.md` §5.
 # defaults:
 #   max_attempts: 3
 #   retain_on_guard_refusal: true
@@ -150,6 +157,7 @@
 #   produces_amendable: false
 #   fix_unit_insertion: true
 #   max_fix_units_per_unit: 2
+#   carry_forward_narrow_greens: true
 #
 # The re-plan-after-two-failures behaviour (FEAT-2026-0104) reads this same
 # `max_attempts` resolution and adds no config key of its own — a unit's
