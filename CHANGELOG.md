@@ -26,11 +26,14 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.26.0+umbrella.0.15.0] - 2026-09-26
+
 ### Added
 
 - **A justified attempt can amend its own `produces:` declaration.** A RESULT block may now drop a declared `produces:` path under `produces_amended:` with a reason, when the attempt passed verification but solved the unit elsewhere; the unit’s `produces:` is rewritten without the dropped path, the drop is recorded as `produces_dropped:` and shown to the judge, and a second identical `produces_not_in_diff` refusal now records into `refusal_history` so a third dispatch never happens. `defaults.produces_amendable: false` in `verification.yml` restores today’s refusal. (FEAT-2026-0114)
 - **A blocked work unit that names a drafted fix unit no longer waits for a human.** A `blocked` RESULT may now carry `blocked_next: {kind: fix_unit, file, id}` naming a drafted fix unit; under `autonomy_default: auto` the driver validates the draft against the same checks a plan-next draft gets, inserts it ahead of the blocked unit, re-arms the blocked unit behind it, and continues — recording a `fix_unit_inserted` event, with no `human_escalation`. Two insertions per blocked unit; `defaults.fix_unit_insertion: false` and `defaults.max_fix_units_per_unit` in `verification.yml` control it. (FEAT-2026-0115)
 - **A `tests` gate failure signs itself with the failing test ids, not the first line of the report.** `attempt_outcome` gains `failing_tests` (the sorted, per-runner-extracted set — unittest, pytest, Maven surefire, vitest/jest, dotnet, dart, bats); `detect_spinning_signature_repeat` now compares that set so two attempts failing different tests are progress, not a spin, falling back to today's signature-and-excerpt comparison only when a set could not be extracted; the `spinning_detected` / `spinning_signature_repeat` escalation payloads carry the last attempt's class, signature and failing set; and `python3 -m specfuse.loop.replay_spin --failing-sets` replays the new rule over recorded history. (FEAT-2026-0116)
+- **A re-close measures only what failed.** A re-armed `close` keeps the `narrow` criteria an earlier close proved green in `GATE-NN-CRITERIA.md` (`carried_from_attempt`), invalidates a carried green when the gate diff since its `proved_at_sha` touches a path in its driver-seeded `covers:` (`invalidated_by`), and re-measures broad entries and the `feature_oracle` as before; the close states `carried forward: N criteria, re-measured: M` in `## Measurements` and the judge bundle lists carried entries with their sha. `defaults.carry_forward_narrow_greens: false` restores the full re-measure. (FEAT-2026-0117)
 
 ## [0.25.0+umbrella.0.15.0] - 2026-09-26
 
