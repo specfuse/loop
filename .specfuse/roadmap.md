@@ -114,7 +114,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
 | FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
 | FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
-| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | active | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
+| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -1033,21 +1033,6 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Risk accepted deliberately.** This has an agent assigning the value that gates unattended merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the rubric is the operator's, low confidence fails closed, the label stays visible and human-overridable, and `max_open_prs` (#3351) plus `max_diff_lines` cap blast radius regardless. Autonomy is `review` rather than `auto` for this reason — a wrong arm on a marker format change orphans every issue written under it.
 
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
-
-**Status: active.**
-
-<a id="feat-2026-0116"></a>
-## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
-
-**Why.** The spinning family is a third of human waits on driver >= 0.19 and 41% of post-escalation idle. #3414: two attempts, two different failing Maven tests, one signature, `"Tests"`, because the post-processed report prints `FAIL: Tests run: …` and the unittest regex takes the first word; $19.15 discarded, one attempt of budget unused. Package-qualified surefire lines miss the regex; pytest, vitest, dotnet and dart have no parser; the exhaustion escalation carries no signature at all (12 of 25 spinning escalations record `None`).
-
-**Goal.** For `failure_class: tests`, the signature is the sorted set of failing test ids extracted per runner from the report and the persisted full log, carried on the event as `failing_tests`; the repeat detector compares sets, so a changed set is progress and an equal set is a repeat (excerpt match as fallback when no set extracts); every spinning-family escalation carries the last attempt's evidence. `replay_spin.py` replays the rule over the corpus so the close can say how many past repeats were false.
-
-**Benefits.** The detector fires on real loops only. Baseline: 7 `spinning_signature_repeat` and 12 `spinning_detected` escalations in 16 days.
-
-**Shape.** Single gate, three units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
-
-**Scope boundary — deliberately out.** Non-`tests` classes' signatures; the re-arm reproduction gate; a per-project granularity knob.
 
 **Status: active.**
 

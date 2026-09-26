@@ -5,7 +5,7 @@ slug: failure-signature-names-the-test
 branch: feat/FEAT-2026-0116-failure-signature-names-the-test
 roadmap_goal: A `tests` failure's signature is the set of failing test ids on every runner the loop meets, and the spinning detector treats a changed set as progress, so `spinning_signature_repeat` fires on a real repeat and never on a run-level summary.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 19.00
 ---
 
