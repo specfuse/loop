@@ -1041,7 +1041,7 @@ def check_produces_satisfiability(feature_dir: Path, gates: list) -> None:
 
 # Ceremony-proportionality threshold (docs/methodology.md §6): one fact, one
 # home. Referenced, not redefined, in the draft-feature skill.
-GATE_PROPORTIONALITY_THRESHOLD = 8
+GATE_PROPORTIONALITY_THRESHOLD = 12  # was 8 until #3426
 GATE_PROPORTIONALITY_SUBSTANTIVE_TYPES = frozenset(
     {"implementation", "qa_authoring", "qa_execution", "qa_curation"}
 )

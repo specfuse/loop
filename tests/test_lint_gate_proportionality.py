@@ -100,7 +100,7 @@ class TestLintGateProportionality(unittest.TestCase):
             ]
             self.assertEqual(len(warns), 1, f"out={out!r}")
             self.assertIn("6", warns[0])
-            self.assertIn("8", warns[0])
+            self.assertIn("12", warns[0])
 
     def test_small_feature_one_gate_clean(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -114,13 +114,28 @@ class TestLintGateProportionality(unittest.TestCase):
             out = self._run(feature)
             self.assertNotIn("WARN", out)
 
-    def test_nine_units_two_gates_clean(self):
+    def test_nine_units_two_gates_warns_since_the_line_moved_to_twelve(self):
+        # #3426: 9 substantive units sat just over the old line of 8.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            feature = _make_feature(
+                tmpdir,
+                [["implementation"] * 5, ["implementation"] * 4],
+            )
+            out = self._run(feature)
+            warns = [
+                line for line in out.splitlines()
+                if "WARN" in line and "planned substantive WU count" in line
+            ]
+            self.assertEqual(len(warns), 1, f"out={out!r}")
+            self.assertIn("9", warns[0])
+
+    def test_thirteen_units_two_gates_clean(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             feature = _make_feature(
                 tmpdir,
                 [
-                    ["implementation"] * 5,
-                    ["implementation"] * 4,
+                    ["implementation"] * 7,
+                    ["implementation"] * 6,
                 ],
             )
             out = self._run(feature)
