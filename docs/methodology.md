@@ -478,6 +478,13 @@ driver accept it, dropping the path into `produces_dropped` on the unit.
 Default `false` — an unrecognized amendment is judged as an unjustified
 unchanged deliverable (`.specfuse/rules/result-contract.md`).
 
+**A block may name its own fix (FEAT-2026-0115).** A `blocked` RESULT's
+`blocked_next:` names a drafted fix unit; once the arm checks clear, the
+driver inserts it ahead of the blocked unit and emits `fix_unit_inserted` to
+`events.jsonl` on re-arm. `defaults.fix_unit_insertion: true` in
+`verification.yml` gates the feature accepting one at all;
+`defaults.max_fix_units_per_unit: 2` caps insertions per blocked unit.
+
 **Closing sessions run on sonnet (#3425).** `close`, `close-intermediate`
 and `plan-next` default to `sonnet` at effort `high`, the same model as the
 judge that checks them (lower-only, about $0.46 per close). Opus was 56% of

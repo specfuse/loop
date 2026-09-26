@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0115/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - .specfuse/rules/result-contract.md
@@ -24,6 +24,21 @@ re_arm_history:
     prior_cost_usd: 2.776901
     prior_duration_seconds: 1163.681
     reason: "produces: named the synced copy .specfuse/skills/.../SKILL.md, which criterion 3's sync-scaffold.sh overwrites from plugins/ on every attempt (drafting error). Canonical plugins path added; retained tree from attempt 2 passed verification."
+cumulative_cost_usd: 0.0
+cumulative_duration_seconds: 0.0
+cumulative_input_tokens: 0
+cumulative_output_tokens: 0
+cumulative_attempts: 3
+cost_usd: 0.388923
+duration_seconds: 535.268
+input_tokens: 40
+output_tokens: 4395
+folded_through_re_arm: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T17:11:02.626073+00:00
 ---
 
 # Document `blocked_next:` where the sessions and the authors read
