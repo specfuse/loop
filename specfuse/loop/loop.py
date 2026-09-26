@@ -4439,8 +4439,9 @@ def squash_commit(
 # --------------------------------------------------------------------------- #
 
 PROMPT_PREAMBLE = """\
-You are executing a single Specfuse work unit. Read .specfuse/rules/ in full before \
-acting; they are binding. Do NOT run any git command — the driver owns all commits \
+You are executing a single Specfuse work unit. The binding rules are already in \
+your context through .claude/CLAUDE.md; read a further file under .specfuse/rules/ \
+only when your unit body names it. Do NOT run any git command — the driver owns all commits \
 and bookkeeping. Edit files only. Verification is tiered: before you report, run \
 only the per-attempt (narrow) tier yourself — your unit type's gate set in \
 .specfuse/verification.yml minus every gate declaring `tier: broad`, with the \
