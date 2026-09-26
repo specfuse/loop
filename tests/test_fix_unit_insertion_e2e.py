@@ -31,7 +31,7 @@ from tests._workspace import integration_workspace, write_stub_deliverable
 
 loop = load_loop()
 
-_FEATURE_ID = "FEAT-TEST-0115"
+_FEATURE_ID = "FEAT-2026-9915"
 _SLUG = "fix-unit-insertion"
 _BRANCH = f"feat/{_FEATURE_ID}-{_SLUG}"
 _T01_ID = f"{_FEATURE_ID}/T01"
@@ -109,6 +109,9 @@ def _scaffold(root: Path, *, autonomy_default: str = "auto",
         "  - gate: 1\n"
         "    file: GATE-01.md\n"
         "    work_units:\n"
+        f"      - id: {_FEATURE_ID}/T00\n"
+        "        file: WU-00-filler.md\n"
+        "        depends_on: []\n"
         f"      - id: {_T01_ID}\n"
         "        file: WU-01-T01.md\n"
         "        depends_on: []\n"
@@ -116,10 +119,19 @@ def _scaffold(root: Path, *, autonomy_default: str = "auto",
     )
     (fdir / "GATE-01.md").write_text(
         "---\ngate: 1\nstatus: open\n---\n\n# Gate 1\n")
+    # A second baseline WU (already `done`) so the arm predicate's drift-cap
+    # class (FEAT-2026-0115/T02) has a baseline count > 1 to compare a single
+    # inserted fix unit against — with only T01 in the baseline, ANY
+    # insertion would exceed the 0.5x count ceiling and refuse.
+    (fdir / "WU-00-filler.md").write_text(
+        f"---\nid: {_FEATURE_ID}/T00\ntype: implementation\n"
+        "status: done\nattempts: 1\nplanned_cost_usd: 2.0\n"
+        f"---\n\n# T00\n\nAlready-done filler baseline unit.\n"
+    )
     (fdir / "WU-01-T01.md").write_text(
         f"---\nid: {_T01_ID}\ntype: implementation\n"
         "model: claude-haiku-4-5-20251001\nstatus: pending\nattempts: 0\n"
-        "max_attempts: 3\n"
+        "max_attempts: 3\nplanned_cost_usd: 2.0\n"
         f"---\n\n# T01\n\nDo the thing.\n"
     )
     if with_draft:
@@ -127,7 +139,13 @@ def _scaffold(root: Path, *, autonomy_default: str = "auto",
             f"---\nid: {_T05_ID}\ntype: implementation\n"
             "model: claude-haiku-4-5-20251001\nstatus: draft\nattempts: 0\n"
             "provenance: drafted by T01's blocked session\n"
-            f"---\n\n# T05\n\nFix the generator defect T01 hit.\n"
+            "planned_cost_usd: 1.0\n"
+            f"---\n\n# T05\n\n"
+            "## Context\n\nFix the generator defect T01 hit.\n\n"
+            "## Acceptance criteria\n\n1. The defect is fixed.\n\n"
+            "## Do not touch\n\nNothing else.\n\n"
+            "## Verification\n\nThe `code` gates.\n\n"
+            "## Escalation triggers\n\nNone expected.\n"
         )
     subprocess.run(["git", "-C", str(root), "add", "."], check=True)
     subprocess.run(["git", "-C", str(root), "commit", "-q", "-m",

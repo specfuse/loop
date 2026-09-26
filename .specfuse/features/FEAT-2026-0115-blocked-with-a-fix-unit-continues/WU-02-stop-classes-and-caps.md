@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0115/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces_driver_helper:
   - evaluate_fix_unit_insertion
@@ -22,6 +22,21 @@ re_arm_history:
     prior_cost_usd: 1.258667
     prior_duration_seconds: 359.74
     reason: "Both sessions reported status: blocked with a real reason (the unit forbade the edits its own design needed); the driver read the block-scalar RESULT as complete (#3436) and escalated as a spin. Unit re-scoped to write-then-evaluate; override because the escalated signature is the parse defect, not the unit."
+cumulative_cost_usd: 0.0
+cumulative_duration_seconds: 0.0
+cumulative_input_tokens: 0
+cumulative_output_tokens: 0
+cumulative_attempts: 2
+cost_usd: 3.124199
+duration_seconds: 685.709
+input_tokens: 156
+output_tokens: 58420
+folded_through_re_arm: 1
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T16:35:06.002763+00:00
 ---
 
 # The arm predicate's stop classes and two caps decide whether the draft is inserted

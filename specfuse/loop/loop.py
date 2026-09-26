@@ -1658,6 +1658,17 @@ def resolve_fix_unit_insertion(cfg: "dict | None" = None) -> bool:
     return (cfg.get("defaults") or {}).get("fix_unit_insertion", True) is not False
 
 
+def resolve_max_fix_units_per_unit(cfg: "dict | None" = None) -> int:
+    """Cap on `fix_unit_inserted` insertions per blocked unit
+    (FEAT-2026-0115/T02). Reads `verification.yml` `defaults.
+    max_fix_units_per_unit` — default 2, same project-default precedence
+    tier as `resolve_fix_unit_insertion`."""
+    if cfg is None:
+        cfg = load_verification()
+    val = (cfg.get("defaults") or {}).get("max_fix_units_per_unit", 2)
+    return val if isinstance(val, int) and not isinstance(val, bool) else 2
+
+
 class FixUnitInsertionError(ValueError):
     """Raised by `insert_fix_unit` when the drafted fix unit, or PLAN.md's
     graph, fails validation (FEAT-2026-0115/T01). Callers must fall back to
@@ -1776,27 +1787,132 @@ def _insert_plan_graph_entry(
     return rendered + ("\n" if plan_text.endswith("\n") else "")
 
 
-def insert_fix_unit(
+def _remove_plan_graph_entry(
+    plan_text: str, gate_number: int, blocked_id: str, new_id: str,
+) -> str:
+    """Reverse of `_insert_plan_graph_entry` (FEAT-2026-0115/T02): drop
+    `new_id`'s own entry from gate `gate_number`'s `work_units:` list, and
+    strip `new_id` back out of `blocked_id`'s `depends_on:` list.
+
+    Used when `evaluate_fix_unit_insertion` refuses a draft that was already
+    written into the graph — the draft file itself is left untouched
+    (`status: draft`), only the graph edit made ahead of evaluation is undone.
+    Same targeted line-surgery approach as the function it reverses, so every
+    other line in the file is copied through unchanged.
+    """
+    lines = plan_text.splitlines()
+    n = len(lines)
+
+    gate_start = None
+    gate_indent = None
+    for i, line in enumerate(lines):
+        m = _PLAN_GATE_LINE_RE.match(line)
+        if m and int(m.group(2)) == gate_number:
+            gate_start = i
+            gate_indent = len(m.group(1))
+            break
+    if gate_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md graph has no '- gate: {gate_number}' entry")
+
+    gate_end = n
+    for i in range(gate_start + 1, n):
+        m = _PLAN_GATE_LINE_RE.match(lines[i])
+        if m and len(m.group(1)) <= gate_indent:
+            gate_end = i
+            break
+
+    wu_start = None
+    for i in range(gate_start, gate_end):
+        if _PLAN_WORK_UNITS_RE.match(lines[i]):
+            wu_start = i
+            break
+    if wu_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md gate {gate_number} has no 'work_units:' key")
+
+    entry_indent = None
+    blocked_entry_start = None
+    blocked_entry_end = None
+    new_entry_start = None
+    new_entry_end = None
+    i = wu_start + 1
+    while i < gate_end:
+        m = _PLAN_ENTRY_ID_RE.match(lines[i])
+        if m and (entry_indent is None or len(m.group(1)) == entry_indent):
+            entry_indent = len(m.group(1))
+            entry_start = i
+            j = i + 1
+            while j < gate_end:
+                jm = _PLAN_ENTRY_ID_RE.match(lines[j])
+                if jm and len(jm.group(1)) == entry_indent:
+                    break
+                j += 1
+            if m.group(2) == blocked_id:
+                blocked_entry_start, blocked_entry_end = entry_start, j
+            elif m.group(2) == new_id:
+                new_entry_start, new_entry_end = entry_start, j
+            i = j
+        else:
+            i += 1
+
+    if blocked_entry_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md gate {gate_number} has no entry for {blocked_id}")
+    if new_entry_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md gate {gate_number} has no entry for {new_id}")
+
+    depends_on_idx = None
+    for k in range(blocked_entry_start, blocked_entry_end):
+        dm = _PLAN_DEPENDS_ON_RE.match(lines[k])
+        if dm:
+            depends_on_idx = k
+            dm_indent, dm_value = dm.group(1), dm.group(2)
+            break
+    if depends_on_idx is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md entry for {blocked_id} has no single-line "
+            f"'depends_on: [...]' field — cannot remove {new_id} from it "
+            f"without a YAML round-trip"
+        )
+
+    inner = dm_value[1:-1].strip()
+    items = [it.strip() for it in inner.split(",") if it.strip()] if inner else []
+    items = [it for it in items if it != new_id]
+    new_depends_line = f"{dm_indent}depends_on: [{', '.join(items)}]"
+
+    out_lines = list(lines)
+    out_lines[depends_on_idx] = new_depends_line
+    del out_lines[new_entry_start:new_entry_end]
+    rendered = "\n".join(out_lines)
+    return rendered + ("\n" if plan_text.endswith("\n") else "")
+
+
+def write_fix_unit_draft_entry(
     feature_dir: Path,
     plan_path: Path,
     gate: "GateNode",
     blocked_wu: WorkUnit,
     draft: dict,
 ) -> dict:
-    """Insert a drafted fix unit ahead of `blocked_wu` in `gate`'s PLAN.md
-    graph, flip the draft `draft -> pending`, and re-arm `blocked_wu`
-    (`status: pending`, `re_arm_count` incremented) — FEAT-2026-0115/T01.
+    """Step 1 of drafted fix-unit insertion (FEAT-2026-0115/T02, splitting
+    T01's `insert_fix_unit`): write the draft into `gate`'s PLAN.md graph
+    ahead of `blocked_wu`, appending its id onto `blocked_wu`'s
+    `depends_on:`. The draft file itself is untouched — `status: draft`
+    stays — and `blocked_wu` is not re-armed yet; both happen only once
+    `evaluate_fix_unit_insertion` returns `ok`, in `finalize_fix_unit_insertion`.
 
     `draft` is `parse_blocked_next`'s return: `{kind, file, id}`. Validates
-    the draft file exists in `feature_dir` with a matching `id:`,
-    `status: draft`, and a non-empty `provenance:` before any write.
-    Performs the writes in file order (PLAN.md, then the draft, then
-    `blocked_wu`) so a failure partway leaves the earliest-possible state on
-    disk. Callers own events.jsonl, PROGRESS.md, the commit, and refreshing
-    the in-memory `units`/`wu` — this function only writes files.
+    the draft file exists in `feature_dir` with a matching `id:` and
+    `status: draft` before any write — structural failures the evaluator has
+    no business judging. Provenance is deliberately NOT checked here: an
+    empty `provenance:` is the evaluator's `missing_provenance` class to
+    catch, with the graph entry already in place so `evaluate_arm_predicate`
+    can see it.
 
-    Returns `{"fix_unit_id", "file", "insertion_count"}`. Raises
-    FixUnitInsertionError on any validation failure, before any write.
+    Returns the draft's frontmatter dict. Raises FixUnitInsertionError on any
+    validation failure, before any write.
     """
     draft_path = feature_dir / draft["file"]
     if not draft_path.is_file():
@@ -1815,16 +1931,45 @@ def insert_fix_unit(
             f"{draft['file']}: status is {draft_fm.get('status')!r}, must "
             f"be 'draft'"
         )
-    if not draft_fm.get("provenance"):
-        raise FixUnitInsertionError(
-            f"{draft['file']}: missing non-empty 'provenance:' frontmatter"
-        )
 
     plan_text = plan_path.read_text()
     new_plan_text = _insert_plan_graph_entry(
         plan_text, gate.number, blocked_wu.wu_id, draft["id"], draft["file"])
     plan_path.write_text(new_plan_text)
 
+    return draft_fm
+
+
+def revert_fix_unit_draft_entry(
+    plan_path: Path,
+    gate: "GateNode",
+    blocked_wu: WorkUnit,
+    draft: dict,
+) -> None:
+    """Undo `write_fix_unit_draft_entry` after `evaluate_fix_unit_insertion`
+    refuses (FEAT-2026-0115/T02): remove the draft's graph entry and its
+    `depends_on` edge on `blocked_wu` again. The draft file stays on disk,
+    `status: draft` unchanged.
+    """
+    plan_text = plan_path.read_text()
+    new_plan_text = _remove_plan_graph_entry(
+        plan_text, gate.number, blocked_wu.wu_id, draft["id"])
+    plan_path.write_text(new_plan_text)
+
+
+def finalize_fix_unit_insertion(
+    feature_dir: Path,
+    blocked_wu: WorkUnit,
+    draft: dict,
+) -> dict:
+    """Step 3 of drafted fix-unit insertion (FEAT-2026-0115/T02): flip the
+    draft `draft -> pending` and re-arm `blocked_wu` (`status: pending`,
+    `re_arm_count` incremented) once `evaluate_fix_unit_insertion` has
+    returned `ok`. Formerly the tail of T01's `insert_fix_unit`.
+
+    Returns `{"fix_unit_id", "file", "insertion_count"}`.
+    """
+    draft_path = feature_dir / draft["file"]
     write_frontmatter_field(draft_path, "status", "pending")
 
     blocked_fm, _ = read_frontmatter(blocked_wu.file)
@@ -1853,6 +1998,112 @@ def insert_fix_unit(
         "file": draft["file"],
         "insertion_count": new_re_arm,
     }
+
+
+_ARM_PREDICATE_STOP_CLASSES = (
+    "missing_provenance",
+    "judge_editing",
+    "decision_class_paths",
+    "drift_caps",
+    "plan_next_lint",
+)
+
+
+def evaluate_fix_unit_insertion(
+    feature_dir: Path,
+    gate: "GateNode",
+    blocked_wu: WorkUnit,
+    draft: dict,
+    cfg: "dict | None" = None,
+) -> tuple:
+    """Judge a drafted fix unit already written into the graph
+    (FEAT-2026-0115/T02) the way a gate arm would, after
+    `write_fix_unit_draft_entry` but before `finalize_fix_unit_insertion`.
+
+    Runs, in order: `plan_baseline.write_baseline_if_absent` so the arm
+    predicate is evaluable; `lint_plan._lint_impl`, refusing with class
+    `lint` when any returned line names the draft's file or id;
+    `arm_eval.evaluate_arm_predicate(feature_dir, gate.number - 1)` — which,
+    with the draft already in the graph, collects it as gate `gate.number`'s
+    drafted successor — refusing with the first non-`clean` class among
+    `_ARM_PREDICATE_STOP_CLASSES`, or class `baseline_missing` when every one
+    of those is `not_evaluable`; the count of prior `fix_unit_inserted`
+    events for `blocked_wu` against `max_fix_units_per_unit` (class
+    `max_fix_units_per_unit`); and the draft's `planned_cost_usd` plus the
+    gate's spend against the gate's `cost_budget_usd`, when declared (class
+    `cost_budget`).
+
+    Returns `(ok, refusing_class, reason)` — `refusing_class` and `reason`
+    are both `None` when `ok` is True.
+    """
+    if cfg is None:
+        cfg = load_verification()
+
+    plan_path = feature_dir / "PLAN.md"
+    plan = load_plan_graph(feature_dir)
+    write_baseline_if_absent(feature_dir, plan)
+
+    from .lint_plan import _lint_impl  # deferred: lint_plan imports loop.py
+
+    lint_findings = _lint_impl(feature_dir)
+    lint_hits = [
+        line for line in lint_findings
+        if draft["file"] in line or draft["id"] in line
+    ]
+    if lint_hits:
+        return False, "lint", "; ".join(lint_hits)
+
+    decision = evaluate_arm_predicate(feature_dir, gate.number - 1)
+    not_evaluable = []
+    for class_name in _ARM_PREDICATE_STOP_CLASSES:
+        verdict = decision.classes.get(class_name)
+        if verdict is None:
+            continue
+        if verdict.status == "not_evaluable":
+            not_evaluable.append(class_name)
+        elif verdict.status != "clean":
+            return False, class_name, verdict.reason
+    if len(not_evaluable) == len(_ARM_PREDICATE_STOP_CLASSES):
+        return False, "baseline_missing", "; ".join(
+            f"{name}: {decision.classes[name].reason}" for name in not_evaluable
+        )
+
+    events_path = feature_dir / "events.jsonl"
+    prior_insertions = 0
+    if events_path.exists():
+        for line in events_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            ev = json.loads(line)
+            if (ev.get("event_type") == "fix_unit_inserted"
+                    and ev.get("correlation_id") == blocked_wu.wu_id):
+                prior_insertions += 1
+    max_fix_units = resolve_max_fix_units_per_unit(cfg)
+    if prior_insertions >= max_fix_units:
+        return False, "max_fix_units_per_unit", (
+            f"{blocked_wu.wu_id} already has {prior_insertions} prior "
+            f"fix_unit_inserted event(s), at cap {max_fix_units}"
+        )
+
+    gate_budget = gate_budget_usd(gate.file)
+    if gate_budget is not None:
+        gate_dict = next(
+            (g for g in plan.get("gates", []) or [] if g.get("gate") == gate.number),
+            None,
+        )
+        feat_fm, _ = read_frontmatter(plan_path)
+        spent = gate_spent_usd(feat_fm, gate_dict or {}, feature_dir)
+        draft_fm, _ = read_frontmatter(feature_dir / draft["file"])
+        draft_cost = draft_fm.get("planned_cost_usd") or 0.0
+        projected = spent + draft_cost
+        if projected > gate_budget:
+            return False, "cost_budget", (
+                f"projected spend ${projected:.2f} (spent ${spent:.2f} + "
+                f"draft planned ${draft_cost:.2f}) exceeds gate {gate.number}'s "
+                f"cost_budget_usd ${gate_budget:.2f}"
+            )
+
+    return True, None, None
 
 
 # --------------------------------------------------------------------------- #
@@ -11587,18 +11838,43 @@ def run(
                         # — but only under `autonomy_default: auto`; under
                         # `review` it falls through to today's escalation
                         # unchanged (T03 words the brief for that case).
+                        # T02: writing the draft into the graph and deciding
+                        # whether to arm it are now two steps, with
+                        # `evaluate_fix_unit_insertion` judging the draft
+                        # in-graph before either the flip or the escalation
+                        # brief's `insertion_refused` naming why not.
                         _fix_unit_draft = None
+                        _insertion = None
+                        _insertion_refused = None
                         if (resolve_fix_unit_insertion(load_verification())
                                 and feat_fm.get("autonomy_default") == "auto"):
                             _fix_unit_draft = parse_blocked_next(wu.result_block)
                         if _fix_unit_draft is not None:
                             try:
-                                _insertion = insert_fix_unit(
+                                write_fix_unit_draft_entry(
                                     feature_dir, feature_dir / "PLAN.md",
                                     gate, wu, _fix_unit_draft,
                                 )
                             except FixUnitInsertionError:
                                 _fix_unit_draft = None
+                            else:
+                                _ir_ok, _ir_class, _ir_reason = (
+                                    evaluate_fix_unit_insertion(
+                                        feature_dir, gate, wu, _fix_unit_draft,
+                                    ))
+                                if _ir_ok:
+                                    _insertion = finalize_fix_unit_insertion(
+                                        feature_dir, wu, _fix_unit_draft)
+                                else:
+                                    revert_fix_unit_draft_entry(
+                                        feature_dir / "PLAN.md", gate, wu,
+                                        _fix_unit_draft)
+                                    _insertion_refused = {
+                                        "draft_file": _fix_unit_draft["file"],
+                                        "class": _ir_class,
+                                        "reason": _ir_reason,
+                                    }
+                                    _fix_unit_draft = None
                         if _fix_unit_draft is not None:
                             _fix_ref = {"id": _fix_unit_draft["id"],
                                         "file": _fix_unit_draft["file"],
@@ -11639,16 +11915,19 @@ def run(
                         # never inserted because the feature is under
                         # `review` (not `autonomy_default: auto`) — the
                         # brief says so instead of looking like a plain
-                        # block. A draft rejected by T02's checks arrives
-                        # the same way once that unit lands.
-                        _ir_draft = parse_blocked_next(wu.result_block)
-                        _insertion_refused = (
-                            {"draft_file": _ir_draft["file"], "class": None,
-                             "reason": "review mode"}
-                            if _ir_draft is not None
-                            and feat_fm.get("autonomy_default") != "auto"
-                            else None
-                        )
+                        # block. T02's evaluator refusal (above) already set
+                        # `_insertion_refused` with a real class when that is
+                        # why insertion did not happen; only fill in the
+                        # review-mode shape when nothing already did.
+                        if _insertion_refused is None:
+                            _ir_draft = parse_blocked_next(wu.result_block)
+                            _insertion_refused = (
+                                {"draft_file": _ir_draft["file"], "class": None,
+                                 "reason": "review mode"}
+                                if _ir_draft is not None
+                                and feat_fm.get("autonomy_default") != "auto"
+                                else None
+                            )
                         _blocked_message = escalate_unit(
                             wu, gate.number, sorted(done_ids),
                             [w.wu_id for w in units
