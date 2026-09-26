@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_fix_unit_insertion_e2e -v -b"
 cost_budget_usd: 40.00
 baseline:
