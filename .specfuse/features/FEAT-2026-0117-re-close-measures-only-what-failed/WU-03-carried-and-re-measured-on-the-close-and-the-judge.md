@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0117/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - render_carry_summary
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/judge.py
   - specfuse/loop/closing_requirements.py
   - tests/test_carry_accounting_close_and_judge.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T19:01:19.168540+00:00
+duration_seconds: 458.415
+cost_usd: 1.706513
+input_tokens: 98
+output_tokens: 30002
 ---
 
 # The close states what it carried; the judge sees it

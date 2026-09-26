@@ -155,6 +155,25 @@ FEATURE_ORACLE_VERDICT_RE = re.compile(
     rf"^###\s+{re.escape(FEATURE_ORACLE_KEY)}:\s*(PASS|FAIL)\s*$", re.MULTILINE,
 )
 
+#: A re-close's `## Measurements` carry-accounting line (FEAT-2026-0117/T03),
+#: required only when `GATE-NN-CRITERIA.md` has at least one
+#: `carried_from_attempt` entry — a first close has no new obligation.
+#: `entries` is duck-typed (`criteria_state.CriterionStateEntry`, or anything
+#: with a `carried_from_attempt` attribute): this registry stays a pure-data
+#: module with no import of the artifact schema it describes.
+def carry_summary_is_required(entries) -> bool:
+    """True when at least one entry carries a green forward from a prior
+    attempt — the trigger for the `## Measurements` carry-accounting line."""
+    return any(entry.carried_from_attempt is not None for entry in entries)
+
+
+def render_carry_summary(entries) -> str:
+    """The exact `## Measurements` line a close pastes when `entries` carries
+    any criterion forward: `carried forward: N criteria, re-measured: M`."""
+    carried = sum(1 for entry in entries if entry.carried_from_attempt is not None)
+    return f"carried forward: {carried} criteria, re-measured: {len(entries) - carried}"
+
+
 GATE_REVIEW_FILENAME_TEMPLATE = "GATE-{next_gate:02d}-REVIEW.md"
 
 
@@ -377,6 +396,19 @@ CLOSING_REQUIREMENTS: dict[str, list[Requirement]] = {
             ),
             file=RETROSPECTIVE_FILENAME,
             enforced_by="check_feature_oracle_verdict_recorded",
+        ),
+        Requirement(
+            id="close-o", wu_type="close", phase="pre-squash",
+            description=(
+                "When GATE-NN-CRITERIA.md carries at least one entry forward "
+                "from a prior attempt, RETROSPECTIVE.md's Measurements "
+                "section records the render_carry_summary(entries) line — "
+                "'carried forward: N criteria, re-measured: M' — so the "
+                "close states what it inherited (FEAT-2026-0117/T03)"
+            ),
+            file=RETROSPECTIVE_FILENAME,
+            applies_when="criteria_artifact_present",
+            enforced_by="check_carry_summary_recorded",
         ),
     ],
     "close-intermediate": [
