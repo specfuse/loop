@@ -43,6 +43,33 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0114"></a>
+## FEAT-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
+
+**Why.** `produces:` is written before anyone has seen the solution. When the solution lands elsewhere, `resolve_produces_refusal` refuses the pass with `produces_not_in_diff` and the unit has no way to say the plan named the wrong file. The 2026-09-26 impact assessment found this the single largest mechanical spinner after the review's changes: five of the six units since 2026-09-10 that failed three times with an identical signature failed on this guard, across two repositories. Attempt 1 did verified work; attempts 2 and 3 changed nothing; the operator edited `produces:` by hand; the re-arm passed on the identical tree. Two defects compound it: the produces site is the one guard that never records into `refusal_history`, so the deterministic-refusal short-circuit cannot end it after two; and the repair note names `produces_unchanged:` without showing its shape (used in zero of nine repair attempts).
+
+**Goal.** A RESULT block may drop a declared path with a reason under `produces_amended:`; the driver rewrites the unit's `produces:`, records `produces_dropped:` on the unit and `produces_amended` on the event, and the judge sees every drop. The guard records its refusals so the second identical one is the last, and the repair note carries both escape hatches' YAML verbatim. Drop only, never add; an implementation unit may not amend itself to nothing. Kill switch `defaults.produces_amendable: false`.
+
+**Benefits.** The guard stops costing a human wait per plan-time misprediction. Baseline to beat: 6 units with repeated `produces_not_in_diff` in 16 days, all ending `blocked_human`.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode from the assessment's evidence; defaulted decisions are recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Adding paths from a RESULT; `produces_unchanged:` semantics; a planning-time lint for hedged declarations; the other three guard sites.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+Observable only across repositories and over time, so filed as a post-merge
+observation rather than an acceptance criterion (`close-discipline.md` §2).
+
+- [ ] Over the next ten features closed in this repo and the generator, count
+      units with two or more consecutive `produces_not_in_diff` attempts
+      (baseline: 6 in the 2026-09-10..26 window, 5 of them running to three)
+      and the share that ended `blocked_human` on that class (baseline: all).
+- [ ] Count `produces_amended` entries on passed events and, for each, whether
+      the terminal close or judge cited the dropped path in a finding.
+
 <a id="feat-2026-0111"></a>
 ## FEAT-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
 
