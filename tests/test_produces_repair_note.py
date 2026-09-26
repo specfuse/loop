@@ -162,6 +162,44 @@ class TestProducesRepairNoteIntegration(unittest.TestCase):
                 [e["payload"]["outcome"] for e in events],
                 ["produces_not_in_diff", "produces_not_in_diff"])
 
+    def test_failure_excerpt_names_both_hatches(self):
+        # The recorded `failure_excerpt` is head+tail of the note
+        # (extract_failure_excerpt's cap) — both escape-hatch key names
+        # must survive that trim, not just the full note.
+        with integration_workspace() as root:
+            os.chdir(root)
+            self._seed_repo(root)
+            fdir = _write_minimal_feature(
+                root, "FEAT-2026-0151", "repair-note-excerpt",
+                "feat/repair-note-excerpt",
+                produces=["src/a.py", "src/b.py"])
+
+            failure_notes: list = []
+
+            def fake_dispatch(wu, failure_note, cost_tracking=True):
+                if wu.wu_id.endswith("/T01"):
+                    failure_notes.append(failure_note)
+                    Path("src/a.py").write_text(
+                        f"A = {len(failure_notes) + 1}\n")
+                    return (
+                        "```result\nstatus: complete\n"
+                        "files_changed:\n  - src/a.py\n"
+                        "```\n"
+                    )
+                return "```result\nstatus: complete\n```\n"
+
+            self._patch("dispatch", fake_dispatch)
+            self._patch("verify", lambda wu, fd, cfg=None: (True, "(stub)"))
+
+            rc = loop.run(None, dry_run=False)
+            self.assertEqual(rc, 1)
+
+            events = self._events(fdir, "FEAT-2026-0151/T01")
+            self.assertEqual(len(events), 2)
+            excerpt = events[0]["payload"]["failure_excerpt"]
+            self.assertIn("produces_unchanged:", excerpt)
+            self.assertIn("produces_amended:", excerpt)
+
 
 if __name__ == "__main__":
     unittest.main()

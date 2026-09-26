@@ -11648,6 +11648,10 @@ def run(
                         if not prod_ok:
                             _prod_note = (
                                 prod_summary
+                                + "\n\nTwo escape hatches: `produces_unchanged:` "
+                                  "— the deliverable already holds at HEAD; "
+                                  "`produces_amended:` — the plan named a path "
+                                  "this solution did not need."
                                 + "\n\nEach listed path is a deliverable this WU "
                                   "declared in `produces:` but did not change. "
                                   "Either make the declared change this attempt, "

@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0114/T02H
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/loop.py
   - tests/test_produces_repair_note.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T15:30:01.364172+00:00
+duration_seconds: 78.991
+cost_usd: 0.296324
+input_tokens: 30
+output_tokens: 3850
 ---
 
 # The refusal excerpt names both escape hatches
