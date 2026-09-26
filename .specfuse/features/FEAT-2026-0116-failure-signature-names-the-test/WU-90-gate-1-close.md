@@ -1,10 +1,20 @@
 ---
 id: FEAT-2026-0116/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
+verdict: met
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.25.0
+started_at: 2026-09-26T18:21:27.659352+00:00
+duration_seconds: 530.888
+cost_usd: 3.06685
+input_tokens: 144
+output_tokens: 50486
 ---
 
 # Close gate 1 — the failure signature names the failing test

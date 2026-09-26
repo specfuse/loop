@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0116/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 6.00
 produces_driver_helper:
   - extract_failing_tests
@@ -10,6 +10,10 @@ produces_driver_helper:
 produces:
   - specfuse/loop/loop.py
   - tests/test_failure_signature_names_the_test.py
+duration_seconds: 789.822
+cost_usd: 2.856976
+input_tokens: 148
+output_tokens: 70530
 ---
 
 # Extract the failing test ids per runner and sign the failure with them

@@ -1,0 +1,33 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "Extract the failing test ids per runner and sign the failure with them",
+          "id": "FEAT-2026-0116/T01",
+          "planned_cost_usd": 6.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "A repeat is the same failing set; every spinning escalation carries its evidence",
+          "id": "FEAT-2026-0116/T02",
+          "planned_cost_usd": 5.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Replay the new rule over the corpus, and document the field",
+          "id": "FEAT-2026-0116/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "Close gate 1 \u2014 the failure signature names the failing test",
+          "id": "FEAT-2026-0116/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

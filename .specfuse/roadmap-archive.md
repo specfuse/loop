@@ -43,6 +43,32 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0116"></a>
+## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
+
+**Why.** The spinning family is a third of human waits on driver >= 0.19 and 41% of post-escalation idle. #3414: two attempts, two different failing Maven tests, one signature, `"Tests"`, because the post-processed report prints `FAIL: Tests run: …` and the unittest regex takes the first word; $19.15 discarded, one attempt of budget unused. Package-qualified surefire lines miss the regex; pytest, vitest, dotnet and dart have no parser; the exhaustion escalation carries no signature at all (12 of 25 spinning escalations record `None`).
+
+**Goal.** For `failure_class: tests`, the signature is the sorted set of failing test ids extracted per runner from the report and the persisted full log, carried on the event as `failing_tests`; the repeat detector compares sets, so a changed set is progress and an equal set is a repeat (excerpt match as fallback when no set extracts); every spinning-family escalation carries the last attempt's evidence. `replay_spin.py` replays the rule over the corpus so the close can say how many past repeats were false.
+
+**Benefits.** The detector fires on real loops only. Baseline: 7 `spinning_signature_repeat` and 12 `spinning_detected` escalations in 16 days.
+
+**Shape.** Single gate, three units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Non-`tests` classes' signatures; the re-arm reproduction gate; a per-project granularity knob.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+Observable only across repositories and over time (`close-discipline.md` §2).
+
+- [ ] Over the next ten features closed in this repo and the generator, count
+      `human_escalation` events with reason `spinning_signature_repeat` and,
+      for each, whether the two attempts' `failing_tests` were equal (baseline:
+      7 such escalations on driver >= 0.19, at least one on a progressing unit).
+- [ ] Count spinning-family escalations whose payload lacks
+      `failure_signature` (baseline: 12 of 25).
+
 <a id="feat-2026-0115"></a>
 ## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
 

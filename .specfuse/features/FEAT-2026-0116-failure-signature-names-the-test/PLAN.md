@@ -5,7 +5,7 @@ slug: failure-signature-names-the-test
 branch: feat/FEAT-2026-0116-failure-signature-names-the-test
 roadmap_goal: A `tests` failure's signature is the set of failing test ids on every runner the loop meets, and the spinning detector treats a changed set as progress, so `spinning_signature_repeat` fires on a real repeat and never on a run-level summary.
 autonomy_default: auto
-status: planned
+status: done
 planned_cost_usd: 19.00
 ---
 
@@ -76,6 +76,11 @@ gates:
       - id: FEAT-2026-0116/T01
         file: WU-01-failing-tests-per-runner.md
         depends_on: []
+      # hygiene (gate 1 broad run, 2026-09-26): bandit B324 on the sha1
+      # truncation tail; T01H marks it usedforsecurity=False.
+      - id: FEAT-2026-0116/T01H
+        file: WU-01H-signature-hash-not-for-security.md
+        depends_on: [FEAT-2026-0116/T01]
       - id: FEAT-2026-0116/T02
         file: WU-02-repeat-means-same-failing-set.md
         depends_on: [FEAT-2026-0116/T01]
@@ -85,7 +90,7 @@ gates:
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0116/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0116/T01, FEAT-2026-0116/T02, FEAT-2026-0116/T03]
+        depends_on: [FEAT-2026-0116/T01, FEAT-2026-0116/T01H, FEAT-2026-0116/T02, FEAT-2026-0116/T03]
 ```
 
 ## Scope boundary — explicitly OUT

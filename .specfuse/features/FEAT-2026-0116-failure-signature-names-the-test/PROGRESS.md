@@ -1,0 +1,6 @@
+- **FEAT-2026-0116/T01**: attempt 2 outcome=passed
+- **FEAT-2026-0116/T02**: attempt 1 outcome=passed
+- **FEAT-2026-0116/T03**: attempt 1 outcome=passed
+- **FEAT-2026-0116/T01H**: attempt 1 outcome=passed
+- **FEAT-2026-0116/G1-CLOSE**: Wrote RETROSPECTIVE.md, filled GATE-01-CRITERIA.md's 14 entries, staged one recurrence lesson to LEARNINGS-pending.md, appended CHANGELOG.md's Unreleased section, and set verdict: met in WU-90's own frontmatter; feature_oracle and replay_spin --failing-sets were re-run fresh and recorded.
+  - note: The judge's evidence for verdict is in RETROSPECTIVE.md's Measurements/Cost-analysis/What-the-loop-did-NOT-verify sections; the Verdict section is explicitly advisory and withheld from it per close-discipline.md §1.

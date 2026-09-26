@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0116/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 produces_driver_helper:
   - detect_spinning_signature_repeat
 produces:
   - specfuse/loop/loop.py
   - tests/test_spinning_repeat_same_failing_set.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T17:56:06.423393+00:00
+duration_seconds: 534.82
+cost_usd: 1.858836
+input_tokens: 126
+output_tokens: 32119
 ---
 
 # A repeat is the same failing set; every spinning escalation carries its evidence

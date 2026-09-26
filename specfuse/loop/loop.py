@@ -2333,6 +2333,186 @@ _FAILURE_KEYWORD_RE = re.compile(
 )
 
 
+# Per-runner failing-test-id line shapes (FEAT-2026-0116/T01). Each is
+# matched against ONE line at a time (`.match`, not `re.MULTILINE` search) so
+# the anchor is always that line's own start.
+_FAILING_TEST_UNITTEST_RE = re.compile(r"^(?:FAIL|ERROR): (\S+) \(([\w.]+)\)")
+# `FAIL: <anything>` (#2885) generalized to any post-processed name, not only
+# the parenthesized unittest shape above — same line-shape the `tests`
+# fallback regex table has matched on since #2885, kept here so this runner
+# still wins over an unrelated surefire line noticed in the same report
+# (#207's stated priority: pytest/unittest first, then Maven surefire). The
+# negative lookahead is the #3414 fix: `FAIL: Tests run: …` is a run-level
+# summary, not a test name, and must never satisfy this pattern.
+_FAILING_TEST_BARE_FAIL_RE = re.compile(r"^FAIL: (?!Tests run:)(\S+)")
+_FAILING_TEST_PYTEST_RE = re.compile(r"^FAILED (\S+)")
+# Package-qualified surefire line: lowercase-leading packages
+# (`dev.acme.FooTest.testBar`) are a valid Java class id too, unlike
+# `_SUREFIRE_FAILING_TEST_RE` above (which requires an uppercase-led class
+# name, since it also has to reject the run-level `[ERROR] Tests run: …`
+# summary — the dot requirement here does that job instead).
+_FAILING_TEST_SUREFIRE_RE = re.compile(r"^\[ERROR\]\s+([\w.$]+\.\w+)(?::\d+)?")
+_FAILING_TEST_JEST_SYMBOL_RE = re.compile(r"^\s*[✕×] (.+)$")
+_FAILING_TEST_JEST_FAIL_RE = re.compile(r"^FAIL (\S+)")
+_FAILING_TEST_DOTNET_RE = re.compile(r"^\s*Failed (\S+)")
+_FAILING_TEST_DART_RE = re.compile(r"^(.+) \[E\]$")
+_FAILING_TEST_BATS_RE = re.compile(r"^not ok \d+ (.+)$")
+
+
+def _failing_tests_python_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        line = raw.rstrip("\n")
+        m = _FAILING_TEST_UNITTEST_RE.match(line)
+        if m:
+            name, module_class = m.group(1), m.group(2)
+            # A module_class that already ends in `.<name>` is already a full
+            # id (a post-processor emitted it pre-joined) — appending name
+            # again would duplicate the suffix instead of naming the test.
+            if not (module_class == name or module_class.endswith("." + name)):
+                ids.add(f"{module_class}.{name}")
+            continue
+        m = _FAILING_TEST_BARE_FAIL_RE.match(line)
+        if m:
+            ids.add(m.group(1))
+            continue
+        m = _FAILING_TEST_PYTEST_RE.match(line)
+        if m:
+            ids.add(m.group(1))
+            continue
+    return ids
+
+
+def _failing_tests_surefire_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        m = _FAILING_TEST_SUREFIRE_RE.match(raw.rstrip("\n"))
+        if m:
+            ids.add(m.group(1))
+    return ids
+
+
+def _failing_tests_jest_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        line = raw.rstrip("\n")
+        m = _FAILING_TEST_JEST_SYMBOL_RE.match(line)
+        if m:
+            ids.add(m.group(1).strip())
+            continue
+        m = _FAILING_TEST_JEST_FAIL_RE.match(line)
+        if m:
+            ids.add(m.group(1))
+    return ids
+
+
+def _failing_tests_dotnet_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        m = _FAILING_TEST_DOTNET_RE.match(raw.rstrip("\n"))
+        if m:
+            ids.add(m.group(1))
+    return ids
+
+
+def _failing_tests_dart_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        m = _FAILING_TEST_DART_RE.match(raw.rstrip("\n"))
+        if m:
+            ids.add(m.group(1))
+    return ids
+
+
+def _failing_tests_bats_stage(lines: "list[str]") -> "set[str]":
+    ids: set[str] = set()
+    for raw in lines:
+        m = _FAILING_TEST_BATS_RE.match(raw.rstrip("\n"))
+        if m:
+            ids.add(m.group(1))
+    return ids
+
+
+# Tried in this order (#207): pytest/unittest first, then Maven surefire,
+# then the remaining runners. A report comes from ONE runner, so the first
+# stage that finds anything wins outright rather than pooling ids across
+# runners — otherwise an incidental `[ERROR]` noise line in a Python report
+# (or vice versa) would join an unrelated id onto the real failing set.
+_FAILING_TEST_STAGES = (
+    _failing_tests_python_stage,
+    _failing_tests_surefire_stage,
+    _failing_tests_jest_stage,
+    _failing_tests_dotnet_stage,
+    _failing_tests_dart_stage,
+    _failing_tests_bats_stage,
+)
+
+
+def extract_failing_tests(lines: "list[str]") -> "list[str]":
+    """Return a sorted, de-duplicated list of failing test ids from *lines*.
+
+    Recognises unittest, pytest, Maven surefire, vitest/jest, dotnet, dart,
+    and bats failure-line shapes (FEAT-2026-0116/T01). A run-level summary
+    line (`FAIL: Tests run: …`, `Tests run: … <<< FAILURE!`) never matches
+    any of these — each pattern requires the per-test identity shape the
+    summary line lacks.
+    """
+    for stage in _FAILING_TEST_STAGES:
+        ids = stage(lines)
+        if ids:
+            return sorted(ids)
+    return []
+
+
+def signature_from_failing_tests(ids: "list[str]") -> str:
+    """Join failing test ids into a signature, capped at 100 chars.
+
+    A truncated signature gets an 8-hex stable hash of the FULL joined
+    string appended, so two different failing-test sets that happen to share
+    a common 100-char prefix still get distinct signatures (FEAT-2026-0116/T01).
+    """
+    joined = ", ".join(ids)
+    if len(joined) <= 100:
+        return joined
+    digest = hashlib.sha1(joined.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
+    suffix = "…" + digest
+    head = joined[:100 - len(suffix)]
+    return head + suffix
+
+
+_FULL_OUTPUT_PATH_RE = re.compile(r"^full output: (.+)$", re.MULTILINE)
+
+
+def failing_tests_for_gate_report(stdout: str) -> "list[str]":
+    """Return the per-runner failing test ids for a `### <gate>: FAIL` report.
+
+    Tries `extract_failing_tests` over the lines after the marker first, and
+    when that yields nothing, over the full log named by the report's
+    `full output: <path>` line (`persist_gate_output`, #3300). Returns `[]`
+    when there is no FAIL marker, no ids either place, or the log path is
+    unreadable. Factored out of `parse_gate_failure_signature` so a caller
+    that already has (failure_class, failure_signature) can also record the
+    failing set on `attempt_outcome` without re-deriving it (FEAT-2026-0116/T01).
+    """
+    marker_re = re.compile(r"^### ([\w-]+): FAIL", re.MULTILINE)
+    m = marker_re.search(stdout)
+    if not m:
+        return []
+    after_lines = stdout[m.end():].splitlines()[:50]
+    ids = extract_failing_tests(after_lines)
+    if ids:
+        return ids
+    log_match = _FULL_OUTPUT_PATH_RE.search(stdout)
+    if not log_match:
+        return []
+    try:
+        log_lines = Path(log_match.group(1)).read_text(
+            encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    return extract_failing_tests(log_lines)
+
+
 def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     """Extract (failure_class, failure_signature) from gate runner stdout.
 
@@ -2365,6 +2545,17 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
     failure_class = _GATE_CLASS_MAP.get(gate_name, "other")
     after_lines = stdout[m.end():].splitlines()[:50]
     after_text = "\n".join(after_lines)
+    # `tests` first tries the per-runner failing-test-id extractor over the
+    # report's own lines, then — when that finds nothing, e.g. the report
+    # tail carries only the run-level summary — over the full log named by
+    # this report's `full output: <path>` line (`persist_gate_output`,
+    # #3300). Only when NEITHER yields an id does this fall to the regex
+    # table below (FEAT-2026-0116/T01): a signature that names the actual
+    # failing test(s) is strictly better than the first informative line.
+    if failure_class == "tests":
+        ids = failing_tests_for_gate_report(stdout)
+        if ids:
+            return failure_class, signature_from_failing_tests(ids)
     # Per-class patterns, tried in order (#207): pytest/unittest first, then
     # Maven surefire — whose failures previously fell through to the first-
     # informative-line heuristic and collapsed onto a generic Maven line,
@@ -2375,8 +2566,11 @@ def parse_gate_failure_signature(stdout: str) -> tuple[str, str]:
             # project that post-processes surefire output into
             # `FAIL: <class>.<method> <<< FAILURE!` lines was missed by the
             # `test_` anchor, and the signature fell to a passing per-class
-            # `[INFO] Tests run: … Failures: 0` line instead.
-            re.compile(r"^FAIL: (\S+)", re.MULTILINE),
+            # `[INFO] Tests run: … Failures: 0` line instead. The negative
+            # lookahead excludes `FAIL: Tests run: …` — a run-level summary,
+            # not a test name (FEAT-2026-0116/T01) — from ever satisfying
+            # this pattern.
+            re.compile(r"^FAIL: (?!Tests run:)(\S+)", re.MULTILINE),
             _SUREFIRE_FAILING_TEST_RE,
         ],
         "lint": [re.compile(r"\b([A-Z]\d{3,4})\b")],
@@ -2444,8 +2638,12 @@ def _truncate_signature(line: str, limit: int = 100) -> str:
 def detect_spinning_signature_repeat(
     current: tuple[str | None, str | None],
     prior: tuple[str | None, str | None] | None,
+    current_failing_tests: "list[str] | None" = None,
+    prior_failing_tests: "list[str] | None" = None,
+    current_excerpt: "str | None" = None,
+    prior_excerpt: "str | None" = None,
 ) -> bool:
-    """Return True iff the same (failure_class, failure_signature) repeats.
+    """Return True iff a repeat is the SAME failing set, not just a signature.
 
     Returns False when prior is None (first failure — nothing to compare).
     Returns False when either element of current is None.
@@ -2454,6 +2652,16 @@ def detect_spinning_signature_repeat(
     Returns False when either signature is non-informative — a bare fence,
     whitespace, pure ANSI, or the NO_SIGNATURE sentinel — since such values
     collapse distinct failures and would false-fire the spin halt (#167).
+
+    Past those guards: when both `*_failing_tests` sets are non-empty, a
+    repeat is the sets being equal (as sets — order doesn't matter) — the
+    authoritative signal, since two attempts that fail different tests are
+    progress even when a truncated signature happens to collide (FEAT-2026-0116/
+    T02). When either set is empty (no runner-recognised per-test id), fall
+    back to today's (failure_class, failure_signature) equality AND an equal
+    `failure_excerpt` — the cheaper alternative #3414 names — since signature
+    equality alone can collapse two different failures onto one generic
+    first line.
     """
     _SENTINEL = ("other", "no_gate_marker")
     if prior is None:
@@ -2465,7 +2673,9 @@ def detect_spinning_signature_repeat(
     if (_is_noninformative_signature(current[1])
             or _is_noninformative_signature(prior[1])):
         return False
-    return current == prior
+    if current_failing_tests and prior_failing_tests:
+        return set(current_failing_tests) == set(prior_failing_tests)
+    return current == prior and current_excerpt == prior_excerpt
 
 
 def detect_deterministic_refusal_repeat(
@@ -2695,6 +2905,7 @@ def emit_attempt_outcome(
     files_touched: list[str] | None = None,
     agent_status: str | None = None,
     agent_blocked_reason: str | None = None,
+    failing_tests: list[str] | None = None,
     extras: dict | None = None,
 ) -> dict:
     """Build a standardized attempt_outcome event dict (v1 payload shape).
@@ -2727,6 +2938,7 @@ def emit_attempt_outcome(
         "agent_status": agent_status,
         "agent_blocked_reason": agent_blocked_reason,
         "re_arm_count": getattr(wu, "re_arm_count", 0),
+        "failing_tests": failing_tests if failing_tests is not None else [],
     }
     if extras:
         payload.update(extras)
@@ -11656,6 +11868,8 @@ def run(
 
                 failure_note = None
                 prior_failure_signature: tuple[str | None, str | None] | None = None
+                prior_failing_tests: "list[str] | None" = None
+                prior_failure_excerpt: "str | None" = None
                 # (summary, files_touched) per guard refusal, newest last (#597).
                 refusal_history: list[tuple[str, list]] = []
                 # Resolved once per unit, then used at every site below in
@@ -11671,6 +11885,13 @@ def run(
                 convergence = ConvergenceState()
                 _best_diff = ""
                 _converge_blocked = False
+                # Last attempt's gate-failure identity, read by the for-else
+                # exhaustion path below so `spinning_detected` carries it too
+                # (FEAT-2026-0116/T02) — initialised here so an all-zero-token
+                # exhaustion (no gate failure ever parsed) reads None/[] rather
+                # than an unbound name.
+                _fc = _fs = None
+                _failing_tests: "list[str]" = []
                 for attempt in range(1, wu_max_attempts + 1):
                     # #597: a guard refusal that repeated on a provably
                     # untouched tree cannot be fixed by running again -- the
@@ -12595,6 +12816,10 @@ def run(
                     attempt_notes.append((attempt, _evidence))
                     _fc, _fs = parse_gate_failure_signature(payload)
                     _ex = extract_failure_excerpt(payload)
+                    _failing_tests = (
+                        failing_tests_for_gate_report(payload) if _fc == "tests"
+                        else []
+                    )
                     replan_history.append({
                         "attempt": attempt,
                         "failure_class": _fc,
@@ -12614,9 +12839,13 @@ def run(
                         files_touched=git_diff_names(head_before, "HEAD"),
                         agent_status="complete",
                         agent_blocked_reason=None,
+                        failing_tests=_failing_tests,
                     ))
-                    # T04: halt early when same (class, signature) repeats.
-                    if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                    # T04/T02: halt early when the same failing set repeats.
+                    if detect_spinning_signature_repeat(
+                            (_fc, _fs), prior_failure_signature,
+                            _failing_tests, prior_failing_tests,
+                            _ex, prior_failure_excerpt):
                         _sig_message = escalate_unit(
                             wu, gate.number, sorted(done_ids),
                             [w.wu_id for w in units
@@ -12630,6 +12859,7 @@ def run(
                             "reason": "spinning_signature_repeat",
                             "failure_class": _fc,
                             "failure_signature": _fs,
+                            "failing_tests": _failing_tests,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
                             "message": _sig_message,
@@ -12681,6 +12911,8 @@ def run(
                         break
                     if (_fc, _fs) != ("other", "no_gate_marker"):
                         prior_failure_signature = (_fc, _fs)
+                        prior_failing_tests = _failing_tests
+                        prior_failure_excerpt = _ex
                     flush_events(events_path, wu_events)
                     wu_events.clear()
                     # Convergent units iterate instead of restarting (#2650).
@@ -12962,6 +13194,9 @@ def run(
                     )
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": reason,
+                        "failure_class": _fc,
+                        "failure_signature": _fs,
+                        "failing_tests": _failing_tests,
                         "attempts": wu_max_attempts,
                         "attempts_usage": attempts_usage,
                         "message": _spinout_brief,
