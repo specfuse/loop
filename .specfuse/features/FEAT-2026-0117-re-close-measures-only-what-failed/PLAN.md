@@ -89,16 +89,21 @@ gates:
       - id: FEAT-2026-0117/T02
         file: WU-02-a-green-is-invalidated-by-its-covered-paths.md
         depends_on: [FEAT-2026-0117/T01]
+      # hygiene (gate 1 entry probe, 2026-09-26): T02's covers tests leaked
+      # their cwd into the suite; T02H adds the cwd guard.
+      - id: FEAT-2026-0117/T02H
+        file: WU-02H-tests-restore-the-working-directory.md
+        depends_on: [FEAT-2026-0117/T02]
       - id: FEAT-2026-0117/T03
         file: WU-03-carried-and-re-measured-on-the-close-and-the-judge.md
         depends_on: [FEAT-2026-0117/T01]
       - id: FEAT-2026-0117/T04
         file: WU-04-document-the-contract.md
-        depends_on: [FEAT-2026-0117/T02, FEAT-2026-0117/T03]
+        depends_on: [FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T03]
       # --- closing sequence: 1-WU close (terminal gate) ---
       - id: FEAT-2026-0117/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0117/T01, FEAT-2026-0117/T02, FEAT-2026-0117/T03, FEAT-2026-0117/T04]
+        depends_on: [FEAT-2026-0117/T01, FEAT-2026-0117/T02, FEAT-2026-0117/T02H, FEAT-2026-0117/T03, FEAT-2026-0117/T04]
 ```
 
 ## Scope boundary — explicitly OUT

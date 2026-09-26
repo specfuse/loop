@@ -1,21 +1,8 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_reclose_carries_narrow_greens_e2e -v -b"
 cost_budget_usd: 40.00
-baseline:
-  sha: a4af46e3907ec65623121f3e461494d81036b70f
-  probed_at: 2026-09-26T19:12:55.203875+00:00
-  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:45fc1aec6b9cb8bfc5073ad076dacada7201b19e:485182606bb8c775407b9cb56226f1853a7979e1:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:76d80fe022b7a6d17a55a3aa02047f136c9f4f45:7d6ae5b2325e3c5c7c68771242767939deda2e5e:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:a970ca5341dcff668c9d68e2c2b2e72690ec9467:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d664745f3d8e8d366a9f5029d78452efa5fda16f:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
-  entry_sha: a4af46e3907ec65623121f3e461494d81036b70f
-  source: attributed:FEAT-2026-0117/T04
-  failing:
-    - gate: tests
-      failure_class: tests
-      failure_signature: "(failures=32,"
-    - gate: coverage
-      failure_class: other
-      failure_signature: "no_gate_marker"
 ---
 
 # Gate 1 — a re-close measures only what failed
