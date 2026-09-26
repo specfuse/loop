@@ -43,6 +43,32 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0117"></a>
+## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
+
+**Why.** Close cost per feature doubled after the review (median $6 to $14) and the judge is not why ($0.46 per close); the re-runs are. 64% of post-review features close a gate twice or more, 39% three or more, and every re-close re-measures every criterion (#3313: FEAT-2026-0104 spent $31.47 closing against $17 building). `close-discipline.md` §§1, 5 already permit carrying a `narrow` green forward and the artifact exists (`GATE-NN-CRITERIA.md`, seeded by the driver, filled by the close, partitioned by `build_reverification_worklist`); what breaks the chain is the re-arm, whose skeleton step resets every entry with `attempt > current` (#3279) regardless of kind, and the worklist never checks `proved_at_sha` against the tree.
+
+**Goal.** A re-armed close keeps `narrow`/`pass` entries (`carried_from_attempt`), invalidates any whose driver-seeded `covers:` paths appear in the gate diff since `proved_at_sha`, re-measures broad entries and the `feature_oracle` as §1 binds, states `carried forward: N criteria, re-measured: M` in `## Measurements`, and shows the judge each carried entry with its sha. Kill switch `defaults.carry_forward_narrow_greens: false`.
+
+**Benefits.** The second close costs a fraction of the first. Target: median close cost per feature back under $8.
+
+**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
+
+**Scope boundary — deliberately out.** Caching the `feature_oracle` or broad gates across closes (a rule change); automatic re-arm after a judge lowering.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+Observable only across repositories and over time (`close-discipline.md` §2).
+
+- [ ] Over the next ten features closed in this repo and the generator, for
+      every gate closed more than once: the second close's `cost_usd` against
+      the first's (baseline: roughly equal), and the count of carried versus
+      re-measured criteria from `## Measurements`.
+- [ ] Any judge finding that names a carried criterion (a carried green that
+      should have been re-measured).
+
 <a id="feat-2026-0116"></a>
 ## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
 

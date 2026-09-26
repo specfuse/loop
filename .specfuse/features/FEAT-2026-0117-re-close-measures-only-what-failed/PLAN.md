@@ -5,7 +5,7 @@ slug: re-close-measures-only-what-failed
 branch: feat/FEAT-2026-0117-re-close-measures-only-what-failed
 roadmap_goal: The second close of a gate re-measures its broad oracles, the feature oracle and the criteria that failed or whose covered paths changed, and inherits every other narrow green, so a judge-lowered or hygiene-driven re-close costs a fraction of the first.
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 22.00
 ---
 

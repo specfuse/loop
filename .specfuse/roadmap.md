@@ -115,7 +115,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
 | FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-2026-0116) |
-| FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | active | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
+| FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-2026-0117) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1033,21 +1033,6 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Risk accepted deliberately.** This has an agent assigning the value that gates unattended merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the rubric is the operator's, low confidence fails closed, the label stays visible and human-overridable, and `max_open_prs` (#3351) plus `max_diff_lines` cap blast radius regardless. Autonomy is `review` rather than `auto` for this reason — a wrong arm on a marker format change orphans every issue written under it.
 
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
-
-**Status: active.**
-
-<a id="feat-2026-0117"></a>
-## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
-
-**Why.** Close cost per feature doubled after the review (median $6 to $14) and the judge is not why ($0.46 per close); the re-runs are. 64% of post-review features close a gate twice or more, 39% three or more, and every re-close re-measures every criterion (#3313: FEAT-2026-0104 spent $31.47 closing against $17 building). `close-discipline.md` §§1, 5 already permit carrying a `narrow` green forward and the artifact exists (`GATE-NN-CRITERIA.md`, seeded by the driver, filled by the close, partitioned by `build_reverification_worklist`); what breaks the chain is the re-arm, whose skeleton step resets every entry with `attempt > current` (#3279) regardless of kind, and the worklist never checks `proved_at_sha` against the tree.
-
-**Goal.** A re-armed close keeps `narrow`/`pass` entries (`carried_from_attempt`), invalidates any whose driver-seeded `covers:` paths appear in the gate diff since `proved_at_sha`, re-measures broad entries and the `feature_oracle` as §1 binds, states `carried forward: N criteria, re-measured: M` in `## Measurements`, and shows the judge each carried entry with its sha. Kill switch `defaults.carry_forward_narrow_greens: false`.
-
-**Benefits.** The second close costs a fraction of the first. Target: median close cost per feature back under $8.
-
-**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
-
-**Scope boundary — deliberately out.** Caching the `feature_oracle` or broad gates across closes (a rule change); automatic re-arm after a judge lowering.
 
 **Status: active.**
 
