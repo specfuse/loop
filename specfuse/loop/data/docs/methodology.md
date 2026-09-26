@@ -600,7 +600,7 @@ completion.
 
 Closing ceremony cost should scale with feature size. A feature whose
 **planned substantive** WU count (types `implementation`, `qa_authoring`,
-`qa_execution`, `qa_curation`) is **≤ 8** drafts as a **single gate** with
+`qa_execution`, `qa_curation`) is **≤ 12** drafts as a **single gate** with
 a **single terminal `close` WU** — no `close-intermediate`, no `plan-next`.
 This is the proportional shape: small features do not pay multi-WU closing
 overhead sized for large ones.
@@ -617,6 +617,13 @@ disables auto-close and the driver dispatches the closing WU as a normal
 reflective session. Ceremony proportionality trades reflection only on
 features that stay small **and** on-plan. The `gate_eval.py` predicate is
 the safety net; this rule does not replace it.
+
+The line moved from 8 to 12 on 2026-09-26 (#3426): post-review features
+average 10.7 substantive units, every extra gate costs a `plan-next` plus a
+`close-intermediate` and an `awaiting_review` wait, and the arm predicate
+would have armed only 18 of 74 gate boundaries it evaluated — the wait was a
+human redraft, not a review. A feature goes multi-gate when a human decision
+sits between its gates, not because it is large.
 
 **Reflective prose is conditional too (FEAT-2026-0106).** The roadmap once
 asked for a retrospective "only on `not_met` or on request" — superseded,
