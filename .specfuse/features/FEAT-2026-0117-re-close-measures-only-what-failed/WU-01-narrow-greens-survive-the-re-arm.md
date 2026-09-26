@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0117/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 6.00
 produces_driver_helper:
   - resolve_carry_forward_narrow_greens
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/loop.py
   - specfuse/loop/criteria_state.py
   - tests/test_reclose_carries_narrow_greens_e2e.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T18:36:08.413087+00:00
+duration_seconds: 975.457
+cost_usd: 5.13032
+input_tokens: 240
+output_tokens: 73783
 ---
 
 # A re-armed close keeps the narrow greens the first close proved

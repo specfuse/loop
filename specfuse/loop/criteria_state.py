@@ -41,6 +41,9 @@ _FIELD_PATTERNS = {
     "state": re.compile(r"^- \*\*state:\*\*\s*`([^`]+)`", re.MULTILINE),
     "proved_at_sha": re.compile(r"^- \*\*proved_at_sha:\*\*\s*`([^`]+)`", re.MULTILINE),
     "attempt": re.compile(r"^- \*\*attempt:\*\*\s*`?([^`\n]+)`?", re.MULTILINE),
+    "carried_from_attempt": re.compile(
+        r"^- \*\*carried_from_attempt:\*\*\s*`?([^`\n]+)`?", re.MULTILINE
+    ),
 }
 
 
@@ -55,6 +58,10 @@ class CriterionStateEntry:
     state: Optional[str]
     proved_at_sha: Optional[str]
     attempt: Optional[str]
+    #: Set by `reset_stale_criteria_entries` when a re-arm carries this
+    #: entry's narrow green past the attempt cycle that proved it — the
+    #: attempt number it was carried FROM, not the current attempt.
+    carried_from_attempt: Optional[str] = None
 
 
 #: Matches `GATE-NN-CRITERIA.md` basenames (any `NN`), and nothing else —
@@ -107,9 +114,73 @@ def parse_criteria_state(text: str) -> list[CriterionStateEntry]:
                 state=_extract_field(block, "state"),
                 proved_at_sha=_extract_field(block, "proved_at_sha"),
                 attempt=_extract_field(block, "attempt"),
+                carried_from_attempt=_extract_field(block, "carried_from_attempt"),
             )
         )
     return entries
+
+
+def resolve_carry_forward_narrow_greens(cfg: "dict | None") -> bool:
+    """Whether a re-armed close carries a `narrow`/`pass` entry's green
+    forward past the attempt cycle that proved it (FEAT-2026-0117/T01).
+
+    Reads `verification.yml` `defaults.carry_forward_narrow_greens` — default
+    True, same project-default precedence tier as `loop.py`'s other
+    `resolve_*` readers. *cfg* is the already-loaded `verification.yml` dict;
+    this module does no file I/O of its own.
+    """
+    if not cfg:
+        return True
+    return (cfg.get("defaults") or {}).get("carry_forward_narrow_greens", True) is not False
+
+
+def reset_stale_criteria_entries(
+    entries: list[CriterionStateEntry], current_attempt: int, carry_narrow: bool,
+) -> list[CriterionStateEntry]:
+    """Reset entries left behind by a superseded attempt cycle (#3279).
+
+    An entry whose recorded `attempt` exceeds *current_attempt* was measured
+    in a cycle a re-arm has since superseded. With *carry_narrow* true, an
+    entry that is also `kind: narrow` and `state: pass` is provably safe to
+    keep — its oracle's scope was knowable, so a re-arm does not invalidate
+    what it proved — and keeps every field, gaining `carried_from_attempt`
+    set to the attempt it was proved on. Every other stale entry resets to
+    `unverified` with its per-attempt fields cleared, exactly as if it had
+    never been verified. Entries at or below the current attempt, and
+    entries with no recorded attempt, are returned unchanged.
+    """
+    refreshed: list[CriterionStateEntry] = []
+    for entry in entries:
+        recorded = entry.attempt
+        try:
+            is_stale = recorded is not None and int(str(recorded).strip()) > current_attempt
+        except (TypeError, ValueError):
+            is_stale = False       # unparseable attempt: leave it for the close
+        if is_stale:
+            if carry_narrow and entry.kind == "narrow" and entry.state == "pass":
+                entry = CriterionStateEntry(
+                    criterion_id=entry.criterion_id,
+                    criterion=entry.criterion,
+                    oracle=entry.oracle,
+                    kind=entry.kind,
+                    state=entry.state,
+                    proved_at_sha=entry.proved_at_sha,
+                    attempt=entry.attempt,
+                    carried_from_attempt=str(recorded).strip(),
+                )
+            else:
+                entry = CriterionStateEntry(
+                    criterion_id=entry.criterion_id,
+                    criterion=entry.criterion,
+                    oracle=None,
+                    kind=None,
+                    state="unverified",
+                    proved_at_sha=None,
+                    attempt=None,
+                    carried_from_attempt=None,
+                )
+        refreshed.append(entry)
+    return refreshed
 
 
 @dataclass(frozen=True)
@@ -191,5 +262,7 @@ def render_criteria_state(entries: list[CriterionStateEntry]) -> str:
             lines.append(f"- **proved_at_sha:** `{entry.proved_at_sha}`")
         if entry.attempt is not None:
             lines.append(f"- **attempt:** `{entry.attempt}`")
+        if entry.carried_from_attempt is not None:
+            lines.append(f"- **carried_from_attempt:** `{entry.carried_from_attempt}`")
         blocks.append("\n".join(lines) + "\n")
     return "\n".join(blocks)

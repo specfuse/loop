@@ -5456,9 +5456,17 @@ def _precreate_criteria_state_stub(
 
     So an entry whose recorded `attempt` exceeds *current_attempt* is reset to
     `unverified` with its per-attempt fields cleared, exactly as if it had never
-    been verified. Entries at or below the current attempt, and entries with no
-    recorded attempt, keep the additive behaviour above — a close re-running
-    inside one attempt cycle must not lose the state it recorded.
+    been verified — UNLESS it is `kind: narrow` and `state: pass` and
+    `verification.yml` `defaults.carry_forward_narrow_greens` (default True)
+    allows it, in which case it keeps every field and gains
+    `carried_from_attempt` (FEAT-2026-0117/T01, `close-discipline.md` §5): a
+    narrow oracle's scope was knowable, so the cycle a re-arm superseded does
+    not invalidate what it proved. Entries at or below the current attempt,
+    and entries with no recorded attempt, keep the additive behaviour above —
+    a close re-running inside one attempt cycle must not lose the state it
+    recorded. `criteria_state.reset_stale_criteria_entries` does the actual
+    reset/carry; this function only resolves the config flag and decides
+    whether the tree needs rewriting.
 
     Owning this here rather than in `/unblock-wu`'s prose covers every re-arm
     path: the skill, a hand edit, or future tooling. *current_attempt* is
@@ -5475,25 +5483,10 @@ def _precreate_criteria_state_stub(
     # gate in exactly the state that cannot progress.
     stale_reset = False
     if current_attempt is not None:
-        refreshed = []
-        for entry in existing:
-            recorded = entry.attempt
-            try:
-                is_stale = recorded is not None and int(str(recorded).strip()) > current_attempt
-            except (TypeError, ValueError):
-                is_stale = False       # unparseable attempt: leave it for the close
-            if is_stale:
-                stale_reset = True
-                entry = criteria_state.CriterionStateEntry(
-                    criterion_id=entry.criterion_id,
-                    criterion=entry.criterion,
-                    oracle=None,
-                    kind=None,
-                    state="unverified",
-                    proved_at_sha=None,
-                    attempt=None,
-                )
-            refreshed.append(entry)
+        carry_narrow = criteria_state.resolve_carry_forward_narrow_greens(load_verification())
+        refreshed = criteria_state.reset_stale_criteria_entries(
+            existing, current_attempt, carry_narrow)
+        stale_reset = refreshed != existing
         existing = refreshed
 
     fresh: list[tuple[str, str]] = []

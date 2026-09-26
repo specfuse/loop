@@ -54,19 +54,29 @@ def _feature_with_criteria(tmp: Path, recorded_attempt: str) -> Path:
     (fdir / "WU-01-x.md").write_text(
         "---\nid: FEAT-2026-9999/T01\ntype: implementation\nstatus: done\n"
         "attempts: 1\n---\n\n# T01\n\n**Acceptance criteria.**\n\n"
-        "- the thing works\n"
+        "- the thing works\n- the whole suite still passes\n"
     )
     (fdir / "WU-90-close.md").write_text(
         "---\nid: FEAT-2026-9999/G1-CLOSE\ntype: close\nstatus: pending\n"
         "attempts: 0\n---\n\n# Close\n"
     )
 
+    # Two entries: a `narrow` one (a scoped test nodeid — its green survives a
+    # re-arm per close-discipline.md §5) and a `broad` one (the full suite —
+    # never carried, re-runs on every close attempt regardless of kind).
     (fdir / "GATE-01-CRITERIA.md").write_text(
         "# Gate 1 — per-criterion state\n\n"
         "Written by `FEAT-2026-9999/G1-CLOSE`.\n\n"
         "### T01#1\n"
         "- **criterion:** the thing works\n"
+        "- **oracle:** `python3 -m unittest tests.test_thing`\n"
         "- **kind:** `narrow`\n"
+        "- **state:** `pass`\n"
+        f"- **attempt:** `{recorded_attempt}`\n\n"
+        "### T01#2\n"
+        "- **criterion:** the whole suite still passes\n"
+        "- **oracle:** `python3 -m unittest discover`\n"
+        "- **kind:** `broad`\n"
         "- **state:** `pass`\n"
         f"- **attempt:** `{recorded_attempt}`\n"
     )
@@ -88,7 +98,9 @@ class TestRearmClearsStaleCriteriaState(unittest.TestCase):
             wu.attempts = attempts
         return wu
 
-    def test_an_entry_from_a_superseded_attempt_is_reset(self):
+    def test_a_broad_entry_from_a_superseded_attempt_is_reset(self):
+        """The `broad` entry (FEAT-2026-0117/T01: never carried, regardless
+        of kind) is exactly the shape #3279 was written against."""
         with tempfile.TemporaryDirectory() as td:
             # Recorded attempt 1; the re-arm set the WU back to attempts 0.
             fdir = _feature_with_criteria(Path(td), "1")
@@ -97,12 +109,29 @@ class TestRearmClearsStaleCriteriaState(unittest.TestCase):
             loop.precreate_dispatch_skeleton(wu, fdir)
 
             text = (fdir / "GATE-01-CRITERIA.md").read_text()
+            self.assertIn("T01#2", text)
+            block = text.split("### T01#2", 1)[1]
             self.assertNotIn(
-                "**state:** `pass`", text,
-                "an entry recorded against attempt 1 is stale once the WU is "
-                "back at attempt 0 — leaving it makes the corpus lint refuse "
-                "the tree and the gate cannot progress (#3279)")
-            self.assertIn("**state:** `unverified`", text)
+                "**state:** `pass`", block,
+                "a broad entry recorded against attempt 1 is stale once the "
+                "WU is back at attempt 0 — leaving it makes the corpus lint "
+                "refuse the tree and the gate cannot progress (#3279)")
+            self.assertIn("**state:** `unverified`", block)
+
+    def test_a_narrow_pass_entry_from_a_superseded_attempt_is_carried(self):
+        """FEAT-2026-0117/T01: a `narrow`/`pass` entry survives a re-arm —
+        `close-discipline.md` §5 says its green may be carried forward."""
+        with tempfile.TemporaryDirectory() as td:
+            fdir = _feature_with_criteria(Path(td), "1")
+            wu = self._close_wu(fdir, attempts=0)
+
+            loop.precreate_dispatch_skeleton(wu, fdir)
+
+            text = (fdir / "GATE-01-CRITERIA.md").read_text()
+            block = text.split("### T01#1", 1)[1].split("### T01#2", 1)[0]
+            self.assertIn("**state:** `pass`", block)
+            self.assertIn("**kind:** `narrow`", block)
+            self.assertIn("**carried_from_attempt:** `1`", block)
 
     def test_an_entry_at_the_current_attempt_is_untouched(self):
         """The additive behaviour the stub's docstring protects.
