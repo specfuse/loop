@@ -11,6 +11,10 @@ produces:
   - specfuse/loop/data/docs/methodology.md
   - .specfuse/verification.yml.example
   - specfuse/loop/data/verification.yml.example
+duration_seconds: 237.234
+cost_usd: 0.448614
+input_tokens: 44
+output_tokens: 5576
 ---
 
 # Document the carry-forward rule where closes and authors read it
