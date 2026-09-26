@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_reclose_carries_narrow_greens_e2e -v -b"
 cost_budget_usd: 40.00
 broad_run:
