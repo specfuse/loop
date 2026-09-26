@@ -130,6 +130,19 @@ it mostly does not need. Author-set unless marked driver-owned.
 - `produces_dropped` — driver-owned. Written when a RESULT's `produces_amended:`
   entries are accepted (`defaults.produces_amendable: true`): the paths dropped
   from this unit's recorded `produces:` (`.specfuse/rules/result-contract.md`).
+- `covers` — driver-seeded, on a `GATE-NN-CRITERIA.md` entry, not WU frontmatter.
+  The path(s) that criterion's oracle actually exercises; absent when no path is
+  derivable, in which case the criterion is never carried forward.
+- `carried_from_attempt` — driver-owned, on a carried `GATE-NN-CRITERIA.md`
+  entry. The attempt number whose run proved the green being carried.
+- `invalidated_by` — driver-owned, on a `GATE-NN-CRITERIA.md` entry whose
+  carried green was invalidated. Names the path in `covers:` the gate diff
+  touched since `proved_at_sha`.
+
+`defaults.carry_forward_narrow_greens` (`verification.yml`, default `true`) —
+whether a re-close may carry forward a prior attempt's `narrow` green at all;
+see `.specfuse/verification.yml.example` and
+`.specfuse/rules/close-discipline.md` §5.
 
 ## 3. Work unit types
 
