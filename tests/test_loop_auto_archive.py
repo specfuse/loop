@@ -340,3 +340,32 @@ class TestAutoArchiveLeavesNeighbourAnchor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPostMergeChecklistTravelsWithTheArchive(unittest.TestCase):
+    """#3424: the checklist lands under the archived detail, not in an issue."""
+
+    def test_checklist_appended_under_the_archived_section(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _make_repo(tmp)
+            fdir = repo / ".specfuse" / "features" / "FEAT-2026-9999-slug"
+            fdir.mkdir(parents=True)
+            (fdir / "PLAN.md").write_text(
+                "---\nfeature_id: FEAT-2026-9999\nstatus: done\n---\n\n# Plan\n\n"
+                "## Post-merge checklist\n\n- [ ] count the thing over the next ten features\n\n"
+                "## Notes\n\n- none\n"
+            )
+            self.assertEqual(loop.auto_archive_feature("FEAT-2026-9999", repo), "archived")
+            archive_text = (repo / ".specfuse" / "roadmap-archive.md").read_text()
+            self.assertIn("**Post-merge checklist.**", archive_text)
+            self.assertIn("- [ ] count the thing over the next ten features", archive_text)
+            self.assertNotIn("## Notes", archive_text)
+
+    def test_no_plan_means_no_checklist_and_no_change(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = _make_repo(tmp)
+            self.assertEqual(loop.auto_archive_feature("FEAT-2026-9999", repo), "archived")
+            self.assertNotIn(
+                "Post-merge checklist", (repo / ".specfuse" / "roadmap-archive.md").read_text(),
+            )
+

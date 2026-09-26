@@ -650,6 +650,21 @@ def resolve_dispatch_skills(verification_cfg: dict) -> bool:
     """
     project = (verification_cfg or {}).get("defaults") or {}
     return bool(project.get("dispatch_skills", False))
+
+
+def resolve_post_merge_issue(verification_cfg: dict) -> bool:
+    """Whether a `met` terminal close files the post-merge checklist as an issue (#3424).
+
+    Reads `defaults.post_merge_issue` from verification.yml. Defaults to False:
+    across this repository and its heaviest consumer, ten such issues were
+    filed and eight were never actioned — the checklist is a measurement note
+    for the operator, not a work item. The record survives instead under the
+    feature's archived detail section (`auto_archive_feature`).
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("post_merge_issue", False))
+
+
 # Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
 # FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
 # stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
@@ -7398,6 +7413,19 @@ def _reconcile_moved_section(
     return section_text
 
 
+def _post_merge_checklist_for_archive(feature_id: str, repo_root: Path) -> str | None:
+    """PLAN.md's `## Post-merge checklist` body for *feature_id*, or None (#3424)."""
+    features = repo_root / ".specfuse" / "features"
+    for plan in sorted(features.glob(f"{feature_id}-*/PLAN.md")):
+        try:
+            _, body = read_frontmatter(plan)
+        except Exception:  # noqa: BLE001 - archive must never fail on a bad PLAN
+            return None
+        section = find_post_merge_checklist_section(body)
+        return section.strip("\n") + "\n" if section else None
+    return None
+
+
 def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     """Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver.
 
@@ -7509,6 +7537,13 @@ def auto_archive_feature(feature_id: str, repo_root: Path) -> str:
     archive_text = archive_text.replace(
         f"](roadmap.md#{feat_id_lower})", f"](#{feat_id_lower})"
     )
+
+    # #3424: the feature's post-merge checklist travels with the archived
+    # detail section instead of becoming an issue nobody actions. Read from
+    # the feature folder's PLAN.md when one exists; a row-only feature has none.
+    checklist = _post_merge_checklist_for_archive(feature_id, repo_root)
+    if checklist and "**Post-merge checklist.**" not in section_text:
+        section_text = section_text.rstrip("\n") + "\n\n**Post-merge checklist.**\n\n" + checklist
 
     marker_end = archive_text.index(marker) + len(marker)
     new_archive = archive_text[:marker_end] + f"\n{anchor}\n{section_text}" + archive_text[marker_end:]
@@ -8863,6 +8898,7 @@ def record_tracked_issue(
 
 def file_followup_issues(
     feature_dir: Path, repo_root: Path, runner=None, *, commit: bool | None = None,
+    post_merge_issue: bool | None = None,
 ) -> dict:
     """File one tracked GitHub issue per FOLLOW-UPS.md entry, after a close's squash.
 
@@ -8913,7 +8949,13 @@ def file_followup_issues(
                 followups_path,
             ))
 
-    if plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done":
+    if post_merge_issue is None:
+        post_merge_issue = resolve_post_merge_issue(load_verification())
+    if post_merge_issue and (
+        plan_fm.get("verdict") == "met" or plan_fm.get("status") == "done"
+    ):
+        # #3424: off by default — the checklist lands under the archived
+        # detail section instead (auto_archive_feature).
         section = find_post_merge_checklist_section(plan_body)
         if section:
             entries.append((

@@ -460,6 +460,12 @@ skill, and the project's skills index (34 skills, 1,534 words of descriptions
 in the loop repository) is fixed context carried in every turn's cache read.
 `defaults.dispatch_skills: true` in `verification.yml` restores the index for
 a project whose units do call `/skill-name` in-session.
+**The post-merge checklist travels with the archive (#3424).** A `met`
+terminal close no longer files PLAN.md's `## Post-merge checklist` as a
+`specfuse:post-merge` issue (ten filed across two repositories, eight never
+actioned); `auto_archive_feature` appends it under the feature's archived
+detail section in `roadmap-archive.md`. `defaults.post_merge_issue: true` in
+`verification.yml` restores the issue.
 
 Retention interacts with spinning detection, not around it:
 `detect_deterministic_refusal_repeat` (#1415) escalates a WU to

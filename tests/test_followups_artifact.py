@@ -404,7 +404,9 @@ class TestTitlesTrackingAndBoundaries(unittest.TestCase):
                 "## Post-merge checklist\n\n- **`gatecheck.py --forbid-no-changes` exits 0 on merged HEAD.**\n"
             )
             runner = _FakeGhRunner()
-            result = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            result = loop.file_followup_issues(
+                feature_dir, feature_dir, runner=runner, post_merge_issue=True,
+            )
             self.assertEqual(result["filed"], 1)
             argv = runner.create_calls[0]
             self.assertEqual(argv[argv.index("--title") + 1], "[FEAT-9999 post-merge] Post-merge checklist")
@@ -412,9 +414,31 @@ class TestTitlesTrackingAndBoundaries(unittest.TestCase):
             plan = (feature_dir / "PLAN.md").read_text()
             self.assertIn("## Post-merge checklist\n\n**Tracked as #101.**\n\n- **`gatecheck.py", plan)
             # And the tracked line makes the next call a no-op.
-            again = loop.file_followup_issues(feature_dir, feature_dir, runner=runner)
+            again = loop.file_followup_issues(
+                feature_dir, feature_dir, runner=runner, post_merge_issue=True,
+            )
             self.assertEqual((again["filed"], again["already_tracked"]), (0, 1))
             self.assertEqual(len(runner.create_calls), 1)
+
+    def test_post_merge_checklist_is_not_an_issue_by_default(self):
+        # #3424: ten filed across two repositories, eight never actioned.
+        with tempfile.TemporaryDirectory() as tmp:
+            feature_dir = Path(tmp)
+            (feature_dir / "PLAN.md").write_text(
+                "---\nfeature_id: FEAT-9999\nstatus: done\nverdict: met\n---\n\n# Plan\n\n"
+                "## Post-merge checklist\n\n- [ ] count the thing over the next ten features\n"
+            )
+            runner = _FakeGhRunner()
+            result = loop.file_followup_issues(
+                feature_dir, feature_dir, runner=runner, post_merge_issue=False,
+            )
+            self.assertEqual((result["filed"], result["unfiled"]), (0, 0))
+            self.assertEqual(runner.create_calls, [])
+            self.assertNotIn("Tracked as", (feature_dir / "PLAN.md").read_text())
+
+    def test_post_merge_default_reads_the_verification_defaults(self):
+        self.assertFalse(loop.resolve_post_merge_issue({}))
+        self.assertTrue(loop.resolve_post_merge_issue({"defaults": {"post_merge_issue": True}}))
 
 
 class TestTrackedLineIsReadUnderTheHeadingOnly(unittest.TestCase):
