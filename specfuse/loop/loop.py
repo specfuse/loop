@@ -1622,6 +1622,239 @@ def reload_unit_after_replan(units: list[WorkUnit], feature_dir: Path,
     return fresh
 
 
+def parse_blocked_next(result_block: "dict | None") -> "dict | None":
+    """Extract a validated `blocked_next:` fix-unit descriptor from a blocked
+    RESULT block (FEAT-2026-0115/T01).
+
+    Returns `{"kind": "fix_unit", "file": str, "id": str}` only when
+    `result_block["blocked_next"]` is shaped exactly that way. Anything
+    else — no block, no `blocked_next`, a `kind` other than `fix_unit`, a
+    missing `file`/`id` — returns None, and the caller falls through to
+    today's escalation.
+    """
+    if not isinstance(result_block, dict):
+        return None
+    blocked_next = result_block.get("blocked_next")
+    if not isinstance(blocked_next, dict):
+        return None
+    if blocked_next.get("kind") != "fix_unit":
+        return None
+    file = blocked_next.get("file")
+    unit_id = blocked_next.get("id")
+    if not file or not unit_id:
+        return None
+    return {"kind": "fix_unit", "file": str(file), "id": str(unit_id)}
+
+
+def resolve_fix_unit_insertion(cfg: "dict | None" = None) -> bool:
+    """Whether a blocked RESULT's `blocked_next:` may insert a fix unit
+    instead of escalating (FEAT-2026-0115/T01).
+
+    Reads `verification.yml` `defaults.fix_unit_insertion` — default True,
+    same precedence shape as `resolve_max_attempts`'s project-default tier.
+    """
+    if cfg is None:
+        cfg = load_verification()
+    return (cfg.get("defaults") or {}).get("fix_unit_insertion", True) is not False
+
+
+class FixUnitInsertionError(ValueError):
+    """Raised by `insert_fix_unit` when the drafted fix unit, or PLAN.md's
+    graph, fails validation (FEAT-2026-0115/T01). Callers must fall back to
+    today's escalation rather than leave PLAN.md or the draft half-edited —
+    every raise site here fires before any write happens."""
+
+
+_PLAN_GATE_LINE_RE = re.compile(r"^(\s*)- gate:\s*(\d+)\s*$")
+_PLAN_ENTRY_ID_RE = re.compile(r"^(\s*)- id:\s*(\S+)\s*$")
+_PLAN_WORK_UNITS_RE = re.compile(r"^(\s*)work_units:\s*$")
+_PLAN_DEPENDS_ON_RE = re.compile(r"^(\s*)depends_on:\s*(\[.*\])\s*$")
+
+
+def _insert_plan_graph_entry(
+    plan_text: str, gate_number: int, blocked_id: str,
+    new_id: str, new_file: str,
+) -> str:
+    """Insert a new work-unit entry ahead of `blocked_id` in gate
+    `gate_number`'s `work_units:` list, and append `new_id` onto
+    `blocked_id`'s own `depends_on:` (FEAT-2026-0115/T01).
+
+    Targeted line surgery, mirroring `arm_txn.py`'s `_flip_status_field`:
+    every OTHER line in the file — every other entry, every comment, every
+    gate — is copied through byte-for-byte. Raises FixUnitInsertionError
+    (naming what could not be found) rather than falling back to a full
+    YAML round-trip, which would reorder/reformat everything else in the
+    graph: the escalation trigger this work unit's brief names.
+    """
+    lines = plan_text.splitlines()
+    n = len(lines)
+
+    gate_start = None
+    gate_indent = None
+    for i, line in enumerate(lines):
+        m = _PLAN_GATE_LINE_RE.match(line)
+        if m and int(m.group(2)) == gate_number:
+            gate_start = i
+            gate_indent = len(m.group(1))
+            break
+    if gate_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md graph has no '- gate: {gate_number}' entry")
+
+    gate_end = n
+    for i in range(gate_start + 1, n):
+        m = _PLAN_GATE_LINE_RE.match(lines[i])
+        if m and len(m.group(1)) <= gate_indent:
+            gate_end = i
+            break
+
+    wu_start = None
+    for i in range(gate_start, gate_end):
+        if _PLAN_WORK_UNITS_RE.match(lines[i]):
+            wu_start = i
+            break
+    if wu_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md gate {gate_number} has no 'work_units:' key")
+
+    entry_indent = None
+    blocked_entry_start = None
+    blocked_entry_end = None
+    i = wu_start + 1
+    while i < gate_end:
+        m = _PLAN_ENTRY_ID_RE.match(lines[i])
+        if m and (entry_indent is None or len(m.group(1)) == entry_indent):
+            entry_indent = len(m.group(1))
+            entry_start = i
+            j = i + 1
+            while j < gate_end:
+                jm = _PLAN_ENTRY_ID_RE.match(lines[j])
+                if jm and len(jm.group(1)) == entry_indent:
+                    break
+                j += 1
+            if m.group(2) == blocked_id:
+                blocked_entry_start, blocked_entry_end = entry_start, j
+            i = j
+        else:
+            i += 1
+
+    if blocked_entry_start is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md gate {gate_number} has no entry for {blocked_id}")
+
+    depends_on_idx = None
+    for k in range(blocked_entry_start, blocked_entry_end):
+        dm = _PLAN_DEPENDS_ON_RE.match(lines[k])
+        if dm:
+            depends_on_idx = k
+            dm_indent, dm_value = dm.group(1), dm.group(2)
+            break
+    if depends_on_idx is None:
+        raise FixUnitInsertionError(
+            f"PLAN.md entry for {blocked_id} has no single-line "
+            f"'depends_on: [...]' field — cannot append {new_id} to it "
+            f"without a YAML round-trip"
+        )
+
+    inner = dm_value[1:-1].strip()
+    items = [it.strip() for it in inner.split(",") if it.strip()] if inner else []
+    items.append(new_id)
+    new_depends_line = f"{dm_indent}depends_on: [{', '.join(items)}]"
+
+    indent_str = " " * entry_indent
+    field_indent_str = " " * (entry_indent + 2)
+    new_entry_lines = [
+        f"{indent_str}- id: {new_id}",
+        f"{field_indent_str}file: {new_file}",
+        f"{field_indent_str}depends_on: []",
+    ]
+
+    out_lines = list(lines)
+    out_lines[depends_on_idx] = new_depends_line
+    out_lines[blocked_entry_start:blocked_entry_start] = new_entry_lines
+    rendered = "\n".join(out_lines)
+    return rendered + ("\n" if plan_text.endswith("\n") else "")
+
+
+def insert_fix_unit(
+    feature_dir: Path,
+    plan_path: Path,
+    gate: "GateNode",
+    blocked_wu: WorkUnit,
+    draft: dict,
+) -> dict:
+    """Insert a drafted fix unit ahead of `blocked_wu` in `gate`'s PLAN.md
+    graph, flip the draft `draft -> pending`, and re-arm `blocked_wu`
+    (`status: pending`, `re_arm_count` incremented) — FEAT-2026-0115/T01.
+
+    `draft` is `parse_blocked_next`'s return: `{kind, file, id}`. Validates
+    the draft file exists in `feature_dir` with a matching `id:`,
+    `status: draft`, and a non-empty `provenance:` before any write.
+    Performs the writes in file order (PLAN.md, then the draft, then
+    `blocked_wu`) so a failure partway leaves the earliest-possible state on
+    disk. Callers own events.jsonl, PROGRESS.md, the commit, and refreshing
+    the in-memory `units`/`wu` — this function only writes files.
+
+    Returns `{"fix_unit_id", "file", "insertion_count"}`. Raises
+    FixUnitInsertionError on any validation failure, before any write.
+    """
+    draft_path = feature_dir / draft["file"]
+    if not draft_path.is_file():
+        raise FixUnitInsertionError(
+            f"blocked_next names {draft['file']}, which does not exist in "
+            f"{feature_dir}"
+        )
+    draft_fm, _ = read_frontmatter(draft_path)
+    if draft_fm.get("id") != draft["id"]:
+        raise FixUnitInsertionError(
+            f"{draft['file']}: frontmatter id {draft_fm.get('id')!r} does "
+            f"not match blocked_next id {draft['id']!r}"
+        )
+    if draft_fm.get("status") != "draft":
+        raise FixUnitInsertionError(
+            f"{draft['file']}: status is {draft_fm.get('status')!r}, must "
+            f"be 'draft'"
+        )
+    if not draft_fm.get("provenance"):
+        raise FixUnitInsertionError(
+            f"{draft['file']}: missing non-empty 'provenance:' frontmatter"
+        )
+
+    plan_text = plan_path.read_text()
+    new_plan_text = _insert_plan_graph_entry(
+        plan_text, gate.number, blocked_wu.wu_id, draft["id"], draft["file"])
+    plan_path.write_text(new_plan_text)
+
+    write_frontmatter_field(draft_path, "status", "pending")
+
+    blocked_fm, _ = read_frontmatter(blocked_wu.file)
+    prior_re_arm = blocked_fm.get("re_arm_count", 0)
+    if not isinstance(prior_re_arm, int) or isinstance(prior_re_arm, bool):
+        prior_re_arm = 0
+    new_re_arm = prior_re_arm + 1
+    write_frontmatter_field(blocked_wu.file, "re_arm_count", new_re_arm)
+    # `re_arm_history`'s last entry is what the dispatch-top code (this
+    # module, the `_is_rearm` block ahead of `task_started`) reads as the
+    # NEXT dispatch's `re_arm_dispatched` reason — so that event fires with
+    # `fix_unit_inserted` when this unit is actually re-dispatched, not
+    # duplicated here at insertion time.
+    prior_history = blocked_fm.get("re_arm_history")
+    history = list(prior_history) if isinstance(prior_history, list) else []
+    history.append({"reason": "fix_unit_inserted"})
+    write_frontmatter_block(
+        blocked_wu.file, "re_arm_history",
+        ["re_arm_history:"] + [f"  - reason: {e.get('reason', '')}" for e in history
+                                if isinstance(e, dict)],
+    )
+    write_frontmatter_field(blocked_wu.file, "status", "pending")
+
+    return {
+        "fix_unit_id": draft["id"],
+        "file": draft["file"],
+        "insertion_count": new_re_arm,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # State backend seam                                                          #
 # --------------------------------------------------------------------------- #
@@ -7304,6 +7537,11 @@ def execute_unit_attempt(
         return "zero_token", None, usage
     is_blocked, reason = agent_reported_blocked(stdout or "")
     if is_blocked:
+        # FEAT-2026-0115/T01: stash the full parsed block (not just the
+        # `blocked_reason` string agent_reported_blocked extracts) so the
+        # dispatch loop's blocked branch can read `blocked_next:` when
+        # deciding whether to insert a fix unit instead of escalating.
+        wu.result_block = parse_result_block(stdout or "")
         return "blocked", reason, usage
     if _accepts_gate_file(verify_fn):
         passed, evidence = verify_fn(wu, feature_dir, gate_file=gate_file)
@@ -11319,6 +11557,61 @@ def run(
                             agent_status="blocked",
                             agent_blocked_reason=payload,
                         ))
+
+                        # FEAT-2026-0115/T01: a blocked RESULT that names a
+                        # drafted fix unit inserts it ahead of this unit and
+                        # re-arms this unit behind it, instead of escalating
+                        # — but only under `autonomy_default: auto`; under
+                        # `review` it falls through to today's escalation
+                        # unchanged (T03 words the brief for that case).
+                        _fix_unit_draft = None
+                        if (resolve_fix_unit_insertion(load_verification())
+                                and feat_fm.get("autonomy_default") == "auto"):
+                            _fix_unit_draft = parse_blocked_next(wu.result_block)
+                        if _fix_unit_draft is not None:
+                            try:
+                                _insertion = insert_fix_unit(
+                                    feature_dir, feature_dir / "PLAN.md",
+                                    gate, wu, _fix_unit_draft,
+                                )
+                            except FixUnitInsertionError:
+                                _fix_unit_draft = None
+                        if _fix_unit_draft is not None:
+                            _fix_ref = {"id": _fix_unit_draft["id"],
+                                        "file": _fix_unit_draft["file"],
+                                        "depends_on": []}
+                            _fix_wu = load_wu(feature_dir, _fix_ref)
+                            units.append(_fix_wu)
+                            wu.depends_on.append(_fix_unit_draft["id"])
+                            wu = reload_unit_after_replan(units, feature_dir, wu)
+                            wu_events.append(build_event(
+                                "fix_unit_inserted", wu.wu_id, {
+                                    "fix_unit_id": _insertion["fix_unit_id"],
+                                    "file": _insertion["file"],
+                                    "gate": gate.number,
+                                    "insertion_count": _insertion["insertion_count"],
+                                }))
+                            # No `re_arm_dispatched` here: `insert_fix_unit`
+                            # wrote `re_arm_history` with this reason as its
+                            # last entry, so the dispatch-top `_is_rearm`
+                            # block emits that event itself, once, when this
+                            # unit is actually re-dispatched — not now.
+                            flush_events(events_path, wu_events)
+                            _progress_path = record_progress_entry(
+                                feature_dir, wu, attempt, "fix_unit_inserted")
+                            commit_bookkeeping(
+                                [wu.file, _fix_wu.file, feature_dir / "PLAN.md",
+                                 events_path, _progress_path],
+                                f"chore(loop): {wu.wu_id} fix unit inserted "
+                                f"({_insertion['fix_unit_id']})\n\n"
+                                f"Feature: {wu.wu_id}",
+                            )
+                            print(f"   FIX UNIT INSERTED — "
+                                  f"{_insertion['fix_unit_id']} ahead of "
+                                  f"{wu.wu_id}; re-armed "
+                                  f"(re_arm_count={_insertion['insertion_count']})")
+                            break
+
                         _blocked_message = escalate_unit(
                             wu, gate.number, sorted(done_ids),
                             [w.wu_id for w in units
