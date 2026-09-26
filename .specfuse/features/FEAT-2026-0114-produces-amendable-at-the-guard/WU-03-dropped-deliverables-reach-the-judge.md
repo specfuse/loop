@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0114/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces_driver_helper:
   - collect_produces_dropped
 produces:
   - specfuse/loop/judge.py
   - tests/test_judge_sees_dropped_produces.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T15:09:46.172955+00:00
+duration_seconds: 169.047
+cost_usd: 0.779243
+input_tokens: 72
+output_tokens: 12002
 ---
 
 # A dropped deliverable is evidence the judge reads
