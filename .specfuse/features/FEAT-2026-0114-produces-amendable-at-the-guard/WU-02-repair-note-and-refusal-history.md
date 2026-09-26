@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0114/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces_driver_helper:
   - PRODUCES_REPAIR_EXAMPLE
 produces:
   - specfuse/loop/loop.py
   - tests/test_produces_repair_note.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T15:03:21.734850+00:00
+duration_seconds: 384.008
+cost_usd: 1.229695
+input_tokens: 94
+output_tokens: 23386
 ---
 
 # The repair note shows both escape hatches, and the second identical refusal is the last

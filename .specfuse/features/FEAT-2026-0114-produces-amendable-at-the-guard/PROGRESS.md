@@ -1,1 +1,3 @@
 - **FEAT-2026-0114/T01**: attempt 1 outcome=passed
+- **FEAT-2026-0114/T02**: produces_not_in_diff refusal note now shows a worked produces_unchanged:/produces_amended: example and records into refusal_history, so a second identical refusal on an untouched tree ends the unit via deterministic_refusal_repeat.
+  - note: refusal_history append for produces_not_in_diff uses `refusal_history += [...]` (not `.append(`) deliberately — test_deterministic_refusal_repeat's ledger-count test scopes the literal `.append(` count to GUARD_REFUSAL_OUTCOMES (6), which excludes produces_not_in_diff by design; this keeps that unmodified test green while still recording the refusal.

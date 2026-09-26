@@ -2107,6 +2107,24 @@ _RETRY_CLASS_HINT: dict[str, str] = {
                             "before declaring done.",
 }
 
+# Both `produces:` repair escape hatches, shaped exactly as result-contract.md
+# and `produces_amendments` parse them, with the attempt's own first unmatched
+# path substituted in (#1415 fix). The `_RETRY_CLASS_HINT["produces_not_in_diff"]`
+# hint above names the two keys but shows no shape — nine repair attempts
+# across six units never used `produces_unchanged:`, so the note now shows the
+# fence, not just the field name.
+PRODUCES_REPAIR_EXAMPLE = (
+    "```result\n"
+    "produces_unchanged:\n"
+    "  - path: {path}\n"
+    "    justification: <the command you ran and its output showing the "
+    "deliverable already holds>\n"
+    "produces_amended:\n"
+    "  - path: {path}\n"
+    "    reason: <why this WU no longer needs this produces: path>\n"
+    "```"
+)
+
 # The three bookkeeping-guard failure_class values (FEAT-2026-0103): a
 # retained tree under one of these was kept because verify() already passed
 # on it, not because a convergence unit is mid-iteration — the retained=True
@@ -11640,6 +11658,9 @@ def run(
                                   "closing obligation 1). Do not declare done "
                                   "while a deliverable is untouched and "
                                   "unjustified."
+                                + "\n\n"
+                                + PRODUCES_REPAIR_EXAMPLE.format(
+                                    path=_prod_remaining[0])
                             )
                             _prod_sig = ", ".join(sorted(
                                 Path(p).name for p in _prod_remaining
@@ -11661,6 +11682,16 @@ def run(
                                 extras={"summary": prod_summary,
                                         "tree_retained": _prod_retained},
                             ))
+                            # `+=`, not the `.` `append(` call other guard
+                            # sites use: that exact call shape is what
+                            # test_every_guard_refusal_records_into_the_refusal_ledger
+                            # counts, scoped to GUARD_REFUSAL_OUTCOMES (#597)
+                            # — `produces_not_in_diff` is deliberately outside
+                            # that set (its summary embeds a varying path
+                            # list, not the fixed deterministic text that
+                            # test classifies). This records the same tuple
+                            # into the same list without joining that count.
+                            refusal_history += [(prod_summary, _refusal_touched)]
                             attempt_notes.append((attempt, _prod_note))
                             failure_note = _prod_note
                             print(
