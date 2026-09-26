@@ -113,7 +113,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
 | FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
-| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | planned | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ detail](#feat-2026-0115) |
+| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | active | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ detail](#feat-2026-0115) |
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | planned | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
 
@@ -1049,7 +1049,7 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 
 **Scope boundary — deliberately out.** Blocks without `blocked_next:` (no free-text parsing); the re-plan turn; gate-end arming and `plan-next`; parallel dispatch.
 
-**Status: planned.**
+**Status: active.**
 
 <a id="feat-2026-0116"></a>
 ## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
