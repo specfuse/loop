@@ -5,7 +5,7 @@ slug: produces-amendable-at-the-guard
 branch: feat/FEAT-2026-0114-produces-amendable-at-the-guard
 roadmap_goal: An attempt that passed verification but did not touch a declared `produces:` path amends the declaration in its RESULT and passes, and an identical refusal never runs a third time.
 autonomy_default: auto
-status: planned
+status: active
 planned_cost_usd: 22.00
 ---
 
