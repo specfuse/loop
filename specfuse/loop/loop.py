@@ -3748,6 +3748,7 @@ def format_spinout_escalation_brief(
     attempt_outcomes: list,
     replanned: bool,
     resume_command: str,
+    insertion_refused: "dict | None" = None,
 ) -> str:
     """Render the six-part operator brief for a spun-out unit (FEAT-2026-0104/T06).
 
@@ -3764,6 +3765,14 @@ def format_spinout_escalation_brief(
     actually resets `attempts` and re-arms — over inventing a new one; a
     plain re-arm, with the reason the table excludes it, otherwise. Neither
     branch flips anything itself: the brief only recommends.
+
+    `insertion_refused` (FEAT-2026-0115/T03) is `None` for every escalation
+    that never named a `blocked_next` fix unit, which keeps this function's
+    output byte-identical to before T03 for those. When set —
+    `{"draft_file", "class", "reason"}`, `class` `None` meaning the feature
+    is under `review` rather than a refused draft — option 1 additionally
+    names the draft, the refusing class and reason (or "review mode"), and
+    the `/arm-gate` command that flips it `draft -> pending` before resuming.
     """
     done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
     remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
@@ -3831,6 +3840,18 @@ def format_spinout_escalation_brief(
             f"Option 1. `{reason}` is not in the re-plan scope table "
             f"because {scope_why}, so re-arming as-is is the next "
             "available step rather than a wider re-scope."
+        )
+
+    if insertion_refused is not None:
+        _draft_file = insertion_refused.get("draft_file", "")
+        _class = insertion_refused.get("class")
+        _ir_reason = insertion_refused.get("reason", "")
+        _why = f"class `{_class}` ({_ir_reason})" if _class else "review mode"
+        option_1 += (
+            f" A drafted fix unit ({_draft_file}) named in the blocked "
+            f"RESULT was not inserted — {_why}. To arm it, flip its "
+            "frontmatter `status: draft` to `pending` (`/arm-gate`), then "
+            f"resume: {resume_command}."
         )
 
     lines = [
@@ -3916,6 +3937,7 @@ def escalate_unit(
     wu_max_attempts: int,
     attempt_outcomes: list,
     replanned: bool = False,
+    insertion_refused: "dict | None" = None,
 ) -> str:
     """Render the six-part operator brief for ANY per-unit `blocked_human`
     escalation -- the single call every `human_escalation` site keyed on
@@ -3934,6 +3956,7 @@ def escalate_unit(
     return format_spinout_escalation_brief(
         wu, gate_number, done_wu_ids, remaining_wu_ids, reason,
         wu_max_attempts, attempt_outcomes, replanned, resume_command,
+        insertion_refused=insertion_refused,
     )
 
 
@@ -11612,6 +11635,20 @@ def run(
                                   f"(re_arm_count={_insertion['insertion_count']})")
                             break
 
+                        # FEAT-2026-0115/T03: a `blocked_next` was named but
+                        # never inserted because the feature is under
+                        # `review` (not `autonomy_default: auto`) — the
+                        # brief says so instead of looking like a plain
+                        # block. A draft rejected by T02's checks arrives
+                        # the same way once that unit lands.
+                        _ir_draft = parse_blocked_next(wu.result_block)
+                        _insertion_refused = (
+                            {"draft_file": _ir_draft["file"], "class": None,
+                             "reason": "review mode"}
+                            if _ir_draft is not None
+                            and feat_fm.get("autonomy_default") != "auto"
+                            else None
+                        )
                         _blocked_message = escalate_unit(
                             wu, gate.number, sorted(done_ids),
                             [w.wu_id for w in units
@@ -11620,6 +11657,7 @@ def run(
                             "agent_reported_blocked", resume_command_for(feature_id),
                             wu_max_attempts, attempt_outcomes,
                             replanned_this_wu,
+                            insertion_refused=_insertion_refused,
                         )
                         wu_events.append(build_event("human_escalation", wu.wu_id, {
                             "reason": "agent_reported_blocked",
@@ -11627,6 +11665,8 @@ def run(
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
                             "message": _blocked_message,
+                            **({"insertion_refused": _insertion_refused}
+                               if _insertion_refused is not None else {}),
                         }))
                         flush_events(events_path, wu_events)
                         _progress_path = record_progress_entry(

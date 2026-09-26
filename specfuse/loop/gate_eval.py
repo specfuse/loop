@@ -203,6 +203,19 @@ def _apply_predicate(
             sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
             reasons.append(f"replan_event: {sub_id}")
 
+    # --- Check 2b: No fix_unit_inserted events (FEAT-2026-0115/T03) ---
+    seen_fix_unit_inserted: set[str] = set()
+    fix_unit_inserted_events: list[str] = []
+    for ev in events:
+        if ev.get("event_type") == "fix_unit_inserted":
+            wu_id = ev.get("correlation_id", "unknown")
+            if wu_id in seen_fix_unit_inserted:
+                continue
+            seen_fix_unit_inserted.add(wu_id)
+            fix_unit_inserted_events.append(wu_id)
+            sub_id = wu_id.split("/")[-1] if "/" in wu_id else wu_id
+            reasons.append(f"fix_unit_inserted: {sub_id}")
+
     # --- Checks 3 & 4: Per-WU cost ratios (skip close/close-intermediate and plan-next) ---
     for wm in wu_metrics_list:
         wu_type = wm["type"]
@@ -279,6 +292,8 @@ def _apply_predicate(
         "plan_next_planned": plan_next_planned,
         "blocked_human_events": blocked_human_events,
         "replan_events": replan_events,
+        "fix_unit_inserted_events": fix_unit_inserted_events,
+        "fix_unit_inserted_count": len(fix_unit_inserted_events),
         "final_outcomes": final_outcomes,
         "warnings": warnings,
     }
@@ -388,6 +403,8 @@ def _evaluate_predicate_core(
                 "plan_next_planned": None,
                 "blocked_human_events": [],
                 "replan_events": [],
+                "fix_unit_inserted_events": [],
+                "fix_unit_inserted_count": 0,
                 "final_outcomes": {},
                 "warnings": pre_warnings,
             },

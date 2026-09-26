@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0115/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces_driver_helper:
   - render_insertion_refused_option
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/gate_eval.py
   - specfuse/loop/loop.py
   - tests/test_fix_unit_insertion_bookkeeping.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T16:29:44.413825+00:00
+duration_seconds: 225.451
+cost_usd: 1.335851
+input_tokens: 96
+output_tokens: 23777
 ---
 
 # An inserted unit is off-plan for auto-close, and the brief says why insertion did not happen
