@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_failure_signature_names_the_test -v -b"
 cost_budget_usd: 35.00
 baseline:
