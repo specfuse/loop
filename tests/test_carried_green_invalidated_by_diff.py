@@ -43,6 +43,12 @@ _CLOSE_BODY = (
 
 class TestDeriveCriterionCovers(unittest.TestCase):
 
+    def setUp(self):
+        self._cwd = os.getcwd()
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+
     def test_unittest_oracle_maps_dotted_module_to_test_file(self):
         wu = types.SimpleNamespace(produces=["src/impl.py"])
         covers = criteria_state.derive_criterion_covers(
