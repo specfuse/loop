@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0115/T04
 type: implementation
-status: pending
-attempts: 0
+status: blocked_human
+attempts: 3
 planned_cost_usd: 3.00
 produces:
   - .specfuse/rules/result-contract.md
@@ -12,6 +12,10 @@ produces:
   - specfuse/loop/data/docs/methodology.md
   - .specfuse/verification.yml.example
   - specfuse/loop/data/verification.yml.example
+duration_seconds: 1163.681
+cost_usd: 2.776901
+input_tokens: 240
+output_tokens: 34698
 ---
 
 # Document `blocked_next:` where the sessions and the authors read
