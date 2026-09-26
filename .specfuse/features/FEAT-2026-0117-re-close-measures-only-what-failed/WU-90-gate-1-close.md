@@ -7,9 +7,9 @@ verdict: met
 planned_cost_usd: 5.00
 auto_close_disabled: true
 duration_seconds: 324.404
-cost_usd: 1.6891
-input_tokens: 90
-output_tokens: 25038
+cost_usd: 1.949675
+input_tokens: 100
+output_tokens: 26757
 re_arm_count: 1
 re_arm_history:
   -
