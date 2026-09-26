@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0117/T02H2
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - tests/test_carried_green_invalidated_by_diff.py
   - tests/test_reclose_carries_narrow_greens_e2e.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.25.0
+started_at: 2026-09-26T19:27:35.007345+00:00
+duration_seconds: 41.116
+cost_usd: 0.166122
+input_tokens: 14
+output_tokens: 1736
 ---
 
 # The e2e helpers restore their patches in reverse order

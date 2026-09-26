@@ -231,7 +231,7 @@ class TestCarriedGreenInvalidatedByCoveredPathDiffE2E(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self._cwd)
-        for name, original in self._patches:
+        for name, original in reversed(self._patches):
             setattr(loop, name, original)
 
     def _patch(self, name: str, replacement):
