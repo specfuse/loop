@@ -1,8 +1,21 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_produces_amendment_e2e -v -b"
 cost_budget_usd: 40.00
+baseline:
+  sha: feaecbe058a84b4c521562526e5af16f3d06d708
+  probed_at: 2026-09-26T15:23:16.333851+00:00
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:3d53d5709a91a384dca0473ec400e4f80d5d6891:4acc6dfc5e8cece358c167d876515eba4a39a500:5a7eaa51c3d1b12fd724e173fb4a170d8ffc2a22:5ff66b6e4d8a264f23709ea60706111a4c59ed11:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:a5b30abb81a25df22d8c1a44e8f2ef81a29c37b3:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d664745f3d8e8d366a9f5029d78452efa5fda16f:d74ef43b60271f9ae4347daee78d3bc5a6fc55d2:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:eb858e4fb560d2660679d5efb15c7f369e8b4135
+  entry_sha: feaecbe058a84b4c521562526e5af16f3d06d708
+  source: attributed:FEAT-2026-0114/T04
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "test_justifying_the_wrong_path_or_nothing_useful_is_still_refused"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 1 — a verified attempt amends its `produces:` and passes; an identical refusal never runs a third time

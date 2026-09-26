@@ -12,6 +12,10 @@ produces:
   - specfuse/loop/data/docs/methodology.md
   - .specfuse/verification.yml.example
   - specfuse/loop/data/verification.yml.example
+duration_seconds: 640.515
+cost_usd: 1.22625
+input_tokens: 106
+output_tokens: 17377
 ---
 
 # Document `produces_amended:` where the sessions and the authors read
