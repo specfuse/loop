@@ -12,9 +12,9 @@ driver_version: 0.25.0
 started_at: 2026-09-26T15:55:13.733600+00:00
 verdict: met
 duration_seconds: 382.756
-cost_usd: 1.757938
-input_tokens: 78
-output_tokens: 31162
+cost_usd: 2.006581
+input_tokens: 90
+output_tokens: 32365
 ---
 
 # Close gate 1 — amend `produces:` at the guard
