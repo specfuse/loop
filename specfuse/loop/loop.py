@@ -2638,8 +2638,12 @@ def _truncate_signature(line: str, limit: int = 100) -> str:
 def detect_spinning_signature_repeat(
     current: tuple[str | None, str | None],
     prior: tuple[str | None, str | None] | None,
+    current_failing_tests: "list[str] | None" = None,
+    prior_failing_tests: "list[str] | None" = None,
+    current_excerpt: "str | None" = None,
+    prior_excerpt: "str | None" = None,
 ) -> bool:
-    """Return True iff the same (failure_class, failure_signature) repeats.
+    """Return True iff a repeat is the SAME failing set, not just a signature.
 
     Returns False when prior is None (first failure — nothing to compare).
     Returns False when either element of current is None.
@@ -2648,6 +2652,16 @@ def detect_spinning_signature_repeat(
     Returns False when either signature is non-informative — a bare fence,
     whitespace, pure ANSI, or the NO_SIGNATURE sentinel — since such values
     collapse distinct failures and would false-fire the spin halt (#167).
+
+    Past those guards: when both `*_failing_tests` sets are non-empty, a
+    repeat is the sets being equal (as sets — order doesn't matter) — the
+    authoritative signal, since two attempts that fail different tests are
+    progress even when a truncated signature happens to collide (FEAT-2026-0116/
+    T02). When either set is empty (no runner-recognised per-test id), fall
+    back to today's (failure_class, failure_signature) equality AND an equal
+    `failure_excerpt` — the cheaper alternative #3414 names — since signature
+    equality alone can collapse two different failures onto one generic
+    first line.
     """
     _SENTINEL = ("other", "no_gate_marker")
     if prior is None:
@@ -2659,7 +2673,9 @@ def detect_spinning_signature_repeat(
     if (_is_noninformative_signature(current[1])
             or _is_noninformative_signature(prior[1])):
         return False
-    return current == prior
+    if current_failing_tests and prior_failing_tests:
+        return set(current_failing_tests) == set(prior_failing_tests)
+    return current == prior and current_excerpt == prior_excerpt
 
 
 def detect_deterministic_refusal_repeat(
@@ -11852,6 +11868,8 @@ def run(
 
                 failure_note = None
                 prior_failure_signature: tuple[str | None, str | None] | None = None
+                prior_failing_tests: "list[str] | None" = None
+                prior_failure_excerpt: "str | None" = None
                 # (summary, files_touched) per guard refusal, newest last (#597).
                 refusal_history: list[tuple[str, list]] = []
                 # Resolved once per unit, then used at every site below in
@@ -11867,6 +11885,13 @@ def run(
                 convergence = ConvergenceState()
                 _best_diff = ""
                 _converge_blocked = False
+                # Last attempt's gate-failure identity, read by the for-else
+                # exhaustion path below so `spinning_detected` carries it too
+                # (FEAT-2026-0116/T02) — initialised here so an all-zero-token
+                # exhaustion (no gate failure ever parsed) reads None/[] rather
+                # than an unbound name.
+                _fc = _fs = None
+                _failing_tests: "list[str]" = []
                 for attempt in range(1, wu_max_attempts + 1):
                     # #597: a guard refusal that repeated on a provably
                     # untouched tree cannot be fixed by running again -- the
@@ -12816,8 +12841,11 @@ def run(
                         agent_blocked_reason=None,
                         failing_tests=_failing_tests,
                     ))
-                    # T04: halt early when same (class, signature) repeats.
-                    if detect_spinning_signature_repeat((_fc, _fs), prior_failure_signature):
+                    # T04/T02: halt early when the same failing set repeats.
+                    if detect_spinning_signature_repeat(
+                            (_fc, _fs), prior_failure_signature,
+                            _failing_tests, prior_failing_tests,
+                            _ex, prior_failure_excerpt):
                         _sig_message = escalate_unit(
                             wu, gate.number, sorted(done_ids),
                             [w.wu_id for w in units
@@ -12831,6 +12859,7 @@ def run(
                             "reason": "spinning_signature_repeat",
                             "failure_class": _fc,
                             "failure_signature": _fs,
+                            "failing_tests": _failing_tests,
                             "attempts": attempt,
                             "attempts_usage": attempts_usage,
                             "message": _sig_message,
@@ -12882,6 +12911,8 @@ def run(
                         break
                     if (_fc, _fs) != ("other", "no_gate_marker"):
                         prior_failure_signature = (_fc, _fs)
+                        prior_failing_tests = _failing_tests
+                        prior_failure_excerpt = _ex
                     flush_events(events_path, wu_events)
                     wu_events.clear()
                     # Convergent units iterate instead of restarting (#2650).
@@ -13163,6 +13194,9 @@ def run(
                     )
                     wu_events.append(build_event("human_escalation", wu.wu_id, {
                         "reason": reason,
+                        "failure_class": _fc,
+                        "failure_signature": _fs,
+                        "failing_tests": _failing_tests,
                         "attempts": wu_max_attempts,
                         "attempts_usage": attempts_usage,
                         "message": _spinout_brief,
