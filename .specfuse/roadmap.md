@@ -113,7 +113,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
 | FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | active | — | [→ detail](#feat-2026-0113) |
 | FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
-| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | active | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ detail](#feat-2026-0115) |
+| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | planned | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ detail](#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | planned | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ detail](#feat-2026-0117) |
 
@@ -1033,21 +1033,6 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Risk accepted deliberately.** This has an agent assigning the value that gates unattended merges, in a repository where `rules.bugs.automerge` is `"on"`. Bounding it: the rubric is the operator's, low confidence fails closed, the label stays visible and human-overridable, and `max_open_prs` (#3351) plus `max_diff_lines` cap blast radius regardless. Autonomy is `review` rather than `auto` for this reason — a wrong arm on a marker format change orphans every issue written under it.
 
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
-
-**Status: active.**
-
-<a id="feat-2026-0115"></a>
-## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
-
-**Why.** Agent-reported blocks are 45% of human waits on driver >= 0.19 and 48% of the idle that follows an escalation. Thirty of thirty-four came from one consumer repository; seventeen from one feature whose QA unit carried the trigger "if a finding is a generator defect, record it and block: the fix is a new unit before T18". The session obeyed, ten times: it diagnosed, drafted the fix unit, and stopped, and each stop waited hours for a human to flip a draft to `pending`, re-arm, and restart. `REPLAN_OPTION_SCOPE` does not even offer re-planning for this reason. FEAT-2026-0104's re-plan turn is the wrong tool: it rewrites a body and may not author units.
-
-**Goal.** A blocked RESULT may carry `blocked_next: {kind: fix_unit, file, id}` naming a drafted unit. Under `autonomy_default: auto`, the driver validates the draft with the plan-next draft lint and the arm predicate's stop classes (`judge_editing`, `decision_class_paths`, `drift_caps`, `missing_provenance`), inserts it ahead of the blocked unit, re-arms the blocked unit behind it, emits `fix_unit_inserted`, and continues. Two insertions per unit, the gate's `cost_budget_usd`, and any veto class refuse and fall back to today's escalation with the class named; under `review` the brief says the fix is drafted and one command arms it. `evaluate_auto_close` reads the event as off-plan, like `replan`.
-
-**Benefits.** The largest wait class disappears for the blocks the session already solved. Baseline: 34 `agent_reported_blocked` escalations, 51 idle hours, in 16 days.
-
-**Shape.** Single gate, four units + close, drafted 2026-09-26 in answers-supplied mode; defaulted decisions recorded in `PLAN.md`.
-
-**Scope boundary — deliberately out.** Blocks without `blocked_next:` (no free-text parsing); the re-plan turn; gate-end arming and `plan-next`; parallel dispatch.
 
 **Status: active.**
 
