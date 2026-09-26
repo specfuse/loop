@@ -29,6 +29,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 ### Changed
 
 - **Dispatched sessions no longer read every rule file before acting.** The preamble opened with "Read `.specfuse/rules/` in full": ten files, 11,573 words, fetched by tool call at the start of every session on top of the 2,461 words `.claude/CLAUDE.md` already injects, then carried in every later turn's cache read. The binding block is the contract; the preamble now says so and a session reads a further rule file only when its unit body names it, as close and plan-next bodies already do. (#3422)
+- **Dispatched sessions no longer carry the skills index.** Every `claude -p` dispatch loaded the project's `.claude/skills` index into the session prompt (34 skills and 1,534 words of descriptions in this repository) although a dispatched unit invokes no skill: the narrow-tier instructions are in the preamble and unit bodies name skill files by path, for reading. The driver now passes `--disable-slash-commands`; `defaults.dispatch_skills: true` in `verification.yml` restores the index for a project whose units do call `/skill-name` in-session. (#3423)
 
 ## [0.24.0+umbrella.0.15.0] - 2026-09-25
 

@@ -635,6 +635,21 @@ def resolve_retain_on_guard_refusal(verification_cfg: dict) -> bool:
     """
     project = (verification_cfg or {}).get("defaults") or {}
     return bool(project.get("retain_on_guard_refusal", True))
+
+
+def resolve_dispatch_skills(verification_cfg: dict) -> bool:
+    """Whether a dispatched session gets the project's skills index (#3423).
+
+    Reads `defaults.dispatch_skills` from verification.yml — the same
+    `defaults` block `resolve_max_attempts` reads. Defaults to False: a
+    dispatched work unit invokes no skill (the narrow-tier instructions are in
+    the preamble and unit bodies name skill files by path, for reading), so
+    the index — 34 skills and 1,534 words of descriptions in this repository —
+    is fixed context carried in every turn's cache read for nothing. Set true
+    for a project whose units do invoke `/skill-name` in-session.
+    """
+    project = (verification_cfg or {}).get("defaults") or {}
+    return bool(project.get("dispatch_skills", False))
 # Per-gate-command wall-clock ceiling. A gate that exceeds it is killed and the gate
 # FAILS (not hangs) — so a deadlocked command (e.g. a test blocked on input()) can't
 # stall the whole driver indefinitely. Generous vs real suites (this repo's is ~20s).
@@ -4791,7 +4806,8 @@ def format_reverification_worklist(wu: WorkUnit, feature_dir: Path) -> str:
 
 
 def dispatch(wu: WorkUnit, failure_note: str | None,
-             cost_tracking: bool = True) -> tuple[str, dict | None]:
+             cost_tracking: bool = True, *,
+             dispatch_skills: bool | None = None) -> tuple[str, dict | None]:
     """Run a fresh agent session for this WU.
 
     When `cost_tracking` is True (default), requests JSON output from
@@ -4811,6 +4827,19 @@ def dispatch(wu: WorkUnit, failure_note: str | None,
     cmd = [p.replace("{model}", wu.model).replace("{effort}", wu.effort)
            for p in CLAUDE_CMD]
     cmd = resolve_claude_cmd(cmd)
+    if dispatch_skills is None:
+        # Resolved here rather than threaded through execute_unit_attempt:
+        # every test fake of dispatch() takes the three positional arguments
+        # and nothing else, and the yaml read is nothing next to a session.
+        try:
+            dispatch_skills = resolve_dispatch_skills(load_verification())
+        except Exception:  # noqa: BLE001 - an unreadable config keeps the default
+            dispatch_skills = False
+    if not dispatch_skills:
+        # #3423: a dispatched unit invokes no skill, so the skills index is
+        # fixed context paid on every turn. `defaults.dispatch_skills: true`
+        # in verification.yml restores it (resolve_dispatch_skills).
+        cmd.insert(2, "--disable-slash-commands")
     if wu.unsandboxed:
         # Per-WU sandbox-escape. Audited via the unsandboxed_dispatch event
         # emitted in run()'s attempt loop; rationale lives in WU frontmatter.

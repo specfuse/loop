@@ -454,6 +454,13 @@ separately carry `auto_repaired_files_changed` in `extras`: the list of
 declared-but-unchanged `files_changed` paths the driver dropped on the
 WU's behalf rather than failing the attempt over.
 
+**Dispatch without the skills index (#3423).** A dispatched session runs
+`claude -p --disable-slash-commands` by default: a work unit invokes no
+skill, and the project's skills index (34 skills, 1,534 words of descriptions
+in the loop repository) is fixed context carried in every turn's cache read.
+`defaults.dispatch_skills: true` in `verification.yml` restores the index for
+a project whose units do call `/skill-name` in-session.
+
 Retention interacts with spinning detection, not around it:
 `detect_deterministic_refusal_repeat` (#1415) escalates a WU to
 `blocked_human` when two consecutive attempts emit an identical refusal
