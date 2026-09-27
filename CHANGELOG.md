@@ -28,6 +28,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ### Fixed
 
+- **A RESULT in a bare fence led by `RESULT`, or with `reason:` for `blocked_reason:`, is read as written.** A session that fenced its block as ```` ``` ```` with `RESULT` on the first line found no ```` ```result ```` match, so an honest `blocked` was read as `complete` and verified against an untouched tree. `parse_result_block` now falls back to such a fence when no proper result block exists, and `agent_reported_blocked` accepts `reason:` when `blocked_reason:` is absent. (#3442)
 - **A blocked RESULT with a multi-line reason is read as blocked, not as complete.** The strict mini-YAML parser rejects YAML block scalars on purpose, so a RESULT whose `blocked_reason` used `|` parsed as nothing: the driver treated the attempt as `complete`, ran verification on a tree the session had honestly left untouched, and escalated the repeat as a spin. `parse_result_block` now retries such a block with a RESULT-only lenient read (top-level scalars, `|` and `>` block scalars, simple lists) before degrading; operator config parsing is unchanged. (#3436)
 
 ## [0.26.0+umbrella.0.15.0] - 2026-09-26

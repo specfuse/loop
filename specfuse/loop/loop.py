@@ -6008,6 +6008,11 @@ def is_zero_token_attempt(usage: dict | None) -> bool:
 
 
 RESULT_BLOCK_RE = re.compile(r"```result\s*\n(.*?)\n```", re.DOTALL)
+# #3442: a near-miss the contract does not name but agents do emit — any fence
+# whose first line is `RESULT` (FEAT-2026-0116/T01). Consulted only when no
+# proper ```result block exists, so a quoted example never overrides one.
+NEAR_MISS_RESULT_BLOCK_RE = re.compile(
+    r"```[^\n`]*\n[ \t]*RESULT:?[ \t]*\n(.*?)\n```", re.DOTALL | re.IGNORECASE)
 
 
 def parse_result_block(stdout: str) -> dict | None:
@@ -6023,6 +6028,8 @@ def parse_result_block(stdout: str) -> dict | None:
     if not stdout:
         return None
     matches = list(RESULT_BLOCK_RE.finditer(stdout))
+    if not matches:
+        matches = list(NEAR_MISS_RESULT_BLOCK_RE.finditer(stdout))
     if not matches:
         return None
     body = matches[-1].group(1)  # LAST result block — agents may discuss before it
@@ -6250,6 +6257,9 @@ def agent_reported_blocked(stdout: str) -> tuple[bool, str | None]:
     if not parsed or parsed.get("status") != "blocked":
         return False, None
     reason = parsed.get("blocked_reason")
+    if reason is None:
+        # #3442: agents also write `reason:`; the contract's key still wins.
+        reason = parsed.get("reason")
     return True, (str(reason) if reason is not None else None)
 
 
