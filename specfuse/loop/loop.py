@@ -6028,6 +6028,14 @@ def parse_result_block(stdout: str) -> dict | None:
     body = matches[-1].group(1)  # LAST result block — agents may discuss before it
     try:
         parsed = _miniyaml.parse(body)
+    except _miniyaml.MiniYAMLError:
+        # #3436: the commonest "malformed" RESULT is a well-formed one using a
+        # YAML block scalar (`blocked_reason: |`), which the strict subset
+        # rejects on purpose for config. Retry with a RESULT-only lenient read
+        # before degrading, so an honest multi-line block is not mistaken for
+        # a silent `complete`. Only the parser's own documented-subset error
+        # takes this path; any other exception still degrades to None below.
+        return _lenient_result_parse(body)
     except Exception:  # noqa: BLE001 - intentional: see comment below
         # Broad catch is deliberate AND scoped to this site only. The agent's
         # stdout is the least-trusted input in the system (free-form LLM text
@@ -6044,6 +6052,55 @@ def parse_result_block(stdout: str) -> dict | None:
         # philosophy. Do not broaden those.
         return None
     return parsed if isinstance(parsed, dict) else None
+
+
+_LENIENT_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):(?:\s+(.*))?$")
+
+
+def _lenient_result_parse(body: str) -> dict | None:
+    """Best-effort read of a RESULT block the strict mini-YAML parser refused (#3436).
+
+    Understands only what agents actually emit at the top level: `key: value`
+    scalars (quotes stripped), `key: |` / `key: >` block scalars (literal keeps
+    line breaks, folded joins with spaces), and `key:` followed by indented
+    `- item` scalar lines. Anything nested deeper is skipped rather than
+    guessed. Returns None unless a `status` field was read, so a block that is
+    genuinely unreadable still degrades to verify() as before. Used only for
+    agent stdout, never for operator-authored config.
+    """
+    lines = body.splitlines()
+    out: dict = {}
+    i = 0
+    while i < len(lines):
+        m = _LENIENT_KEY_RE.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        key, rhs = m.group(1), (m.group(2) or "").strip()
+        i += 1
+        child: list[str] = []
+        while i < len(lines) and (not lines[i].strip() or lines[i][:1] in (" ", "\t")):
+            child.append(lines[i])
+            i += 1
+        while child and not child[-1].strip():
+            child.pop()
+        if rhs[:1] in ("|", ">"):
+            indents = [len(c) - len(c.lstrip()) for c in child if c.strip()]
+            cut = min(indents) if indents else 0
+            text = [c[cut:] if c.strip() else "" for c in child]
+            out[key] = ("\n".join(text) if rhs[0] == "|"
+                        else " ".join(s.strip() for s in text if s.strip()))
+        elif rhs:
+            out[key] = rhs.strip("\"'")
+        elif child and all(c.lstrip().startswith("- ") for c in child if c.strip()
+                           and len(c) - len(c.lstrip()) == min(
+                               len(x) - len(x.lstrip()) for x in child if x.strip())):
+            base = min(len(x) - len(x.lstrip()) for x in child if x.strip())
+            items = [c.strip()[2:].strip().strip("\"'") for c in child
+                     if c.strip() and len(c) - len(c.lstrip()) == base]
+            if all(":" not in it for it in items):
+                out[key] = items
+    return out if "status" in out else None
 
 
 PROGRESS_FILENAME = "PROGRESS.md"
