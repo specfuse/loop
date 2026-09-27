@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A blocked RESULT with a multi-line reason is read as blocked, not as complete.** The strict mini-YAML parser rejects YAML block scalars on purpose, so a RESULT whose `blocked_reason` used `|` parsed as nothing: the driver treated the attempt as `complete`, ran verification on a tree the session had honestly left untouched, and escalated the repeat as a spin. `parse_result_block` now retries such a block with a RESULT-only lenient read (top-level scalars, `|` and `>` block scalars, simple lists) before degrading; operator config parsing is unchanged. (#3436)
+
 ## [0.26.0+umbrella.0.15.0] - 2026-09-26
 
 ### Added
