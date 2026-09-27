@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.26.1+umbrella.0.15.0] - 2026-09-27
+
 ### Fixed
 
 - **A RESULT in a bare fence led by `RESULT`, or with `reason:` for `blocked_reason:`, is read as written.** A session that fenced its block as ```` ``` ```` with `RESULT` on the first line found no ```` ```result ```` match, so an honest `blocked` was read as `complete` and verified against an untouched tree. `parse_result_block` now falls back to such a fence when no proper result block exists, and `agent_reported_blocked` accepts `reason:` when `blocked_reason:` is absent. (#3442)
