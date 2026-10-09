@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bug-lane `/fix-bug` session runs inside its item worktree, not the operator's checkout.** With per-item worktrees on, the item's tree reached the headless session only as a `Working directory:` line in its prompt; the `claude` process itself started in the run's directory, so a session that followed `/fix-bug`'s own branch workflow branched, committed and rebased in the primary checkout, and later items ran on its branch. The `claude` dispatch is now started with `cwd` set to the item worktree. (#3420)
+
 ## [0.26.1+umbrella.0.15.0] - 2026-09-27
 
 ### Fixed
