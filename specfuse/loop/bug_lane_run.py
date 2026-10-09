@@ -216,6 +216,10 @@ _BUCKET_PENDING = "pending"
 
 _CI_FAILING = "fail"
 
+#: What `gh pr checks` prints on stderr, with empty stdout and exit 1, for a PR
+#: that has no check runs at all (#3445).
+_NO_CHECKS_REPORTED = "no checks reported"
+
 
 def _required_checks_verdict(rows: list, required) -> str:
     """`""` when every required check is present and passing, else why not.
@@ -272,6 +276,12 @@ def _read_ci_conclusion_once(
     # only a fallback when there is no parseable output.
     stdout = getattr(result, "stdout", None)
     if not stdout:
+        # #3445: `gh` never prints `[]` for a PR with no check runs. It prints
+        # nothing, says `no checks reported on the '<branch>' branch` on stderr
+        # and exits 1. That is the "no check registered yet" state below, not
+        # an unreadable read, and must not decline as `ci_not_green`.
+        if _NO_CHECKS_REPORTED in (getattr(result, "stderr", None) or ""):
+            return _CI_PENDING
         return _CI_UNKNOWN
 
     try:
