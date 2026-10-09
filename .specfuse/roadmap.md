@@ -116,6 +116,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-2026-0117) |
+| FEAT-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-2026-0200) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1035,6 +1036,17 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Scope boundary — deliberately out.** `rules.bugs.min_severity` itself and where any project sets it. The `severity_aliases` map (#3349, shipped). `SEVERITY_ORDER`'s four values — this feature reads that vocabulary, it does not extend it. Overwriting any description a repository wrote for a `severity:*` label it defined itself — where a repo declares its own scheme, specfuse provisions nothing and contributes nothing.
 
 **Status: active.**
+
+<a id="feat-2026-0200"></a>
+## FEAT-2026-0200 — Bug lane: detect merge conflicts and branch items from current main
+
+**Why.** A bug-lane PR that conflicts with `main` gets no CI at all, and the lane can only call that pending; every item branches from the run-start SHA, so after the first merge each PR touching an append-only file (`CHANGELOG.md`) conflicts (#3445).
+
+**Goal.** Branch each item from the current `origin/main`, decline a conflicted PR with a distinct `merge_conflict` reason and label naming the conflicting paths, and optionally re-apply a branch's added lines for configured append-only files.
+
+**Benefits.** Escalations say what is actually wrong; most conflicts never happen; operators stop hand-rebasing `CHANGELOG.md`.
+
+**Status: planned.**
 
 ## Notes
 
