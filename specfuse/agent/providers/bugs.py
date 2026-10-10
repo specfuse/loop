@@ -80,13 +80,18 @@ def _bounded_runner(
     its prompt, so a session that followed `/fix-bug`'s own branch workflow
     from where it was launched branched and committed in the operator's
     primary checkout. The process boundary is what isolates it, not the text.
+
+    Any other keyword a caller passes is forwarded untouched (#3452). The
+    red-on-base probe runs its command with `cwd=<base worktree>`; a wrapper
+    that accepted only `check` raised `TypeError`, which the probe's
+    fail-closed `except` turned into `red_on_base_unverified` on every PR.
     """
 
-    def wrapped(argv, check: bool = False):
-        kwargs = {"check": check}
+    def wrapped(argv, check: bool = False, **kwargs):
+        kwargs["check"] = check
         if argv and argv[0] == "claude":
             kwargs["timeout"] = timeout_seconds
-            kwargs["cwd"] = working_dir
+            kwargs.setdefault("cwd", working_dir)
         return runner(argv, **kwargs)
 
     return wrapped
