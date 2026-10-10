@@ -63,7 +63,9 @@ _FIX_BUG_STOPPED_OUTCOMES = (OUTCOME_REFUSED, OUTCOME_COULD_NOT_PROCEED)
 #: "fix" its own "PR was declined by the merge guardrails" report.
 _HUMAN_OWNED_LABELS = frozenset({NEEDS_HUMAN_LABEL, "blocked-wu"})
 
-def _bounded_runner(runner: Callable, timeout_seconds: float) -> Callable:
+def _bounded_runner(
+    runner: Callable, timeout_seconds: float, working_dir: str = "."
+) -> Callable:
     """Wrap *runner* so the headless `claude` dispatch inside `run_bug_lane`
     (`specfuse.loop.bug_lane_run:595`, off-limits to this WU) gets a real
     wall-clock timeout without editing that module.
@@ -72,12 +74,19 @@ def _bounded_runner(runner: Callable, timeout_seconds: float) -> Callable:
     `claude` -- `run_bug_lane` reuses this same runner for every `gh` read
     and write along the way, and those must not inherit an item-scale
     deadline meant for one long-running session.
+
+    The same call is started with `cwd=working_dir` (#3420). The item's
+    worktree used to reach the session only as a `Working directory:` line in
+    its prompt, so a session that followed `/fix-bug`'s own branch workflow
+    from where it was launched branched and committed in the operator's
+    primary checkout. The process boundary is what isolates it, not the text.
     """
 
     def wrapped(argv, check: bool = False):
         kwargs = {"check": check}
         if argv and argv[0] == "claude":
             kwargs["timeout"] = timeout_seconds
+            kwargs["cwd"] = working_dir
         return runner(argv, **kwargs)
 
     return wrapped
@@ -725,7 +734,7 @@ class BugsProvider:
         started = time.monotonic()
         try:
             result = run_bug_lane(
-                _bounded_runner(self._runner, timeout_seconds),
+                _bounded_runner(self._runner, timeout_seconds, self._working_dir),
                 self._repo,
                 issue_number,
                 working_dir=self._working_dir,

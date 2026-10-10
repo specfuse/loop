@@ -26,6 +26,11 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bug-lane `/fix-bug` session runs inside its item worktree, not the operator's checkout.** With per-item worktrees on, the item's tree reached the headless session only as a `Working directory:` line in its prompt; the `claude` process itself started in the run's directory, so a session that followed `/fix-bug`'s own branch workflow branched, committed and rebased in the primary checkout, and later items ran on its branch. The `claude` dispatch is now started with `cwd` set to the item worktree. (#3420)
+- **A bug-lane PR with no check runs reads as pending, not as a red build.** On a PR with no checks, `gh pr checks --json` prints nothing to stdout, reports `no checks reported on the '<branch>' branch` on stderr and exits 1; the lane read the empty output as unreadable and declined the PR `ci_not_green`, so six PRs that conflicted with `main` (and on which GitHub therefore never ran CI) were reported red with zero check runs. That output is now the "no check registered yet" state the poll already treats as pending, so the PR declines `ci_pending` at the deadline, or proceeds if checks appear. Detecting the conflict itself is a separate change. (#3445)
+
 ## [0.26.1+umbrella.0.15.0] - 2026-09-27
 
 ### Fixed
