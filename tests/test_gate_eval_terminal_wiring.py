@@ -44,6 +44,15 @@ _WU_BODY = (
 # ---------------------------------------------------------------------------
 
 
+def _seed_changelog(root: Path, feature_id: str) -> None:
+    """An Unreleased entry tracing to *feature_id*, so a clean terminal gate may
+    auto-close (#3448: without one it falls back to the full close)."""
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n### Added\n\n"
+        f"- **The feature.** What it adds. ({feature_id})\n"
+    )
+
+
 def _write_plan_md(fdir: Path, feature_id: str, gate_num: int = 1) -> None:
     (fdir / "PLAN.md").write_text(
         f"---\n"
@@ -172,6 +181,7 @@ class TestMaybeAutoCloseTerminalAutoPath(unittest.TestCase):
         _write_wu_impl(fdir, f"{self.feature_id}/T01")
         _write_wu_close(fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
         _write_gate_file(fdir, self.gate_num)
+        _seed_changelog(fdir, self.feature_id)
         _write_task_completed_event(fdir, f"{self.feature_id}/T01")
 
         self.gate = _make_gate_node(fdir, self.feature_id, self.gate_num)
@@ -276,6 +286,7 @@ class TestMaybeAutoCloseTerminalPerWuOptOut(unittest.TestCase):
             f"auto_close_disabled: true\n---\n\n# Close\n"
         )
         _write_gate_file(fdir, self.gate_num)
+        _seed_changelog(fdir, self.feature_id)
         _write_task_completed_event(fdir, f"{self.feature_id}/T01")
         self.gate = _make_gate_node(fdir, self.feature_id, self.gate_num)
         self.close_wu = _make_close_wu(
@@ -329,6 +340,7 @@ class TestMaybeAutoCloseTerminalDeliverableMissing(unittest.TestCase):
         )
         _write_wu_close(fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
         _write_gate_file(fdir, self.gate_num)
+        _seed_changelog(fdir, self.feature_id)
         _write_task_completed_event(fdir, f"{self.feature_id}/T01")
         self.gate = _make_gate_node(fdir, self.feature_id, self.gate_num)
         self.close_wu = _make_close_wu(
@@ -381,6 +393,7 @@ class TestMaybeAutoCloseTerminalNonAutoPath(unittest.TestCase):
         _write_wu_impl(fdir, f"{self.feature_id}/T01")
         _write_wu_close(fdir, f"{self.feature_id}/G{self.gate_num}-CLOSE")
         _write_gate_file(fdir, self.gate_num)
+        _seed_changelog(fdir, self.feature_id)
         # blocked_human event on the impl WU prevents auto=True
         _write_blocked_human_event(fdir, f"{self.feature_id}/T01")
 

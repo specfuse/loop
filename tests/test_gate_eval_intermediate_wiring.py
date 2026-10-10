@@ -716,6 +716,10 @@ class TestMaybeAutoCloseTerminalIdempotent(unittest.TestCase):
         self.feature_id = "FEAT-2026-9975"
         fdir = self.root
         self.fdir = fdir
+        (fdir / "CHANGELOG.md").write_text(  # #3448: terminal auto-close needs one
+            "# Changelog\n\n## [Unreleased]\n\n### Added\n\n"
+            f"- **The feature.** What it adds. ({self.feature_id})\n"
+        )
 
         (fdir / "PLAN.md").write_text(
             f"---\n"

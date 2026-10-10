@@ -65,9 +65,19 @@ _ARCHIVE_SCAFFOLD = (
 )
 
 
+def _seed_changelog(root: Path, feature_id: str) -> None:
+    """An Unreleased entry tracing to *feature_id*, so a clean terminal gate may
+    auto-close (#3448: without one it falls back to the full close)."""
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n### Added\n\n"
+        f"- **The feature.** What it adds. ({feature_id})\n"
+    )
+
+
 def scaffold_feature(root: Path, feature_id: str, slug: str, branch: str) -> Path:
     """Single terminal gate: one implementation WU, one close WU (auto-close
     enabled — the default), matching test_lifecycle_integration.py's shape."""
+    _seed_changelog(root, feature_id)
     (root / ".specfuse" / "roadmap.md").write_text(_roadmap(feature_id, slug))
     (root / ".specfuse" / "roadmap-archive.md").write_text(_ARCHIVE_SCAFFOLD)
 
