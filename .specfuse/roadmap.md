@@ -117,6 +117,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-2026-0116) |
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-2026-0117) |
 | FEAT-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-2026-0200) |
+| FEAT-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-2026-0201) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1045,6 +1046,17 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Goal.** Branch each item from the current `origin/main`, decline a conflicted PR with a distinct `merge_conflict` reason and label naming the conflicting paths, and optionally re-apply a branch's added lines for configured append-only files.
 
 **Benefits.** Escalations say what is actually wrong; most conflicts never happen; operators stop hand-rebasing `CHANGELOG.md`.
+
+**Status: planned.**
+
+<a id="feat-2026-0201"></a>
+## FEAT-2026-0201 — Every shipped feature leaves a CHANGELOG trace
+
+**Why.** A terminal gate that auto-closes never ran close-k, so generator FEAT-2026-0199 shipped in 0.14.0 with no CHANGELOG entry (#3448). The bug fix (#3454) stops a terminal gate auto-closing without an Unreleased entry, but that costs every feature with no consumer-visible change a close dispatch, close-k still passes when the consumer-visible section is absent, and nothing checks at release time.
+
+**Goal.** Add a `consumer_visible: none` PLAN field that lets a feature with no consumer-visible change auto-close its terminal gate again; make close-k fail when the consumer-visible section is absent rather than pass; and add a release-time backstop that refuses to stamp a release when a FEAT merged since the previous tag has no trace in the new section, unless it declared `consumer_visible: none`.
+
+**Benefits.** No feature ships without a changelog trace, whatever path it closed through; features with nothing to announce keep a cheap auto-close; a wrong `n/a` or a manual close is caught before release, not by a downstream consumer.
 
 **Status: planned.**
 
