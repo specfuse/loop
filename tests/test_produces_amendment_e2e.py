@@ -31,8 +31,18 @@ from tests._workspace import integration_workspace
 loop = load_loop()
 
 
+def _seed_changelog(root: Path, feature_id: str) -> None:
+    """An Unreleased entry tracing to *feature_id*, so a clean terminal gate may
+    auto-close (#3448: without one it falls back to the full close)."""
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n### Added\n\n"
+        f"- **The feature.** What it adds. ({feature_id})\n"
+    )
+
+
 def _write_minimal_feature(root: Path, feature_id: str, slug: str,
                            branch: str, produces: list) -> Path:
+    _seed_changelog(root, feature_id)
     fdir = root / f".specfuse/features/{feature_id}-{slug}"
     fdir.mkdir(parents=True)
     t_id = f"{feature_id}/T01"

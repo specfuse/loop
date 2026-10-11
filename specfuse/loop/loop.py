@@ -9138,6 +9138,23 @@ def resolve_auto_close_override(
     return (False, "")
 
 
+def _unreleased_has_entry_for(repo_root: Path, feature_id: str) -> bool:
+    """Whether `CHANGELOG.md`'s Unreleased section traces to *feature_id* (#3448).
+
+    A missing or unparseable changelog counts as no entry: the caller then
+    dispatches the full close, which is where that gap is reported.
+    """
+    changelog = repo_root / CHANGELOG_PATH
+    if not changelog.is_file():
+        return False
+    try:
+        unreleased = parse_changelog(changelog.read_text()).unreleased()
+    except Exception:  # noqa: BLE001 - fall back to the close, never crash the gate
+        return False
+    entries = unreleased.entries if unreleased else []
+    return changelog_has_entry_for(entries, feature_id)
+
+
 def maybe_auto_close_terminal(
     feature_dir: Path,
     feature_id: str,
@@ -9187,6 +9204,23 @@ def maybe_auto_close_terminal(
         return False, AutoCloseDecision(
             auto=False,
             reasons=[f"declared_deliverable_missing: {reason}"],
+            metrics=decision.metrics,
+            gate_id=gate.number,
+            feature_id=feature_id,
+            predicate_version=decision.predicate_version,
+        )
+    if not _unreleased_has_entry_for(repo_root, feature_id):
+        # #3448: the auto path never dispatches the close, so close-k
+        # (`assert_changelog_entry_for_contract_changes`) never runs and a
+        # feature could ship with no CHANGELOG entry whatever it changed.
+        # Dispatch the close instead: close-k runs there, and a feature with
+        # no consumer-visible change can still write the explicit `n/a`.
+        return False, AutoCloseDecision(
+            auto=False,
+            reasons=[
+                f"no_changelog_entry: {CHANGELOG_PATH} Unreleased has no "
+                f"entry tracing to {feature_id}"
+            ],
             metrics=decision.metrics,
             gate_id=gate.number,
             feature_id=feature_id,
