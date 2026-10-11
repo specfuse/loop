@@ -118,6 +118,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-2026-0117) |
 | FEAT-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-2026-0200) |
 | FEAT-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-2026-0201) |
+| FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1057,6 +1058,17 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Goal.** Add a `consumer_visible: none` PLAN field that lets a feature with no consumer-visible change auto-close its terminal gate again; make close-k fail when the consumer-visible section is absent rather than pass; and add a release-time backstop that refuses to stamp a release when a FEAT merged since the previous tag has no trace in the new section, unless it declared `consumer_visible: none`.
 
 **Benefits.** No feature ships without a changelog trace, whatever path it closed through; features with nothing to announce keep a cheap auto-close; a wrong `n/a` or a manual close is caught before release, not by a downstream consumer.
+
+**Status: planned.**
+
+<a id="feat-2026-0202"></a>
+## FEAT-2026-0202 — Bug lane: skip issues that are fixed and awaiting verification
+
+**Why.** Issues are selected with `--state open` and only `needs-human` and `blocked-wu` are excluded, so an issue a merged PR moved to the repository's own resolved/QA status (`status:resolved` on clabonte/generator) is triaged as a bug again and listed as "newly triaged as bug and not dispatched — re-run to fix them"; a re-run would dispatch an already-fixed issue. Selection also checks only *open* PRs, so an issue fixed by a merged `refs #N` PR that left it open is dispatched again (#3447 point 3; the superseded-PR half shipped as a bug fix). Related: #1583, which has no triage category for "already delivered".
+
+**Goal.** A `rules.bugs.skip_labels` policy key naming the labels that mean "fixed, awaiting verification"; `BugsProvider.advertise`, triage's bug intake and the run summary's not-dispatched list all skip issues carrying one; selection also skips an issue with a merged PR that closes or references it since its last triage, reported rather than silent. Decide alongside #1583 whether a `resolved` triage category replaces or complements the labels.
+
+**Benefits.** No bug-lane spend re-fixing work already in `main`; the run summary stops telling the operator to re-run for issues that need no work; a repository's own verification workflow is respected without renaming its labels.
 
 **Status: planned.**
 
