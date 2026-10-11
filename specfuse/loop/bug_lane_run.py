@@ -76,6 +76,7 @@ __all__ = (
     "OUTCOME_MERGED",
     "OUTCOME_DECLINED",
     "OUTCOME_AUTOMERGE_OFF",
+    "OUTCOME_SUPERSEDED",
     "run_bug_lane",
     "pr_ci_conclusion",
     "add_guardrail_label",
@@ -103,6 +104,12 @@ OUTCOME_DECLINED = "declined"
 #: automatically" section that read "the merge guardrails declined the PR",
 #: when the guardrails had passed and the dial was the only thing in the way.
 OUTCOME_AUTOMERGE_OFF = "automerge_off"
+
+#: The issue was closed while the item ran -- by another PR, or by hand -- so
+#: the lane's PR duplicates work already done and was closed (#3447). Not an
+#: escalation: nothing is left for a human to decide, and asking one to merge
+#: a duplicate of a closed fix was the bug.
+OUTCOME_SUPERSEDED = "superseded"
 
 #: `needs_decision` escalates like the other two: the session opened no PR,
 #: so there is nothing for the guardrails to evaluate, and what the operator
@@ -596,6 +603,70 @@ def _issue_provenance(runner: Callable, repo: str, issue_number: int) -> Optiona
     return {"kind": "triaged_issue", "ref": str(issue_number)}
 
 
+def _superseded_by(
+    runner: Callable, repo: str, issue_number: int, own_pr: int
+) -> tuple[bool, Optional[int]]:
+    """Whether *issue_number* was closed by something other than *own_pr*,
+    and the PR that closed it when GitHub knows one (#3447).
+
+    Fails open: an unreadable issue reads as not superseded, so a `gh` hiccup
+    leaves the lane exactly where it was before this check existed rather than
+    closing a PR that may be the only fix.
+    """
+    result = runner(
+        [
+            "gh", "issue", "view", str(issue_number), "--repo", repo,
+            "--json", "state,closedByPullRequestsReferences",
+        ],
+        check=False,
+    )
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return False, None
+    try:
+        data = json.loads(result.stdout)
+    except ValueError:
+        return False, None
+    if not isinstance(data, dict) or data.get("state") != "CLOSED":
+        return False, None
+    closers = [
+        ref.get("number")
+        for ref in data.get("closedByPullRequestsReferences") or ()
+        if isinstance(ref, dict)
+    ]
+    closers = [n for n in closers if isinstance(n, int) and not isinstance(n, bool)]
+    if own_pr in closers:
+        return False, None
+    return True, (closers[0] if closers else None)
+
+
+def _close_superseded(
+    runner: Callable,
+    repo: str,
+    issue_number: int,
+    pr_number: int,
+    by_pr: Optional[int],
+    dispatch_profile: tuple,
+) -> BugLaneResult:
+    """Close the lane's own PR as a duplicate of a fix already done (#3447)."""
+    by = f"PR #{by_pr}" if by_pr else "another change"
+    runner(
+        [
+            "gh", "pr", "close", str(pr_number), "--repo", repo,
+            "--comment",
+            f"Superseded: issue #{issue_number} was closed by {by} while the "
+            "bug lane was evaluating this PR. Closing it as a duplicate.",
+        ],
+        check=False,
+    )
+    return BugLaneResult(
+        outcome=OUTCOME_SUPERSEDED,
+        reason=f"superseded by {by}",
+        pr_number=pr_number,
+        evidence=(f"Issue #{issue_number} was closed by {by}.",),
+        dispatch_profile=dispatch_profile,
+    )
+
+
 #: Branch shape `/fix-bug` uses for an issue it is fixing.
 _WORK_BRANCH_GLOB = "fix/issue-{number}-*"
 
@@ -865,6 +936,13 @@ def run_bug_lane(
             outcome=OUTCOME_DECLINED, reason=_REASON_PR_NOT_FOUND,
             pr_number=None, dispatch_profile=_profile)
 
+    # #3447: another session may have fixed the issue while this one ran.
+    superseded, by_pr = _superseded_by(runner, repo, issue_number, pr_number)
+    if superseded:
+        return _close_superseded(
+            runner, repo, issue_number, pr_number, by_pr, _profile,
+        )
+
     changed_files, diff_lines = _pr_changed_files_and_diff_lines(runner, repo, pr_number)
     limits = bug_lane_limits(policy_path)
     provenance = _issue_provenance(runner, repo, issue_number)
@@ -934,6 +1012,15 @@ def run_bug_lane(
         state_reader=state_reader,
     )
     dial = resolve_bug_automerge(policy_path)
+
+    # #3447: asked again after the CI wait, the longest stretch an item spends
+    # -- the observed duplicates were closed elsewhere during exactly this
+    # window. Neither merging nor escalating a duplicate of a closed fix.
+    superseded, by_pr = _superseded_by(runner, repo, issue_number, pr_number)
+    if superseded:
+        return _close_superseded(
+            runner, repo, issue_number, pr_number, by_pr, _profile,
+        )
 
     if dial and decision.eligible:
         runner(
