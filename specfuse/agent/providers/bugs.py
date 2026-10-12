@@ -41,6 +41,7 @@ from specfuse.loop.bug_lane_run import (
     OUTCOME_DECLINED,
     OUTCOME_MERGED,
     OUTCOME_REFUSED,
+    OUTCOME_SUPERSEDED,
     REASON_PR_NOT_FOUND,
     pr_closes_issue,
     run_bug_lane,
@@ -775,6 +776,15 @@ class BugsProvider:
             return ActionOutcome(
                 status=STATUS_COMPLETED,
                 detail=f"{result.reason or ''}{profile_note}", spend=0)
+
+        if result.outcome == OUTCOME_SUPERSEDED:
+            # #3447: the issue was closed elsewhere and the lane closed its own
+            # duplicate PR. Done, with nothing for a human to merge or decide.
+            return ActionOutcome(
+                status=STATUS_COMPLETED,
+                detail=f"{result.reason}; PR #{result.pr_number} closed{profile_note}",
+                spend=0,
+            )
 
         detail = result.reason if result.reason is not None else result.outcome
 
