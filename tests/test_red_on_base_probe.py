@@ -28,9 +28,13 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
 from specfuse.loop.red_on_base import (
+    probe_red_on_base,
     select_test_files,
-    test_was_red_on_base,
 )
+
+
+def _verdict(*args, **kwargs):
+    return probe_red_on_base(*args, **kwargs).verdict
 
 
 class SelectingTheTestsToRun(unittest.TestCase):
@@ -75,7 +79,7 @@ class TheProbe(unittest.TestCase):
             calls.append(argv)
             return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-        verdict = test_was_red_on_base(
+        verdict = _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="", worktree_root=self._tmp(),
         )
@@ -84,7 +88,7 @@ class TheProbe(unittest.TestCase):
         self.assertEqual([], calls, "nothing runs without a declared command")
 
     def test_no_test_files_is_unverified(self):
-        verdict = test_was_red_on_base(
+        verdict = _verdict(
             lambda argv, **kw: SimpleNamespace(returncode=0, stdout="", stderr=""),
             base_sha="abc123", test_files=[],
             command_template="pytest {tests}", worktree_root=self._tmp(),
@@ -96,12 +100,12 @@ class TheProbe(unittest.TestCase):
         seen = {}
 
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             seen["cmd"] = argv
             return SimpleNamespace(returncode=1, stdout="1 failed", stderr="")
 
-        verdict = test_was_red_on_base(
+        verdict = _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -113,7 +117,7 @@ class TheProbe(unittest.TestCase):
         def runner(argv, **kw):
             return SimpleNamespace(returncode=0, stdout="ok", stderr="")
 
-        verdict = test_was_red_on_base(
+        verdict = _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -122,11 +126,11 @@ class TheProbe(unittest.TestCase):
 
     def test_a_worktree_that_will_not_create_is_unverified(self):
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 return SimpleNamespace(returncode=1, stdout="", stderr="fatal")
             raise AssertionError("must not run tests without a worktree")
 
-        verdict = test_was_red_on_base(
+        verdict = _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -137,7 +141,7 @@ class TheProbe(unittest.TestCase):
         def runner(argv, **kw):
             raise OSError("boom")
 
-        self.assertIsNone(test_was_red_on_base(
+        self.assertIsNone(_verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         ))
@@ -146,13 +150,13 @@ class TheProbe(unittest.TestCase):
         removals = []
 
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 if "remove" in argv:
                     removals.append(argv)
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             return SimpleNamespace(returncode=1, stdout="", stderr="")
 
-        test_was_red_on_base(
+        _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -168,7 +172,7 @@ class TheProbe(unittest.TestCase):
             argvs.append(list(argv))
             return SimpleNamespace(returncode=1, stdout="", stderr="")
 
-        test_was_red_on_base(
+        _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -198,12 +202,12 @@ class TheCommandGetsAShell(unittest.TestCase):
         seen = {}
 
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             seen["argv"] = list(argv)
             return SimpleNamespace(returncode=1, stdout="", stderr="")
 
-        test_was_red_on_base(
+        _verdict(
             runner, base_sha="abc123", test_files=["src/test/java/FooTest.java"],
             command_template=template, worktree_root=self._tmp(),
         )
@@ -231,12 +235,12 @@ class TheCommandGetsAShell(unittest.TestCase):
         seen = {}
 
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             seen["argv"] = list(argv)
             return SimpleNamespace(returncode=1, stdout="", stderr="")
 
-        test_was_red_on_base(
+        _verdict(
             runner, base_sha="abc", test_files=["tests/a b.py", "tests/c;d.py"],
             command_template="pytest {tests}", worktree_root=self._tmp(),
         )
@@ -267,11 +271,11 @@ class ACommandThatCannotRunIsUnverified(unittest.TestCase):
 
     def _verdict_for(self, exit_code):
         def runner(argv, **kw):
-            if argv[:2] == ["git", "worktree"]:
+            if argv[:1] == ["git"]:
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
             return SimpleNamespace(returncode=exit_code, stdout="", stderr="")
 
-        return test_was_red_on_base(
+        return _verdict(
             runner, base_sha="abc123", test_files=["tests/test_a.py"],
             command_template="./scripts/probe.sh {tests}",
             worktree_root=self._tmp(),

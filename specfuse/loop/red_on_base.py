@@ -48,6 +48,7 @@ from __future__ import annotations
 import contextlib
 import shlex
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -56,6 +57,35 @@ from typing import Any, Callable, Optional
 #: "found but not executable", 127 is "not found". Neither says anything about
 #: the test, so neither may be read as a verdict on it (#3403).
 _COULD_NOT_EXECUTE = frozenset({126, 127})
+
+#: How much of git's stderr a reason carries -- enough to name the failure,
+#: short enough to sit on one line of an escalation.
+_STDERR_CHARS = 200
+
+
+@dataclass(frozen=True)
+class RedOnBaseProbe:
+    """The probe's verdict, and why it could not reach one (#3416).
+
+    `reason` is empty whenever `verdict` is a bool. When `verdict` is `None`
+    it names the step that gave up -- `no_command`, `no_test_files`,
+    `base_sha_lookup_failed`, `fetch_failed: <stderr>`,
+    `worktree_add_failed: <stderr>`, `runner_raised: <exc>` or
+    `could_not_execute: exit <n>` -- so an `unverified` decline can be acted
+    on without re-deriving the probe by hand.
+    """
+
+    verdict: Optional[bool]
+    reason: str = ""
+
+
+def _stderr_of(result: Any) -> str:
+    text = (getattr(result, "stderr", "") or "").strip().replace("\n", " ")
+    return text[:_STDERR_CHARS]
+
+
+def _unverified(reason: str) -> RedOnBaseProbe:
+    return RedOnBaseProbe(verdict=None, reason=reason)
 
 
 def select_test_files(changed_files: Any, test_paths: Any) -> list:
@@ -79,15 +109,16 @@ def select_test_files(changed_files: Any, test_paths: Any) -> list:
     return [path for path in candidates if path.startswith(roots)]
 
 
-def test_was_red_on_base(
+def probe_red_on_base(
     runner: Callable,
     *,
     base_sha: str,
     test_files: Any,
     command_template: str,
     worktree_root: Any,
-) -> Optional[bool]:
-    """`True` if *test_files* fail at *base_sha*, `False` if they pass, else `None`.
+) -> RedOnBaseProbe:
+    """`True` if *test_files* fail at *base_sha*, `False` if they pass, else `None`
+    -- with the reason, when `None` (#3416).
 
     `command_template` is the operator's own command with a `{tests}`
     placeholder, run through `sh -c` so pipes, `||` and `$(...)` all work --
@@ -106,32 +137,45 @@ def test_was_red_on_base(
     diff all land there.
     """
     if not command_template or not str(command_template).strip():
-        return None
+        return _unverified("no_command")
     files = [str(p) for p in (test_files or [])]
     if not files:
-        return None
+        return _unverified("no_test_files")
+    if not base_sha or not str(base_sha).strip():
+        return _unverified("base_sha_lookup_failed")
     root = Path(str(worktree_root)) / f"red-on-base-{uuid.uuid4().hex[:12]}"
 
     try:
+        # #3416: `base_sha` is the base branch's tip on GitHub *now*. A PR
+        # merged there during the run moves it past the local `origin/main`,
+        # and `worktree add` of a commit the clone has never seen fails. Fetch
+        # it by SHA when it is absent.
+        present = runner(
+            ["git", "cat-file", "-e", f"{base_sha}^{{commit}}"], check=False,
+        )
+        if getattr(present, "returncode", 1) != 0:
+            fetched = runner(["git", "fetch", "origin", str(base_sha)], check=False)
+            if getattr(fetched, "returncode", 1) != 0:
+                return _unverified(f"fetch_failed: {_stderr_of(fetched)}")
         created = runner(
             ["git", "worktree", "add", "--detach", str(root), str(base_sha)],
             check=False,
         )
-    except Exception:  # noqa: BLE001 - a probe never takes the run down with it
-        return None
+    except Exception as exc:  # noqa: BLE001 - a probe never takes the run down with it
+        return _unverified(f"runner_raised: {exc}")
     if getattr(created, "returncode", 1) != 0:
-        return None
+        return _unverified(f"worktree_add_failed: {_stderr_of(created)}")
 
     try:
         rendered = command_template.replace(
             "{tests}", " ".join(shlex.quote(p) for p in files))
         try:
             result = runner(["sh", "-c", rendered], cwd=str(root), check=False)
-        except Exception:  # noqa: BLE001 - same reason as above
-            return None
+        except Exception as exc:  # noqa: BLE001 - same reason as above
+            return _unverified(f"runner_raised: {exc}")
         code = getattr(result, "returncode", None)
         if not isinstance(code, int):
-            return None
+            return _unverified("could_not_execute: no exit code")
         if code in _COULD_NOT_EXECUTE:
             # The shell could not run the command at all. That is "the check
             # never ran", not "the test failed" -- and the difference is the
@@ -144,10 +188,10 @@ def test_was_red_on_base(
             # through on the strength of a command that never ran. Fail-open,
             # in the one guardrail whose entire job is to be harder to satisfy
             # than the others.
-            return None
+            return _unverified(f"could_not_execute: exit {code}")
         # Non-zero at the base is the proof we want: the test the PR adds does
         # not hold on the tree the fix was written against.
-        return code != 0
+        return RedOnBaseProbe(verdict=code != 0)
     finally:
         # Cleanup failure must not mask the verdict the probe just produced,
         # and a leaked worktree is a tidiness problem rather than a correctness
@@ -155,3 +199,4 @@ def test_was_red_on_base(
         # and ruff's S110 stays meaningful where it fires for real.
         with contextlib.suppress(Exception):
             runner(["git", "worktree", "remove", "--force", str(root)], check=False)
+

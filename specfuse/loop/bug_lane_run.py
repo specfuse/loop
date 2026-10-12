@@ -51,13 +51,14 @@ from specfuse.loop.bug_lane import (
     REASON_DIFF_TOO_LARGE,
     REASON_JUDGE_PATH_TOUCHED,
     REASON_NO_TEST_EVIDENCE,
+    REASON_RED_ON_BASE_UNVERIFIED,
     evaluate_merge_guardrails,
     evaluate_pr_shape_guardrails,
     judge_paths_touched,
 )
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.labels import provision_labels
-from specfuse.loop.red_on_base import select_test_files, test_was_red_on_base
+from specfuse.loop.red_on_base import probe_red_on_base, select_test_files
 from specfuse.loop.triage import parse_marker
 from specfuse.monitor.diagnosis import DiagnosisParseError
 from specfuse.monitor.diagnosis import parse as parse_diagnosis
@@ -722,9 +723,21 @@ def unpushed_work_for_issue(runner: Callable, issue_number: int) -> Optional[tup
 
 
 def _evidence_for(
-    reason: str, changed_files: list, diff_lines: int, limits: dict
+    reason: str,
+    changed_files: list,
+    diff_lines: int,
+    limits: dict,
+    *,
+    red_on_base_reason: str = "",
 ) -> tuple:
     """Render the measurement behind *reason* as sentences a human can read."""
+    if reason == REASON_RED_ON_BASE_UNVERIFIED and red_on_base_reason:
+        # #3416: which step of the probe gave up. Without it `unverified` is
+        # the one decline nobody can act on short of re-running it by hand.
+        return (
+            f"The red-on-base probe could not run the PR's tests at the merge "
+            f"base: {red_on_base_reason}.",
+        )
     if reason == REASON_JUDGE_PATH_TOUCHED:
         hits = judge_paths_touched(changed_files)
         if not hits:
@@ -990,14 +1003,16 @@ def run_bug_lane(
     # test run.
     require_red = resolve_require_red_on_base(policy_path)
     red_on_base = None
+    red_on_base_reason = ""
     if require_red:
-        red_on_base = test_was_red_on_base(
+        probe = probe_red_on_base(
             runner,
             base_sha=_merge_base_sha(runner, repo, pr_number),
             test_files=select_test_files(changed_files, limits["test_paths"]),
             command_template=resolve_red_on_base_command(policy_path),
             worktree_root=tempfile.gettempdir(),
         )
+        red_on_base, red_on_base_reason = probe.verdict, probe.reason
 
     decision = evaluate_merge_guardrails(
         changed_files=changed_files,
@@ -1047,6 +1062,9 @@ def run_bug_lane(
     # case returned above.
     return _declined(
         runner, repo, pr_number, decision.reason, working_dir,
-        evidence=_evidence_for(decision.reason, changed_files, diff_lines, limits),
+        evidence=_evidence_for(
+            decision.reason, changed_files, diff_lines, limits,
+            red_on_base_reason=red_on_base_reason,
+        ),
         dispatch_profile=_profile,
     )

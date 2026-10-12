@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 """#3452: the red-on-base probe runs through the bug lane's *real* runner.
 
-`test_was_red_on_base` runs the operator's command with `runner(..., cwd=)`.
+The red-on-base probe runs the operator's command with `runner(..., cwd=)`.
 The runner the bug lane hands it is `BugsProvider`'s `_bounded_runner`
 wrapper around the agent's `_default_runner`, and neither accepted `cwd`.
 The `TypeError` was swallowed by the probe's fail-closed `except`, so every
@@ -32,7 +32,11 @@ if str(REPO_ROOT) not in sys.path:
 from specfuse.agent.providers.bugs import BugsProvider
 from specfuse.agent.run import KIND_BUG, ActionItem
 from specfuse.loop.bug_lane_run import BugLaneResult, OUTCOME_MERGED
-from specfuse.loop.red_on_base import test_was_red_on_base
+from specfuse.loop.red_on_base import probe_red_on_base
+
+
+def _verdict(*args, **kwargs):
+    return probe_red_on_base(*args, **kwargs).verdict
 
 
 def _git(cwd, *args):
@@ -70,7 +74,7 @@ class TestRedOnBaseThroughTheLaneRunner(unittest.TestCase):
 
         def fake_lane(passed_runner, repo, issue_number, **kwargs):
             verdicts.append(
-                test_was_red_on_base(
+                _verdict(
                     passed_runner,
                     base_sha=self.base,
                     test_files=["tests/test_x.py"],
