@@ -793,30 +793,37 @@ def _declined(
     )
 
 
-def _merge_base_sha(runner: Callable, repo: str, pr_number: int) -> str:
-    """The commit the PR is measured against, or `""` (#3377).
+def _pr_base_and_head(runner: Callable, repo: str, pr_number: int) -> tuple[str, str]:
+    """`(baseRefOid, headRefOid)` for the PR, `""` for whichever is unknown.
 
     `baseRefOid` is the tip of the base branch as GitHub sees it now, which is
-    what the PR would merge into — the tree the fix was written against, and so
-    the tree its new test must fail on. An empty string makes the probe decline
-    rather than guess a commit.
+    what the PR would merge into -- the tree its new test must fail on
+    (#3377). `headRefOid` is the PR's own commit, whose test files the probe
+    runs on that tree (#3417). An empty string makes the probe decline rather
+    than guess a commit.
     """
     try:
         result = runner(
             ["gh", "pr", "view", str(pr_number), "--repo", repo,
-             "--json", "baseRefOid"],
+             "--json", "baseRefOid,headRefOid"],
             check=False,
         )
     except Exception:  # noqa: BLE001 - a lookup failure declines, never raises
-        return ""
+        return "", ""
     if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
-        return ""
+        return "", ""
     try:
         payload = json.loads(result.stdout)
     except ValueError:
-        return ""
-    sha = payload.get("baseRefOid") if isinstance(payload, dict) else None
-    return sha.strip() if isinstance(sha, str) else ""
+        return "", ""
+    if not isinstance(payload, dict):
+        return "", ""
+
+    def _sha(key: str) -> str:
+        value = payload.get(key)
+        return value.strip() if isinstance(value, str) else ""
+
+    return _sha("baseRefOid"), _sha("headRefOid")
 
 
 def dispatch_profile_for(
@@ -1005,9 +1012,11 @@ def run_bug_lane(
     red_on_base = None
     red_on_base_reason = ""
     if require_red:
+        base_sha, head_sha = _pr_base_and_head(runner, repo, pr_number)
         probe = probe_red_on_base(
             runner,
-            base_sha=_merge_base_sha(runner, repo, pr_number),
+            base_sha=base_sha,
+            head_sha=head_sha,
             test_files=select_test_files(changed_files, limits["test_paths"]),
             command_template=resolve_red_on_base_command(policy_path),
             worktree_root=tempfile.gettempdir(),

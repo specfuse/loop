@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0. See LICENSE.
 """The red-on-base probe fetches a base it lacks, and says why it gave up (#3416).
 
-`_merge_base_sha` asks GitHub for `baseRefOid` -- the base branch's tip *now*.
+The lane asks GitHub for `baseRefOid` -- the base branch's tip *now*.
 Any PR merged to it during a run moves that tip past the local clone's
 `origin/main`, so `git worktree add <sha>` failed and every later bug-lane PR
 in the run declined `red_on_base_unverified` (5 of 5 on clabonte/generator,

@@ -69,8 +69,8 @@ class RedOnBaseProbe:
 
     `reason` is empty whenever `verdict` is a bool. When `verdict` is `None`
     it names the step that gave up -- `no_command`, `no_test_files`,
-    `base_sha_lookup_failed`, `fetch_failed: <stderr>`,
-    `worktree_add_failed: <stderr>`, `runner_raised: <exc>` or
+    `base_sha_lookup_failed`, `head_sha_lookup_failed`, `fetch_failed: <stderr>`,
+    `worktree_add_failed: <stderr>`, `overlay_failed: <stderr>`, `runner_raised: <exc>` or
     `could_not_execute: exit <n>` -- so an `unverified` decline can be acted
     on without re-deriving the probe by hand.
     """
@@ -86,6 +86,22 @@ def _stderr_of(result: Any) -> str:
 
 def _unverified(reason: str) -> RedOnBaseProbe:
     return RedOnBaseProbe(verdict=None, reason=reason)
+
+
+def _ensure_commit(runner: Callable, sha: str) -> str:
+    """Make *sha* present locally; return `""`, or a `fetch_failed` reason.
+
+    The base and head SHAs come from GitHub, and either can be a commit the
+    local clone has never seen -- the base after a merge during the run
+    (#3416), the head when the PR was pushed from elsewhere.
+    """
+    present = runner(["git", "cat-file", "-e", f"{sha}^{{commit}}"], check=False)
+    if getattr(present, "returncode", 1) == 0:
+        return ""
+    fetched = runner(["git", "fetch", "origin", str(sha)], check=False)
+    if getattr(fetched, "returncode", 1) != 0:
+        return f"fetch_failed: {_stderr_of(fetched)}"
+    return ""
 
 
 def select_test_files(changed_files: Any, test_paths: Any) -> list:
@@ -116,6 +132,7 @@ def probe_red_on_base(
     test_files: Any,
     command_template: str,
     worktree_root: Any,
+    head_sha: Optional[str] = None,
 ) -> RedOnBaseProbe:
     """`True` if *test_files* fail at *base_sha*, `False` if they pass, else `None`
     -- with the reason, when `None` (#3416).
@@ -132,6 +149,14 @@ def probe_red_on_base(
     without executing anything. It also means the template is POSIX shell; a
     Windows runner would need its own spelling, and none is invented here.
 
+    *head_sha* is the PR's head (#3417). Its version of each test path is
+    overlaid onto the base worktree before the command runs, so the probe
+    runs the PR's tests against the base's production code. Without it, the
+    base's own copy of a modified test file ran: a test added to an existing
+    class, or an updated golden, passed there and could never read red. A
+    blank *head_sha* -- the caller could not look it up -- is unverified;
+    `None` skips the overlay.
+
     `None` means "could not establish", never "fine". A worktree that will not
     create, a runner that raises, no declared command and no test file in the
     diff all land there.
@@ -143,20 +168,21 @@ def probe_red_on_base(
         return _unverified("no_test_files")
     if not base_sha or not str(base_sha).strip():
         return _unverified("base_sha_lookup_failed")
+    if head_sha is not None and not str(head_sha).strip():
+        return _unverified("head_sha_lookup_failed")
     root = Path(str(worktree_root)) / f"red-on-base-{uuid.uuid4().hex[:12]}"
 
     try:
         # #3416: `base_sha` is the base branch's tip on GitHub *now*. A PR
         # merged there during the run moves it past the local `origin/main`,
         # and `worktree add` of a commit the clone has never seen fails. Fetch
-        # it by SHA when it is absent.
-        present = runner(
-            ["git", "cat-file", "-e", f"{base_sha}^{{commit}}"], check=False,
-        )
-        if getattr(present, "returncode", 1) != 0:
-            fetched = runner(["git", "fetch", "origin", str(base_sha)], check=False)
-            if getattr(fetched, "returncode", 1) != 0:
-                return _unverified(f"fetch_failed: {_stderr_of(fetched)}")
+        # it by SHA when it is absent -- and the head too, for the overlay.
+        for sha in (base_sha, head_sha):
+            if sha is None:
+                continue
+            missing = _ensure_commit(runner, str(sha))
+            if missing:
+                return _unverified(missing)
         created = runner(
             ["git", "worktree", "add", "--detach", str(root), str(base_sha)],
             check=False,
@@ -167,6 +193,16 @@ def probe_red_on_base(
         return _unverified(f"worktree_add_failed: {_stderr_of(created)}")
 
     try:
+        if head_sha is not None:
+            try:
+                overlaid = runner(
+                    ["git", "-C", str(root), "checkout", str(head_sha), "--", *files],
+                    check=False,
+                )
+            except Exception as exc:  # noqa: BLE001 - same reason as above
+                return _unverified(f"runner_raised: {exc}")
+            if getattr(overlaid, "returncode", 1) != 0:
+                return _unverified(f"overlay_failed: {_stderr_of(overlaid)}")
         rendered = command_template.replace(
             "{tests}", " ".join(shlex.quote(p) for p in files))
         try:
