@@ -190,10 +190,11 @@ class TheCapGatesPROpeningLanes(unittest.TestCase):
             "the cap is about opening pull requests; triage opens none",
         )
 
-    def test_an_unreadable_pr_listing_does_not_suppress(self):
-        # `snapshot.prs` is empty with `prs_error` set when the listing fails.
-        # Counting that as zero open PRs is the right read: the cap must not
-        # fire on a number the run could not actually measure.
+    def test_an_unreadable_pr_listing_holds_back_pr_opening_work(self):
+        # #3412: `snapshot.prs` is empty with `prs_error` set when the listing
+        # fails. Reading that as zero open PRs turned the cap off for the run
+        # -- exactly when the run can see least. With a cap declared, the
+        # PR-opening kinds wait for a readable listing instead.
         class _FailingPRs(_PRListRunner):
             def __call__(self, argv, check=False):
                 if list(argv)[:3] == ["gh", "pr", "list"]:
@@ -204,7 +205,7 @@ class TheCapGatesPROpeningLanes(unittest.TestCase):
         reports = []
         _run(_FailingPRs(open_prs=99), (bugs,), _POLICY.format(cap="1"), reports)
 
-        self.assertEqual(bugs.executed, ["bug-7"])
+        self.assertEqual(bugs.executed, [])
 
 
 class TheSnapshotRefreshMovesTheCap(unittest.TestCase):

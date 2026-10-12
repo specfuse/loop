@@ -863,17 +863,15 @@ def run_agent(
                 report=report,
             )
 
-        # The PR listing failing is NOT a refusal: `max_open_prs` deliberately
-        # reads an unreadable listing as zero rather than firing on a number
-        # the run could not measure. But that leaves the cap silently disabled
-        # for this run, so the summary says so rather than the operator finding
-        # it in the log. Whether it should refuse instead is a live question
-        # (#3392 item 3) and not decided here.
-        if snapshot.prs_error:
+        # The PR listing failing is NOT a refusal (#3412): work that opens no
+        # PR still runs. Under a declared `max_open_prs`, the PR-opening kinds
+        # are held back in the dispatch loop below until a refresh reads the
+        # listing; without a cap there is nothing to enforce, and the run says
+        # only that the listing is unreadable.
+        if snapshot.prs_error and agent_policy.resolve_max_open_prs(policy_path) is None:
             report(
-                "snapshot: max_open_prs is NOT enforced this run — the PR "
-                "listing could not be read, so the cap has no number to "
-                "measure against"
+                "snapshot: the PR listing could not be read — no "
+                "max_open_prs is declared, so nothing is held back"
             )
 
         budget_kwargs = {}
@@ -924,7 +922,9 @@ def run_agent(
         #: only so the report fires on each transition rather than every pass:
         #: `snapshot.prs` is re-read between items (#3338), so a PR merged
         #: mid-run genuinely lifts this and the operator should see both edges.
-        open_prs_suppressed = False
+        # Why PR-opening kinds are held: "" (not held), "unreadable" or
+        # "cap" -- so each change of reason is reported once (#3412).
+        open_prs_suppressed = ""
         #: (signature, consecutive count) for the run-level failure breaker
         #: (#3343). Reset by an escalation with a different cause and by any
         #: completed item — a run making progress is not in the state this
@@ -964,26 +964,40 @@ def run_agent(
                 snapshot_stale = False
 
             # A failed PR listing leaves `snapshot.prs` empty with
-            # `prs_error` set. That reads as zero here, deliberately: the cap
-            # must not fire on a number the run could not measure, and #3338's
-            # refresh already carries the previous listing forward when it can.
+            # `prs_error` set -- not zero open PRs, an unknown number (#3412).
+            # Reading it as zero turned the cap off for the run, exactly when
+            # the run could see least. Under a cap the PR-opening kinds wait,
+            # the way reaching the cap already makes them wait, until a refresh
+            # reads the listing. #3338's refresh carries a previously read
+            # listing forward, so `prs_error` stays set only while this run has
+            # never read one.
             suppressed_kinds = frozenset()
-            if _open_pr_cap is not None and len(snapshot.prs) >= _open_pr_cap:
+            if _open_pr_cap is not None and snapshot.prs_error:
                 suppressed_kinds = PR_OPENING_KINDS
-                if not open_prs_suppressed:
+                if open_prs_suppressed != "unreadable":
+                    report(
+                        f"max_open_prs NOT measurable — the PR listing could "
+                        f"not be read ({snapshot.prs_error}); not starting "
+                        f"{', '.join(sorted(PR_OPENING_KINDS))} items until it "
+                        f"can be"
+                    )
+                    open_prs_suppressed = "unreadable"
+            elif _open_pr_cap is not None and len(snapshot.prs) >= _open_pr_cap:
+                suppressed_kinds = PR_OPENING_KINDS
+                if open_prs_suppressed != "cap":
                     report(
                         f"max_open_prs reached — {len(snapshot.prs)} open PR(s) "
                         f"at a cap of {_open_pr_cap}; not starting "
                         f"{', '.join(sorted(PR_OPENING_KINDS))} items until one "
                         f"closes"
                     )
-                    open_prs_suppressed = True
+                    open_prs_suppressed = "cap"
             elif open_prs_suppressed:
                 report(
                     f"max_open_prs cleared — {len(snapshot.prs)} open PR(s) "
                     f"against a cap of {_open_pr_cap}"
                 )
-                open_prs_suppressed = False
+                open_prs_suppressed = ""
 
             action, a, b = _select_next(
                 providers,
