@@ -54,10 +54,11 @@ def _payload(**overrides) -> EscalationPayload:
 class _Runner:
     """Records argv, and answers `gh issue view` with a configurable issue."""
 
-    def __init__(self, *, body: str = "", comments: tuple = ()):
+    def __init__(self, *, body: str = "", comments: tuple = (), labels: tuple = ()):
         self.calls: list[list] = []
         self._body = body
         self._comments = comments
+        self._labels = labels
 
     def __call__(self, argv, check: bool = False):
         self.calls.append(list(argv))
@@ -70,6 +71,7 @@ class _Runner:
                     {
                         "body": self._body,
                         "comments": [{"body": c} for c in self._comments],
+                        "labels": [{"name": n} for n in self._labels],
                     }
                 ),
                 stderr="",
@@ -155,7 +157,12 @@ class TestAnnotateEscalation(unittest.TestCase):
         self.assertNotIn("--add-assignee", edits[0])
 
     def test_second_call_posts_no_duplicate_comment_but_repairs_labels(self):
-        runner = _Runner(comments=("<!-- specfuse:escalation id=bug-240 -->\nolder",))
+        # Still `needs-human`: the same standing escalation, not a re-arm
+        # (#3446, where a marker without the label is posted again).
+        runner = _Runner(
+            comments=("<!-- specfuse:escalation id=bug-240 -->\nolder",),
+            labels=(NEEDS_HUMAN_LABEL,),
+        )
 
         annotate_escalation(
             240, "bug-240", category="blocked-wu", repo="o/r",

@@ -404,16 +404,25 @@ def emit_issue_with_body(
     return number or CREATED_NUMBER_UNKNOWN
 
 
-def _issue_carries_marker(
+def _issue_carries_standing_escalation(
     runner: Callable, repo: str, issue_number: int, correlation_id: str
 ) -> bool:
-    """True when *issue_number*'s body or comments already carry this marker."""
+    """True when *issue_number* carries this marker **and** `needs-human`.
+
+    The marker alone is not enough (#3446). An operator re-arms an escalated
+    issue by removing `needs-human`, and the bug lane never dispatches an
+    issue that still carries it -- so a marker on an issue without the label
+    is an earlier escalation the operator has already answered, and a new one
+    has to be posted. Deduplicating on the marker alone left five re-armed
+    issues showing only their stale reason after a run that escalated each
+    of them again.
+    """
     marker = _correlation_marker(correlation_id)
     result = runner(
         [
             "gh", "issue", "view", str(issue_number),
             "--repo", repo,
-            "--json", "body,comments",
+            "--json", "body,comments,labels",
         ],
         check=False,
     )
@@ -424,6 +433,13 @@ def _issue_carries_marker(
     except ValueError:
         return False
     if not isinstance(data, dict):
+        return False
+    labels = {
+        label.get("name")
+        for label in data.get("labels") or []
+        if isinstance(label, dict)
+    }
+    if NEEDS_HUMAN_LABEL not in labels:
         return False
     if marker in (data.get("body") or ""):
         return True
@@ -462,10 +478,11 @@ def annotate_escalation(
     on that issue.** ``emit_escalation`` stays for escalations that are about
     no issue -- a gate review, a queue entry with no feature folder.
 
-    Idempotent on the comment: a second call for the same *correlation_id*
-    finds its marker in the body or an existing comment and posts nothing, but
-    still re-asserts the labels and assignee, so a first call whose label write
-    failed is repaired rather than left half-applied.
+    Idempotent per escalation, not per item (#3446): a second call for the
+    same *correlation_id* while the issue still carries `needs-human` finds
+    its marker and posts nothing, but still re-asserts the labels and
+    assignee. Once the operator has re-armed the issue by removing
+    `needs-human`, the next escalation is a new event and is posted.
 
     Labelling and assigning are best-effort and never raise (#1785's rule: the
     record is the verdict, the label is a projection of it). Only the comment,
@@ -473,7 +490,9 @@ def annotate_escalation(
     """
     runner = runner if runner is not None else _default_runner
 
-    if not _issue_carries_marker(runner, repo, issue_number, correlation_id):
+    if not _issue_carries_standing_escalation(
+        runner, repo, issue_number, correlation_id
+    ):
         body = render_escalation_body(
             correlation_id,
             category=category,
