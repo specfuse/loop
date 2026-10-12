@@ -119,6 +119,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-2026-0200) |
 | FEAT-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-2026-0201) |
 | FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
+| FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | planned | — | [→ detail](#feat-2026-0203) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1069,6 +1070,17 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 **Goal.** A `rules.bugs.skip_labels` policy key naming the labels that mean "fixed, awaiting verification"; `BugsProvider.advertise`, triage's bug intake and the run summary's not-dispatched list all skip issues carrying one; selection also skips an issue with a merged PR that closes or references it since its last triage, reported rather than silent. Decide alongside #1583 whether a `resolved` triage category replaces or complements the labels.
 
 **Benefits.** No bug-lane spend re-fixing work already in `main`; the run summary stops telling the operator to re-run for issues that need no work; a repository's own verification workflow is respected without renaming its labels.
+
+**Status: planned.**
+
+<a id="feat-2026-0203"></a>
+## FEAT-2026-0203 — Monitoring: deploy-correlated HTTP status regression check
+
+**Why.** A deployment that breaks auth configuration, role or scope mapping, routing or content negotiation produces a wave of 4xx responses, not 5xx, so `http-5xx` never fires and the regression ships silently (#248). A continuous 4xx-rate alert would cross the monitoring initiative's "no metrics" boundary, and FEAT-2026-0069 recorded that `invariant` is not the sanctioned route to rate-based detection. The operator's refinement on #248 resolves the tension: a server-fault 4xx spike indicates a backend regression only when it starts soon after a component deployment, so the check can be bounded to a post-deployment window and fire once per deployment -- a discrete artifact, not a metric.
+
+**Goal.** A first-class `http-status-regression` check type in `monitoring.yml`: per component, a `deploy_signal` (`kind`: a CI-emitted annotation, a telemetry application-version change, or an operator-supplied marker query, resolved by the provider adapter), a `window_after_deploy`, and a `codes` list defaulting to the server-fault subset 401, 403, 405, 410, 412, 415, 428 (400, 404 and 409 excluded as legitimate client or business behaviour). It compares occurrences of each code in the window after a rollout with the comparable window before, and emits one finding per (component, status code, deployment), fingerprinted through FEAT-2026-0040's model with the deployment as part of the signature. `/derive-monitoring` proposes the check where a deployment signal is discoverable.
+
+**Benefits.** Catches a regression class that ships silently today, without continuous rate alerting or noise from client-side 4xx spikes days after a deploy; keeps the discrete-artifact model intact instead of eroding `invariant` by precedent; ships the server-fault code subset as a shared documented default rather than a hand-written query per project.
 
 **Status: planned.**
 
