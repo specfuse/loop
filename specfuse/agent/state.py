@@ -47,7 +47,7 @@ from typing import Callable, Optional
 from specfuse.loop import agent_policy
 from specfuse.loop.lint_plan import read_frontmatter
 from specfuse.loop.plan_baseline import load_plan_graph
-from specfuse.loop.triage import parse_marker
+from specfuse.loop.triage import effective_category, parse_marker
 
 DEFAULT_ISSUE_LIST_LIMIT = 100
 DEFAULT_PR_LIST_LIMIT = 100
@@ -166,6 +166,8 @@ def _to_issue_summary(raw: dict) -> IssueSummary:
     )
     marker = parse_marker(raw.get("body") or "")
     category, confidence = marker if marker is not None else (None, None)
+    # #3415: an operator's relabel overrides the marker triage wrote.
+    category = effective_category(category, labels)
     return IssueSummary(
         number=raw.get("number"),
         title=raw.get("title", ""),

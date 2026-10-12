@@ -94,6 +94,35 @@ def label_for(category: str) -> str:
     return CATEGORY_LABEL_MAP[category]
 
 
+def effective_category(marker_category: Optional[str], labels) -> Optional[str]:
+    """The issue's triage category once a human relabel is honoured (#3415).
+
+    The body marker is the record triage wrote; a category label that
+    disagrees with it is an operator's later decision -- promoting a refused
+    bug to a feature is done by relabelling `triage:bug` -> `triage:feature`,
+    which leaves the marker saying `bug`. Reading the marker alone sent ten
+    promoted issues back to `/fix-bug` in one run. So:
+
+    - no category label, or only the marker's own: the marker;
+    - exactly one *other* category label: that category -- the override;
+    - several category labels: `None`, so nothing routes on a contradiction.
+
+    *labels* is any iterable of label names. No marker stays `None`: a label
+    alone was never a triage record, and this does not invent one.
+    """
+    if marker_category is None:
+        return None
+    names = set(labels or ())
+    labelled = {
+        category for category, label in CATEGORY_LABEL_MAP.items() if label in names
+    }
+    if not labelled or labelled == {marker_category}:
+        return marker_category
+    if len(labelled) == 1:
+        return next(iter(labelled))
+    return None
+
+
 def labels_for(category: str) -> tuple:
     """Return every label `category` projects onto its issue, category
     label first. Total over `CATEGORIES`.
@@ -359,6 +388,10 @@ def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT)
             marked_category, marked_confidence = marker
             target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
             existing_labels = {label.get("name") for label in issue.get("labels") or []}
+            if effective_category(marked_category, existing_labels) != marked_category:
+                # #3415: another category's label is a human override, not a
+                # desync -- repairing it would re-label a promoted issue a bug.
+                continue
             if not target_labels or all(label in existing_labels for label in target_labels):
                 continue
             row = dict(issue)
