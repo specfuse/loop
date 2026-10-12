@@ -16,7 +16,7 @@ import subprocess
 import time
 from typing import Any, Callable, Optional, Sequence
 
-from specfuse.agent.invoke import resolve_item_timeout_seconds
+from specfuse.agent.invoke import resolve_item_timeout_seconds, usage_spend
 from specfuse.agent.run import (
     KIND_BUG,
     STATUS_COMPLETED,
@@ -753,9 +753,11 @@ class BugsProvider:
                 status=STATUS_ESCALATED,
                 detail=(
                     f"could_not_proceed: headless /fix-bug session timed out "
-                    f"after {elapsed:.0f}s"
+                    f"after {elapsed:.0f}s (its token spend is not counted)"
                 ),
                 escalation=_timed_out_payload(issue_number, elapsed),
+                # A session cut off by the timeout printed no usage envelope,
+                # so its spend is unknown, not zero (#3419) -- said in `detail`.
                 spend=0,
             )
 
@@ -765,17 +767,14 @@ class BugsProvider:
         # and therefore unevaluable — the one point the proposal called out as
         # mattering most.
         profile_note = _dispatch_profile_note(result.dispatch_profile)
+        # #3419: what the headless `/fix-bug` session spent, on every outcome.
+        # Was a hard-coded 0, so `max_tokens` bounded triage alone.
+        spend = usage_spend(result.usage)
 
         if result.outcome == OUTCOME_MERGED:
-            # `run_bug_lane` (`specfuse/loop/bug_lane_run.py`, T04's file) does
-            # not surface the headless `/fix-bug` session's usage envelope on
-            # `BugLaneResult` -- reporting the bug lane's real spend needs a
-            # change there, out of this WU's reach (`specfuse/loop/` is
-            # off-limits except what T01 declares). Explicit `spend=0` rather
-            # than a value this module cannot actually measure.
             return ActionOutcome(
                 status=STATUS_COMPLETED,
-                detail=f"{result.reason or ''}{profile_note}", spend=0)
+                detail=f"{result.reason or ''}{profile_note}", spend=spend)
 
         if result.outcome == OUTCOME_SUPERSEDED:
             # #3447: the issue was closed elsewhere and the lane closed its own
@@ -783,7 +782,7 @@ class BugsProvider:
             return ActionOutcome(
                 status=STATUS_COMPLETED,
                 detail=f"{result.reason}; PR #{result.pr_number} closed{profile_note}",
-                spend=0,
+                spend=spend,
             )
 
         detail = result.reason if result.reason is not None else result.outcome
@@ -849,6 +848,7 @@ class BugsProvider:
             detail=f"{detail}{profile_note}",
             escalation=escalation,
             environmental=not result.outcome_named,
+            spend=spend,
         )
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:

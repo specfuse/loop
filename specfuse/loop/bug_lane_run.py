@@ -34,7 +34,7 @@ import json
 import tempfile
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Optional
 
 from specfuse.loop.agent_policy import (
@@ -58,6 +58,7 @@ from specfuse.loop.bug_lane import (
 )
 from specfuse.loop.bug_lane_state import GitHubMergeCapState, record_merge
 from specfuse.loop.labels import provision_labels
+from specfuse.loop.loop import parse_claude_json_output
 from specfuse.loop.red_on_base import probe_red_on_base, select_test_files
 from specfuse.loop.triage import parse_marker
 from specfuse.monitor.diagnosis import DiagnosisParseError
@@ -190,6 +191,10 @@ class BugLaneResult:
     #: telling them apart is the difference between "fix this by hand" and
     #: "push the branch that already exists".
     unpushed_work: Optional[tuple] = None
+    #: The headless session's usage envelope (#3419), `None` when the CLI
+    #: printed none. `BugsProvider` turns it into `ActionOutcome.spend`;
+    #: without it `max_tokens` never bounded the lane that spends.
+    usage: Optional[dict] = None
 
 
 #: How long to wait for a freshly-opened PR's checks to reach a conclusion,
@@ -914,6 +919,33 @@ def run_bug_lane(
     always accurate) and merges only when the dial is `on` *and* the
     guardrails are eligible -- the module's single merge call site.
     """
+    session: dict = {}
+    result = _run_bug_lane(
+        runner, repo, issue_number,
+        working_dir=working_dir, policy_path=policy_path, now=now,
+        ci_sleep=ci_sleep, ci_clock=ci_clock,
+        ci_deadline_seconds=ci_deadline_seconds,
+        pr_lookup_sleep=pr_lookup_sleep, session=session,
+    )
+    # #3419: every outcome carries the session's usage, whichever of the
+    # lane's many return paths produced it.
+    return replace(result, usage=session.get("usage"))
+
+
+def _run_bug_lane(
+    runner: Callable,
+    repo: str,
+    issue_number: int,
+    *,
+    working_dir: str,
+    policy_path: Any,
+    now: Optional[float],
+    ci_sleep: Callable,
+    ci_clock: Callable,
+    ci_deadline_seconds: Optional[float],
+    pr_lookup_sleep: Callable,
+    session: dict,
+) -> BugLaneResult:
     model, effort, profile_source = dispatch_profile_for(
         runner, repo, issue_number, policy_path
     )
@@ -921,8 +953,13 @@ def run_bug_lane(
     argv, prompt = build_invocation(
         issue_number, repo, working_dir, model=model, effort=effort
     )
-    invocation = runner(argv + [prompt], check=False)
-    session_output = getattr(invocation, "stdout", "") or ""
+    # #3419: ask for the CLI's JSON envelope so the session's usage is known.
+    # Its `result` is the same final text plain `-p` printed, so everything
+    # below reads `session_output` exactly as before.
+    invocation = runner(argv + ["--output-format", "json", prompt], check=False)
+    session_output, session["usage"] = parse_claude_json_output(
+        getattr(invocation, "stdout", "") or ""
+    )
     outcome = classify_outcome(session_output)
 
     if outcome in _ESCALATING_OUTCOMES:
