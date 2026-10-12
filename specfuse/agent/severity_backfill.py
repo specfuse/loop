@@ -1,6 +1,6 @@
 # Copyright 2026 Specfuse Contributors
 # Licensed under the Apache License, Version 2.0. See LICENSE.
-"""`specfuse-backfill-severity` -- amend already-marked, severity-less issues
+"""`specfuse-backfill-severity` -- amend already-marked, severity-less bugs
 with a severity, for issues the normal triage path will never revisit
 (FEAT-2026-0113).
 
@@ -15,7 +15,7 @@ script is one deliberate command away, not one argv typo on the binary an
 unattended run uses.
 
 `run_backfill` (T10) is the real run shape: `triage.list_severity_backfill_candidates`
-(T08) selects the open, marked, severity-less issues; `labels.read_severity_rubric`
+(T08) selects the open, marked, severity-less bugs; `labels.read_severity_rubric`
 is read exactly once per run; each candidate is classified through
 `triage_invoke.build_invocation` + `triage_invoke.classify_severity` -- the same
 classifier a fresh triage uses, so a low-confidence or out-of-rubric answer fails
@@ -161,7 +161,7 @@ def run_backfill(
     effort: str = "medium",
 ) -> dict:
     """Select, classify, and (only under `apply=True`) write severities for
-    every open, marked, severity-less issue in `repo` -- the real run shape
+    every open, marked, severity-less bug in `repo` -- the real run shape
     T07's single-issue tracer bullet stood in for.
 
     The rubric is read exactly once, before any candidate is even selected:
@@ -289,7 +289,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="specfuse-backfill-severity",
         description=(
-            "Amend every open, marked, severity-less issue with a severity, "
+            "Amend every open, marked, severity-less bug with a severity, "
             "marker first, label projected after."
         ),
     )

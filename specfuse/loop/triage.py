@@ -505,22 +505,26 @@ def _is_backfill_candidate(issue: dict) -> bool:
         return False
     if fields.get("severity"):
         return False
-    category = fields.get("category")
-    if category not in CATEGORIES:
+    if fields.get("category") not in CATEGORIES:
         return False
     if has_finding_marker(body):
         return False
     existing_labels = {label.get("name") for label in issue.get("labels") or []}
     if existing_labels & CATEGORY_LABELS:
         return False
-    return True
+    # Bugs only (#3360): severity gates the bug lane (`rules.bugs.min_severity`)
+    # and nothing else, so a severity on a feature or a question decides
+    # nothing. The first live dry run selected 25 features among 31
+    # candidates. By the effective category, so a bug an operator promoted by
+    # relabelling (#3415) is not one.
+    return effective_category(fields.get("category"), existing_labels) == "bug"
 
 
 def list_severity_backfill_candidates(
     runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT
 ) -> list:
-    """Return up to `limit` already-marked, severity-less open issues a
-    backfill run may amend.
+    """Return up to `limit` already-marked, severity-less open **bugs** a
+    backfill run may amend -- severity gates only the bug lane (#3360).
 
     The inverse of `list_untriaged`'s exclusion: a marked issue is normally
     done and skipped, but one whose marker carries no `severity=` field is
