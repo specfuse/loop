@@ -59,6 +59,16 @@ _SAFETY_FLOOR = (
 )
 
 
+#: Launches the session with background tasks switched off (#3418). A headless
+#: session that backgrounds its test run and ends its turn to wait gets no
+#: notification -- `claude -p` exits when the turn does -- so a finished fix
+#: ended with no outcome marker and escalated `could_not_proceed`. The skill's
+#: own "run gates in the foreground" rule did not stop it; removing
+#: `run_in_background` from the session's tools does. Passed as `--settings`
+#: so it rides in argv, which every runner forwards unchanged.
+_NO_BACKGROUND_SETTINGS = '{"env":{"CLAUDE_CODE_DISABLE_BACKGROUND_TASKS":"1"}}'
+
+
 def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="medium",
                      command=DEFAULT_COMMAND):
     """Build argv and prompt text for a headless `fix-bug` session.
@@ -72,6 +82,7 @@ def build_invocation(issue_number, repo, working_dir, model="sonnet", effort="me
         "-p",
         "--model", model,
         "--effort", effort,
+        "--settings", _NO_BACKGROUND_SETTINGS,
     ]
     prompt = (
         f"{command} {issue_number}\n\n"
