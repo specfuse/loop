@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **`derive-monitoring` warns when a monitoring credential names a variable the application itself reads.** The monitor is a separate process and should hold its own read-only credential (a DLQ peek needs Listen, while an application's Service Bus connection string usually carries Send and Manage), but nothing noticed when `monitoring.yml` was pointed at the application's own variable. After gathering the credential env-var names, the skill now searches the target repo for application reads of each one (code env reads, `.env` files, compose and Helm/Kubernetes `env` blocks, Bicep/Terraform app settings, and the `Section:Key` path in `appsettings*.json` for a `Section__Key` name) and reports each hit as a `credential-reuse` `WARN` with `file:line` evidence, a suggested monitor-only name, and a pointer to `monitoring-secrets-checklist.md`. It is a heuristic that misses indirect reads, and it never blocks the draft; `lint_monitoring` is unchanged. (#254)
+
 ## [0.27.1+umbrella.0.15.0] - 2026-10-14
 
 ### Fixed

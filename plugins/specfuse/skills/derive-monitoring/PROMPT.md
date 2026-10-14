@@ -36,7 +36,8 @@ Read these in the loop scaffold under this repo's `.specfuse/` before acting:
 - `.specfuse/monitoring.yml.example` and
   `.specfuse/monitoring.overrides.yml.example` — the file shapes.
 - `tests/test_derive_monitoring_discovery.py` — the reference implementation
-  of `discover_components`, `suggest_checks`, and `audit_diagnosability`; the
+  of `discover_components`, `suggest_checks`, `audit_diagnosability`, and
+  `audit_credential_reuse`; the
   method below points at it and must not diverge from it.
 
 ## Method (strict order — infer first, ask last)
@@ -116,6 +117,25 @@ produce the draft — every would-be question becomes an explicit `[gap]`
 line in the report. Do not invent an environment, a provider name, a
 credential name, or an `invariant` query.
 
+### Step 3b — Credential reuse audit
+
+The monitor must not reuse the application's own credentials (an app's broker
+connection string usually carries send/manage rights; a DLQ peek needs listen
+only). For each credential env-var name from Step 3, search the repo —
+excluding `.specfuse/` — for the application reading the same variable: env
+reads (`os.environ`/`getenv`, `process.env`,
+`Environment.GetEnvironmentVariable`, `System.getenv`), `.env` files, compose
+`environment:`, Helm/k8s `env:`, Bicep/Terraform app settings, and for a
+`Section__Key` name the `Section` → `Key` path in `appsettings*.json`. Each hit
+is a `credential-reuse` finding with `file:line` evidence, a suggested
+monitor-only name (e.g. `MONITOR_<NAME>`), and a pointer to
+`.specfuse/monitoring-secrets-checklist.md` for a separately provisioned
+read-only credential (e.g. Listen-only on Service Bus). **This is a heuristic**:
+it misses indirect reads (names built at runtime, prefix-stripping config
+providers, secrets mounted under another name), so no hit is not proof. Every
+finding is `WARN`, never `ERROR`; it never blocks the draft. Mirror
+`audit_credential_reuse` in `tests/test_derive_monitoring_discovery.py`.
+
 ### Step 4 — Output
 
 Print, in order:
@@ -131,7 +151,9 @@ Print, in order:
 
 3. **A filled-in reading of `monitoring-secrets-checklist.md`** — one line
    per credential environment-variable name used above, naming where to
-   obtain its value. Names only, never values.
+   obtain its value. Names only, never values. A name with a
+   `credential-reuse` finding says so and names its suggested monitor-only
+   replacement.
 
 4. **The reconciliation report**, in this exact structure:
 
@@ -143,6 +165,11 @@ Print, in order:
 
 ## Diagnosability audit (WARN only)
 - <component>: <property> — <finding, or "none">
+
+## Credential reuse (WARN only, heuristic)
+- <ENV_VAR_NAME>: credential-reuse — read by the application at <file:line>;
+  suggest <MONITOR_ENV_VAR_NAME>, provisioned read-only per
+  .specfuse/monitoring-secrets-checklist.md — or "none found (heuristic)"
 
 ## Questions and answers
 - Q1: <question>  → A: <answer> → shaped <field>.

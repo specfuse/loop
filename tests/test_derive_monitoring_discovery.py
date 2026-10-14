@@ -12,7 +12,7 @@ the skill itself is prose, and this reference implementation is what its
 method section points at), and fixtures are built in-test from an in-module manifest via `tempfile`,
 never committed under `tests/fixtures/`.
 
-Three pure functions:
+Four pure functions:
 
   * `discover_components(tree, patterns)` — keys candidates on deployment
     evidence (`patterns["components"][*].deployment_markers` matched within
@@ -24,6 +24,9 @@ Three pure functions:
     check list. Never emits `invariant` (its `query` is operator-supplied).
   * `audit_diagnosability(tree, components, patterns)` — WARN-only findings
     against `.specfuse/rules/design-for-diagnosis.md`'s five properties.
+  * `audit_credential_reuse(tree, credential_names, patterns)` — WARN-only,
+    heuristic: a monitoring credential env-var name the application itself
+    reads (#254).
 
 Provider-agnostic boundary (mirrors `test_design_for_diagnosis_rule.py`'s
 posture and denylist): evidence patterns are an injected, stack-specific
@@ -40,6 +43,8 @@ give a false pass.
 
 from __future__ import annotations
 
+import json
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -264,6 +269,95 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
                 "its code emits no heartbeat event",
             ))
 
+    return findings
+
+
+CREDENTIAL_REUSE_EXCLUDED_PREFIXES = (".specfuse/",)
+SECRETS_CHECKLIST = ".specfuse/monitoring-secrets-checklist.md"
+
+
+def suggest_monitor_only_name(name: str) -> str:
+    """A distinct name for a separately provisioned, monitor-only credential."""
+    return "MONITOR_" + name.replace("__", "_").upper()
+
+
+def _json_path_line(text: str, path: list) -> int | None:
+    """1-based line of ``path``'s leaf key in a JSON document, or None.
+
+    Key lookup is case-insensitive, matching hierarchical configuration
+    binders that treat ``Section:Key`` paths that way.
+    """
+    try:
+        node = json.loads(text)
+    except ValueError:
+        return None
+    for key in path:
+        if not isinstance(node, dict):
+            return None
+        match = next((k for k in node if k.lower() == key.lower()), None)
+        if match is None:
+            return None
+        node = node[match]
+    lines = text.splitlines()
+    start = 0
+    for key in path:
+        needle = f'"{key.lower()}"'
+        found = next(
+            (i for i in range(start, len(lines)) if needle in lines[i].lower()), None
+        )
+        if found is None:
+            return None
+        start = found
+    return start + 1
+
+
+def audit_credential_reuse(tree: dict, credential_names: list, patterns: dict) -> list[dict]:
+    """#254: flag monitoring credential names the application itself reads.
+
+    A heuristic over repo text: a credential env-var name counts as an
+    application read when it appears as a whole token on any line outside the
+    monitoring scaffold (``CREDENTIAL_REUSE_EXCLUDED_PREFIXES``) — code env
+    reads, ``.env`` files, container/deployment ``env`` blocks and
+    infrastructure app settings all spell the name verbatim. A ``Section__Key``
+    name additionally matches the ``Section`` -> ``Key`` path in the
+    hierarchical config files named by
+    ``patterns["credential_reuse"]["hierarchical_config_suffixes"]``. Indirect
+    reads (a name built at runtime, a prefix-stripping config provider) are
+    missed by construction.
+
+    Every finding is ``WARN``: a project that predates the advice reuses its
+    application credentials by construction.
+    """
+    cfg = patterns.get("credential_reuse", {})
+    suffixes = tuple(cfg.get("hierarchical_config_suffixes", []))
+    findings = []
+    for name in sorted(set(credential_names)):
+        token = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
+        path = name.split("__") if "__" in name else None
+        evidence = []
+        for relpath in sorted(tree):
+            if relpath.startswith(CREDENTIAL_REUSE_EXCLUDED_PREFIXES):
+                continue
+            text = tree[relpath]
+            for lineno, line in enumerate(text.splitlines(), start=1):
+                if token.search(line):
+                    evidence.append(f"{relpath}:{lineno}")
+            if path and suffixes and relpath.endswith(suffixes):
+                lineno = _json_path_line(text, path)
+                if lineno is not None:
+                    evidence.append(f"{relpath}:{lineno}")
+        if not evidence:
+            continue
+        suggested = suggest_monitor_only_name(name)
+        finding = _finding(
+            "credential-reuse",
+            f"credential '{name}' is also read by the application "
+            f"({', '.join(evidence)}); provision a separate read-only "
+            f"credential under a monitor-only name such as '{suggested}' "
+            f"(see {SECRETS_CHECKLIST})",
+        )
+        finding.update({"credential": name, "evidence": evidence, "suggested_name": suggested})
+        findings.append(finding)
     return findings
 
 
@@ -1036,6 +1130,113 @@ class TestOneDeployableManyTriggers(unittest.TestCase):
             path.write_text(text)
             findings = validate_monitoring(path)
         self.assertEqual(findings, [], f"unexpected findings: {findings}")
+
+
+# --- #254: credential reuse ------------------------------------------------
+
+_SKILL_DIR = Path(__file__).parent.parent / "plugins" / "specfuse" / "skills" / "derive-monitoring"
+
+_CREDENTIAL_REUSE_PATTERNS = {
+    "credential_reuse": {
+        "hierarchical_config_suffixes": ["appsettings.json", "appsettings.Production.json"],
+    },
+}
+
+_CREDENTIAL_REUSE_TREE = {
+    "src/app.py": (
+        "import os\n"
+        "\n"
+        'conn = os.environ["ACME_BUS_CONNECTION_STRING"]\n'
+        'other = os.environ["ACME_BUS_CONNECTION_STRING_V2"]\n'
+    ),
+    "deploy/.env": "ACME_BUS_CONNECTION_STRING=placeholder\n",
+    "src/Api/appsettings.json": (
+        "{\n"
+        '  "Logging": {"LogLevel": {"Default": "Information"}},\n'
+        '  "ApplicationInsights": {\n'
+        '    "ConnectionString": ""\n'
+        "  }\n"
+        "}\n"
+    ),
+    ".specfuse/monitoring.yml": (
+        "connection_string: ACME_BUS_CONNECTION_STRING\n"
+        "api_key: ApplicationInsights__ConnectionString\n"
+        "api_key: ACME_MONITOR_ONLY_KEY\n"
+    ),
+}
+
+_CREDENTIAL_NAMES = [
+    "ACME_BUS_CONNECTION_STRING",
+    "ApplicationInsights__ConnectionString",
+    "ACME_MONITOR_ONLY_KEY",
+]
+
+
+class TestCredentialReuseAudit(unittest.TestCase):
+    """#254: a monitoring credential env-var name that the application itself
+    reads is the application's credential, not a separately provisioned
+    read-only one. The audit flags it WARN with file:line evidence and a
+    suggested monitor-only name; a name only the monitoring files mention is
+    quiet."""
+
+    def _findings(self):
+        return audit_credential_reuse(
+            _CREDENTIAL_REUSE_TREE, _CREDENTIAL_NAMES, _CREDENTIAL_REUSE_PATTERNS
+        )
+
+    def _by_name(self):
+        return {f["credential"]: f for f in self._findings()}
+
+    def test_reused_names_are_flagged_warn(self):
+        findings = self._findings()
+        self.assertEqual(
+            sorted(f["credential"] for f in findings),
+            ["ACME_BUS_CONNECTION_STRING", "ApplicationInsights__ConnectionString"],
+        )
+        for finding in findings:
+            self.assertEqual(finding["severity"], "WARN")
+            self.assertIn(finding["severity"], AUDIT_SEVERITIES)
+            self.assertEqual(finding["check"], "credential-reuse")
+
+    def test_env_reads_carry_file_line_evidence(self):
+        finding = self._by_name()["ACME_BUS_CONNECTION_STRING"]
+        self.assertEqual(finding["evidence"], ["deploy/.env:1", "src/app.py:3"])
+
+    def test_section_key_name_matches_hierarchical_config_path(self):
+        finding = self._by_name()["ApplicationInsights__ConnectionString"]
+        self.assertEqual(finding["evidence"], ["src/Api/appsettings.json:4"])
+
+    def test_finding_suggests_a_monitor_only_name_and_the_checklist(self):
+        for finding in self._findings():
+            with self.subTest(credential=finding["credential"]):
+                self.assertTrue(finding["suggested_name"].startswith("MONITOR_"))
+                self.assertNotEqual(finding["suggested_name"], finding["credential"])
+                self.assertIn(finding["suggested_name"], finding["message"])
+                self.assertIn("monitoring-secrets-checklist.md", finding["message"])
+
+    def test_monitoring_files_and_longer_names_do_not_count_as_reads(self):
+        findings = audit_credential_reuse(
+            {
+                ".specfuse/monitoring.yml": "api_key: ACME_MONITOR_ONLY_KEY\n",
+                "src/app.py": 'os.environ["ACME_MONITOR_ONLY_KEY_OLD"]\n',
+            },
+            ["ACME_MONITOR_ONLY_KEY"],
+            _CREDENTIAL_REUSE_PATTERNS,
+        )
+        self.assertEqual(findings, [])
+
+
+class TestSkillNamesTheCredentialReuseCheck(unittest.TestCase):
+    """#254: the skill prose carries the check the reference implements, so
+    the two cannot diverge silently."""
+
+    def test_skill_and_prompt_name_credential_reuse(self):
+        for name in ("SKILL.md", "PROMPT.md"):
+            text = (_SKILL_DIR / name).read_text(encoding="utf-8")
+            with self.subTest(file=name):
+                self.assertIn("credential-reuse", text)
+                self.assertIn("monitoring-secrets-checklist.md", text)
+                self.assertIn("heuristic", text)
 
 
 if __name__ == "__main__":
