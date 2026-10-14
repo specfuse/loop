@@ -100,6 +100,13 @@ provider-agnostic by construction: a check type names a concept
 
 A check `type` outside this set is a validator finding.
 
+On Azure, the App Insights adapters query the Log Analytics workspace named by
+`workspace_id`, so an `invariant` `query` must be written in the workspace
+schema (`AppRequests`, `AppExceptions`, `AppEvents`, with `AppRoleName`,
+`TimeGenerated`, `Properties`), not the classic App Insights names
+(`requests`, `exceptions`, `customEvents`, `cloud_RoleName`, `timestamp`,
+`customDimensions`), which a workspace does not resolve.
+
 ## Check targets
 
 `component` and check `targets` are two different axes, and the schema keeps

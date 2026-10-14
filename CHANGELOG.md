@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The App Insights adapters query the workspace schema, so `error-logs`, `http-5xx` and `heartbeat` work against a current App Insights resource.** The adapters built their KQL from classic App Insights names (`exceptions`, `requests`, `customEvents`, `cloud_RoleName`, `timestamp`, `customDimensions`) but ran it with `query_workspace`, which resolves only the Log Analytics workspace schema, so every telemetry check failed on its first query with `Failed to resolve table or column expression`. The queries now read `AppExceptions`, `AppRequests` and `AppEvents` filtered on `AppRoleName`, and alias columns back to the keys the adapters already read. `monitoring-schema.md` notes that an `invariant` query must use the workspace schema too. (#3468)
+
 ## [0.27.0+umbrella.0.15.0] - 2026-10-12
 
 ### Changed

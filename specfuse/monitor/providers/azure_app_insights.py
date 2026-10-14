@@ -69,19 +69,28 @@ class AppInsightsTransport(Protocol):
 
 def _error_logs_query(component: str) -> str:
     """Built only from *component*, an operator-configured name — never from
-    a telemetry query's returned rows."""
+    a telemetry query's returned rows.
+
+    Every query here runs through ``query_workspace``, so it uses the Log
+    Analytics workspace schema (``AppExceptions``, ``AppRoleName``,
+    ``TimeGenerated``), not the classic App Insights names, which a workspace
+    does not resolve (#3468). Columns are aliased back to the keys the
+    adapters read from each row."""
     return (
-        "exceptions "
-        f"| where cloud_RoleName == '{component}' "
-        "| project timestamp, operation_Id, operation_ParentId, type, outerMessage"
+        "AppExceptions "
+        f"| where AppRoleName == '{component}' "
+        "| project timestamp = TimeGenerated, operation_Id = OperationId, "
+        "operation_ParentId = ParentId, type = ExceptionType, "
+        "outerMessage = OuterMessage"
     )
 
 
 def _http_5xx_query(component: str) -> str:
     return (
-        "requests "
-        f"| where cloud_RoleName == '{component}' and resultCode startswith '5' "
-        "| project timestamp, operation_Id, name, resultCode"
+        "AppRequests "
+        f"| where AppRoleName == '{component}' and ResultCode startswith '5' "
+        "| project timestamp = TimeGenerated, operation_Id = OperationId, "
+        "name = Name, resultCode = ResultCode"
     )
 
 
@@ -205,10 +214,10 @@ def _heartbeat_query(component: str) -> str:
     signal by schedule name, since one component may carry several
     heartbeat targets (T04's `acme-functions-host` shape)."""
     return (
-        "customEvents "
-        f"| where cloud_RoleName == '{component}' and name == 'ScheduleHeartbeat' "
-        "| summarize last_heartbeat = max(timestamp) by "
-        "name = tostring(customDimensions.scheduleName)"
+        "AppEvents "
+        f"| where AppRoleName == '{component}' and Name == 'ScheduleHeartbeat' "
+        "| summarize last_heartbeat = max(TimeGenerated) by "
+        "name = tostring(Properties.scheduleName)"
     )
 
 
