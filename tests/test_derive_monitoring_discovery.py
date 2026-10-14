@@ -23,7 +23,7 @@ Three pure functions:
   * `suggest_checks(component)` — maps a neutral record to a conservative
     check list. Never emits `invariant` (its `query` is operator-supplied).
   * `audit_diagnosability(tree, components, patterns)` — WARN-only findings
-    against `.specfuse/rules/design-for-diagnosis.md`'s four properties.
+    against `.specfuse/rules/design-for-diagnosis.md`'s five properties.
 
 Provider-agnostic boundary (mirrors `test_design_for_diagnosis_rule.py`'s
 posture and denylist): evidence patterns are an injected, stack-specific
@@ -201,7 +201,7 @@ def _any_marker_present(contents, markers) -> bool:
 
 
 def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[dict]:
-    """Audit a tree against the four design-for-diagnosis properties.
+    """Audit a tree against the five design-for-diagnosis properties.
 
     Every finding this function can emit carries severity ``WARN`` — there is
     no ``ERROR`` path (see ``AUDIT_SEVERITIES``). A populated codebase that
@@ -211,9 +211,13 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
 
     ``patterns["diagnosability"]`` supplies the injected marker vocabulary:
     ``correlation_id_markers``, ``structured_logging_markers``, and
-    ``dlq_context_markers``. The per-component role-name property needs no
-    marker table — it checks whether a component's own name string is
-    stamped somewhere in its own evidence files.
+    ``dlq_context_markers``, and ``heartbeat_emission_markers``. The
+    per-component role-name property needs no marker table — it checks
+    whether a component's own name string is stamped somewhere in its own
+    evidence files. The heartbeat-emission property (#3470) is likewise
+    per-component: a component with discovered ``schedules`` (so
+    ``suggest_checks`` gives it heartbeat targets) must show a heartbeat
+    emission marker in its own evidence files.
     """
     diag = patterns.get("diagnosability", {})
     contents = list(tree.values())
@@ -247,6 +251,18 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
             "dlq-error-context",
             "no DLQ failure-context evidence found for message-consuming component(s)",
         ))
+
+    emission_markers = diag.get("heartbeat_emission_markers", [])
+    for component in components:
+        if not component.get("schedules"):
+            continue
+        own = [tree[relpath] for relpath in component.get("evidence", []) if relpath in tree]
+        if not _any_marker_present(own, emission_markers):
+            findings.append(_finding(
+                "heartbeat-emission",
+                f"component '{component['name']}' gets heartbeat targets but "
+                "its code emits no heartbeat event",
+            ))
 
     return findings
 
@@ -918,6 +934,46 @@ class TestAuditIsQuietOnADiagnosableTree(unittest.TestCase):
         ]
         findings = audit_diagnosability(tree, components, _STACK_A_PATTERNS)
         self.assertEqual(findings, [])
+
+
+class TestAuditFlagsHeartbeatTargetsNothingEmits(unittest.TestCase):
+    """#3470: a component that gets heartbeat targets but whose evidence
+    emits no heartbeat event is a design-for-diagnosis gap — its heartbeat
+    check would report every target as a silent schedule from its first
+    run. A component that does emit, or that has no schedules, is quiet."""
+
+    _PATTERNS = {
+        **_STACK_C_PATTERNS,
+        "diagnosability": {
+            "correlation_id_markers": ["ACME_C_CORRELATION"],
+            "structured_logging_markers": ["ACME_C_STRUCTURED_LOG"],
+            "dlq_context_markers": ["ACME_C_DLQ_CONTEXT"],
+            "heartbeat_emission_markers": ["ACME_C_HEARTBEAT_EMIT"],
+        },
+    }
+
+    def _heartbeat_findings(self, tree):
+        components = discover_components(tree, self._PATTERNS)
+        self.assertTrue(components[0]["schedules"])
+        findings = audit_diagnosability(tree, components, self._PATTERNS)
+        return [f for f in findings if f["check"] == "heartbeat-emission"]
+
+    def test_scheduled_component_without_emission_is_flagged(self):
+        findings = self._heartbeat_findings(_STACK_C_TREE)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["severity"], "WARN")
+        self.assertIn("acme-functions-host", findings[0]["message"])
+
+    def test_scheduled_component_that_emits_is_quiet(self):
+        tree = dict(_STACK_C_TREE)
+        tree["host/timer_one.txt"] += "ACME_C_HEARTBEAT_EMIT once per firing\n"
+        self.assertEqual(self._heartbeat_findings(tree), [])
+
+    def test_component_without_schedules_is_quiet(self):
+        components = discover_components(_STACK_A_TREE, _STACK_A_PATTERNS)
+        self.assertFalse(any(c["schedules"] for c in components))
+        findings = audit_diagnosability(_STACK_A_TREE, components, _STACK_A_PATTERNS)
+        self.assertNotIn("heartbeat-emission", {f["check"] for f in findings})
 
 
 class TestAutofixQuotedInEmittedYaml(unittest.TestCase):

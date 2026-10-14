@@ -133,9 +133,17 @@ diverging into two different things.
 ### Step 2 — Diagnosability audit
 
 Audit the discovered components against
-`.specfuse/rules/design-for-diagnosis.md` (T04)'s four properties: correlation-ID
+`.specfuse/rules/design-for-diagnosis.md` (T04)'s five properties: correlation-ID
 propagation, structured logging, per-component role names matching
-`monitoring.yml`, and DLQ failure-context capture. **Findings are reported as
+`monitoring.yml`, heartbeat emission, and DLQ failure-context capture. The
+`heartbeat-emission` property is per-component: any component Step 1 gives
+`heartbeat` targets (it has discovered schedules) must show, in its own code,
+an emission of the rule's heartbeat event — a `ScheduleHeartbeat` custom event
+carrying the schedule's name in a `scheduleName` property, under the
+component's role name. The marker to search for is that event name unless the
+project's pattern table names its own emitter. A component with heartbeat
+targets and no emission gets a `heartbeat-emission` finding: without it, every
+target reports as a silent schedule from the check's first run. **Findings are reported as
 `WARN`, never `ERROR`.** A populated codebase that predates the design-for-diagnosis
 rule violates it everywhere by construction, so an `ERROR` predicate would be
 unsatisfiable on real input and would force the operator to fix unrelated

@@ -74,6 +74,26 @@ log destination must each stamp their own role name on every record; a shared,
 unstamped log stream makes the two indistinguishable once findings are
 harvested.
 
+## Scheduled work emits one heartbeat event per firing
+
+A component that runs work on a schedule emits a heartbeat each time a schedule
+fires, in exactly this shape: one custom event named `ScheduleHeartbeat`,
+carrying the schedule's name in a property named `scheduleName`, emitted under
+the component's role name (the same role name the previous section requires,
+matching the `monitoring.yml` entry). The `scheduleName` value is the same
+string as the `name` of the matching `heartbeat` target in `monitoring.yml`.
+Emit once per firing — not once per item processed, and not only on success
+paths that may never be reached.
+
+A `heartbeat` check finds a silent schedule by the *absence* of this event: it
+computes when each target's schedule last should have fired and looks for a
+`ScheduleHeartbeat` event with that target's `scheduleName`, under that role
+name, at or after that time. A component that emits nothing, emits under a
+different event name or property, or emits without its role name is
+indistinguishable from one whose schedule has stopped — the check reports every
+target as silent from its first run, and the real silence, when it comes, is
+lost in that noise.
+
 ## DLQ entries carry failure context, not just the payload
 
 A message that lands in a dead-letter queue carries, alongside its original

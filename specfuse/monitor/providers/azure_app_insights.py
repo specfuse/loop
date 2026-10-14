@@ -208,6 +208,15 @@ class InvariantAdapter:
         return redact_artifact(artifact)
 
 
+# The heartbeat emission contract (#3470): a component signals one firing of a
+# schedule by emitting one custom event with this name, under its own role name,
+# carrying the schedule's name in this property. Documented for target
+# applications in `.specfuse/rules/design-for-diagnosis.md`;
+# tests/test_heartbeat_emission_contract.py holds the two in step.
+HEARTBEAT_EVENT_NAME = "ScheduleHeartbeat"
+HEARTBEAT_SCHEDULE_PROPERTY = "scheduleName"
+
+
 def _heartbeat_query(component: str) -> str:
     """Built only from *component*, an operator-configured name — never from
     a telemetry query's returned rows. Groups the component's heartbeat
@@ -215,9 +224,10 @@ def _heartbeat_query(component: str) -> str:
     heartbeat targets (T04's `acme-functions-host` shape)."""
     return (
         "AppEvents "
-        f"| where AppRoleName == '{component}' and Name == 'ScheduleHeartbeat' "
+        f"| where AppRoleName == '{component}' "
+        f"and Name == '{HEARTBEAT_EVENT_NAME}' "
         "| summarize last_heartbeat = max(TimeGenerated) by "
-        "name = tostring(Properties.scheduleName)"
+        f"name = tostring(Properties.{HEARTBEAT_SCHEDULE_PROPERTY})"
     )
 
 
