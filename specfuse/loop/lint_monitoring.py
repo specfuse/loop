@@ -35,6 +35,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from specfuse.monitor.durations import DURATION_GRAMMAR, parse_duration_seconds
+
 from . import _miniyaml
 
 __all__ = ("validate_monitoring", "main", "CRON_DIALECTS")
@@ -339,6 +341,15 @@ def _check_targets(
                 )
         if check_type == "heartbeat":
             findings.extend(_check_cron_dialect(target, where, t_index))
+        if check_type == "queue-stalled" and target.get("stall_after") is not None:
+            try:
+                parse_duration_seconds(str(target["stall_after"]))
+            except ValueError:
+                findings.append(
+                    f"{where}: targets[{t_index}]: 'queue-stalled' target "
+                    f"'stall_after' value {target['stall_after']!r} is not a "
+                    f"valid duration — expected {DURATION_GRAMMAR}"
+                )
     return findings
 
 

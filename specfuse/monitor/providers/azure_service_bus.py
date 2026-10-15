@@ -30,6 +30,7 @@ from datetime import datetime
 from typing import Iterable, Iterator, List, Mapping, Optional, Protocol, Sequence
 
 from specfuse.monitor.artifact import FailureArtifact
+from specfuse.monitor.durations import parse_duration_seconds
 from specfuse.monitor.redaction import redact_artifact
 
 # Credential construction is shared with the other Azure provider and looked up
@@ -137,32 +138,10 @@ class ServiceBusDlqAdapter:
         return redact_artifact(artifact)
 
 
-_STALL_AFTER_RE = re.compile(r"^(\d+)([smhd])$")
-_STALL_AFTER_MULTIPLIERS: Mapping[str, int] = {
-    "s": 1,
-    "m": 60,
-    "h": 3600,
-    "d": 86400,
-}
-
-
 def parse_stall_after_seconds(value: str) -> int:
-    """Parse a `stall_after` value (`<integer><unit>`, unit in s/m/h/d) into
-    seconds.
-
-    Refuses rather than guesses (the WU's sub-decision 1): anything outside
-    the grammar — no unit, an unsupported unit, whitespace, a negative sign
-    — raises `ValueError` naming the offending value. No coercion, no
-    "assume minutes", no silent zero.
-    """
-    match = _STALL_AFTER_RE.match(value)
-    if not match:
-        raise ValueError(
-            f"invalid stall_after value {value!r} — expected "
-            f"<integer><unit> with unit in s/m/h/d, e.g. '15m'"
-        )
-    magnitude, unit = match.groups()
-    return int(magnitude) * _STALL_AFTER_MULTIPLIERS[unit]
+    """Parse a `stall_after` value into seconds. Thin alias over the shared
+    grammar in `specfuse.monitor.durations`."""
+    return parse_duration_seconds(value, field="stall_after")
 
 
 @dataclass(frozen=True)

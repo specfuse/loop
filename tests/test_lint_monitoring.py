@@ -735,18 +735,40 @@ class TestQueueStalled(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("subscription", findings[0])
 
-    def test_queue_stalled_threshold_coordinate_is_opaque(self):
-        text = VALID_CONFIG.replace(
-            "      - type: heartbeat\n",
-            "      - type: heartbeat\n"
-            "      - type: queue-stalled\n"
-            "        targets:\n"
-            "          - subscription: orders-sub\n"
-            "            function: ProcessOrder\n"
-            "            stall_after: not-a-duration-at-all-9999h\n",
-        )
-        p = self._write(text)
-        self.assertEqual(validate_monitoring(p), [])
+    # #295 / FEAT-2026-0203: `stall_after` is no longer opaque — the
+    # harvester refuses a malformed value at runtime, so lint refuses it too.
+    def test_malformed_stall_after_is_a_lint_error(self):
+        for bad in ("15min", "10 minutes"):
+            with self.subTest(stall_after=bad):
+                text = VALID_CONFIG.replace(
+                    "      - type: heartbeat\n",
+                    "      - type: heartbeat\n"
+                    "      - type: queue-stalled\n"
+                    "        targets:\n"
+                    "          - subscription: orders-sub\n"
+                    "            function: ProcessOrder\n"
+                    f"            stall_after: {bad}\n",
+                )
+                findings = validate_monitoring(self._write(text))
+                self.assertEqual(len(findings), 1)
+                self.assertIn("queue-stalled", findings[0])
+                self.assertIn("targets[0]", findings[0])
+                self.assertIn("stall_after", findings[0])
+                self.assertIn("<integer><unit>", findings[0])
+
+    def test_wellformed_stall_after_is_clean(self):
+        for good in ("15m", "90s", "2h", "1d"):
+            with self.subTest(stall_after=good):
+                text = VALID_CONFIG.replace(
+                    "      - type: heartbeat\n",
+                    "      - type: heartbeat\n"
+                    "      - type: queue-stalled\n"
+                    "        targets:\n"
+                    "          - subscription: orders-sub\n"
+                    "            function: ProcessOrder\n"
+                    f"            stall_after: {good}\n",
+                )
+                self.assertEqual(validate_monitoring(self._write(text)), [])
 
 
 class TestInvariantTargetsRejected(unittest.TestCase):

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0203/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/monitor/durations.py
@@ -11,6 +11,15 @@ produces:
   - tests/test_monitor_durations.py
   - tests/test_lint_monitoring.py
   - docs/concepts/monitoring-schema.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.27.1
+started_at: 2026-10-15T02:55:47.841950+00:00
+duration_seconds: 126.578
+cost_usd: 0.250054
+input_tokens: 18
+output_tokens: 5869
 ---
 
 # T02 — one duration grammar; a malformed stall_after is a lint error (#295)
