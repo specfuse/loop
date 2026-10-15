@@ -12,6 +12,10 @@ produces:
   - specfuse/loop/data/monitoring.yml.example
   - .specfuse/rules/design-for-diagnosis.md
   - specfuse/loop/data/rules/design-for-diagnosis.md
+duration_seconds: 77.015
+cost_usd: 0.23493
+input_tokens: 16
+output_tokens: 5599
 ---
 
 # T03 — the http-status-regression schema is validated and documented
