@@ -12,9 +12,9 @@ gate_set: plannext
 driver_version: 0.27.1
 started_at: 2026-10-15T03:50:39.040765+00:00
 duration_seconds: 234.002
-cost_usd: 1.211677
-input_tokens: 56
-output_tokens: 25565
+cost_usd: 1.424914
+input_tokens: 64
+output_tokens: 27092
 ---
 
 # Close gate 1 — a deployment that raises server-fault 4xx files one finding
