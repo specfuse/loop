@@ -87,6 +87,7 @@ components:
         deploy_signal:
           kind: app-version
         window_after_deploy: 1h
+        codes: [401, 403, 405, 410, 412, 415, 428]
 
       # heartbeat: alerts when the component stops reporting in at all —
       # the check that catches "it didn't error, it just went silent."

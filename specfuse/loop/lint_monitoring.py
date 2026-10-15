@@ -260,6 +260,8 @@ def _check_checks(checks: object, component_label: str) -> list[str]:
                     f"'queue-stalled' check requires 'targets' — each target "
                     f"needs 'subscription' and 'function'"
                 )
+        elif check_type == "http-status-regression":
+            findings.extend(_check_http_status_regression(check, component_label, index))
         elif check_type == "invariant":
             for field in ("query", "fingerprint_by"):
                 if not check.get(field):
@@ -284,6 +286,59 @@ _TARGET_REQUIRED_FIELDS = {
     "heartbeat": ("name",),
     "queue-stalled": ("subscription", "function"),
 }
+DEPLOY_SIGNAL_KINDS = frozenset({"app-version"})
+
+
+def _check_http_status_regression(
+    check: dict, component_label: str, check_index: int
+) -> list[str]:
+    """Field rules for one `http-status-regression` check (`targets` is
+    rejected by `_check_targets`)."""
+    where = f"component '{component_label}': checks[{check_index}]"
+    prefix = f"{where}: 'http-status-regression' check"
+    findings: list[str] = []
+
+    signal = check.get("deploy_signal")
+    if not isinstance(signal, dict) or not signal.get("kind"):
+        findings.append(
+            f"{prefix} requires 'deploy_signal' — a mapping with a 'kind'"
+        )
+    elif signal["kind"] not in DEPLOY_SIGNAL_KINDS:
+        findings.append(
+            f"{prefix} has unknown 'deploy_signal' kind {signal['kind']!r} — "
+            f"must be one of {sorted(DEPLOY_SIGNAL_KINDS)}"
+        )
+
+    window = check.get("window_after_deploy")
+    if window is None:
+        findings.append(f"{prefix} requires 'window_after_deploy'")
+    else:
+        try:
+            parse_duration_seconds(str(window))
+        except ValueError:
+            findings.append(
+                f"{prefix} 'window_after_deploy' value {window!r} is not a "
+                f"valid duration — expected {DURATION_GRAMMAR}"
+            )
+
+    codes = check.get("codes")
+    if codes is not None:
+        if (
+            not isinstance(codes, list)
+            or not codes
+            or not all(
+                isinstance(c, int) and not isinstance(c, bool) and 400 <= c <= 499
+                for c in codes
+            )
+        ):
+            findings.append(
+                f"{prefix} 'codes' must be a non-empty list of integers in 400–499"
+            )
+        elif len(set(codes)) != len(codes):
+            findings.append(f"{prefix} 'codes' must not contain duplicates")
+    return findings
+
+
 # Check types that must never carry `targets` at all.
 _TARGETLESS_CHECK_TYPES = frozenset(
     {"error-logs", "http-5xx", "http-status-regression", "invariant"}

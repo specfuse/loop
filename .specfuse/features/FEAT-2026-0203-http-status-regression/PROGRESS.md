@@ -1,2 +1,4 @@
 - **FEAT-2026-0203/T01**: attempt 1 outcome=passed
 - **FEAT-2026-0203/T02**: attempt 1 outcome=passed
+- **FEAT-2026-0203/T03**: attempt 2 outcome=passed
+- **FEAT-2026-0203/T03**: Added `codes: [401, 403, 405, 410, 412, 415, 428]` to the existing `http-status-regression` example check in both example files. Lint exits 0, `cmp` shows the files identical, and tests.test_monitoring_example, tests.test_monitoring_fenced_blocks and tests.test_lint_monitoring pass (73 tests, OK).

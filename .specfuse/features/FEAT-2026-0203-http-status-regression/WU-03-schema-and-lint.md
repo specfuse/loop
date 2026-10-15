@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0203/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 3
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/lint_monitoring.py
@@ -12,10 +12,10 @@ produces:
   - specfuse/loop/data/monitoring.yml.example
   - .specfuse/rules/design-for-diagnosis.md
   - specfuse/loop/data/rules/design-for-diagnosis.md
-duration_seconds: 77.015
-cost_usd: 0.23493
-input_tokens: 16
-output_tokens: 5599
+duration_seconds: 163.969
+cost_usd: 0.676838
+input_tokens: 54
+output_tokens: 12524
 ---
 
 # T03 — the http-status-regression schema is validated and documented

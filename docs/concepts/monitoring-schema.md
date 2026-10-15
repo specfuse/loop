@@ -94,7 +94,7 @@ provider-agnostic by construction: a check type names a concept
 | `dlq` | `harvest_mode` (`peek` or `quarantine`), `targets` | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. `targets` is **required**: a dead-lettered message is attributed to a subscription, and a target-less `dlq` check on a multi-subscription host cannot say which one. |
 | `error-logs` | none | Scans structured application logs for error-level entries. |
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
-| `http-status-regression` | `deploy_signal`, `window_after_deploy` | Alerts when a deployment raises the rate of server-fault 4xx responses compared with the window before it. For HTTP-serving components that stamp a version on every deployment. |
+| `http-status-regression` | `deploy_signal`, `window_after_deploy` | Alerts when a deployment raises the rate of server-fault 4xx responses compared with the window before it. For HTTP-serving components that stamp a version on every deployment. `deploy_signal` is a mapping with a required `kind`; the only accepted `kind` is `app-version`. `window_after_deploy` is a duration (`<integer><unit>`, e.g. `30m`). `codes` is optional: a non-empty list of unique integers in 400–499, defaulting to `[401, 403, 405, 410, 412, 415, 428]` (400, 404 and 409 are excluded). A code fires when its count after the deployment is at least 3× the count before and at least 10 — both thresholds are fixed constants, not fields. |
 | `heartbeat` | none | Alerts when the component stops reporting in at all. |
 | `invariant` | `query`, `fingerprint_by` | Runs an operator-supplied query (opaque to this schema — not parsed or executed here) and alerts on unexpected rows. `fingerprint_by` names the field used to dedupe repeat findings into one issue. |
 | `queue-stalled` | `targets` | Alerts when a consumer stops consuming from a subscription — no message failed (so `dlq` sees nothing), the host is still alive (so `heartbeat` sees nothing), and the symptom is a broker coordinate (queue depth / age of oldest message), not a telemetry query, so `invariant` cannot express it either. `targets` is required from birth: a wedged consumer on a multi-subscription host raises the identical "which one" question `dlq`/`heartbeat` targets already answer. |
@@ -150,6 +150,7 @@ triggers as `targets[]` is what keeps that property satisfiable.
 | `invariant` | **forbidden** | — | `fingerprint_by` is already this check type's enumeration key; permitting `targets` too would give it two competing enumeration keys. |
 | `error-logs` | **forbidden** | — | Role-name keyed and genuinely component-scoped; the validator rejects `targets` here. |
 | `http-5xx` | **forbidden** | — | Same reason as `error-logs`. |
+| `http-status-regression` | **forbidden** | — | Per-component, like `http-5xx`: the deployment it compares across is a component-wide event. |
 
 Where `targets` is present it must be a non-empty list of mappings, and every
 entry must carry that check type's required coordinates. An empty list is a

@@ -804,5 +804,42 @@ class TestInvariantTargetsRejected(unittest.TestCase):
         self.assertEqual(validate_monitoring(p), [])
 
 
+class TestHttpStatusRegression(unittest.TestCase):
+    """`http-status-regression` field rules (FEAT-2026-0203/T03)."""
+
+    def _findings(self, body: str) -> list[str]:
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "monitoring.yml"
+            p.write_text(
+                VALID_CONFIG.replace(
+                    "      - type: heartbeat\n",
+                    "      - type: heartbeat\n      - type: http-status-regression\n"
+                    + body,
+                    1,
+                )
+            )
+            return validate_monitoring(p)
+
+    def test_field_rules(self):
+        good = "        deploy_signal:\n          kind: app-version\n"
+        window = "        window_after_deploy: 30m\n"
+        self.assertEqual(self._findings(good + window), [])
+        cases = {
+            "missing deploy_signal": window,
+            "wrong kind": "        deploy_signal:\n          kind: ci-annotation\n" + window,
+            "missing window": good,
+            "malformed window": good + "        window_after_deploy: 30 minutes\n",
+            "codes 500": good + window + "        codes: [500]\n",
+            "codes empty": good + window + "        codes: []\n",
+            "codes duplicate": good + window + "        codes: [401, 401]\n",
+            "targets": good
+            + window
+            + "        targets:\n          - subscription: s\n            function: f\n",
+        }
+        for name, body in cases.items():
+            with self.subTest(name):
+                self.assertEqual(len(self._findings(body)), 1, name)
+
+
 if __name__ == "__main__":
     unittest.main()

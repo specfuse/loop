@@ -7,8 +7,8 @@ Licensed under the Apache License, Version 2.0. See LICENSE.
 
 This rule governs the *target application's* code — not this loop's own
 execution. It states what a deployed component must do so the check types a
-`monitoring.yml` admits (`dlq`, `error-logs`, `http-5xx`, `heartbeat`,
-`invariant`) produce a diagnosable finding instead of a bare alert. A check that
+`monitoring.yml` admits (`dlq`, `error-logs`, `http-5xx`,
+`http-status-regression`, `heartbeat`, `invariant`, `queue-stalled`) produce a diagnosable finding instead of a bare alert. A check that
 fires without one of these properties tells an operator only that something is
 wrong, not what or where.
 
