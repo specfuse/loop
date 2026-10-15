@@ -1086,7 +1086,7 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 
 **Scope boundary.** OUT: CI-annotation and marker-query signals, configurable thresholds, 5xx regressions, non-Azure providers, re-sighting after a closed finding, consumer adoption.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
