@@ -11,6 +11,10 @@ produces:
   - specfuse/monitor/cli.py
   - specfuse/monitor/artifact.py
   - specfuse/loop/lint_monitoring.py
+duration_seconds: 41.529
+cost_usd: 0.262969
+input_tokens: 16
+output_tokens: 5748
 ---
 
 # T01 — an http-status-regression check runs end to end, thinly

@@ -1,8 +1,24 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_http_status_regression_end_to_end -v -b"
 cost_budget_usd: 30.00
+baseline:
+  sha: 8453d774e34f8241362417ae0d23b166f841f912
+  probed_at: 2026-10-15T02:41:14.052052+00:00
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:09099f6c10f7d21e56e8f30249dd3e090d73faa4:143b3831a602a917f9e32e55acb57a391d8069ac:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:23931385c2b997a7aa9131f343935b63f3a92ef1:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:40b9f5f698e4b13c64573ca3176b0f2b78878624:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:84bb8013b5c92bb31c205b015fc53ccf38bcb1a9:97bcab1bc7244262cec901f46035f51dfdd07278:b4305b01d3eb16aff49cab646a99f7c26d7ca9f3:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  entry_sha: 8453d774e34f8241362417ae0d23b166f841f912
+  source: attributed:FEAT-2026-0203/T01
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "(failures=3,"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
+    - gate: roadmap-link-gate
+      failure_class: other
+      failure_signature: "ERROR: roadmap.md:1089: FEAT-2026-0203's detail section says… active.**' and keep any prose after it"
 ---
 
 # Gate 1 — a deployment that raises server-fault 4xx files one finding
