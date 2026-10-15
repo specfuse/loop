@@ -5,3 +5,4 @@
 - **FEAT-2026-0203/T04**: Real one-query KQL and 3x/10 share-of-requests rule replace T01 stubs; evaluated only on fully elapsed windows; query added to schema-check enumeration.
   - note: Row contract from the query is version, code, first_seen, after, before, after_total, before_total. The T01 e2e oracle rows had to gain first_seen and totals. The schema checker now treats names defined by `=` as known aliases, treats workspace table names inside subqueries as valid, and has join/mv-expand keywords added.
 - **FEAT-2026-0203/T05**: attempt 1 outcome=passed
+- **FEAT-2026-0203/G1-CLOSE**: Close artifacts written and verified — feature_oracle PASS, one-query decision measured, 20 criteria re-measured, CHANGELOG entries for FEAT-2026-0203 and
