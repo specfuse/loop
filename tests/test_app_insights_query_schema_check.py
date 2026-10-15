@@ -67,6 +67,7 @@ _KQL_KEYWORDS = frozenset({
     "where", "project", "summarize", "extend", "by", "take", "limit",
     "and", "or", "not", "startswith", "endswith", "contains", "has", "in",
     "true", "false", "asc", "desc", "order", "sort",
+    "join", "kind", "inner", "on", "mv", "expand",
 })
 
 _STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
@@ -74,6 +75,8 @@ _STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 # access, not a column) and what follows it (``(`` is a call, a lone ``=``
 # is an output alias).
 _IDENT = re.compile(r"(?P<dot>\.\s*)?\b(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b(?=\s*(?P<after>\(|==|=)?)")
+# An output name defined anywhere in the query, so a later stage may read it.
+_ALIAS = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*=(?!=)")
 
 
 def schema_violations(query: str) -> list[str]:
@@ -89,12 +92,14 @@ def schema_violations(query: str) -> list[str]:
     columns = WORKSPACE_SCHEMA.get(table)
     if columns is None:
         return [f"table {table!r} is not a workspace table"]
+    aliases = set(_ALIAS.findall(rest))
     problems = []
     for match in _IDENT.finditer(rest):
         name, after = match.group("name"), match.group("after")
         if match.group("dot") or after in ("(", "="):
             continue
-        if name.lower() in _KQL_KEYWORDS or name in columns:
+        if name.lower() in _KQL_KEYWORDS or name in columns or name in aliases\
+                or name in WORKSPACE_SCHEMA:
             continue
         problems.append(f"column {name!r} is not a column of {table}")
     return problems
@@ -104,6 +109,9 @@ _BUILT_IN_QUERIES = {
     "error-logs": aai._error_logs_query,
     "http-5xx": aai._http_5xx_query,
     "heartbeat": aai._heartbeat_query,
+    "http-status-regression": lambda component: aai._http_status_regression_query(
+        component, 3600, ["401", "403"]
+    ),
 }
 
 

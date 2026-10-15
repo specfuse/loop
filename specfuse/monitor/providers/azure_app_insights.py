@@ -28,11 +28,12 @@ folded back into a subsequent query; that is the direction
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.artifact import FailureArtifact
+from specfuse.monitor.durations import parse_duration_seconds
 from specfuse.monitor.redaction import redact_artifact
 
 # Credential construction is shared with the other Azure provider and looked up
@@ -165,27 +166,87 @@ class Http5xxAdapter:
         return redact_artifact(artifact)
 
 
+# The regression rule (PLAN.md decision 2): a code fires when its share of the
+# after-window's requests is at least REGRESSION_FACTOR times its share of the
+# equal-length before-window and it occurs at least REGRESSION_MIN_COUNT times
+# after the deployment. Documented constants in v1, not monitoring.yml fields.
+REGRESSION_FACTOR = 3
+REGRESSION_MIN_COUNT = 10
+
+# How far back the one query looks for each version's first-seen time. A
+# deployment is only evaluated when its before-window also lies inside it.
+_REGRESSION_LOOKBACK = "7d"
+
+
 def _http_status_regression_query(
-    component: str, deploy_signal: object, window_after_deploy: object, codes: Sequence[object]
+    component: str, window_seconds: int, codes: Sequence[object]
 ) -> str:
-    """Placeholder (T04 owns the real query). Built only from operator
-    configuration — never from returned rows or the watermark."""
+    """One query, built only from operator configuration (the component, the
+    configured ``codes``, ``window_after_deploy`` and a fixed lookback) —
+    never from returned rows or the watermark. Each version's first-seen time
+    is found, deployments whose after-window has fully elapsed are kept, and
+    per (version, code) the after- and before-window counts come back with
+    each window's total request count. The ratio arithmetic is the adapter's.
+    """
+    window = f"{int(window_seconds)}s"
     code_list = ", ".join(f"'{c}'" for c in codes)
-    return (
-        "AppRequests "
-        f"| where AppRoleName == '{component}' and ResultCode in ({code_list}) "
-        f"// deploy_signal={deploy_signal} window_after_deploy={window_after_deploy} "
-        "| project timestamp = TimeGenerated, version = AppVersion, "
-        "resultCode = ResultCode"
+    scope = (
+        f"AppRequests | where AppRoleName == '{component}' "
+        f"and TimeGenerated > ago({_REGRESSION_LOOKBACK}) "
+        "and isnotempty(AppVersion)"
     )
+    return (
+        f"{scope} "
+        "| summarize first_seen = min(TimeGenerated) by AppVersion "
+        f"| where first_seen + {window} <= now() "
+        f"and first_seen - {window} >= ago({_REGRESSION_LOOKBACK}) "
+        "| project AppVersion, first_seen, k = 1 "
+        f"| join kind=inner ({scope} | project TimeGenerated, ResultCode, k = 1) on k "
+        f"| where TimeGenerated >= first_seen - {window} "
+        f"and TimeGenerated < first_seen + {window} "
+        "| summarize after = countif(TimeGenerated >= first_seen), "
+        "before = countif(TimeGenerated < first_seen) "
+        "by AppVersion, first_seen, ResultCode "
+        "| summarize per_code = make_list(pack('code', ResultCode, "
+        "'after', after, 'before', before)), "
+        "after_total = sum(after), before_total = sum(before) "
+        "by AppVersion, first_seen "
+        "| mv-expand per_code "
+        "| project version = AppVersion, first_seen, "
+        "code = tostring(per_code.code), after = tolong(per_code.after), "
+        "before = tolong(per_code.before), after_total, before_total "
+        f"| where code in ({code_list})"
+    )
+
+
+def _as_utc(value: object) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _count(value: object) -> Optional[int]:
+    try:
+        return int(float(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
 
 
 class HttpStatusRegressionAdapter:
     """``TelemetryAdapter`` for the ``http-status-regression`` check type.
 
-    Skeleton rule: a row fires when its ``after`` count exceeds its ``before``
-    count. One finding per (status code, deployment version); the version is
-    part of ``failure_signature`` so the finding is filed once per deployment.
+    One finding per (status code, deployment version) whose after-window has
+    fully elapsed at ``reference_time`` and whose share of requests regressed
+    by ``REGRESSION_FACTOR`` with at least ``REGRESSION_MIN_COUNT`` after-window
+    occurrences. The version is part of ``failure_signature`` so the finding
+    is filed once per deployment.
     """
 
     def __init__(
@@ -197,6 +258,7 @@ class HttpStatusRegressionAdapter:
         deploy_signal: object = None,
         window_after_deploy: object = None,
         codes: Optional[Sequence[object]] = None,
+        reference_time: Optional[datetime] = None,
     ) -> None:
         self._component = component
         self._telemetry = resolve_telemetry(component, environment)
@@ -204,37 +266,63 @@ class HttpStatusRegressionAdapter:
         self._deploy_signal = deploy_signal
         self._window_after_deploy = window_after_deploy
         self._codes = [str(c) for c in (codes or [])]
+        self._reference_time = reference_time
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
-        query = _http_status_regression_query(
-            self._component, self._deploy_signal, self._window_after_deploy, self._codes
+        window_seconds = parse_duration_seconds(
+            self._window_after_deploy, "window_after_deploy"  # type: ignore[arg-type]
         )
-        rows = self._transport.run_query(query)
+        reference = _as_utc(self._reference_time) or datetime.now(timezone.utc)
+        query = _http_status_regression_query(self._component, window_seconds, self._codes)
         seen: set = set()
-        for row in rows:
+        for row in self._transport.run_query(query):
             code = str(row.get("code") or "")
             version = str(row.get("version") or "unknown-version")
             if self._codes and code not in self._codes:
                 continue
-            try:
-                regressed = float(row.get("after") or 0) > float(row.get("before") or 0)
-            except (TypeError, ValueError):
+            first_seen = _as_utc(row.get("first_seen"))
+            counts = [
+                _count(row.get(key))
+                for key in ("after", "before", "after_total", "before_total")
+            ]
+            if first_seen is None or None in counts:
                 continue
-            if not regressed or (code, version) in seen:
+            if first_seen + timedelta(seconds=window_seconds) > reference:
+                continue
+            after, before, after_total, before_total = counts  # type: ignore[misc]
+            if (code, version) in seen or not _regressed(
+                after, before, after_total, before_total
+            ):
                 continue
             seen.add((code, version))
-            yield self._build_artifact(code, version)
+            yield self._build_artifact(code, version, after, after_total)
 
-    def _build_artifact(self, code: str, version: str) -> FailureArtifact:
+    def _build_artifact(
+        self, code: str, version: str, after: int, after_total: int
+    ) -> FailureArtifact:
         artifact = FailureArtifact(
             component=self._component,
             check_type="http-status-regression",
             failure_class=code,
             failure_signature=f"{version}:{code}",
-            observed_text=f"{code} rose after deployment {version}",
+            observed_text=(
+                f"{code} was {after} of {after_total} requests in the "
+                f"{self._window_after_deploy} after deployment {version}, "
+                f"at least {REGRESSION_FACTOR}x its share before"
+            ),
             target_coordinates=None,
         )
         return redact_artifact(artifact)
+
+
+def _regressed(after: int, before: int, after_total: int, before_total: int) -> bool:
+    """``after/after_total >= FACTOR * before/before_total``, in integers; a
+    before-window with no requests, or none of the code, has a share of 0."""
+    if after_total <= 0 or after < REGRESSION_MIN_COUNT:
+        return False
+    if before_total <= 0 or before <= 0:
+        return True
+    return after * before_total >= REGRESSION_FACTOR * before * after_total
 
 
 class InvariantAdapter:

@@ -46,7 +46,15 @@ _CONFIG_YAML = (
 
 
 def _row(version="2026.10.1", code="401", before=1, after=40):
-    return {"version": version, "code": code, "before": before, "after": after}
+    return {
+        "version": version,
+        "code": code,
+        "first_seen": "2026-10-14T07:00:00Z",
+        "before": before,
+        "after": after,
+        "before_total": 100,
+        "after_total": 100,
+    }
 
 
 class _RecordingTransport:

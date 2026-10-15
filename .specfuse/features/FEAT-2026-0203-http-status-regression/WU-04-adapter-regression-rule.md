@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0203/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - specfuse/monitor/providers/azure_app_insights.py
   - tests/test_http_status_regression_adapter.py
   - tests/test_app_insights_query_schema_check.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.27.1
+started_at: 2026-10-15T03:38:08.814112+00:00
+duration_seconds: 116.518
+cost_usd: 0.537765
+input_tokens: 28
+output_tokens: 15439
 ---
 
 # T04 — the adapter detects the deployment and applies the regression rule
