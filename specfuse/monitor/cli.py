@@ -252,6 +252,9 @@ def _build_adapter(cls, *, component: str, environment: Mapping[str, object], ch
         query=check.get("query"),
         fingerprint_by=check.get("fingerprint_by"),
         max_message_count=check.get("max_message_count", 50),
+        deploy_signal=check.get("deploy_signal"),
+        window_after_deploy=check.get("window_after_deploy"),
+        codes=check.get("codes"),
     )
     return _call_filtered(cls, **kwargs)
 

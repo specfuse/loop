@@ -43,7 +43,15 @@ RUNNER_VALUES = frozenset({"local", "gh-actions", "in-cluster"})
 DIAGNOSE_VALUES = frozenset({"manual", "auto"})
 AUTOFIX_VALUES = frozenset({"off", "on"})
 CHECK_TYPES = frozenset(
-    {"dlq", "error-logs", "http-5xx", "heartbeat", "invariant", "queue-stalled"}
+    {
+        "dlq",
+        "error-logs",
+        "http-5xx",
+        "http-status-regression",
+        "heartbeat",
+        "invariant",
+        "queue-stalled",
+    }
 )
 HARVEST_MODE_VALUES = frozenset({"peek", "quarantine"})
 
@@ -275,7 +283,9 @@ _TARGET_REQUIRED_FIELDS = {
     "queue-stalled": ("subscription", "function"),
 }
 # Check types that must never carry `targets` at all.
-_TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx", "invariant"})
+_TARGETLESS_CHECK_TYPES = frozenset(
+    {"error-logs", "http-5xx", "http-status-regression", "invariant"}
+)
 
 
 def _check_targets(

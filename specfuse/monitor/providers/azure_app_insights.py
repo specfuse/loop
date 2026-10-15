@@ -165,6 +165,78 @@ class Http5xxAdapter:
         return redact_artifact(artifact)
 
 
+def _http_status_regression_query(
+    component: str, deploy_signal: object, window_after_deploy: object, codes: Sequence[object]
+) -> str:
+    """Placeholder (T04 owns the real query). Built only from operator
+    configuration — never from returned rows or the watermark."""
+    code_list = ", ".join(f"'{c}'" for c in codes)
+    return (
+        "AppRequests "
+        f"| where AppRoleName == '{component}' and ResultCode in ({code_list}) "
+        f"// deploy_signal={deploy_signal} window_after_deploy={window_after_deploy} "
+        "| project timestamp = TimeGenerated, version = AppVersion, "
+        "resultCode = ResultCode"
+    )
+
+
+class HttpStatusRegressionAdapter:
+    """``TelemetryAdapter`` for the ``http-status-regression`` check type.
+
+    Skeleton rule: a row fires when its ``after`` count exceeds its ``before``
+    count. One finding per (status code, deployment version); the version is
+    part of ``failure_signature`` so the finding is filed once per deployment.
+    """
+
+    def __init__(
+        self,
+        *,
+        component: str,
+        environment: Mapping[str, object],
+        transport: AppInsightsTransport,
+        deploy_signal: object = None,
+        window_after_deploy: object = None,
+        codes: Optional[Sequence[object]] = None,
+    ) -> None:
+        self._component = component
+        self._telemetry = resolve_telemetry(component, environment)
+        self._transport = transport
+        self._deploy_signal = deploy_signal
+        self._window_after_deploy = window_after_deploy
+        self._codes = [str(c) for c in (codes or [])]
+
+    def fetch_failures(self) -> Iterator[FailureArtifact]:
+        query = _http_status_regression_query(
+            self._component, self._deploy_signal, self._window_after_deploy, self._codes
+        )
+        rows = self._transport.run_query(query)
+        seen: set = set()
+        for row in rows:
+            code = str(row.get("code") or "")
+            version = str(row.get("version") or "unknown-version")
+            if self._codes and code not in self._codes:
+                continue
+            try:
+                regressed = float(row.get("after") or 0) > float(row.get("before") or 0)
+            except (TypeError, ValueError):
+                continue
+            if not regressed or (code, version) in seen:
+                continue
+            seen.add((code, version))
+            yield self._build_artifact(code, version)
+
+    def _build_artifact(self, code: str, version: str) -> FailureArtifact:
+        artifact = FailureArtifact(
+            component=self._component,
+            check_type="http-status-regression",
+            failure_class=code,
+            failure_signature=f"{version}:{code}",
+            observed_text=f"{code} rose after deployment {version}",
+            target_coordinates=None,
+        )
+        return redact_artifact(artifact)
+
+
 class InvariantAdapter:
     """``TelemetryAdapter`` for the ``invariant`` check type.
 

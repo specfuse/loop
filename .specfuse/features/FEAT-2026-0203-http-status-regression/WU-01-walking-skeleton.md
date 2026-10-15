@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0203/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 oracle_env: macos_local
 produces:
@@ -11,10 +11,15 @@ produces:
   - specfuse/monitor/cli.py
   - specfuse/monitor/artifact.py
   - specfuse/loop/lint_monitoring.py
-duration_seconds: 41.529
-cost_usd: 0.262969
-input_tokens: 16
-output_tokens: 5748
+duration_seconds: 52.026
+cost_usd: 0.335449
+input_tokens: 22
+output_tokens: 6872
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.27.1
+started_at: 2026-10-15T02:54:55.297725+00:00
 ---
 
 # T01 — an http-status-regression check runs end to end, thinly

@@ -31,7 +31,9 @@ _TARGET_COORDINATE_FIELDS: Mapping[str, tuple[str, ...]] = {
 
 # Check types that must never carry target coordinates — 0069 rejected
 # `targets` on these, so `fingerprint_by` stays their single enumeration key.
-_TARGETLESS_CHECK_TYPES = frozenset({"error-logs", "http-5xx", "invariant"})
+_TARGETLESS_CHECK_TYPES = frozenset(
+    {"error-logs", "http-5xx", "http-status-regression", "invariant"}
+)
 
 
 @dataclass(frozen=True)
