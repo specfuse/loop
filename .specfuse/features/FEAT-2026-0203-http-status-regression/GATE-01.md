@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 feature_oracle: "python3 -m unittest tests.test_http_status_regression_end_to_end -v -b"
 cost_budget_usd: 30.00
 baseline:

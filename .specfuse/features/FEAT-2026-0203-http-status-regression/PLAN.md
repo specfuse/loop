@@ -5,7 +5,7 @@ slug: http-status-regression
 branch: feat/FEAT-2026-0203-http-status-regression
 roadmap_goal: A deployment that breaks auth, routing or content negotiation raises one finding per (component, status code, deployment), without continuous rate alerting
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 19.50
 ---
 

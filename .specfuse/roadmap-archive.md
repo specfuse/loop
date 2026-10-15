@@ -43,6 +43,30 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0203"></a>
+## FEAT-2026-0203 — Monitoring: deploy-correlated HTTP status regression check
+
+**Why.** A deployment that breaks auth configuration, role or scope mapping, routing or content negotiation produces a wave of 4xx responses, not 5xx, so `http-5xx` never fires and the regression ships silently (#248). A continuous 4xx-rate alert would cross the monitoring initiative's "no metrics" boundary, and FEAT-2026-0069 recorded that `invariant` is not the sanctioned route to rate-based detection. The operator's refinement on #248 resolves the tension: a server-fault 4xx spike indicates a backend regression only when it starts soon after a component deployment, so the check can be bounded to a post-deployment window and fire once per deployment -- a discrete artifact, not a metric.
+
+**Goal.** A first-class `http-status-regression` check type in `monitoring.yml`: per component, a `deploy_signal` (`kind`: a CI-emitted annotation, a telemetry application-version change, or an operator-supplied marker query, resolved by the provider adapter), a `window_after_deploy`, and a `codes` list defaulting to the server-fault subset 401, 403, 405, 410, 412, 415, 428 (400, 404 and 409 excluded as legitimate client or business behaviour). It compares occurrences of each code in the window after a rollout with the comparable window before, and emits one finding per (component, status code, deployment), fingerprinted through FEAT-2026-0040's model with the deployment as part of the signature. `/derive-monitoring` proposes the check where a deployment signal is discoverable.
+
+**Benefits.** Catches a regression class that ships silently today, without continuous rate alerting or noise from client-side 4xx spikes days after a deploy; keeps the discrete-artifact model intact instead of eroding `invariant` by precedent; ships the server-fault code subset as a shared documented default rather than a hand-written query per project.
+
+**Shape (drafted 2026-10-14).** One gate, five units: a walking skeleton, one shared duration grammar (which also discharges #295's `stall_after` lint, folded in by operator decision), schema and lint, the adapter's one-query regression rule (share of requests, 3× and at least 10, on a fully elapsed window), and `derive-monitoring` support with a version-stamping design rule. v1 accepts only the `app-version` deployment signal. Folder: `.specfuse/features/FEAT-2026-0203-http-status-regression/`.
+
+**Scope boundary.** OUT: CI-annotation and marker-query signals, configurable thresholds, 5xx regressions, non-Azure providers, re-sighting after a closed finding, consumer adoption.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- **Live run against a real workspace.** Every in-loop oracle runs over a stub
+  transport, and the query is checked against the workspace schema reference from
+  #3471, not against Azure. Run the opt-in live check
+  (`SPECFUSE_LIVE_TESTS=1 SPECFUSE_LIVE_WORKSPACE_ID=<id>`) once the new query is in
+  its list, against a workspace whose component stamps `AppVersion`. No consumer does
+  today, so this cannot be a pre-close human unit.
+
 <a id="feat-2026-0117"></a>
 ## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
 
