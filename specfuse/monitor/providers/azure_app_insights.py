@@ -27,6 +27,7 @@ folded back into a subsequent query; that is the direction
 
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
@@ -173,6 +174,16 @@ class Http5xxAdapter:
 REGRESSION_FACTOR = 3
 REGRESSION_MIN_COUNT = 10
 
+# The codes evaluated when `monitoring.yml` names none: forbidden, method not
+# allowed, unsupported media type — the 4xx a deployment produces when it breaks
+# authorization mapping, routing or content negotiation. 401 is deliberately
+# opt-in: a 401 wave is as often expired client tokens as a broken deployment.
+DEFAULT_REGRESSION_CODES = ("403", "405", "415")
+
+# How many operations, and how many sample operation ids, a finding names.
+_TOP_OPERATIONS = 5
+_SAMPLE_OPERATIONS = 3
+
 # How far back the one query looks for each version's first-seen time. A
 # deployment is only evaluated when its before-window also lies inside it.
 _REGRESSION_LOOKBACK = "7d"
@@ -186,7 +197,9 @@ def _http_status_regression_query(
     never from returned rows or the watermark. Each version's first-seen time
     is found, deployments whose after-window has fully elapsed are kept, and
     per (version, code) the after- and before-window counts come back with
-    each window's total request count. The ratio arithmetic is the adapter's.
+    each window's total request count, the code's top operations by
+    after-window count, and a few after-window operation ids. The ratio
+    arithmetic is the adapter's.
     """
     window = f"{int(window_seconds)}s"
     code_list = ", ".join(f"'{c}'" for c in codes)
@@ -201,22 +214,58 @@ def _http_status_regression_query(
         f"| where first_seen + {window} <= now() "
         f"and first_seen - {window} >= ago({_REGRESSION_LOOKBACK}) "
         "| project AppVersion, first_seen, k = 1 "
-        f"| join kind=inner ({scope} | project TimeGenerated, ResultCode, k = 1) on k "
+        f"| join kind=inner ({scope} "
+        "| project TimeGenerated, ResultCode, Name, OperationId, k = 1) on k "
         f"| where TimeGenerated >= first_seen - {window} "
         f"and TimeGenerated < first_seen + {window} "
         "| summarize after = countif(TimeGenerated >= first_seen), "
-        "before = countif(TimeGenerated < first_seen) "
+        "before = countif(TimeGenerated < first_seen), "
+        "sample = take_anyif(OperationId, TimeGenerated >= first_seen) "
+        "by AppVersion, first_seen, ResultCode, Name "
+        "| sort by AppVersion asc, ResultCode asc, after desc "
+        "| extend rn = row_number(1, prev(AppVersion) != AppVersion "
+        "or prev(ResultCode) != ResultCode) "
+        "| summarize after = sum(after), before = sum(before), "
+        "endpoints = make_list_if(pack('name', Name, 'after', after, "
+        f"'before', before), rn <= {_TOP_OPERATIONS}), "
+        f"samples = make_list_if(sample, rn <= {_SAMPLE_OPERATIONS} "
+        "and isnotempty(sample)) "
         "by AppVersion, first_seen, ResultCode "
         "| summarize per_code = make_list(pack('code', ResultCode, "
-        "'after', after, 'before', before)), "
+        "'after', after, 'before', before, 'endpoints', endpoints, "
+        "'samples', samples)), "
         "after_total = sum(after), before_total = sum(before) "
         "by AppVersion, first_seen "
         "| mv-expand per_code "
         "| project version = AppVersion, first_seen, "
         "code = tostring(per_code.code), after = tolong(per_code.after), "
-        "before = tolong(per_code.before), after_total, before_total "
+        "before = tolong(per_code.before), endpoints = per_code.endpoints, "
+        "samples = per_code.samples, after_total, before_total "
         f"| where code in ({code_list})"
     )
+
+
+def _dynamic_list(value: object) -> list:
+    """A ``dynamic`` column arrives parsed or as JSON text, depending on the
+    client; anything else reads as empty rather than failing the finding."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+    return list(value) if isinstance(value, (list, tuple)) else []
+
+
+def _share(count: int, total: int) -> str:
+    return f"{100 * count / total:.2f}%" if total > 0 else "n/a (no requests)"
+
+
+def _iso(moment: datetime) -> str:
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _kql_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("'", "\\'")
 
 
 def _as_utc(value: object) -> Optional[datetime]:
@@ -265,7 +314,7 @@ class HttpStatusRegressionAdapter:
         self._transport = transport
         self._deploy_signal = deploy_signal
         self._window_after_deploy = window_after_deploy
-        self._codes = [str(c) for c in (codes or [])]
+        self._codes = [str(c) for c in codes] if codes else list(DEFAULT_REGRESSION_CODES)
         self._reference_time = reference_time
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
@@ -278,7 +327,7 @@ class HttpStatusRegressionAdapter:
         for row in self._transport.run_query(query):
             code = str(row.get("code") or "")
             version = str(row.get("version") or "unknown-version")
-            if self._codes and code not in self._codes:
+            if code not in self._codes:
                 continue
             first_seen = _as_utc(row.get("first_seen"))
             counts = [
@@ -295,21 +344,67 @@ class HttpStatusRegressionAdapter:
             ):
                 continue
             seen.add((code, version))
-            yield self._build_artifact(code, version, after, after_total)
+            yield self._build_artifact(
+                code, version, first_seen, window_seconds,
+                after, before, after_total, before_total,
+                _dynamic_list(row.get("endpoints")), _dynamic_list(row.get("samples")),
+            )
 
     def _build_artifact(
-        self, code: str, version: str, after: int, after_total: int
+        self,
+        code: str,
+        version: str,
+        first_seen: datetime,
+        window_seconds: int,
+        after: int,
+        before: int,
+        after_total: int,
+        before_total: int,
+        endpoints: list,
+        samples: list,
     ) -> FailureArtifact:
+        window = self._window_after_deploy
+        lines = [
+            f"{code} rose after deployment {version} "
+            f"(first seen {_iso(first_seen)}).",
+            f"Share of requests: {_share(before, before_total)} in the {window} "
+            f"before ({before} of {before_total}), {_share(after, after_total)} "
+            f"in the {window} after ({after} of {after_total}). Fires at "
+            f"{REGRESSION_FACTOR}x the before-share with at least "
+            f"{REGRESSION_MIN_COUNT} occurrences after.",
+        ]
+        operations = sorted(
+            (e for e in endpoints if isinstance(e, Mapping)),
+            key=lambda e: _count(e.get("after")) or 0,
+            reverse=True,
+        )[:_TOP_OPERATIONS]
+        if operations:
+            lines += ["", f"Top operations returning {code}:"]
+            lines += [
+                f"  {e.get('name') or '(unnamed)'}: {_count(e.get('after')) or 0} "
+                f"after, {_count(e.get('before')) or 0} before"
+                for e in operations
+            ]
+        sample_ids = [str(s) for s in samples if s][:_SAMPLE_OPERATIONS]
+        if sample_ids:
+            lines += ["", f"Sample operation ids after the deployment: {', '.join(sample_ids)}"]
+        span = timedelta(seconds=window_seconds)
+        lines += [
+            "",
+            "Investigate in Log Analytics:",
+            "AppRequests",
+            f"| where AppRoleName == '{_kql_literal(self._component)}' "
+            f"and ResultCode == '{_kql_literal(code)}'",
+            f"| where TimeGenerated between (datetime({_iso(first_seen - span)}) "
+            f".. datetime({_iso(first_seen + span)}))",
+            "| summarize count() by AppVersion, Name, bin(TimeGenerated, 5m)",
+        ]
         artifact = FailureArtifact(
             component=self._component,
             check_type="http-status-regression",
             failure_class=code,
             failure_signature=f"{version}:{code}",
-            observed_text=(
-                f"{code} was {after} of {after_total} requests in the "
-                f"{self._window_after_deploy} after deployment {version}, "
-                f"at least {REGRESSION_FACTOR}x its share before"
-            ),
+            observed_text="\n".join(lines),
             target_coordinates=None,
         )
         return redact_artifact(artifact)
