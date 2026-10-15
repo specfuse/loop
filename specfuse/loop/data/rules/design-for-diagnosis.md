@@ -108,3 +108,17 @@ an operator has to reproduce the failure from scratch, from a payload alone,
 with no error, no attempt count, and no correlation ID to trace back to the
 request that produced it. Context captured at dead-letter time is the
 difference between a diagnosis and a re-investigation.
+
+## A deployable stamps a version that changes on every deployment
+
+An HTTP-serving component stamps a service version onto the telemetry it emits,
+and that version changes on every deployment — the stamp is injected at build or
+release time, not a constant in source that survives a release unchanged.
+
+An `http-status-regression` check detects a deployment by the first appearance
+of a new version value, then compares the failure rate of newly-seen client-error
+and server-error statuses after that point with the rate before it. A component
+that stamps no version has no deployment signal at all; one that stamps the same
+value every release shows no new version to detect, so the check never opens its
+post-deployment window and a regression ships unseen. Either way the check
+cannot be evaluated, and discovery reports the gap rather than proposing it.

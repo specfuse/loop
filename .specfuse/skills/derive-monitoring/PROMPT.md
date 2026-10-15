@@ -79,7 +79,7 @@ propagation, structured logging, per-component role names, heartbeat
 emission, DLQ failure-context capture. A component given `heartbeat`
 targets whose own code emits no `ScheduleHeartbeat` event (schedule name
 in a `scheduleName` property, under its role name) gets a
-`heartbeat-emission` finding — those targets would all report silent. **Every finding is `WARN`, never `ERROR`.** A
+`heartbeat-emission` finding — those targets would all report silent. An HTTP-serving component showing no per-deployment version stamp (`version-stamping`) gets one finding and no `http-status-regression` check; with the stamp it gets that check (`deploy_signal: {kind: app-version}`, a `window_after_deploy`). **Every finding is `WARN`, never `ERROR`.** A
 populated codebase predating the rule violates it everywhere by
 construction, so an `ERROR` predicate would be unsatisfiable on real input.
 The audit informs the operator; it never blocks the draft.

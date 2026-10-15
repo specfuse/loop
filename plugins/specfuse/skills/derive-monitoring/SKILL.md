@@ -143,7 +143,14 @@ carrying the schedule's name in a `scheduleName` property, under the
 component's role name. The marker to search for is that event name unless the
 project's pattern table names its own emitter. A component with heartbeat
 targets and no emission gets a `heartbeat-emission` finding: without it, every
-target reports as a silent schedule from the check's first run. **Findings are reported as
+target reports as a silent schedule from the check's first run. The `version-stamping` property is per-component: an HTTP-serving component must
+show, in its own scope, evidence of a service version that changes on every
+deployment (the markers come from the project's `version_stamping_markers`
+pattern table; discovery cannot tell a build-injected stamp from a constant
+string, so the table must name only per-deployment stamp mechanisms). With
+evidence, Step 2's mapping also proposes `http-status-regression` with
+`deploy_signal: {kind: app-version}` and a `window_after_deploy`; without it, no
+check is proposed and the component gets one `version-stamping` finding. **Findings are reported as
 `WARN`, never `ERROR`.** A populated codebase that predates the design-for-diagnosis
 rule violates it everywhere by construction, so an `ERROR` predicate would be
 unsatisfiable on real input and would force the operator to fix unrelated

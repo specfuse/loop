@@ -4,3 +4,4 @@
 - **FEAT-2026-0203/T03**: Added `codes: [401, 403, 405, 410, 412, 415, 428]` to the existing `http-status-regression` example check in both example files. Lint exits 0, `cmp` shows the files identical, and tests.test_monitoring_example, tests.test_monitoring_fenced_blocks and tests.test_lint_monitoring pass (73 tests, OK).
 - **FEAT-2026-0203/T04**: Real one-query KQL and 3x/10 share-of-requests rule replace T01 stubs; evaluated only on fully elapsed windows; query added to schema-check enumeration.
   - note: Row contract from the query is version, code, first_seen, after, before, after_total, before_total. The T01 e2e oracle rows had to gain first_seen and totals. The schema checker now treats names defined by `=` as known aliases, treats workspace table names inside subqueries as valid, and has join/mv-expand keywords added.
+- **FEAT-2026-0203/T05**: attempt 1 outcome=passed

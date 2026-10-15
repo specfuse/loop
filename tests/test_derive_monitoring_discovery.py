@@ -134,10 +134,21 @@ def discover_components(tree: dict, patterns: dict) -> list[dict]:
                     "dialect": trigger["dialect"],
                 })
 
+        version_markers = patterns.get("diagnosability", {}).get(
+            "version_stamping_markers", []
+        )
+        version_stamping = any(
+            marker in content
+            for relpath, content in tree.items()
+            if relpath.startswith(scope_prefix)
+            for marker in version_markers
+        )
+
         records.append({
             "name": candidate["name"],
             "type": candidate["type"],
             "http_serving": http_serving,
+            "version_stamping": version_stamping,
             "message_consuming": message_consuming,
             "subscriptions": subscriptions,
             "schedules": schedules,
@@ -162,13 +173,23 @@ def suggest_checks(component: dict) -> list[dict]:
     neutral ``schedules`` list, each a real ``{name, cron, timezone, dialect}``
     entry known from discovery; a component with no known schedules gets a
     target-less ``heartbeat`` -- the same honesty rule ``dlq`` already
-    follows. ``invariant`` is never suggested — its ``query`` is
+    follows. An HTTP-serving component whose record carries
+    ``version_stamping`` evidence also gets ``http-status-regression`` with
+    ``deploy_signal: {kind: app-version}`` and a ``window_after_deploy``; one
+    that stamps no version gets none (see the ``version-stamping`` audit
+    finding). ``invariant`` is never suggested — its ``query`` is
     operator-supplied by definition, so inventing one would be fabricating
     evidence too.
     """
     checks = []
     if component.get("http_serving"):
         checks.append({"type": "http-5xx"})
+        if component.get("version_stamping"):
+            checks.append({
+                "type": "http-status-regression",
+                "deploy_signal": {"kind": "app-version"},
+                "window_after_deploy": "30m",
+            })
     if component.get("message_consuming"):
         subscriptions = component.get("subscriptions") or []
         if subscriptions:
@@ -216,7 +237,8 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
 
     ``patterns["diagnosability"]`` supplies the injected marker vocabulary:
     ``correlation_id_markers``, ``structured_logging_markers``, and
-    ``dlq_context_markers``, and ``heartbeat_emission_markers``. The
+    ``dlq_context_markers``, ``heartbeat_emission_markers``, and
+    ``version_stamping_markers``. The
     per-component role-name property needs no marker table — it checks
     whether a component's own name string is stamped somewhere in its own
     evidence files. The heartbeat-emission property (#3470) is likewise
@@ -267,6 +289,15 @@ def audit_diagnosability(tree: dict, components: list, patterns: dict) -> list[d
                 "heartbeat-emission",
                 f"component '{component['name']}' gets heartbeat targets but "
                 "its code emits no heartbeat event",
+            ))
+
+    for component in components:
+        if component.get("http_serving") and not component.get("version_stamping"):
+            findings.append(_finding(
+                "version-stamping",
+                f"component '{component['name']}' serves HTTP but shows no "
+                "per-deployment version stamp; http-status-regression cannot "
+                "detect its deployments",
             ))
 
     return findings
@@ -418,6 +449,11 @@ def render_monitoring_yml(components_with_checks: list[dict]) -> str:
                         for t_key, t_value in items[1:]:
                             t_value = _render_target_value(t_key, t_value)
                             lines.append(f"            {t_key}: {t_value}")
+                    continue
+                if isinstance(value, dict):
+                    lines.append(f"        {key}:")
+                    for d_key, d_value in value.items():
+                        lines.append(f"          {d_key}: {d_value}")
                     continue
                 lines.append(f"        {key}: {value}")
     return "\n".join(lines) + "\n"
@@ -1016,6 +1052,7 @@ class TestAuditIsQuietOnADiagnosableTree(unittest.TestCase):
                 "type": "http-service",
                 "http_serving": True,
                 "message_consuming": False,
+                "version_stamping": True,
                 "evidence": ["services/web/handler.txt"],
             },
             {
@@ -1068,6 +1105,56 @@ class TestAuditFlagsHeartbeatTargetsNothingEmits(unittest.TestCase):
         self.assertFalse(any(c["schedules"] for c in components))
         findings = audit_diagnosability(_STACK_A_TREE, components, _STACK_A_PATTERNS)
         self.assertNotIn("heartbeat-emission", {f["check"] for f in findings})
+
+
+class TestHttpStatusRegressionProposal(unittest.TestCase):
+    """FEAT-2026-0203/T05: `http-status-regression` is proposed only for an
+    HTTP-serving component with version-stamping evidence; one without gets
+    no check and a single `version-stamping` WARN."""
+
+    _PATTERNS = {
+        **_STACK_A_PATTERNS,
+        "diagnosability": {
+            **_STACK_A_PATTERNS["diagnosability"],
+            "version_stamping_markers": ["ACME_A_VERSION_STAMP"],
+        },
+    }
+
+    def _check_types(self, tree):
+        components = discover_components(tree, self._PATTERNS)
+        web = next(c for c in components if c["name"] == "acme-web-api")
+        findings = [
+            f
+            for f in audit_diagnosability(tree, components, self._PATTERNS)
+            if f["check"] == "version-stamping"
+        ]
+        return web, suggest_checks(web), findings
+
+    def test_proposed_only_with_version_evidence(self):
+        tree = dict(_STACK_A_TREE)
+        tree["services/web/version.txt"] = "ACME_A_VERSION_STAMP build-injected\n"
+        _, checks, findings = self._check_types(tree)
+        proposed = [c for c in checks if c["type"] == "http-status-regression"]
+        self.assertEqual(len(proposed), 1)
+        self.assertEqual(proposed[0]["deploy_signal"], {"kind": "app-version"})
+        self.assertEqual(findings, [])
+        text = render_monitoring_yml(
+            [{"name": "acme-web-api", "type": "http-service", "checks": checks}]
+        )
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "monitoring.yml"
+            path.write_text(text)
+            self.assertEqual(validate_monitoring(path), [])
+
+        _, checks, findings = self._check_types(_STACK_A_TREE)
+        self.assertNotIn("http-status-regression", [c["type"] for c in checks])
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0]["severity"], "WARN")
+        self.assertIn("acme-web-api", findings[0]["message"])
+
+    def test_non_http_component_is_quiet(self):
+        _, _, findings = self._check_types(_STACK_A_TREE)
+        self.assertNotIn("acme-order-worker", " ".join(f["message"] for f in findings))
 
 
 class TestAutofixQuotedInEmittedYaml(unittest.TestCase):

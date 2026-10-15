@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0203/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - .specfuse/rules/design-for-diagnosis.md
@@ -12,6 +12,15 @@ produces:
   - .specfuse/skills/derive-monitoring/SKILL.md
   - .specfuse/skills/derive-monitoring/PROMPT.md
   - tests/test_derive_monitoring_discovery.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.27.1
+started_at: 2026-10-15T03:40:06.444619+00:00
+duration_seconds: 91.879
+cost_usd: 0.3346
+input_tokens: 24
+output_tokens: 7365
 ---
 
 # T05 — derive-monitoring proposes the check where a version is stamped
