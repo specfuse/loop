@@ -85,7 +85,7 @@ confidence in the checks grows.
 
 ## Check types
 
-Every check has a required `type`, one of six neutral values. This set is
+Every check has a required `type`, one of seven neutral values. This set is
 provider-agnostic by construction: a check type names a concept
 (a dead-letter queue, a heartbeat), never a vendor.
 
@@ -94,6 +94,7 @@ provider-agnostic by construction: a check type names a concept
 | `dlq` | `harvest_mode` (`peek` or `quarantine`), `targets` | Alerts on messages landing in this component's dead-letter queue. `peek` reads without removing; `quarantine` removes after reading. `targets` is **required**: a dead-lettered message is attributed to a subscription, and a target-less `dlq` check on a multi-subscription host cannot say which one. |
 | `error-logs` | none | Scans structured application logs for error-level entries. |
 | `http-5xx` | none | Alerts when the rolling 5xx rate crosses a threshold. For HTTP-serving components. |
+| `http-status-regression` | `deploy_signal`, `window_after_deploy` | Alerts when a deployment raises the rate of server-fault 4xx responses compared with the window before it. For HTTP-serving components that stamp a version on every deployment. |
 | `heartbeat` | none | Alerts when the component stops reporting in at all. |
 | `invariant` | `query`, `fingerprint_by` | Runs an operator-supplied query (opaque to this schema — not parsed or executed here) and alerts on unexpected rows. `fingerprint_by` names the field used to dedupe repeat findings into one issue. |
 | `queue-stalled` | `targets` | Alerts when a consumer stops consuming from a subscription — no message failed (so `dlq` sees nothing), the host is still alive (so `heartbeat` sees nothing), and the symptom is a broker coordinate (queue depth / age of oldest message), not a telemetry query, so `invariant` cannot express it either. `targets` is required from birth: a wedged consumer on a multi-subscription host raises the identical "which one" question `dlq`/`heartbeat` targets already answer. |

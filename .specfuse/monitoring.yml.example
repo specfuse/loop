@@ -81,6 +81,13 @@ components:
       # Use for any component that serves HTTP traffic directly.
       - type: http-5xx
 
+      # http-status-regression: alerts when a deployment raises the rate of
+      # server-fault 4xx responses compared with the window before it.
+      - type: http-status-regression
+        deploy_signal:
+          kind: app-version
+        window_after_deploy: 1h
+
       # heartbeat: alerts when the component stops reporting in at all —
       # the check that catches "it didn't error, it just went silent."
       - type: heartbeat

@@ -44,6 +44,12 @@ and the per-type targets matrix. The 3× / ≥10 thresholds are documented there
 fixed constants, not fields. Both example files gain one `http-status-regression`
 check and stay byte-identical. Both design-rule copies list the seventh type.
 
+**Skeleton already in place (operator fix, 2026-10-14).** T01 registered the check
+type, which broke `tests/test_monitoring_example.py`'s two invariants (every type in
+the example, every type in the doc's check-types table) before this unit could run.
+A minimal table row and a minimal `web-api` example check were added on the branch to
+restore the baseline. Extend them in place; do not add a second row or example.
+
 **Acceptance criteria.**
 
 1. `tests/test_lint_monitoring.py::TestHttpStatusRegression::test_field_rules` fails
