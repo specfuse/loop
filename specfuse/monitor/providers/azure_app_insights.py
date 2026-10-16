@@ -69,7 +69,29 @@ class AppInsightsTransport(Protocol):
         ...
 
 
-def _error_logs_query(component: str) -> str:
+def _kql_datetime(moment: datetime) -> str:
+    """A KQL ``datetime()`` literal at full precision. ``moment`` comes from
+    the harvester's own clock or watermark file, never from a returned row."""
+    text = moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    return f"datetime({text})"
+
+
+def _harvest_window(since: Optional[datetime], until: Optional[datetime]) -> str:
+    """The harvest-window predicate (#3480), or nothing when no window was
+    given. Bounded on ``ingestion_time()`` rather than ``TimeGenerated`` so a
+    row stamped before the previous run but ingested after it is read by the
+    next run instead of falling between two windows."""
+    if since is None or until is None:
+        return ""
+    return (
+        f"| where ingestion_time() >= {_kql_datetime(since)} "
+        f"and ingestion_time() < {_kql_datetime(until)} "
+    )
+
+
+def _error_logs_query(
+    component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
+) -> str:
     """Built only from *component*, an operator-configured name — never from
     a telemetry query's returned rows.
 
@@ -81,16 +103,20 @@ def _error_logs_query(component: str) -> str:
     return (
         "AppExceptions "
         f"| where AppRoleName == '{component}' "
+        f"{_harvest_window(since, until)}"
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
         "operation_ParentId = ParentId, type = ExceptionType, "
         "outerMessage = OuterMessage"
     )
 
 
-def _http_5xx_query(component: str) -> str:
+def _http_5xx_query(
+    component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
+) -> str:
     return (
         "AppRequests "
         f"| where AppRoleName == '{component}' and ResultCode startswith '5' "
+        f"{_harvest_window(since, until)}"
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
         "name = Name, resultCode = ResultCode"
     )
@@ -105,13 +131,17 @@ class ErrorLogsAdapter:
         component: str,
         environment: Mapping[str, object],
         transport: AppInsightsTransport,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
     ) -> None:
         self._component = component
         self._telemetry = resolve_telemetry(component, environment)
         self._transport = transport
+        self._since = since
+        self._until = until
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
-        query = _error_logs_query(self._component)
+        query = _error_logs_query(self._component, self._since, self._until)
         rows = self._transport.run_query(query)
         for row in rows:
             yield self._build_artifact(row)
@@ -140,13 +170,17 @@ class Http5xxAdapter:
         component: str,
         environment: Mapping[str, object],
         transport: AppInsightsTransport,
+        since: Optional[datetime] = None,
+        until: Optional[datetime] = None,
     ) -> None:
         self._component = component
         self._telemetry = resolve_telemetry(component, environment)
         self._transport = transport
+        self._since = since
+        self._until = until
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
-        query = _http_5xx_query(self._component)
+        query = _http_5xx_query(self._component, self._since, self._until)
         rows = self._transport.run_query(query)
         for row in rows:
             yield self._build_artifact(row)

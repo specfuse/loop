@@ -68,6 +68,30 @@ is reported by `specfuse monitor run` as unhandled by design — naming
 silently nor treated as an error. Do not dial a component to `in-cluster`
 expecting it to be monitored until that feature ships.
 
+## The harvest window
+
+Each run reads only what is new since the previous one. The window for an
+environment starts at its watermark (the time the previous non-dry run
+started, kept in `.specfuse/monitor-watermarks/<env>.json`) and ends at this
+run's start. With no readable watermark (a first run, a fresh CI runner, a new
+operator) it starts 24 hours back instead, and the run summary says so.
+
+The window applies to the checks that read event history: `error-logs` and
+`http-5xx` filter on `ingestion_time()`, so a row stamped just before the
+previous run but ingested after it is read by the next run rather than lost
+between the two. Three check types are deliberately not bounded by it:
+
+- `heartbeat` needs the most recent heartbeat however old it is;
+- `http-status-regression` compares the windows around each deployment and
+  carries its own fixed lookback;
+- `invariant` runs the operator's query as written. A query that reads event
+  history should bound itself (for example `| where TimeGenerated > ago(1h)`);
+  otherwise every matching row in retention is a finding, deduplicated only by
+  `fingerprint_by`.
+
+A run in which any check errored leaves the watermark where it was, so the
+next run retries the same window.
+
 ## What `--dry-run` does and does not gate
 
 `--dry-run` performs the read-only `fetch_failures()` calls against real

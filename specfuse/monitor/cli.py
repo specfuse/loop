@@ -241,7 +241,16 @@ def _default_transport_resolver(module, check_type: str, binding: Mapping[str, o
     )
 
 
-def _build_adapter(cls, *, component: str, environment: Mapping[str, object], check: Mapping[str, object], transport, now: datetime):
+def _build_adapter(
+    cls,
+    *,
+    component: str,
+    environment: Mapping[str, object],
+    check: Mapping[str, object],
+    transport,
+    now: datetime,
+    since: Optional[datetime] = None,
+):
     kwargs = dict(
         component=component,
         environment=environment,
@@ -255,6 +264,10 @@ def _build_adapter(cls, *, component: str, environment: Mapping[str, object], ch
         deploy_signal=check.get("deploy_signal"),
         window_after_deploy=check.get("window_after_deploy"),
         codes=check.get("codes"),
+        # The harvest window (#3480): adapters that read event history
+        # accept it; those that need older history by design do not.
+        since=since,
+        until=now if since is not None else None,
     )
     return _call_filtered(cls, **kwargs)
 
@@ -266,6 +279,7 @@ def _process_check(
     environment: Mapping[str, object],
     transport_resolver: Callable,
     now: datetime,
+    since: Optional[datetime] = None,
 ):
     check_type = check.get("type")
     if check_type not in CHECK_TYPES:
@@ -290,7 +304,13 @@ def _process_check(
     adapter_cls = _find_adapter_class(module, check_type)
     transport = transport_resolver(module, check_type, binding)
     adapter = _build_adapter(
-        adapter_cls, component=component_name, environment=environment, check=check, transport=transport, now=now
+        adapter_cls,
+        component=component_name,
+        environment=environment,
+        check=check,
+        transport=transport,
+        now=now,
+        since=since,
     )
     artifacts = list(adapter.fetch_failures())
     skipped = list(getattr(adapter, "skipped_targets", []))
@@ -501,6 +521,7 @@ def run_cycle(
                         environment=environment,
                         transport_resolver=transport_resolver,
                         now=now,
+                        since=since,
                     )
                 except Exception as exc:  # noqa: BLE001 — isolation is the point
                     env_errored = True
