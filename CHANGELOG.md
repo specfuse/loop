@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.28.1+umbrella.0.15.0] - 2026-10-16
+
 ### Fixed
 
 - **`specfuse monitor run` isolates each check: one failing check no longer aborts the whole cycle.** A provider SDK error (a query the workspace rejects, an authentication or authorization error, throttling) or a check-scoped setup error such as an unset credential variable escaped `run_cycle` as a raw traceback, so later checks and components were never run and no summary printed. Each check now runs on its own: its error becomes a summary line `<env>/<component>: check <type> errored — <ExceptionType>: <message>`, the other checks still run and file, the environment's watermark is not advanced so the failed window is retried next cycle, and the run exits 1 after printing the summary. Run-level errors (an unknown `--env` or `--component`, an invalid runner) stay fatal. (#3478)
