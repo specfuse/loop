@@ -454,8 +454,10 @@ def run_cycle(
 
     summary: list = []
     total_findings = 0
+    any_errored = False
 
     for env_name in sorted(selected_envs):
+        env_errored = False
         environment = selected_envs[env_name]
         watermark_path = watermark_dir / f"{env_name}.json"
         since, fallback_reason = _read_watermark(watermark_path, lookback=lookback, now=now)
@@ -487,13 +489,26 @@ def run_cycle(
             findings: list = []
             skipped: list = []
             for check in component.get("checks") or []:
-                artifacts, check_skipped = _process_check(
-                    check=check,
-                    component=component,
-                    environment=environment,
-                    transport_resolver=transport_resolver,
-                    now=now,
-                )
+                # #3478: one check's failure — a provider SDK error, a missing
+                # credential, a permission the running identity lacks — must
+                # not blind every other check in the run. Report it, keep the
+                # environment's watermark where it was so the window is
+                # retried, and exit non-zero once the summary is printed.
+                try:
+                    artifacts, check_skipped = _process_check(
+                        check=check,
+                        component=component,
+                        environment=environment,
+                        transport_resolver=transport_resolver,
+                        now=now,
+                    )
+                except Exception as exc:  # noqa: BLE001 — isolation is the point
+                    env_errored = True
+                    summary.append(
+                        f"{env_name}/{component_name}: check {check.get('type')} errored — "
+                        f"{type(exc).__name__}: {exc}"
+                    )
+                    continue
                 findings.extend(artifacts)
                 skipped.extend(check_skipped)
 
@@ -528,14 +543,20 @@ def run_cycle(
                     f"{getattr(skip, 'reason', 'unknown reason')}"
                 )
 
-        if not dry_run:
+        if env_errored:
+            any_errored = True
+            summary.append(
+                f"environment {env_name}: watermark not advanced — a check errored; "
+                "its window is retried next cycle"
+            )
+        elif not dry_run:
             _write_watermark(watermark_path, now=now)
 
     summary.append(f"total: {total_findings} finding(s) across {len(selected_components)} component(s)")
     for line in summary:
         print(line, file=out)
 
-    return 0
+    return 1 if any_errored else 0
 
 
 # ---------------------------------------------------------------------------
