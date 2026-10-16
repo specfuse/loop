@@ -5,7 +5,7 @@ slug: triage-severity
 branch: feat/FEAT-2026-0113-triage-severity
 roadmap_goal: Triage assigns a severity, so `min_severity` routes instead of stranding
 autonomy_default: review
-status: active
+status: done
 planned_cost_usd: 58.50
 ---
 

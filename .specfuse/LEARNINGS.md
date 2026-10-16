@@ -4533,3 +4533,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   gate's Definition of done, named clause by clause — and the close re-reads the oracle's surviving
   test list against that definition rather than only reading its exit code. A green oracle is not
   evidence that the oracle still asks the question.
+
+- [FEAT-2026-0203/G1-CLOSE] **A walking skeleton's oracle must pin the schema unit's field
+  shapes, not guess them; its own fixture config is the first thing the lint unit will reject.**
+  `FEAT-2026-0203/T01` wrote the end-to-end oracle with a literal
+  `deploy_signal: {kind: app-version}` config before `T03` had settled how that nested mapping
+  was parsed and linted, and T03 then failed twice on its own gate with
+  `test_one_deployment_files_one_finding_per_code` red. **Drafting rule:** when a skeleton's
+  fixture embeds a new schema field, the schema/lint unit's acceptance criteria name the
+  skeleton's fixture as a known-valid input, so the disagreement is caught by the lint unit's own
+  narrow tier rather than by the next gate-entry probe's `preexisting_gate_failure`.

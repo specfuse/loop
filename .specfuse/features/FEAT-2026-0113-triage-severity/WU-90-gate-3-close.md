@@ -15,7 +15,7 @@ oracles:
 model: opus
 effort: high
 gate_set: plannext
-verdict: not_met
+verdict: met
 driver_version: 0.20.1
 started_at: 2026-09-18T12:00:12.151470+00:00
 duration_seconds: 1089.082

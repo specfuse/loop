@@ -46,9 +46,6 @@ from specfuse.loop.labels import (
 from specfuse.loop import agent_policy, triage
 from specfuse.loop.build_provenance import warn_if_out_of_tree
 
-#: Stands in for T10's classification session (gate 3, walking skeleton).
-_STUB_SEVERITY = "medium"
-
 
 def _default_runner(argv: list, check: bool = False):
     return subprocess.run(argv, check=check, capture_output=True, text=True)
