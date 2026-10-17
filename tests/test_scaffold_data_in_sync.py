@@ -61,6 +61,7 @@ DOCS_TRACKED = {
     "docs/concepts/monitoring-schema.md",
     "docs/concepts/monitoring-runners.md",
     "docs/lifecycles.md",
+    "docs/flows.html",
 }
 
 # Unmirrored manifest — files authored directly under specfuse/loop/data/

@@ -53,6 +53,7 @@ _EXPECTED_RELPATHS = {
     "docs/concepts/monitoring-schema.md",
     "docs/concepts/monitoring-runners.md",
     "docs/lifecycles.md",
+    "docs/flows.html",
     "workflows/specfuse-monitor.yml",
 }
 

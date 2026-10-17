@@ -15,6 +15,9 @@ Start here:
   each uses, and the specific points where the loop stops and needs a human.
   Read this when you know *what* the skills are and want to know *which
   lifecycle you are in*.
+- [`flows.html`](flows.html) — an interactive companion to `lifecycles.md`: click
+  through each lifecycle's stages and human checkpoints, and simulate where a
+  monitoring finding ends up. Open it in a browser.
 - [`methodology.md`](methodology.md) — the canonical definition of the gate cycle:
   unit hierarchy, ownership split, the five-section work-unit contract,
   verification-as-oracle, auto-close, plan-next, LEARNINGS, and autonomy. Shared
