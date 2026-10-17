@@ -28,6 +28,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ### Fixed
 
+- **`specfuse monitor run` files one issue per fingerprint per cycle, even when a check returns the same failure several times.** `run_cycle` handed every artifact to `record_finding`, whose find-or-create lookup goes through `gh issue list`; GitHub's listing lags an issue created seconds earlier, so a fingerprint repeated within one cycle was filed again (two identical issues on the first real run). The cycle now skips a fingerprint it has already filed and reports the skipped rows as `N repeat(s) of an already-filed fingerprint`. (#3486)
 - **A headless diagnosis wrapped in a markdown code fence is no longer rejected as unparseable.** `parse_analysis` called `json.loads` on the whole session output, but `claude -p` often answers with its one JSON object inside a ```` ```json ```` fence, so `specfuse agent run`'s findings-diagnose provider escalated about two in three good diagnoses as "not valid JSON" and posted nothing. One surrounding fence (tagged `json` or bare) is now read as the object it holds; prose outside the fence, two fenced objects, or an unterminated fence still fail. (#3489)
 
 ## [0.28.1+umbrella.0.15.0] - 2026-10-16
