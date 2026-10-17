@@ -121,7 +121,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
 | FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-2026-0203) |
 | FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-2026-0204) |
-| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | planned | — | [→ detail](#feat-2026-0205) |
+| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | active | `.specfuse/features/FEAT-2026-0205-diagnosis-severity/` | [→ detail](#feat-2026-0205) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1052,7 +1052,7 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Sequencing.** After FEAT-2026-0204: a severity judged from one line of evidence would be a guess.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
