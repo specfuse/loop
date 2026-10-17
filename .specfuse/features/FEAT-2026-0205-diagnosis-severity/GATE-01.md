@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: passed
 feature_oracle: "python3 -m unittest tests.test_diagnosis_severity_end_to_end -v -b"
 cost_budget_usd: 24.00
 broad_run:

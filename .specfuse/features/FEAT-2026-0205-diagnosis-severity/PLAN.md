@@ -5,7 +5,7 @@ slug: diagnosis-severity
 branch: feat/FEAT-2026-0205-diagnosis-severity
 roadmap_goal: Every diagnosed monitoring finding carries a severity the diagnosis judged from its evidence, shown as a label and used to spend the autofix daily cap on the most severe findings first, without findings ever entering the bug lane
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 13.00
 ---
 

@@ -43,6 +43,25 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0205"></a>
+## FEAT-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
+
+**Why.** Monitoring findings deliberately skip triage: `list_untriaged` flags them `already_structured` and the triage provider skips them (FEAT-2026-0049), because their route to a fix is diagnose → autofix, gated on the diagnosis's `confidence` and `fix_scope`, not the bug lane's triage severity. Routing works without a severity, but a queue of findings is flat: nothing says which one matters most, and autofix's daily cap spends itself in arrival order.
+
+**Goal.** Add a `severity` field to the diagnosis contract (`specfuse/monitor/diagnosis.py`), assessed by the diagnosis session from the evidence FEAT-2026-0204 puts on the finding (endpoint, status, client abort or not, frequency, instances); project it as a label on the finding; and decide explicitly whether severity ever changes routing (e.g. autofix's daily cap favouring higher severities) and whether a finding may ever enter the bug lane, or stays on diagnose → autofix.
+
+**Scope boundary.** OUT: triaging findings through the human-issue triage path; changing autofix's confidence threshold or `fix_scope` rule.
+
+**Sequencing.** After FEAT-2026-0204: a severity judged from one line of evidence would be a guess.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- **One live diagnosis with a severity.** After release, diagnose one real finding on
+  the first consumer (by hand or `diagnose: auto`) and confirm the marker carries a
+  severity, the issue gets one `severity:` label, and a second diagnosis replaces it.
+
 <a id="feat-2026-0204"></a>
 ## FEAT-2026-0204 — Monitoring: findings a diagnosis can start from
 
