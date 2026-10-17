@@ -98,8 +98,8 @@ next run retries the same window.
 
 The watermark directory is local runtime state, not something to commit.
 `specfuse init` adds `.specfuse/monitor-watermarks/` to a new project's
-`.gitignore`. A project initialised earlier keeps its existing gitignore block
-(`specfuse upgrade` does not rewrite it), so add the line by hand. On a CI
+`.gitignore`, and `specfuse upgrade` adds it to a project initialised earlier
+(it appends any snippet line the file lacks, leaving your own lines alone). On a CI
 runner the directory starts empty every run — the shipped workflow template
 does not cache it — so each run there reads the 24-hour fallback window.
 
