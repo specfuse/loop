@@ -101,9 +101,18 @@ reads.
   open finding whose component is `auto` and that has no diagnosis yet, runs a
   headless analysis session, and posts the same comment.
 
-Either way it is **one diagnosis per issue**: an issue that already carries a
-parseable diagnosis is skipped. A session whose output cannot be parsed posts
-nothing and escalates on the issue instead.
+Under `auto`, an issue is diagnosed **once**, with two exceptions:
+
+- **The issue was reopened after a fix.** When the monitor reopens a closed
+  finding (stage 2), its comment carries a `specfuse:finding-reopened` marker.
+  A reopen newer than the latest diagnosis gets one fresh diagnosis: a
+  regression after a fix usually means the old root cause was wrong.
+- **Someone adds the `rediagnose` label.** The next agent run diagnoses the
+  issue again and removes the label.
+
+Nothing else re-diagnoses: not a low `confidence`, not more occurrences. A
+session whose output cannot be parsed posts nothing and escalates on the issue
+instead.
 
 **Where it stops for you.** Under `manual`, here. Under `auto`, only when the
 analysis output is unusable.
@@ -157,8 +166,9 @@ You review and merge the pull request. Its `closes #N` closes the finding issue.
 
 If the same fingerprint fires again after the fix ships, the closed issue
 reopens with a comment naming the new sighting (see stage 2), which is the
-regression signal you want. It is not diagnosed again automatically: the issue
-already carries a diagnosis (specfuse/loop#3487).
+regression signal you want. Under `diagnose: auto` the reopened issue gets one
+fresh diagnosis (stage 3). Autofix still declines it as already attempted (one
+automated try per fingerprint), so the regression comes back to you.
 
 ## What must be scheduled
 
