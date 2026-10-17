@@ -10,6 +10,9 @@ what is still missing.
 What happens to a finding after it is filed — diagnosis, the autofix decision,
 the fix — and which processes must be scheduled for it is in
 [`monitoring-to-fix.md`](monitoring-to-fix.md).
+`specfuse monitor run` does not diagnose anything itself: when it files or
+updates findings for a component set to `diagnose: auto`, its summary prints one
+line saying those findings wait for `specfuse agent run` (specfuse-agent).
 
 ## The two shipped surfaces
 
