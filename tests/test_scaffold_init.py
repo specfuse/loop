@@ -51,6 +51,7 @@ _EXPECTED_TREE = {
     "docs/concepts/monitoring-schema.md",
     "docs/concepts/monitoring-runners.md",
     "docs/lifecycles.md",
+    "docs/flows.html",
     "docs/glossary.md",
     "docs/getting-started.md",
     "docs/methodology.md",

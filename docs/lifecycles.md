@@ -23,6 +23,10 @@ guarantees, and different human checkpoints:
 | [Maintenance](#5-the-maintenance-lifecycle) | a calendar | none | you, periodically |
 | [Monitoring](#6-the-monitoring-lifecycle) | a failure in a deployed component | none — one issue per fingerprint | `specfuse monitor run`, then `specfuse-agent` or you |
 
+> **Interactive version.** [`flows.html`](flows.html), next to this file, walks the same
+> lifecycles stage by stage in a browser and simulates where a monitoring finding ends
+> up for a given set of dials. In a project it is `.specfuse/docs/flows.html`.
+
 **The one rule that explains all the checkpoints.** The loop automates
 execution, not judgment. Every place it stops is a place where proceeding would
 mean guessing at something only you can decide — which feature matters, whether
