@@ -6,3 +6,4 @@
 - **FEAT-2026-0204/T06**: `_http_5xx_query` now left-joins one exception and one dependency per OperationId in a single query, and `Http5xxAdapter` renders Exception, Where, Dependency, Duration, Samples and Reproduce; the T06 test class is unskipped and passes.
   - note: I factored the in-app frame KQL into `_top_frame_stages()` and extended the schema checker to accept columns from joined subquery tables; later units that join `AppDependencies` or other tables get that for free.
 - **FEAT-2026-0204/T07**: attempt 1 outcome=passed
+- **FEAT-2026-0204/T08**: attempt 1 outcome=passed

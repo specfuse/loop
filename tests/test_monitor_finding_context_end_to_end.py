@@ -321,20 +321,103 @@ class DlqContext(unittest.TestCase):
         self.assertIn("**Peek it:**", body)
 
 
-@unittest.skip("owned by FEAT-2026-0204/T08")
+def _drive_scheduled(check, environment_extra, transport):
+    calls = []
+
+    def gh(args, check=True):
+        calls.append(list(args))
+        if args[:3] == ["gh", "issue", "create"]:
+            return SimpleNamespace(returncode=0, stdout=f"https://github.com/{_REPO}/issues/903\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+
+    config = _config()
+    config["environments"]["production"].update(environment_extra)
+    config["components"][0]["checks"] = [check]
+    with tempfile.TemporaryDirectory() as tmp:
+        cli.run_cycle(
+            config, dry_run=False, repo=_REPO,
+            transport_resolver=lambda module, check_type, binding: transport,
+            gh_runner=gh, now=_NOW, watermark_dir=Path(tmp), out=io.StringIO(),
+        )
+    return [c for c in calls if c[:3] == ["gh", "issue", "create"]]
+
+
 class HeartbeatContext(unittest.TestCase):
-    SECTIONS = ("Schedule", "Last execution", "Earliest heartbeat", "Telemetry in silent gap")
+    def _drive(self, rows):
+        transport = _Transport(rows)
+        creates = _drive_scheduled(
+            {"type": "heartbeat", "targets": [{
+                "name": "nightly-sync", "cron": "0 0 * * *", "dialect": "standard-5",
+                "timezone": "Etc/UTC", "function": "NightlySync",
+            }]},
+            {}, transport,
+        )
+        return creates, transport
 
     def test_sections_present(self):
-        self.fail("T08")
+        creates, transport = self._drive([{
+            "name": "nightly-sync", "first_heartbeat": "2026-10-10T00:00:00Z",
+            "last_heartbeat": "2026-10-13T00:00:00Z",
+            "last_run": "2026-10-13T00:00:05Z", "last_result": "200",
+            "host_last_seen": "2026-10-13T06:00:00Z",
+        }])
+        self.assertEqual(len(creates), 1)
+        body = _field(creates[0], "--body")
+        for needle in (
+            "**Schedule:**", "cron: 0 0 * * *", "dialect: standard-5", "timezone: Etc/UTC",
+            "**Last run:** NightlySync at 2026-10-13T00:00:05Z, result 200",
+            "**Host last seen:** 2026-10-13T06:00:00Z",
+            "**Host silent:**", "3d 18h before the expected firing",
+        ):
+            self.assertIn(needle, body)
+        self.assertEqual(len(transport.queries), 1)
+
+    def test_host_alive_has_no_host_silent_line(self):
+        creates, _ = self._drive([{
+            "name": "nightly-sync", "first_heartbeat": "2026-10-10T00:00:00Z",
+            "last_heartbeat": "2026-10-13T00:00:00Z",
+            "host_last_seen": "2026-10-17T00:30:00Z",
+        }])
+        body = _field(creates[0], "--body")
+        self.assertIn("**Host last seen:** 2026-10-17T00:30:00Z", body)
+        self.assertNotIn("Host silent", body)
+
+    def test_query_is_one_bounded_schema_clean_query(self):
+        query = aai._heartbeat_query(
+            "web-api", {"nightly-sync": "NightlySync"},
+            datetime(2026, 10, 17, 0, 0, 0, tzinfo=timezone.utc),
+        )
+        self.assertEqual(schema_violations(query), [])
+        self.assertEqual(query.count("TimeGenerated >= datetime(2026-10-17T00:00:00Z)"), 2)
+        self.assertEqual(schema_violations(aai._heartbeat_query("web-api")), [])
 
 
-@unittest.skip("owned by FEAT-2026-0204/T08")
 class QueueStalledContext(unittest.TestCase):
-    SECTIONS = ("Oldest active message age", "Last completed message", "Depth")
-
     def test_sections_present(self):
-        self.fail("T08")
+        class Transport:
+            def get_active_message_count(self, *, subscription):
+                return 412
+
+            def get_oldest_message_enqueued_time(self, *, subscription):
+                return datetime(2026, 10, 15, 22, 30, 0, tzinfo=timezone.utc)
+
+        creates = _drive_scheduled(
+            {"type": "queue-stalled", "targets": [{
+                "subscription": "orders", "function": "OrderHandler", "stall_after": "1h",
+            }]},
+            {"broker": {
+                "provider": "azure_service_bus", "credentials": {"connection_string": "ACME_CONN"},
+                "fully_qualified_namespace": "acme.servicebus.example.com", "topic_name": "orders-topic",
+            }},
+            Transport(),
+        )
+        self.assertEqual(len(creates), 1)
+        body = _field(creates[0], "--body")
+        for needle in (
+            "oldest active message age: 1d 2h 30m (95400s)",
+            "depth (active messages): 412",
+        ):
+            self.assertIn(needle, body)
 
 
 if __name__ == "__main__":

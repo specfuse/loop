@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0204/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 oracle_env: macos_local
 produces:
   - specfuse/monitor/providers/azure_app_insights.py
   - specfuse/monitor/providers/azure_service_bus.py
   - tests/test_monitor_finding_context_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:54:20.760618+00:00
+duration_seconds: 115.864
+cost_usd: 0.544787
+input_tokens: 32
+output_tokens: 12549
 ---
 
 # T08 — a silent schedule says whether the job ran and the host was up; a stalled queue says how stale

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 
@@ -718,15 +719,28 @@ HEARTBEAT_EVENT_NAME = "ScheduleHeartbeat"
 HEARTBEAT_SCHEDULE_PROPERTY = "scheduleName"
 
 
-def _heartbeat_query(component: str) -> str:
-    """Built only from *component*, an operator-configured name — never from
-    a telemetry query's returned rows. Groups the component's heartbeat
-    signal by schedule name, since one component may carry several
-    heartbeat targets (T04's `acme-functions-host` shape). Also carries each
-    schedule's earliest heartbeat, whose minimum across rows is the
-    component's earliest heartbeat — the instant before which no firing is
-    evaluated (FEAT-2026-0204/T04)."""
-    return (
+def _heartbeat_query(
+    component: str,
+    functions: Optional[Mapping[str, str]] = None,
+    since: Optional[datetime] = None,
+) -> str:
+    """Built only from *component*, *functions* and *since* — operator
+    configuration, never a telemetry query's returned rows. Groups the
+    component's heartbeat signal by schedule name, since one component may
+    carry several heartbeat targets (T04's `acme-functions-host` shape). Also
+    carries each schedule's earliest heartbeat, whose minimum across rows is
+    the component's earliest heartbeat — the instant before which no firing is
+    evaluated (FEAT-2026-0204/T04).
+
+    Still one query (FEAT-2026-0204/T08): *functions* maps a schedule name to
+    the function it triggers, and adds that function's last `AppRequests`
+    execution (`last_run`, `last_result`); `host_last_seen` is the component's
+    latest `AppRequests` row of any kind. Both `AppRequests` reads are bounded
+    to *since* — the oldest expected firing across the targets — so neither
+    scans the component's whole request history; absent *since*, a 30-day
+    lookback bounds them."""
+    bound = f"datetime({_iso(since)})" if since is not None else "ago(30d)"
+    query = (
         "AppEvents "
         f"| where AppRoleName == '{component}' "
         f"and Name == '{HEARTBEAT_EVENT_NAME}' "
@@ -734,6 +748,26 @@ def _heartbeat_query(component: str) -> str:
         "first_heartbeat = min(TimeGenerated) by "
         f"name = tostring(Properties.{HEARTBEAT_SCHEDULE_PROPERTY})"
     )
+    if functions:
+        cases = ", ".join(
+            f"Name == '{_kql_literal(function)}', '{_kql_literal(schedule)}'"
+            for schedule, function in functions.items()
+        )
+        query += (
+            " | join kind=leftouter (AppRequests "
+            f"| where AppRoleName == '{component}' and TimeGenerated >= {bound} "
+            f"| extend name = case({cases}, '') "
+            "| where name != '' "
+            "| summarize arg_max(TimeGenerated, ResultCode) by name "
+            "| project name, last_run = TimeGenerated, last_result = ResultCode) "
+            "on name"
+        )
+    query += (
+        " | extend host_last_seen = toscalar(AppRequests "
+        f"| where AppRoleName == '{component}' and TimeGenerated >= {bound} "
+        "| summarize max(TimeGenerated))"
+    )
+    return query
 
 
 def _parse_heartbeat_timestamp(value: object) -> Optional[datetime]:
@@ -778,12 +812,32 @@ class HeartbeatAdapter:
         self._reference_time = reference_time
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
-        query = _heartbeat_query(self._component)
+        evaluated = []
+        for target in self._targets:
+            cron, dialect = target.get("cron"), target.get("dialect")
+            if not cron or not dialect:
+                continue
+            expected = most_recent_firing(
+                cron, dialect, target.get("timezone", "Etc/UTC"), self._reference_time
+            )
+            evaluated.append((target, expected))
+        functions = {
+            t["name"]: t["function"] for t, _ in evaluated if t.get("function")
+        }
+        since = min((e for _, e in evaluated), default=None)
+        query = _heartbeat_query(self._component, functions or None, since)
         rows = self._transport.run_query(query)
         last_seen: dict[str, datetime] = {}
+        details: dict[str, Mapping[str, object]] = {}
+        host_last_seen: Optional[datetime] = None
         earliest: Optional[datetime] = None
         for row in rows:
             name = row.get("name")
+            host = _parse_heartbeat_timestamp(row.get("host_last_seen"))
+            if host is not None and (host_last_seen is None or host > host_last_seen):
+                host_last_seen = host
+            if name:
+                details[str(name)] = row
             observed = _parse_heartbeat_timestamp(row.get("last_heartbeat"))
             first = _parse_heartbeat_timestamp(row.get("first_heartbeat")) or observed
             if first is not None and (earliest is None or first < earliest):
@@ -796,29 +850,29 @@ class HeartbeatAdapter:
             # indistinguishable, so every target stays pending.
             return
 
-        for target in self._targets:
+        # A cron-less heartbeat target is valid per T04; `evaluated` omits it
+        # as there is nothing to evaluate a firing expectation against.
+        for target, expected in evaluated:
             name = target["name"]
-            cron = target.get("cron")
-            dialect = target.get("dialect")
-            if not cron or not dialect:
-                # A cron-less heartbeat target is valid per T04; there is
-                # nothing to evaluate a firing expectation against.
-                continue
-            timezone_name = target.get("timezone", "Etc/UTC")
-            expected = most_recent_firing(
-                cron, dialect, timezone_name, self._reference_time
-            )
             if expected < earliest:
                 # Pending first firing: emission began after this firing.
                 continue
             observed = last_seen.get(name)
             if observed is not None and observed >= expected:
                 continue
-            yield self._build_artifact(name, expected, observed)
+            yield self._build_artifact(
+                target, expected, observed, details.get(name, {}), host_last_seen
+            )
 
     def _build_artifact(
-        self, name: str, expected: datetime, observed: Optional[datetime]
+        self,
+        target: Mapping[str, str],
+        expected: datetime,
+        observed: Optional[datetime],
+        detail: Mapping[str, object],
+        host_last_seen: Optional[datetime],
     ) -> FailureArtifact:
+        name = target["name"]
         observed_text = (
             f"schedule '{name}' expected to fire at or before "
             f"{expected.isoformat()}, last observed heartbeat "
@@ -832,7 +886,62 @@ class HeartbeatAdapter:
             failure_signature=f"heartbeat:{name}",
             observed_text=observed_text,
         )
+        artifact = replace(
+            artifact,
+            context=_heartbeat_context(target, expected, detail, host_last_seen),
+        )
         return redact_artifact(artifact)
+
+
+def _heartbeat_context(
+    target: Mapping[str, str],
+    expected: datetime,
+    detail: Mapping[str, object],
+    host_last_seen: Optional[datetime],
+) -> dict:
+    context = {
+        "Schedule": (
+            f"cron: {target['cron']}\ndialect: {target['dialect']}\n"
+            f"timezone: {target.get('timezone', 'Etc/UTC')}\n"
+            f"expected firing (UTC): {_iso(expected)}"
+        )
+    }
+    function = target.get("function")
+    if function:
+        last_run = _parse_heartbeat_timestamp(detail.get("last_run"))
+        if last_run is not None:
+            result = detail.get("last_result")
+            context["Last run"] = (
+                f"{function} at {_iso(last_run)}"
+                + (f", result {result}" if result not in (None, "") else "")
+            )
+        else:
+            context["Last run"] = f"{function}: no execution in the lookback window"
+    context["Host last seen"] = (
+        _iso(host_last_seen)
+        if host_last_seen is not None
+        else "no request in the lookback window"
+    )
+    if host_last_seen is None or host_last_seen < expected:
+        gap = (
+            f"no AppRequests row since {_iso(expected)}"
+            if host_last_seen is None
+            else f"{_duration_text(expected - host_last_seen)} before the expected firing"
+        )
+        context["Host silent"] = (
+            f"component sent no request telemetry at or after the expected firing "
+            f"(last sign of life {gap})"
+        )
+    return context
+
+
+def _duration_text(delta: timedelta) -> str:
+    seconds = max(int(delta.total_seconds()), 0)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    parts = [f"{n}{u}" for n, u in ((days, "d"), (hours, "h"), (minutes, "m")) if n]
+    return " ".join(parts) or "0m"
 
 
 def build_app_insights_transport(

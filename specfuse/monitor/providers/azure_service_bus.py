@@ -266,6 +266,15 @@ def parse_stall_after_seconds(value: str) -> int:
     return parse_duration_seconds(value, field="stall_after")
 
 
+def _age_text(seconds: float) -> str:
+    total = max(int(seconds), 0)
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    parts = [f"{n}{u}" for n, u in ((days, "d"), (hours, "h"), (minutes, "m")) if n]
+    return " ".join(parts or [f"{secs}s"]) + f" ({total}s)"
+
+
 @dataclass(frozen=True)
 class SkippedTarget:
     """A `queue-stalled` target the adapter did not evaluate, and why."""
@@ -365,6 +374,17 @@ class QueueStalledAdapter:
             failure_class="QueueStalled",
             failure_signature=f"QueueStalled:{subscription}",
             observed_text=observed_text,
+        )
+        artifact = replace(
+            artifact,
+            context={
+                "Where": function,
+                "Queue": (
+                    f"oldest active message age: {_age_text(age_seconds)}\n"
+                    f"depth (active messages): {active_count}\n"
+                    f"stall_after: {stall_after_raw}"
+                ),
+            },
         )
         return redact_artifact(artifact)
 
