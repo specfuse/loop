@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.29.0+umbrella.0.15.0] - 2026-10-17
+
 ### Added
 
 - **`specfuse monitor run` says when a component's findings are waiting for `specfuse agent run`.** `diagnose: auto` is acted on by `specfuse agent run`'s findings-diagnose provider, not by the harvester, so a schedule that ran only the monitor left `auto` findings undiagnosed with no hint why. A cycle that files or updates findings for a `diagnose: auto` component now prints one summary line per such component (also under `--dry-run`); nothing else changes. (#3488)
