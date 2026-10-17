@@ -112,6 +112,14 @@ LABEL_REGISTRY: tuple[LabelSpec, ...] = (
         description="auto-fix attempted, failed",
         consumer="monitor/autofix_state.py",
     ),
+    # #3487: a person's request for a fresh diagnosis of a finding; consumed
+    # (removed) by the findings-diagnose provider once it posts one.
+    LabelSpec(
+        name=issues.REDIAGNOSE_LABEL,
+        colour="fbca04",
+        description="Ask specfuse agent to diagnose this finding again",
+        consumer="agent/providers/findings_diagnose.py",
+    ),
     # FEAT-2026-0045/T01: the category->label projection of the triage
     # marker. `question` reuses the existing `triage-question` entry above
     # rather than minting a second label -- see triage.py's module docstring.

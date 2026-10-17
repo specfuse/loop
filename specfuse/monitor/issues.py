@@ -59,6 +59,16 @@ from specfuse.monitor.redaction import redact_artifact
 # own label lets `gh issue list` scope to exactly this lifecycle's issues.
 FINDING_LABEL = "monitoring-finding"
 
+#: Leads the comment `record_finding` posts when it reopens a closed finding.
+#: `specfuse.agent.providers.findings_diagnose` reads it to re-diagnose a
+#: regression once (#3487); the marker, not the prose, is the authority.
+REOPENED_MARKER = "<!-- specfuse:finding-reopened -->"
+
+#: A person asks for a fresh diagnosis of a finding by adding this label; the
+#: findings-diagnose provider removes it once the new diagnosis is posted
+#: (#3487).
+REDIAGNOSE_LABEL = "rediagnose"
+
 DEFAULT_LIST_LIMIT = 100
 DEFAULT_THROTTLE_SECONDS = 6 * 60 * 60
 # A finding with no sighting for this long is annotated as a close candidate
@@ -78,6 +88,13 @@ def _marker(fingerprint: str) -> str:
 
 
 _MARKER_PREFIX = _MARKER_TEMPLATE.split("{fingerprint}")[0]
+
+
+def is_reopen_comment(body: object) -> bool:
+    """True iff `body` is a comment `record_finding` posted when it reopened a
+    closed finding. Never raises: anything that is not a string carrying the
+    full marker reads as "not a reopen"."""
+    return isinstance(body, str) and REOPENED_MARKER in body
 
 
 def has_finding_marker(body: str) -> bool:
@@ -435,6 +452,7 @@ def record_finding(
                 "gh", "issue", "comment", number,
                 "--repo", repo,
                 "--body",
+                f"{REOPENED_MARKER}\n"
                 f"Recurred after close: occurrence {occurrences}, "
                 f"first seen {_iso(first_seen)}, last seen {_iso(now)}."
                 + (f" New dead-lettered message: {', '.join(unseen)}." if unseen else ""),

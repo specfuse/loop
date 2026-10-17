@@ -38,6 +38,8 @@ class TestLabelRegistry(unittest.TestCase):
         # the PR's new test passes at the merge base, and the check was
         # required but could not be run — kept distinct because "the check
         # said no" and "the check never ran" need different fixes.
+        # The twenty-seventh is #3487's rediagnose label: a person's request
+        # for a fresh diagnosis of a finding, consumed by findings-diagnose.
         #
         # A bare count is a weak invariant — it fails on every legitimate addition
         # and catches nothing a coverage assertion does not. The real guard is
@@ -45,7 +47,7 @@ class TestLabelRegistry(unittest.TestCase):
         # label constant in the package and asserts each is declared here.
         # The method name carried a literal number until #3377 and had already
         # drifted from the assertion twice; it no longer names one.
-        self.assertEqual(len(LABEL_REGISTRY), 26)
+        self.assertEqual(len(LABEL_REGISTRY), 27)
 
     def test_entries_expose_nonempty_string_fields(self):
         for entry in LABEL_REGISTRY:
@@ -65,7 +67,7 @@ class TestLabelRegistry(unittest.TestCase):
             {escalation.NEEDS_HUMAN_LABEL}
             | set(escalation.CATEGORY_LABELS)
             | {gh_features.FEATURE_LABEL}
-            | {issues.FINDING_LABEL}
+            | {issues.FINDING_LABEL, issues.REDIAGNOSE_LABEL}
             | {autofix_state.AUTOFIX_FAILED_LABEL}
             | {
                 triage.BUG_LABEL,
