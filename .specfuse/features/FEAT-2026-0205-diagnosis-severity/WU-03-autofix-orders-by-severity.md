@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0205/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.50
 produces:
   - specfuse/agent/providers/findings_autofix.py
   - tests/test_diagnosis_severity_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T19:08:35.678886+00:00
+duration_seconds: 21.534
+cost_usd: 0.13445
+input_tokens: 8
+output_tokens: 2493
 ---
 
 # T03 — autofix spends its daily cap on the most severe findings first

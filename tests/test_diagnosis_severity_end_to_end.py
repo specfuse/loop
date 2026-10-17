@@ -135,9 +135,40 @@ class OldAndUnknownSeverityReadAsAbsent(unittest.TestCase):
 
 
 class AutofixOrdersBySeverity(unittest.TestCase):
-    @unittest.skip("owned by FEAT-2026-0205/T03")
-    def test_owned_by_t03(self):
-        pass
+    def test_advertised_most_severe_first(self):
+        from specfuse.agent.providers.findings_autofix import FindingsAutofixProvider
+
+        severities = {1: "low", 2: "critical", 3: None}
+        issues = tuple(
+            IssueSummary(
+                number=n, title=f"finding {n}", labels=(FINDING_LABEL,),
+                triage_category=None, triage_confidence=None,
+            )
+            for n in severities
+        )
+        snapshot = AgentSnapshot(
+            queue=(), triage_auto=False, bug_automerge=False, bug_lane_limits={},
+            issues=issues, issues_error=None, prs=(), prs_error=None, features=(),
+        )
+
+        def runner(argv, check: bool = False):
+            number = int(argv[3])
+            comment = render(Diagnosis(
+                "rc", "ev", "fix", 0.9, "small", severity=severities[number],
+            ))
+            payload = {"body": _BODY, "comments": [{"body": comment}]}
+            return SimpleNamespace(returncode=0, stdout=json.dumps(payload), stderr="")
+
+        provider = FindingsAutofixProvider(repo="o/r", runner=runner)
+        with patch(
+            "specfuse.agent.providers.findings_autofix.load_monitoring_config",
+            return_value=_CONFIG,
+        ):
+            items = provider.advertise(snapshot)
+        self.assertEqual(
+            [item.item_id for item in items],
+            ["finding-autofix-2", "finding-autofix-1", "finding-autofix-3"],
+        )
 
 
 class BugLaneIgnoresFindingSeverity(unittest.TestCase):
