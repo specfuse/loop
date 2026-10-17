@@ -55,6 +55,12 @@ class FailureArtifact:
     # Carried by ``dlq`` artifacts only; deliberately not part of the
     # fingerprint, so one issue covers a failure kind, not each message.
     message_id: Optional[str] = None
+    # Diagnostic context (FEAT-2026-0204 decision 9): ordered section label ->
+    # text, the row's own timestamp, and the instance that emitted it. None of
+    # the three is part of the fingerprint.
+    context: Optional[Mapping[str, str]] = None
+    observed_at: Optional[str] = None
+    instance: Optional[str] = None
 
     @classmethod
     def from_target(

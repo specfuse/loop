@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0204/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/monitor/artifact.py
@@ -11,6 +11,15 @@ produces:
   - specfuse/monitor/redaction.py
   - specfuse/monitor/providers/azure_app_insights.py
   - tests/test_monitor_finding_context_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:48:53.647641+00:00
+duration_seconds: 194.293
+cost_usd: 0.90173
+input_tokens: 46
+output_tokens: 25028
 ---
 
 # T05 — a finding has a readable title, labels, and an `error-logs` body a diagnosis can start from

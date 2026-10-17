@@ -67,7 +67,7 @@ _KQL_KEYWORDS = frozenset({
     "where", "project", "summarize", "extend", "by", "take", "limit",
     "and", "or", "not", "startswith", "endswith", "contains", "has", "in",
     "true", "false", "asc", "desc", "order", "sort",
-    "join", "kind", "inner", "on", "mv", "expand",
+    "join", "kind", "inner", "leftouter", "on", "mv", "expand",
 })
 
 _STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")

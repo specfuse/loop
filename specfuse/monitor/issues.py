@@ -101,6 +101,17 @@ MESSAGES_CAP = 50
 
 
 @dataclass(frozen=True)
+class SeenThisRun:
+    """What one harvest cycle saw of a fingerprint: row count, first and last
+    row timestamps (ISO, UTC) when the rows carried one, and the instances."""
+
+    count: int
+    first: Optional[str] = None
+    last: Optional[str] = None
+    instances: tuple = ()
+
+
+@dataclass(frozen=True)
 class _Meta:
     occurrences: int
     last_seen: float
@@ -175,8 +186,21 @@ def _iso(ts: float) -> str:
     return _utc(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _render_title(fingerprint: str, artifact: FailureArtifact) -> str:
-    return f"[monitor:{fingerprint[:12]}] {artifact.component}: {artifact.failure_class}"
+def _where_type(context) -> Optional[str]:
+    """The type named by the context's ``Where`` entry (``Type.Method (assembly)``
+    -> ``Type``), or None when the context names no location."""
+    where = (context or {}).get("Where")
+    if not where:
+        return None
+    frame = where.split(" (", 1)[0].strip()
+    return frame.rsplit(".", 1)[0] if "." in frame else (frame or None)
+
+
+def _render_title(artifact: FailureArtifact) -> str:
+    artifact = redact_artifact(artifact)
+    title = f"{artifact.component}: {artifact.failure_class}"
+    where = _where_type(artifact.context)
+    return f"{title} in {where}" if where else title
 
 
 def _render_body(
@@ -187,6 +211,7 @@ def _render_body(
     last_seen: float,
     first_seen: Optional[float] = None,
     messages: Optional[tuple] = None,
+    seen: Optional[SeenThisRun] = None,
 ) -> str:
     """Render an issue body for `artifact`, redacted at egress.
 
@@ -212,11 +237,21 @@ def _render_body(
     lines.append(f"**Occurrences:** {occurrences}")
     lines.append(f"**First seen:** {_iso(first_seen)}")
     lines.append(f"**Last seen:** {_iso(last_seen)}")
+    if seen is not None:
+        span = f", first {seen.first}, last {seen.last}" if seen.first and seen.last else ""
+        lines.append(f"**Seen this run:** {seen.count}{span} (UTC)")
+        if seen.instances:
+            lines.append(f"**Instances:** {', '.join(seen.instances)}")
     lines.append("")
     lines.append("**Observed:**")
     lines.append("```")
     lines.append(artifact.observed_text)
     lines.append("```")
+    for label, value in (artifact.context or {}).items():
+        if "\n" in value:
+            lines.extend(["", f"**{label}:**", "```", value, "```"])
+        else:
+            lines.append(f"**{label}:** {value}")
     return "\n".join(lines)
 
 
@@ -310,6 +345,8 @@ def record_finding(
     limit: int = DEFAULT_LIST_LIMIT,
     throttle_seconds: float = DEFAULT_THROTTLE_SECONDS,
     message_ids: Sequence[str] = (),
+    seen: Optional[SeenThisRun] = None,
+    ensure_label: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Find-or-create the one issue for `fingerprint` and return its number.
 
@@ -340,16 +377,21 @@ def record_finding(
     if existing is None:
         body = _render_body(
             fingerprint, artifact, occurrences=1, last_seen=now, first_seen=now,
-            messages=ids or None,
+            messages=ids or None, seen=seen,
         )
-        title = _render_title(fingerprint, artifact)
+        title = _render_title(artifact)
+        labels = [FINDING_LABEL, f"component:{artifact.component}", f"check:{artifact.check_type}"]
+        if ensure_label is not None:
+            for label in labels[1:]:
+                ensure_label(label)
+        label_args = [arg for label in labels for arg in ("--label", label)]
         result = runner(
             [
                 "gh", "issue", "create",
                 "--repo", repo,
                 "--title", title,
                 "--body", body,
-                "--label", FINDING_LABEL,
+                *label_args,
             ],
             check=True,
         )
@@ -383,7 +425,7 @@ def record_finding(
                 "gh", "issue", "edit", number, "--repo", repo, "--body",
                 _render_body(
                     fingerprint, artifact, occurrences=occurrences, last_seen=now,
-                    first_seen=first_seen, messages=messages,
+                    first_seen=first_seen, messages=messages, seen=seen,
                 ),
             ],
             check=True,
@@ -395,7 +437,7 @@ def record_finding(
     occurrences = meta.occurrences + 1 if meta is not None else 1
     new_body = _render_body(
         fingerprint, artifact, occurrences=occurrences, last_seen=now,
-        first_seen=first_seen, messages=messages,
+        first_seen=first_seen, messages=messages, seen=seen,
     )
     runner(
         ["gh", "issue", "edit", number, "--repo", repo, "--body", new_body],

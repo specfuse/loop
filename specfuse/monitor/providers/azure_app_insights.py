@@ -69,6 +69,12 @@ class AppInsightsTransport(Protocol):
         ...
 
 
+def _clean_id(value: object) -> str:
+    """An operation id kept to id characters: it is echoed into reproduction
+    text, and a returned value must never alter that text's shape."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "", str(value or ""))
+
+
 def _kql_datetime(moment: datetime) -> str:
     """A KQL ``datetime()`` literal at full precision. ``moment`` comes from
     the harvester's own clock or watermark file, never from a returned row."""
@@ -89,6 +95,16 @@ def _harvest_window(since: Optional[datetime], until: Optional[datetime]) -> str
     )
 
 
+# Assembly prefixes whose frames are framework, not application, code.
+_FRAMEWORK_PREFIXES = ("System.", "Microsoft.")
+_FRAMEWORK_FRAME_RE = "|".join(re.escape(p.rstrip(".")) for p in _FRAMEWORK_PREFIXES)
+
+# Exception types that mean the caller went away, not that the service failed.
+_CANCELLATION_TYPES = ("TaskCanceledException", "OperationCanceledException")
+
+_SAMPLE_OPERATION_IDS = 3
+
+
 def _error_logs_query(
     component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
 ) -> str:
@@ -99,14 +115,53 @@ def _error_logs_query(
     Analytics workspace schema (``AppExceptions``, ``AppRoleName``,
     ``TimeGenerated``), not the classic App Insights names, which a workspace
     does not resolve (#3468). Columns are aliased back to the keys the
-    adapters read from each row."""
+    adapters read from each row.
+
+    One query carries the diagnostic context too (FEAT-2026-0204/T05): the
+    request is a left join on ``OperationId`` (one row per operation), and the
+    top in-app frame is read from ``Details[0].parsedStack`` by dropping
+    framework frames with ``replace_regex`` and extracting the first frame
+    left — string work per row, no ``mv-expand`` over every exception."""
+    framework = _FRAMEWORK_FRAME_RE
+    cancelled = " or ".join(f"ExceptionType endswith '{t}'" for t in _CANCELLATION_TYPES)
+    request_floor = (
+        f"| where TimeGenerated >= {_kql_datetime(since - timedelta(hours=1))} "
+        if since is not None
+        else ""
+    )
     return (
         "AppExceptions "
         f"| where AppRoleName == '{component}' "
         f"{_harvest_window(since, until)}"
+        "| extend stack = tostring(Details[0].parsedStack) "
+        f"| extend appStack = replace_regex(stack, '\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
+        "| extend frameMethod = extract('\"method\":\"([^\"]*)\"', 1, appStack), "
+        "frameAssembly = extract('\"assembly\":\"([^\"]*)\"', 1, appStack) "
+        "| join kind=leftouter ("
+        "AppRequests "
+        f"| where AppRoleName == '{component}' "
+        f"{request_floor}"
+        "| project OperationId = OperationId, Name = Name, ResultCode = ResultCode "
+        "| summarize requestName = take_any(Name), requestResult = take_any(ResultCode) by OperationId"
+        ") on OperationId "
+        f"| extend clientAbort = iff(({cancelled}) and requestResult startswith '2', true, false) "
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
         "operation_ParentId = ParentId, type = ExceptionType, "
-        "outerMessage = OuterMessage"
+        "outerMessage = OuterMessage, instance = AppRoleInstance, "
+        "loggerCategory = tostring(Properties.CategoryName), "
+        "loggerTemplate = tostring(Properties.OriginalFormat), "
+        "requestName, requestResult, frameMethod, frameAssembly, clientAbort"
+    )
+
+
+def _reproduce_query(component: str, operation_ids: Sequence[str]) -> str:
+    """Text for a human to paste into Log Analytics; never executed here."""
+    quoted = ", ".join(f"'{i}'" for i in operation_ids)
+    return (
+        "AppExceptions\n"
+        f"| where AppRoleName == '{component}'\n"
+        f"| where OperationId in ({quoted})\n"
+        "| project TimeGenerated, ExceptionType, OuterMessage, OperationId, Details"
     )
 
 
@@ -142,11 +197,24 @@ class ErrorLogsAdapter:
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
         query = _error_logs_query(self._component, self._since, self._until)
-        rows = self._transport.run_query(query)
+        rows = list(self._transport.run_query(query))
+        samples: dict = {}
         for row in rows:
-            yield self._build_artifact(row)
+            ids = samples.setdefault(self._signature(row), [])
+            operation_id = _clean_id(row.get("operation_Id"))
+            if operation_id and operation_id not in ids and len(ids) < _SAMPLE_OPERATION_IDS:
+                ids.append(operation_id)
+        for row in rows:
+            yield self._build_artifact(row, samples[self._signature(row)])
 
-    def _build_artifact(self, row: Mapping[str, object]) -> FailureArtifact:
+    @staticmethod
+    def _signature(row: Mapping[str, object]) -> str:
+        exception_type = str(row.get("type") or "UnknownException")
+        return f"{exception_type}:{_normalize_message(str(row.get('outerMessage') or ''))}"
+
+    def _build_artifact(
+        self, row: Mapping[str, object], sample_ids: Sequence[str] = ()
+    ) -> FailureArtifact:
         exception_type = str(row.get("type") or "UnknownException")
         raw_message = str(row.get("outerMessage") or "")
         failure_signature = f"{exception_type}:{_normalize_message(raw_message)}"
@@ -157,8 +225,39 @@ class ErrorLogsAdapter:
             failure_signature=failure_signature,
             observed_text=raw_message,
             target_coordinates=None,
+            context=self._context(row, exception_type, sample_ids),
+            observed_at=str(row["timestamp"]) if row.get("timestamp") else None,
+            instance=str(row["instance"]) if row.get("instance") else None,
         )
         return redact_artifact(artifact)
+
+    def _context(
+        self, row: Mapping[str, object], exception_type: str, sample_ids: Sequence[str]
+    ) -> Optional[dict]:
+        context: dict = {}
+        method = str(row.get("frameMethod") or "")
+        if method:
+            assembly = str(row.get("frameAssembly") or "")
+            context["Where"] = f"{method} ({assembly})" if assembly else method
+        route = str(row.get("requestName") or "")
+        result = str(row.get("requestResult") or "")
+        if route or result:
+            context["Request"] = " ".join(
+                part for part in (route, f"returned {result}" if result else "") if part
+            )
+        category = str(row.get("loggerCategory") or "")
+        template = str(row.get("loggerTemplate") or "")
+        if category or template:
+            context["Logger"] = category + (f" (template: {template})" if template else "")
+        if str(row.get("clientAbort")).lower() == "true":
+            context["Likely client abort"] = (
+                f"{exception_type} on a request that returned {result}: "
+                "the client disconnected after the service answered."
+            )
+        if sample_ids:
+            context["Samples"] = ", ".join(sample_ids)
+            context["Reproduce"] = _reproduce_query(self._component, sample_ids)
+        return context or None
 
 
 class Http5xxAdapter:
