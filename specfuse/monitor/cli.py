@@ -541,10 +541,24 @@ def run_cycle(
                     summary.append(f"  would file: {_describe(artifact)}")
             else:
                 created = updated = throttled = 0
+                # Fingerprint all findings before filing. A provider may return
+                # multiple rows representing the same failure in one cycle;
+                # GitHub's issue listing does not immediately include a just-
+                # created issue, so calling record_finding for every row can
+                # create duplicates. Retain the first artifact for the body
+                # and pass its actual frequency to the occurrence record.
+                grouped: dict[str, list] = {}
                 for artifact in findings:
                     fingerprint = fingerprint_artifact(artifact)
+                    if fingerprint not in grouped:
+                        grouped[fingerprint] = [artifact, 0]
+                    grouped[fingerprint][1] += 1
+                for fingerprint, (artifact, occurrences) in grouped.items():
                     recorder = _CallRecorder(gh_runner)
-                    record_finding(fingerprint, artifact, repo, runner=recorder, now=now.timestamp())
+                    record_finding(
+                        fingerprint, artifact, repo, runner=recorder,
+                        now=now.timestamp(), occurrences=occurrences,
+                    )
                     outcome = _classify(recorder)
                     if outcome == "created":
                         created += 1

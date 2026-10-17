@@ -205,11 +205,13 @@ def record_finding(
     now: Optional[float] = None,
     limit: int = DEFAULT_LIST_LIMIT,
     throttle_seconds: float = DEFAULT_THROTTLE_SECONDS,
+    occurrences: int = 1,
 ) -> str:
     """Find-or-create the one issue for `fingerprint` and return its number.
 
     On the first sighting, files a new issue carrying the marker and an
-    occurrence record of 1. On a repeat sighting, bumps the occurrence record
+    occurrence record of ``occurrences`` (one by default). On a repeat sighting,
+    bumps the occurrence record by the number of sightings
     — this module's chosen form is a body edit carrying an updated
     `finding-meta` marker, not a comment, so the throttle state is always
     derivable from the same `gh issue list` read this function already does,
@@ -220,11 +222,13 @@ def record_finding(
     """
     runner = runner if runner is not None else _default_runner
     now = time.time() if now is None else now
+    if type(occurrences) is not int or occurrences < 1:
+        raise ValueError("occurrences must be a positive integer")
 
     existing = find_finding_issue(runner, repo, fingerprint, limit=limit)
 
     if existing is None:
-        body = _render_body(fingerprint, artifact, occurrences=1, last_seen=now)
+        body = _render_body(fingerprint, artifact, occurrences=occurrences, last_seen=now)
         title = _render_title(fingerprint, artifact)
         result = runner(
             [
@@ -243,8 +247,8 @@ def record_finding(
     if meta is not None and (now - meta.last_seen) < throttle_seconds:
         return number
 
-    occurrences = meta.occurrences + 1 if meta is not None else 1
-    new_body = _render_body(fingerprint, artifact, occurrences=occurrences, last_seen=now)
+    total_occurrences = meta.occurrences + occurrences if meta is not None else occurrences
+    new_body = _render_body(fingerprint, artifact, occurrences=total_occurrences, last_seen=now)
     runner(
         ["gh", "issue", "edit", number, "--repo", repo, "--body", new_body],
         check=True,

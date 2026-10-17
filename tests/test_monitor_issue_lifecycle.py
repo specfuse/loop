@@ -136,6 +136,38 @@ class TestFindingLifecycle(unittest.TestCase):
         self.assertEqual(number, "200")
         self.assertIn("create", runner.calls[-1])
 
+    def test_bulk_first_sighting_preserves_actual_occurrence_count(self):
+        runner = _StubRunner([_list_result([]), _create_result(number=200)])
+        number = record_finding(
+            "fp-new", _artifact(), _REPO, runner=runner, now=1000.0,
+            occurrences=4,
+        )
+        self.assertEqual(number, "200")
+        creation = [call for call in runner.calls if "create" in call][0]
+        self.assertIn("occurrences=4", creation[creation.index("--body") + 1])
+
+    def test_bulk_repeat_sighting_adds_all_occurrences(self):
+        row = _row("fp-repeat", number=42, occurrences=2, last_seen=1000.0)
+        runner = _StubRunner([_list_result([row]), _ok_result()])
+        record_finding(
+            "fp-repeat", _artifact(), _REPO, runner=runner,
+            now=1000.0 + issues.DEFAULT_THROTTLE_SECONDS + 1,
+            occurrences=3,
+        )
+        edited = [call for call in runner.calls if "edit" in call][0]
+        self.assertIn("occurrences=5", edited[edited.index("--body") + 1])
+
+    def test_invalid_bulk_counts_fail_before_any_github_call(self):
+        for bad_count in (0, -1, False, 1.5):
+            with self.subTest(bad_count=bad_count):
+                runner = _StubRunner([])
+                with self.assertRaises(ValueError):
+                    record_finding(
+                        "fp-invalid", _artifact(), _REPO,
+                        runner=runner, now=1000.0, occurrences=bad_count,
+                    )
+                self.assertEqual(runner.calls, [])
+
     # --- criterion 6: a truncated page is never reported as not-found ---
 
     def test_full_page_with_no_match_raises_rather_than_reports_not_found(self):

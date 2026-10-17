@@ -445,6 +445,39 @@ class TestWatermarkFallback(_CliTestCase):
 
 
 class TestRunSummary(_CliTestCase):
+    def test_duplicate_fingerprint_is_created_once_in_a_cycle(self):
+        config = _config([{"type": "error-logs"}])
+        identical = {"type": "TaskCanceledException", "outerMessage": "timeout"}
+
+        def resolver(module, check_type, binding):
+            return _StubAppInsightsTransport([identical, identical])
+
+        gh_calls = []
+
+        def runner(args, check=True):
+            gh_calls.append(args)
+            if args[:3] == ["gh", "issue", "list"]:
+                # GitHub has not indexed the issue created earlier this cycle.
+                return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+            if args[:3] == ["gh", "issue", "create"]:
+                return SimpleNamespace(
+                    returncode=0, stdout=f"https://github.com/{_REPO}/issues/55\n", stderr=""
+                )
+            raise AssertionError(f"unexpected gh call: {args}")
+
+        out = io.StringIO()
+        code = cli.run_cycle(
+            config, dry_run=False, repo=_REPO,
+            transport_resolver=resolver, gh_runner=runner, now=_NOW,
+            watermark_dir=self.watermark_dir, out=out,
+        )
+
+        self.assertEqual(code, 0)
+        created = [call for call in gh_calls if call[:3] == ["gh", "issue", "create"]]
+        self.assertEqual(len(created), 1, gh_calls)
+        self.assertIn("occurrences=2", created[0][created[0].index("--body") + 1])
+        self.assertIn("2 finding(s) — created 1, updated 0, throttled 0", out.getvalue())
+
     def test_created_count_and_skip_reasons_reach_the_summary(self):
         config = _config([
             {"type": "dlq", "targets": [{"subscription": "orders-sub", "function": "ProcessOrder"}]},
