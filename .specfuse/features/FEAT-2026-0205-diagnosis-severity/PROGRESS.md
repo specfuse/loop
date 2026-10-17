@@ -3,3 +3,5 @@
 - **FEAT-2026-0205/T02**: attempt 1 outcome=passed
 - **FEAT-2026-0205/T03**: attempt 1 outcome=passed
 - **FEAT-2026-0205/T04**: attempt 1 outcome=passed
+- **FEAT-2026-0205/G1-CLOSE**: Re-ran the feature oracle (9 tests, no skips), wrote RETROSPECTIVE.md, added the CHANGELOG entry, recorded the 11 criteria as pass and set verdict met.
+  - note: The live headless diagnosis was deferred, not run: it posts a comment and label to a real issue and costs a live session. It is named in Deferred verification alongside the PLAN.md post-merge check.

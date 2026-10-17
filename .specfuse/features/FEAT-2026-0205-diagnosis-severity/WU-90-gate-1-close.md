@@ -1,11 +1,21 @@
 ---
 id: FEAT-2026-0205/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
+model: sonnet
+effort: high
+gate_set: plannext
+verdict: met
+driver_version: 0.28.2
+started_at: 2026-10-17T19:14:33.385632+00:00
+duration_seconds: 148.718
+cost_usd: 0.806492
+input_tokens: 48
+output_tokens: 17387
 ---
 
 # G1-CLOSE — terminal close
