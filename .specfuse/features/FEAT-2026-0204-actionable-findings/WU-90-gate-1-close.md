@@ -13,9 +13,9 @@ verdict: met
 driver_version: 0.28.2
 started_at: 2026-10-17T16:43:33.017235+00:00
 duration_seconds: 153.218
-cost_usd: 1.104336
-input_tokens: 72
-output_tokens: 20228
+cost_usd: 1.284495
+input_tokens: 76
+output_tokens: 20812
 ---
 
 # G1-CLOSE — terminal close
