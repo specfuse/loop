@@ -126,6 +126,8 @@ class ServiceBusDlqAdapter:
         exception_type, raw_message = _exception_type_and_message(message)
         failure_signature = f"{exception_type}:{_normalize_message(raw_message)}"
         observed_text = getattr(message, "dead_letter_error_description", None) or ""
+        raw_id = getattr(message, "message_id", None)
+        message_id = str(raw_id) if raw_id else None
 
         artifact = FailureArtifact.from_target(
             component=self._component,
@@ -134,6 +136,7 @@ class ServiceBusDlqAdapter:
             failure_class=failure_class,
             failure_signature=failure_signature,
             observed_text=observed_text,
+            message_id=message_id,
         )
         return redact_artifact(artifact)
 

@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0204/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - specfuse/monitor/providers/azure_service_bus.py
   - specfuse/monitor/artifact.py
   - specfuse/monitor/issues.py
   - tests/test_monitor_finding_lifecycle_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:46:21.789052+00:00
+duration_seconds: 151.473
+cost_usd: 0.52299
+input_tokens: 38
+output_tokens: 11000
 ---
 
 # T03 — closing a `dlq` finding acknowledges it until a new message arrives

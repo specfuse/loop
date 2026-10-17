@@ -545,6 +545,12 @@ def run_cycle(
                     summary.append(f"  would file: {_describe(artifact)}")
             else:
                 created = updated = throttled = repeats = 0
+                message_ids: dict = {}
+                for artifact in findings:
+                    if artifact.message_id:
+                        ids = message_ids.setdefault(fingerprint_artifact(artifact), [])
+                        if artifact.message_id not in ids:
+                            ids.append(artifact.message_id)
                 for artifact in findings:
                     fingerprint = fingerprint_artifact(artifact)
                     if fingerprint in filed_fingerprints:
@@ -552,7 +558,10 @@ def run_cycle(
                         continue
                     filed_fingerprints.add(fingerprint)
                     recorder = _CallRecorder(gh_runner)
-                    record_finding(fingerprint, artifact, repo, runner=recorder, now=now.timestamp())
+                    record_finding(
+                        fingerprint, artifact, repo, runner=recorder, now=now.timestamp(),
+                        message_ids=tuple(message_ids.get(fingerprint, ())),
+                    )
                     outcome = _classify(recorder)
                     if outcome == "created":
                         created += 1

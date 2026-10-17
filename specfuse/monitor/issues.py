@@ -46,7 +46,7 @@ import math
 import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, Sequence
 
 from specfuse.loop.escalation import _default_runner, _extract_issue_number
 from specfuse.monitor.artifact import FailureArtifact
@@ -309,6 +309,7 @@ def record_finding(
     now: Optional[float] = None,
     limit: int = DEFAULT_LIST_LIMIT,
     throttle_seconds: float = DEFAULT_THROTTLE_SECONDS,
+    message_ids: Sequence[str] = (),
 ) -> str:
     """Find-or-create the one issue for `fingerprint` and return its number.
 
@@ -322,14 +323,25 @@ def record_finding(
     existing issue number and makes no further `gh` call at all. A match whose
     issue is closed (inside the lookup window) is reopened with one comment
     instead of being refiled. Never closes an issue.
+
+    A ``dlq`` artifact's message ids (`message_ids`, defaulting to the
+    artifact's own) are recorded in the meta's ``messages``. A closed ``dlq``
+    issue whose recorded messages already cover every id stays closed with no
+    ``gh`` write; an unseen id reopens it with a comment naming that id.
     """
     runner = runner if runner is not None else _default_runner
     now = time.time() if now is None else now
+    ids: tuple = ()
+    if artifact.check_type == "dlq":
+        ids = tuple(dict.fromkeys(i for i in (*message_ids, artifact.message_id) if i))
 
     existing = find_finding_issue(runner, repo, fingerprint, limit=limit, now=now)
 
     if existing is None:
-        body = _render_body(fingerprint, artifact, occurrences=1, last_seen=now, first_seen=now)
+        body = _render_body(
+            fingerprint, artifact, occurrences=1, last_seen=now, first_seen=now,
+            messages=ids or None,
+        )
         title = _render_title(fingerprint, artifact)
         result = runner(
             [
@@ -347,7 +359,12 @@ def record_finding(
     meta = _parse_meta(existing.get("body", ""))
     first_seen = (meta.first_seen if meta.first_seen is not None else meta.last_seen) if meta is not None else now
     messages = meta.messages if meta is not None else None
+    unseen = tuple(i for i in ids if i not in (messages or ()))
+    if unseen:
+        messages = (*(messages or ()), *unseen)
     if str(existing.get("state", "OPEN")).upper() == "CLOSED":
+        if ids and not unseen:
+            return number
         occurrences = meta.occurrences + 1 if meta is not None else 1
         runner(["gh", "issue", "reopen", number, "--repo", repo], check=True)
         runner(
@@ -356,7 +373,8 @@ def record_finding(
                 "--repo", repo,
                 "--body",
                 f"Recurred after close: occurrence {occurrences}, "
-                f"first seen {_iso(first_seen)}, last seen {_iso(now)}.",
+                f"first seen {_iso(first_seen)}, last seen {_iso(now)}."
+                + (f" New dead-lettered message: {', '.join(unseen)}." if unseen else ""),
             ],
             check=True,
         )
