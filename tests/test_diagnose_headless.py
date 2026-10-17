@@ -65,6 +65,36 @@ class TestDiagnoseHeadless(unittest.TestCase):
         with self.assertRaises(AnalysisParseError):
             parse_analysis("not json at all {{{")
 
+    def test_one_complete_fenced_json_object_is_accepted(self):
+        payload = json.dumps(_ANALYSIS)
+        for fenced in (
+            f"```json\n{payload}\n```",
+            f"```\n{payload}\n```",
+            f"  \n```json\n{payload}\n```\n  ",
+        ):
+            with self.subTest(fenced=fenced):
+                diagnosis = parse_analysis(fenced)
+                self.assertEqual(diagnosis, parse_analysis(payload))
+                self.assertEqual(render_headless(fenced), render_headless(payload))
+
+    def test_fences_do_not_permit_prose_or_multiple_json_objects(self):
+        payload = json.dumps(_ANALYSIS)
+        for invalid in (
+            f"Here is my diagnosis:\n```json\n{payload}\n```",
+            f"```json\n{payload}\n```\nSome explanation",
+            f"```json\n{payload}\n{payload}\n```",
+            f"```json\n{payload}",
+            f"```javascript\n{payload}\n```",
+        ):
+            with self.subTest(invalid=invalid):
+                with self.assertRaises(AnalysisParseError):
+                    parse_analysis(invalid)
+
+    def test_fenced_object_still_requires_validated_fields(self):
+        invalid = dict(_ANALYSIS, fix_scope="unsupported")
+        with self.assertRaises(AnalysisParseError):
+            parse_analysis(f"```json\n{json.dumps(invalid)}\n```")
+
     def test_missing_fix_scope_is_rejected_not_defaulted(self):
         analysis = {k: v for k, v in _ANALYSIS.items() if k != "fix_scope"}
         with self.assertRaises(AnalysisParseError):

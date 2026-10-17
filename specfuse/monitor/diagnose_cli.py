@@ -44,8 +44,17 @@ def parse_analysis(raw: str) -> Diagnosis:
     or defaulted field — on invalid JSON, a non-object payload, a missing
     required field, or a `fix_scope` outside `FIX_SCOPES`.
     """
+    # Headless model sessions sometimes wrap an otherwise valid object in one
+    # Markdown fence. Unwrap only a complete, standalone JSON code block; any
+    # explanatory prose, additional objects, or mismatched fences still fails
+    # in json.loads rather than being silently ignored.
+    text = raw.strip()
+    lines = text.splitlines()
+    if len(lines) >= 3 and lines[0] in ("```json", "```") and lines[-1] == "```":
+        text = "\n".join(lines[1:-1])
+
     try:
-        data: Any = json.loads(raw)
+        data: Any = json.loads(text)
     except json.JSONDecodeError as exc:
         raise AnalysisParseError(f"analysis result is not valid JSON: {exc}") from exc
 
