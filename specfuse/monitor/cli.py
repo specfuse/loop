@@ -625,6 +625,17 @@ def run_cycle(
                     line += f", {repeats} repeat(s) of an already-filed fingerprint"
                 summary.append(line)
 
+            if findings and component.get("diagnose") == "auto":
+                # #3488: the `diagnose` dial is read by `specfuse agent run`'s
+                # findings-diagnose provider, not by this harvester. Say so once
+                # per component, so a schedule that runs only the monitor does
+                # not look like a diagnosis that silently never happens.
+                summary.append(
+                    f"{env_name}/{component_name}: diagnose: auto — findings are "
+                    "diagnosed by `specfuse agent run` (specfuse-agent); they wait "
+                    "until it runs"
+                )
+
             for skip in skipped:
                 summary.append(
                     f"{env_name}/{component_name}: skipped "
