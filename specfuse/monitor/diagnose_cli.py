@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from typing import Any
 
@@ -37,6 +38,19 @@ class AnalysisParseError(ValueError):
     """
 
 
+#: One markdown code fence around the whole result, optionally tagged `json`.
+#: Headless sessions asked for "exactly one JSON object" still fence it often
+#: (#3489); anything outside the fence stays a parse error.
+_FENCE_RE = re.compile(r"\A\s*```(?:json)?[ \t]*\n(?P<body>.*?)\n```\s*\Z", re.DOTALL)
+
+
+def _strip_fence(raw: str) -> str:
+    match = _FENCE_RE.match(raw)
+    if match is None or "```" in match.group("body"):
+        return raw
+    return match.group("body")
+
+
 def parse_analysis(raw: str) -> Diagnosis:
     """Parse an analysis-step result (JSON text) into a `Diagnosis`.
 
@@ -45,7 +59,7 @@ def parse_analysis(raw: str) -> Diagnosis:
     required field, or a `fix_scope` outside `FIX_SCOPES`.
     """
     try:
-        data: Any = json.loads(raw)
+        data: Any = json.loads(_strip_fence(raw))
     except json.JSONDecodeError as exc:
         raise AnalysisParseError(f"analysis result is not valid JSON: {exc}") from exc
 
