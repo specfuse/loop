@@ -7,6 +7,10 @@ flag, and it does not gate any code path inside the cycle itself. This
 document covers the two surfaces FEAT-2026-0040 ships and states plainly
 what is still missing.
 
+What happens to a finding after it is filed — diagnosis, the autofix decision,
+the fix — and which processes must be scheduled for it is in
+[`monitoring-to-fix.md`](monitoring-to-fix.md).
+
 ## The two shipped surfaces
 
 **Local.** An operator, or a cron entry on a machine they control, runs
@@ -91,6 +95,13 @@ between the two. Three check types are deliberately not bounded by it:
 
 A run in which any check errored leaves the watermark where it was, so the
 next run retries the same window.
+
+The watermark directory is local runtime state, not something to commit.
+`specfuse init` adds `.specfuse/monitor-watermarks/` to a new project's
+`.gitignore`. A project initialised earlier keeps its existing gitignore block
+(`specfuse upgrade` does not rewrite it), so add the line by hand. On a CI
+runner the directory starts empty every run — the shipped workflow template
+does not cache it — so each run there reads the 24-hour fallback window.
 
 ## What `--dry-run` does and does not gate
 

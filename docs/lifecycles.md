@@ -10,7 +10,7 @@ time. This document is the other half — **which lifecycle you are in, what the
 loop does for you inside it, and the specific points where it stops and needs
 you.**
 
-There are five ways work moves through a Specfuse project. They are not
+There are six ways work moves through a Specfuse project. They are not
 variations on one process; they have different entry points, different
 guarantees, and different human checkpoints:
 
@@ -21,6 +21,7 @@ guarantees, and different human checkpoints:
 | [Autonomous](#3-the-autonomous-lifecycle) | `queue:` + open issues | inherits whichever lane it selects | `specfuse-agent`, unattended |
 | [Escalation](#4-the-escalation-lifecycle) | a `needs-human` issue | none | you, one issue at a time |
 | [Maintenance](#5-the-maintenance-lifecycle) | a calendar | none | you, periodically |
+| [Monitoring](#6-the-monitoring-lifecycle) | a failure in a deployed component | none — one issue per fingerprint | `specfuse monitor run`, then `specfuse-agent` or you |
 
 **The one rule that explains all the checkpoints.** The loop automates
 execution, not judgment. Every place it stops is a place where proceeding would
@@ -314,6 +315,43 @@ flowchart LR
 
 ---
 
+## 6. The monitoring lifecycle
+
+Here the work starts in production, not in a roadmap row or a hand-written
+issue. `specfuse monitor run` reads each component's checks in
+`.specfuse/monitoring.yml` against its telemetry and broker, and files **one
+`monitoring-finding` issue per distinct failure** (per fingerprint). From
+there, two per-component dials decide how far it goes without you:
+
+```mermaid
+flowchart LR
+    M["specfuse monitor run"] --> I["finding issue"]
+    I -->|"diagnose: manual"| D1["/diagnose-issue N"]
+    I -->|"diagnose: auto"| D2["specfuse-agent"]
+    D1 --> DG["diagnosis comment"]
+    D2 --> DG
+    DG -->|"autofix: on, confidence &ge; 0.8,<br/>fix_scope small"| FX["headless /specfuse:fix-bug<br/>&rarr; one PR"]
+    DG -->|"otherwise"| H["you"]
+    FX --> H
+```
+
+### The places it stops for you
+
+- **`diagnose: manual`** — every finding waits for `/diagnose-issue`.
+- **A diagnosis routed to a human** — `fix_scope` is `large` or `external`, or
+  `confidence` is below 0.8.
+- **The pull request** — an autofix opens a pull request and never merges it.
+
+Findings do not go through triage, and the bug lane does not pick them up: they
+reach a fix only through the diagnosis and autofix dials. Two processes must
+run for this to happen on its own — `specfuse monitor run` files, and
+`specfuse-agent` diagnoses and fixes.
+
+The full flow, stage by stage, with what to read before turning each dial up:
+[`concepts/monitoring-to-fix.md`](concepts/monitoring-to-fix.md).
+
+---
+
 ## Choosing a lifecycle
 
 ```mermaid
@@ -323,6 +361,7 @@ flowchart TD
     Q -->|"an inbound issue<br/>you haven't classified"| TRI["/triage-issues"]
     Q -->|"a parked<br/>needs-human issue"| ANS["/answer-escalation"]
     Q -->|"time and a<br/>groomed queue"| AGENT["specfuse-agent"]
+    Q -->|"a monitoring-finding<br/>issue"| DIAG["/diagnose-issue"]
     Q -->|"no idea"| ATT["/attention"]
 
     BUG -->|"refused as<br/>feature-scoped"| FEAT
@@ -347,3 +386,5 @@ outcome: feature-scoped work with no plan, no gates, and no record.
   deterministic classes checked before a gate arms under `auto`.
 - [`concepts/adopting-auto-mode.md`](concepts/adopting-auto-mode.md) — moving a
   feature to `autonomy_default: auto`.
+- [`concepts/monitoring-to-fix.md`](concepts/monitoring-to-fix.md) — from a
+  production failure to a merged fix: detect, file, diagnose, decide, fix.

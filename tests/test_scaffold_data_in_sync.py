@@ -57,6 +57,10 @@ DOCS_TRACKED = {
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/autonomy-stop-classes.md",
     "docs/concepts/adopting-auto-mode.md",
+    "docs/concepts/monitoring-to-fix.md",
+    "docs/concepts/monitoring-schema.md",
+    "docs/concepts/monitoring-runners.md",
+    "docs/lifecycles.md",
 }
 
 # Unmirrored manifest — files authored directly under specfuse/loop/data/
