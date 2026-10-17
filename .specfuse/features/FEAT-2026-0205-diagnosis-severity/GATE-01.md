@@ -3,6 +3,11 @@ gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_diagnosis_severity_end_to_end -v -b"
 cost_budget_usd: 24.00
+broad_run:
+  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:1fea2572bb182d4233b903d016587fe6aeb4b58a:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:4acc6dfc5e8cece358c167d876515eba4a39a500:56bb22809af19d9fe40ed1755749bbb055c02a2a:5a5f687302f4c04388f1fb3c9b331b789186aef8:5ff66b6e4d8a264f23709ea60706111a4c59ed11:727e67bb41107456bc0a367716633c5f25f0c483:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:8736c3a345751965905e412e4db9d75caec53f07:97bcab1bc7244262cec901f46035f51dfdd07278:9e4fee0a2e47852f661fa0cd40425fba7deb93bd:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  ran_at: 2026-10-17T19:14:33.198871+00:00
+  ok: true
+  failing: []
 ---
 
 # Gate 1 — a diagnosed finding carries a severity that orders autofix
