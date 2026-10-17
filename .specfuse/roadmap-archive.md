@@ -43,6 +43,28 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0204"></a>
+## FEAT-2026-0204 — Monitoring: findings a diagnosis can start from
+
+**Why.** The first real `specfuse monitor run` against a consumer's production workspace (the first consumer's backend, 0.28.1, 2026-10-17) filed 16 issues for 7 findings; after #3486's in-cycle dedupe, [#3496](https://github.com/specfuse/loop/issues/3496) records what remains. A closed finding is refiled as a new issue every run, losing its diagnosis, because the lookup lists open issues only. A weekly schedule whose only expected firing predates heartbeat emission files a guaranteed false `silent-schedule`. And every finding carries one line of evidence, so the three hand diagnoses run that day spent most of their effort re-querying App Insights for the endpoint, stack frame, dead-lettered message and host liveness the finding could have carried.
+
+**Goal.** One gate. **T01–T04** make the lifecycle correct: a recurring fingerprint reopens its closed issue (closed within 90 days) with one comment, the monitor still never closes; a `dlq` finding is acknowledged by closing it until a new message id appears; the finding-meta marker gains first-seen and seen message ids and its reader fails closed; a schedule is not "silent" before heartbeats began on its component. **T05–T08** make every check's finding carry what a diagnosis needs, in the operator's words "as much information as possible to run a diagnostic": readable titles, `component:`/`check:` labels, first/last seen, counts, instances, a reproduction KQL, and per-check evidence (stack frame, request and client-abort flag for `error-logs`; joined exception and dependency for `http-5xx`; message details and `Exception.*` properties for `dlq`; last run and host liveness for `heartbeat`), each still from one query per check.
+
+**Benefits.** Findings stop being refiled or falsely raised, and a diagnosis, by hand or `diagnose: auto`, starts from evidence instead of from KQL.
+
+**Scope boundary.** OUT: severity (FEAT-2026-0205); re-diagnosing a reopened finding (#3487); diagnosis triggered by `monitor run` (#3488); a component liveness check type; auto-closing anything.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- **Live run against the first consumer's workspace.** Every in-loop oracle runs over
+  stub transports and a stub `gh`. After release, run `specfuse monitor run` on
+  the first consumer's backend and confirm: a closed finding that recurs is reopened, not
+  refiled; the four weekly schedules read "pending first firing" until their first
+  heartbeat; and a sample of finding bodies carries every section the Diagnostic context names for
+  its check.
+
 <a id="feat-2026-0113"></a>
 ## FEAT-2026-0113 — Triage assigns a severity, so `min_severity` routes instead of stranding
 

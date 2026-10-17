@@ -5,7 +5,7 @@ slug: actionable-findings
 branch: feat/FEAT-2026-0204-actionable-findings
 roadmap_goal: A filed monitoring finding is never refiled, never a false alarm from a schedule that has not emitted yet, and carries everything a diagnosis needs without re-querying the telemetry backend
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 23.50
 ---
 
