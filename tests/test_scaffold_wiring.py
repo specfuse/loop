@@ -129,7 +129,13 @@ class TestWiringMergeSafeExistingContent(unittest.TestCase):
         original = gitignore.read_text(encoding="utf-8")
         wire_claude(self.target)
         after = gitignore.read_text(encoding="utf-8")
-        self.assertEqual(original, after)
+        # #3501: the snippet lines the file lacks are appended after the
+        # operator's own; nothing already present is duplicated or moved.
+        self.assertTrue(after.startswith(original))
+        lines = [ln for ln in after.splitlines() if ln.strip()]
+        self.assertEqual(len(lines), len(set(lines)))
+        wire_claude(self.target)
+        self.assertEqual(gitignore.read_text(encoding="utf-8"), after)
 
     def test_existing_claude_md_user_content_preserved(self):
         from specfuse.loop.scaffold import wire_claude
