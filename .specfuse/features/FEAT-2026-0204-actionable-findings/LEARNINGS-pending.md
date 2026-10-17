@@ -12,6 +12,7 @@
   should diff that checklist against the criteria and either assert each item or
   record its removal in the plan.
 
+  > **Accepted 2026-10-17** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-2026-0204/G1-CLOSE]`.
 - **A unit that changes what an adapter needs to emit a finding can break tests it
   does not own; name the dispatch-level tests in its verification.** `T04` made `heartbeat` need an earlier heartbeat to evaluate, and
   `test_monitor_cli.TestAllCheckTypesDispatch`, whose heartbeat stub had no history,
@@ -19,6 +20,7 @@
   at the gate's broad run (the 16:03Z `broad_run_result`) and cost a repair commit
   and a second broad run (`ab4c8b1`).
 
+  > **Accepted 2026-10-17** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-2026-0204/G1-CLOSE]`.
 - **A stub-transport oracle proves the shape of a query and a body, never that the
   backend accepts the query, so a feature that writes KQL needs one opt-in live
   render before its close, not only after release.** FEAT-2026-0204's `error-logs`
@@ -30,3 +32,6 @@
   behind ten framework frames. None of the three is visible to a fixture-fed test.
   When a unit emits a query or renders evidence a human will read, its close should
   run the opt-in live tests, or name in Deferred verification why not.
+
+  > **Accepted 2026-10-17** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-2026-0204/G1-CLOSE]`.
+
