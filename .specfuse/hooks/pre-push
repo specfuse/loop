@@ -17,5 +17,27 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 # Consume it here and give the smoke test no stdin: handing git's pipe to a
 # long-running child left git dying with SIGPIPE (exit 141) after a green
 # run, so the push silently never happened (#3491).
-cat > /dev/null
+#
+# The smoke test itself should run BEFORE `git push`: git opens the connection
+# to the remote before this hook runs, so a ~4-minute smoke run here lets an
+# idle SSH session drop and git still dies with SIGPIPE afterwards (#3516).
+# `scripts/smoke-test.sh` stamps the tree it passed on; when every commit being
+# pushed is stamped, this hook returns at once.
+local_shas=()
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  case "$local_sha" in
+    ""|*[!0]*) [ -n "$local_sha" ] && local_shas+=("$local_sha") ;;
+    *) ;;  # all zeros: a branch deletion, nothing to test
+  esac
+done
+
+if [ "${#local_shas[@]}" -eq 0 ]; then
+  exit 0
+fi
+if "$REPO_ROOT/scripts/smoke-stamp.sh" covers "${local_shas[@]}"; then
+  echo "pre-push: smoke test already passed on this tree — skipping"
+  exit 0
+fi
+echo "pre-push: no smoke-test stamp for this tree; running it now."
+echo "pre-push: run scripts/smoke-test.sh before git push to skip this wait (#3516)."
 exec "$REPO_ROOT/scripts/smoke-test.sh" < /dev/null

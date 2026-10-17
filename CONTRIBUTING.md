@@ -41,6 +41,11 @@ single-valued, so the two installers point at the one directory rather than
 clobbering each other. Emergency bypass: `git commit/push --no-verify` (CI still
 enforces the secrets and smoke gates).
 
+**Run the smoke test before you push.** `scripts/smoke-test.sh` stamps the tree it passed
+on, and the `pre-push` hook then returns at once. Without a stamp the hook runs the smoke test
+itself, which can take long enough for git's already-open connection to drop: git exits 141
+after `smoke test: OK` and nothing is pushed (#3516).
+
 > The denylist is gitignored on purpose — committing the literal private strings
 > to a public repo would re-leak them. Each clone keeps its own.
 
