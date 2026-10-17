@@ -91,9 +91,13 @@ it was seen, and the per-check evidence) is listed in
 
 A **diagnosis** is one comment on the finding issue, rendered by
 `specfuse/monitor/diagnosis.py`, carrying a root cause, the evidence trail, a
-candidate fix, a `confidence` between 0 and 1, and a `fix_scope` of `small`,
-`large` or `external`. It does not fix anything; it is what the next stage
-reads.
+candidate fix, a `confidence` between 0 and 1, a `fix_scope` of `small`,
+`large` or `external`, and a `severity` of `critical`, `high`, `medium` or
+`low`. Severity is judged from the evidence against one rubric: `critical` means
+users cannot complete a core action or data is lost now, `low` means noise or no
+user-visible effect. The finding gets one matching `severity:<value>` label. A
+diagnosis without a severity (older comments, or an unrecognised value) reads as
+unrated. It does not fix anything; it is what the next stage reads.
 
 - **`diagnose: manual`.** A person runs `/diagnose-issue <N>` in Claude Code.
   The skill reads the finding and the component's source, then posts the
@@ -138,6 +142,10 @@ The threshold, the cap and the one-try rule are constants in code, not config
 values, so they cannot be tuned away from the config file. Anything the
 predicate cannot read (a diagnosis that does not parse, a component missing
 from the config) declines; it never fires on a guess.
+
+Severity changes no rule above. It only orders the queue: when the daily cap
+leaves room for fewer findings than are eligible, the most severe are offered
+first and unrated ones last.
 
 **What a person sees.** A decline is silent — the predicate working, not a
 failure. A route-to-human raises an escalation for the finding (a
@@ -227,14 +235,15 @@ finding marker as already structured (`specfuse/loop/triage.py`), and the triage
 provider skips it (`specfuse/agent/providers/triage.py`): the monitor already
 knows a finding is a defect, and the diagnosis and autofix stages gate it on
 stronger evidence than a category. As a result a finding has no triage
-category and no severity, and the bug lane does not pick it up unless a person
-labels it a bug. **Planned** (FEAT-2026-0205): a severity on the diagnosis, so
-findings can be prioritised without going through triage.
+category, and the bug lane does not pick it up unless a person labels it a bug.
+A finding gets its severity from the diagnosis, not from triage, and that
+`severity:<value>` label never brings it into the bug lane: the lane selects on
+the triage category.
 
 | | Finding | Human-written issue |
 | --- | --- | --- |
 | Enters by | `specfuse monitor run` | a person opening an issue |
-| Classified by | the check that found it | triage |
+| Classified by | the check that found it; severity from the diagnosis | triage |
 | Gated by | diagnosis `confidence` and `fix_scope` (`autofix.py`) | triage category and severity (`min_severity`) |
 | Fixed by | headless `/specfuse:fix-bug` | headless `/fix-bug` (bug lane) |
 | Merged by | a person | the bug lane, when `rules.bugs.automerge` is on |

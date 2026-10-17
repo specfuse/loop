@@ -172,9 +172,19 @@ class AutofixOrdersBySeverity(unittest.TestCase):
 
 
 class BugLaneIgnoresFindingSeverity(unittest.TestCase):
-    @unittest.skip("owned by FEAT-2026-0205/T04")
-    def test_owned_by_t04(self):
-        pass
+    def test_severity_labelled_finding_is_not_advertised(self):
+        from specfuse.agent.providers.bugs import BugsProvider
+
+        issue = IssueSummary(
+            number=7, title="a finding", labels=(FINDING_LABEL, "severity:critical"),
+            triage_category=None, triage_confidence=None,
+        )
+        snapshot = AgentSnapshot(
+            queue=(), triage_auto=False, bug_automerge=False, bug_lane_limits={},
+            issues=(issue,), issues_error=None, prs=(), prs_error=None, features=(),
+        )
+        provider = BugsProvider(repo="o/r", runner=_runner([], _analysis()))
+        self.assertEqual(provider.advertise(snapshot), [])
 
 
 if __name__ == "__main__":

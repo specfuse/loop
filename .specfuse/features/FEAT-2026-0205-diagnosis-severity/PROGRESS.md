@@ -2,3 +2,4 @@
   - note: The rubric is a one-line placeholder sentence in specfuse/agent/diagnose_invoke.py (not in produces:), left for T02. The provider removes stale severity labels using the union of the snapshot labels and a fresh `gh issue view --json labels` read.
 - **FEAT-2026-0205/T02**: attempt 1 outcome=passed
 - **FEAT-2026-0205/T03**: attempt 1 outcome=passed
+- **FEAT-2026-0205/T04**: attempt 1 outcome=passed

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0205/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - tests/test_diagnosis_severity_end_to_end.py
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/data/docs/concepts/monitoring-to-fix.md
   - docs/flows.html
   - specfuse/loop/data/docs/flows.html
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T19:08:57.394164+00:00
+duration_seconds: 27.835
+cost_usd: 0.186803
+input_tokens: 12
+output_tokens: 3013
 ---
 
 # T04 — findings stay out of the bug lane; the docs say what severity does
