@@ -42,6 +42,7 @@ the body, re-checked client-side, is the sole authority.
 from __future__ import annotations
 
 import json
+import math
 import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -63,7 +64,6 @@ DEFAULT_QUIET_AFTER_RUNS = 5
 CLOSED_LOOKUP_DAYS = 90
 
 _MARKER_TEMPLATE = "<!-- specfuse:finding fingerprint={fingerprint} -->"
-_META_TEMPLATE = "<!-- specfuse:finding-meta occurrences={occurrences} last_seen={last_seen} -->"
 _QUIET_MARKER = "<!-- specfuse:finding-quiet-annotated -->"
 
 
@@ -97,37 +97,97 @@ class TruncatedListingError(RuntimeError):
     """
 
 
+MESSAGES_CAP = 50
+
+
 @dataclass(frozen=True)
 class _Meta:
     occurrences: int
     last_seen: float
+    first_seen: Optional[float] = None
+    messages: Optional[tuple] = None
+
+
+def _to_int(value: str) -> Optional[int]:
+    try:
+        number = int(value)
+    except ValueError:
+        return None
+    return number if number >= 0 else None
+
+
+def _to_epoch(value: str) -> Optional[float]:
+    try:
+        number = float(value)
+    except ValueError:
+        return None
+    return number if math.isfinite(number) and number >= 0 else None
+
+
+def _to_messages(value: str) -> Optional[tuple]:
+    ids = value.split(",")
+    if not value or any(not i for i in ids):
+        return None
+    return tuple(ids[-MESSAGES_CAP:])
 
 
 def _parse_meta(body: str) -> Optional[_Meta]:
+    """Read the finding-meta marker; never raises.
+
+    Anything not fully understood is absent: an unreadable required field
+    (``occurrences``, ``last_seen``, or either duplicated) yields ``None`` for
+    the whole meta, an unreadable optional field (``first_seen``, ``messages``)
+    is absent from an otherwise valid meta.
+    """
+    body = body or ""
     marker_start = body.find("<!-- specfuse:finding-meta ")
     if marker_start == -1:
         return None
     marker_end = body.find("-->", marker_start)
     if marker_end == -1:
         return None
-    fragment = body[marker_start:marker_end]
-    occurrences = None
-    last_seen = None
-    for token in fragment.split():
-        if token.startswith("occurrences="):
-            occurrences = int(token.split("=", 1)[1])
-        elif token.startswith("last_seen="):
-            last_seen = float(token.split("=", 1)[1])
+    seen: dict = {}
+    dupes: set = set()
+    for token in body[marker_start:marker_end].split():
+        key, sep, value = token.partition("=")
+        if not sep or key not in ("occurrences", "last_seen", "first_seen", "messages"):
+            continue
+        if key in seen:
+            dupes.add(key)
+        seen[key] = value
+    occurrences = None if "occurrences" in dupes else _to_int(seen.get("occurrences", ""))
+    last_seen = None if "last_seen" in dupes else _to_epoch(seen.get("last_seen", ""))
     if occurrences is None or last_seen is None:
         return None
-    return _Meta(occurrences=occurrences, last_seen=last_seen)
+    first_seen = None if "first_seen" in dupes else _to_epoch(seen.get("first_seen", ""))
+    messages = None if "messages" in dupes else _to_messages(seen.get("messages", ""))
+    return _Meta(occurrences=occurrences, last_seen=last_seen, first_seen=first_seen, messages=messages)
+
+
+def _render_meta(*, occurrences: int, last_seen: float, first_seen: float, messages: Optional[tuple]) -> str:
+    parts = f"occurrences={occurrences} last_seen={last_seen} first_seen={first_seen}"
+    if messages:
+        parts += " messages=" + ",".join(messages[-MESSAGES_CAP:])
+    return f"<!-- specfuse:finding-meta {parts} -->"
+
+
+def _iso(ts: float) -> str:
+    return _utc(ts).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _render_title(fingerprint: str, artifact: FailureArtifact) -> str:
     return f"[monitor:{fingerprint[:12]}] {artifact.component}: {artifact.failure_class}"
 
 
-def _render_body(fingerprint: str, artifact: FailureArtifact, *, occurrences: int, last_seen: float) -> str:
+def _render_body(
+    fingerprint: str,
+    artifact: FailureArtifact,
+    *,
+    occurrences: int,
+    last_seen: float,
+    first_seen: Optional[float] = None,
+    messages: Optional[tuple] = None,
+) -> str:
     """Render an issue body for `artifact`, redacted at egress.
 
     Artifacts are expected to already be redacted at the adapter boundary
@@ -135,9 +195,10 @@ def _render_body(fingerprint: str, artifact: FailureArtifact, *, occurrences: in
     the property is re-asserted here rather than trusted from upstream.
     """
     artifact = redact_artifact(artifact)
+    first_seen = last_seen if first_seen is None else first_seen
     lines = [
         _marker(fingerprint),
-        _META_TEMPLATE.format(occurrences=occurrences, last_seen=last_seen),
+        _render_meta(occurrences=occurrences, last_seen=last_seen, first_seen=first_seen, messages=messages),
         "",
         f"**Component:** {artifact.component}",
         f"**Check type:** {artifact.check_type}",
@@ -149,6 +210,8 @@ def _render_body(fingerprint: str, artifact: FailureArtifact, *, occurrences: in
         lines.append(f"**Target:** {coords}")
     lines.append("")
     lines.append(f"**Occurrences:** {occurrences}")
+    lines.append(f"**First seen:** {_iso(first_seen)}")
+    lines.append(f"**Last seen:** {_iso(last_seen)}")
     lines.append("")
     lines.append("**Observed:**")
     lines.append("```")
@@ -266,7 +329,7 @@ def record_finding(
     existing = find_finding_issue(runner, repo, fingerprint, limit=limit, now=now)
 
     if existing is None:
-        body = _render_body(fingerprint, artifact, occurrences=1, last_seen=now)
+        body = _render_body(fingerprint, artifact, occurrences=1, last_seen=now, first_seen=now)
         title = _render_title(fingerprint, artifact)
         result = runner(
             [
@@ -282,6 +345,8 @@ def record_finding(
 
     number = str(existing["number"])
     meta = _parse_meta(existing.get("body", ""))
+    first_seen = (meta.first_seen if meta.first_seen is not None else meta.last_seen) if meta is not None else now
+    messages = meta.messages if meta is not None else None
     if str(existing.get("state", "OPEN")).upper() == "CLOSED":
         occurrences = meta.occurrences + 1 if meta is not None else 1
         runner(["gh", "issue", "reopen", number, "--repo", repo], check=True)
@@ -291,14 +356,17 @@ def record_finding(
                 "--repo", repo,
                 "--body",
                 f"Recurred after close: occurrence {occurrences}, "
-                f"last seen {_utc(now).strftime('%Y-%m-%d %H:%M:%S')} UTC.",
+                f"first seen {_iso(first_seen)}, last seen {_iso(now)}.",
             ],
             check=True,
         )
         runner(
             [
                 "gh", "issue", "edit", number, "--repo", repo, "--body",
-                _render_body(fingerprint, artifact, occurrences=occurrences, last_seen=now),
+                _render_body(
+                    fingerprint, artifact, occurrences=occurrences, last_seen=now,
+                    first_seen=first_seen, messages=messages,
+                ),
             ],
             check=True,
         )
@@ -307,7 +375,10 @@ def record_finding(
         return number
 
     occurrences = meta.occurrences + 1 if meta is not None else 1
-    new_body = _render_body(fingerprint, artifact, occurrences=occurrences, last_seen=now)
+    new_body = _render_body(
+        fingerprint, artifact, occurrences=occurrences, last_seen=now,
+        first_seen=first_seen, messages=messages,
+    )
     runner(
         ["gh", "issue", "edit", number, "--repo", repo, "--body", new_body],
         check=True,

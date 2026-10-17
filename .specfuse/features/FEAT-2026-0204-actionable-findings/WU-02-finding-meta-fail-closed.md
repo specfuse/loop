@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0204/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - tests/test_monitor_finding_meta.py
   - specfuse/monitor/issues.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:43:52.954243+00:00
+duration_seconds: 69.909
+cost_usd: 0.317184
+input_tokens: 20
+output_tokens: 8914
 ---
 
 # T02 — the finding-meta marker records first seen and seen message ids, and never raises
