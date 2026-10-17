@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0204/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - specfuse/monitor/providers/azure_app_insights.py
   - tests/test_heartbeat_adapter.py
   - tests/test_monitor_finding_lifecycle_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:45:03.214493+00:00
+duration_seconds: 78.121
+cost_usd: 0.294099
+input_tokens: 22
+output_tokens: 6598
 ---
 
 # T04 — a schedule is not "silent" before heartbeats began on its component

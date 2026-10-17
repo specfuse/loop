@@ -140,10 +140,30 @@ class DlqAcknowledgement(unittest.TestCase):
         self.fail("T03")
 
 
-@unittest.skip("owned by FEAT-2026-0204/T04")
 class HeartbeatGrace(unittest.TestCase):
     def test_target_before_first_heartbeat_is_not_silent(self):
-        self.fail("T04")
+        config = _config()
+        config["components"][0]["checks"] = [{
+            "type": "heartbeat",
+            "targets": [{
+                "name": "weekly-job", "cron": "0 8 * * 1",
+                "dialect": "standard-5", "timezone": "Etc/UTC",
+            }],
+        }]
+        rows = [{
+            "name": "other-schedule",
+            "last_heartbeat": "2026-10-16T09:00:00Z",
+            "first_heartbeat": "2026-10-14T13:50:00Z",
+        }]
+        gh = _Gh([])
+        with tempfile.TemporaryDirectory() as tmp:
+            code = cli.run_cycle(
+                config, dry_run=False, repo=_REPO,
+                transport_resolver=lambda module, check_type, binding: _Transport(rows),
+                gh_runner=gh, now=_NOW, watermark_dir=Path(tmp), out=io.StringIO(),
+            )
+        self.assertEqual(code, 0)
+        self.assertNotIn("create", gh.verbs(), gh.calls)
 
 
 if __name__ == "__main__":

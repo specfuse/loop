@@ -510,12 +510,16 @@ def _heartbeat_query(component: str) -> str:
     """Built only from *component*, an operator-configured name — never from
     a telemetry query's returned rows. Groups the component's heartbeat
     signal by schedule name, since one component may carry several
-    heartbeat targets (T04's `acme-functions-host` shape)."""
+    heartbeat targets (T04's `acme-functions-host` shape). Also carries each
+    schedule's earliest heartbeat, whose minimum across rows is the
+    component's earliest heartbeat — the instant before which no firing is
+    evaluated (FEAT-2026-0204/T04)."""
     return (
         "AppEvents "
         f"| where AppRoleName == '{component}' "
         f"and Name == '{HEARTBEAT_EVENT_NAME}' "
-        "| summarize last_heartbeat = max(TimeGenerated) by "
+        "| summarize last_heartbeat = max(TimeGenerated), "
+        "first_heartbeat = min(TimeGenerated) by "
         f"name = tostring(Properties.{HEARTBEAT_SCHEDULE_PROPERTY})"
     )
 
@@ -565,11 +569,20 @@ class HeartbeatAdapter:
         query = _heartbeat_query(self._component)
         rows = self._transport.run_query(query)
         last_seen: dict[str, datetime] = {}
+        earliest: Optional[datetime] = None
         for row in rows:
             name = row.get("name")
             observed = _parse_heartbeat_timestamp(row.get("last_heartbeat"))
+            first = _parse_heartbeat_timestamp(row.get("first_heartbeat")) or observed
+            if first is not None and (earliest is None or first < earliest):
+                earliest = first
             if name and observed is not None:
                 last_seen[str(name)] = observed
+
+        if earliest is None:
+            # No liveness signal at all: "never deployed" and "silent" are
+            # indistinguishable, so every target stays pending.
+            return
 
         for target in self._targets:
             name = target["name"]
@@ -583,6 +596,9 @@ class HeartbeatAdapter:
             expected = most_recent_firing(
                 cron, dialect, timezone_name, self._reference_time
             )
+            if expected < earliest:
+                # Pending first firing: emission began after this firing.
+                continue
             observed = last_seen.get(name)
             if observed is not None and observed >= expected:
                 continue
