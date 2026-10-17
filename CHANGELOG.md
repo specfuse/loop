@@ -38,6 +38,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ### Fixed
 
+- **A close re-armed the way `/unblock-wu` documents now reaches dispatch instead of deadlocking.** Re-arming sets the close's `attempts` to 0 while `GATE-NN-CRITERIA.md` still records the superseded attempt; the driver repaired that mismatch (#3279) only at dispatch, but the once-per-gate broad run that must pass first went red on it through the corpus `close-l` sweep, so the gate returned to `awaiting_review` and the repair never ran. The repair now also runs right before the broad run, and the repaired record is committed with the broad run's bookkeeping. (#3508)
 - **The `http-status-regression` check's query now parses in App Insights.** Its column alias `sample` is a KQL operator name, so every `http-status-regression` check in 0.28.0–0.28.2 errored on its first real run with `SYN0002 Query could not be parsed at 'sample'`. The alias is renamed, and the offline workspace-schema check now rejects any alias spelled like a KQL operator, so this class is caught without a live workspace. (#3506)
 
 ## [0.28.2+umbrella.0.15.0] - 2026-10-17
