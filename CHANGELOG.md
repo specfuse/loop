@@ -26,6 +26,15 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **`docs/concepts/monitoring-to-fix.md`: the path from a failure in a deployed component to a merged fix.** One page, one diagram, a section per stage — `specfuse monitor run` detects and files one issue per fingerprint, the `diagnose` dial (`/diagnose-issue` or `specfuse-agent`) posts a diagnosis, the `autofix` dial's fixed rules (dial off, `fix_scope` large/external, `confidence` below 0.8, one try per fingerprint, 5 attempts per 24 hours) decide whether a headless `/specfuse:fix-bug` opens a pull request, and a person merges it. It states what must be scheduled (`diagnose: auto` does nothing unless `specfuse-agent` runs, #3488), how to turn the dials up, and how findings differ from human-written issues, which go through triage and the bug lane. `docs/lifecycles.md` gains a sixth lifecycle, monitoring, pointing at it. (#3488)
+
+### Changed
+
+- **`specfuse init`/`upgrade` now ship the monitoring docs and `lifecycles.md` into `.specfuse/docs/`.** `monitoring-to-fix.md`, `monitoring-schema.md`, `monitoring-runners.md` and `lifecycles.md` were repository-only, so a consumer configuring `monitoring.yml` had no local copy of its schema or of the flow it drives. (#3488)
+- **The gitignore block `specfuse init` writes now ignores `.specfuse/monitor-watermarks/`**, the per-machine harvest state `specfuse monitor run` keeps, which otherwise showed up as untracked in a consumer repository. A project initialised earlier keeps its existing block and should add the line by hand. (#3486)
+
 ## [0.28.2+umbrella.0.15.0] - 2026-10-17
 
 ### Fixed
