@@ -15,7 +15,7 @@ import specfuse.monitor.issues as issues
 from specfuse.monitor.artifact import FailureArtifact
 from specfuse.monitor.fingerprint import fingerprint_artifact
 from specfuse.monitor.issues import (
-    DEFAULT_QUIET_AFTER_RUNS,
+    DEFAULT_QUIET_AFTER_SECONDS,
     FINDING_LABEL,
     TruncatedListingError,
     annotate_if_quiet,
@@ -240,7 +240,7 @@ class TestFindingLifecycle(unittest.TestCase):
         all_calls += throttled_runner.calls
 
         quiet_runner = _StubRunner([_list_result([row]), _ok_result(), _ok_result()])
-        annotate_if_quiet("fp-close-check", _REPO, DEFAULT_QUIET_AFTER_RUNS, runner=quiet_runner)
+        annotate_if_quiet("fp-close-check", _REPO, now=1000.0 + DEFAULT_QUIET_AFTER_SECONDS, runner=quiet_runner)
         all_calls += quiet_runner.calls
 
         for call in all_calls:
@@ -255,7 +255,7 @@ class TestFindingLifecycle(unittest.TestCase):
         row = _row(fp, number=77, occurrences=3, last_seen=1000.0)
         runner = _StubRunner([_list_result([row]), _ok_result(), _ok_result()])
 
-        number = annotate_if_quiet(fp, _REPO, DEFAULT_QUIET_AFTER_RUNS, runner=runner)
+        number = annotate_if_quiet(fp, _REPO, now=1000.0 + DEFAULT_QUIET_AFTER_SECONDS, runner=runner)
 
         self.assertEqual(number, "77")
         comment_calls = [c for c in runner.calls if "comment" in c]
@@ -264,9 +264,13 @@ class TestFindingLifecycle(unittest.TestCase):
         self.assertIn("candidate for close", comment_calls[0][body_index])
 
     def test_quiet_annotation_below_threshold_does_not_fire(self):
+        row = _row("fp-not-quiet-yet", number=12, occurrences=1, last_seen=1000.0)
         runner = _StubRunner([])
 
-        result = annotate_if_quiet("fp-not-quiet-yet", _REPO, DEFAULT_QUIET_AFTER_RUNS - 1, runner=runner)
+        result = annotate_if_quiet(
+            "fp-not-quiet-yet", _REPO, now=1000.0 + DEFAULT_QUIET_AFTER_SECONDS - 1,
+            runner=runner, existing=row,
+        )
 
         self.assertIsNone(result)
         self.assertEqual(runner.calls, [])
@@ -276,18 +280,18 @@ class TestFindingLifecycle(unittest.TestCase):
         already_annotated_row = _row(fp, number=88, occurrences=3, last_seen=1000.0, extra_marker=issues._QUIET_MARKER)
         runner = _StubRunner([_list_result([already_annotated_row])])
 
-        number = annotate_if_quiet(fp, _REPO, DEFAULT_QUIET_AFTER_RUNS, runner=runner)
+        number = annotate_if_quiet(fp, _REPO, now=1000.0 + DEFAULT_QUIET_AFTER_SECONDS, runner=runner)
 
         self.assertEqual(number, "88")
         comment_calls = [c for c in runner.calls if "comment" in c]
         self.assertEqual(len(comment_calls), 0)
 
-    def test_quiet_after_runs_is_a_named_parameter_not_a_constant_literal(self):
+    def test_quiet_after_seconds_is_a_named_parameter_not_a_constant_literal(self):
         fp = "fp-custom-n"
         row = _row(fp, number=99, occurrences=1, last_seen=1000.0)
         runner = _StubRunner([_list_result([row]), _ok_result(), _ok_result()])
 
-        number = annotate_if_quiet(fp, _REPO, 2, quiet_after_runs=2, runner=runner)
+        number = annotate_if_quiet(fp, _REPO, now=1000.0 + 60, quiet_after_seconds=60, runner=runner)
 
         self.assertEqual(number, "99")
 

@@ -7,8 +7,9 @@
 `AgentSnapshot` cannot answer.
 
 `advertise` returns one `kind="finding-diagnose"` item per open snapshot
-issue carrying `specfuse.monitor.issues.FINDING_LABEL` that has no diagnosis
-comment yet. The snapshot's `IssueSummary` carries no body, so this
+issue carrying `specfuse.monitor.issues.FINDING_LABEL` that needs a diagnosis:
+none yet, a monitor reopen comment newer than its latest diagnosis, or the
+`rediagnose` label (#3487). The snapshot's `IssueSummary` carries no body, so this
 provider reads each candidate's body and comments itself with
 `gh issue view N --json body,comments` -- the same read
 `autofix_run._read_finding_issue` performs and the same softening of "the
@@ -52,11 +53,12 @@ from specfuse.agent.run import (
 )
 from specfuse.agent.state import AgentSnapshot
 from specfuse.monitor.diagnosis import DiagnosisParseError, parse
-from specfuse.monitor.issues import FINDING_LABEL
+from specfuse.monitor.issues import FINDING_LABEL, REDIAGNOSE_LABEL, is_reopen_comment
 
 _ITEM_ID_PREFIX = "finding-diagnose-"
 _DEFAULT_MONITORING_CONFIG_PATH = ".specfuse/monitoring.yml"
 _DIAGNOSE_DIAL_AUTO = "auto"
+
 
 
 def _read_issue(runner: Callable, repo: str, issue_number: int) -> dict:
@@ -73,15 +75,25 @@ def _read_issue(runner: Callable, repo: str, issue_number: int) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _already_diagnosed(comments: list) -> bool:
-    for comment in comments or []:
+def _is_diagnosis(body: str) -> bool:
+    try:
+        return parse(body) is not None
+    except DiagnosisParseError:
+        return False
+
+
+def _needs_diagnosis(comments: list) -> bool:
+    """True when the finding has no diagnosis yet, or the monitor reopened it
+    after its latest diagnosis (#3487: a regression after a fix is diagnosed
+    again, once per reopen). `gh issue view` lists comments oldest first."""
+    last_diagnosis = last_reopen = -1
+    for index, comment in enumerate(comments or []):
         body = comment.get("body", "") if isinstance(comment, dict) else ""
-        try:
-            if parse(body) is not None:
-                return True
-        except DiagnosisParseError:
-            continue
-    return False
+        if _is_diagnosis(body):
+            last_diagnosis = index
+        elif is_reopen_comment(body):
+            last_reopen = index
+    return last_diagnosis < 0 or last_reopen > last_diagnosis
 
 
 def _unparseable_diagnosis_payload(number: int, error: str) -> EscalationPayload:
@@ -168,11 +180,15 @@ class FindingsDiagnoseProvider:
             if dial != _DIAGNOSE_DIAL_AUTO:
                 continue
 
-            if _already_diagnosed(comments):
+            relabelled = REDIAGNOSE_LABEL in issue.labels
+            if not relabelled and not _needs_diagnosis(comments):
                 continue
 
             item_id = f"{_ITEM_ID_PREFIX}{issue.number}"
-            self._rows[item_id] = {"number": issue.number, "title": issue.title, "body": body}
+            self._rows[item_id] = {
+                "number": issue.number, "title": issue.title, "body": body,
+                "relabelled": relabelled,
+            }
             items.append(
                 ActionItem(
                     item_id=item_id,
@@ -221,6 +237,13 @@ class FindingsDiagnoseProvider:
             ],
             check=False,
         )
+        if row.get("relabelled"):
+            # Consume the request so the next run does not diagnose again.
+            self._runner(
+                ["gh", "issue", "edit", str(number), "--repo", self._repo,
+                 "--remove-label", REDIAGNOSE_LABEL],
+                check=False,
+            )
         return ActionOutcome(
             status=STATUS_COMPLETED,
             detail=f"issue #{number} diagnosed",

@@ -51,6 +51,7 @@ from specfuse.loop.escalation import _default_runner
 from specfuse.loop.lint_monitoring import CHECK_TYPES, RUNNER_VALUES, validate_monitoring
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.fingerprint import fingerprint_artifact
+from specfuse.monitor import issues as _issues
 from specfuse.monitor.issues import SeenThisRun, record_finding
 
 __all__ = ("main", "run_cycle", "load_monitoring_config", "MonitorCliError")
@@ -478,6 +479,59 @@ def _describe(artifact) -> str:
     return " ".join(parts)
 
 
+def _annotate_quiet_findings(
+    gh_runner: Callable,
+    repo: str,
+    *,
+    now: float,
+    components: set,
+    seen: set,
+    dry_run: bool,
+    cached: Optional[Mapping] = None,
+) -> list:
+    """#3502: annotate each open finding of a component this cycle fully
+    checked whose fingerprint was not seen this cycle and has gone unseen for
+    the quiet threshold. One listing for the whole pass. A component with an
+    errored check is never in `components`, so a broken check cannot make a
+    finding look quiet. Never closes anything."""
+    cached = cached or {}
+
+    def _from_cache(args, check=True):
+        hit = cached.get(tuple(args))
+        return hit if hit is not None else gh_runner(args, check=check)
+
+    rows = _issues.list_finding_issues(_from_cache, repo, now=now)
+    annotated = []
+    lines = []
+    for row in rows:
+        if str(row.get("state", "OPEN")).upper() == "CLOSED":
+            continue
+        body = row.get("body", "") or ""
+        fingerprint = _issues.finding_fingerprint(body)
+        if fingerprint is None or fingerprint in seen:
+            continue
+        if _issues.finding_component(body) not in components:
+            continue
+        if _issues._QUIET_MARKER in body:
+            continue
+        elapsed = _issues.quiet_for(row, now)
+        if elapsed is None or elapsed < _issues.DEFAULT_QUIET_AFTER_SECONDS:
+            continue
+        days = int(elapsed // (24 * 60 * 60))
+        if dry_run:
+            lines.append(f"  would annotate #{row['number']} as quiet (no sighting for {days} day(s))")
+            continue
+        number = _issues.annotate_if_quiet(fingerprint, repo, now=now, runner=gh_runner, existing=row)
+        if number is not None:
+            annotated.append(number)
+    if annotated:
+        lines.insert(0, f"quiet: annotated {len(annotated)} finding(s) as close candidates: "
+                     + ", ".join(f"#{n}" for n in annotated))
+    elif lines:
+        lines.insert(0, "quiet: findings that would be annotated as close candidates")
+    return lines
+
+
 def run_cycle(
     config: Mapping[str, object],
     *,
@@ -496,6 +550,17 @@ def run_cycle(
     out = out if out is not None else sys.stdout
     now = now if now is not None else datetime.now(timezone.utc)
     gh_runner = gh_runner if gh_runner is not None else _default_runner
+    # #3502: the quiet pass reuses the last finding listing this cycle already
+    # made rather than listing again (same `now`, so the same argv).
+    listings: dict = {}
+    inner_runner = gh_runner
+
+    def gh_runner(args, check=True):
+        result = inner_runner(args, check=check)
+        if list(args[:3]) == ["gh", "issue", "list"]:
+            listings[tuple(args)] = result
+        return result
+
     # Fingerprints already handed to `record_finding` this cycle (#3486): the
     # `gh issue list` lookup can lag an issue created moments earlier, so a
     # repeated fingerprint must not reach it twice.
@@ -525,6 +590,11 @@ def run_cycle(
     summary: list = []
     total_findings = 0
     any_errored = False
+    # #3502: which components this cycle checked, which of them had a check
+    # error, and every fingerprint seen — the inputs to the quiet pass.
+    checked_components: set = set()
+    errored_components: set = set()
+    seen_fingerprints: set = set()
 
     for env_name in sorted(selected_envs):
         env_errored = False
@@ -556,6 +626,7 @@ def run_cycle(
                 )
                 continue
 
+            checked_components.add(component_name)
             findings: list = []
             skipped: list = []
             for check in component.get("checks") or []:
@@ -575,6 +646,7 @@ def run_cycle(
                     )
                 except Exception as exc:  # noqa: BLE001 — isolation is the point
                     env_errored = True
+                    errored_components.add(component_name)
                     summary.append(
                         f"{env_name}/{component_name}: check {check.get('type')} errored — "
                         f"{type(exc).__name__}: {exc}"
@@ -584,6 +656,7 @@ def run_cycle(
                 skipped.extend(check_skipped)
 
             total_findings += len(findings)
+            seen_fingerprints.update(fingerprint_artifact(a) for a in findings)
 
             if dry_run:
                 summary.append(f"{env_name}/{component_name}: {len(findings)} finding(s) — would be filed")
@@ -625,6 +698,17 @@ def run_cycle(
                     line += f", {repeats} repeat(s) of an already-filed fingerprint"
                 summary.append(line)
 
+            if findings and component.get("diagnose") == "auto":
+                # #3488: the `diagnose` dial is read by `specfuse agent run`'s
+                # findings-diagnose provider, not by this harvester. Say so once
+                # per component, so a schedule that runs only the monitor does
+                # not look like a diagnosis that silently never happens.
+                summary.append(
+                    f"{env_name}/{component_name}: diagnose: auto — findings are "
+                    "diagnosed by `specfuse agent run` (specfuse-agent); they wait "
+                    "until it runs"
+                )
+
             for skip in skipped:
                 summary.append(
                     f"{env_name}/{component_name}: skipped "
@@ -640,6 +724,16 @@ def run_cycle(
             )
         elif not dry_run:
             _write_watermark(watermark_path, now=now)
+
+    quiet_scope = checked_components - errored_components
+    if repo is not None and quiet_scope:
+        summary.extend(
+            _annotate_quiet_findings(
+                gh_runner, repo, now=now.timestamp(), components=quiet_scope,
+                cached=listings,
+                seen=seen_fingerprints, dry_run=dry_run,
+            )
+        )
 
     summary.append(f"total: {total_findings} finding(s) across {len(selected_components)} component(s)")
     for line in summary:
