@@ -2,7 +2,7 @@
 id: FEAT-2026-0204/G1-CLOSE
 type: close
 status: pending
-attempts: 0
+attempts: 1
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
