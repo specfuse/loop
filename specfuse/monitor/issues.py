@@ -4,10 +4,12 @@
 
 One issue per fingerprint: find-or-create, bump an occurrence record under a
 throttle on repeat sightings, and annotate a fingerprint that has gone quiet.
-This module never closes an issue, reopens one, or transitions its state —
-that is a deliberate scope boundary (see ``PLAN.md``'s scope-boundary
-section): a monitoring tool that auto-closes on silence erases the evidence
-of an intermittent fault, so closing stays a human decision.
+This module never closes an issue — that is a deliberate scope boundary
+(see ``PLAN.md``'s scope-boundary section): a monitoring tool that
+auto-closes on silence erases the evidence of an intermittent fault, so
+closing stays a human decision. It does reopen one: a fingerprint whose
+issue a human closed and that then recurs inside the lookup window is a
+regression, and refiling it forks the history (FEAT-2026-0204 decision 1).
 
 Reused from ``specfuse.loop.escalation`` on purpose: the injected-runner seam
 (``runner(args, check=...)`` defaulting to ``_default_runner``),
@@ -41,6 +43,7 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -56,6 +59,8 @@ FINDING_LABEL = "monitoring-finding"
 DEFAULT_LIST_LIMIT = 100
 DEFAULT_THROTTLE_SECONDS = 6 * 60 * 60
 DEFAULT_QUIET_AFTER_RUNS = 5
+# How long after closing an issue still counts as "the same finding" (PLAN.md decision 3).
+CLOSED_LOOKUP_DAYS = 90
 
 _MARKER_TEMPLATE = "<!-- specfuse:finding fingerprint={fingerprint} -->"
 _META_TEMPLATE = "<!-- specfuse:finding-meta occurrences={occurrences} last_seen={last_seen} -->"
@@ -152,37 +157,73 @@ def _render_body(fingerprint: str, artifact: FailureArtifact, *, occurrences: in
     return "\n".join(lines)
 
 
-def _list_findings(runner: Callable, repo: str, *, limit: int) -> list:
+def _utc(ts: float) -> datetime:
+    return datetime.fromtimestamp(ts, tz=timezone.utc)
+
+
+def _closed_bound(now: float) -> datetime:
+    return _utc(now - CLOSED_LOOKUP_DAYS * 86400)
+
+
+def _closed_within(issue: dict, bound: datetime) -> bool:
+    """True for an open row, or a closed row whose ``closedAt`` is inside the window."""
+    if str(issue.get("state", "OPEN")).upper() != "CLOSED":
+        return True
+    closed_at = issue.get("closedAt")
+    if not closed_at:
+        return False
+    try:
+        return datetime.fromisoformat(str(closed_at).replace("Z", "+00:00")) >= bound
+    except ValueError:
+        return False
+
+
+def _list_findings(runner: Callable, repo: str, *, limit: int, now: float) -> list:
+    bound = _closed_bound(now)
+    # One listing: open issues plus issues closed inside the window. The
+    # negated ``closed:<`` qualifier is a date filter, not a search over the
+    # marker; the client-side ``closedAt`` check below does not rely on it.
     result = runner(
         [
             "gh", "issue", "list",
             "--repo", repo,
             "--label", FINDING_LABEL,
-            "--state", "open",
+            "--state", "all",
+            "--search", f"-closed:<{bound.strftime('%Y-%m-%d')}",
             "--limit", str(limit),
-            "--json", "number,body,title",
+            "--json", "number,body,title,state,closedAt",
         ],
         check=False,
     )
     if result.returncode != 0 or not result.stdout:
         return []
     try:
-        return json.loads(result.stdout)
+        rows = json.loads(result.stdout)
     except ValueError:
         return []
+    return [r for r in rows if _closed_within(r, bound)]
 
 
 def find_finding_issue(
-    runner: Callable, repo: str, fingerprint: str, *, limit: int = DEFAULT_LIST_LIMIT
+    runner: Callable,
+    repo: str,
+    fingerprint: str,
+    *,
+    limit: int = DEFAULT_LIST_LIMIT,
+    now: Optional[float] = None,
 ) -> Optional[dict]:
     """Return the listing row carrying `fingerprint`'s marker, or None.
+
+    Rows are open issues plus issues closed within `CLOSED_LOOKUP_DAYS` of
+    `now`; each carries its `state`.
 
     Filters client-side over `gh issue list`'s output rather than passing the
     marker to `--search` (see the module docstring). Raises
     `TruncatedListingError` when the returned row count equals `limit` and
     none of them matched, since that page is not proof of absence.
     """
-    issues = _list_findings(runner, repo, limit=limit)
+    now = time.time() if now is None else now
+    issues = _list_findings(runner, repo, limit=limit, now=now)
     marker = _marker(fingerprint)
     for issue in issues:
         if marker in issue.get("body", ""):
@@ -215,13 +256,14 @@ def record_finding(
     derivable from the same `gh issue list` read this function already does,
     with no second API call needed to inspect comment history. A repeat
     sighting inside `throttle_seconds` of the last recorded update returns the
-    existing issue number and makes no further `gh` call at all. Never closes,
-    reopens, or otherwise transitions the issue's state.
+    existing issue number and makes no further `gh` call at all. A match whose
+    issue is closed (inside the lookup window) is reopened with one comment
+    instead of being refiled. Never closes an issue.
     """
     runner = runner if runner is not None else _default_runner
     now = time.time() if now is None else now
 
-    existing = find_finding_issue(runner, repo, fingerprint, limit=limit)
+    existing = find_finding_issue(runner, repo, fingerprint, limit=limit, now=now)
 
     if existing is None:
         body = _render_body(fingerprint, artifact, occurrences=1, last_seen=now)
@@ -240,6 +282,27 @@ def record_finding(
 
     number = str(existing["number"])
     meta = _parse_meta(existing.get("body", ""))
+    if str(existing.get("state", "OPEN")).upper() == "CLOSED":
+        occurrences = meta.occurrences + 1 if meta is not None else 1
+        runner(["gh", "issue", "reopen", number, "--repo", repo], check=True)
+        runner(
+            [
+                "gh", "issue", "comment", number,
+                "--repo", repo,
+                "--body",
+                f"Recurred after close: occurrence {occurrences}, "
+                f"last seen {_utc(now).strftime('%Y-%m-%d %H:%M:%S')} UTC.",
+            ],
+            check=True,
+        )
+        runner(
+            [
+                "gh", "issue", "edit", number, "--repo", repo, "--body",
+                _render_body(fingerprint, artifact, occurrences=occurrences, last_seen=now),
+            ],
+            check=True,
+        )
+        return number
     if meta is not None and (now - meta.last_seen) < throttle_seconds:
         return number
 

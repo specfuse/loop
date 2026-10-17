@@ -390,7 +390,7 @@ def _classify(recorder: "_CallRecorder") -> str:
     verbs = {c[2] for c in recorder.calls if len(c) > 2 and c[0] == "gh" and c[1] == "issue"}
     if "create" in verbs:
         return "created"
-    if "edit" in verbs:
+    if "edit" in verbs or "reopen" in verbs:
         return "updated"
     return "throttled"
 

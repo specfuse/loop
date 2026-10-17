@@ -92,8 +92,9 @@ class TestFindingLifecycle(unittest.TestCase):
     # --- criterion 4: finder does not pass the marker to --search ---
 
     def test_source_never_passes_search_flag(self):
-        self.assertNotIn('"--search"', _ISSUES_SOURCE)
-        self.assertNotIn("'--search'", _ISSUES_SOURCE)
+        # A date qualifier is allowed (FEAT-2026-0204/T01); the marker never is.
+        self.assertNotIn("--search\", _marker", _ISSUES_SOURCE)
+        self.assertNotIn("specfuse:finding", "".join(re.findall(r'"--search",[^\n]*', _ISSUES_SOURCE)))
 
     def test_list_call_uses_label_and_json_fields_not_search(self):
         runner = _StubRunner([_list_result([])])
@@ -104,8 +105,9 @@ class TestFindingLifecycle(unittest.TestCase):
         self.assertIn("--label", list_call)
         self.assertIn(FINDING_LABEL, list_call)
         self.assertIn("--json", list_call)
-        self.assertIn("number,body,title", list_call)
-        self.assertNotIn("--search", list_call)
+        self.assertIn("number,body,title,state,closedAt", list_call)
+        search = list_call[list_call.index("--search") + 1] if "--search" in list_call else ""
+        self.assertNotIn("specfuse", search)
 
     # --- criterion 5: marker-in-body re-check is load-bearing ---
 
@@ -244,7 +246,6 @@ class TestFindingLifecycle(unittest.TestCase):
         for call in all_calls:
             self.assertNotIn("close", call)
             joined = " ".join(call).lower()
-            self.assertNotIn("closed", joined)
             self.assertNotIn("state:closed", joined)
 
     # --- criterion 10: quiet annotation annotates and stops ---

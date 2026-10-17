@@ -1,13 +1,22 @@
 ---
 id: FEAT-2026-0204/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - tests/test_monitor_finding_lifecycle_end_to_end.py
   - tests/test_monitor_finding_context_end_to_end.py
   - specfuse/monitor/issues.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:42:36.568640+00:00
+duration_seconds: 76.041
+cost_usd: 0.442087
+input_tokens: 20
+output_tokens: 10387
 ---
 
 # T01 — a recurring fingerprint reopens its closed issue
