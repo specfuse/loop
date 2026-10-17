@@ -1,13 +1,19 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_monitor_finding_lifecycle_end_to_end tests.test_monitor_finding_context_end_to_end -v -b"
 cost_budget_usd: 36.00
 broad_run:
-  tree: 06e0c26931e87f6cdaad1fae464cf4e2fc857483:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:3e28247308d97081531038990a05fbb195252862:4acc6dfc5e8cece358c167d876515eba4a39a500:55b11c7ec71942c69f5e48ed7d35c15ab8b6dddc:5ff66b6e4d8a264f23709ea60706111a4c59ed11:727e67bb41107456bc0a367716633c5f25f0c483:73e987ed6ba03adecc27ed3fcdeea7b2c46c6554:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:8ea4803093f70f56ddac146e3cd232885e05ad90:97bcab1bc7244262cec901f46035f51dfdd07278:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:e786d57c604e4de064fa3e8d85158255096c8cb9
-  ran_at: 2026-10-17T16:17:35.307134+00:00
-  ok: true
-  failing: []
+  tree: 014779809262a45fe65968ee7f836779c2801631:06e0c26931e87f6cdaad1fae464cf4e2fc857483:07ca9c541fb97154fd97d8e23d7f69cd87918215:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:2891080d52e158d5ad72b08822c9becd9d909eb1:4444b5ce09c73cf0225108da03b75a9bff889310:4acc6dfc5e8cece358c167d876515eba4a39a500:55b11c7ec71942c69f5e48ed7d35c15ab8b6dddc:5ff66b6e4d8a264f23709ea60706111a4c59ed11:727e67bb41107456bc0a367716633c5f25f0c483:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:ba1ab2fe62a90d25fafb5cf043ce40c5f6c32dbe:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef
+  ran_at: 2026-10-17T16:33:37.580635+00:00
+  ok: false
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "(failures=1,"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 1 — findings that are never refiled, never false, and carry what a diagnosis needs
