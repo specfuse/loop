@@ -59,3 +59,5 @@ done < <("$PYTHON" -m specfuse.loop.gate_commands .specfuse/verification.yml)
 
 echo
 echo "smoke test: OK"
+# Stamp the tree that passed, so the pre-push hook can skip a second run (#3516).
+"$REPO_ROOT/scripts/smoke-stamp.sh" record || true
