@@ -22,6 +22,7 @@ included. It never returns a rendered body built from a defaulted field.
 from __future__ import annotations
 
 from specfuse.agent.invoke import build_claude_argv
+from specfuse.loop.agent_policy import SEVERITY_ORDER
 from specfuse.monitor.diagnose_cli import AnalysisParseError, render_headless
 from specfuse.monitor.diagnosis import FIX_SCOPES
 
@@ -69,7 +70,9 @@ def build_invocation(
         "partial evidence gets a low number.\n"
         f"- fix_scope: exactly one of {', '.join(FIX_SCOPES)} -- do not "
         "invent or default this value; if none plainly fits, say so in "
-        "candidate_fix and still pick the closest of the three.\n\n"
+        "candidate_fix and still pick the closest of the three.\n"
+        f"- severity (optional): one of {', '.join(SEVERITY_ORDER)} -- how "
+        "serious the finding is; omit it if you cannot tell.\n\n"
         "Do not post anything and do not run `gh issue comment` yourself; "
         "the caller renders and posts the diagnosis this session produces."
     )

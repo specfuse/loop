@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0205/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - tests/test_diagnosis_severity_end_to_end.py
   - specfuse/monitor/diagnosis.py
   - specfuse/monitor/diagnose_cli.py
   - specfuse/agent/providers/findings_diagnose.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T19:07:11.095460+00:00
+duration_seconds: 51.474
+cost_usd: 0.29213
+input_tokens: 16
+output_tokens: 7797
 ---
 
 # T01 — a diagnosis carries a severity, and the finding gets one severity label

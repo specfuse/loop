@@ -25,7 +25,9 @@ subprocess or network call. It formats and parses; the skill posts.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Optional
 
+from specfuse.loop.agent_policy import SEVERITY_VALUES
 from specfuse.monitor.redaction import redact_text
 
 FIX_SCOPES = ("small", "large", "external")
@@ -61,11 +63,17 @@ class Diagnosis:
     candidate_fix: str
     confidence: float
     fix_scope: str
+    severity: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.fix_scope not in FIX_SCOPES:
             raise ValueError(
                 f"fix_scope must be one of {FIX_SCOPES!r}, got {self.fix_scope!r}"
+            )
+        if self.severity is not None and self.severity not in SEVERITY_VALUES:
+            raise ValueError(
+                f"severity must be one of {sorted(SEVERITY_VALUES)!r}, "
+                f"got {self.severity!r}"
             )
         if not (0.0 <= self.confidence <= 1.0):
             raise ValueError(
@@ -74,9 +82,11 @@ class Diagnosis:
 
 
 def _marker(diagnosis: Diagnosis) -> str:
+    severity = f" severity={diagnosis.severity}" if diagnosis.severity else ""
     return (
         f"{_MARKER_PREFIX}"
         f"confidence={diagnosis.confidence} fix_scope={diagnosis.fix_scope}"
+        f"{severity}"
         f"{_MARKER_SUFFIX}"
     )
 
@@ -100,6 +110,8 @@ def render(diagnosis: Diagnosis) -> str:
         f"**Confidence:** {diagnosis.confidence}",
         f"**Fix scope:** {diagnosis.fix_scope}",
     ]
+    if diagnosis.severity:
+        lines.append(f"**Severity:** {diagnosis.severity}")
     return "\n".join(lines)
 
 
@@ -137,6 +149,9 @@ def parse(body: str) -> Diagnosis | None:
             f"confidence is not a float: {fields['confidence']!r}"
         ) from exc
     fix_scope = fields["fix_scope"]
+    # A lookup, not a try/except: an absent or unknown value reads as absent.
+    severity = fields.get("severity")
+    severity = severity if severity in SEVERITY_VALUES else None
 
     sections = _parse_sections(body[marker_end + len(_MARKER_SUFFIX) :])
 
@@ -147,6 +162,7 @@ def parse(body: str) -> Diagnosis | None:
             candidate_fix=sections["Candidate fix"],
             confidence=confidence,
             fix_scope=fix_scope,
+            severity=severity,
         )
     except KeyError as exc:
         raise DiagnosisParseError(f"diagnosis body missing section: {exc}") from exc
@@ -174,7 +190,7 @@ def _parse_sections(body: str) -> dict[str, str]:
             current = matched_header
             buffer = []
             continue
-        if stripped.startswith("**Confidence:**") or stripped.startswith("**Fix scope:**"):
+        if stripped.startswith(("**Confidence:**", "**Fix scope:**", "**Severity:**")):
             if current is not None:
                 sections[current] = "\n".join(buffer).strip()
                 current = None
