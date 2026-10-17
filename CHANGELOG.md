@@ -36,6 +36,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 - **`specfuse init`/`upgrade` now ship the monitoring docs and `lifecycles.md` into `.specfuse/docs/`.** `monitoring-to-fix.md`, `monitoring-schema.md`, `monitoring-runners.md` and `lifecycles.md` were repository-only, so a consumer configuring `monitoring.yml` had no local copy of its schema or of the flow it drives. (#3488)
 - **The gitignore block `specfuse init` writes now ignores `.specfuse/monitor-watermarks/`**, the per-machine harvest state `specfuse monitor run` keeps, which otherwise showed up as untracked in a consumer repository. A project initialised earlier keeps its existing block and should add the line by hand. (#3486)
 
+### Fixed
+
+- **The `http-status-regression` check's query now parses in App Insights.** Its column alias `sample` is a KQL operator name, so every `http-status-regression` check in 0.28.0–0.28.2 errored on its first real run with `SYN0002 Query could not be parsed at 'sample'`. The alias is renamed, and the offline workspace-schema check now rejects any alias spelled like a KQL operator, so this class is caught without a live workspace. (#3506)
+
 ## [0.28.2+umbrella.0.15.0] - 2026-10-17
 
 ### Fixed
