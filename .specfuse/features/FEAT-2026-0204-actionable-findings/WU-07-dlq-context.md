@@ -1,12 +1,21 @@
 ---
 id: FEAT-2026-0204/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - specfuse/monitor/providers/azure_service_bus.py
   - tests/test_monitor_finding_context_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T15:53:20.571187+00:00
+duration_seconds: 59.993
+cost_usd: 0.389376
+input_tokens: 32
+output_tokens: 7599
 ---
 
 # T07 — a `dlq` finding carries the dead-lettered message's details and recorded exception

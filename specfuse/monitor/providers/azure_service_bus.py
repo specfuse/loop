@@ -24,8 +24,9 @@ importing this module never requires `azure-servicebus` to be installed
 
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Iterable, Iterator, List, Mapping, Optional, Protocol, Sequence
 
@@ -71,6 +72,108 @@ def _exception_type_and_message(message: object) -> tuple[str, str]:
     return "UnknownException", description
 
 
+_STACK_LINES_MAX = 10
+_BODY_BYTES_MAX = 65536
+
+
+def _text(value: object) -> str:
+    if isinstance(value, (bytes, bytearray)):
+        return bytes(value).decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _app_property(message: object, name: str) -> Optional[str]:
+    """Value of application property `name`; keys and values may be `bytes`."""
+    props = getattr(message, "application_properties", None)
+    if not isinstance(props, Mapping):
+        return None
+    for key, value in props.items():
+        if _text(key) == name and value is not None:
+            text = _text(value).strip()
+            return text or None
+    return None
+
+
+def _body_top_level_keys(message: object) -> Optional[List[str]]:
+    """Top-level keys of a JSON-object body, never values. Only a `bytes` or
+    `str` body is read; a section generator or oversized body is skipped
+    rather than buffered."""
+    body = getattr(message, "body", None)
+    if isinstance(body, (bytes, bytearray)):
+        if len(body) > _BODY_BYTES_MAX:
+            return None
+        body = bytes(body).decode("utf-8", errors="replace")
+    if not isinstance(body, str) or len(body) > _BODY_BYTES_MAX:
+        return None
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return [str(key) for key in parsed]
+
+
+def _dlq_context(
+    message: object,
+    *,
+    subscription: str,
+    function: str,
+    namespace: str,
+    topic: str,
+) -> dict:
+    context = {}
+    if function:
+        context["Where"] = function
+
+    lines = []
+    for label, attr in (
+        ("id", "message_id"),
+        ("sequence number", "sequence_number"),
+        ("subject", "subject"),
+        ("enqueued (UTC)", "enqueued_time_utc"),
+        ("delivery count", "delivery_count"),
+    ):
+        value = getattr(message, attr, None)
+        if value is None or value == "":
+            continue
+        if attr == "enqueued_time_utc" and isinstance(value, datetime):
+            value = value.strftime("%Y-%m-%dT%H:%M:%SZ")
+        lines.append(f"{label}: {value}")
+    if lines:
+        context["Message"] = "\n".join(lines)
+
+    dead = []
+    reason = getattr(message, "dead_letter_reason", None)
+    description = getattr(message, "dead_letter_error_description", None)
+    if reason:
+        dead.append(f"reason: {reason}")
+    if description:
+        dead.append(f"description: {description}")
+    if dead:
+        context["Dead-letter"] = "\n".join(dead)
+
+    exc_message = _app_property(message, "Exception.Message")
+    exc_stack = _app_property(message, "Exception.StackTrace")
+    exc = []
+    if exc_message:
+        exc.append(exc_message)
+    if exc_stack:
+        exc.extend(exc_stack.splitlines()[:_STACK_LINES_MAX])
+    if exc:
+        context["Exception"] = "\n".join(exc[: _STACK_LINES_MAX + 1])
+
+    keys = _body_top_level_keys(message)
+    if keys is not None:
+        context["Body shape"] = "top-level keys: " + (", ".join(keys) if keys else "(none)")
+
+    context["Peek it"] = (
+        f"namespace: {namespace}\ntopic: {topic}\n"
+        f"subscription: {subscription}\nsub-queue: $DeadLetterQueue"
+    )
+    return context
+
+
 class DeadLetterMessage(Protocol):
     """The shape a dead-lettered message must supply. Matches the fields a
     real `ServiceBusReceivedMessage` exposes; a stub only needs these."""
@@ -102,7 +205,13 @@ class ServiceBusDlqAdapter:
         transport: ServiceBusDlqTransport,
         targets: Sequence[Mapping[str, str]],
         max_message_count: int = 50,
+        environment: Optional[Mapping[str, object]] = None,
     ) -> None:
+        broker = (environment or {}).get("broker") or {}
+        if not isinstance(broker, Mapping):
+            broker = {}
+        self._namespace = str(broker.get("fully_qualified_namespace") or "<namespace>")
+        self._topic = str(broker.get("topic_name") or "<topic>")
         self._component = component
         self._transport = transport
         self._targets = targets
@@ -137,6 +246,16 @@ class ServiceBusDlqAdapter:
             failure_signature=failure_signature,
             observed_text=observed_text,
             message_id=message_id,
+        )
+        artifact = replace(
+            artifact,
+            context=_dlq_context(
+                message,
+                subscription=subscription,
+                function=function,
+                namespace=self._namespace,
+                topic=self._topic,
+            ),
         )
         return redact_artifact(artifact)
 

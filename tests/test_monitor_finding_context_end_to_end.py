@@ -247,12 +247,78 @@ class Http5xxContext(unittest.TestCase):
         self.assertIn("arg_max(depRank", query)
 
 
-@unittest.skip("owned by FEAT-2026-0204/T07")
-class DlqContext(unittest.TestCase):
-    SECTIONS = ("Message id", "Sequence number", "Dead-letter reason", "Body shape", "Peek command")
+def _drive_dlq_messages(messages):
+    calls = []
 
+    def gh(args, check=True):
+        calls.append(list(args))
+        if args[:3] == ["gh", "issue", "create"]:
+            return SimpleNamespace(returncode=0, stdout=f"https://github.com/{_REPO}/issues/902\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+
+    class Transport:
+        def peek_dead_letter_messages(self, *, subscription, max_message_count):
+            return list(messages)
+
+    config = _config()
+    config["environments"]["production"]["broker"] = {
+        "provider": "azure_service_bus", "credentials": {"connection_string": "ACME_CONN"},
+        "fully_qualified_namespace": "acme.servicebus.example.com", "topic_name": "orders-topic",
+    }
+    config["components"][0]["checks"] = [{
+        "type": "dlq", "targets": [{"subscription": "orders", "function": "OrderHandler"}],
+    }]
+    with tempfile.TemporaryDirectory() as tmp:
+        cli.run_cycle(
+            config, dry_run=False, repo=_REPO,
+            transport_resolver=lambda module, check_type, binding: Transport(),
+            gh_runner=gh, now=_NOW, watermark_dir=Path(tmp), out=io.StringIO(),
+        )
+    return [c for c in calls if c[:3] == ["gh", "issue", "create"]]
+
+
+class DlqContext(unittest.TestCase):
     def test_sections_present(self):
-        self.fail("T07")
+        message = SimpleNamespace(
+            message_id="m-1016", sequence_number=77, subject="RestaurantUpdated",
+            enqueued_time_utc=datetime(2026, 10, 16, 23, 0, 0, tzinfo=timezone.utc),
+            delivery_count=10, dead_letter_reason="", dead_letter_error_description="",
+            application_properties={
+                b"Exception.Message": b"Sequence contains no elements",
+                b"Exception.StackTrace": b"\n".join(b"   at Acme.Frame%d()" % n for n in range(30)),
+            },
+            body=b'{"restaurantId": "SECRET-R", "companyId": "SECRET-C", "after": {"x": 1}}',
+        )
+        creates = _drive_dlq_messages([message])
+        self.assertEqual(len(creates), 1)
+        title, body = _field(creates[0], "--title"), _field(creates[0], "--body")
+        self.assertEqual(title, "web-api: Unknown in OrderHandler")
+        for needle in (
+            "**Message:**", "id: m-1016", "sequence number: 77", "subject: RestaurantUpdated",
+            "enqueued (UTC): 2026-10-16T23:00:00Z", "delivery count: 10",
+            "Sequence contains no elements", "at Acme.Frame0()",
+            "**Body shape:** top-level keys: restaurantId, companyId, after",
+            "**Peek it:**", "namespace: acme.servicebus.example.com", "topic: orders-topic",
+            "subscription: orders", "sub-queue: $DeadLetterQueue",
+        ):
+            self.assertIn(needle, body)
+        self.assertNotIn("at Acme.Frame10()", body)
+        self.assertNotIn("**Dead-letter:**", body)
+        for value in ("SECRET-R", "SECRET-C"):
+            self.assertNotIn(value, body)
+
+    def test_bare_message_still_files(self):
+        message = SimpleNamespace(
+            message_id="m-1", sequence_number=1, dead_letter_reason="MaxDeliveryCountExceeded",
+            dead_letter_error_description="System.Exception: boom", body=b"not json",
+        )
+        creates = _drive_dlq_messages([message])
+        self.assertEqual(len(creates), 1)
+        body = _field(creates[0], "--body")
+        for absent in ("**Exception:**", "**Body shape:**"):
+            self.assertNotIn(absent, body)
+        self.assertIn("**Dead-letter:**", body)
+        self.assertIn("**Peek it:**", body)
 
 
 @unittest.skip("owned by FEAT-2026-0204/T08")
