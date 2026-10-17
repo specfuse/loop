@@ -18,3 +18,15 @@
   went red. The narrow tier ran only the unit's own modules, so the failure surfaced
   at the gate's broad run (the 16:03Z `broad_run_result`) and cost a repair commit
   and a second broad run (`ab4c8b1`).
+
+- **A stub-transport oracle proves the shape of a query and a body, never that the
+  backend accepts the query, so a feature that writes KQL needs one opt-in live
+  render before its close, not only after release.** FEAT-2026-0204's `error-logs`
+  and `http-5xx` queries passed the checked-in schema reference, the one-query
+  assertion and every context test, and still did not parse in App Insights (a `\{`
+  inside an ordinary KQL string). Rendering real findings against the consumer's
+  workspace with the opt-in live tests also showed "First seen" was the harvest time
+  rather than the first occurrence, and a `dlq` exception cut off its handler frame
+  behind ten framework frames. None of the three is visible to a fixture-fed test.
+  When a unit emits a query or renders evidence a human will read, its close should
+  run the opt-in live tests, or name in Deferred verification why not.

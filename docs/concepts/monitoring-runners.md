@@ -147,8 +147,9 @@ a component with no heartbeat at all files nothing.
 
 The title reads `<component>: <failure class> in <where>`, with no fingerprint.
 Each issue carries the labels `component:<name>` and `check:<type>` (created on
-first use). Every body states the occurrence count, the first and last time seen
-(UTC), what was seen in this run (count, first, last, and the instances), and the
+first use). Every body states the occurrence count, when it was first seen (the earliest
+occurrence the run's rows show; for `dlq`, the message's enqueued time) and when
+the issue was last updated (UTC), what was seen in this run (count, first, last, and the instances), and the
 **Observed** line. Per check, the sections after **Observed** are:
 
 | check | sections |

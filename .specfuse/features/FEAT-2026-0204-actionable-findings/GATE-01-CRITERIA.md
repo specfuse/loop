@@ -44,7 +44,7 @@
 - **oracle:** python3 -m unittest tests.test_monitor_finding_lifecycle_end_to_end tests.test_monitor_finding_context_end_to_end -v -b
 - **kind:** `broad`
 - **state:** `pass`
-- **proved_at_sha:** `3a5deb0b8dc3e1be3c40008da17b0a8586a7c1bd`
+- **proved_at_sha:** `3b002bcd28928c16a40b1819a715e3f046837f10`
 - **attempt:** `1`
 - **covers:** tests/test_monitor_finding_lifecycle_end_to_end.py, tests/test_monitor_finding_context_end_to_end.py, specfuse/monitor/issues.py
 

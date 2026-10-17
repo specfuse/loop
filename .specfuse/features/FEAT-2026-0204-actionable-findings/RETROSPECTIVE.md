@@ -1,24 +1,33 @@
 # Retrospective — FEAT-2026-0204 gate 1 close
 
+This is the second close of gate 1. The first (2026-10-17 16:21Z) judged `not_met`
+on two missing diagnostic sections and filed #3504 and #3505; commit `d9667f9`
+discharged both and fixed three defects found by rendering real findings against
+the first consumer's workspace, then re-armed the close. Everything below was
+re-measured this session.
+
 ## Measurements
 
-All commands below were run fresh in this session from the repository root, exit
-codes read directly. HEAD was `3a5deb0b8dc3e1be3c40008da17b0a8586a7c1bd` with this
-close's own working-tree edits (`docs/concepts/monitoring-runners.md`,
-`CHANGELOG.md`, this file, `FOLLOW-UPS.md`, `LEARNINGS-pending.md`,
-`GATE-01-CRITERIA.md`) uncommitted. This session may not run git, so the tree
+All commands were run fresh in this session from the repository root, exit codes
+read directly. HEAD was `3b002bcd28928c16a40b1819a715e3f046837f10` with this close's
+own working-tree edits (`CHANGELOG.md`, `docs/concepts/monitoring-runners.md`, this
+file, `LEARNINGS-pending.md`, `GATE-01-CRITERIA.md`, the `verdict` field of
+`WU-90-gate-1-close.md`) uncommitted. This session may not run git, so the tree
 state is HEAD plus those edits.
 
 ### feature_oracle: PASS
 
 Command: `python3 -m unittest tests.test_monitor_finding_lifecycle_end_to_end tests.test_monitor_finding_context_end_to_end -v -b`
-(exit 0): `Ran 27 tests in 0.016s` / `OK`, with every class below running (none skipped):
+(exit 0): `Ran 29 tests` / `OK`, every class running, none skipped:
 
 ```
-ClosedFindingReopens      4 tests    DlqAcknowledgement   4 tests    HeartbeatGrace    1 test
-EveryFinding              5 tests    ErrorLogsContext     3 tests    Http5xxContext    4 tests
-DlqContext                2 tests    HeartbeatContext     3 tests    QueueStalledContext 1 test
+ClosedFindingReopens   4    DlqAcknowledgement          4    HeartbeatGrace             1
+EveryFinding           5    ErrorLogsContext            3    Http5xxContext             4
+DlqContext             2    HeartbeatContext            3    QueueStalledContext        1
+DlqExceptionPrefersAppFrames 1    DlqFirstSeenIsTheEnqueuedTime 1
 ```
+
+(The last two classes are the oracle's additions in `d9667f9`; the first close ran 27.)
 
 ### No surviving skip
 
@@ -28,43 +37,40 @@ reports nothing (exit 1, no output). No oracle class is hollow.
 ### Nothing in the monitor closes an issue
 
 `grep -rn '"issue", "close"\|issue close' specfuse/monitor` reports nothing (exit 1).
-The `specfuse/monitor/issues.py` docstring now reads "This module never closes an
+The `specfuse/monitor/issues.py` docstring reads "This module never closes an
 issue … It does reopen one", the sentence T01 rewrote.
 
 ### Broad run (driver's, not re-run here)
 
-The full `code` gate set is the driver's, once per gate, and this session was told
-not to run it. The driver's recorded results in `events.jsonl`:
+The full `code` gate set is the driver's, once per gate. Its recorded results in
+`events.jsonl`:
 
-- 2026-10-17T16:03:12Z `broad_run_result` `ok: false`: `tests` failed with
-  `FAILED (failures=1, skipped=4)`, the failure
-  `test_monitor_cli.TestAllCheckTypesDispatch.test_all_six_check_types_reach_their_adapter`;
-  `coverage` followed (`no_gate_marker`, a consequence of the red `tests` run).
-  Repaired in `ab4c8b1` ("give the dispatch test's heartbeat stub a history").
-- 2026-10-17T16:17:35Z `broad_run_result` `ok: true`, `failing: []`, on the tree
-  recorded in `GATE-01.md`'s `broad_run:` block.
+- 16:03:12Z `ok: false`: `tests` failed with `test_monitor_cli.TestAllCheckTypesDispatch`
+  (a heartbeat stub with no history, after T04); `coverage` followed (`no_gate_marker`).
+  Repaired in `ab4c8b1`.
+- 16:17:35Z `ok: true`.
+- 16:33:37Z `ok: false`, `tests` failed with
+  `test_lint_closing_criteria.TestCorpusSweepStaysClean.test_real_feature_corpus_has_no_close_l_or_close_intermediate_f_findings`:
+  that test lints every feature in the repo, and at that moment this feature's
+  close had just been re-armed, so it reported `close-b`/`close-c`/`close-d`/`close-l`
+  for the in-flight close. Same tree hash as the next run; no code was changed
+  between them. `coverage` followed.
+- 16:43:32Z `ok: true`, `failing: []`, on the tree recorded in `GATE-01.md`'s
+  `broad_run:` block. `Ran 4627 tests`, `OK (skipped=4)`.
 
 ### Per-criterion oracles (30 criteria, `GATE-01-CRITERIA.md`)
 
-carried forward: 0 criteria, re-measured: 30
+carried forward: 29 criteria, re-measured: 1
 
-Each criterion's oracle was re-run this attempt; per-entry command, `kind` and
-`state` are in `GATE-01-CRITERIA.md`. All 30 exit 0: T01#1–#3, #5; T02#1–#4;
-T03#1–#4; T04#1–#5; T05#1–#3; T06#1–#3; T07#1–#3; T08#1–#3, plus the two grep
-criteria T01#4 and T08#3 (a "reports nothing" criterion is satisfied by `grep`
-exit 1, so those two oracles are written `! grep …`).
+29 criteria (T01#1–#4, T02#1–#4, T03#1–#4, T04#1–#5, T05#1–#3, T06#1–#3,
+T07#1–#3, T08#1–#3) were carried forward from attempt 1, proved at
+`3a5deb0b8dc3e1be3c40008da17b0a8586a7c1bd`. Their modules are unchanged in intent;
+as a cross-check this session also ran `tests.test_app_insights_query_schema_check`,
+`tests.test_heartbeat_adapter`, `tests.test_service_bus_dlq_adapter` and
+`tests.test_monitor_finding_meta` together (exit 0, `Ran 41 tests`, `OK (skipped=1)`).
 
-Two substitutions, stated rather than hidden:
-
-- **T02#4** names the reopen comment and the body as ISO-8601 UTC with `first_seen`
-  unchanged. Its oracle is the whole `tests.test_monitor_finding_meta` module (11
-  tests), which holds `test_update_keeps_first_seen` and
-  `test_reopen_keeps_first_seen_and_comments_iso`; no narrower node covers both
-  halves.
-- **T07#3** is two checks joined: `tests.test_service_bus_dlq_adapter` (exit 0) and
-  `grep -nE "\.(receive_messages|complete_message|abandon_message|dead_letter_message|defer_message)\(" specfuse/monitor/providers/azure_service_bus.py`
-  reporting nothing. The module's only receiver calls are `get_subscription_receiver`
-  and `peek_messages`.
+Re-measured: **T01#5**, the `feature_oracle` above, exit 0; its `proved_at_sha` in
+`GATE-01-CRITERIA.md` is now `3b002bcd28928c16a40b1819a715e3f046837f10`.
 
 ### One query per check
 
@@ -82,33 +88,34 @@ Each context class asserts `len(transport.queries) == 1` after the cycle
 | 1. closed → one reopen + one comment, no create; open updates; new files one | `ClosedFindingReopens` (4 tests), incl. `test_closed_issue_is_reopened_not_refiled`; T02's `test_reopen_keeps_first_seen_and_comments_iso` for count and UTC | proven |
 | 2. nothing closes an issue | the `grep` above, exit 1 | proven |
 | 3. closed `dlq` with covered ids stays closed; a new id reopens naming it | `DlqAcknowledgement.test_closed_dlq_with_covered_ids_stays_closed`, `test_unseen_message_id_reopens_naming_it`; `test_fingerprint_ignores_message_id` | proven |
-| 4. a target preceding the earliest heartbeat is not silent; a missed firing after emission still is | `HeartbeatGrace.test_target_before_first_heartbeat_is_not_silent`; `test_heartbeat_adapter.TestHeartbeatGrace` (3 tests) | proven |
+| 4. a target preceding the earliest heartbeat is not silent; a missed firing after emission still is | `HeartbeatGrace.test_target_before_first_heartbeat_is_not_silent`; `test_heartbeat_adapter.TestHeartbeatGrace` | proven |
 | 5. an unreadable finding-meta reads as absent, never raises | `test_monitor_finding_meta.TestFailClosed`, `TestCycleSurvivesMalformedMeta` | proven |
 | 6. readable title, `component:`/`check:` labels, run summary, no fingerprint change | `EveryFinding.test_readable_title_labels_and_run_summary`, `test_each_label_is_created_once_before_first_use`, `test_fingerprint_unchanged_by_context` | proven |
-| 7. each check's finding carries the sections `PLAN.md` names, one query each, schema-clean, redacted | the five context classes, `test_secret_in_context_value_is_redacted_in_body` | **not proven**: two sections the plan names are not rendered (below) |
+| 7. each check's finding carries the sections `PLAN.md` names, one query each, schema-clean, redacted | the five context classes; `test_secret_in_context_value_is_redacted_in_body`; the table below | proven |
 
 ### Sections a rendered fixture finding carries, against `PLAN.md` "Diagnostic context"
 
 Every finding also carries a readable title, the two labels, `Occurrences`, `First
-seen`, `Last seen`, `Seen this run` (count, first, last, UTC) and `Instances`
-(`EveryFinding`); the Reproduce text is a section of the checks that name it below.
+seen`, `Last updated`, `Seen this run` (count, first, last, UTC) and `Instances`
+(`EveryFinding`).
 
 | check | plan names | a fixture finding carries | missing |
 | --- | --- | --- | --- |
-| `error-logs` | top in-app frame; request with route and result code; logger category and template; client-abort flag; 2–3 sample ids | Where, Request, Logger, Likely client abort, Samples, Reproduce | none |
+| `error-logs` | top in-app frame; request with route and result code; logger category and template; client-abort flag; 2–3 sample ids; reproduction KQL | Where, Request, Logger, Likely client abort, Samples, Reproduce | none |
 | `http-5xx` | correlated exception (type, message, top frame); failing or slowest dependency; duration; samples | Exception, Where, Dependency, Duration, Samples, Reproduce | none |
-| `dlq` | message id, sequence number, subject, enqueued time, delivery count; reason/description, or `Exception.Message`/`StackTrace` when blank; body shape only; peek command | Message (all five fields), Dead-letter or Exception, Body shape, Peek it | none |
-| `heartbeat` | cron and timezone; last execution and result; **the component's earliest heartbeat**; whether the role sent telemetry in the gap | Schedule (cron, dialect, timezone, expected firing), Last run, Host last seen, Host silent | **earliest heartbeat** |
-| `queue-stalled` | oldest active message age; **the subscription's last completed message**; depth | Queue (oldest active message age, depth, `stall_after`), Where | **last completed message** |
+| `dlq` | message id, sequence number, subject, enqueued time, delivery count; reason/description, or `Exception.Message`/`StackTrace` when blank; body shape only; peek command | Message (all five fields), Dead-letter or Exception (app frames first, with a count of omitted framework frames), Body shape, Peek it | none |
+| `heartbeat` | cron and timezone; last execution and result; the component's earliest heartbeat; whether the role sent telemetry in the gap | Schedule (cron, dialect, timezone, expected firing), Last run, Host last seen, Host silent, Earliest heartbeat | none |
+| `queue-stalled` | oldest active message age, in addition to depth | Queue (oldest active message age, depth, `stall_after`), Where | none |
 
-Neither missing section is recorded as deliberately dropped by any unit or by
-`PLAN.md`. `WU-08`'s Objective and criteria name Schedule, Last run, Host last seen,
-Host silent and the oldest age, and name neither of these two. The earliest
-heartbeat is computed (`first_heartbeat`, `azure_app_insights.py:748`) and used for
-the grace test, then not put in `context`. The last completed message would need a
-new broker read the `QueueStalled` transport protocol does not have. The close's
-escalation trigger applies, so the verdict is `not_met` and `FOLLOW-UPS.md` carries
-both.
+The first close found two gaps. Both are discharged and recorded: the earliest
+heartbeat is now rendered (`context["Earliest heartbeat"]`,
+`azure_app_insights.py:940`; `HeartbeatContext.test_sections_present` asserts
+`**Earliest heartbeat:** 2026-10-10T00:00:00Z`), and `PLAN.md`'s "Diagnostic
+context" is amended to drop the subscription's last completed message with its
+reason (Service Bus runtime properties carry no completion time, and reading one
+from messages would mean receiving them), which `docs/concepts/monitoring-runners.md`
+repeats. So no check's finding lacks a section the plan names without a recorded
+reason, and the escalation trigger does not apply.
 
 ## Cost analysis
 
@@ -126,23 +133,25 @@ Reconciled from `events.jsonl` `attempt_outcome` events and each unit's
 | T07 | 2.00 | 0.3894 | 1 | 60 |
 | T08 | 2.50 | 0.5448 | 1 | 116 |
 | T01–T08 | 18.50 | 3.8395 | 8 | 817 |
-| G1-CLOSE | 5.00 | not recorded | 1 in progress | — |
+| G1-CLOSE, first attempt (incl. judge fold) | 5.00 | 1.7830 | 1 | 246 |
+| **recorded total** | 23.50 | **5.6225** | 9 | 1063 |
 
-`PLAN.md` plans 23.50 across all nine units; the eight implementation units spent
-$3.84 of their $18.50 (21%), every unit between 15% and 30% of its plan. The
-close's own cost is not in `events.jsonl` while it is running (its
-`attempt_outcome` is written when the driver ends the attempt), so it is not
-reconciled here. `GATE-01.md` sets `cost_budget_usd: 36.00`; recorded spend is
-$3.84. The `ab4c8b1` repair of the dispatch test was made outside a work unit and
-has no event.
+`PLAN.md` plans 23.50; the nine recorded attempts spent $5.62 (24%), and
+`GATE-01.md` sets `cost_budget_usd: 36.00`. This close's own attempt is not in
+`events.jsonl` while it runs (its `attempt_outcome` is written when the driver ends
+the attempt), so it is not reconciled here and the total above excludes it. The
+`ab4c8b1` and `d9667f9` repairs were made outside a work unit and have no event.
 
 ### Failure-class breakdown
 
-One off-plan event, class `tests`: the 16:03Z broad run. T04 made a silent
-schedule need an earlier heartbeat to evaluate; `tests/test_monitor_cli.py`'s
-`TestAllCheckTypesDispatch` stubbed the heartbeat transport with rows lacking one,
-and T04's `produces:` and verification did not name that file (only T01's verification ran `tests.test_monitor_cli`), so T04's narrow tier never ran it.
-The `coverage` failure was its shadow.
+Two off-plan events, both class `tests`, both at the broad run:
+
+1. 16:03Z: T04 made a silent schedule need an earlier heartbeat to evaluate;
+   `tests/test_monitor_cli.py`'s `TestAllCheckTypesDispatch` stubbed the heartbeat
+   transport without one, and T04's `produces:` did not name that file, so its
+   narrow tier never ran it. `coverage` failed as its shadow.
+2. 16:33Z: a corpus sweep test linting the in-flight, just-re-armed close. Same tree
+   as the passing 16:43Z run; a re-arm-timing artifact, not a code defect.
 
 ## Deferred verification
 
@@ -153,29 +162,28 @@ The `coverage` failure was its shadow.
    "pending first firing" until their first heartbeat; a sample of finding bodies
    carries every section the Diagnostic context names for its check. Checked as the
    one `specfuse:post-merge` issue filed at close.
-2. **The real `AppDependencies`/`AppRequests` joins and `arg_max` reductions.** The
-   KQL passes the checked-in workspace schema reference
-   (`tests.test_app_insights_query_schema_check`) and the query's shape is asserted
-   (`test_query_reduces_joined_tables_to_one_row_per_operation`), but nothing in the
-   loop executes it against a workspace. Where checked: the same live run, item 1.
+2. **The `AppDependencies`/`AppRequests` joins and `arg_max` reductions at
+   production volume.** The KQL passes the checked-in workspace schema reference
+   and its shape is asserted, and `d9667f9`'s opt-in live render showed both
+   queries resolve against the consumer's workspace, but that run was manual and
+   outside the loop and nothing in the loop executes the query. Where checked: the
+   live run, item 1.
 3. **The real Service Bus peek and runtime properties.** `dlq` and `queue-stalled`
    context is built from stub messages shaped like Backend#1016 (including
    `bytes`-keyed application properties); the SDK's actual object shapes are not
-   exercised. Where checked: the live run, on a subscription with a dead-lettered
-   message.
+   exercised in-loop. Where checked: the live run, on a subscription with a
+   dead-lettered message.
 4. **`gh issue reopen` and `gh label create --force` against GitHub.** The stub
    `gh` records argv; whether GitHub accepts it and a reopened issue keeps its
    diagnosis comment is not observed. Where checked: the live run's first recurrence.
 5. **The 90-day listing bound under real volume.** `test_listing_is_bounded` proves
    the bound is derived from `now`; whether a busy repository stays under the
    100-row `TruncatedListingError` is not. Where checked: the live run's issue list.
-6. **The two missing sections.** Not verified because not built: `FOLLOW-UPS.md`
-   entries 1 and 2. Re-run condition stated there.
 
 ## Consumer-visible contract changes
 
-Enumerated across T01–T08 for acknowledgment; each is also in `CHANGELOG.md`
-`Unreleased` (`Added` ×1, `Changed` ×1, `Fixed` ×2, all FEAT-2026-0204).
+Enumerated across T01–T08 and `d9667f9` for acknowledgment; each is also in
+`CHANGELOG.md` `Unreleased` (`Added` ×1, `Changed` ×1, `Fixed` ×2, all FEAT-2026-0204).
 
 - **Changed — a recurring closed finding is reopened, not refiled.** An issue
   closed within 90 days is reopened with one comment (count, first/last seen UTC);
@@ -185,17 +193,35 @@ Enumerated across T01–T08 for acknowledgment; each is also in `CHANGELOG.md`
   recorded message ids cover the queue stays closed with no write; an unrecorded id
   reopens it naming that message. The finding-meta marker gains `first_seen` and
   `messages` fields (a marker written by an earlier version still parses).
-- **Changed — issue titles and labels.** The fingerprint-bearing `[monitor:` prefix leaves
-  the title (now `<component>: <failure class> in <where>`); issues carry
-  `component:<name>` and `check:<type>` labels, created on first use. A consumer
-  filtering on the old title prefix must filter on the marker or the labels. No
-  fingerprint changed, so nothing is refiled.
+- **Changed — issue titles, labels and the body's time lines.** The fingerprint-bearing
+  `[monitor:` prefix leaves the title (now `<component>: <failure class> in <where>`);
+  issues carry `component:<name>` and `check:<type>` labels, created on first use. A
+  consumer filtering on the old title prefix must filter on the marker or the
+  labels. The body's `**Last seen:**` line is now `**Last updated:**`, and `First
+  seen` is the earliest occurrence the run's rows show rather than the harvest time.
+  No fingerprint changed, so nothing is refiled.
 - **Added — per-check diagnostic context** in the issue body, as the table above
   lists, with a Reproduce query and Peek it command that are text only.
 - **Fixed — a schedule not yet emitting no longer files `silent-schedule`.**
 - **Fixed — a malformed finding-meta value no longer aborts a run.**
 
 Awaiting human acknowledgment of this list, per `close-discipline.md` §3.
+
+## Documentation pass
+
+`docs/concepts/monitoring-to-fix.md` does not exist at this tree, so the pass
+updated `docs/concepts/monitoring-runners.md`, as the unit allows. Its "What a
+finding is, and how its issue is kept" section describes reopen-not-refile with the
+"reopens, never closes" boundary, `dlq` acknowledgement, heartbeat grace, and a
+per-check "What a finding contains" table. This session corrected one sentence
+(first seen / last updated) to match `d9667f9`. That file is not in
+`tests/test_scaffold_data_in_sync.py`'s docs manifest and has no copy under
+`specfuse/loop/data/docs/`, so there is no shipped copy to keep byte-identical;
+`tests.test_scaffold_data_in_sync` passes. `CHANGELOG.md`'s Unreleased section had
+a stale sentence saying the earliest heartbeat and last completed message were not
+shown; it now states what is shown and why the last completed message is not, and
+`tests.test_changelog_schema`, `test_changelog_append_only` and
+`test_changelog_collection` pass.
 
 ## Retrospective
 
@@ -205,15 +231,21 @@ removed exactly its own, so no unit failed on a missing module and the final tre
 has no hollow class. The fail-closed discipline held: T02's `TestFailClosed` calls
 the reader directly. Fingerprint independence was tested in three places (message
 id, `context`, `observed_at`) and nothing refiled. All eight units passed on attempt
-1 at 21% of plan.
+1 at 21% of plan. The not-met verdict did its job too: the first close's per-check
+table caught two missing sections the oracle could not see, and each was resolved
+with a test or a recorded reason rather than a hedge.
 
 **What didn't.** The plan's "Diagnostic context" is an enumerated list that the
-feature's own goal ("gather as much information as possible") rests on, and two of
-its items never reached a unit: T08's body restated the heartbeat and queue-stalled
-requirements from memory, not from the list, so its criteria were all met while the
-plan's list was not. The oracle asserts what the unit criteria name, so it could not
-see the gap; only this close's per-check comparison did. The broad run also caught
-a dispatch test that T04's behaviour change broke and no unit's `produces:` covered.
+feature's own goal rests on, and two of its items never reached a unit: T08's body
+restated the heartbeat and queue-stalled requirements from memory, not from the
+list. The oracle asserts what the unit criteria name, so only the close's
+comparison saw the gap. Separately, no in-loop test could see that two queries did
+not parse in the real workspace, that "First seen" was the harvest time, or that a
+`dlq` exception's handler frame was cut off; all three surfaced only when real
+findings were rendered by hand after the first close. The broad run also caught a
+dispatch test T04's behaviour change broke and no unit's `produces:` covered.
 
-**Open follow-ups (not blockers to the merge of what is built).** The two missing
-sections; the live run; and the Service Bus context shapes in deferred item 3.
+**Open follow-ups (not blockers).** The live run and the Service Bus context
+shapes in Deferred verification. `FOLLOW-UPS.md` (#3504, #3505) is the first
+close's record and is discharged by `d9667f9`; the driver owns that file and it is
+left as written.

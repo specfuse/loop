@@ -9,3 +9,5 @@
 - **FEAT-2026-0204/T08**: attempt 1 outcome=passed
 - **FEAT-2026-0204/G1-CLOSE**: Terminal close written with verdict not_met, because the heartbeat finding omits the earliest heartbeat and the queue-stalled finding omits the last completed message, both of which PLAN.md names and no unit records dropping; lint_plan.py --closing passes (CLOSING-READY).
   - note: Neither missing section is built; FOLLOW-UPS.md has two entries with re-run conditions. Once the driver files them, fixing them needs a unit that edits specfuse/monitor/providers/azure_app_insights.py and azure_service_bus.py, which this close was barred from touching.
+- **FEAT-2026-0204/G1-CLOSE**: Re-closed gate 1 with a fresh feature-oracle pass and no skips. Retrospective, changelog, docs and learnings are updated, `verdict: met` is written and closing lint reports CLOSING-READY.
+  - note: The gate 1 broad run failed once on a corpus-sweep test linting the just-re-armed close, then passed on the same tree. The live run on the first consumer is still the open post-merge item.
