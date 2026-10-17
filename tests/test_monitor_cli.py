@@ -94,7 +94,14 @@ _ROWS_BY_CHECK_TYPE = {
     "error-logs": [{"type": "NullReferenceException", "outerMessage": "boom at line 5"}],
     "http-5xx": [{"name": "/orders", "resultCode": "503"}],
     "invariant": [{"order_id": "abc-123"}],
-    "heartbeat": [],
+    # FEAT-2026-0204/T04: a component with no heartbeat history is "pending first
+    # firing" and files nothing, so the stub gives `nightly` a history that began
+    # well before its missed 2026-07-29 02:00 firing.
+    "heartbeat": [{
+        "name": "nightly",
+        "first_heartbeat": "2026-07-20T02:00:00Z",
+        "last_heartbeat": "2026-07-27T02:00:00Z",
+    }],
 }
 
 
