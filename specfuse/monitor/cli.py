@@ -457,6 +457,10 @@ def run_cycle(
     out = out if out is not None else sys.stdout
     now = now if now is not None else datetime.now(timezone.utc)
     gh_runner = gh_runner if gh_runner is not None else _default_runner
+    # Fingerprints already handed to `record_finding` this cycle (#3486): the
+    # `gh issue list` lookup can lag an issue created moments earlier, so a
+    # repeated fingerprint must not reach it twice.
+    filed_fingerprints: set = set()
 
     environments = config.get("environments") or {}
     components = config.get("components") or []
@@ -540,9 +544,13 @@ def run_cycle(
                 for artifact in findings:
                     summary.append(f"  would file: {_describe(artifact)}")
             else:
-                created = updated = throttled = 0
+                created = updated = throttled = repeats = 0
                 for artifact in findings:
                     fingerprint = fingerprint_artifact(artifact)
+                    if fingerprint in filed_fingerprints:
+                        repeats += 1
+                        continue
+                    filed_fingerprints.add(fingerprint)
                     recorder = _CallRecorder(gh_runner)
                     record_finding(fingerprint, artifact, repo, runner=recorder, now=now.timestamp())
                     outcome = _classify(recorder)
@@ -552,10 +560,13 @@ def run_cycle(
                         updated += 1
                     else:
                         throttled += 1
-                summary.append(
+                line = (
                     f"{env_name}/{component_name}: {len(findings)} finding(s) — "
                     f"created {created}, updated {updated}, throttled {throttled}"
                 )
+                if repeats:
+                    line += f", {repeats} repeat(s) of an already-filed fingerprint"
+                summary.append(line)
 
             for skip in skipped:
                 summary.append(
