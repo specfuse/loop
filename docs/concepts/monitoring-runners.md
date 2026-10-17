@@ -99,3 +99,72 @@ telemetry/broker transports — it is not an offline mode. It gates only the
 writes: the watermark file and every `gh` invocation. If you point a dry
 run at a production telemetry backend, it will consume that backend's read
 quota exactly as a real run would.
+
+## What a finding is, and how its issue is kept
+
+Every finding is one GitHub issue per fingerprint. The fingerprint is the
+`specfuse:finding` marker in the issue body, and it is the only thing that
+identifies a finding: nothing a finding *carries* (its title, its context, the
+time it was seen, a dead-lettered message's id) enters it.
+
+### A recurrence reopens; it never refiles, and nothing is ever closed
+
+On each run, a fingerprint is matched against issues in three states:
+
+- **Open** — the issue is updated, as before.
+- **Closed within the last 90 days** — the issue is **reopened** with exactly one
+  comment carrying the new occurrence count and the first and last time it was
+  seen, in UTC. No second issue is filed, so the earlier diagnosis and any
+  "reopen if…" note stay attached to the finding.
+- **Absent, or closed longer ago than 90 days** — a new issue is filed. After 90
+  quiet days that is the honest reading, and the bound keeps the listing under
+  GitHub's 100-row limit.
+
+The monitor **reopens, never closes.** Closing on silence would erase the evidence
+of an intermittent fault, so closing stays a human decision, and no code in
+`specfuse/monitor` issues a close. A finding-meta marker the monitor cannot fully
+understand (a hand-edited or truncated one) reads as absent rather than failing
+the run.
+
+### `dlq`: closing an issue means "acknowledged"
+
+A dead-lettered message stays in the queue until someone resubmits or purges it,
+so it is seen on every run. The `dlq` finding records the message ids it has seen.
+A closed `dlq` issue whose recorded ids cover every message currently in the queue
+**stays closed**, with no write at all — closing it means "acknowledged, replay
+pending". A message id the issue has not recorded **reopens** it, with a comment
+naming that message. Messages are only ever peeked; the monitor never receives,
+completes or abandons one.
+
+### `heartbeat`: a schedule that has not emitted yet is not silent
+
+A target whose latest expected firing precedes the component's earliest observed
+heartbeat is *pending its first firing*, and produces no `silent-schedule`
+finding. A target that has emitted before and then missed a firing still does, and
+a component with no heartbeat at all files nothing.
+
+### What a finding contains
+
+The title reads `<component>: <failure class> in <where>`, with no fingerprint.
+Each issue carries the labels `component:<name>` and `check:<type>` (created on
+first use). Every body states the occurrence count, the first and last time seen
+(UTC), what was seen in this run (count, first, last, and the instances), and the
+**Observed** line. Per check, the sections after **Observed** are:
+
+| check | sections |
+| --- | --- |
+| `error-logs` | Where (top in-app stack frame), Request (route and result code), Logger (category and message template), Likely client abort, Samples, Reproduce |
+| `http-5xx` | Exception (type, message), Where, Dependency (target, type, result code, duration), Duration, Samples, Reproduce |
+| `dlq` | Message (id, sequence number, subject, enqueued time, delivery count), Dead-letter reason, or the Exception message and top stack frames when the reason is blank, Body shape (the top-level keys, never the values), Peek it |
+| `heartbeat` | Schedule (cron, dialect, timezone, expected firing), Last run (the function's last execution and result), Host last seen, and a Host silent line when the component sent no request telemetry across the expected firing |
+| `queue-stalled` | Queue (oldest active message age, depth, `stall_after`), Where |
+
+A section with nothing to say is left out rather than printed empty. The finding
+does not show the schedule's earliest heartbeat (it only decides the grace above)
+or a subscription's last completed message.
+
+Each check still issues exactly one query. Every correlation (an exception to its
+request, a request to its dependency, a schedule to its host's liveness) is a join
+inside that query. The **Reproduce** and **Peek it** sections are text for a
+human to run, built from configuration and sample ids, and the monitor never runs
+them. Every section is redacted before it leaves the machine.

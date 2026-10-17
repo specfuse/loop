@@ -26,6 +26,19 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **A finding's issue now carries what a diagnosis starts from.** The title reads `<component>: <failure class> in <where>` with no fingerprint (the fingerprint stays in the body marker, the only authority), and each issue is labelled `component:<name>` and `check:<type>`, created on first use. The body adds when and where it was seen this run (count, first and last in UTC, instances) and, per check: `error-logs` the top in-app stack frame, the request's route and result code, the logger category and template, a likely-client-abort flag (a cancellation on a request that still returned 2xx) and sample operation ids; `http-5xx` the correlated exception, the failing or slowest dependency and the duration; `dlq` the message's id, sequence number, subject, enqueued time and delivery count, the dead-letter reason (or the `Exception.Message` and top stack frames when it is blank) and the body's top-level keys, never its values; `heartbeat` the schedule, the function's last execution and whether the host sent any request telemetry across the gap; `queue-stalled` the oldest active message's age. Findings also carry a ready-to-run reproduction query and, for `dlq`, a peek command, both text for a human that the monitor never runs. Each check still issues one query, every section is redacted before egress, and no fingerprint changes, so no existing finding is refiled. A heartbeat finding does not yet show the schedule's earliest heartbeat, and a `queue-stalled` finding does not show the subscription's last completed message. (FEAT-2026-0204)
+
+### Changed
+
+- **`specfuse monitor run` reopens a closed finding that recurs instead of filing a second issue.** A fingerprint whose issue was closed within the last 90 days is reopened with one comment carrying the new occurrence count and the first and last time seen in UTC; the earlier diagnosis stays attached. A fingerprint closed longer ago than 90 days files a new issue. The monitor still never closes an issue: `issues.py` now says it "never closes" rather than "never reopens". A closed `dlq` issue whose recorded message ids cover every message in the queue stays closed with no write, meaning "acknowledged, replay pending"; a message id it has not recorded reopens it with a comment naming that message. (FEAT-2026-0204)
+
+### Fixed
+
+- **A `heartbeat` target that has not emitted yet no longer files a false `silent-schedule` finding.** The check compared the latest expected firing against the last heartbeat with no notion of when heartbeats began, so a weekly schedule whose only expected firing predated the component's first heartbeat filed a guaranteed false finding. A target whose expected firing precedes the component's earliest observed heartbeat is now pending its first firing and files nothing; a target that emitted and then missed a firing still does. (FEAT-2026-0204)
+- **A finding-meta marker the monitor cannot fully read no longer aborts the whole run.** The reader raised `ValueError` on a malformed `occurrences=` or `last_seen=` value on any listed issue; an unreadable value now reads as absent and the run continues. (FEAT-2026-0204)
+
 ## [0.28.2+umbrella.0.15.0] - 2026-10-17
 
 ### Fixed
