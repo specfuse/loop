@@ -140,6 +140,17 @@ of an intermittent fault, so closing stays a human decision, and no code in
 understand (a hand-edited or truncated one) reads as absent rather than failing
 the run.
 
+### A finding that goes quiet is annotated, once
+
+An open finding whose fingerprint has not been seen for **7 days** gets one
+comment naming it a candidate for close, and a marker in its body so the comment
+is not repeated. The monitor only does this for a component every one of whose
+checks ran without error in that cycle — a broken check never makes a finding
+look quiet — and it still closes nothing. If the fingerprint fires again, the
+issue's body is rewritten without the marker, so a later quiet period is
+annotated again. The pass reuses the cycle's own issue listing; `--dry-run`
+prints the issues it would annotate.
+
 ### `dlq`: closing an issue means "acknowledged"
 
 A dead-lettered message stays in the queue until someone resubmits or purges it,

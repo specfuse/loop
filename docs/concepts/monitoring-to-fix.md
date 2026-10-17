@@ -77,6 +77,8 @@ and touches nothing.
 
 The monitor may reopen an issue but never closes one. Closing is a human
 decision, so a fault that goes quiet for a while keeps its evidence.
+A finding unseen for 7 days gets a one-time comment naming it a candidate for
+close; you decide.
 
 What the issue body carries for each check type (title, labels, when and where
 it was seen, and the per-check evidence) is listed in
