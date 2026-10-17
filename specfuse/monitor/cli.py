@@ -51,7 +51,7 @@ from specfuse.loop.escalation import _default_runner
 from specfuse.loop.lint_monitoring import CHECK_TYPES, RUNNER_VALUES, validate_monitoring
 from specfuse.monitor.adapters import resolve_telemetry
 from specfuse.monitor.fingerprint import fingerprint_artifact
-from specfuse.monitor.issues import record_finding
+from specfuse.monitor.issues import SeenThisRun, record_finding
 
 __all__ = ("main", "run_cycle", "load_monitoring_config", "MonitorCliError")
 
@@ -390,7 +390,7 @@ def _classify(recorder: "_CallRecorder") -> str:
     verbs = {c[2] for c in recorder.calls if len(c) > 2 and c[0] == "gh" and c[1] == "issue"}
     if "create" in verbs:
         return "created"
-    if "edit" in verbs:
+    if "edit" in verbs or "reopen" in verbs:
         return "updated"
     return "throttled"
 
@@ -419,6 +419,45 @@ def _resolve_repo() -> str:
 # ---------------------------------------------------------------------------
 # the run cycle
 # ---------------------------------------------------------------------------
+
+
+def _utc_iso(value: Optional[str]) -> Optional[datetime]:
+    """Parse a row timestamp to an aware UTC datetime, or None when unreadable."""
+    if not value:
+        return None
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment.astimezone(timezone.utc)
+
+
+def _aggregate_seen(findings: Sequence) -> dict:
+    """Per fingerprint, what this cycle's rows say: count, first and last
+    ``observed_at`` (UTC), and the distinct instances in first-seen order."""
+    stamps: dict = {}
+    counts: dict = {}
+    instances: dict = {}
+    for artifact in findings:
+        fingerprint = fingerprint_artifact(artifact)
+        counts[fingerprint] = counts.get(fingerprint, 0) + 1
+        moment = _utc_iso(artifact.observed_at)
+        if moment is not None:
+            stamps.setdefault(fingerprint, []).append(moment)
+        if artifact.instance:
+            seen = instances.setdefault(fingerprint, [])
+            if artifact.instance not in seen:
+                seen.append(artifact.instance)
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    return {
+        fingerprint: SeenThisRun(
+            count=count,
+            first=min(stamps[fingerprint]).strftime(fmt) if fingerprint in stamps else None,
+            last=max(stamps[fingerprint]).strftime(fmt) if fingerprint in stamps else None,
+            instances=tuple(instances.get(fingerprint, ())),
+        )
+        for fingerprint, count in counts.items()
+    }
 
 
 def _describe(artifact) -> str:
@@ -461,6 +500,13 @@ def run_cycle(
     # `gh issue list` lookup can lag an issue created moments earlier, so a
     # repeated fingerprint must not reach it twice.
     filed_fingerprints: set = set()
+    # Labels already ensured this run: each is created once, before first use.
+    ensured_labels: set = set()
+
+    def ensure_label(name: str) -> None:
+        if name not in ensured_labels:
+            gh_runner(["gh", "label", "create", name, "--repo", repo, "--force"], check=True)
+            ensured_labels.add(name)
 
     environments = config.get("environments") or {}
     components = config.get("components") or []
@@ -545,6 +591,13 @@ def run_cycle(
                     summary.append(f"  would file: {_describe(artifact)}")
             else:
                 created = updated = throttled = repeats = 0
+                message_ids: dict = {}
+                for artifact in findings:
+                    if artifact.message_id:
+                        ids = message_ids.setdefault(fingerprint_artifact(artifact), [])
+                        if artifact.message_id not in ids:
+                            ids.append(artifact.message_id)
+                seen_by_fingerprint = _aggregate_seen(findings)
                 for artifact in findings:
                     fingerprint = fingerprint_artifact(artifact)
                     if fingerprint in filed_fingerprints:
@@ -552,7 +605,11 @@ def run_cycle(
                         continue
                     filed_fingerprints.add(fingerprint)
                     recorder = _CallRecorder(gh_runner)
-                    record_finding(fingerprint, artifact, repo, runner=recorder, now=now.timestamp())
+                    record_finding(
+                        fingerprint, artifact, repo, runner=recorder, now=now.timestamp(),
+                        message_ids=tuple(message_ids.get(fingerprint, ())),
+                        seen=seen_by_fingerprint.get(fingerprint), ensure_label=ensure_label,
+                    )
                     outcome = _classify(recorder)
                     if outcome == "created":
                         created += 1

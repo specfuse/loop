@@ -66,12 +66,21 @@ and touches nothing.
   occurrence count — at most once every 6 hours per issue.
 - **The same fingerprint several times in one run** is filed once; the summary
   reports the extra rows as repeats.
-- **A fingerprint whose issue was closed** is filed as a new issue today: the
-  lookup reads open issues only. **Planned** (FEAT-2026-0204): reopen the closed
-  issue with a comment instead, so its history and diagnosis stay in one place.
+- **A fingerprint whose issue was closed in the last 90 days** reopens that
+  issue with one comment (the new occurrence count, first and last seen), so its
+  history and diagnosis stay in one place. An issue closed longer ago than that
+  is treated as new.
+- **A `dlq` finding is acknowledged by closing it.** A dead-lettered message
+  stays in the queue until someone resubmits or purges it, so the issue records
+  the message ids it has seen and stays closed while the queue holds only those;
+  a new message id reopens it with a comment naming the message.
 
-The monitor never closes an issue. Closing is a human decision, so a fault that
-goes quiet for a while keeps its evidence.
+The monitor may reopen an issue but never closes one. Closing is a human
+decision, so a fault that goes quiet for a while keeps its evidence.
+
+What the issue body carries for each check type (title, labels, when and where
+it was seen, and the per-check evidence) is listed in
+[`monitoring-runners.md`](monitoring-runners.md#what-a-finding-contains).
 
 **What a person sees.** An issue per distinct failure, under the
 `monitoring-finding` label.
@@ -146,9 +155,10 @@ opened by autofix waits for a person.
 
 You review and merge the pull request. Its `closes #N` closes the finding issue.
 
-If the same fingerprint fires again after the fix ships, today that files a
-new issue (see stage 2). **Planned** (FEAT-2026-0204): the closed issue reopens
-with the new sighting, which is the regression signal you want.
+If the same fingerprint fires again after the fix ships, the closed issue
+reopens with a comment naming the new sighting (see stage 2), which is the
+regression signal you want. It is not diagnosed again automatically: the issue
+already carries a diagnosis (specfuse/loop#3487).
 
 ## What must be scheduled
 

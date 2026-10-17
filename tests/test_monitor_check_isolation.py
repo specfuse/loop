@@ -90,6 +90,8 @@ class _GhRecorder:
             return SimpleNamespace(
                 returncode=0, stdout=f"https://github.com/{_REPO}/issues/{self.created}\n", stderr=""
             )
+        if args[:3] == ["gh", "label", "create"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         raise AssertionError(f"unexpected gh call: {args}")
 
 

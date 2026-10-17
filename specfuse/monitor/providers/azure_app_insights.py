@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Iterator, Mapping, Optional, Protocol, Sequence
 
@@ -69,6 +70,12 @@ class AppInsightsTransport(Protocol):
         ...
 
 
+def _clean_id(value: object) -> str:
+    """An operation id kept to id characters: it is echoed into reproduction
+    text, and a returned value must never alter that text's shape."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "", str(value or ""))
+
+
 def _kql_datetime(moment: datetime) -> str:
     """A KQL ``datetime()`` literal at full precision. ``moment`` comes from
     the harvester's own clock or watermark file, never from a returned row."""
@@ -89,6 +96,29 @@ def _harvest_window(since: Optional[datetime], until: Optional[datetime]) -> str
     )
 
 
+# Assembly prefixes whose frames are framework, not application, code.
+_FRAMEWORK_PREFIXES = ("System.", "Microsoft.")
+_FRAMEWORK_FRAME_RE = "|".join(re.escape(p.rstrip(".")) for p in _FRAMEWORK_PREFIXES)
+
+# Exception types that mean the caller went away, not that the service failed.
+_CANCELLATION_TYPES = ("TaskCanceledException", "OperationCanceledException")
+
+_SAMPLE_OPERATION_IDS = 3
+
+
+def _top_frame_stages() -> str:
+    """KQL stages that add ``frameMethod`` and ``frameAssembly`` to an
+    ``AppExceptions`` row: the first in-app frame of ``Details[0].parsedStack``,
+    framework frames dropped with ``replace_regex``."""
+    framework = _FRAMEWORK_FRAME_RE
+    return (
+        "| extend stack = tostring(Details[0].parsedStack) "
+        f"| extend appStack = replace_regex(stack, @'\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
+        "| extend frameMethod = extract('\"method\":\"([^\"]*)\"', 1, appStack), "
+        "frameAssembly = extract('\"assembly\":\"([^\"]*)\"', 1, appStack) "
+    )
+
+
 def _error_logs_query(
     component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
 ) -> str:
@@ -99,26 +129,106 @@ def _error_logs_query(
     Analytics workspace schema (``AppExceptions``, ``AppRoleName``,
     ``TimeGenerated``), not the classic App Insights names, which a workspace
     does not resolve (#3468). Columns are aliased back to the keys the
-    adapters read from each row."""
+    adapters read from each row.
+
+    One query carries the diagnostic context too (FEAT-2026-0204/T05): the
+    request is a left join on ``OperationId`` (one row per operation), and the
+    top in-app frame is read from ``Details[0].parsedStack`` by dropping
+    framework frames with ``replace_regex`` and extracting the first frame
+    left — string work per row, no ``mv-expand`` over every exception."""
+    cancelled = " or ".join(f"ExceptionType endswith '{t}'" for t in _CANCELLATION_TYPES)
+    request_floor = (
+        f"| where TimeGenerated >= {_kql_datetime(since - timedelta(hours=1))} "
+        if since is not None
+        else ""
+    )
     return (
         "AppExceptions "
         f"| where AppRoleName == '{component}' "
         f"{_harvest_window(since, until)}"
+        f"{_top_frame_stages()}"
+        "| join kind=leftouter ("
+        "AppRequests "
+        f"| where AppRoleName == '{component}' "
+        f"{request_floor}"
+        "| project OperationId = OperationId, Name = Name, ResultCode = ResultCode "
+        "| summarize requestName = take_any(Name), requestResult = take_any(ResultCode) by OperationId"
+        ") on OperationId "
+        f"| extend clientAbort = iff(({cancelled}) and requestResult startswith '2', true, false) "
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
         "operation_ParentId = ParentId, type = ExceptionType, "
-        "outerMessage = OuterMessage"
+        "outerMessage = OuterMessage, instance = AppRoleInstance, "
+        "loggerCategory = tostring(Properties.CategoryName), "
+        "loggerTemplate = tostring(Properties.OriginalFormat), "
+        "requestName, requestResult, frameMethod, frameAssembly, clientAbort"
+    )
+
+
+def _reproduce_query(component: str, operation_ids: Sequence[str]) -> str:
+    """Text for a human to paste into Log Analytics; never executed here."""
+    quoted = ", ".join(f"'{i}'" for i in operation_ids)
+    return (
+        "AppExceptions\n"
+        f"| where AppRoleName == '{component}'\n"
+        f"| where OperationId in ({quoted})\n"
+        "| project TimeGenerated, ExceptionType, OuterMessage, OperationId, Details"
     )
 
 
 def _http_5xx_query(
     component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
 ) -> str:
+    """One query carries the diagnostic context (FEAT-2026-0204/T06). The
+    exception and the dependency are each reduced to one row per
+    ``OperationId`` before the left joins, so a request with several
+    exceptions or dependencies still yields one row: the first exception, and
+    the failed dependency, else the slowest."""
+    context_floor = (
+        f"| where TimeGenerated >= {_kql_datetime(since - timedelta(hours=1))} "
+        if since is not None
+        else ""
+    )
     return (
         "AppRequests "
         f"| where AppRoleName == '{component}' and ResultCode startswith '5' "
         f"{_harvest_window(since, until)}"
+        "| join kind=leftouter ("
+        "AppExceptions "
+        f"| where AppRoleName == '{component}' "
+        f"{context_floor}"
+        f"{_top_frame_stages()}"
+        "| summarize arg_min(TimeGenerated, ExceptionType, OuterMessage, frameMethod, frameAssembly) "
+        "by OperationId "
+        "| project OperationId, exceptionType = ExceptionType, "
+        "exceptionMessage = OuterMessage, frameMethod, frameAssembly"
+        ") on OperationId "
+        "| join kind=leftouter ("
+        "AppDependencies "
+        f"| where AppRoleName == '{component}' "
+        f"{context_floor}"
+        "| extend depRank = iff(Success == false, 1000000000, 0) + DurationMs "
+        "| summarize arg_max(depRank, Target, DependencyType, ResultCode, DurationMs, Success) "
+        "by OperationId "
+        "| project OperationId, dependencyTarget = Target, dependencyType = DependencyType, "
+        "dependencyResult = ResultCode, dependencyDurationMs = DurationMs, "
+        "dependencyFailed = Success == false"
+        ") on OperationId "
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
-        "name = Name, resultCode = ResultCode"
+        "name = Name, resultCode = ResultCode, durationMs = DurationMs, "
+        "instance = AppRoleInstance, exceptionType, exceptionMessage, "
+        "frameMethod, frameAssembly, dependencyTarget, dependencyType, "
+        "dependencyResult, dependencyDurationMs, dependencyFailed"
+    )
+
+
+def _reproduce_5xx_query(component: str, operation_ids: Sequence[str]) -> str:
+    """Text for a human to paste into Log Analytics; never executed here."""
+    quoted = ", ".join(f"'{i}'" for i in operation_ids)
+    return (
+        "AppRequests\n"
+        f"| where AppRoleName == '{component}'\n"
+        f"| where OperationId in ({quoted})\n"
+        "| project TimeGenerated, Name, ResultCode, DurationMs, OperationId"
     )
 
 
@@ -142,11 +252,24 @@ class ErrorLogsAdapter:
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
         query = _error_logs_query(self._component, self._since, self._until)
-        rows = self._transport.run_query(query)
+        rows = list(self._transport.run_query(query))
+        samples: dict = {}
         for row in rows:
-            yield self._build_artifact(row)
+            ids = samples.setdefault(self._signature(row), [])
+            operation_id = _clean_id(row.get("operation_Id"))
+            if operation_id and operation_id not in ids and len(ids) < _SAMPLE_OPERATION_IDS:
+                ids.append(operation_id)
+        for row in rows:
+            yield self._build_artifact(row, samples[self._signature(row)])
 
-    def _build_artifact(self, row: Mapping[str, object]) -> FailureArtifact:
+    @staticmethod
+    def _signature(row: Mapping[str, object]) -> str:
+        exception_type = str(row.get("type") or "UnknownException")
+        return f"{exception_type}:{_normalize_message(str(row.get('outerMessage') or ''))}"
+
+    def _build_artifact(
+        self, row: Mapping[str, object], sample_ids: Sequence[str] = ()
+    ) -> FailureArtifact:
         exception_type = str(row.get("type") or "UnknownException")
         raw_message = str(row.get("outerMessage") or "")
         failure_signature = f"{exception_type}:{_normalize_message(raw_message)}"
@@ -157,8 +280,39 @@ class ErrorLogsAdapter:
             failure_signature=failure_signature,
             observed_text=raw_message,
             target_coordinates=None,
+            context=self._context(row, exception_type, sample_ids),
+            observed_at=str(row["timestamp"]) if row.get("timestamp") else None,
+            instance=str(row["instance"]) if row.get("instance") else None,
         )
         return redact_artifact(artifact)
+
+    def _context(
+        self, row: Mapping[str, object], exception_type: str, sample_ids: Sequence[str]
+    ) -> Optional[dict]:
+        context: dict = {}
+        method = str(row.get("frameMethod") or "")
+        if method:
+            assembly = str(row.get("frameAssembly") or "")
+            context["Where"] = f"{method} ({assembly})" if assembly else method
+        route = str(row.get("requestName") or "")
+        result = str(row.get("requestResult") or "")
+        if route or result:
+            context["Request"] = " ".join(
+                part for part in (route, f"returned {result}" if result else "") if part
+            )
+        category = str(row.get("loggerCategory") or "")
+        template = str(row.get("loggerTemplate") or "")
+        if category or template:
+            context["Logger"] = category + (f" (template: {template})" if template else "")
+        if str(row.get("clientAbort")).lower() == "true":
+            context["Likely client abort"] = (
+                f"{exception_type} on a request that returned {result}: "
+                "the client disconnected after the service answered."
+            )
+        if sample_ids:
+            context["Samples"] = ", ".join(sample_ids)
+            context["Reproduce"] = _reproduce_query(self._component, sample_ids)
+        return context or None
 
 
 class Http5xxAdapter:
@@ -181,11 +335,25 @@ class Http5xxAdapter:
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
         query = _http_5xx_query(self._component, self._since, self._until)
-        rows = self._transport.run_query(query)
+        rows = list(self._transport.run_query(query))
+        samples: dict = {}
         for row in rows:
-            yield self._build_artifact(row)
+            ids = samples.setdefault(self._signature(row), [])
+            operation_id = _clean_id(row.get("operation_Id"))
+            if operation_id and operation_id not in ids and len(ids) < _SAMPLE_OPERATION_IDS:
+                ids.append(operation_id)
+        for row in rows:
+            yield self._build_artifact(row, samples[self._signature(row)])
 
-    def _build_artifact(self, row: Mapping[str, object]) -> FailureArtifact:
+    @staticmethod
+    def _signature(row: Mapping[str, object]) -> str:
+        route = str(row.get("name") or "unknown-route")
+        status_code = str(row.get("resultCode") or "5xx")
+        return f"{route}:{status_code}"
+
+    def _build_artifact(
+        self, row: Mapping[str, object], sample_ids: Sequence[str] = ()
+    ) -> FailureArtifact:
         route = str(row.get("name") or "unknown-route")
         status_code = str(row.get("resultCode") or "5xx")
         failure_signature = f"{route}:{status_code}"
@@ -197,8 +365,53 @@ class Http5xxAdapter:
             failure_signature=failure_signature,
             observed_text=observed_text,
             target_coordinates=None,
+            context=self._context(row, sample_ids),
+            observed_at=str(row["timestamp"]) if row.get("timestamp") else None,
+            instance=str(row["instance"]) if row.get("instance") else None,
         )
         return redact_artifact(artifact)
+
+    def _context(
+        self, row: Mapping[str, object], sample_ids: Sequence[str]
+    ) -> Optional[dict]:
+        context: dict = {}
+        exception_type = str(row.get("exceptionType") or "")
+        if exception_type:
+            message = str(row.get("exceptionMessage") or "")
+            context["Exception"] = f"{exception_type}: {message}" if message else exception_type
+        method = str(row.get("frameMethod") or "")
+        if method:
+            assembly = str(row.get("frameAssembly") or "")
+            context["Where"] = f"{method} ({assembly})" if assembly else method
+        target = str(row.get("dependencyTarget") or "")
+        if target:
+            kind = str(row.get("dependencyType") or "")
+            result = str(row.get("dependencyResult") or "")
+            parts = [target]
+            if kind:
+                parts.append(f"type {kind}")
+            if result:
+                parts.append(f"returned {result}")
+            if str(row.get("dependencyFailed")).lower() != "true":
+                parts.append("slowest dependency, not failed")
+            duration = _milliseconds(row.get("dependencyDurationMs"))
+            if duration:
+                parts.append(duration)
+            context["Dependency"] = ", ".join(parts)
+        duration = _milliseconds(row.get("durationMs"))
+        if duration:
+            context["Duration"] = duration
+        if sample_ids:
+            context["Samples"] = ", ".join(sample_ids)
+            context["Reproduce"] = _reproduce_5xx_query(self._component, sample_ids)
+        return context or None
+
+
+def _milliseconds(value: object) -> str:
+    try:
+        return f"{float(value):.0f} ms"  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return ""
 
 
 # The regression rule (PLAN.md decision 2): a code fires when its share of the
@@ -506,18 +719,55 @@ HEARTBEAT_EVENT_NAME = "ScheduleHeartbeat"
 HEARTBEAT_SCHEDULE_PROPERTY = "scheduleName"
 
 
-def _heartbeat_query(component: str) -> str:
-    """Built only from *component*, an operator-configured name — never from
-    a telemetry query's returned rows. Groups the component's heartbeat
-    signal by schedule name, since one component may carry several
-    heartbeat targets (T04's `acme-functions-host` shape)."""
-    return (
+def _heartbeat_query(
+    component: str,
+    functions: Optional[Mapping[str, str]] = None,
+    since: Optional[datetime] = None,
+) -> str:
+    """Built only from *component*, *functions* and *since* — operator
+    configuration, never a telemetry query's returned rows. Groups the
+    component's heartbeat signal by schedule name, since one component may
+    carry several heartbeat targets (T04's `acme-functions-host` shape). Also
+    carries each schedule's earliest heartbeat, whose minimum across rows is
+    the component's earliest heartbeat — the instant before which no firing is
+    evaluated (FEAT-2026-0204/T04).
+
+    Still one query (FEAT-2026-0204/T08): *functions* maps a schedule name to
+    the function it triggers, and adds that function's last `AppRequests`
+    execution (`last_run`, `last_result`); `host_last_seen` is the component's
+    latest `AppRequests` row of any kind. Both `AppRequests` reads are bounded
+    to *since* — the oldest expected firing across the targets — so neither
+    scans the component's whole request history; absent *since*, a 30-day
+    lookback bounds them."""
+    bound = f"datetime({_iso(since)})" if since is not None else "ago(30d)"
+    query = (
         "AppEvents "
         f"| where AppRoleName == '{component}' "
         f"and Name == '{HEARTBEAT_EVENT_NAME}' "
-        "| summarize last_heartbeat = max(TimeGenerated) by "
+        "| summarize last_heartbeat = max(TimeGenerated), "
+        "first_heartbeat = min(TimeGenerated) by "
         f"name = tostring(Properties.{HEARTBEAT_SCHEDULE_PROPERTY})"
     )
+    if functions:
+        cases = ", ".join(
+            f"Name == '{_kql_literal(function)}', '{_kql_literal(schedule)}'"
+            for schedule, function in functions.items()
+        )
+        query += (
+            " | join kind=leftouter (AppRequests "
+            f"| where AppRoleName == '{component}' and TimeGenerated >= {bound} "
+            f"| extend name = case({cases}, '') "
+            "| where name != '' "
+            "| summarize arg_max(TimeGenerated, ResultCode) by name "
+            "| project name, last_run = TimeGenerated, last_result = ResultCode) "
+            "on name"
+        )
+    query += (
+        " | extend host_last_seen = toscalar(AppRequests "
+        f"| where AppRoleName == '{component}' and TimeGenerated >= {bound} "
+        "| summarize max(TimeGenerated))"
+    )
+    return query
 
 
 def _parse_heartbeat_timestamp(value: object) -> Optional[datetime]:
@@ -562,35 +812,68 @@ class HeartbeatAdapter:
         self._reference_time = reference_time
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
-        query = _heartbeat_query(self._component)
+        evaluated = []
+        for target in self._targets:
+            cron, dialect = target.get("cron"), target.get("dialect")
+            if not cron or not dialect:
+                continue
+            expected = most_recent_firing(
+                cron, dialect, target.get("timezone", "Etc/UTC"), self._reference_time
+            )
+            evaluated.append((target, expected))
+        functions = {
+            t["name"]: t["function"] for t, _ in evaluated if t.get("function")
+        }
+        since = min((e for _, e in evaluated), default=None)
+        query = _heartbeat_query(self._component, functions or None, since)
         rows = self._transport.run_query(query)
         last_seen: dict[str, datetime] = {}
+        details: dict[str, Mapping[str, object]] = {}
+        host_last_seen: Optional[datetime] = None
+        earliest: Optional[datetime] = None
         for row in rows:
             name = row.get("name")
+            host = _parse_heartbeat_timestamp(row.get("host_last_seen"))
+            if host is not None and (host_last_seen is None or host > host_last_seen):
+                host_last_seen = host
+            if name:
+                details[str(name)] = row
             observed = _parse_heartbeat_timestamp(row.get("last_heartbeat"))
+            first = _parse_heartbeat_timestamp(row.get("first_heartbeat")) or observed
+            if first is not None and (earliest is None or first < earliest):
+                earliest = first
             if name and observed is not None:
                 last_seen[str(name)] = observed
 
-        for target in self._targets:
+        if earliest is None:
+            # No liveness signal at all: "never deployed" and "silent" are
+            # indistinguishable, so every target stays pending.
+            return
+
+        # A cron-less heartbeat target is valid per T04; `evaluated` omits it
+        # as there is nothing to evaluate a firing expectation against.
+        for target, expected in evaluated:
             name = target["name"]
-            cron = target.get("cron")
-            dialect = target.get("dialect")
-            if not cron or not dialect:
-                # A cron-less heartbeat target is valid per T04; there is
-                # nothing to evaluate a firing expectation against.
+            if expected < earliest:
+                # Pending first firing: emission began after this firing.
                 continue
-            timezone_name = target.get("timezone", "Etc/UTC")
-            expected = most_recent_firing(
-                cron, dialect, timezone_name, self._reference_time
-            )
             observed = last_seen.get(name)
             if observed is not None and observed >= expected:
                 continue
-            yield self._build_artifact(name, expected, observed)
+            yield self._build_artifact(
+                target, expected, observed, details.get(name, {}), host_last_seen, earliest
+            )
 
     def _build_artifact(
-        self, name: str, expected: datetime, observed: Optional[datetime]
+        self,
+        target: Mapping[str, str],
+        expected: datetime,
+        observed: Optional[datetime],
+        detail: Mapping[str, object],
+        host_last_seen: Optional[datetime],
+        earliest: Optional[datetime] = None,
     ) -> FailureArtifact:
+        name = target["name"]
         observed_text = (
             f"schedule '{name}' expected to fire at or before "
             f"{expected.isoformat()}, last observed heartbeat "
@@ -604,7 +887,69 @@ class HeartbeatAdapter:
             failure_signature=f"heartbeat:{name}",
             observed_text=observed_text,
         )
+        artifact = replace(
+            artifact,
+            context=_heartbeat_context(target, expected, detail, host_last_seen, earliest),
+        )
         return redact_artifact(artifact)
+
+
+def _heartbeat_context(
+    target: Mapping[str, str],
+    expected: datetime,
+    detail: Mapping[str, object],
+    host_last_seen: Optional[datetime],
+    earliest: Optional[datetime] = None,
+) -> dict:
+    context = {
+        "Schedule": (
+            f"cron: {target['cron']}\ndialect: {target['dialect']}\n"
+            f"timezone: {target.get('timezone', 'Etc/UTC')}\n"
+            f"expected firing (UTC): {_iso(expected)}"
+        )
+    }
+    function = target.get("function")
+    if function:
+        last_run = _parse_heartbeat_timestamp(detail.get("last_run"))
+        if last_run is not None:
+            result = detail.get("last_result")
+            context["Last run"] = (
+                f"{function} at {_iso(last_run)}"
+                + (f", result {result}" if result not in (None, "") else "")
+            )
+        else:
+            context["Last run"] = f"{function}: no execution in the lookback window"
+    context["Host last seen"] = (
+        _iso(host_last_seen)
+        if host_last_seen is not None
+        else "no request in the lookback window"
+    )
+    if host_last_seen is None or host_last_seen < expected:
+        gap = (
+            f"no AppRequests row since {_iso(expected)}"
+            if host_last_seen is None
+            else f"{_duration_text(expected - host_last_seen)} before the expected firing"
+        )
+        context["Host silent"] = (
+            f"component sent no request telemetry at or after the expected firing "
+            f"(last sign of life {gap})"
+        )
+    if earliest is not None:
+        # #3504: the instant the grace rule measures from. A schedule is only
+        # called silent for firings after the component's first heartbeat.
+        context["Earliest heartbeat"] = (
+            f"{_iso(earliest)} (component-wide; firings before it are not evaluated)"
+        )
+    return context
+
+
+def _duration_text(delta: timedelta) -> str:
+    seconds = max(int(delta.total_seconds()), 0)
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    parts = [f"{n}{u}" for n, u in ((days, "d"), (hours, "h"), (minutes, "m")) if n]
+    return " ".join(parts) or "0m"
 
 
 def build_app_insights_transport(

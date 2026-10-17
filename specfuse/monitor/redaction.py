@@ -92,6 +92,10 @@ def redact_artifact(artifact: FailureArtifact) -> FailureArtifact:
             key: redact_text(value) for key, value in target_coordinates.items()
         }
 
+    context = artifact.context
+    if context is not None:
+        context = {key: redact_text(value) for key, value in context.items()}
+
     return replace(
         artifact,
         component=redact_text(artifact.component),
@@ -99,4 +103,6 @@ def redact_artifact(artifact: FailureArtifact) -> FailureArtifact:
         failure_class=redact_text(artifact.failure_class),
         observed_text=redact_text(artifact.observed_text),
         target_coordinates=target_coordinates,
+        context=context,
+        instance=redact_text(artifact.instance) if artifact.instance else artifact.instance,
     )

@@ -99,11 +99,13 @@ class TestHeartbeatAdapter(unittest.TestCase):
         self.assertEqual(artifacts, [])
 
     def test_distinct_silent_targets_on_one_component_yield_distinct_fingerprints(self):
-        # Both targets now silent (no heartbeat row for either).
+        # Both targets now silent (the component emitted, but neither of
+        # these schedules did since before their expected firings).
+        rows = [{"name": "other-schedule", "last_heartbeat": "2026-07-01T00:00:00Z"}]
         adapter = HeartbeatAdapter(
             component="acme-functions-host",
             environment=_ENVIRONMENT,
-            transport=StubTransport(rows=[]),
+            transport=StubTransport(rows=rows),
             targets=_two_target_fixture(),
             reference_time=_REFERENCE,
         )
@@ -143,7 +145,10 @@ class TestHeartbeatAdapter(unittest.TestCase):
             spy.assert_called_once_with("acme-functions-host", _ENVIRONMENT)
 
     def test_row_with_no_last_heartbeat_value_is_treated_as_silent(self):
-        rows = [{"name": "nightly-reconciliation", "last_heartbeat": None}]
+        rows = [
+            {"name": "nightly-reconciliation", "last_heartbeat": None},
+            {"name": "other-schedule", "last_heartbeat": "2026-07-01T00:00:00Z"},
+        ]
         adapter = HeartbeatAdapter(
             component="acme-functions-host",
             environment=_ENVIRONMENT,
@@ -178,7 +183,9 @@ class TestHeartbeatAdapter(unittest.TestCase):
         adapter = HeartbeatAdapter(
             component="c",
             environment=_ENVIRONMENT,
-            transport=StubTransport(rows=[]),
+            transport=StubTransport(
+                rows=[{"name": "other", "last_heartbeat": "2026-07-01T00:00:00Z"}]
+            ),
             targets=targets,
             reference_time=_REFERENCE,
         )
@@ -187,6 +194,65 @@ class TestHeartbeatAdapter(unittest.TestCase):
         observed_text = artifacts[0].observed_text
         self.assertNotIn(planted_secret, observed_text)
         self.assertIn("<redacted:", observed_text)
+
+
+class TestHeartbeatGrace(unittest.TestCase):
+    _WEEKLY = {
+        "name": "weekly-job",
+        "cron": "0 8 * * 1",
+        "dialect": "standard-5",
+        "timezone": "Etc/UTC",
+    }
+
+    def _run(self, rows, reference):
+        transport = StubTransport(rows=rows)
+        adapter = HeartbeatAdapter(
+            component="acme-functions-host",
+            environment=_ENVIRONMENT,
+            transport=transport,
+            targets=[self._WEEKLY],
+            reference_time=reference,
+        )
+        return list(adapter.fetch_failures()), transport
+
+    def test_firing_before_first_heartbeat_is_not_evaluated(self):
+        rows = [{
+            "name": "other-schedule",
+            "last_heartbeat": "2026-10-16T09:00:00Z",
+            "first_heartbeat": "2026-10-14T13:50:00Z",
+        }]
+        artifacts, transport = self._run(
+            rows, datetime(2026, 10, 17, 1, 0, 0, tzinfo=timezone.utc)
+        )
+        self.assertEqual(artifacts, [])
+        self.assertEqual(len(transport.queries), 1)
+
+    def test_missed_firing_after_emission_still_fires(self):
+        target = dict(self._WEEKLY, cron="0 8 * * *")
+        rows = [{
+            "name": "weekly-job",
+            "last_heartbeat": "2026-10-14T08:00:00Z",
+            "first_heartbeat": "2026-10-14T08:00:00Z",
+        }]
+        adapter = HeartbeatAdapter(
+            component="acme-functions-host",
+            environment=_ENVIRONMENT,
+            transport=StubTransport(rows=rows),
+            targets=[target],
+            reference_time=datetime(2026, 10, 15, 9, 0, 0, tzinfo=timezone.utc),
+        )
+        artifacts = list(adapter.fetch_failures())
+        self.assertEqual(len(artifacts), 1)
+        self.assertEqual(artifacts[0].failure_class, "silent-schedule")
+        self.assertIn("2026-10-15T08:00:00", artifacts[0].observed_text)
+        self.assertIn("last observed heartbeat 2026-10-14T08:00:00", artifacts[0].observed_text)
+
+    def test_component_without_any_heartbeat_files_nothing(self):
+        artifacts, transport = self._run(
+            [], datetime(2026, 10, 17, 1, 0, 0, tzinfo=timezone.utc)
+        )
+        self.assertEqual(artifacts, [])
+        self.assertEqual(len(transport.queries), 1)
 
 
 if __name__ == "__main__":

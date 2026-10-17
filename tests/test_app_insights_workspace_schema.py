@@ -49,7 +49,11 @@ class TestWorkspaceSchemaQueries(unittest.TestCase):
         self.assert_no_classic_names(query)
         self.assertEqual(
             _projected_keys(query),
-            ["timestamp", "operation_Id", "operation_ParentId", "type", "outerMessage"],
+            [
+                "timestamp", "operation_Id", "operation_ParentId", "type", "outerMessage",
+                "instance", "loggerCategory", "loggerTemplate", "requestName",
+                "requestResult", "frameMethod", "frameAssembly", "clientAbort",
+            ],
         )
         self.assertIn("timestamp = TimeGenerated", query)
         self.assertIn("type = ExceptionType", query)
@@ -62,7 +66,7 @@ class TestWorkspaceSchemaQueries(unittest.TestCase):
         self.assertIn("ResultCode startswith '5'", query)
         self.assert_no_classic_names(query)
         self.assertEqual(
-            _projected_keys(query), ["timestamp", "operation_Id", "name", "resultCode"]
+            _projected_keys(query)[:4], ["timestamp", "operation_Id", "name", "resultCode"]
         )
         self.assertIn("name = Name", query)
         self.assertIn("resultCode = ResultCode", query)

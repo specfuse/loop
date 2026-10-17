@@ -52,6 +52,15 @@ class FailureArtifact:
     failure_signature: str
     observed_text: str
     target_coordinates: Optional[Mapping[str, str]] = None
+    # Carried by ``dlq`` artifacts only; deliberately not part of the
+    # fingerprint, so one issue covers a failure kind, not each message.
+    message_id: Optional[str] = None
+    # Diagnostic context (FEAT-2026-0204 decision 9): ordered section label ->
+    # text, the row's own timestamp, and the instance that emitted it. None of
+    # the three is part of the fingerprint.
+    context: Optional[Mapping[str, str]] = None
+    observed_at: Optional[str] = None
+    instance: Optional[str] = None
 
     @classmethod
     def from_target(
@@ -63,6 +72,7 @@ class FailureArtifact:
         failure_class: str,
         failure_signature: str,
         observed_text: str,
+        message_id: Optional[str] = None,
     ) -> "FailureArtifact":
         """Build an artifact from a monitoring target, extracting only the
         coordinate keys that check type is defined to carry."""
@@ -81,4 +91,5 @@ class FailureArtifact:
             failure_signature=failure_signature,
             observed_text=observed_text,
             target_coordinates=coordinates or None,
+            message_id=message_id if check_type == "dlq" else None,
         )
