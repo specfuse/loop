@@ -10,18 +10,21 @@ Start here:
   them. One or two sentences each; read it if a term in the output is unfamiliar.
 - [`skills.md`](skills.md) — the Claude Code skills catalog, ordered by lifecycle
   phase (pick → draft → arm → diagnose → wrap).
-- [`lifecycles.md`](lifecycles.md) — the five ways work moves through a project
-  (feature, bug, autonomous, escalation, maintenance), with diagrams, the skills
+- [`lifecycles.md`](lifecycles.md) — the six ways work moves through a project
+  (feature, bug, autonomous, escalation, maintenance, monitoring), with diagrams, the skills
   each uses, and the specific points where the loop stops and needs a human.
   Read this when you know *what* the skills are and want to know *which
   lifecycle you are in*.
+- [`flows.html`](flows.html) — an interactive companion to `lifecycles.md`: click
+  through each lifecycle's stages and human checkpoints, and simulate where a
+  monitoring finding ends up. Open it in a browser.
 - [`methodology.md`](methodology.md) — the canonical definition of the gate cycle:
   unit hierarchy, ownership split, the five-section work-unit contract,
   verification-as-oracle, auto-close, plan-next, LEARNINGS, and autonomy. Shared
   vocabulary between the loop and the orchestrator. Reference-grade.
 
-`getting-started.md`, `glossary.md`, `skills.md`, `methodology.md`, and
-`concepts/` are also
+`getting-started.md`, `glossary.md`, `skills.md`, `lifecycles.md`,
+`methodology.md`, and `concepts/` are also
 shipped into target repos by `specfuse init`/`upgrade` (under `.specfuse/docs/`),
 so an initialized project is self-documenting.
 
@@ -43,6 +46,16 @@ so an initialized project is self-documenting.
   driver at this version puts in any Specfuse project, the mid-life baseline
   hazard affecting every feature predating this one, and the numbered
   procedure for moving one feature's `PLAN.md` to `autonomy_default: auto`.
+- [`concepts/monitoring-to-fix.md`](concepts/monitoring-to-fix.md) — from a
+  failure in a deployed component to a merged fix: what `specfuse monitor run`
+  files, how the `diagnose` and `autofix` dials take a finding further, what
+  must be scheduled, and how findings differ from human-written issues.
+- [`concepts/monitoring-schema.md`](concepts/monitoring-schema.md) — the
+  `.specfuse/monitoring.yml` schema: environments, components, the dials, check
+  types and their targets.
+- [`concepts/monitoring-runners.md`](concepts/monitoring-runners.md) — where
+  the harvest runs (the `runner` dial), the harvest window and its watermark,
+  and what `--dry-run` does.
 
 ## Binding rules (under `.specfuse/rules/`)
 

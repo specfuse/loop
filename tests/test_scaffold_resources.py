@@ -49,6 +49,11 @@ _EXPECTED_RELPATHS = {
     "docs/concepts/architecture-addendum-gates-and-iterative-planning.md",
     "docs/concepts/autonomy-stop-classes.md",
     "docs/concepts/adopting-auto-mode.md",
+    "docs/concepts/monitoring-to-fix.md",
+    "docs/concepts/monitoring-schema.md",
+    "docs/concepts/monitoring-runners.md",
+    "docs/lifecycles.md",
+    "docs/flows.html",
     "workflows/specfuse-monitor.yml",
 }
 

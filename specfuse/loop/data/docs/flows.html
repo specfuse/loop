@@ -1,0 +1,519 @@
+<!doctype html>
+<!--
+Copyright 2026 Specfuse Contributors
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+Interactive companion to docs/lifecycles.md and docs/concepts/monitoring-to-fix.md.
+Shipped into every project as .specfuse/docs/flows.html. tests/test_flows_page.py keeps it
+in step with lifecycles.md and specfuse/monitor/autofix.py.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Specfuse Loop Flows</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a left rail of lifecycles, a stage track down the middle, the selected stage's detail beside it; stacks to one column on phones. */
+:root {
+  --bg: #f3f5f6;
+  --surface: #ffffff;
+  --ink: #17242b;
+  --muted: #5a6b74;
+  --line: #d5dde1;
+  --accent: #2456c7;        /* driver: automated steps */
+  --accent-soft: #e3ebfb;
+  --human: #b45f06;         /* a person decides or acts */
+  --human-soft: #fbeedd;
+  --ok: #1f7a4d;
+  --ok-soft: #e0f2e9;
+  --stop: #a3302a;
+  --stop-soft: #f8e2e0;
+  --display: "Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171b; --surface: #16222a; --ink: #e4ecef; --muted: #93a6af; --line: #29404b;
+    --accent: #7ea3ff; --accent-soft: #1a2a4d; --human: #f0a24b; --human-soft: #3a2812;
+    --ok: #5fcf96; --ok-soft: #12301f; --stop: #f08a83; --stop-soft: #3b1816; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171b; --surface: #16222a; --ink: #e4ecef; --muted: #93a6af; --line: #29404b;
+  --accent: #7ea3ff; --accent-soft: #1a2a4d; --human: #f0a24b; --human-soft: #3a2812;
+  --ok: #5fcf96; --ok-soft: #12301f; --stop: #f08a83; --stop-soft: #3b1816; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 20px; padding-block: 28px 64px; }
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 22px; }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 4vw, 40px); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 6px 0 0; color: var(--muted); max-width: 62ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.dot.auto { background: var(--accent); }
+.dot.human { background: var(--human); }
+.dot.end { background: var(--ok); }
+.dot.stop { background: var(--stop); }
+.rule { padding: 12px 14px; border-left: 3px solid var(--ink); background: var(--surface); margin-bottom: 22px; max-width: 80ch; }
+.rule b { font-family: var(--display); font-weight: 700; }
+
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; }
+nav.flows { display: flex; flex-direction: column; gap: 4px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); align-self: start; }
+nav.flows button { all: unset; cursor: pointer; padding: 9px 12px; border-radius: 8px; display: grid; gap: 1px; }
+nav.flows button .n { font-weight: 600; }
+nav.flows button .s { font-size: 12.5px; color: var(--muted); }
+nav.flows button:hover { background: var(--surface); }
+nav.flows button[aria-selected="true"] { background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
+nav.flows button:focus-visible, .stage:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav.flows .sep { height: 1px; background: var(--line); margin: 8px 4px; }
+
+.flowhead { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; margin-bottom: 4px; }
+h2 { font-family: var(--display); font-weight: 700; font-size: 26px; margin: 0; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.meta b { color: var(--ink); font-weight: 600; }
+.summary { max-width: 72ch; margin: 0 0 18px; }
+
+.board { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+ol.track { list-style: none; margin: 0; padding: 0; position: relative; }
+ol.track::before { content: ""; position: absolute; left: 15px; top: 14px; bottom: 14px; width: 2px; background: var(--line); }
+.stage { all: unset; cursor: pointer; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 10px; align-items: start; padding: 7px 8px 7px 0; border-radius: 8px; width: 100%; position: relative; }
+.stage .k { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--mono); background: var(--surface); border: 2px solid var(--accent); color: var(--accent); z-index: 1; }
+.stage.human .k { border-color: var(--human); color: var(--human); }
+.stage.end .k { border-color: var(--ok); color: var(--ok); }
+.stage .t { font-weight: 600; padding-top: 5px; }
+.stage .c { font: 12.5px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.stage:hover .t { text-decoration: underline; text-underline-offset: 3px; }
+.stage[aria-current="true"] { background: var(--surface); }
+.stage[aria-current="true"] .k { background: var(--accent); color: var(--surface); }
+.stage.human[aria-current="true"] .k { background: var(--human); }
+.stage.end[aria-current="true"] .k { background: var(--ok); }
+.branchnote { margin: 2px 0 6px 42px; font-size: 12.5px; color: var(--muted); }
+
+.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; min-width: 0; }
+.detail .who { display: inline-block; font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; background: var(--accent-soft); color: var(--accent); }
+.detail .who.human { background: var(--human-soft); color: var(--human); }
+.detail .who.end { background: var(--ok-soft); color: var(--ok); }
+.detail h3 { font-family: var(--display); font-size: 21px; margin: 10px 0 6px; }
+.detail p { margin: 0 0 10px; max-width: 68ch; }
+.detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 12px 0 0; font-size: 14px; }
+.detail dt { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; padding-top: 2px; }
+.detail dd { margin: 0; min-width: 0; }
+code, .cmd { font-family: var(--mono); font-size: 13px; }
+.cmd { display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; overflow-x: auto; white-space: pre; }
+.stops { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.stops h4 { margin: 0 0 6px; font-size: 13px; color: var(--stop); text-transform: uppercase; letter-spacing: .05em; }
+.stops ul { margin: 0; padding-left: 18px; }
+.stops li { margin-bottom: 4px; }
+
+section.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; margin-top: 22px; }
+section.panel h3 { font-family: var(--display); font-size: 20px; margin: 0 0 4px; }
+section.panel > p { color: var(--muted); margin: 0 0 14px; max-width: 72ch; }
+.sim { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 22px; }
+.controls { display: grid; gap: 12px; }
+.controls label { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.controls label small { font-weight: 400; color: var(--muted); }
+select, input[type="range"] { font: inherit; }
+select { padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { all: unset; cursor: pointer; font: 500 13px var(--mono); padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.conf { display: flex; align-items: center; gap: 10px; }
+.conf output { font: 600 14px var(--mono); font-variant-numeric: tabular-nums; min-width: 3ch; }
+.checkrow { display: flex; gap: 8px; align-items: center; font-weight: 500 !important; grid-template-columns: none !important; }
+.path { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.path li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.path .m { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--mono); color: var(--surface); background: var(--accent); margin-top: 1px; }
+.path li.human .m { background: var(--human); }
+.path li.stop .m { background: var(--stop); }
+.path li.end .m { background: var(--ok); }
+.path .why { color: var(--muted); font-size: 13.5px; }
+.outcome { margin-top: 14px; padding: 12px 14px; border-radius: 8px; font-weight: 600; }
+.outcome.ok { background: var(--ok-soft); color: var(--ok); }
+.outcome.human { background: var(--human-soft); color: var(--human); }
+.outcome.stop { background: var(--stop-soft); color: var(--stop); }
+.outcome small { display: block; font-weight: 400; color: var(--ink); margin-top: 3px; }
+
+.tiers { display: grid; gap: 8px; }
+.tier { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.tier b.num { font: 600 13px var(--mono); color: var(--muted); }
+.tier .lane { font-weight: 600; }
+.tier .lane small { display: block; font-weight: 400; color: var(--muted); }
+
+.chooser { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.choice { all: unset; cursor: pointer; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); display: grid; gap: 4px; }
+.choice:hover { border-color: var(--accent); }
+.choice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.choice .q { font-weight: 600; }
+.choice .a { font: 13px var(--mono); color: var(--accent); }
+.foot { margin-top: 28px; color: var(--muted); font-size: 13px; max-width: 80ch; }
+.foot a { color: var(--accent); }
+.planned { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--human); border: 1px solid var(--human); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  nav.flows { position: static; flex-direction: row; flex-wrap: wrap; }
+  nav.flows button .s { display: none; }
+  nav.flows .sep { display: none; }
+  .board, .sim { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .detail, .path li { animation: rise .18s ease-out both; }
+  @keyframes rise { from { transform: translateY(3px); opacity: .6; } to { transform: none; opacity: 1; } }
+}
+
+/* Base reset (the page is opened straight from disk, so it carries its own). */
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Specfuse Loop Flows</h1>
+      <p class="lede">The six ways work moves through a Specfuse project: where each one starts, what the driver does on its own, and the exact points where it stops for you. Pick a lifecycle, then click any stage.</p>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><i class="dot auto"></i>the loop does it</span>
+      <span><i class="dot human"></i>you decide or act</span>
+      <span><i class="dot end"></i>result</span>
+      <span><i class="dot stop"></i>where it stops for you</span>
+    </div>
+  </header>
+
+  <p class="rule"><b>One rule explains every checkpoint.</b> The loop automates execution, not judgment. Every place it stops is a place where going on would mean guessing at something only you can decide. It halts rather than guesses, and it says why.</p>
+
+  <div class="layout">
+    <nav class="flows" role="tablist" aria-label="Lifecycles" id="nav"></nav>
+    <main id="main" aria-live="polite"></main>
+  </div>
+
+  <p class="foot">A visual companion to <a href="lifecycles.md">lifecycles.md</a> and <a href="concepts/monitoring-to-fix.md">concepts/monitoring-to-fix.md</a>, which stay the source of truth. In a Specfuse project this page lives at <code>.specfuse/docs/flows.html</code> and is refreshed by <code>specfuse upgrade</code>, so it always describes the specfuse-loop version that installed it. Items marked <span class="planned">planned</span> are on the roadmap, not shipped in this version.</p>
+</div>
+
+<script>
+const FLOWS = [
+  {
+    id: "attention", name: "Daily check-in", sub: "what needs me?",
+    entry: "you sit down to a project", who: "you", ceremony: "read-only",
+    summary: "One command answers “what needs me?”. It sweeps local .specfuse/ state and the needs-human GitHub queue into one list ordered by how badly each item blocks the loop. Work it top-down.",
+    stages: [
+      { k: "human", t: "Run /attention", c: "/attention", d: "Read-only. Nothing is written. It lists everything parked across features and the needs-human queue, most blocking first.", rows: { Reads: ".specfuse/ feature state, needs-human issues, open PRs" } },
+      { k: "human", t: "Blocked work units", c: "/gate-status → /unblock-wu", d: "A blocked_human work unit means an agent already tried and gave up, so the loop is stalled until you act. Diagnose with /gate-status, fix the cause, re-arm with /unblock-wu.", rows: { Priority: "1 — the loop cannot move" } },
+      { k: "human", t: "Gates awaiting review", c: "/arm-gate", d: "The previous gate's plan-next drafted the next gate's work units. Read them, then arm.", rows: { Priority: "2" } },
+      { k: "human", t: "needs-human issues", c: "/answer-escalation", d: "Each parked escalation, one at a time: hand it to the skill that owns it, answer it, close it, or skip it.", rows: { Priority: "3" } },
+      { k: "human", t: "Blocked features", c: "/block-feature --unblock", d: "Clear the named blocker, then unblock the feature.", rows: { Priority: "4" } },
+      { k: "human", t: "Stale PRs", c: "merge, fix CI, or close", d: "A stale PR is waiting, not stalled, so it comes last.", rows: { Priority: "5" } },
+      { k: "end", t: "Nothing parked", c: "/pick-feature", d: "Pick the next roadmap row." }
+    ]
+  },
+  {
+    id: "feature", name: "Feature", sub: "planned work with gates",
+    entry: "a roadmap row", who: "driver + you at gate boundaries", ceremony: "gates, work units, close",
+    summary: "For anything that needs design, several work units, or a record of why it was built. You plan and arm; the driver dispatches work units, verifies each against the gates, and runs the close.",
+    stages: [
+      { k: "human", t: "Reserve an ID", c: "/roadmap-add", d: "Adds a roadmap row with the next FEAT-YYYY-NNNN, checked against the roadmap, every PLAN.md, LEARNINGS and GitHub so an ID is never reused.", rows: { Writes: ".specfuse/roadmap.md" } },
+      { k: "human", t: "Pick it", c: "/pick-feature", d: "Chooses the next row and moves it from planned to active.", rows: { Writes: "roadmap row status" } },
+      { k: "human", t: "Draft it", c: "/draft-feature", d: "A guided interview, one question at a time, then PLAN.md, GATE-NN.md and the work units. Every gate has a feature_oracle: one command that proves the gate's outcome end to end. It starts red; the first work unit (the walking skeleton) turns it green.", rows: { Writes: "PLAN.md, GATE-NN.md, WU-*.md", Rule: "12 or fewer substantive units → one gate with a single close (ceremony proportionality)" } },
+      { k: "human", t: "Arm the gate", c: "/arm-gate", d: "Work units go from draft to pending. The driver never does this itself: it is the review checkpoint where you read what the loop is about to do. Under autonomy auto, a predicate and its stop classes decide whether a later gate can arm without you.", rows: { Writes: "WU status draft → pending" }, stops: ["Every gate boundary under review or supervised autonomy", "A stop class firing under auto (see autonomy-stop-classes)"] },
+      { k: "auto", t: "Run", c: "specfuse run --feature FEAT-ID", d: "Probes the baseline first: if the gates are already red, it halts instead of blaming the first unit. Then each pending unit is dispatched to a fresh session, its output verified against the gates in .specfuse/verification.yml, up to 3 attempts.", rows: { Reads: "verification.yml, the WU's acceptance criteria", Writes: "commits per unit, events.jsonl" }, stops: ["A red baseline before the first unit", "A unit blocked after its attempts (blocked_human) → /gate-status, /unblock-wu", "A type: human unit → do the step, then /unblock-wu --done --evidence", "cost_budget_usd reached"] },
+      { k: "auto", t: "Close", c: "close work unit", d: "One session writes the retrospective, the lessons, the docs pass and a verdict: met or not_met, nothing in between. Under auto, a separate judge session sees only the evidence and can lower the verdict but never raise it.", rows: { Writes: "RETROSPECTIVE.md, LEARNINGS(-pending).md, docs" } },
+      { k: "end", t: "Verdict", c: "met → terminal flips", d: "met: the driver flips the gate to passed, PLAN.md and the roadmap row to done, and archives the detail section. not_met: nothing flips; FOLLOW-UPS.md gets one entry per failed criterion and each becomes a tracked issue." },
+      { k: "human", t: "Wrap and merge", c: "/wrap-feature", d: "Push, open the PR, watch CI, then merge. Under auto, lessons were staged in LEARNINGS-pending.md: promoting them into LEARNINGS.md is your act at PR review, or they are lost.", stops: ["The merge is always yours"] }
+    ]
+  },
+  {
+    id: "bug", name: "Bug", sub: "1 bug = 1 branch = 1 PR",
+    entry: "a GitHub issue with a repro", who: "/fix-bug, test-first", ceremony: "none",
+    summary: "Bugs skip the feature methodology: no PLAN.md, no gates, no roadmap row. The fix shape is known, so ceremony would be overhead. The failing test is the proof you fixed the right thing.",
+    stages: [
+      { k: "human", t: "Start from the issue", c: "/fix-bug N", d: "Reads the issue with its comments. No repro means no falsifiable test, so it stops and asks for one." },
+      { k: "auto", t: "Triage: bug or feature?", c: "feature indicators", d: "Refuses when the fix needs 3 or more files, a new abstraction, a contract change consumers see, or an irreversible migration. When it refuses, believe it: forcing feature work through as a bug fix leaves no plan and no record.", stops: ["A feature indicator fires → /draft-feature"] },
+      { k: "auto", t: "Write a failing test", c: "must fail on HEAD first", d: "The test replicates the bug and must fail on the unchanged code. A test that passes before the fix is not testing the bug." },
+      { k: "auto", t: "Minimum fix", c: "no 'while I'm here'", d: "The smallest change that makes the test pass. Another bug spotted on the way gets its own issue." },
+      { k: "auto", t: "Run the gates", c: "tests, lint, security, coverage", d: "Everything in the code gate set, all green, no silenced findings." },
+      { k: "auto", t: "Diff self-check", c: "indicators vs the diff", d: "Triage judged the issue text before code existed. The same indicators are re-applied to the real diff, because some (a new frontmatter field, say) only show up there.", stops: ["An indicator fires against the diff → stop, propose /draft-feature"] },
+      { k: "end", t: "One commit, one PR", c: "closes #N + CHANGELOG entry", d: "The CHANGELOG entry is written here or nowhere: bugs have no close ceremony to collect it." },
+      { k: "human", t: "Merge", c: "you, after CI", d: "Interactive /fix-bug never merges. In the autonomous bug lane, a repo can opt into automerge for triaged bugs (rules.bugs.automerge).", stops: ["The merge"] }
+    ]
+  },
+  {
+    id: "autonomous", name: "Autonomous", sub: "specfuse-agent drains the queue",
+    entry: "queue: + open issues", who: "specfuse-agent, unattended", ceremony: "inherits the lane it picks",
+    summary: "A conductor with no capability of its own. Each turn it takes a snapshot, picks one item by policy, runs it through the lane that owns it, and repeats until the work or the budget runs out.",
+    stages: [
+      { k: "human", t: "Start it", c: "specfuse-agent [--max-items N] [--max-minutes M]", d: "One agent per repo (.specfuse/.agent.lock). A PAUSE marker stops it between items without killing the process.", rows: { Reads: ".specfuse/agent-policy.yml (queue, rules, budgets)" } },
+      { k: "auto", t: "Snapshot", c: "issues, PRs, features, queue", d: "Every field is a value read once, so selection is deterministic." },
+      { k: "auto", t: "Select by policy", c: "tiers, not judgment", d: "The lowest tier with work wins. See the tier ladder below.", rows: { Note: "A feature is invisible unless it is in queue:, active or planned, has pending units, and a WIP slot is free" } },
+      { k: "auto", t: "Execute one item", c: "the lane's own entry point", d: "Advance a feature (specfuse run), fix a triaged bug (headless /fix-bug), triage an issue, diagnose a finding, or fire an autofix." },
+      { k: "end", t: "Completed or escalated", c: "loop back to select", d: "An escalation files or annotates a needs-human issue, then the agent selects again.", stops: ["It never arms a gate, drafts a feature, or answers an escalation for you"] },
+      { k: "end", t: "Drained", c: "nothing left, or budget hit", d: "budgets: caps tokens per run, items per day and open PRs." }
+    ],
+    extra: "tiers"
+  },
+  {
+    id: "escalation", name: "Escalation", sub: "parked work, one issue at a time",
+    entry: "a needs-human issue", who: "you", ceremony: "none",
+    summary: "When any lane cannot proceed, it files a GitHub issue labelled needs-human plus a category. That queue is the record of what is parked.",
+    stages: [
+      { k: "auto", t: "A lane escalates", c: "needs-human + category", d: "Each escalation says what was done, what the issue is, what decision is needed, why it did not resolve automatically, the options and a recommendation.", rows: { Categories: "gate-review, drafting-needed, blocked-wu, triage-question, merge-approval" } },
+      { k: "human", t: "Read and explain", c: "/answer-escalation", d: "Walks the queue one issue at a time." },
+      { k: "human", t: "Choose a disposition", c: "hand off · answer · close · skip", d: "Hand off to the owning skill (gate-review → /arm-gate, drafting-needed → /draft-feature, blocked-wu → /unblock-wu, triage-question → /triage-issues), answer with guidance, close as won't-fix, or skip and leave it parked." },
+      { k: "auto", t: "Release both labels", c: "needs-human AND blocked-wu", d: "The bug lane skips an issue carrying either label, so releasing one leaves it answered and still parked. The guidance comment is the point: it is what makes the next attempt different." },
+      { k: "end", t: "The lane picks it up again", c: "next agent run", d: "" }
+    ]
+  },
+  {
+    id: "maintenance", name: "Maintenance", sub: "periodic rituals",
+    entry: "the calendar", who: "you", ceremony: "none",
+    summary: "Nothing breaks immediately if you skip these. Things quietly degrade instead.",
+    stages: [
+      { k: "human", t: "Groom the queue (weekly)", c: "/groom-backlog", d: "queue: goes stale the week it is written. A done entry at the top means the feature lane advertises nothing at all." },
+      { k: "human", t: "Clear what's parked (weekly)", c: "/attention", d: "The daily check-in, done as a sweep." },
+      { k: "human", t: "Learn from failures", c: "/learnings-suggest → /learnings-curate", d: "The first clusters failed attempts into candidate rules; the second merges, retires and promotes. Planning loads LEARNINGS.md, so its size is a standing cost." },
+      { k: "human", t: "Promote staged lessons", c: "LEARNINGS-pending.md → LEARNINGS.md", d: "Under auto, lessons stage in the feature folder. Planning never reads that file and merging the PR does not promote them." },
+      { k: "human", t: "Archive", c: "/roadmap-archive", d: "Moves done features' detail sections out of the roadmap." },
+      { k: "human", t: "Upgrade projects (on release)", c: "/scaffold-upgrade", d: "Brings target projects' .specfuse/ scaffold to the new version." }
+    ]
+  },
+  {
+    id: "monitoring", name: "Monitoring", sub: "production failure → fix",
+    entry: "a failure in a deployed component", who: "specfuse monitor run, then specfuse-agent or you", ceremony: "one issue per fingerprint",
+    summary: "Work that starts in production. The monitor files one issue per distinct failure; two per-component dials in monitoring.yml decide how far it goes without you. Findings skip triage and the bug lane on purpose: their route to a fix is diagnose, then autofix.",
+    stages: [
+      { k: "auto", t: "Detect", c: "specfuse monitor run", d: "Runs each component's checks against its telemetry and broker: error-logs, http-5xx, http-status-regression, dlq, queue-stalled, heartbeat, invariant. Reads only what arrived since the last run (the watermark), or the last 24 hours on a first run. One failing check is reported and the rest still run.", rows: { Reads: ".specfuse/monitoring.yml, App Insights, Service Bus", Scheduled: "by you: cron, CI, or later the in-cluster runner" } },
+      { k: "auto", t: "File", c: "one issue per fingerprint", d: "The fingerprint is component + check + normalised failure. New fingerprint: a new monitoring-finding issue. Same fingerprint, open issue: the occurrence count goes up (at most every 6 hours). The monitor reopens a closed finding but never closes one. A schedule is not called silent before its component's first heartbeat.", rows: { "Closed issue": "reopened with a comment when it closed within 90 days", "dlq issue": "closing it acknowledges the message; only a new message id reopens it" } },
+      { k: "human", t: "Diagnose", c: "diagnose: manual | auto", d: "manual: you run /diagnose-issue N. auto: specfuse-agent diagnoses each open, undiagnosed finding in a headless session. Either way one comment is posted: root cause, evidence, candidate fix, confidence (0 to 1) and fix_scope (small, large, external). One diagnosis per issue.", stops: ["diagnose: manual — every finding waits for you", "diagnose: auto only acts when specfuse-agent is scheduled too"] },
+      { k: "auto", t: "Decide", c: "autofix: \"off\" | \"on\"", d: "Fixed rules, not configuration: autofix off → decline. fix_scope large or external → route to you. confidence below 0.8 → route to you. Already attempted for this fingerprint → decline. Daily cap reached → decline. Otherwise → fire.", stops: ["Routed to a human: an escalation comment says which rule fired"] },
+      { k: "auto", t: "Fix", c: "headless /specfuse:fix-bug", d: "The same test-first bug workflow, run without a person. It opens one PR that closes the finding, or stops with a named outcome and the issue gets auto-fix-attempted-failed." },
+      { k: "human", t: "Merge", c: "you", d: "An autofix PR is never merged automatically.", stops: ["Always"] },
+      { k: "end", t: "Closed", c: "PR merged → issue closed", d: "If the fingerprint fires again after the fix ships, the issue reopens with a comment: the regression signal. The monitor reopens issues but never closes one." }
+    ],
+    extra: "simulator"
+  },
+  {
+    id: "choose", name: "Which one am I in?", sub: "start from what you have",
+    sep: true
+  }
+];
+
+const CHOICES = [
+  { q: "A misbehavior with a repro", a: "/fix-bug", go: "bug" },
+  { q: "An idea that needs design or several units", a: "/roadmap-add → /pick-feature", go: "feature" },
+  { q: "A parked needs-human issue", a: "/answer-escalation", go: "escalation" },
+  { q: "A monitoring-finding issue", a: "/diagnose-issue", go: "monitoring" },
+  { q: "Time, and a groomed queue", a: "specfuse-agent", go: "autonomous" },
+  { q: "An inbound issue nobody classified", a: "/triage-issues", go: "autonomous" },
+  { q: "It's been a week", a: "/groom-backlog", go: "maintenance" },
+  { q: "No idea", a: "/attention", go: "attention" }
+];
+
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const WHO = { auto: "the loop", human: "you", end: "result" };
+
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+
+let current = null;
+
+function renderNav() {
+  const nav = $("#nav");
+  nav.innerHTML = FLOWS.map(f =>
+    (f.sep ? '<div class="sep" role="presentation"></div>' : "") +
+    `<button role="tab" id="tab-${f.id}" aria-controls="main" aria-selected="false" data-id="${f.id}"><span class="n">${esc(f.name)}</span><span class="s">${esc(f.sub)}</span></button>`
+  ).join("");
+  nav.addEventListener("click", e => { const b = e.target.closest("button"); if (b) select(b.dataset.id); });
+  nav.addEventListener("keydown", e => {
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    const ids = FLOWS.map(f => f.id); let i = ids.indexOf(current);
+    i = (i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length;
+    select(ids[i]); $(`#tab-${ids[i]}`).focus(); e.preventDefault();
+  });
+}
+
+function select(id) {
+  current = id;
+  document.querySelectorAll("nav.flows button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.id === id)));
+  store("flow", id);
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+  const f = FLOWS.find(x => x.id === id);
+  if (id === "choose") return renderChooser();
+  renderFlow(f);
+}
+
+function renderFlow(f) {
+  const main = $("#main");
+  main.innerHTML = `
+    <div class="flowhead"><h2>${esc(f.name)}</h2></div>
+    <div class="meta"><span>Starts from <b>${esc(f.entry)}</b></span><span>Driven by <b>${esc(f.who)}</b></span><span>Ceremony <b>${esc(f.ceremony)}</b></span></div>
+    <p class="summary">${esc(f.summary)}</p>
+    <div class="board">
+      <ol class="track">${f.stages.map((s, i) => `
+        <li><button class="stage ${s.k}" data-i="${i}" aria-current="false">
+          <span class="k">${i + 1}</span><span><span class="t">${esc(s.t)}</span><br><span class="c">${esc(s.c)}</span></span>
+        </button></li>`).join("")}
+      </ol>
+      <div class="detail" id="detail"></div>
+    </div>
+    ${f.extra === "simulator" ? simulatorHTML() : ""}
+    ${f.extra === "tiers" ? tiersHTML() : ""}`;
+  $(".track", main).addEventListener("click", e => { const b = e.target.closest(".stage"); if (b) showStage(f, +b.dataset.i); });
+  showStage(f, 0);
+  if (f.extra === "simulator") wireSimulator();
+  if (f.extra === "tiers") wireTiers();
+}
+
+function showStage(f, i) {
+  document.querySelectorAll(".stage").forEach(b => b.setAttribute("aria-current", String(+b.dataset.i === i)));
+  const s = f.stages[i];
+  const rows = s.rows ? `<dl>${Object.entries(s.rows).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : "";
+  const stops = s.stops ? `<div class="stops"><h4>Stops for you</h4><ul>${s.stops.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : "";
+  $("#detail").innerHTML = `
+    <span class="who ${s.k}">${WHO[s.k]}</span>
+    <h3>${i + 1}. ${esc(s.t)}</h3>
+    <span class="cmd">${esc(s.c)}</span>
+    ${s.d ? `<p style="margin-top:12px">${esc(s.d)}</p>` : ""}${rows}${stops}`;
+  // re-trigger the small entrance animation
+  const d = $("#detail"); d.style.animation = "none"; void d.offsetWidth; d.style.animation = "";
+}
+
+/* ---------- monitoring simulator ---------- */
+const SIM = { diagnose: "auto", agent: "yes", autofix: "on", scope: "small", conf: 0.85, attempted: false, cap: false, fixOutcome: "pr" };
+
+function seg(name, opts) {
+  return `<div class="seg" role="group" aria-label="${name}">${opts.map(([v, l]) => `<button class="chip" data-k="${name}" data-v="${v}" aria-pressed="${String(SIM[name]) === v}">${l}</button>`).join("")}</div>`;
+}
+
+function simulatorHTML() {
+  return `<section class="panel" aria-labelledby="simh">
+    <h3 id="simh">Where does a finding end up?</h3>
+    <p>Set a component's dials and what its diagnosis says. The path follows the rules shipped in 0.28.2 (<code>specfuse/monitor/autofix.py</code>). The confidence threshold and the fix_scope rule are hardcoded on purpose, so nobody can tune the guardrail away in a config file.</p>
+    <div class="sim">
+      <div class="controls">
+        <label>diagnose <small>per component, in monitoring.yml</small>${seg("diagnose", [["manual", "manual"], ["auto", "auto"]])}</label>
+        <label>specfuse-agent scheduled? <small>auto only acts when it runs</small>${seg("agent", [["yes", "yes"], ["no", "no"]])}</label>
+        <label>autofix ${seg("autofix", [["off", "\"off\""], ["on", "\"on\""]])}</label>
+        <label for="scope">Diagnosis fix_scope
+          <select id="scope"><option value="small">small</option><option value="large">large</option><option value="external">external</option></select></label>
+        <label for="conf">Diagnosis confidence
+          <span class="conf"><input id="conf" type="range" min="0" max="1" step="0.05" value="${SIM.conf}"><output id="confout">${SIM.conf.toFixed(2)}</output></span></label>
+        <label class="checkrow"><input type="checkbox" id="attempted"> already attempted for this fingerprint</label>
+        <label class="checkrow"><input type="checkbox" id="cap"> today's autofix cap reached</label>
+        <label>If it fires, the fix session ${seg("fixOutcome", [["pr", "opens a PR"], ["refused", "refuses"]])}</label>
+      </div>
+      <div><ol class="path" id="path"></ol><div id="outcome"></div></div>
+    </div>
+  </section>`;
+}
+
+function wireSimulator() {
+  document.querySelectorAll(".chip").forEach(c => c.addEventListener("click", () => {
+    SIM[c.dataset.k] = c.dataset.v;
+    document.querySelectorAll(`.chip[data-k="${c.dataset.k}"]`).forEach(x => x.setAttribute("aria-pressed", String(x === c)));
+    runSim();
+  }));
+  $("#scope").value = SIM.scope;
+  $("#scope").addEventListener("change", e => { SIM.scope = e.target.value; runSim(); });
+  $("#conf").addEventListener("input", e => { SIM.conf = +e.target.value; $("#confout").textContent = SIM.conf.toFixed(2); runSim(); });
+  $("#attempted").addEventListener("change", e => { SIM.attempted = e.target.checked; runSim(); });
+  $("#cap").addEventListener("change", e => { SIM.cap = e.target.checked; runSim(); });
+  runSim();
+}
+
+function runSim() {
+  const p = [];
+  const step = (k, t, why) => p.push({ k, t, why });
+  let out;
+  step("auto", "monitor run files the finding", "One issue per fingerprint, labelled monitoring-finding.");
+  if (SIM.diagnose === "manual") {
+    step("human", "You run /diagnose-issue N", "diagnose: manual — nothing happens until you do.");
+  } else if (SIM.agent === "no") {
+    step("stop", "Nothing diagnoses it", "diagnose: auto is read by specfuse-agent. With only monitor run scheduled, the finding waits (#3488).");
+    out = ["stop", "Waits undiagnosed", "Schedule specfuse-agent, or diagnose by hand."];
+  } else {
+    step("auto", "specfuse-agent diagnoses it", "A headless session posts one diagnosis comment.");
+  }
+  if (!out) {
+    step("auto", `Diagnosis: fix_scope ${SIM.scope}, confidence ${SIM.conf.toFixed(2)}`, "These two fields are what the autofix decision reads.");
+    if (SIM.autofix === "off") {
+      out = ["human", "Declined: autofix is off", "The diagnosis is yours to act on. Turn autofix on once diagnoses on this component read well."];
+    } else if (SIM.scope !== "small") {
+      step("stop", "Routed to a human", `fix_scope ${SIM.scope} is outside an automated fix's competence.`);
+      out = ["human", "Escalated to you", "An escalation comment names the rule that fired."];
+    } else if (SIM.conf < 0.8) {
+      step("stop", "Routed to a human", `confidence ${SIM.conf.toFixed(2)} is below the 0.80 threshold.`);
+      out = ["human", "Escalated to you", "A low-confidence diagnosis is a starting point for a person, not a fix order."];
+    } else if (SIM.attempted) {
+      out = ["human", "Declined: already attempted", "One automated try per fingerprint, ever. A recurrence after a fix is yours to look at."];
+    } else if (SIM.cap) {
+      out = ["human", "Declined: daily cap reached", "It becomes eligible again tomorrow, if nothing else changes."];
+    } else {
+      step("auto", "Fire: headless /specfuse:fix-bug", "The attempt is recorded before the session starts, so a crash can't cause a second try.");
+      if (SIM.fixOutcome === "refused") {
+        step("stop", "The fix session stops", "Feature-scoped, no reproducible test, or a red gate: a named outcome, never a guess.");
+        out = ["stop", "Labelled auto-fix-attempted-failed", "An escalation comment on the finding says why."];
+      } else {
+        step("auto", "One PR, closes the finding", "Failing test first, minimum fix, all gates green.");
+        step("human", "You review and merge", "An autofix PR is never merged automatically.");
+        out = ["ok", "Fixed after your merge", "The issue closes with the PR."];
+      }
+    }
+  }
+  $("#path").innerHTML = p.map((s, i) => `<li class="${s.k}"><span class="m">${s.k === "stop" ? "!" : i + 1}</span><span><b>${esc(s.t)}</b><br><span class="why">${esc(s.why)}</span></span></li>`).join("");
+  $("#outcome").innerHTML = `<div class="outcome ${out[0]}">${esc(out[1])}<small>${esc(out[2])}</small></div>`;
+}
+
+/* ---------- autonomous tiers ---------- */
+let preempt = true;
+function tiersHTML() {
+  return `<section class="panel" aria-labelledby="tierh">
+    <h3 id="tierh">Which lane goes first?</h3>
+    <p>Selection is policy, not judgment: the lowest tier with work wins each turn. <code>rules.bugs.preempt</code> moves bugs ahead of features.</p>
+    <div class="seg" style="margin-bottom:12px" role="group" aria-label="preempt">
+      <button class="chip" id="pre-on" aria-pressed="true">preempt: true</button>
+      <button class="chip" id="pre-off" aria-pressed="false">preempt: false</button>
+    </div>
+    <div class="tiers" id="tiers"></div>
+  </section>`;
+}
+function wireTiers() {
+  const set = v => { preempt = v; $("#pre-on").setAttribute("aria-pressed", String(v)); $("#pre-off").setAttribute("aria-pressed", String(!v)); drawTiers(); };
+  $("#pre-on").addEventListener("click", () => set(true));
+  $("#pre-off").addEventListener("click", () => set(false));
+  drawTiers();
+}
+function drawTiers() {
+  const lanes = [
+    { t: -1, n: "Answered escalations", s: "an escalation you answered is picked up again first" },
+    { t: preempt ? 0 : 2, n: "Bugs", s: "triaged bugs at or above min_severity, via headless /fix-bug" },
+    { t: 1, n: "Features", s: "in queue: order, one WIP slot by default" },
+    { t: 3, n: "Findings and triage", s: "diagnose findings, fire autofixes, triage new issues" }
+  ].sort((a, b) => a.t - b.t);
+  $("#tiers").innerHTML = lanes.map(l => `<div class="tier"><b class="num">tier ${l.t}</b><span class="lane">${esc(l.n)}<small>${esc(l.s)}</small></span></div>`).join("");
+}
+
+/* ---------- chooser ---------- */
+function renderChooser() {
+  $("#main").innerHTML = `
+    <div class="flowhead"><h2>Which one am I in?</h2></div>
+    <p class="summary">Start from what you have in hand. Each answer opens the lifecycle it belongs to.</p>
+    <div class="chooser">${CHOICES.map(c => `<button class="choice" data-go="${c.go}"><span class="q">${esc(c.q)}</span><span class="a">${esc(c.a)}</span></button>`).join("")}</div>
+    <section class="panel"><h3>When /fix-bug refuses, believe it</h3><p style="margin:0">A refusal means a feature indicator fired: 3 or more files, a new abstraction, a contract change consumers see, an irreversible migration. Forcing a bug-sized fix through gives you feature-scoped work with no plan, no gates and no record.</p></section>`;
+  $(".chooser").addEventListener("click", e => { const b = e.target.closest(".choice"); if (b) { select(b.dataset.go); $(`#tab-${b.dataset.go}`).focus(); } });
+}
+
+renderNav();
+const fromHash = location.hash.slice(1);
+const ids = FLOWS.map(f => f.id);
+select(ids.includes(fromHash) ? fromHash : (ids.includes(store("flow")) ? store("flow") : "feature"));
+</script>
+</body>
+</html>

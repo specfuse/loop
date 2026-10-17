@@ -74,6 +74,16 @@ _KQL_KEYWORDS = frozenset({
     "join", "kind", "inner", "leftouter", "on", "mv", "expand",
 })
 
+# Tabular operator names KQL reserves: a bare output alias spelled like one
+# does not parse in a workspace (#3506, `sample = take_anyif(...)`), so an
+# alias here is a violation even though it is never read as a column.
+_RESERVED_ALIASES = frozenset({
+    "as", "by", "consume", "count", "distinct", "evaluate", "extend", "facet",
+    "find", "fork", "getschema", "invoke", "join", "limit", "lookup", "on",
+    "order", "parse", "print", "project", "range", "reduce", "render", "sample",
+    "search", "serialize", "sort", "summarize", "take", "top", "union", "where",
+})
+
 _STRING_LITERAL = re.compile(r"'(?:[^'\\]|\\.)*'|\"(?:[^\"\\]|\\.)*\"")
 # An identifier, with what precedes it (a ``.`` marks a dynamic property
 # access, not a column) and what follows it (``(`` is a call, a lone ``=``
@@ -100,7 +110,10 @@ def schema_violations(query: str) -> list[str]:
     for joined in re.findall(r"\(\s*(\w+)\s*\|", rest):
         columns = columns | WORKSPACE_SCHEMA.get(joined, frozenset())
     aliases = set(_ALIAS.findall(rest))
-    problems = []
+    problems = [
+        f"alias {name!r} is a reserved KQL operator name"
+        for name in sorted(aliases) if name.lower() in _RESERVED_ALIASES
+    ]
     for match in _IDENT.finditer(rest):
         name, after = match.group("name"), match.group("after")
         if match.group("dot") or after in ("(", "="):
@@ -253,3 +266,19 @@ class TestBuiltInQueriesRunAgainstLiveWorkspace(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestReservedAliasIsAViolation(unittest.TestCase):
+    """#3506: `sample = ...` passed this check and failed to parse live."""
+
+    def test_reserved_alias_is_reported(self):
+        self.assertIn(
+            "alias 'sample' is a reserved KQL operator name",
+            schema_violations("AppRequests | summarize sample = take_any(OperationId) by Name"),
+        )
+
+    def test_ordinary_alias_is_not(self):
+        self.assertEqual(
+            schema_violations("AppRequests | summarize sampleOp = take_any(OperationId) by Name"), []
+        )
+

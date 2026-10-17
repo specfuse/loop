@@ -75,8 +75,8 @@ Each component is a mapping with five required fields:
 | `name` | yes | free-form string; used in validator findings and issue titles |
 | `type` | yes | free-form string describing the component's shape (e.g. `http-service`, `queue-consumer`) — not enum-constrained |
 | `runner` | yes | one of `local`, `gh-actions`, `in-cluster` — where diagnosis/autofix executes |
-| `diagnose` | yes | one of `manual`, `auto` — whether a harvested finding is investigated automatically |
-| `autofix` | yes | one of `"off"`, `"on"` — whether a diagnosed finding may trigger an automated fix. Must be quoted in YAML; the bare `off`/`on` spellings are rejected (the "Norway problem") |
+| `diagnose` | yes | one of `manual`, `auto` — whether a harvested finding is investigated automatically. `auto` takes effect through `specfuse-agent`, not `specfuse monitor run`; see [`monitoring-to-fix.md`](monitoring-to-fix.md) |
+| `autofix` | yes | one of `"off"`, `"on"` — whether a diagnosed finding may trigger an automated fix. Must be quoted in YAML; the bare `off`/`on` spellings are rejected (the "Norway problem"). Takes effect through `specfuse-agent`; the rules a diagnosis must pass before a fix fires are in [`monitoring-to-fix.md`](monitoring-to-fix.md) |
 | `checks` | yes | list of check mappings |
 
 Recommended starting posture for a new component: `runner: local`,
