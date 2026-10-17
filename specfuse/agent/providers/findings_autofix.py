@@ -7,7 +7,8 @@ confidence threshold, `fix_scope` routing, fingerprint rate limit, and daily
 cap all stay in `specfuse.monitor.autofix`/`autofix_state`, read only
 through `run_autofix`.
 
-`advertise` returns one `kind="finding-autofix"` item per open snapshot
+`advertise` returns, most severe diagnosis first (stable within a severity),
+one `kind="finding-autofix"` item per open snapshot
 issue carrying `specfuse.monitor.issues.FINDING_LABEL` that already has a
 diagnosis comment -- the mirror of T10's filter, read the same way via
 `gh issue view N --json body,comments` and `specfuse.monitor.diagnosis.parse`.
@@ -63,6 +64,7 @@ from specfuse.monitor.issues import FINDING_LABEL
 
 _ITEM_ID_PREFIX = "finding-autofix-"
 _DEFAULT_MONITORING_CONFIG_PATH = ".specfuse/monitoring.yml"
+_SEVERITY_ORDER = ("critical", "high", "medium", "low")
 _FAILING_OUTCOMES = ("refused", "could_not_proceed")
 
 
@@ -89,6 +91,24 @@ def _has_diagnosis(comments: list) -> bool:
         except DiagnosisParseError:
             continue
     return False
+
+
+def _latest_diagnosis(comments: list):
+    latest = None
+    for comment in comments or []:
+        body = comment.get("body", "") if isinstance(comment, dict) else ""
+        try:
+            diagnosis = parse(body)
+        except DiagnosisParseError:
+            continue
+        if diagnosis is not None:
+            latest = diagnosis
+    return latest
+
+
+def _severity_rank(diagnosis) -> int:
+    severity = diagnosis.severity if diagnosis is not None else None
+    return _SEVERITY_ORDER.index(severity) if severity in _SEVERITY_ORDER else len(_SEVERITY_ORDER)
 
 
 def _known_components(monitoring_config: Any) -> set:
@@ -171,6 +191,7 @@ class FindingsAutofixProvider:
         known_components = _known_components(monitoring_config)
 
         items = []
+        ranks = {}
         for issue in snapshot.issues:
             if FINDING_LABEL not in issue.labels:
                 continue
@@ -183,7 +204,8 @@ class FindingsAutofixProvider:
             if component is None or component not in known_components:
                 continue
 
-            if not _has_diagnosis(comments):
+            diagnosis = _latest_diagnosis(comments)
+            if diagnosis is None:
                 continue
 
             item_id = f"{_ITEM_ID_PREFIX}{issue.number}"
@@ -192,6 +214,7 @@ class FindingsAutofixProvider:
                 "component": component,
                 "monitoring_config": monitoring_config,
             }
+            ranks[item_id] = _severity_rank(diagnosis)
             items.append(
                 ActionItem(
                     item_id=item_id,
@@ -200,6 +223,7 @@ class FindingsAutofixProvider:
                     queue_key=None,
                 )
             )
+        items.sort(key=lambda item: ranks[item.item_id])
         return items
 
     def execute(self, item: ActionItem) -> ActionOutcome:

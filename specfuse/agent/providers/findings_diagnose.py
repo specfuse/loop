@@ -26,8 +26,8 @@ The rendered comment body is `diagnosis.render`'s, unaltered -- this module
 holds no heading template and no marker string of its own. An unparseable
 analysis result posts nothing: `execute` escalates with the parse error's
 own message and never retries, defaults a field, or posts a partial body.
-This provider performs no git mutation and no label write of its own; a
-diagnosis is a comment.
+This provider performs no git mutation. Its only label write is the
+`severity:<value>` label of a diagnosis that carries a severity.
 """
 
 from __future__ import annotations
@@ -52,6 +52,7 @@ from specfuse.agent.run import (
     _default_runner,
 )
 from specfuse.agent.state import AgentSnapshot
+from specfuse.loop.agent_policy import SEVERITY_LABEL_PREFIX
 from specfuse.monitor.diagnosis import DiagnosisParseError, parse
 from specfuse.monitor.issues import FINDING_LABEL, REDIAGNOSE_LABEL, is_reopen_comment
 
@@ -187,7 +188,7 @@ class FindingsDiagnoseProvider:
             item_id = f"{_ITEM_ID_PREFIX}{issue.number}"
             self._rows[item_id] = {
                 "number": issue.number, "title": issue.title, "body": body,
-                "relabelled": relabelled,
+                "relabelled": relabelled, "labels": tuple(issue.labels),
             }
             items.append(
                 ActionItem(
@@ -237,6 +238,7 @@ class FindingsDiagnoseProvider:
             ],
             check=False,
         )
+        self._label_severity(number, rendered, row.get("labels", ()))
         if row.get("relabelled"):
             # Consume the request so the next run does not diagnose again.
             self._runner(
@@ -249,6 +251,46 @@ class FindingsDiagnoseProvider:
             detail=f"issue #{number} diagnosed",
             spend=spend,
         )
+
+    def _read_labels(self, number: int) -> set:
+        result = self._runner(
+            ["gh", "issue", "view", str(number), "--repo", self._repo, "--json", "labels"],
+            check=False,
+        )
+        if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+            return set()
+        try:
+            parsed = json.loads(result.stdout)
+        except ValueError:
+            return set()
+        entries = parsed.get("labels") if isinstance(parsed, dict) else None
+        return {
+            e["name"] for e in entries or []
+            if isinstance(e, dict) and isinstance(e.get("name"), str)
+        }
+
+    def _label_severity(self, number: int, rendered: str, labels) -> None:
+        """Give the finding exactly one `severity:<value>` label, replacing any
+        previous one. No severity on the diagnosis, no label write."""
+        diagnosis = parse(rendered)
+        severity = diagnosis.severity if diagnosis is not None else None
+        if severity is None:
+            return
+        wanted = f"{SEVERITY_LABEL_PREFIX}{severity}"
+        self._runner(
+            ["gh", "label", "create", wanted, "--force", "--repo", self._repo],
+            check=False,
+        )
+        current = set(labels) | self._read_labels(number)
+        stale = [
+            label for label in sorted(current)
+            if label.startswith(SEVERITY_LABEL_PREFIX) and label != wanted
+        ]
+        argv = ["gh", "issue", "edit", str(number), "--repo", self._repo]
+        for label in stale:
+            argv += ["--remove-label", label]
+        argv += ["--add-label", wanted]
+        self._runner(argv, check=False)
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:
         return None

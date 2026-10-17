@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from specfuse.agent.invoke import build_claude_argv
 from specfuse.monitor.diagnose_cli import AnalysisParseError, render_headless
-from specfuse.monitor.diagnosis import FIX_SCOPES
+from specfuse.monitor.diagnosis import FIX_SCOPES, SEVERITY_RUBRIC
 
 __all__ = ("AnalysisParseError", "build_invocation", "read_result")
 
@@ -69,7 +69,11 @@ def build_invocation(
         "partial evidence gets a low number.\n"
         f"- fix_scope: exactly one of {', '.join(FIX_SCOPES)} -- do not "
         "invent or default this value; if none plainly fits, say so in "
-        "candidate_fix and still pick the closest of the three.\n\n"
+        "candidate_fix and still pick the closest of the three.\n"
+        "- severity (optional): how serious the finding is, judged from its "
+        "evidence against this rubric; omit it if you cannot tell:\n"
+        + "".join(f"  - {line}\n" for line in SEVERITY_RUBRIC)
+        + "\n"
         "Do not post anything and do not run `gh issue comment` yourself; "
         "the caller renders and posts the diagnosis this session produces."
     )

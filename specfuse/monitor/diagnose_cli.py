@@ -23,6 +23,7 @@ import re
 import sys
 from typing import Any
 
+from specfuse.loop.agent_policy import SEVERITY_VALUES
 from specfuse.monitor.diagnosis import Diagnosis, FIX_SCOPES, render
 
 _REQUIRED_FIELDS = ("root_cause", "evidence", "candidate_fix", "confidence", "fix_scope")
@@ -80,6 +81,10 @@ def parse_analysis(raw: str) -> Diagnosis:
             f"fix_scope must be one of {FIX_SCOPES!r}, got {fix_scope!r}"
         )
 
+    # Optional: absent or out-of-vocabulary reads as no severity, never an error.
+    severity = data.get("severity")
+    severity = severity if severity in SEVERITY_VALUES else None
+
     try:
         confidence = float(data["confidence"])
     except (TypeError, ValueError) as exc:
@@ -94,6 +99,7 @@ def parse_analysis(raw: str) -> Diagnosis:
             candidate_fix=str(data["candidate_fix"]),
             confidence=confidence,
             fix_scope=fix_scope,
+            severity=severity,
         )
     except ValueError as exc:
         raise AnalysisParseError(str(exc)) from exc

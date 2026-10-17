@@ -110,6 +110,11 @@ Build a `specfuse.monitor.diagnosis.Diagnosis`:
   design work, `external` for a fix outside this repo's control (a
   third-party outage, an upstream dependency bug).
 
+- `severity` (optional) — one of the `SEVERITY_VALUES`, judged from the
+  finding's evidence against `specfuse.monitor.diagnosis.SEVERITY_RUBRIC`. Read
+  the rubric from there; do not restate or paraphrase it here. Omit it when the
+  evidence does not let you tell.
+
 Construct the dataclass directly — its `__post_init__` validates `fix_scope`
 and the `confidence` bound, so an illegal value raises before render is ever
 attempted.

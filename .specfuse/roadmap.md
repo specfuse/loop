@@ -121,7 +121,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
 | FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-2026-0203) |
 | FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-2026-0204) |
-| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | planned | — | [→ detail](#feat-2026-0205) |
+| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | done | `.specfuse/features/FEAT-2026-0205-diagnosis-severity/` | [→ archive](roadmap-archive.md#feat-2026-0205) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1038,19 +1038,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Goal.** A `rules.bugs.skip_labels` policy key naming the labels that mean "fixed, awaiting verification"; `BugsProvider.advertise`, triage's bug intake and the run summary's not-dispatched list all skip issues carrying one; selection also skips an issue with a merged PR that closes or references it since its last triage, reported rather than silent. Decide alongside #1583 whether a `resolved` triage category replaces or complements the labels.
 
 **Benefits.** No bug-lane spend re-fixing work already in `main`; the run summary stops telling the operator to re-run for issues that need no work; a repository's own verification workflow is respected without renaming its labels.
-
-**Status: planned.**
-
-<a id="feat-2026-0205"></a>
-## FEAT-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
-
-**Why.** Monitoring findings deliberately skip triage: `list_untriaged` flags them `already_structured` and the triage provider skips them (FEAT-2026-0049), because their route to a fix is diagnose → autofix, gated on the diagnosis's `confidence` and `fix_scope`, not the bug lane's triage severity. Routing works without a severity, but a queue of findings is flat: nothing says which one matters most, and autofix's daily cap spends itself in arrival order.
-
-**Goal.** Add a `severity` field to the diagnosis contract (`specfuse/monitor/diagnosis.py`), assessed by the diagnosis session from the evidence FEAT-2026-0204 puts on the finding (endpoint, status, client abort or not, frequency, instances); project it as a label on the finding; and decide explicitly whether severity ever changes routing (e.g. autofix's daily cap favouring higher severities) and whether a finding may ever enter the bug lane, or stays on diagnose → autofix.
-
-**Scope boundary.** OUT: triaging findings through the human-issue triage path; changing autofix's confidence threshold or `fix_scope` rule.
-
-**Sequencing.** After FEAT-2026-0204: a severity judged from one line of evidence would be a guess.
 
 **Status: planned.**
 
