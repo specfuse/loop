@@ -12,6 +12,8 @@ clause, split by check type because each needs a different change.
 
 ### A `heartbeat` finding does not carry the component's earliest heartbeat
 
+**Tracked as #3504.**
+
 **Criterion, verbatim (`GATE-01.md`, Definition of done, clause 7):**
 
 > For each of `error-logs`, `http-5xx`, `dlq`, `heartbeat` and `queue-stalled`, a
@@ -41,6 +43,8 @@ the heartbeat query still issues one `run_query` and passes `schema_violations`,
 closing sentence are updated to match.
 
 ### A `queue-stalled` finding does not carry the subscription's last completed message
+
+**Tracked as #3505.**
 
 **Criterion, verbatim (`GATE-01.md`, Definition of done, clause 7):** as in the
 entry above.
