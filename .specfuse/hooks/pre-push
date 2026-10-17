@@ -12,4 +12,10 @@
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
-exec "$REPO_ROOT/scripts/smoke-test.sh"
+
+# git writes one ref line per pushed ref to this hook's stdin (githooks(5)).
+# Consume it here and give the smoke test no stdin: handing git's pipe to a
+# long-running child left git dying with SIGPIPE (exit 141) after a green
+# run, so the push silently never happened (#3491).
+cat > /dev/null
+exec "$REPO_ROOT/scripts/smoke-test.sh" < /dev/null

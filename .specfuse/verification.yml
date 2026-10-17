@@ -142,6 +142,12 @@ code:
     tier: broad
     command: "bats tests/leak_scan_hook.bats"
 
+  - name: pre-push-hook
+    # §11 operator-script gate: the pre-push hook consumes git's ref list and
+    # gives the smoke test no stdin (#3491).
+    tier: broad
+    command: "bats tests/pre_push_hook.bats"
+
   - name: sync-scaffold-bats
     # §11 operator-script gate: sync-scaffold.sh happy-path via bats.
     # The drift-guard test (test_scaffold_data_in_sync.py) runs under 'tests'.
