@@ -26,6 +26,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A headless diagnosis wrapped in a markdown code fence is no longer rejected as unparseable.** `parse_analysis` called `json.loads` on the whole session output, but `claude -p` often answers with its one JSON object inside a ```` ```json ```` fence, so `specfuse agent run`'s findings-diagnose provider escalated about two in three good diagnoses as "not valid JSON" and posted nothing. One surrounding fence (tagged `json` or bare) is now read as the object it holds; prose outside the fence, two fenced objects, or an unterminated fence still fail. (#3489)
+
 ## [0.28.1+umbrella.0.15.0] - 2026-10-16
 
 ### Fixed
