@@ -120,6 +120,8 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-2026-0201) |
 | FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
 | FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-2026-0203) |
+| FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | active | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ detail](#feat-2026-0204) |
+| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | planned | — | [→ detail](#feat-2026-0205) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1036,6 +1038,32 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Goal.** A `rules.bugs.skip_labels` policy key naming the labels that mean "fixed, awaiting verification"; `BugsProvider.advertise`, triage's bug intake and the run summary's not-dispatched list all skip issues carrying one; selection also skips an issue with a merged PR that closes or references it since its last triage, reported rather than silent. Decide alongside #1583 whether a `resolved` triage category replaces or complements the labels.
 
 **Benefits.** No bug-lane spend re-fixing work already in `main`; the run summary stops telling the operator to re-run for issues that need no work; a repository's own verification workflow is respected without renaming its labels.
+
+**Status: planned.**
+
+<a id="feat-2026-0204"></a>
+## FEAT-2026-0204 — Monitoring: findings a diagnosis can start from
+
+**Why.** The first real `specfuse monitor run` against a consumer's production workspace (the first consumer's backend, 0.28.1, 2026-10-17) filed 16 issues for 7 findings; after #3486's in-cycle dedupe, [#3496](https://github.com/specfuse/loop/issues/3496) records what remains. A closed finding is refiled as a new issue every run, losing its diagnosis, because the lookup lists open issues only. A weekly schedule whose only expected firing predates heartbeat emission files a guaranteed false `silent-schedule`. And every finding carries one line of evidence, so the three hand diagnoses run that day spent most of their effort re-querying App Insights for the endpoint, stack frame, dead-lettered message and host liveness the finding could have carried.
+
+**Goal.** One gate. **T01–T04** make the lifecycle correct: a recurring fingerprint reopens its closed issue (closed within 90 days) with one comment, the monitor still never closes; a `dlq` finding is acknowledged by closing it until a new message id appears; the finding-meta marker gains first-seen and seen message ids and its reader fails closed; a schedule is not "silent" before heartbeats began on its component. **T05–T08** make every check's finding carry what a diagnosis needs, in the operator's words "as much information as possible to run a diagnostic": readable titles, `component:`/`check:` labels, first/last seen, counts, instances, a reproduction KQL, and per-check evidence (stack frame, request and client-abort flag for `error-logs`; joined exception and dependency for `http-5xx`; message details and `Exception.*` properties for `dlq`; last run and host liveness for `heartbeat`), each still from one query per check.
+
+**Benefits.** Findings stop being refiled or falsely raised, and a diagnosis, by hand or `diagnose: auto`, starts from evidence instead of from KQL.
+
+**Scope boundary.** OUT: severity (FEAT-2026-0205); re-diagnosing a reopened finding (#3487); diagnosis triggered by `monitor run` (#3488); a component liveness check type; auto-closing anything.
+
+**Status: active.**
+
+<a id="feat-2026-0205"></a>
+## FEAT-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
+
+**Why.** Monitoring findings deliberately skip triage: `list_untriaged` flags them `already_structured` and the triage provider skips them (FEAT-2026-0049), because their route to a fix is diagnose → autofix, gated on the diagnosis's `confidence` and `fix_scope`, not the bug lane's triage severity. Routing works without a severity, but a queue of findings is flat: nothing says which one matters most, and autofix's daily cap spends itself in arrival order.
+
+**Goal.** Add a `severity` field to the diagnosis contract (`specfuse/monitor/diagnosis.py`), assessed by the diagnosis session from the evidence FEAT-2026-0204 puts on the finding (endpoint, status, client abort or not, frequency, instances); project it as a label on the finding; and decide explicitly whether severity ever changes routing (e.g. autofix's daily cap favouring higher severities) and whether a finding may ever enter the bug lane, or stays on diagnose → autofix.
+
+**Scope boundary.** OUT: triaging findings through the human-issue triage path; changing autofix's confidence threshold or `fix_scope` rule.
+
+**Sequencing.** After FEAT-2026-0204: a severity judged from one line of evidence would be a guess.
 
 **Status: planned.**
 
