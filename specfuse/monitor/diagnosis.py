@@ -32,6 +32,20 @@ from specfuse.monitor.redaction import redact_text
 
 FIX_SCOPES = ("small", "large", "external")
 
+#: One line per `SEVERITY_VALUES` member, highest first, each judged from the
+#: finding's evidence. The headless prompt and `/diagnose-issue` both ask for a
+#: severity against this text, so the two entry points cannot drift apart.
+SEVERITY_RUBRIC = (
+    "critical: users cannot complete a core action, or data is lost or "
+    "corrupted, now",
+    "high: a user-facing request or a message flow fails repeatedly, or a "
+    "scheduled job has stopped",
+    "medium: a failure with a workaround, or limited to a few requests or "
+    "instances",
+    "low: noise (e.g. a client abort on a request that succeeded) or no "
+    "user-visible effect",
+)
+
 _MARKER_PREFIX = "<!-- specfuse:diagnosis "
 _MARKER_SUFFIX = " -->"
 

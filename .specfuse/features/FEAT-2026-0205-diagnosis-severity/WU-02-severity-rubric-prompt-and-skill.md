@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0205/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - specfuse/monitor/diagnosis.py
@@ -10,6 +10,15 @@ produces:
   - plugins/specfuse/skills/diagnose-issue/SKILL.md
   - .specfuse/skills/diagnose-issue/SKILL.md
   - tests/test_diagnosis_severity_rubric.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.28.2
+started_at: 2026-10-17T19:08:02.845066+00:00
+duration_seconds: 32.566
+cost_usd: 0.196815
+input_tokens: 16
+output_tokens: 3480
 ---
 
 # T02 — one severity rubric, used by the headless prompt and /diagnose-issue
