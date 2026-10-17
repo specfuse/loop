@@ -280,11 +280,21 @@ def _write_gitignore(target_path: Path) -> None:
     snippet = read_scaffold("gitignore.snippet").decode("utf-8")
     gitignore = target_path / ".gitignore"
     existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
-    if _GITIGNORE_SENTINEL in existing:
-        return
     if existing and not existing.endswith("\n"):
         existing += "\n"
-    gitignore.write_text(existing + snippet, encoding="utf-8")
+    if _GITIGNORE_SENTINEL not in existing:
+        gitignore.write_text(existing + snippet, encoding="utf-8")
+        return
+    # The snippet is already there, perhaps from an older version: append only
+    # the rule lines it now carries that the file lacks (#3501), leaving the
+    # operator's own lines and order alone. A second run finds none missing.
+    present = {ln.strip() for ln in existing.splitlines()}
+    missing = [
+        ln for ln in snippet.splitlines()
+        if ln.strip() and not ln.lstrip().startswith("#") and ln.strip() not in present
+    ]
+    if missing:
+        gitignore.write_text(existing + "\n".join(missing) + "\n", encoding="utf-8")
 
 
 def _write_changelog(target_path: Path) -> None:
