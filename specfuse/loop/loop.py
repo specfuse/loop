@@ -11802,6 +11802,15 @@ def run(
                 # `gate_broad_run_check`, so a resumed gate at an unchanged
                 # tree (e.g. after a driver-restart halt) does not re-pay it.
                 if not dry_run and wu.type in ("close", "close-intermediate"):
+                    # A re-armed close (#3508): repair the criteria record a
+                    # superseded attempt left (#3279) BEFORE the broad run
+                    # measures the tree. Repairing only at dispatch deadlocks —
+                    # the broad run's corpus close-l sweep rejects that very
+                    # mismatch, so dispatch is never reached.
+                    _precreate_criteria_state_stub(feature_dir, gate.number, wu.attempts)
+                    _criteria_path = feature_dir / criteria_state.criteria_filename(gate.number)
+                    _broad_bookkeeping = [gate.file, events_path] + (
+                        [_criteria_path] if _criteria_path.is_file() else [])
                     _broad_ok, _broad_failing, _broad_ran = gate_broad_run_check(
                         gate.file, feature_dir, cfg)
                     _broad_tree = _current_tree_hash() or "unresolvable"
@@ -11834,7 +11843,7 @@ def run(
                             feature_dir, feature_id, gate.number))
                         flush_events(events_path, _broad_events)
                         commit_bookkeeping(
-                            [gate.file, events_path],
+                            _broad_bookkeeping,
                             f"chore(loop): gate {gate.number} broad run "
                             f"failed — awaiting_review\n\nFeature: {feature_id}",
                         )
@@ -11843,7 +11852,7 @@ def run(
                     elif _broad_ran:
                         flush_events(events_path, _broad_events)
                         commit_bookkeeping(
-                            [gate.file, events_path],
+                            _broad_bookkeeping,
                             f"chore(loop): gate {gate.number} broad run "
                             f"clean\n\nFeature: {feature_id}",
                         )

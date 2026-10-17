@@ -40,7 +40,8 @@ WUs and stop" mode.
   `check_criteria_state_well_formed` refuses the tree
   (`close-l: … attempt '1' != current attempt '0'`), the gate's broad
   run goes red on the corpus lint, and the close never dispatches.
-  **The driver now repairs this itself** at dispatch (#3279): an entry
+  **The driver now repairs this itself** before the gate's broad run and
+  again at dispatch (#3279, #3508): an entry
   whose recorded attempt exceeds the WU's current `attempts` is reset
   to `unverified`, while entries at or below it keep the state the
   close recorded. So there is nothing to do here — and hand-clearing
