@@ -172,12 +172,79 @@ class ErrorLogsContext(unittest.TestCase):
         self.assertEqual(schema_violations(aai._error_logs_query("web-api")), [])
 
 
-@unittest.skip("owned by FEAT-2026-0204/T06")
-class Http5xxContext(unittest.TestCase):
-    SECTIONS = ("Correlated exception", "Failing dependency", "Duration", "Sample OperationIds")
+_ROW_5XX = {
+    "timestamp": "2026-10-17T00:20:00Z", "operation_Id": "op-9", "name": "POST /tokens",
+    "resultCode": "500", "durationMs": 1234.0, "instance": "web-api-0",
+    "exceptionType": "Acme.Auth.ManagementApiException",
+    "exceptionMessage": "Management API call failed.",
+    "frameMethod": "Acme.Auth.TokenService.Exchange", "frameAssembly": "Acme.Auth",
+    "dependencyTarget": "acme.example.com", "dependencyType": "Http",
+    "dependencyResult": "401", "dependencyDurationMs": 210.0, "dependencyFailed": True,
+}
 
+
+def _config_5xx():
+    config = _config()
+    config["components"][0]["checks"] = [{"type": "http-5xx"}]
+    return config
+
+
+def _drive_5xx(rows):
+    calls = []
+
+    def gh(args, check=True):
+        calls.append(list(args))
+        if args[:3] == ["gh", "issue", "create"]:
+            return SimpleNamespace(returncode=0, stdout=f"https://github.com/{_REPO}/issues/901\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+
+    transport = _Transport(rows)
+    with tempfile.TemporaryDirectory() as tmp:
+        cli.run_cycle(
+            _config_5xx(), dry_run=False, repo=_REPO,
+            transport_resolver=lambda module, check_type, binding: transport,
+            gh_runner=gh, now=_NOW, watermark_dir=Path(tmp), out=io.StringIO(),
+        )
+    creates = [c for c in calls if c[:3] == ["gh", "issue", "create"]]
+    return creates, transport
+
+
+class Http5xxContext(unittest.TestCase):
     def test_sections_present(self):
-        self.fail("T06")
+        creates, transport = _drive_5xx([_ROW_5XX])
+        self.assertEqual(len(creates), 1)
+        body = _field(creates[0], "--body")
+        for needle in (
+            "**Exception:** Acme.Auth.ManagementApiException: Management API call failed.",
+            "**Where:** Acme.Auth.TokenService.Exchange (Acme.Auth)",
+            "**Dependency:** acme.example.com, type Http, returned 401, 210 ms",
+            "**Duration:** 1234 ms",
+            "**Samples:** op-9",
+            "**Reproduce:**",
+            "| where OperationId in ('op-9')",
+        ):
+            self.assertIn(needle, body)
+        self.assertEqual(len(transport.queries), 1)
+
+    def test_no_exception_and_no_dependency_still_files_without_those_sections(self):
+        row = {
+            "timestamp": "2026-10-17T00:20:00Z", "operation_Id": "op-9",
+            "name": "POST /tokens", "resultCode": "500", "durationMs": 50.0,
+        }
+        creates, _ = _drive_5xx([row])
+        self.assertEqual(len(creates), 1)
+        body = _field(creates[0], "--body")
+        for absent in ("**Exception:**", "**Where:**", "**Dependency:**"):
+            self.assertNotIn(absent, body)
+        self.assertIn("**Duration:** 50 ms", body)
+
+    def test_query_has_no_schema_violations(self):
+        self.assertEqual(schema_violations(aai._http_5xx_query("web-api")), [])
+
+    def test_query_reduces_joined_tables_to_one_row_per_operation(self):
+        query = aai._http_5xx_query("web-api")
+        self.assertEqual(query.count("by OperationId "), 2)
+        self.assertIn("arg_max(depRank", query)
 
 
 @unittest.skip("owned by FEAT-2026-0204/T07")

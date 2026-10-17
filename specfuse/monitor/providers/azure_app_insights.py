@@ -105,6 +105,19 @@ _CANCELLATION_TYPES = ("TaskCanceledException", "OperationCanceledException")
 _SAMPLE_OPERATION_IDS = 3
 
 
+def _top_frame_stages() -> str:
+    """KQL stages that add ``frameMethod`` and ``frameAssembly`` to an
+    ``AppExceptions`` row: the first in-app frame of ``Details[0].parsedStack``,
+    framework frames dropped with ``replace_regex``."""
+    framework = _FRAMEWORK_FRAME_RE
+    return (
+        "| extend stack = tostring(Details[0].parsedStack) "
+        f"| extend appStack = replace_regex(stack, '\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
+        "| extend frameMethod = extract('\"method\":\"([^\"]*)\"', 1, appStack), "
+        "frameAssembly = extract('\"assembly\":\"([^\"]*)\"', 1, appStack) "
+    )
+
+
 def _error_logs_query(
     component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
 ) -> str:
@@ -122,7 +135,6 @@ def _error_logs_query(
     top in-app frame is read from ``Details[0].parsedStack`` by dropping
     framework frames with ``replace_regex`` and extracting the first frame
     left — string work per row, no ``mv-expand`` over every exception."""
-    framework = _FRAMEWORK_FRAME_RE
     cancelled = " or ".join(f"ExceptionType endswith '{t}'" for t in _CANCELLATION_TYPES)
     request_floor = (
         f"| where TimeGenerated >= {_kql_datetime(since - timedelta(hours=1))} "
@@ -133,10 +145,7 @@ def _error_logs_query(
         "AppExceptions "
         f"| where AppRoleName == '{component}' "
         f"{_harvest_window(since, until)}"
-        "| extend stack = tostring(Details[0].parsedStack) "
-        f"| extend appStack = replace_regex(stack, '\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
-        "| extend frameMethod = extract('\"method\":\"([^\"]*)\"', 1, appStack), "
-        "frameAssembly = extract('\"assembly\":\"([^\"]*)\"', 1, appStack) "
+        f"{_top_frame_stages()}"
         "| join kind=leftouter ("
         "AppRequests "
         f"| where AppRoleName == '{component}' "
@@ -168,12 +177,57 @@ def _reproduce_query(component: str, operation_ids: Sequence[str]) -> str:
 def _http_5xx_query(
     component: str, since: Optional[datetime] = None, until: Optional[datetime] = None
 ) -> str:
+    """One query carries the diagnostic context (FEAT-2026-0204/T06). The
+    exception and the dependency are each reduced to one row per
+    ``OperationId`` before the left joins, so a request with several
+    exceptions or dependencies still yields one row: the first exception, and
+    the failed dependency, else the slowest."""
+    context_floor = (
+        f"| where TimeGenerated >= {_kql_datetime(since - timedelta(hours=1))} "
+        if since is not None
+        else ""
+    )
     return (
         "AppRequests "
         f"| where AppRoleName == '{component}' and ResultCode startswith '5' "
         f"{_harvest_window(since, until)}"
+        "| join kind=leftouter ("
+        "AppExceptions "
+        f"| where AppRoleName == '{component}' "
+        f"{context_floor}"
+        f"{_top_frame_stages()}"
+        "| summarize arg_min(TimeGenerated, ExceptionType, OuterMessage, frameMethod, frameAssembly) "
+        "by OperationId "
+        "| project OperationId, exceptionType = ExceptionType, "
+        "exceptionMessage = OuterMessage, frameMethod, frameAssembly"
+        ") on OperationId "
+        "| join kind=leftouter ("
+        "AppDependencies "
+        f"| where AppRoleName == '{component}' "
+        f"{context_floor}"
+        "| extend depRank = iff(Success == false, 1000000000, 0) + DurationMs "
+        "| summarize arg_max(depRank, Target, DependencyType, ResultCode, DurationMs, Success) "
+        "by OperationId "
+        "| project OperationId, dependencyTarget = Target, dependencyType = DependencyType, "
+        "dependencyResult = ResultCode, dependencyDurationMs = DurationMs, "
+        "dependencyFailed = Success == false"
+        ") on OperationId "
         "| project timestamp = TimeGenerated, operation_Id = OperationId, "
-        "name = Name, resultCode = ResultCode"
+        "name = Name, resultCode = ResultCode, durationMs = DurationMs, "
+        "instance = AppRoleInstance, exceptionType, exceptionMessage, "
+        "frameMethod, frameAssembly, dependencyTarget, dependencyType, "
+        "dependencyResult, dependencyDurationMs, dependencyFailed"
+    )
+
+
+def _reproduce_5xx_query(component: str, operation_ids: Sequence[str]) -> str:
+    """Text for a human to paste into Log Analytics; never executed here."""
+    quoted = ", ".join(f"'{i}'" for i in operation_ids)
+    return (
+        "AppRequests\n"
+        f"| where AppRoleName == '{component}'\n"
+        f"| where OperationId in ({quoted})\n"
+        "| project TimeGenerated, Name, ResultCode, DurationMs, OperationId"
     )
 
 
@@ -280,11 +334,25 @@ class Http5xxAdapter:
 
     def fetch_failures(self) -> Iterator[FailureArtifact]:
         query = _http_5xx_query(self._component, self._since, self._until)
-        rows = self._transport.run_query(query)
+        rows = list(self._transport.run_query(query))
+        samples: dict = {}
         for row in rows:
-            yield self._build_artifact(row)
+            ids = samples.setdefault(self._signature(row), [])
+            operation_id = _clean_id(row.get("operation_Id"))
+            if operation_id and operation_id not in ids and len(ids) < _SAMPLE_OPERATION_IDS:
+                ids.append(operation_id)
+        for row in rows:
+            yield self._build_artifact(row, samples[self._signature(row)])
 
-    def _build_artifact(self, row: Mapping[str, object]) -> FailureArtifact:
+    @staticmethod
+    def _signature(row: Mapping[str, object]) -> str:
+        route = str(row.get("name") or "unknown-route")
+        status_code = str(row.get("resultCode") or "5xx")
+        return f"{route}:{status_code}"
+
+    def _build_artifact(
+        self, row: Mapping[str, object], sample_ids: Sequence[str] = ()
+    ) -> FailureArtifact:
         route = str(row.get("name") or "unknown-route")
         status_code = str(row.get("resultCode") or "5xx")
         failure_signature = f"{route}:{status_code}"
@@ -296,8 +364,53 @@ class Http5xxAdapter:
             failure_signature=failure_signature,
             observed_text=observed_text,
             target_coordinates=None,
+            context=self._context(row, sample_ids),
+            observed_at=str(row["timestamp"]) if row.get("timestamp") else None,
+            instance=str(row["instance"]) if row.get("instance") else None,
         )
         return redact_artifact(artifact)
+
+    def _context(
+        self, row: Mapping[str, object], sample_ids: Sequence[str]
+    ) -> Optional[dict]:
+        context: dict = {}
+        exception_type = str(row.get("exceptionType") or "")
+        if exception_type:
+            message = str(row.get("exceptionMessage") or "")
+            context["Exception"] = f"{exception_type}: {message}" if message else exception_type
+        method = str(row.get("frameMethod") or "")
+        if method:
+            assembly = str(row.get("frameAssembly") or "")
+            context["Where"] = f"{method} ({assembly})" if assembly else method
+        target = str(row.get("dependencyTarget") or "")
+        if target:
+            kind = str(row.get("dependencyType") or "")
+            result = str(row.get("dependencyResult") or "")
+            parts = [target]
+            if kind:
+                parts.append(f"type {kind}")
+            if result:
+                parts.append(f"returned {result}")
+            if str(row.get("dependencyFailed")).lower() != "true":
+                parts.append("slowest dependency, not failed")
+            duration = _milliseconds(row.get("dependencyDurationMs"))
+            if duration:
+                parts.append(duration)
+            context["Dependency"] = ", ".join(parts)
+        duration = _milliseconds(row.get("durationMs"))
+        if duration:
+            context["Duration"] = duration
+        if sample_ids:
+            context["Samples"] = ", ".join(sample_ids)
+            context["Reproduce"] = _reproduce_5xx_query(self._component, sample_ids)
+        return context or None
+
+
+def _milliseconds(value: object) -> str:
+    try:
+        return f"{float(value):.0f} ms"  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return ""
 
 
 # The regression rule (PLAN.md decision 2): a code fires when its share of the

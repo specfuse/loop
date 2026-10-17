@@ -59,6 +59,10 @@ WORKSPACE_SCHEMA: dict[str, frozenset[str]] = {
         "ResultCode", "Source", "Success", "Url",
     },
     "AppEvents": _COMMON_APP_COLUMNS | {"Name"},
+    "AppDependencies": _COMMON_APP_COLUMNS | {
+        "Data", "DependencyType", "DurationMs", "Id", "Name", "ResultCode",
+        "Success", "Target",
+    },
 }
 
 # Operators, keywords and literals the built-in queries use. Function calls
@@ -92,6 +96,9 @@ def schema_violations(query: str) -> list[str]:
     columns = WORKSPACE_SCHEMA.get(table)
     if columns is None:
         return [f"table {table!r} is not a workspace table"]
+    # A joined subquery reads its own table: its columns are valid too.
+    for joined in re.findall(r"\(\s*(\w+)\s*\|", rest):
+        columns = columns | WORKSPACE_SCHEMA.get(joined, frozenset())
     aliases = set(_ALIAS.findall(rest))
     problems = []
     for match in _IDENT.finditer(rest):
