@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.28.2+umbrella.0.15.0] - 2026-10-17
+
 ### Fixed
 
 - **This repo's pre-push hook no longer makes `git push` die silently after a green smoke test.** `.specfuse/hooks/pre-push` handed git's stdin (the ref list git writes to every pre-push hook) to `scripts/smoke-test.sh`, a long-running process tree, so git intermittently died with SIGPIPE (exit 141) after `smoke test: OK` and the branch never reached the remote. The hook now consumes the ref list itself and runs the smoke test with no stdin; a bats test (`tests/pre_push_hook.bats`, gate `pre-push-hook`) pins it. Contributor tooling only; nothing a consumer installs changes. (#3491)
