@@ -34,7 +34,6 @@ from specfuse.loop import caller_check
 #: Most are reached from the umbrella repo or by a runner this check cannot see.
 BASELINE = {
     "all_requirements",
-    "annotate_if_quiet",
     "append_entry",
     "build_azure_transport",
     "census",

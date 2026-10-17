@@ -44,6 +44,7 @@ from __future__ import annotations
 import calendar
 import json
 import math
+import re
 import time
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -70,7 +71,11 @@ REDIAGNOSE_LABEL = "rediagnose"
 
 DEFAULT_LIST_LIMIT = 100
 DEFAULT_THROTTLE_SECONDS = 6 * 60 * 60
-DEFAULT_QUIET_AFTER_RUNS = 5
+# A finding with no sighting for this long is annotated as a close candidate
+# (#3502). Elapsed time, not a run count: the meta records when a fingerprint
+# was last seen, and nothing records how many runs have passed since, so a run
+# count could only be kept by editing every quiet issue on every run.
+DEFAULT_QUIET_AFTER_SECONDS = 7 * 24 * 60 * 60
 # How long after closing an issue still counts as "the same finding" (PLAN.md decision 3).
 CLOSED_LOOKUP_DAYS = 90
 
@@ -480,29 +485,64 @@ def record_finding(
     return number
 
 
+_FINGERPRINT_IN_BODY = re.compile(r"<!-- specfuse:finding fingerprint=(\S+) -->")
+_COMPONENT_IN_BODY = re.compile(r"^\*\*Component:\*\* (.+?)\s*$", re.M)
+
+
+def finding_fingerprint(body: str) -> Optional[str]:
+    """The fingerprint a finding issue's marker carries, or None."""
+    match = _FINGERPRINT_IN_BODY.search(body or "")
+    return match.group(1) if match else None
+
+
+def finding_component(body: str) -> Optional[str]:
+    """The component a finding issue's body names, or None."""
+    match = _COMPONENT_IN_BODY.search(body or "")
+    return match.group(1) if match else None
+
+
+def list_finding_issues(runner: Callable, repo: str, *, now: float, limit: int = DEFAULT_LIST_LIMIT) -> list:
+    """Open finding issues plus those closed inside the lookup window, each
+    carrying its `state` — the same single listing `find_finding_issue` reads."""
+    return _list_findings(runner, repo, limit=limit, now=now)
+
+
+def quiet_for(row: dict, now: float) -> Optional[float]:
+    """Seconds since an issue's fingerprint was last seen, or None when its
+    meta cannot be read (fail closed: an unreadable meta is never quiet)."""
+    meta = _parse_meta(row.get("body", "") or "")
+    if meta is None:
+        return None
+    return now - meta.last_seen
+
+
 def annotate_if_quiet(
     fingerprint: str,
     repo: str,
-    runs_since_last_seen: int,
     *,
-    quiet_after_runs: int = DEFAULT_QUIET_AFTER_RUNS,
+    now: float,
+    quiet_after_seconds: float = DEFAULT_QUIET_AFTER_SECONDS,
     runner: Optional[Callable] = None,
     limit: int = DEFAULT_LIST_LIMIT,
+    existing: Optional[dict] = None,
 ) -> Optional[str]:
-    """Annotate a fingerprint's issue as a close candidate once it has been
-    absent for `quiet_after_runs` consecutive runs. Annotates and stops —
-    never closes, reopens, or otherwise transitions the issue's state.
+    """Annotate an open finding issue as a close candidate once its fingerprint
+    has gone unseen for `quiet_after_seconds`. Annotates and stops — never
+    closes, reopens, or otherwise transitions the issue's state.
 
-    Idempotent per crossing: the annotation comment is posted once, guarded by
-    `_QUIET_MARKER` recorded into the issue body, so a caller invoking this on
-    every run after the threshold does not re-annotate on every call.
+    Idempotent per quiet period: the comment is posted once, guarded by
+    `_QUIET_MARKER` recorded into the issue body. A later sighting re-renders
+    the body without the marker (`record_finding`), so the next quiet period
+    is annotated again. Pass `existing` (a listing row) to skip the lookup when
+    the caller already holds the listing.
     """
-    if runs_since_last_seen < quiet_after_runs:
-        return None
-
     runner = runner if runner is not None else _default_runner
-    existing = find_finding_issue(runner, repo, fingerprint, limit=limit)
     if existing is None:
+        existing = find_finding_issue(runner, repo, fingerprint, limit=limit, now=now)
+    if existing is None or str(existing.get("state", "OPEN")).upper() == "CLOSED":
+        return None
+    elapsed = quiet_for(existing, now)
+    if elapsed is None or elapsed < quiet_after_seconds:
         return None
 
     number = str(existing["number"])
@@ -510,13 +550,14 @@ def annotate_if_quiet(
     if _QUIET_MARKER in body:
         return number
 
+    days = int(elapsed // (24 * 60 * 60))
     runner(
         [
             "gh", "issue", "comment", number,
             "--repo", repo,
             "--body",
-            f"Quiet for {runs_since_last_seen} runs — candidate for close. "
-            "This annotation does not close the issue; a human decides.",
+            f"No sighting for {days} day(s) (last seen {_iso(now - elapsed)}) — "
+            "candidate for close. This annotation does not close the issue; a human decides.",
         ],
         check=True,
     )
