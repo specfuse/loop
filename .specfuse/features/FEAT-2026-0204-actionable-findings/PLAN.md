@@ -178,8 +178,12 @@ notes and #3496 point 3; T05–T08 implement it and the context oracle asserts i
 - **`heartbeat`:** the schedule's cron and timezone; the function's last execution
   from `AppRequests` and its result; the component's earliest heartbeat; whether the
   role sent any telemetry in the silent gap (Backend#1019's undetected 4-day outage).
-- **`queue-stalled`:** oldest active message age and the subscription's last
-  completed message, in addition to today's depth.
+- **`queue-stalled`:** oldest active message age, in addition to today's depth.
+  *Amended after the close (#3505):* the subscription's last completed message was
+  in this list, but Service Bus runtime properties carry no completion time —
+  `accessed_at_utc` also moves on sends, so it would mislead — and reading one from
+  the messages would mean receiving them, which the check must never do. Dropped
+  with that reason; the docs say the same.
 - **Redaction:** every new field passes `redact_artifact` before egress; stack
   frames carry file paths, messages carry identifiers. Samples are capped at 3.
 

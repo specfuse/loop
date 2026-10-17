@@ -73,6 +73,7 @@ def _exception_type_and_message(message: object) -> tuple[str, str]:
 
 
 _STACK_LINES_MAX = 10
+_FRAMEWORK_FRAME_PREFIXES = ("at System.", "at Microsoft.")
 _BODY_BYTES_MAX = 65536
 
 
@@ -159,9 +160,18 @@ def _dlq_context(
     if exc_message:
         exc.append(exc_message)
     if exc_stack:
-        exc.extend(exc_stack.splitlines()[:_STACK_LINES_MAX])
+        frames = [line for line in exc_stack.splitlines() if line.strip()]
+        # The app's own frames first, as error-logs does: a deep framework
+        # stack otherwise fills every line and cuts off the handler frame that
+        # explains the failure (live finding, 2026-10-17).
+        app = [line for line in frames if not line.strip().startswith(_FRAMEWORK_FRAME_PREFIXES)]
+        shown = app[:_STACK_LINES_MAX] if app else frames[:_STACK_LINES_MAX]
+        exc.extend(shown)
+        omitted = len(frames) - len(app) if app else 0
+        if omitted:
+            exc.append(f"({omitted} framework frame(s) omitted)")
     if exc:
-        context["Exception"] = "\n".join(exc[: _STACK_LINES_MAX + 1])
+        context["Exception"] = "\n".join(exc)
 
     keys = _body_top_level_keys(message)
     if keys is not None:
@@ -247,8 +257,12 @@ class ServiceBusDlqAdapter:
             observed_text=observed_text,
             message_id=message_id,
         )
+        enqueued = getattr(message, "enqueued_time_utc", None)
         artifact = replace(
             artifact,
+            # A dead-lettered message's occurrence time is when it was enqueued,
+            # so "First seen" means the failure, not the harvest.
+            observed_at=enqueued.isoformat() if isinstance(enqueued, datetime) else None,
             context=_dlq_context(
                 message,
                 subscription=subscription,

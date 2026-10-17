@@ -113,7 +113,7 @@ def _top_frame_stages() -> str:
     framework = _FRAMEWORK_FRAME_RE
     return (
         "| extend stack = tostring(Details[0].parsedStack) "
-        f"| extend appStack = replace_regex(stack, '\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
+        f"| extend appStack = replace_regex(stack, @'\\{{[^{{}}]*\"assembly\":\"({framework})\\.[^{{}}]*\\}}', '') "
         "| extend frameMethod = extract('\"method\":\"([^\"]*)\"', 1, appStack), "
         "frameAssembly = extract('\"assembly\":\"([^\"]*)\"', 1, appStack) "
     )
@@ -861,7 +861,7 @@ class HeartbeatAdapter:
             if observed is not None and observed >= expected:
                 continue
             yield self._build_artifact(
-                target, expected, observed, details.get(name, {}), host_last_seen
+                target, expected, observed, details.get(name, {}), host_last_seen, earliest
             )
 
     def _build_artifact(
@@ -871,6 +871,7 @@ class HeartbeatAdapter:
         observed: Optional[datetime],
         detail: Mapping[str, object],
         host_last_seen: Optional[datetime],
+        earliest: Optional[datetime] = None,
     ) -> FailureArtifact:
         name = target["name"]
         observed_text = (
@@ -888,7 +889,7 @@ class HeartbeatAdapter:
         )
         artifact = replace(
             artifact,
-            context=_heartbeat_context(target, expected, detail, host_last_seen),
+            context=_heartbeat_context(target, expected, detail, host_last_seen, earliest),
         )
         return redact_artifact(artifact)
 
@@ -898,6 +899,7 @@ def _heartbeat_context(
     expected: datetime,
     detail: Mapping[str, object],
     host_last_seen: Optional[datetime],
+    earliest: Optional[datetime] = None,
 ) -> dict:
     context = {
         "Schedule": (
@@ -931,6 +933,12 @@ def _heartbeat_context(
         context["Host silent"] = (
             f"component sent no request telemetry at or after the expected firing "
             f"(last sign of life {gap})"
+        )
+    if earliest is not None:
+        # #3504: the instant the grace rule measures from. A schedule is only
+        # called silent for firings after the component's first heartbeat.
+        context["Earliest heartbeat"] = (
+            f"{_iso(earliest)} (component-wide; firings before it are not evaluated)"
         )
     return context
 

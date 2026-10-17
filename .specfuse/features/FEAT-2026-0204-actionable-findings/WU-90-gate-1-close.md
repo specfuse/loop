@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0204/G1-CLOSE
 type: close
-status: done
-attempts: 1
+status: pending
+attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
 oracle_env: macos_local
@@ -10,7 +10,6 @@ model: sonnet
 effort: high
 gate_set: plannext
 driver_version: 0.28.2
-verdict: not_met
 started_at: 2026-10-17T16:17:35.486975+00:00
 duration_seconds: 245.598
 cost_usd: 1.783003

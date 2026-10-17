@@ -60,7 +60,7 @@ class TestRoundTrip(unittest.TestCase):
     def test_body_names_first_and_last_seen_iso(self):
         body = _render_body("fp", _artifact(), occurrences=1, last_seen=2000.0, first_seen=1000.0)
         self.assertIn("**First seen:** 1970-01-01T00:16:40Z", body)
-        self.assertIn("**Last seen:** 1970-01-01T00:33:20Z", body)
+        self.assertIn("**Last updated:** 1970-01-01T00:33:20Z", body)
 
 
 class TestFailClosed(unittest.TestCase):
@@ -179,3 +179,30 @@ class TestCycleSurvivesMalformedMeta(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFirstSeenIsTheFirstOccurrence(unittest.TestCase):
+    """Live finding, 2026-10-17: "First seen" printed the harvest time (16:24)
+    beside "Seen this run: first 01:55". A new issue's first-seen is the
+    earliest occurrence the cycle saw, not when the monitor ran."""
+
+    def test_new_issue_first_seen_comes_from_the_rows(self):
+        from types import SimpleNamespace
+
+        from specfuse.monitor.issues import SeenThisRun, record_finding
+
+        calls = []
+
+        def gh(args, check=True):
+            calls.append(args)
+            if args[:3] == ["gh", "issue", "list"]:
+                return SimpleNamespace(returncode=0, stdout="[]", stderr="")
+            return SimpleNamespace(returncode=0, stdout="https://github.com/a/b/issues/1\n", stderr="")
+
+        now = 1792254256.0  # 2026-10-17T16:24:16Z
+        seen = SeenThisRun(count=9, first="2026-10-17T01:55:14Z", last="2026-10-17T01:59:47Z")
+        record_finding("fp", _artifact(), "a/b", runner=gh, now=now, seen=seen)
+        body = next(c for c in calls if c[:3] == ["gh", "issue", "create"])
+        body = body[body.index("--body") + 1]
+        self.assertIn("**First seen:** 2026-10-17T01:55:14Z", body)
+        self.assertIn("first_seen=1792202114.0", body)

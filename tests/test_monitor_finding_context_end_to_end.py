@@ -368,6 +368,9 @@ class HeartbeatContext(unittest.TestCase):
             "**Last run:** NightlySync at 2026-10-13T00:00:05Z, result 200",
             "**Host last seen:** 2026-10-13T06:00:00Z",
             "**Host silent:**", "3d 18h before the expected firing",
+            # #3504: the component's earliest heartbeat, the instant the grace
+            # rule measures from, is evidence a diagnosis needs too.
+            "**Earliest heartbeat:** 2026-10-10T00:00:00Z",
         ):
             self.assertIn(needle, body)
         self.assertEqual(len(transport.queries), 1)
@@ -422,3 +425,39 @@ class QueueStalledContext(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DlqExceptionPrefersAppFrames(unittest.TestCase):
+    """Live finding, 2026-10-17: the first 10 stack lines of a dead-lettered
+    message were all EF Core frames, so the handler frame that explained the
+    failure was cut off. The app's own frames come first, as for error-logs."""
+
+    def test_app_frame_survives_a_deep_framework_stack(self):
+        framework = [b"   at Microsoft.EntityFrameworkCore.Frame%d()" % n for n in range(15)]
+        app = [b"   at Acme.Orders.OrderHandler.HandleAsync() in OrderHandler.cs:line 55"]
+        message = SimpleNamespace(
+            message_id="m-deep", sequence_number=1, subject="Order.Created",
+            enqueued_time_utc=datetime(2026, 10, 10, 2, 7, 34, tzinfo=timezone.utc),
+            delivery_count=0, dead_letter_reason="", dead_letter_error_description="",
+            application_properties={
+                b"Exception.Message": b"An error occurred while saving the entity changes.",
+                b"Exception.StackTrace": b"\n".join(framework + app),
+            },
+            body=b"{}",
+        )
+        body = _field(_drive_dlq_messages([message])[0], "--body")
+        self.assertIn("OrderHandler.HandleAsync() in OrderHandler.cs:line 55", body)
+        self.assertIn("15 framework frame(s) omitted", body)
+        self.assertNotIn("Microsoft.EntityFrameworkCore.Frame0()", body)
+
+
+class DlqFirstSeenIsTheEnqueuedTime(unittest.TestCase):
+    def test_first_seen_is_when_the_message_was_enqueued(self):
+        message = SimpleNamespace(
+            message_id="m-old", sequence_number=2, subject="Order.Created",
+            enqueued_time_utc=datetime(2026, 10, 10, 2, 7, 34, tzinfo=timezone.utc),
+            delivery_count=0, dead_letter_reason="", dead_letter_error_description="",
+            application_properties={}, body=b"{}",
+        )
+        body = _field(_drive_dlq_messages([message])[0], "--body")
+        self.assertIn("**First seen:** 2026-10-10T02:07:34Z", body)

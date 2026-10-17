@@ -41,6 +41,7 @@ the body, re-checked client-side, is the sole authority.
 
 from __future__ import annotations
 
+import calendar
 import json
 import math
 import time
@@ -236,7 +237,7 @@ def _render_body(
     lines.append("")
     lines.append(f"**Occurrences:** {occurrences}")
     lines.append(f"**First seen:** {_iso(first_seen)}")
-    lines.append(f"**Last seen:** {_iso(last_seen)}")
+    lines.append(f"**Last updated:** {_iso(last_seen)}")
     if seen is not None:
         span = f", first {seen.first}, last {seen.last}" if seen.first and seen.last else ""
         lines.append(f"**Seen this run:** {seen.count}{span} (UTC)")
@@ -335,6 +336,17 @@ def find_finding_issue(
     return None
 
 
+def _seen_epoch(text: Optional[str]) -> Optional[float]:
+    """Epoch seconds for a `SeenThisRun` timestamp, or None when absent or
+    unreadable (never raises)."""
+    if not text:
+        return None
+    try:
+        return float(calendar.timegm(time.strptime(text, "%Y-%m-%dT%H:%M:%SZ")))
+    except ValueError:
+        return None
+
+
 def record_finding(
     fingerprint: str,
     artifact: FailureArtifact,
@@ -375,8 +387,12 @@ def record_finding(
     existing = find_finding_issue(runner, repo, fingerprint, limit=limit, now=now)
 
     if existing is None:
+        # The first occurrence the rows show, not the harvest time: a cycle can
+        # read hours of rows (live finding, 2026-10-17).
+        first = _seen_epoch(seen.first) if seen is not None else None
         body = _render_body(
-            fingerprint, artifact, occurrences=1, last_seen=now, first_seen=now,
+            fingerprint, artifact, occurrences=1, last_seen=now,
+            first_seen=first if first is not None else now,
             messages=ids or None, seen=seen,
         )
         title = _render_title(artifact)

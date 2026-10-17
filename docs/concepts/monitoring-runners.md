@@ -156,12 +156,15 @@ first use). Every body states the occurrence count, the first and last time seen
 | `error-logs` | Where (top in-app stack frame), Request (route and result code), Logger (category and message template), Likely client abort, Samples, Reproduce |
 | `http-5xx` | Exception (type, message), Where, Dependency (target, type, result code, duration), Duration, Samples, Reproduce |
 | `dlq` | Message (id, sequence number, subject, enqueued time, delivery count), Dead-letter reason, or the Exception message and top stack frames when the reason is blank, Body shape (the top-level keys, never the values), Peek it |
-| `heartbeat` | Schedule (cron, dialect, timezone, expected firing), Last run (the function's last execution and result), Host last seen, and a Host silent line when the component sent no request telemetry across the expected firing |
+| `heartbeat` | Schedule (cron, dialect, timezone, expected firing), Last run (the function's last execution and result), Host last seen, a Host silent line when the component sent no request telemetry across the expected firing, and Earliest heartbeat (the component's first heartbeat, which the grace rule measures from) |
 | `queue-stalled` | Queue (oldest active message age, depth, `stall_after`), Where |
 
-A section with nothing to say is left out rather than printed empty. The finding
-does not show the schedule's earliest heartbeat (it only decides the grace above)
-or a subscription's last completed message.
+A section with nothing to say is left out rather than printed empty. A
+`queue-stalled` finding cannot show when the subscription last completed a
+message: Service Bus runtime properties carry no completion time (their
+`accessed_at_utc` changes on sends as well as receives, so it would mislead),
+and reading one from the messages themselves would mean receiving them, which
+the check never does.
 
 Each check still issues exactly one query. Every correlation (an exception to its
 request, a request to its dependency, a schedule to its host's liveness) is a join
