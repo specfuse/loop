@@ -269,21 +269,21 @@ def apply_triage(
             marked_category, _marked_confidence = marker
             marked_severity = (parse_marker_fields(body) or {}).get("severity")
             target_labels = labels_for(marked_category) if marked_category in CATEGORIES else ()
-            if marked_severity:
-                target_labels = tuple(target_labels) + (
-                    (label_projection or {}).get(
-                        marked_severity, severity_label_for(marked_severity)),
-                )
-            existing_labels = {
-                label.get("name") for label in decision.get("labels") or []
-            }
-            missing = [label for label in target_labels if label not in existing_labels]
             row = {
                 "number": number,
                 "skipped": True,
                 "marker_written": False,
                 "label_written": False,
             }
+            if marked_severity:
+                severity_label = (label_projection or {}).get(
+                    marked_severity, severity_label_for(marked_severity))
+                if not _record_severity_conflict(row, decision, severity_label):
+                    target_labels = tuple(target_labels) + (severity_label,)
+            existing_labels = {
+                label.get("name") for label in decision.get("labels") or []
+            }
+            missing = [label for label in target_labels if label not in existing_labels]
             if missing:
                 try:
                     runner(
@@ -335,9 +335,10 @@ def apply_triage(
 
         labels_to_add = list(labels_for(applied_category))
         if severity:
-            labels_to_add.append(
-                (label_projection or {}).get(
-                    severity, severity_label_for(severity)))
+            severity_label = (label_projection or {}).get(
+                severity, severity_label_for(severity))
+            if not _record_severity_conflict(row, decision, severity_label):
+                labels_to_add.append(severity_label)
 
         try:
             runner(
@@ -356,6 +357,24 @@ def apply_triage(
 
         results.append(row)
     return results
+
+
+def _record_severity_conflict(row: dict, decision: dict, severity_label: str) -> bool:
+    """Whether the issue already carries a `severity:*` label (#3521).
+
+    A label already there is the source, as in `severity_decision` (#3360):
+    triage records its verdict in the marker only and never adds a second
+    `severity:*` label beside it, or `read_severity_label` -- and so the bug
+    lane's `min_severity` floor -- would read whichever came first. When the
+    held label says something other than triage's verdict, the held names are
+    recorded on *row* as `severity_conflict` so the caller can report it.
+    """
+    held = _severity_label_names(decision.get("labels"))
+    if not held:
+        return False
+    if severity_label.strip().lower() not in held:
+        row["severity_conflict"] = held
+    return True
 
 
 def list_untriaged(runner: Callable, repo: str, limit: int = DEFAULT_LIST_LIMIT) -> list:

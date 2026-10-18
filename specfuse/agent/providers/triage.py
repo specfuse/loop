@@ -368,6 +368,9 @@ class TriageProvider:
                 "category": category,
                 "confidence": confidence,
                 "severity": severity,
+                # #3521: without the issue's labels `apply_triage` cannot see
+                # a person's `severity:*` label, and adds a second one beside it.
+                "labels": row.get("labels") or [],
             }
         ]
         results = apply_triage(
@@ -391,11 +394,14 @@ class TriageProvider:
                 spend=spend,
             )
 
-        return ActionOutcome(
-            status=STATUS_COMPLETED,
-            detail=f"issue #{number} triaged as {row_result.get('category')}",
-            spend=spend,
-        )
+        detail = f"issue #{number} triaged as {row_result.get('category')}"
+        if row_result.get("severity_conflict"):
+            detail += (
+                f"; severity label left as "
+                f"{', '.join(row_result['severity_conflict'])} "
+                f"(triage judged {severity})"
+            )
+        return ActionOutcome(status=STATUS_COMPLETED, detail=detail, spend=spend)
 
     def reconcile(self, item: ActionItem, outcome: ActionOutcome) -> None:
         return None

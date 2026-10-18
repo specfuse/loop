@@ -29,6 +29,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 ### Fixed
 
 - **`budgets.max_tokens_per_run` now counts cache tokens, so it can actually stop a run.** A session's spend was `input_tokens + output_tokens` only; with prompt caching nearly all of a headless session's input is cache reads or cache creation, so a run that included a 13-minute, 9-file `/fix-bug` session reported 16,147 tokens and a 2,835,000 cap never bound. Spend, and the run summary's `tokens spent`, now add `cache_read_input_tokens` and `cache_creation_input_tokens`. Counts per run will be far higher than before: a cap derived from a dollar figure at an assumed tokens-per-dollar rate now binds sooner than that figure, since cache reads cost less than other input, and may need raising. (#3522)
+- **Triage no longer adds a second `severity:*` label beside one already on the issue.** An issue a maintainer had labelled `severity:low` came out of a triage pass with `severity:high` as well, and which of the two the bug lane's `min_severity` floor read decided dispatch. Following #3360, a `severity:*` label already on the issue is the source: triage records its own verdict in the marker only, writes no severity label, and when the two disagree the run says so (`severity label left as severity:low (triage judged high)`). The marker-repair path applies the same rule. (#3521)
 
 ## [0.29.0+umbrella.0.15.0] - 2026-10-17
 
