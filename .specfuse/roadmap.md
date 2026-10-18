@@ -122,6 +122,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-2026-0203) |
 | FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-2026-0204) |
 | FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | done | `.specfuse/features/FEAT-2026-0205-diagnosis-severity/` | [→ archive](roadmap-archive.md#feat-2026-0205) |
+| FEAT-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-2026-0223) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1038,6 +1039,17 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Goal.** A `rules.bugs.skip_labels` policy key naming the labels that mean "fixed, awaiting verification"; `BugsProvider.advertise`, triage's bug intake and the run summary's not-dispatched list all skip issues carrying one; selection also skips an issue with a merged PR that closes or references it since its last triage, reported rather than silent. Decide alongside #1583 whether a `resolved` triage category replaces or complements the labels.
 
 **Benefits.** No bug-lane spend re-fixing work already in `main`; the run summary stops telling the operator to re-run for issues that need no work; a repository's own verification workflow is respected without renaming its labels.
+
+**Status: planned.**
+
+<a id="feat-2026-0223"></a>
+## FEAT-2026-0223 — Dollar-denominated run spend cap
+
+**Why.** `budgets.max_tokens_per_run` is the agent run's only spend cap, and operators derive its value from a dollar figure at an assumed tokens-per-dollar rate (clabonte/generator: p90 $9.45 at 200k tokens/$ = 2,835,000). Tokens are a poor proxy for dollars: cache reads cost roughly a tenth of uncached input, so the same token count can mean very different spend depending on the cache mix. #3522's interim fix (PR #3524) counts all four usage token fields so the cap binds at all, but it now binds stricter than the dollar figure it came from and needs recalibrating whenever the cache mix shifts.
+
+**Goal.** Add a cost-denominated cap (e.g. `budgets.max_cost_usd_per_run`) budgeted on the `total_cost_usd` that `specfuse/agent/invoke.py` already parses from each session's envelope. The run summary reports the same dollar figure the cap is compared against. Existing `max_tokens_per_run` policies keep working, with a documented migration path; `derive-agent-policy`, `policy_proposals` and `policy_review` propose and review the new field.
+
+**Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
 
