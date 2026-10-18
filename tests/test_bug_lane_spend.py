@@ -129,17 +129,17 @@ class TestBugLaneSpendIsReported(unittest.TestCase):
         self.assertIn("--output-format", claude[0])
         self.assertEqual(claude[0][claude[0].index("--output-format") + 1], "json")
 
-    def test_merged_item_reports_input_plus_output_tokens(self):
+    def test_merged_item_reports_all_usage_tokens(self):
         outcome = _execute(_Runner(_COMPLETED), automerge="on")
 
         self.assertEqual(outcome.status, STATUS_COMPLETED)
-        self.assertEqual(outcome.spend, 1500)
+        self.assertEqual(outcome.spend, 51500)  # cache reads count too (#3522)
 
     def test_escalated_item_reports_its_spend_too(self):
         outcome = _execute(_Runner(_REFUSED))
 
         self.assertEqual(outcome.status, STATUS_ESCALATED)
-        self.assertEqual(outcome.spend, 1500)
+        self.assertEqual(outcome.spend, 51500)
 
     def test_envelope_text_is_read_as_the_session_output(self):
         # The outcome and PR number come from the envelope's `result`.

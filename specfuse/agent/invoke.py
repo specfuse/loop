@@ -112,13 +112,24 @@ def _parse_envelope(raw: str) -> tuple:
     return result_text, (usage if usage else None)
 
 
+#: Every token field `budgets.max_tokens_per_run` is compared against (#3522).
+SPEND_TOKEN_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+    "cache_creation_input_tokens",
+)
+
+
 def usage_spend(usage: Optional[dict]) -> int:
-    """`spend` for `ActionOutcome`: input + output tokens, cache reads
-    excluded -- matching the driver's own cost line (`loop.py:7300-7302`).
+    """`spend` for `ActionOutcome`: all four usage token fields, cache reads
+    and cache creation included (#3522). With prompt caching nearly all of a
+    headless session's input is cache traffic, so leaving it out reported a
+    small fraction of the real volume and `max_tokens_per_run` never bound.
     Zero for a `None` usage, never a `KeyError`."""
     if not usage:
         return 0
-    return int(usage.get("input_tokens", 0)) + int(usage.get("output_tokens", 0))
+    return sum(int(usage.get(key, 0)) for key in SPEND_TOKEN_FIELDS)
 
 
 def run_claude(

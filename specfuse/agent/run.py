@@ -198,8 +198,8 @@ class ActionOutcome:
     `spend` is real tokens, not a proxy — a provider that dispatches a
     headless `claude` session reports it through
     `specfuse.agent.invoke.usage_spend(invoke_result.usage)`
-    (FEAT-2026-0108/T01): input plus output tokens, cache reads excluded, so
-    it lines up with the driver's own cost line. It defaults to zero so a
+    (FEAT-2026-0108/T01): all four usage token fields, cache reads and cache
+    creation included (#3522). It defaults to zero so a
     provider that dispatches nothing, or whose session reported no usage
     envelope, leaves the run's total spend untouched. `escalation`, when set
     on a `STATUS_ESCALATED` outcome, is recorded — on `target_issue` when the
