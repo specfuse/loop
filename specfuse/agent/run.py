@@ -62,6 +62,7 @@ from specfuse.loop.build_provenance import warn_if_out_of_tree
 from specfuse.loop.escalation import (
     CREATED_NUMBER_UNKNOWN,
     annotate_escalation,
+    clear_closed_escalation_labels,
     emit_escalation,
 )
 
@@ -866,6 +867,13 @@ def run_agent(
             policy_path=policy_path,
             features_root=features_root,
         )
+        # #3523: a closed issue keeps no escalation labels the lane wrote.
+        cleared = clear_closed_escalation_labels(runner, repo)
+        if cleared:
+            report(
+                "cleared needs-human from closed escalated issue(s): "
+                + ", ".join(f"#{number}" for number in cleared)
+            )
         bugs_preempt = _resolve_bugs_preempt(policy_path)
         report(
             f"snapshot: {len(snapshot.issues)} open issues, "
