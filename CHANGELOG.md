@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.29.1+umbrella.0.15.0] - 2026-10-19
+
 ### Fixed
 
 - **Gate logs are capped at 500 MB per feature, not only 30 per gate.** Every gate run writes its full output to `<feature>/work/gate-logs/`, and the only limit was 30 logs per gate; a generator `tests` log runs ~138 MB, so one feature could hold ~4 GB, and one operator laptop held ~59 GB across three checkouts. After each write, the oldest logs across all of a feature's gates are now deleted until the folder is within 500 MB; the log just written is always kept, since the gate report names it. Logs already on disk shrink on the feature's next gate run; for a finished feature, `work/gate-logs/` is scratch and safe to delete by hand. (#3499)
