@@ -67,14 +67,14 @@ class TestRunClaudeParsesUsageEnvelope(unittest.TestCase):
         self.assertIn("json", calls[0])
         self.assertEqual(calls[0][-1], "do the thing")
 
-    def test_usage_spend_excludes_cache_reads(self):
+    def test_usage_spend_counts_cache_tokens(self):
         usage = {
             "input_tokens": 900,
             "output_tokens": 300,
             "cache_read_input_tokens": 5000,
             "cache_creation_input_tokens": 200,
         }
-        self.assertEqual(usage_spend(usage), 1200)
+        self.assertEqual(usage_spend(usage), 6400)
 
 
 class TestNonJsonOutputYieldsNoUsage(unittest.TestCase):
