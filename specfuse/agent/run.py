@@ -299,11 +299,39 @@ class RunSummary:
     #: re-run, because a triage-only run otherwise looks like a bug lane that
     #: declined everything.
     newly_triaged_bugs_undispatched: tuple = ()
+    #: `(number, reason)` for bugs this run triaged that the severity floor
+    #: holds back (#3521). Kept apart from the re-run list above: a re-run
+    #: would not dispatch them either, so the summary names the floor instead.
+    newly_triaged_bugs_below_floor: tuple = ()
 
 
 def _bug_marked_numbers(snapshot: AgentSnapshot) -> set:
     """Issue numbers whose body carries a `bug` triage marker right now."""
     return {issue.number for issue in snapshot.issues if issue.triage_category == "bug"}
+
+
+def _split_by_severity_floor(numbers, snapshot: AgentSnapshot,
+                             policy_path: Optional[str]) -> tuple:
+    """`(re-runnable, [(number, reason), ...])` for bugs triaged and never
+    dispatched (#3521).
+
+    Reads the floor exactly as `BugsProvider.advertise` does, so a bug this
+    returns as held back is one the next run's lane would skip too -- telling
+    the operator to re-run for it was a promise the lane would not keep.
+    """
+    floor = agent_policy.resolve_min_severity(policy_path)
+    aliases = agent_policy.resolve_severity_aliases(policy_path)
+    labels_by_number = {issue.number: issue.labels for issue in snapshot.issues}
+    rerun, held = [], []
+    for number in numbers:
+        severity, via = agent_policy.read_severity_label(
+            labels_by_number.get(number), aliases)
+        ok, why = agent_policy.meets_severity_floor(severity, floor, via=via)
+        if ok:
+            rerun.append(number)
+        else:
+            held.append((number, why))
+    return rerun, held
 
 
 def _refresh_snapshot(
@@ -1179,6 +1207,10 @@ def run_agent(
             for number in _bug_marked_numbers(snapshot) - bugs_marked_at_start
             if f"bug-{number}" not in handled_ids
         )
+        newly_triaged, below_floor = _split_by_severity_floor(
+            newly_triaged, snapshot, policy_path)
+        for number, why in below_floor:
+            report(f"#{number} newly triaged as bug, not dispatched — {why}")
         if newly_triaged:
             report(
                 f"{len(newly_triaged)} issue(s) newly triaged as bug and not "
@@ -1200,6 +1232,7 @@ def run_agent(
             escalations=tuple(escalations),
             wip_refs=tuple(wip_refs),
             newly_triaged_bugs_undispatched=tuple(newly_triaged),
+            newly_triaged_bugs_below_floor=tuple(below_floor),
         )
     finally:
         lock_fd.close()
@@ -1229,6 +1262,8 @@ def _format_summary(summary: RunSummary) -> str:
             f"    {len(summary.newly_triaged_bugs_undispatched)} newly triaged "
             f"as bug, not dispatched — re-run to fix them: {numbers}"
         )
+    for number, why in summary.newly_triaged_bugs_below_floor:
+        lines.append(f"    #{number} newly triaged as bug, not dispatched — {why}")
     return "\n".join(lines)
 
 
