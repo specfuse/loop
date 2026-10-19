@@ -303,7 +303,8 @@ class TriageProvider:
 
         rubric = self._rubric_for_run()
         argv, prompt = build_invocation(
-            number, title, body, self._repo, self._working_dir, rubric=rubric
+            number, title, body, self._repo, self._working_dir, rubric=rubric,
+            comments=row.get("comments") or [],
         )
         invoked = run_claude(argv, prompt, runner=self._runner)
         spend = usage_spend(invoked.usage)

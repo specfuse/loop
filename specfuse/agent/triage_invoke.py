@@ -47,6 +47,7 @@ def build_invocation(
     model: str = "sonnet",
     effort: str = "medium",
     rubric: Optional[dict] = None,
+    comments: Optional[list] = None,
 ):
     """Build argv and prompt text for a headless triage-classification
     session against one issue. Returns a `(argv, prompt)` tuple; runs
@@ -60,6 +61,12 @@ def build_invocation(
     session -- and the marker instruction grows a third `severity=` field.
     The prompt is built from `rubric`'s own mapping alone; it holds no copy
     of any shipped default definitions.
+
+    `comments` is the issue's comment list as `gh issue list --json comments`
+    returns it (#3520): a maintainer often routes an issue -- folds it into a
+    feature, marks it a duplicate -- in a comment, and a classifier reading
+    the body alone labels it `bug` anyway. No comments leaves the prompt
+    byte-identical to the one built without them.
     """
     argv = build_claude_argv(model, effort)
     if rubric:
@@ -88,11 +95,29 @@ def build_invocation(
         f"Issue number: {issue_number}\n"
         f"Issue title: {title}\n\n"
         f"Issue body:\n{body}\n\n"
+        f"{_comments_block(comments)}"
         "Classify this issue into exactly one of the categories: "
         f"{', '.join(CATEGORIES)}.\n\n"
         f"{marker_instruction}"
     )
     return argv, prompt
+
+
+def _comments_block(comments: Optional[list]) -> str:
+    if not comments:
+        return ""
+    rendered = []
+    for comment in comments:
+        author = (comment.get("author") or {}).get("login") or "unknown"
+        association = comment.get("authorAssociation") or "NONE"
+        rendered.append(f"--- @{author} ({association}):\n{comment.get('body') or ''}")
+    return (
+        "Issue comments, oldest first:\n"
+        + "\n\n".join(rendered)
+        + "\n\nIf a maintainer comment already routes this issue -- folds it "
+        "into a feature or another issue, or marks it a duplicate -- classify "
+        "it by that decision, not by the body alone.\n\n"
+    )
 
 
 def classify_result(result_text: str) -> Optional[tuple]:
