@@ -523,6 +523,71 @@ def annotate_escalation(
     return issue_number
 
 
+#: How many closed `needs-human` issues one sweep reads. Cleared issues drop
+#: the label, so the set stays small once a repository has been swept once.
+_CLOSED_SWEEP_LIMIT = 100
+
+
+def clear_closed_escalation_labels(
+    runner: Callable, repo: str, *, limit: int = _CLOSED_SWEEP_LIMIT
+) -> list:
+    """Remove the lane's escalation labels from closed issues (#3523).
+
+    An escalated issue that a person then fixed and closed kept
+    ``needs-human`` and its category label: it looked parked to anyone
+    filtering by label, and reopened, the bug lane would skip it. Only an
+    issue carrying this module's escalation marker (body or comment) is
+    touched -- the labels on it are the lane's own -- and only
+    ``needs-human`` plus ``CATEGORY_LABELS`` are removed. Best-effort like
+    every other label projection here: an unreadable listing or a failed edit
+    clears nothing and never raises. Returns the numbers cleared.
+    """
+    try:
+        result = runner(
+            [
+                "gh", "issue", "list",
+                "--repo", repo,
+                "--label", NEEDS_HUMAN_LABEL,
+                "--state", "closed",
+                "--limit", str(limit),
+                "--json", "number,body,comments,labels",
+            ],
+            check=False,
+        )
+    except Exception:  # noqa: BLE001 - a sweep failure must not stop the run
+        return []
+    if getattr(result, "returncode", 1) != 0 or not getattr(result, "stdout", None):
+        return []
+    try:
+        issues = json.loads(result.stdout)
+    except ValueError:
+        return []
+    marker_prefix = _CORRELATION_MARKER_TEMPLATE.split("{", 1)[0]
+    cleared = []
+    for issue in issues if isinstance(issues, list) else ():
+        if not isinstance(issue, dict) or "number" not in issue:
+            continue
+        texts = [issue.get("body") or ""] + [
+            comment.get("body") or ""
+            for comment in issue.get("comments") or []
+            if isinstance(comment, dict)
+        ]
+        if not any(marker_prefix in text for text in texts):
+            continue
+        names = {
+            label.get("name")
+            for label in issue.get("labels") or []
+            if isinstance(label, dict)
+        }
+        to_remove = sorted(names & (CATEGORY_LABELS | {NEEDS_HUMAN_LABEL}))
+        argv = ["gh", "issue", "edit", str(issue["number"]), "--repo", repo]
+        for label in to_remove:
+            argv += ["--remove-label", label]
+        if _try_run(runner, argv):
+            cleared.append(issue["number"])
+    return cleared
+
+
 def _try_run(runner: Callable, argv: list) -> bool:
     """Run *argv*, swallowing any failure. Returns whether it succeeded.
 
