@@ -199,7 +199,9 @@ def _list_open_issues(runner: Callable, repo: str, *, limit: int) -> list:
             "--repo", repo,
             "--state", "open",
             "--limit", str(limit),
-            "--json", "number,title,body,labels",
+            # #3520: comments carry a maintainer's routing decision the
+            # classifier must see.
+            "--json", "number,title,body,labels,comments",
         ],
         check=False,
     )
