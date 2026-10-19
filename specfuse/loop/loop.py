@@ -6493,6 +6493,32 @@ def order_gate_set(gate_set: list) -> list:
 #: scratch; the cap bounds it across a long feature.
 GATE_LOG_KEEP = 30
 
+#: Total bytes of persisted gate logs to keep per feature, across every gate
+#: (#3499). The count cap alone let one feature hold ~4 GB: a generator
+#: `tests` log runs ~138 MB.
+GATE_LOG_BUDGET_BYTES = 500 * 1024 * 1024
+
+
+def _prune_gate_logs_to_budget(log_dir: Path, keep: Path) -> None:
+    """Delete the oldest logs in *log_dir* until the total is within
+    `GATE_LOG_BUDGET_BYTES`, never *keep* (the log just written, which the
+    report names)."""
+    logs = []
+    for path in log_dir.glob("*.log"):
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        logs.append((stat.st_mtime, path.name, path, stat.st_size))
+    total = sum(size for *_, size in logs)
+    for _, _, path, size in sorted(logs):
+        if total <= GATE_LOG_BUDGET_BYTES:
+            break
+        if path == keep:
+            continue
+        path.unlink(missing_ok=True)
+        total -= size
+
 
 def persist_gate_output(feature_dir: Path, gate_name: str,
                         out: "str | None") -> "Path | None":
@@ -6504,7 +6530,8 @@ def persist_gate_output(feature_dir: Path, gate_name: str,
     else was dropped, so the only way to learn a failing Maven test's name
     was to read `target/surefire-reports` by hand. The log is the source the
     heuristics summarise; the report names its path. Older logs beyond
-    `GATE_LOG_KEEP` per gate are pruned, oldest first.
+    `GATE_LOG_KEEP` per gate are pruned, oldest first, and then the oldest
+    across all gates until the feature is within `GATE_LOG_BUDGET_BYTES`.
     """
     feature_dir = Path(feature_dir)
     # Only a real feature folder gets a work/ tree: a placeholder such as
@@ -6521,6 +6548,7 @@ def persist_gate_output(feature_dir: Path, gate_name: str,
         older = sorted(log_dir.glob(f"{safe}-*.log"))
         for stale in older[:-GATE_LOG_KEEP] if len(older) > GATE_LOG_KEEP else []:
             stale.unlink(missing_ok=True)
+        _prune_gate_logs_to_budget(log_dir, keep=path)
         return path
     except OSError:
         return None
