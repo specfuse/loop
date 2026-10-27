@@ -104,6 +104,7 @@ JUDGE_MODULES = tuple(
         "agent_policy.py",       # automerge dial, diff/merge caps, test paths
         "cost.py",               # spend, read by budget_projection
         "gate_commands.py",      # resolves which commands a gate must pass
+        "gen_contract.py",       # IS a `code` gate in component repos; an edit can turn a red contract green
         # What a work unit or a close must satisfy.
         "closing_requirements.py",
         "criteria_state.py",
