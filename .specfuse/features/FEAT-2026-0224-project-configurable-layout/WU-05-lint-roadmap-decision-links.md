@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.50
 produces:
   - tests/test_lint_roadmap.py
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.29.1
+started_at: 2026-10-28T01:29:27.223743+00:00
+duration_seconds: 68.499
+cost_usd: 0.312255
+input_tokens: 22
+output_tokens: 7225
 ---
 
 # T05 — `lint_roadmap` checks a decision link's fragment, anchor and location

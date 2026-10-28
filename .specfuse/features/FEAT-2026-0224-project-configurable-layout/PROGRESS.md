@@ -4,3 +4,4 @@
 - **FEAT-2026-0224/T04**: attempt 2 outcome=spinning_signature_repeat
 - **FEAT-2026-0224/T06**: attempt 1 outcome=passed
 - **FEAT-2026-0224/T04**: attempt 1 outcome=passed
+- **FEAT-2026-0224/T05**: attempt 1 outcome=passed

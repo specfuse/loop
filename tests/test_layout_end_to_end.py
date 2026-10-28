@@ -94,9 +94,27 @@ class NoLayoutGoldens(unittest.TestCase):
             self.assertEqual(render_lint(tmp), GOLDEN_LINT["blocked_dangling"])
 
 
-@unittest.skip("owned by FEAT-2026-0224/T05")
 class LintChecksDecisionLinks(unittest.TestCase):
-    pass
+    def test_missing_anchor_and_outside_location_are_errors(self):
+        from specfuse.loop.lint_roadmap import SEVERITY_ERROR, lint_roadmap
+
+        roadmap = (
+            "# Roadmap\n\n| Feature ID | Title | Status | Folder | Detail |\n|---|---|---|---|---|\n"
+            "| FEAT-2026-0001 | T | blocked | — | — |\n\n"
+            '<a id="feat-2026-0001"></a>\n## FEAT-2026-0001 — T\n\n'
+            "**Blocked by.** [D-1](../docs/decisions/decisions.md#D-9) [x](../docs/other.md)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".specfuse").mkdir()
+            (root / ".specfuse" / "layout.yml").write_text(ENTRIES_LAYOUT)
+            (root / ".specfuse" / "roadmap.md").write_text(roadmap)
+            (root / "docs" / "decisions").mkdir(parents=True)
+            (root / "docs" / "decisions" / "decisions.md").write_text("## D-1\n")
+            (root / "docs" / "other.md").write_text("x\n")
+            msgs = [f.message for f in lint_roadmap(root) if f.severity == SEVERITY_ERROR]
+        self.assertTrue(any("no anchor 'D-9'" in m for m in msgs), msgs)
+        self.assertTrue(any("docs/decisions" in m and "other.md" in m for m in msgs), msgs)
 
 
 class InvalidLayoutIsReported(unittest.TestCase):
