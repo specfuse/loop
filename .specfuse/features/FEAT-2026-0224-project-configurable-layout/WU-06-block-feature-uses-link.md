@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - plugins/specfuse/skills/block-feature/SKILL.md
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.29.1
+started_at: 2026-10-28T00:53:00.456950+00:00
+duration_seconds: 80.486
+cost_usd: 0.249828
+input_tokens: 16
+output_tokens: 5810
 ---
 
 # T06 — `block-feature` renders decision links through the layout
