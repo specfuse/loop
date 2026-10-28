@@ -79,9 +79,19 @@ class EntriesLinkRenders(unittest.TestCase):
             self.assertEqual(r.stdout.strip(), "[D-0007: x](../docs/decisions/decisions.md#D-0007)")
 
 
-@unittest.skip("owned by FEAT-2026-0224/T04")
 class NoLayoutGoldens(unittest.TestCase):
-    pass
+    def test_blocked_dangling_lint_matches_golden(self):
+        from tests.test_layout_no_layout_goldens import (
+            FIXTURES,
+            GOLDEN_LINT,
+            render_lint,
+            write_fixture,
+        )
+
+        self.assertIn("blocked_dangling", FIXTURES)
+        with tempfile.TemporaryDirectory() as tmp:
+            write_fixture(tmp, "blocked_dangling")
+            self.assertEqual(render_lint(tmp), GOLDEN_LINT["blocked_dangling"])
 
 
 @unittest.skip("owned by FEAT-2026-0224/T05")

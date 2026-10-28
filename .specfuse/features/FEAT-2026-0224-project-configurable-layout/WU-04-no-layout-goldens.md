@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - tests/test_layout_no_layout_goldens.py
@@ -23,10 +23,18 @@ re_arm_override: true
 escalation_reason: spinning_signature_repeat
 escalation_failure_class: tests
 escalation_failure_signature: (errors=1)
-duration_seconds: 117.939
-cost_usd: 0.584336
-input_tokens: 40
-output_tokens: 11059
+duration_seconds: 61.947
+cost_usd: 0.295318
+input_tokens: 24
+output_tokens: 6497
+cumulative_cost_usd: 0.584336
+cumulative_duration_seconds: 117.939
+cumulative_input_tokens: 40
+cumulative_output_tokens: 11059
+cumulative_attempts: 2
+folded_through_re_arm: 1
+driver_version: 0.29.1
+started_at: 2026-10-28T01:28:24.586995+00:00
 ---
 
 # T04 — no-layout goldens, recorded before any consumer changes
