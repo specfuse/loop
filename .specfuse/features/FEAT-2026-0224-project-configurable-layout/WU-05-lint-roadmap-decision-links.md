@@ -49,12 +49,12 @@ link outside `docs/adr` → no finding** (decision 4's positive control); no lay
 
 1. Each case above is a named test in `tests/test_lint_roadmap.py`; the missing-anchor,
    outside-location and fragment-with-anchor tests fail on HEAD and pass after.
-2. `tests/test_layout_no_layout_goldens.py` passes **unchanged** — this unit edits no
-   file under `tests/fixtures/layout_goldens/`, and
+2. `tests/test_layout_no_layout_goldens.py` passes **unchanged**: this unit does not
+   edit that file (its fixtures and goldens are constants there), and
    `python3 .specfuse/scripts/roadmap_link_gate.py` exits 0 on this repository.
 3. `tests/test_layout_end_to_end.py::LintChecksDecisionLinks` passes.
 
-**Do not touch.** Fixture goldens (T04). `layout.py` beyond calling it.
+**Do not touch.** `tests/test_layout_no_layout_goldens.py` (T04's goldens). `layout.py` beyond calling it.
 
 **Verification.** The narrow tier for `implementation`, plus
 `python3 -m unittest tests.test_layout_no_layout_goldens -b` and
