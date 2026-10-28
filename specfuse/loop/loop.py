@@ -6941,6 +6941,11 @@ def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
     before returning. *config*'s `format` is assumed already validated by
     `resolve_narrow_selection_config` — this function never sees an unknown
     one.
+
+    `python_module` skips any path that is not an importable `.py` file — a
+    fixture glob or data file under `tests/` is something a unit legitimately
+    produces, and turning it into a dotted name hands unittest a module it
+    cannot import, failing every attempt identically (#3539).
     """
     fmt = config["format"]
     items = []
@@ -6950,6 +6955,8 @@ def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
         elif fmt == "path":
             module = p
         else:
+            if not p.endswith(".py") or any(c in p for c in "*?["):
+                continue
             module = _test_module_name(p)
         items.append(config["item_template"].format(module=module))
     return items
