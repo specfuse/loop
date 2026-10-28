@@ -60,8 +60,8 @@ it were missing. Report it as **parked**, and distinguish the two:
 - `deferred` — voluntarily parked pending an external decision/dependency, with
   no named blocker (the next gate's arm-gate condition usually spells out what
   it's waiting on).
-- `blocked` — waiting on a *named* unmet dependency: an ADR awaiting approval or
-  an upstream feature, linked from its roadmap `**Blocked by.**` block. Read
+- `blocked` — waiting on a *named* unmet dependency: a decision awaiting approval (ADR or a
+  decision entry, per `layout.yml`) or an upstream feature, linked from its roadmap `**Blocked by.**` block. Read
   that block to name exactly what it waits on.
 
 Both are non-dispatchable but resumable — read the PLAN/GATE state anyway. A

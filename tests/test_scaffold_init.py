@@ -137,7 +137,11 @@ class TestScaffoldInitWritesTree(unittest.TestCase):
     def test_roadmap_seeded_from_template(self):
         roadmap = self.specfuse / "roadmap.md"
         self.assertTrue(roadmap.exists())
-        self.assertEqual(roadmap.read_bytes(), read_scaffold("roadmap.template.md"))
+        from specfuse.loop import layout
+
+        template = read_scaffold("roadmap.template.md").decode("utf-8")
+        want = layout.render_roadmap_template(template, layout.load(self.target))
+        self.assertEqual(roadmap.read_bytes(), want.encode("utf-8"))
 
     def test_learnings_seeded_from_template(self):
         learnings = self.specfuse / "LEARNINGS.md"

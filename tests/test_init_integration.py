@@ -157,10 +157,18 @@ class TestInitFullLayout(unittest.TestCase):
             )
 
     def test_roadmap_seeded_from_template(self):
+        # The template carries layout region markers (FEAT-2026-0224/T07) that
+        # seeding renders away, so the seed is the rendered template, not the
+        # raw file.
+        from specfuse.loop import layout
         self.assertEqual(
             (self.sf / "roadmap.md").read_bytes(),
-            read_scaffold("roadmap.template.md"),
+            layout.render_roadmap_template(
+                read_scaffold("roadmap.template.md").decode(),
+                layout.load(self.sf.parent),
+            ).encode(),
         )
+        self.assertNotIn(b"<!-- layout:", (self.sf / "roadmap.md").read_bytes())
 
     def test_learnings_seeded_from_template(self):
         self.assertEqual(

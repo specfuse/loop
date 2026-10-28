@@ -35,7 +35,7 @@ issue/PR titles are not reused.
 - **New rows are always `planned`.** That's the only status this skill
   writes. For reference, the full roadmap status vocabulary is
   `planned | active | blocked | deferred | done | abandoned` (`blocked` = a
-  named dependency is unmet — an ADR or upstream feature, linked from the
+  named dependency is unmet — a decision awaiting approval (ADR or decision entry, per `layout.yml`) or an upstream feature, linked from the
   detail section's `**Blocked by.**` block; `deferred` = a voluntary park with
   no named blocker); later transitions are owned by /pick-feature, the driver,
   or a human — not this skill.

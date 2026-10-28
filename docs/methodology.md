@@ -26,8 +26,8 @@ on both surfaces.
   both stay resumable: a human flips the feature back to `active` when the
   obstacle clears. Both are distinct from `abandoned` (dead) and `done`
   (complete).
-  - `blocked` — cannot proceed because a **named** dependency is unmet: an ADR
-    awaiting approval, or an upstream `FEAT-YYYY-NNNN` that must complete first.
+  - `blocked` — cannot proceed because a **named** dependency is unmet: a decision
+    awaiting approval (ADR or decision entry, per `layout.yml`), or an upstream `FEAT-YYYY-NNNN` that must complete first.
     A blocked feature always names and links its blocker, so the roadmap shows
     the dependency at a glance. Only `planned` or `active` may be blocked.
   - `deferred` — a *voluntary* park with no named blocker, pending an external

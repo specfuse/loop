@@ -46,6 +46,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 
+from specfuse.loop import layout as _layout
+
 SEVERITY_ERROR = "error"
 SEVERITY_WARN = "warn"
 
@@ -128,9 +130,10 @@ def _lint_roadmap_impl(repo_root: Path) -> list:
     findings += _check_ref_resolution(archive_doc, anchor_sets)
 
     rows = _parse_table_rows(roadmap_doc.lines)
-    findings += _check_blocked_by(roadmap_doc, archive_doc, rows)
+    findings += _check_blocked_by(roadmap_doc, archive_doc, rows, repo_root)
     findings += _check_orphan_sections(roadmap_doc, archive_doc, rows)
     findings += _check_section_status(roadmap_doc, archive_doc, rows)
+    findings += _layout.validate(repo_root)
 
     return findings
 
@@ -150,6 +153,47 @@ def _find_anchors(lines):
         if m:
             anchors.append((i, m.group(1).lower()))
     return anchors
+
+
+_EXPLICIT_ANCHOR_RE = re.compile(r'<a\s+(?:id|name)\s*=\s*"([^"]+)"', re.IGNORECASE)
+_MD_HEADING_RE = re.compile(r'^ {0,3}#{1,6}\s+(.*?)\s*#*\s*$')
+
+
+def _github_slug(text: str) -> str:
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', text)
+    text = re.sub(r'[`*~]', '', text.lower())
+    text = re.sub(r'[^\w\- ]', '', text)
+    return text.replace(' ', '-')
+
+
+def _collect_anchor_names(text: str) -> set:
+    """Fragments a `.md` file answers to: explicit `<a id|name>` plus GitHub heading slugs."""
+    names = set()
+    seen = {}
+    in_fence = False
+    for line in text.splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        names.update(_EXPLICIT_ANCHOR_RE.findall(line))
+        m = _MD_HEADING_RE.match(line)
+        if m:
+            slug = _github_slug(m.group(1))
+            n = seen.get(slug, 0)
+            seen[slug] = n + 1
+            names.add(slug if n == 0 else f"{slug}-{n}")
+    return names
+
+
+def _declared_decisions_location(repo_root: Path):
+    """Resolved `decisions.location` only when layout.yml declares a `decisions:` block."""
+    data = _layout._read(repo_root / _layout.LAYOUT_RELPATH)
+    if not isinstance(data, dict) or not isinstance(data.get("decisions"), dict):
+        return None
+    return _layout.get(_layout.load(repo_root), "decisions.location")
 
 
 def _find_headings(lines):
@@ -343,8 +387,9 @@ def _find_blocked_by(section, lines):
     return None, None
 
 
-def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows) -> list:
+def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows, repo_root: Path) -> list:
     findings = []
+    declared_location = _declared_decisions_location(repo_root)
     roadmap_sections = _detail_sections(roadmap_doc.lines)
     archive_sections = _detail_sections(archive_doc.lines)
 
@@ -393,7 +438,8 @@ def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows) -> lis
                 parsed = urlparse(href)
                 if parsed.scheme in ("http", "https") and parsed.netloc:
                     continue
-                target = (doc.path.parent / href).resolve()
+                link_path, fragment, _ = _layout.split_link(href)
+                target = (doc.path.parent / link_path).resolve()
                 if not target.exists():
                     findings.append(Finding(
                         SEVERITY_ERROR, doc.filename, blocked_by_line + 1,
@@ -401,6 +447,29 @@ def _check_blocked_by(roadmap_doc: _FileDoc, archive_doc: _FileDoc, rows) -> lis
                         "to a file on disk and is not a well-formed URL — fix the "
                         "path",
                     ))
+                    continue
+                if fragment and target.is_file() and target.suffix == ".md":
+                    try:
+                        names = _collect_anchor_names(target.read_text(encoding="utf-8"))
+                    except (OSError, UnicodeDecodeError):
+                        names = None
+                    if names is not None and fragment not in names:
+                        findings.append(Finding(
+                            SEVERITY_ERROR, doc.filename, blocked_by_line + 1,
+                            f"{row['id']}'s Blocked-by link '{href}' points at "
+                            f"'{link_path}', which has no anchor '{fragment}'",
+                        ))
+                if declared_location is not None:
+                    location = (repo_root / declared_location).resolve()
+                    try:
+                        target.relative_to(location)
+                    except ValueError:
+                        findings.append(Finding(
+                            SEVERITY_ERROR, doc.filename, blocked_by_line + 1,
+                            f"{row['id']}'s Blocked-by link '{href}' points at "
+                            f"'{link_path}', which is not under decisions.location "
+                            f"'{declared_location}' — link a decision record there",
+                        ))
         else:
             if blocked_by_text is not None:
                 findings.append(Finding(

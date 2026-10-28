@@ -117,7 +117,7 @@ top-down without re-sorting mentally.
    stalled until a human acts.
 3. `awaiting_review` gates — a gate boundary is waiting on the human
    accept/revise/reject checkpoint.
-4. `blocked` features — a named dependency (an ADR or an upstream feature) is
+4. `blocked` features — a named dependency (a decision awaiting approval — ADR or decision entry, per `layout.yml` — or an upstream feature) is
    unmet; resumable once a human clears it.
 5. `stale` pull requests — green and ready, or silently rotting, either way
    waiting on a human to look.

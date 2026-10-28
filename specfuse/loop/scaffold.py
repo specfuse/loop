@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 
 from . import _miniyaml
+from . import layout as _layout
 from . import labels as _labels
 # The one name for the file close-k reads; scaffold seeds what that guard
 # requires, so both must agree on the path (#575).
@@ -174,6 +175,15 @@ _SKIP_SEEDS: frozenset[str] = frozenset({
 })
 
 
+def _seed_bytes(relpath: str, content: bytes, target_path: Path) -> bytes:
+    """Seed content as written to the project; the roadmap template follows `layout.yml`."""
+    if relpath != "roadmap.template.md":
+        return content
+    return _layout.render_roadmap_template(
+        content.decode("utf-8"), _layout.load(target_path)
+    ).encode("utf-8")
+
+
 def init_specfuse(
     target: str | Path, *, ci_check: str | None = None
 ) -> list[str]:
@@ -199,7 +209,7 @@ def init_specfuse(
         dest_rel = _SEED_RENAME.get(relpath, relpath)
         dest = specfuse_dir / dest_rel
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_bytes(content)
+        dest.write_bytes(_seed_bytes(relpath, content, target_path))
         written.append(dest_rel)
 
     features_keep = specfuse_dir / "features" / ".gitkeep"
@@ -638,7 +648,7 @@ def upgrade_specfuse(
         dest = specfuse_dir / target_rel
         if not dest.exists():
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(read_scaffold(seed_rel))
+            dest.write_bytes(_seed_bytes(seed_rel, read_scaffold(seed_rel), target_path))
             written.append(target_rel)
 
     features_dir = specfuse_dir / "features"

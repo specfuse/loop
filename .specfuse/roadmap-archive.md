@@ -43,6 +43,29 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0224"></a>
+## FEAT-2026-0224 — Project-configurable layout (`.specfuse/layout.yml`)
+
+**Why.** Specfuse hardcodes where it reads and writes. `git grep -E 'docs/adr|docs/product/backlog|docs/product/INITIATIVE_BACKLOG\.md|api/docs/handoffs|api/docs/flows|docs/generated'` (excluding roadmaps, LEARNINGS, retrospectives, CHANGELOG and feature folders) finds about 95 lines: 21 in `loop` at HEAD, all `docs/adr`, and 74 in `authoring` at origin/main, all the other paths. A project organised differently cannot fix this locally, because `specfuse upgrade` and plugin updates restore the edited files and the edit is silently lost. In `loop` the whole problem is decisions. A project that records decisions as structured entries rather than ADR files is told by `block-feature` and five other skills that a blocker is "an ADR", gets ADR links built for it, and cannot use a fragment link at all: `lint_roadmap` checks each Blocked-by link with `(doc.path.parent / href).exists()`, so `decisions.md#D-0007` fails as a missing file.
+
+**Goal.** Gate 1, the foundation: an optional `.specfuse/layout.yml` with only a `decisions:` block (`style: adr | entries`, `location`, `link`). With no file, or with the block omitted, behaviour is today's. `paths:` is not accepted yet; a `paths:` block is a lint warning naming the authoring follow-up, so a project never sets a key that silently does nothing. Path validation rejects absolute paths, `..`, Windows drive and backslash forms and symlinks that escape the repo, and normalises trailing slashes, with one negative test each. A resolver in `specfuse/loop` (`specfuse.loop.layout`), exposed as `specfuse layout get <key>` through a new `DELEGATED_COMMANDS` entry in the umbrella CLI (`specfuse/specfuse`, `specfuse/cli.py`), which needs its own publish. Link rendering and link checking are one deterministic function in that module, not prose in a skill. Golden tests with no `layout.yml` on the deterministic surfaces only: `specfuse layout get` for every key, the rendered blocker link, `lint_roadmap` findings on fixture roadmaps, and the rendered `roadmap.template.md`. Gate 2, decision-style support: `block-feature` calls the link function; `lint_roadmap` strips a link's fragment before the file check, checks the anchor when the target is Markdown, and checks the target is under `decisions.location`, with tests beside the existing Blocked-by cases in `tests/test_lint_roadmap.py`; the roadmap template and the blocker wording in `attention`, `gate-status`, `groom-backlog`, `pick-feature` and `roadmap-add` follow `decisions.style`. Every change lands in all copies (`plugins/specfuse/skills/` and `.specfuse/skills/`; `specfuse/loop/data/roadmap.template.md` and `.specfuse/roadmap.template.md`), enforced by `test_skills_vendored_in_sync.py` and `test_scaffold_data_in_sync.py`. Entries-style links are settled by the `link` template, e.g. `{location}/{domain}.yaml#{id}` or `{location}/decisions.md#{id}`: it renders a repo-relative file with an optional fragment, or an http(s) URL, which the lint already skips. Out of scope: `paths:` keys, their authoring consumers and a reusable literal-path audit (authoring follow-up, which must call the resolver without making `specfuse-authoring` depend on `loop` by accident), and generator scenario-test assertions on `x-async.emit` (clabonte/generator#2971).
+
+**Benefits.** A project can replace ADRs with its own decision records without forking skills or losing edits on upgrade, and its roadmap lint stays green. Link building and checking share one tested function, so the skill and the lint cannot disagree. No-layout goldens on deterministic surfaces prove existing projects are unchanged without relying on LLM output. The resolver and validation are in place for the authoring follow-up to add `paths:` with its consumers.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- **Umbrella delegated command.** After a loop release containing
+  `specfuse.loop.layout`, open a PR in `specfuse/specfuse` adding
+  `"layout": ("specfuse.loop.layout:main", "specfuse-layout", "resolve the project's layout.yml")`
+  to `DELEGATED_COMMANDS` in `specfuse/cli.py`, raise the umbrella's loop floor to
+  that release, publish, and confirm `specfuse layout get decisions.style` prints
+  `adr` in a project with no `layout.yml`.
+- **One entries-style project.** In a consumer repo that records decisions as
+  entries, add a `layout.yml`, run `/block-feature` on one feature, and confirm the
+  rendered link passes `roadmap-link-gate`.
+
 <a id="feat-2026-0205"></a>
 ## FEAT-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
 

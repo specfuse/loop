@@ -103,6 +103,63 @@ class TestLintRoadmap(unittest.TestCase):
         self.assertEqual(len(hits), 1, findings)
         self.assertIn("fix the path", hits[0].message)
 
+    def _blocked_repo(self, td, href, files, layout=None):
+        """Scope unit: one Blocked-by link that is not a FEAT ref and not a URL."""
+        repo = Path(td)
+        for rel, text in files.items():
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+            (repo / rel).write_text(text)
+        roadmap = (
+            ROADMAP_HEADER
+            + _row("FEAT-2026-0060", "blocked")
+            + '\n<a id="feat-2026-0060"></a>\n'
+            + "## FEAT-2026-0060 — Iota\n\n"
+            + f"**Blocked by.** [D]({href}) — pending.\n"
+        )
+        _write_repo(repo, roadmap)
+        if layout is not None:
+            (repo / ".specfuse" / "layout.yml").write_text(layout)
+        return [f for f in lint_roadmap(repo) if f.severity == SEVERITY_ERROR]
+
+    def test_fragment_with_explicit_anchor_is_clean(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../docs/adr/x.md#my-id", {"docs/adr/x.md": '<a id="my-id"></a>\n'})
+        self.assertEqual(errs, [])
+
+    def test_fragment_with_missing_anchor_is_error_naming_it(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../docs/adr/x.md#nope", {"docs/adr/x.md": "# Other\n"})
+        self.assertEqual(len(errs), 1, errs)
+        self.assertIn("has no anchor 'nope'", errs[0].message)
+
+    def test_fragment_matching_heading_slug_is_clean(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../docs/adr/x.md#the-decision-d-7", {"docs/adr/x.md": "## The Decision: D-7\n"})
+        self.assertEqual(errs, [])
+
+    def test_yaml_fragment_checks_file_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../docs/adr/x.yaml#anything", {"docs/adr/x.yaml": "a: 1\n"})
+        self.assertEqual(errs, [])
+
+    def test_entries_layout_link_outside_location_is_error(self):
+        layout = "decisions:\n  style: entries\n  location: docs/decisions\n"
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../docs/adr/x.md", {"docs/adr/x.md": "# X\n"}, layout)
+        self.assertEqual(len(errs), 1, errs)
+        self.assertIn("docs/decisions", errs[0].message)
+        self.assertIn("docs/adr/x.md", errs[0].message)
+
+    def test_no_layout_link_outside_docs_adr_is_clean(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../notes/x.md", {"notes/x.md": "# X\n"})
+        self.assertEqual(errs, [])
+
+    def test_no_layout_fragment_with_anchor_is_clean(self):
+        with tempfile.TemporaryDirectory() as td:
+            errs = self._blocked_repo(td, "../notes/x.md#frag", {"notes/x.md": '<a name="frag"></a>\n'})
+        self.assertEqual(errs, [])
+
     def test_invariant_3_anchor_heading_mismatch_is_error_naming_fix(self):
         roadmap = (
             ROADMAP_HEADER

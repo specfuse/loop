@@ -1,6 +1,6 @@
 ---
 name: block-feature
-description: "Flip a roadmap feature to `blocked` (or clear the block) and maintain its `**Blocked by.**` detail block with linked blockers — an ADR file under docs/adr/ awaiting approval, or an upstream FEAT-ID that must complete first. Writes the roadmap row status, the detail-section blocker block (ensuring each linked feature has a resolvable anchor), and the PLAN frontmatter status if a folder exists. Invoke on /block-feature FEAT-ID --by \"<blocker>\" [...], /block-feature FEAT-ID --unblock, or interactively."
+description: "Flip a roadmap feature to `blocked` (or clear the block) and maintain its `**Blocked by.**` detail block with linked blockers — a decision record awaiting approval, or an upstream FEAT-ID that must complete first. Writes the roadmap row status, the detail-section blocker block (ensuring each linked feature has a resolvable anchor), and the PLAN frontmatter status if a folder exists. Invoke on /block-feature FEAT-ID --by \"<blocker>\" [...], /block-feature FEAT-ID --unblock, or interactively."
 ---
 
 <!--
@@ -16,7 +16,7 @@ Roadmap counterpart to `/unblock-wu`. `/unblock-wu` re-arms a `blocked_human`
 roadmap-level `blocked` status and keeps its `**Blocked by.**` block truthful.
 
 `blocked` means the feature cannot proceed because a **named** dependency is
-unmet — an ADR awaiting approval, or an upstream feature that must complete
+unmet — a decision record awaiting approval, or an upstream feature that must complete
 first. It differs from `deferred` (a voluntary park with no named blocker): a
 `blocked` feature always names what it waits on and links to it, so the roadmap
 shows the dependency at a glance. See the status legend in
@@ -69,7 +69,7 @@ back to a degraded "show the plan and stop" mode.
   `**Blocked by.**` block and flip status back (see §Unblock).
 - `/block-feature` (no args) — interactive: pick the feature, then collect
   blockers.
-- When the user says "block FEAT-…", "this feature is waiting on ADR-…",
+- When the user says "block FEAT-…", "this feature is waiting on decision …",
   "mark it blocked on FEAT-…", or "unblock FEAT-…".
 
 ## Blocker spec grammar
@@ -77,19 +77,34 @@ back to a degraded "show the plan and stop" mode.
 Each `--by "<blocker>"` (or interactive line) is one blocker. Three shapes,
 auto-detected; each renders as one Markdown link plus a short `— <reason>`:
 
-1. **ADR** — the value starts with a path ending `.md` (by convention under
-   `docs/adr/`), optionally `label | path | reason`:
-   - `docs/adr/0007-event-schema-versioning.md | awaiting approval`
-     → `[ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval`
-   - **Path is relative to `.specfuse/roadmap.md`**, not repo root: a repo-root
-     path like `docs/adr/…` is rendered with a leading `../` (→ `../docs/adr/…`)
-     so the link resolves from the roadmap's directory. An absolute URL is used
-     verbatim.
-   - Derive the `ADR-NNNN: title` label from the filename when no explicit
-     label is given (strip the `NNNN-` prefix, kebab → spaced title-case).
-   - **Do not require the ADR file to exist** — a feature is often blocked
-     precisely because the ADR is still a draft or unwritten. If the path is
-     absent, note it in the plan (`(file not present yet)`) but proceed.
+1. **Decision record** — a decision the feature awaits. Read the project's style
+   first: `python3 -m specfuse.loop.layout get decisions.style` (no
+   `.specfuse/layout.yml` answers `adr`). Never build the link by hand; render it
+   with the `layout link` command, which applies the project's `decisions.link`
+   template and makes the path relative to `.specfuse/roadmap.md`.
+   - **`adr`** — the value starts with a path ending `.md` (by convention under
+     `docs/adr/`), optionally `label | path | reason`. The ADR link is:
+     ```
+     python3 -m specfuse.loop.layout link --from .specfuse --target <path> --label "<label>"
+     ```
+     - `docs/adr/0007-event-schema-versioning.md | awaiting approval`
+       → `[ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval`
+     - Derive the `ADR-NNNN: title` label from the filename when no explicit
+       label is given (strip the `NNNN-` prefix, kebab → spaced title-case).
+   - **`entries`** — the value is a decision id (e.g. `D-0007`), optionally
+     `label | id | reason`. Render with the id as target; when
+     `python3 -m specfuse.loop.layout get decisions.link` contains `{domain}`,
+     also ask the operator for the domain and pass `--domain`:
+     ```
+     python3 -m specfuse.loop.layout link --from .specfuse --target <id> --label "<label>"
+     python3 -m specfuse.loop.layout link --from .specfuse --target <id> --label "<label>" --domain <domain>
+     ```
+     If the command exits non-zero (e.g. a missing `--domain`), show its message
+     and ask; do not fall back to a hand-built link.
+   - An absolute URL is used verbatim by the command.
+   - **Do not require the decision record to exist** — a feature is often blocked
+     precisely because the decision is still a draft or unwritten. If the target
+     is absent, note it in the plan (`(file not present yet)`) but proceed.
 2. **Feature** — the value is (or starts with) a `FEAT-YYYY-NNNN`, optionally
    `FEAT-… | reason`:
    - `FEAT-2026-0011 | scoring data must land first`
@@ -239,7 +254,7 @@ decided something*, that text comes from them.
 
 ## Version
 
-**v0.1.** Block / unblock with a required, linked blocker list (ADR file,
+**v0.1.** Block / unblock with a required, linked blocker list (decision record,
 upstream FEAT-ID, or freeform). Three write surfaces plus idempotent anchor
 maintenance for intra-page feature links. Expected to grow once real blocks
 surface needs it doesn't cover — e.g. auto-detecting when a feature blocker

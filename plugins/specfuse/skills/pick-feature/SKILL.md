@@ -49,7 +49,7 @@ comparison but cannot accept your pick.
   leave it parallel).
 - **`deferred` and `blocked` are not pick candidates — and not active
   blockers.** A `deferred` feature is parked by choice; a `blocked` feature
-  waits on a named unmet dependency (an ADR or upstream feature, linked from
+  waits on a named unmet dependency (a decision awaiting approval — ADR or decision entry, per `layout.yml` — or an upstream feature, linked from
   its detail section's `**Blocked by.**` block). For either: do NOT offer it in
   the pick list (neither is `planned`), and do NOT treat it as the current
   active that must be finished first (neither is `active`, nothing is
