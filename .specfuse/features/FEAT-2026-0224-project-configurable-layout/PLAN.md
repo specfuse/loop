@@ -5,7 +5,7 @@ slug: project-configurable-layout
 branch: feat/FEAT-2026-0224-project-configurable-layout
 roadmap_goal: A project can declare where and how it records decisions in an optional `.specfuse/layout.yml`, and every loop surface that builds or checks a decision link follows it, with behaviour byte-identical when the file is absent
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 24.00
 ---
 
