@@ -1,7 +1,7 @@
 ---
 id: FEAT-2026-0224/T04
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 2.00
 produces:
@@ -11,6 +11,13 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+escalation_reason: spinning_signature_repeat
+escalation_failure_class: tests
+escalation_failure_signature: (errors=1)
+duration_seconds: 117.939
+cost_usd: 0.584336
+input_tokens: 40
+output_tokens: 11059
 ---
 
 # T04 — no-layout goldens, recorded before any consumer changes
