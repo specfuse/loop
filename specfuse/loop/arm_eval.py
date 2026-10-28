@@ -158,6 +158,8 @@ NON_JUDGE_MODULES = {
     "learnings_query.py": "reads LEARNINGS.md for planning context",
     "lint_monitoring.py": "lints monitoring.yml, which no arm/close/merge "
         "verdict reads",
+    "layout.py": "resolves layout.yml for lint_roadmap and skills; no arm/"
+        "close/merge verdict reads it",
     "lint_roadmap.py": "lints roadmap.md, which no arm/close/merge verdict reads",
     "notify.py": "delivery of a message about a decision already made",
     "notify_escalation.py": "as notify.py",

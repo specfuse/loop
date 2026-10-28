@@ -1,0 +1,98 @@
+#
+# Copyright 2026 Specfuse contributors
+# Licensed under the Apache License, Version 2.0. See LICENSE.
+#
+"""End-to-end oracle for FEAT-2026-0224: `python3 -m specfuse.loop.layout`.
+
+Every invocation is a subprocess of the source module, never an installed
+console script. Classes owned by later units are skipped, each naming its owner.
+"""
+
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+ENTRIES_LAYOUT = """decisions:
+  style: entries
+  location: docs/decisions
+  link: "{location}/decisions.md#{id}"
+"""
+
+
+def run_layout(repo, *args):
+    return subprocess.run(
+        [sys.executable, "-m", "specfuse.loop.layout", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=_env(),
+        check=False,
+    )
+
+
+def _env():
+    import os
+
+    env = dict(os.environ)
+    root = str(Path(__file__).resolve().parent.parent)
+    env["PYTHONPATH"] = root + os.pathsep + env.get("PYTHONPATH", "")
+    return env
+
+
+class NoLayoutGetIsToday(unittest.TestCase):
+    def test_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for key, want in (
+                ("decisions.style", "adr"),
+                ("decisions.location", "docs/adr"),
+                ("decisions.link", "{path}"),
+            ):
+                r = run_layout(tmp, "get", key)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), want)
+
+
+class EntriesLayoutGet(unittest.TestCase):
+    def test_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / ".specfuse").mkdir()
+            (Path(tmp) / ".specfuse" / "layout.yml").write_text(ENTRIES_LAYOUT)
+            for key, want in (
+                ("decisions.style", "entries"),
+                ("decisions.location", "docs/decisions"),
+                ("decisions.link", "{location}/decisions.md#{id}"),
+            ):
+                r = run_layout(tmp, "get", key)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), want)
+
+
+@unittest.skip("owned by FEAT-2026-0224/T03")
+class EntriesLinkRenders(unittest.TestCase):
+    pass
+
+
+@unittest.skip("owned by FEAT-2026-0224/T04")
+class NoLayoutGoldens(unittest.TestCase):
+    pass
+
+
+@unittest.skip("owned by FEAT-2026-0224/T05")
+class LintChecksDecisionLinks(unittest.TestCase):
+    pass
+
+
+@unittest.skip("owned by FEAT-2026-0224/T02")
+class InvalidLayoutIsReported(unittest.TestCase):
+    pass
+
+
+@unittest.skip("owned by FEAT-2026-0224/T07")
+class TemplateFollowsStyle(unittest.TestCase):
+    pass
+
+
+if __name__ == "__main__":
+    unittest.main()
