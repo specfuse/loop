@@ -4574,3 +4574,23 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   behind ten framework frames. None of the three is visible to a fixture-fed test.
   When a unit emits a query or renders evidence a human will read, its close should
   run the opt-in live tests, or name in Deferred verification why not.
+
+- [FEAT-2026-0224/G1-CLOSE] **The `judge_editing` arm class cannot fire on a
+  single-gate feature, so a plan that expects it to halt has no review gate.** PLAN
+  decision 3 expected T01's edit to `arm_eval.py` (a judge module) to trip
+  `judge_editing`. It did not: the class reads the *drafted* successor-gate WUs, a
+  terminal gate drafts none, and the one `arm_predicate_evaluated` event reported
+  `judge_editing: clean — no drafted WU touches judge-path surfaces`. The edit shipped
+  with no halt and no review beyond the PR diff. When a single-gate feature (or the
+  last gate of any feature) must edit a judge surface, choose `review` autonomy, or put
+  the edit in a `type: human` unit the operator marks done. The docs now say this
+  (#3544); enforcing it in the driver is FEAT-2026-0246.
+
+- [FEAT-2026-0224/G1-CLOSE] **A unit that changes a seeded or rendered artifact must
+  name every test that asserts the old bytes, not only its own.** T07 changed the
+  roadmap template and its seed; every unit passed its narrow tier, and the first broad
+  run failed on `test_init_integration.TestInitFullLayout.test_roadmap_seeded_from_template`,
+  which compared the seed to the old bytes and sat in no unit's `produces:`. The fix
+  was one test, but it cost a failed broad run and a gate returned to `awaiting_review`.
+  When the plan edits a template or a seed, grep `tests/` for the artifact's filename
+  and list each hit in the unit's `produces:` or its Do-not-touch exceptions.

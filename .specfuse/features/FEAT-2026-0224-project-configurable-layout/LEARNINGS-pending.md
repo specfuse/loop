@@ -21,6 +21,8 @@ are staged for the operator to **promote, narrow, or reject** at PR review.
   a judge module, the plan should say the PR review is the only gate, or put the edit
   in a `type: human` unit the operator marks done.
 
+  > **Accepted 2026-10-27** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-2026-0224/G1-CLOSE]`. Remedy updated on promotion: `review` autonomy per #3544; enforcement is FEAT-2026-0246.
+
 - **[FEAT-2026-0224/G1-CLOSE] A unit that changes a seeded or rendered artifact must
   name every test that asserts the old bytes, not only its own.** T07 changed the
   roadmap template and its seed; every unit passed its narrow tier, and the first broad
@@ -29,3 +31,5 @@ are staged for the operator to **promote, narrow, or reject** at PR review.
   was one test, but it cost a failed broad run and a gate returned to `awaiting_review`.
   When the plan edits a template or a seed, grep `tests/` for the artifact's filename
   and list each hit in the unit's `produces:` or its Do-not-touch exceptions.
+
+  > **Accepted 2026-10-27** — promoted to `.specfuse/LEARNINGS.md` as `[FEAT-2026-0224/G1-CLOSE]`.
