@@ -84,9 +84,25 @@ class LintChecksDecisionLinks(unittest.TestCase):
     pass
 
 
-@unittest.skip("owned by FEAT-2026-0224/T02")
 class InvalidLayoutIsReported(unittest.TestCase):
-    pass
+    def _repo(self, tmp, text):
+        (Path(tmp) / ".specfuse").mkdir()
+        (Path(tmp) / ".specfuse" / "layout.yml").write_text(text)
+
+    def test_absolute_location_exits_1_naming_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._repo(tmp, "decisions:\n  style: entries\n  location: /abs/dir\n")
+            r = run_layout(tmp, "check")
+            self.assertEqual(r.returncode, 1, r.stderr)
+            self.assertIn("/abs/dir", r.stdout)
+
+    def test_paths_block_exits_0_with_warn(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._repo(tmp, ENTRIES_LAYOUT + "paths:\n  specs: specs\n")
+            r = run_layout(tmp, "check")
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("WARN", r.stdout)
+            self.assertIn("`paths:` is not supported yet", r.stdout)
 
 
 @unittest.skip("owned by FEAT-2026-0224/T07")

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.50
 produces:
   - tests/test_layout_validation.py
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.29.1
+started_at: 2026-10-28T00:40:54.119604+00:00
+duration_seconds: 62.847
+cost_usd: 0.246509
+input_tokens: 16
+output_tokens: 7476
 ---
 
 # T02 — an invalid layout is reported, and `paths:` is a warning
