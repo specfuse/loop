@@ -1,8 +1,19 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_layout_end_to_end -v -b"
 cost_budget_usd: 26.00
+broad_run:
+  tree: 054923b0bea95ba720a9a42a693f4da9e9ea960f:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:1a99cf5b086cf7d21d38df7b39124d1fafd56826:243d8e82854c7b3f2eebefd227ea009bf7a342ea:27968248a450a842ccd187b7dce0fb0ded934866:4acc6dfc5e8cece358c167d876515eba4a39a500:5ff66b6e4d8a264f23709ea60706111a4c59ed11:61870de6daffa7805d95dacfc69772c1b19f3f8b:6a5f803b704e8325954fe471657909999d8ab0d8:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:8ce4e62971295adbfb196d90deb190a9ac4bd58f:97bcab1bc7244262cec901f46035f51dfdd07278:9911f793735215d5ac45527509272c1afc5de7fe:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:fa2f4f88657587b6e3b560977858810846b1d366
+  ran_at: 2026-10-28T01:41:05.354093+00:00
+  ok: false
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "(failures=1,"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 1 — a project can declare its decision records, and nothing changes without one
