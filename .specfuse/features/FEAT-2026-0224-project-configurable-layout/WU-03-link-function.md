@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - tests/test_layout_link.py
@@ -11,6 +11,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.29.1
+started_at: 2026-10-28T00:41:57.567183+00:00
+duration_seconds: 35.045
+cost_usd: 0.168622
+input_tokens: 10
+output_tokens: 3858
 ---
 
 # T03 — one function renders a decision link, and one checks it

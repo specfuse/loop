@@ -69,9 +69,14 @@ class EntriesLayoutGet(unittest.TestCase):
                 self.assertEqual(r.stdout.strip(), want)
 
 
-@unittest.skip("owned by FEAT-2026-0224/T03")
 class EntriesLinkRenders(unittest.TestCase):
-    pass
+    def test_link_cli(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / ".specfuse").mkdir()
+            (Path(tmp) / ".specfuse" / "layout.yml").write_text(ENTRIES_LAYOUT)
+            r = run_layout(tmp, "link", "--target", "D-0007", "--label", "D-0007: x")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(r.stdout.strip(), "[D-0007: x](../docs/decisions/decisions.md#D-0007)")
 
 
 @unittest.skip("owned by FEAT-2026-0224/T04")

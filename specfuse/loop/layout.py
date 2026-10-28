@@ -22,6 +22,7 @@ not built yet; any string is accepted. Standalone: must not import the driver.
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import sys
 from dataclasses import dataclass
@@ -216,6 +217,35 @@ def get(layout: Layout, key: str) -> str:
     return getattr(layout.decisions, key.split(".", 1)[1])
 
 
+def split_link(href: str):
+    """(path, fragment | None, is_url) — the one parser of a decision href."""
+    if re.match(r"^https?://", href):
+        return href, None, True
+    path, sep, fragment = href.partition("#")
+    return path, (fragment if sep else None), False
+
+
+def render_link(layout: Layout, *, target: str, label: str, from_dir: str, domain=None) -> str:
+    """`[label](href)` for a decision; a repo-relative href is made relative to `from_dir`."""
+    supplied = {"location": layout.decisions.location}
+    supplied["path" if layout.decisions.style == "adr" else "id"] = target
+    if domain is not None:
+        supplied["domain"] = domain
+
+    def fill(match):
+        name = match.group(1)
+        if name not in supplied:
+            raise ValueError(f"link template needs {{{name}}} but the call does not supply it")
+        return supplied[name]
+
+    href = _PLACEHOLDER_RE.sub(fill, layout.decisions.link)
+    path, fragment, is_url = split_link(href)
+    if not is_url and path:
+        path = posixpath.relpath(path, posixpath.normpath(from_dir or "."))
+        href = path if fragment is None else f"{path}#{fragment}"
+    return f"[{label}]({href})"
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="specfuse.loop.layout", description="Resolve the project's layout.yml."
@@ -225,6 +255,11 @@ def main(argv=None) -> int:
     getp = sub.add_parser("get", help="print the resolved value of one key")
     getp.add_argument("key")
     sub.add_parser("check", help="report malformed layout; exit 1 on any error")
+    linkp = sub.add_parser("link", help="print the rendered decision link")
+    linkp.add_argument("--target", required=True)
+    linkp.add_argument("--label", required=True)
+    linkp.add_argument("--from", dest="from_dir", default=".specfuse")
+    linkp.add_argument("--domain", default=None)
     args = parser.parse_args(argv)
 
     if args.command == "check":
@@ -236,6 +271,21 @@ def main(argv=None) -> int:
         return 1 if any(f.severity == SEVERITY_ERROR for f in findings) else 0
 
     layout = load(args.repo)
+    if args.command == "link":
+        try:
+            print(
+                render_link(
+                    layout,
+                    target=args.target,
+                    label=args.label,
+                    from_dir=args.from_dir,
+                    domain=args.domain,
+                )
+            )
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        return 0
     try:
         value = get(layout, args.key)
     except KeyError:
