@@ -26,6 +26,8 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+## [0.30.0+umbrella.0.15.0] - 2026-10-27
+
 ### Added
 
 - **`specfuse.loop.gen_contract`: one engine for a component repo's generated-code contract.** A component repo's `gen-contract.yml` states what generated code must look like and what nobody may do to it (no hand edits under the generated trees, the header present, frozen backlogs). Projects have written their own checker for it, and four copies had drifted apart. The engine runs the contract with the generic checks (`forbid_pattern`, `require_pattern`, `first_line_equals`, `first_line_in`, `filename_matches`, `forbid_paths`, `ratchet`) and the project's own checks from a `builtins:` module. It reports rule ID, `file:line` and the rule's `why`, and has `--only`, `--list`, `--explain` and `--json`. Exit codes: 0 green, 1 findings, 2 cannot run. It is stricter than the copies in three places. A rule whose scope matches no file fails instead of passing vacuously (`allow_empty: true` opts out; `forbid_paths` is exempt). A `waived_until` backlog that reaches zero fails until the block is deleted. And the contract is validated before any rule runs. It reads the contract with the loop's own YAML parser, so it adds no dependency. Wire it as a `code` gate in `.specfuse/verification.yml`. The `specfuse gen-contract` command comes with the umbrella's dispatch entry (specfuse/specfuse#225). (#3536)
