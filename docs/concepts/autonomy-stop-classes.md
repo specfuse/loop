@@ -48,6 +48,13 @@ cleared by editing driver code; it clears by changing the plan's numbers.
 file under a judge-path surface — paths that would let a work unit edit its
 own verification.
 
+**Does not cover the terminal gate.** The class reads only the successor
+gate's drafted units. A terminal gate has no successor, so what its own units
+change is never checked; a single-gate feature is never checked at all. The
+terminal close goes straight to the judge, and no judge-path check sits on
+that path (#3542). A feature that edits a judge surface in its last gate should
+run under `review`.
+
 **Fires when:** a drafted WU's `produces:` list contains a path matching one
 of `JUDGE_PATHS` — `.specfuse/verification.yml`, `.specfuse/hooks/`,
 `.specfuse/rules/`, `.github/workflows/`, or `pyproject.toml` (matched
