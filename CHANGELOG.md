@@ -30,6 +30,10 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 - **`specfuse.loop.gen_contract`: one engine for a component repo's generated-code contract.** A component repo's `gen-contract.yml` states what generated code must look like and what nobody may do to it (no hand edits under the generated trees, the header present, frozen backlogs). Projects have written their own checker for it, and four copies had drifted apart. The engine runs the contract with the generic checks (`forbid_pattern`, `require_pattern`, `first_line_equals`, `first_line_in`, `filename_matches`, `forbid_paths`, `ratchet`) and the project's own checks from a `builtins:` module. It reports rule ID, `file:line` and the rule's `why`, and has `--only`, `--list`, `--explain` and `--json`. Exit codes: 0 green, 1 findings, 2 cannot run. It is stricter than the copies in three places. A rule whose scope matches no file fails instead of passing vacuously (`allow_empty: true` opts out; `forbid_paths` is exempt). A `waived_until` backlog that reaches zero fails until the block is deleted. And the contract is validated before any rule runs. It reads the contract with the loop's own YAML parser, so it adds no dependency. Wire it as a `code` gate in `.specfuse/verification.yml`. The `specfuse gen-contract` command comes with the umbrella's dispatch entry (specfuse/specfuse#225). (#3536)
 
+### Fixed
+
+- **Per-attempt test selection skips `produces:` entries that are not Python test modules.** With the default `format: python_module`, every `produces:` path under `tests/` became a dotted module name, so a fixture glob (`tests/fixtures/x/**`) or a data file (`tests/fixtures/x/roadmap.md`) handed unittest a module it could not import. The narrow tests gate then failed identically on every attempt, and the unit was parked as a spinning block even though its tests passed. Only `.py` paths without glob characters are selected now; when a unit declares no such path, the full `command` runs, as before. The `class_name` and `path` formats are unchanged. (#3539)
+
 ## [0.29.1+umbrella.0.15.0] - 2026-10-19
 
 ### Fixed
