@@ -155,5 +155,32 @@ class NoLayoutGoldens(unittest.TestCase):
                 )
 
 
+# sha256 of HEAD's roadmap.template.md (before the layout region markers).
+GOLDEN_TEMPLATE_SHA256 = "de1fdd5dcfdfe9f55757e640585983794de8cbcbc070d01511840e2bf7666c8c"
+
+
+class NoLayoutTemplateGoldens(unittest.TestCase):
+    def test_render_equals_head_template(self):
+        import hashlib
+
+        from specfuse.loop import layout
+
+        text = (ROOT / "specfuse/loop/data/roadmap.template.md").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = layout.render_roadmap_template(text, layout.load(tmp))
+        self.assertNotIn("layout:decisions-example", out)
+        self.assertEqual(hashlib.sha256(out.encode("utf-8")).hexdigest(), GOLDEN_TEMPLATE_SHA256)
+
+    def test_fresh_seed_equals_head_seed(self):
+        import hashlib
+
+        from specfuse.loop.scaffold import init_specfuse
+
+        with tempfile.TemporaryDirectory() as tmp:
+            init_specfuse(tmp)
+            seed = (Path(tmp) / ".specfuse" / "roadmap.md").read_bytes()
+        self.assertEqual(hashlib.sha256(seed).hexdigest(), GOLDEN_TEMPLATE_SHA256)
+
+
 if __name__ == "__main__":
     unittest.main()

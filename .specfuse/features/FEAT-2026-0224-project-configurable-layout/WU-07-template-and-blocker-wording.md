@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0224/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/data/roadmap.template.md
@@ -26,6 +26,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.29.1
+started_at: 2026-10-28T01:30:36.254269+00:00
+duration_seconds: 142.708
+cost_usd: 0.670664
+input_tokens: 56
+output_tokens: 12726
 ---
 
 # T07 — the roadmap template and blocker wording follow `decisions.style`

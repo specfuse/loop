@@ -246,6 +246,39 @@ def render_link(layout: Layout, *, target: str, label: str, from_dir: str, domai
     return f"[{label}]({href})"
 
 
+_REGION_RE = re.compile(
+    r"<!-- layout:decisions-example -->\n(.*?)<!-- /layout:decisions-example -->\n", re.DOTALL
+)
+
+
+def _entries_example(layout: Layout) -> str:
+    link = render_link(
+        layout, target="D-0007", label="D-0007: event-schema versioning", from_dir=".specfuse"
+    )
+    return (
+        f"**Blocked by.** {link} — awaiting approval; "
+        "[FEAT-2026-0011](#feat-2026-0011) — scoring data must land first.\n\n"
+        "Each blocker is a Markdown link: a decision entry points at its heading anchor "
+        "in the decisions file (kept under\n"
+        f"`{layout.decisions.location}/` per `layout.yml`, so from `.specfuse/roadmap.md` the link is\n"
+        "relative to `.specfuse/`); a feature dependency points at the blocking\n"
+        "feature's roadmap anchor (`#feat-yyyy-nnnn`). When every blocker clears, a human\n"
+        "flips `blocked` → `active` (or `planned`) and removes the `**Blocked by.**` block.\n"
+    )
+
+
+def render_roadmap_template(text: str, layout: Layout) -> str:
+    """Roadmap template with its decisions-example region rendered for `layout`.
+
+    The region markers never reach the output; with the default style the
+    region body is kept verbatim, so a no-layout seed is byte-identical to
+    the marker-free template.
+    """
+    if layout.decisions.style == "entries":
+        return _REGION_RE.sub(lambda m: _entries_example(layout), text)
+    return _REGION_RE.sub(lambda m: m.group(1), text)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="specfuse.loop.layout", description="Resolve the project's layout.yml."

@@ -5,3 +5,5 @@
 - **FEAT-2026-0224/T06**: attempt 1 outcome=passed
 - **FEAT-2026-0224/T04**: attempt 1 outcome=passed
 - **FEAT-2026-0224/T05**: attempt 1 outcome=passed
+- **FEAT-2026-0224/T07**: attempt 1 outcome=passed
+- **FEAT-2026-0224/T07**: Previous attempt's edits stay in tree; verification already passed. No new edits. groom-backlog SKILL.md holds at HEAD: its only ADR mention is the specific FEAT-2026-0011 blocker `ADR-0002`, not generic blocker-style wording.

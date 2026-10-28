@@ -138,9 +138,36 @@ class InvalidLayoutIsReported(unittest.TestCase):
             self.assertIn("`paths:` is not supported yet", r.stdout)
 
 
-@unittest.skip("owned by FEAT-2026-0224/T07")
 class TemplateFollowsStyle(unittest.TestCase):
-    pass
+    def test_entries_template_has_no_adr_and_lints_clean(self):
+        import re
+
+        from specfuse.loop import layout
+        from specfuse.loop.lint_roadmap import SEVERITY_ERROR, lint_roadmap
+
+        text = (Path(__file__).resolve().parent.parent / "specfuse/loop/data/roadmap.template.md").read_text(
+            encoding="utf-8"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".specfuse").mkdir()
+            (root / ".specfuse" / "layout.yml").write_text(ENTRIES_LAYOUT)
+            out = layout.render_roadmap_template(text, layout.load(root))
+            self.assertNotIn("docs/adr", out)
+            self.assertNotIn("layout:decisions-example", out)
+            example = re.search(r"^\*\*Blocked by\.\*\*.*$", out, re.M).group(0)
+            roadmap = (
+                "# Roadmap\n\n| Feature ID | Title | Status | Folder | Detail |\n|---|---|---|---|---|\n"
+                "| FEAT-2026-0001 | T | blocked | — | [→ detail](#feat-2026-0001) |\n"
+                "| FEAT-2026-0011 | U | active | — | [→ detail](#feat-2026-0011) |\n\n"
+                '<a id="feat-2026-0001"></a>\n## FEAT-2026-0001 — T\n\n' + example + "\n\n"
+                '<a id="feat-2026-0011"></a>\n## FEAT-2026-0011 — U\n\nBody.\n'
+            )
+            (root / ".specfuse" / "roadmap.md").write_text(roadmap)
+            (root / "docs" / "decisions").mkdir(parents=True)
+            (root / "docs" / "decisions" / "decisions.md").write_text('<a id="D-0007"></a>\n## D-0007\n')
+            errs = [f.message for f in lint_roadmap(root) if f.severity == SEVERITY_ERROR]
+        self.assertEqual(errs, [])
 
 
 if __name__ == "__main__":

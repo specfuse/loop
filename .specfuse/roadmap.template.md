@@ -34,6 +34,7 @@ links to it.
 A `blocked` feature's detail section carries a `**Blocked by.**` block — blank
 line above it, one linked blocker per clause:
 
+<!-- layout:decisions-example -->
 **Blocked by.** [ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval; [FEAT-2026-0011](#feat-2026-0011) — scoring data must land first.
 
 Each blocker is a Markdown link: an ADR points at its `.md` file (kept under
@@ -41,6 +42,7 @@ Each blocker is a Markdown link: an ADR points at its `.md` file (kept under
 `../docs/adr/…`); a feature dependency points at the blocking
 feature's roadmap anchor (`#feat-yyyy-nnnn`). When every blocker clears, a human
 flips `blocked` → `active` (or `planned`) and removes the `**Blocked by.**` block.
+<!-- /layout:decisions-example -->
 
 ## Notes
 
