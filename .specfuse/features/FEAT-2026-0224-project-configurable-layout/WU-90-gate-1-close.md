@@ -1,13 +1,20 @@
 ---
 id: FEAT-2026-0224/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 5.00
 model: sonnet
 effort: high
 gate_set: plannext
 auto_close_disabled: true
+driver_version: 0.29.1
+started_at: 2026-10-28T01:50:24.814820+00:00
+verdict: met
+duration_seconds: 252.141
+cost_usd: 1.3992
+input_tokens: 72
+output_tokens: 30366
 ---
 
 # G1-CLOSE — terminal close
