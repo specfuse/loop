@@ -123,7 +123,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-2026-0204) |
 | FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | done | `.specfuse/features/FEAT-2026-0205-diagnosis-severity/` | [→ archive](roadmap-archive.md#feat-2026-0205) |
 | FEAT-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-2026-0223) |
-| FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | planned | — | [→ detail](#feat-2026-0224) |
+| FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | active | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ detail](#feat-2026-0224) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1063,7 +1063,7 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Benefits.** A project can replace ADRs with its own decision records without forking skills or losing edits on upgrade, and its roadmap lint stays green. Link building and checking share one tested function, so the skill and the lint cannot disagree. No-layout goldens on deterministic surfaces prove existing projects are unchanged without relying on LLM output. The resolver and validation are in place for the authoring follow-up to add `paths:` with its consumers.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
