@@ -32,6 +32,7 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ### Fixed
 
+- **A re-armed unit keeps the new files its refused attempt created.** After a bookkeeping refusal (`produces_not_in_diff`, `files_changed_mismatch`, …) the driver keeps the attempt's tree, which left the files the attempt created untracked again. A re-armed dispatch snapshots untracked files as the operator's work in progress, so it dropped the unit's own new files from its commit. Every new `produces:` file then failed `produces_not_in_diff` on every attempt, and new files the plan did not name were silently left out of the commit. The driver now marks those files intent-to-add when it keeps the tree: they stay uncommitted but are no longer untracked. (#3538)
 - **Per-attempt test selection skips `produces:` entries that are not Python test modules.** With the default `format: python_module`, every `produces:` path under `tests/` became a dotted module name, so a fixture glob (`tests/fixtures/x/**`) or a data file (`tests/fixtures/x/roadmap.md`) handed unittest a module it could not import. The narrow tests gate then failed identically on every attempt, and the unit was parked as a spinning block even though its tests passed. Only `.py` paths without glob characters are selected now; when a unit declares no such path, the full `command` runs, as before. The `class_name` and `path` formats are unchanged. (#3539)
 
 ## [0.29.1+umbrella.0.15.0] - 2026-10-19
