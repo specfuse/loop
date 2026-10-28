@@ -4739,7 +4739,10 @@ def reset_preserving_events(
         _clean_attempt_ignored(ignored_before, events_path)
 
 
-def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
+def retain_tree_after_refusal(
+    head_before: str, events_path: Path,
+    untracked_before: "set[str] | frozenset[str] | None" = None,
+) -> str:
     """`git reset --mixed <head_before>` — uncommit the squash, keep the tree.
 
     Counterpart to `reset_preserving_events` for a bookkeeping-guard refusal
@@ -4748,11 +4751,25 @@ def retain_tree_after_refusal(head_before: str, events_path: Path) -> str:
     reset above, events.jsonl and every file the attempt wrote are already
     exactly where they need to end up — nothing to read back and rewrite.
 
+    The reset leaves the files the attempt created untracked again, which a
+    later dispatch's `untracked_paths` snapshot would read as operator WIP —
+    on a re-arm, `squash_commit` then dropped the unit's own new files and
+    every new `produces:` path failed `produces_not_in_diff` (#3538). So the
+    paths that appeared since *untracked_before* are marked intent-to-add
+    (`git add -N`): still uncommitted, no longer untracked. `None` means no
+    snapshot, and marks nothing, as `reset_preserving_events` does.
+
     Returns the retained diff via `capture_working_tree_diff` so the caller
-    can fold it into the note the next attempt sees.
+    can fold it into the note the next attempt sees. It is captured before
+    the intent-to-add, so the note is the same either way.
     """
     git("reset", "--mixed", head_before)
-    return capture_working_tree_diff(head_before)
+    diff = capture_working_tree_diff(head_before)
+    if untracked_before is not None:
+        created = sorted(untracked_paths() - set(untracked_before))
+        if created:
+            git("add", "-N", "--", *created)
+    return diff
 
 
 def _resolve_guard_refusal_tree(
@@ -4767,7 +4784,8 @@ def _resolve_guard_refusal_tree(
     then the retained diff last when the tree was kept.
     """
     if resolve_retain_on_guard_refusal(cfg):
-        diff = retain_tree_after_refusal(head_before, events_path)
+        diff = retain_tree_after_refusal(head_before, events_path,
+                                         untracked_before=untracked_before)
         return compose_guard_repair_note(failure_class, note, diff, True), True
     reset_preserving_events(head_before, events_path,
                             untracked_before=untracked_before)
@@ -6941,6 +6959,11 @@ def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
     before returning. *config*'s `format` is assumed already validated by
     `resolve_narrow_selection_config` — this function never sees an unknown
     one.
+
+    `python_module` skips any path that is not an importable `.py` file — a
+    fixture glob or data file under `tests/` is something a unit legitimately
+    produces, and turning it into a dotted name hands unittest a module it
+    cannot import, failing every attempt identically (#3539).
     """
     fmt = config["format"]
     items = []
@@ -6950,6 +6973,8 @@ def render_selected_tests(paths: "list[str]", config: dict) -> "list[str]":
         elif fmt == "path":
             module = p
         else:
+            if not p.endswith(".py") or any(c in p for c in "*?["):
+                continue
             module = _test_module_name(p)
         items.append(config["item_template"].format(module=module))
     return items

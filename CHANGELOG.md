@@ -35,6 +35,11 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 - **`lint_roadmap` checks a Blocked-by link's file and its fragment separately, so `decisions.md#D-0007` is no longer a false error.** The `#fragment` was kept in the path, so any Blocked-by link carrying one reported "does not resolve" as a missing file whether or not the file existed. This applies to every project, with or without a `layout.yml`: the file part is checked, and then the anchor, which is an `<a id="…">` or `<a name="…">` or a heading's GitHub slug, matched exactly. A fragment link that was an error is now clean when the anchor exists and an error naming the anchor when it does not. A link with no fragment reports exactly what it did. An entries heading `## D-0007 — title` slugs to `d-0007--title`, so a link to `#D-0007` needs an explicit anchor. (FEAT-2026-0224)
 
+### Fixed
+
+- **A re-armed unit keeps the new files its refused attempt created.** After a bookkeeping refusal (`produces_not_in_diff`, `files_changed_mismatch`, …) the driver keeps the attempt's tree, which left the files the attempt created untracked again. A re-armed dispatch snapshots untracked files as the operator's work in progress, so it dropped the unit's own new files from its commit. Every new `produces:` file then failed `produces_not_in_diff` on every attempt, and new files the plan did not name were silently left out of the commit. The driver now marks those files intent-to-add when it keeps the tree: they stay uncommitted but are no longer untracked. (#3538)
+- **Per-attempt test selection skips `produces:` entries that are not Python test modules.** With the default `format: python_module`, every `produces:` path under `tests/` became a dotted module name, so a fixture glob (`tests/fixtures/x/**`) or a data file (`tests/fixtures/x/roadmap.md`) handed unittest a module it could not import. The narrow tests gate then failed identically on every attempt, and the unit was parked as a spinning block even though its tests passed. Only `.py` paths without glob characters are selected now; when a unit declares no such path, the full `command` runs, as before. The `class_name` and `path` formats are unchanged. (#3539)
+
 ## [0.29.1+umbrella.0.15.0] - 2026-10-19
 
 ### Fixed
