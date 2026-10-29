@@ -442,6 +442,7 @@ def _resolve_feature_dir(feature_id: str, repo_root: Path) -> "Path | None":
         return None
 
     candidates = sorted(d for d in features_dir.iterdir() if d.is_dir())
+    feature_id = _ids.resolve(repo_root, feature_id)
 
     # Priority 1: exact directory name
     exact = [d for d in candidates if d.name == feature_id]

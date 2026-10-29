@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T09
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 2.00
 provenance: "Part of the operator-accepted design for the full rename (see T08's provenance): old IDs live on in commit messages, GitHub issue and PR titles and other repositories, so after `ids migrate --all` the loop's ID lookups resolve them through `.specfuse/id-aliases.yml`."
@@ -17,6 +17,15 @@ produces:
   - tests/test_keyed_feature_ids_end_to_end.py
 produces_driver_helper:
   - _FEATURE_ID_RE
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:57:02.600715+00:00
+duration_seconds: 87.944
+cost_usd: 0.330947
+input_tokens: 22
+output_tokens: 7424
 ---
 
 # T09 — old IDs still resolve after a full rename

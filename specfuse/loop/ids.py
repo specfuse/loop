@@ -449,6 +449,42 @@ def _dirty(root: Path) -> bool:
     return bool(r.stdout.strip())
 
 
+def read_aliases(repo_root) -> dict:
+    """`{old_id: new_id}` from `.specfuse/id-aliases.yml`; `{}` when absent."""
+    path = Path(repo_root) / ".specfuse" / ALIASES_FILE
+    if not path.is_file():
+        return {}
+    out = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0]
+        old, sep, new = line.partition(":")
+        if sep and old.strip() and new.strip():
+            out[old.strip()] = new.strip().strip("'\"")
+    return out
+
+
+def resolve(repo_root, feature_id, err=None) -> str:
+    """The ID itself when it has a folder, else its alias target (one hop).
+
+    No alias map, no alias entry, or an alias whose target has no folder all
+    return *feature_id* unchanged; the last case is reported on *err*
+    (default stderr) rather than followed into an error.
+    """
+    if not isinstance(feature_id, str) or _has_folder(Path(repo_root), feature_id):
+        return feature_id
+    target = read_aliases(repo_root).get(feature_id)
+    if target is None:
+        return feature_id
+    if not _has_folder(Path(repo_root), target):
+        print(
+            f"WARNING: {ALIASES_FILE} maps {feature_id} to {target}, "
+            f"which has no feature folder",
+            file=err or sys.stderr,
+        )
+        return feature_id
+    return target
+
+
 def _append_aliases(root: Path, renames) -> None:
     path = root / ".specfuse" / ALIASES_FILE
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""

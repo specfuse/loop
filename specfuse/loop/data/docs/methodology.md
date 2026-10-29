@@ -60,6 +60,16 @@ planned roadmap rows. Pick a short key distinct across the repos of one project;
 uniqueness is by convention, not enforced. No prompt asks for the key; it is read
 from `layout.yml`. The ID shape lives in `specfuse.loop.ids`.
 
+**Renaming existing features.** `ids migrate --all` is the opt-in full rename: it
+re-keys every feature of the repository, rewriting folder names, PLAN and WU
+frontmatter, roadmap rows and anchors, and `events.jsonl` correlation IDs, and
+records each old-to-new pair in `.specfuse/id-aliases.yml`. It cannot reach git
+history, GitHub issue and PR titles, or other repositories, which keep the old
+IDs. The loop resolves an old ID through the alias map (one hop) wherever an
+operator types one: `--feature`, `gate_eval`, and `[FEAT-…]` issue titles. Prose
+mentions are listed for review (`--include-prose` rewrites them) rather than
+rewritten silently.
+
 The correlation ID threads the entire lifecycle — it appears in the feature
 folder name, the WU file, every event-log entry, the branch, the commit trailer
 (`Feature: FEAT-YYYY-NNNN/TNN`), and (in the orchestrator) the GitHub issue.

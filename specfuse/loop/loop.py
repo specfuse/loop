@@ -1178,6 +1178,9 @@ def _resolve_feature_dir(arg: str) -> Path:
     if (direct / "PLAN.md").exists():
         return direct
 
+    if _FEATURE_ID_RE.match(arg):
+        arg = _ids.resolve(REPO_ROOT, arg)
+
     if not _FEATURE_ID_RE.match(arg):
         sys.exit(f"No PLAN.md under {direct}{_feature_hint()}")
 

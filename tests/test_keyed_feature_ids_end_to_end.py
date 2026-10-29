@@ -202,6 +202,9 @@ class Clause9MigrateAll(unittest.TestCase):
             self.assertIn("FEAT-2026-0008: " + new,
                           (root / ".specfuse" / "id-aliases.yml").read_text())
             self.assertIn("FEAT-2026-0008", (root / "NOTES.md").read_text())
+            from specfuse.loop import ids
+            self.assertEqual(ids.resolve(root, "FEAT-2026-0008"), new)
+            self.assertEqual(ids.resolve(root, new), new)
             plan, roadmap = lint_errors(root, new)
             self.assertEqual((plan, roadmap), ([], []))
             again = _run(root, "specfuse.loop.ids", "migrate", "--all", "--apply")
