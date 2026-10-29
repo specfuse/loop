@@ -1,7 +1,7 @@
 ---
 id: FEAT-LOOP-2026-0248/G1-CLOSE
 type: close
-status: pending
+status: blocked_human
 attempts: 0
 planned_cost_usd: 5.00
 auto_close_disabled: true
