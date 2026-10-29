@@ -477,6 +477,31 @@ def resolve(repo_root, feature_id, err=None) -> str:
     return target
 
 
+def _validate_tree(root: Path) -> list:
+    """ERROR lines from lint_plan, lint_roadmap and agent-policy validation, in-process."""
+    from specfuse.loop import agent_policy, lint_plan, lint_roadmap
+
+    errors = []
+    features = root / ".specfuse" / "features"
+    if features.is_dir():
+        for folder in sorted(p for p in features.iterdir() if p.is_dir()):
+            errors.extend(
+                f"ERROR: {folder.name}: {e}"
+                for e in lint_plan.lint(folder)
+                if not e.startswith("WARN")
+            )
+    for f in lint_roadmap.lint_roadmap(root):
+        if f.severity == lint_roadmap.SEVERITY_ERROR:
+            errors.append(f"ERROR: {f.file}:{f.line}: {f.message}")
+    policy = root / ".specfuse" / "agent-policy.yml"
+    if policy.is_file():
+        errors.extend(
+            e for e in agent_policy.validate_agent_policy(policy, repo_root=root)
+            if e.startswith("ERROR")
+        )
+    return errors
+
+
 def _append_aliases(root: Path, renames) -> None:
     path = root / ".specfuse" / ALIASES_FILE
     existing = path.read_text(encoding="utf-8") if path.is_file() else ""
@@ -553,6 +578,17 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
             )
         _append_aliases(root, plan.renames)
         print(f"re-keyed {len(plan.renames)} feature(s); alias map .specfuse/{ALIASES_FILE}", file=out)
+        errors = _validate_tree(root)
+        for e in errors:
+            print(e, file=out)
+        if errors:
+            print(
+                f"ids migrate: {len(errors)} error(s) after rename; the tree is under git, "
+                "`git checkout -- . && git clean -fd .specfuse/features` undoes the rename",
+                file=out,
+            )
+            return 1
+        print("validated: lint_plan, lint_roadmap, agent-policy clean", file=out)
         return 0
     finally:
         if lock is not None:

@@ -1,14 +1,23 @@
 ---
 id: FEAT-LOOP-2026-0248/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/agent_policy.py
   - specfuse/loop/ids.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T15:12:17.907356+00:00
+duration_seconds: 57.562
+cost_usd: 0.397029
+input_tokens: 24
+output_tokens: 6897
 ---
 
 # T01 — walking skeleton: policy resolves old IDs, and `--apply` validates what it wrote
