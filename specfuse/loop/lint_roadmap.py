@@ -137,6 +137,7 @@ def _lint_roadmap_impl(repo_root: Path) -> list:
     findings += _check_blocked_by(roadmap_doc, archive_doc, rows, repo_root)
     findings += _check_orphan_sections(roadmap_doc, archive_doc, rows)
     findings += _check_section_status(roadmap_doc, archive_doc, rows)
+    findings += _check_unkeyed_planned(rows, repo_root)
     findings += _layout.validate(repo_root)
 
     return findings
@@ -359,6 +360,30 @@ def roadmap_statuses(repo_root=None) -> dict:
         return {}
     lines = roadmap_path.read_text(encoding="utf-8").splitlines()
     return {row["id"]: row["status"] for row in _parse_table_rows(lines)}
+
+
+def _check_unkeyed_planned(rows, repo_root: Path) -> list:
+    """With `ids.key` set, warn on each `planned` row still allocated the legacy way."""
+    try:
+        key = _layout.get(_layout.load(repo_root), "ids.key")
+    except Exception:  # noqa: BLE001 - a bad layout is _layout.validate's finding, not ours
+        return []
+    if not key:
+        return []
+    findings = []
+    for row in rows:
+        if row["status"] != "planned":
+            continue
+        parsed = _ids.parse(row["id"])
+        if parsed is None or parsed.key:
+            continue
+        findings.append(Finding(
+            SEVERITY_WARN, ROADMAP_FILENAME, row["line"],
+            f"{row['id']} is planned but has no project key; layout.yml sets "
+            f"ids.key: {key} — re-key it with "
+            "`python3 -m specfuse.loop.ids migrate --planned-only`",
+        ))
+    return findings
 
 
 def _detail_sections(lines) -> dict:

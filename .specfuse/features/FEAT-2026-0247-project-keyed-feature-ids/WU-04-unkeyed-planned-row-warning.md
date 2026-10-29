@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0247/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 produces:
   - specfuse/loop/lint_roadmap.py
   - tests/test_lint_roadmap_unkeyed_rows.py
   - tests/test_keyed_feature_ids_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:19:37.224331+00:00
+duration_seconds: 42.55
+cost_usd: 0.220912
+input_tokens: 16
+output_tokens: 4095
 ---
 
 # T04 — with a key set, an unkeyed planned row draws a WARN

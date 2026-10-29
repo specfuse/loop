@@ -5,7 +5,7 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03); the rest
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04); the rest
 are skipped naming their owner. A skip surviving to the close is a hollow oracle.
 """
 
@@ -144,9 +144,20 @@ class Clause4SkillsAllocateThroughIdsNext(unittest.TestCase):
         self.assertIn("specfuse.loop.ids next", self._skill("draft-feature"))
 
 
-@unittest.skip("owned by FEAT-2026-0247/T04")
 class Clause5UnkeyedPlannedRowWarns(unittest.TestCase):
-    pass
+    def test_unkeyed_planned_row_warns_with_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_repo(tmp, key="ACME", feature_id="FEAT-2026-0008")
+            warns = [f for f in lint_roadmap.lint_roadmap(root) if f.severity == lint_roadmap.SEVERITY_WARN]
+            self.assertEqual(len(warns), 1, warns)
+            self.assertIn("FEAT-2026-0008", warns[0].message)
+            self.assertIn("ACME", warns[0].message)
+            self.assertIn("migrate --planned-only", warns[0].message)
+
+    def test_silent_without_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_repo(tmp, feature_id="FEAT-2026-0008")
+            self.assertEqual(lint_roadmap.lint_roadmap(root), [])
 
 
 @unittest.skip("owned by FEAT-2026-0247/T05")
