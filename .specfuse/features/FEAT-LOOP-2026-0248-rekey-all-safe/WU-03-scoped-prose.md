@@ -1,14 +1,24 @@
 ---
 id: FEAT-LOOP-2026-0248/T03
 type: implementation
-status: pending
-attempts: 0
+status: blocked_human
+attempts: 2
 oracle_env: macos_local
 planned_cost_usd: 2.00
 produces:
   - specfuse/loop/ids.py
   - tests/test_ids_migrate_all.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T15:14:29.643382+00:00
+duration_seconds: 88.399
+cost_usd: 0.376264
+input_tokens: 24
+output_tokens: 6469
+escalation_reason: deterministic_refusal_repeat
 ---
 
 # T03 — `--include-prose` takes paths; `--exclude-id` protects shared numbers
