@@ -13,3 +13,4 @@
 - **FEAT-LOOP-2026-0248/T05**: Fixed 8 test modules so they pass on the unrenamed tree and in the rehearsal; two failures remain that need `specfuse/` changes (schema pattern and folderless-row alias).
   - note: `ids.resolve` needs the alias target to resolve for a roadmap row with no feature folder (`FEAT-2026-0078`); the event schema pattern needs to accept keyed IDs. Both are in `specfuse/` and `.specfuse/schemas/`, outside T05.
 - **FEAT-LOOP-2026-0248/T08**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: attempt 1 outcome=passed

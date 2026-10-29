@@ -14,6 +14,7 @@ from pathlib import Path
 
 from specfuse.loop import (
     agent_policy,
+    ids,
     changelog,
     gate_eval,
     gh_features,
@@ -43,7 +44,8 @@ def _changelog_trace(fid):
 def _gh_title(fid):
     issues = [{"number": 1, "title": f"[{fid}] Thing", "labels": []}]
     got = gh_features.list_features("o/r", runner=lambda repo: issues)
-    return [c["feature_id"] for c in got] == [fid]
+    # list_features resolves an old ID through the cwd repo's alias map.
+    return [c["feature_id"] for c in got] == [ids.resolve(".", fid)]
 
 
 def _promotion(fid):
@@ -128,12 +130,14 @@ class PartialLookup(unittest.TestCase):
     def test_real_corpus_by_ordinal_matches_head(self):
         features = REPO_ROOT / ".specfuse" / "features"
         for d in sorted(p for p in features.iterdir() if p.is_dir()):
-            if len(d.name.split("-")) < 4:
+            parsed = ids.parse(d.name)
+            if parsed is None:
                 continue
-            ordinal = d.name.split("-")[2]
+            ordinal = f"{parsed.ordinal:04d}"
             expected = [
                 c for c in sorted(features.iterdir())
-                if c.is_dir() and len(c.name.split("-")) >= 4 and c.name.split("-")[2] == ordinal
+                if c.is_dir() and ids.parse(c.name) is not None
+                and ids.parse(c.name).ordinal == parsed.ordinal
             ]
             if len(expected) == 1:
                 got = gate_eval._resolve_feature_dir(ordinal, REPO_ROOT)

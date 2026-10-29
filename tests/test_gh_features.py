@@ -19,6 +19,8 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
+from specfuse.loop import ids
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -124,7 +126,10 @@ class TestComponentLocalIssue(unittest.TestCase):
         self.candidate = next(c for c in candidates if c["number"] == 7)
 
     def test_feature_id(self):
-        self.assertEqual(self.candidate["feature_id"], "FEAT-2026-0003")
+        # list_features resolves an old ID through the alias map of the cwd repo.
+        self.assertEqual(
+            self.candidate["feature_id"], ids.resolve(".", "FEAT-2026-0003")
+        )
 
     def test_initiative_is_none(self):
         self.assertIsNone(self.candidate["initiative"])

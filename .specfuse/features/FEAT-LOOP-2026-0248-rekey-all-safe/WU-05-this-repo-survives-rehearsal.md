@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 unsandboxed: true
 unsandboxed_rationale: "--rehearse runs git worktree add/remove and the full test suite in a temp worktree; inside the sandbox the previous dispatch saw about 160 false errors (git, build-dependency network fetch) that vanished unsandboxed. Memory/LEARNINGS: run the suite unsandboxed."
 re_arm_count: 3
@@ -31,10 +31,21 @@ re_arm_history:
 oracle_env: macos_local
 planned_cost_usd: 4.00
 max_attempts: 3
-duration_seconds: 3076.528
-cost_usd: 1.374982
-input_tokens: 96
-output_tokens: 21996
+duration_seconds: 3162.025
+cost_usd: 0.994565
+input_tokens: 60
+output_tokens: 15124
+cumulative_cost_usd: 1.374982
+cumulative_duration_seconds: 3076.528
+cumulative_input_tokens: 96
+cumulative_output_tokens: 21996
+cumulative_attempts: 4
+folded_through_re_arm: 3
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T18:44:13.410027+00:00
 ---
 
 # T05 — this repository's full suite passes a rehearsal of the rename

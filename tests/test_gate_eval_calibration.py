@@ -286,7 +286,8 @@ class TestMainCLI(unittest.TestCase):
     @unittest.skipUnless(_0017_DIR.is_dir(), "skipped: feature dir absent (FEAT-2026-0017)")
     def test_backtest_0017_runs_and_prints_feature_id(self):
         out = self._run_main(["backtest", "0017"])
-        self.assertIn("FEAT-2026-0017", out)
+        from specfuse.loop import ids
+        self.assertIn(ids.resolve(REPO_ROOT, "FEAT-2026-0017"), out)
         self.assertIn("auto=", out)
 
     @unittest.skipUnless(_0017_DIR.is_dir(), "skipped: feature dir absent (FEAT-2026-0017)")

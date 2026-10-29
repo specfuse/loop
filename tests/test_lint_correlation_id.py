@@ -23,13 +23,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from specfuse.loop import ids
 from tests._loop_loader import load_lint
 
 lint_plan = load_lint()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LINT = REPO_ROOT / ".specfuse/scripts/lint_plan.py"
-EXAMPLE_FEATURE = REPO_ROOT / ".specfuse/features/FEAT-2026-0001-health-endpoint"
+EXAMPLE_ID = ids.resolve(REPO_ROOT, "FEAT-2026-0001")
+EXAMPLE_FEATURE = REPO_ROOT / f".specfuse/features/{EXAMPLE_ID}-health-endpoint"
 
 
 def copy_example_to(tmp: Path) -> Path:
@@ -56,35 +58,35 @@ class TestLintCorrelationId(unittest.TestCase):
             feature = copy_example_to(Path(tmpdir))
             # Break the graph: /T01 -> /T1 (single-digit, malformed).
             mutate(feature / "PLAN.md",
-                   "id: FEAT-2026-0001/T01",
-                   "id: FEAT-2026-0001/T1")
+                   f"id: {EXAMPLE_ID}/T01",
+                   f"id: {EXAMPLE_ID}/T1")
             errs = lint_plan.lint(feature)
             self.assertTrue(errs, "malformed graph id must produce errors")
             joined = "\n".join(errs)
             self.assertIn("malformed correlation id", joined)
-            self.assertIn("FEAT-2026-0001/T1", joined)
+            self.assertIn(f"{EXAMPLE_ID}/T1", joined)
 
     def test_malformed_frontmatter_id_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             feature = copy_example_to(Path(tmpdir))
             # Break the frontmatter: id field, not the graph.
             mutate(feature / "WU-01-health-endpoint.md",
-                   "id: FEAT-2026-0001/T01",
-                   "id: FEAT-2026-0001/T1")
+                   f"id: {EXAMPLE_ID}/T01",
+                   f"id: {EXAMPLE_ID}/T1")
             errs = lint_plan.lint(feature)
             self.assertTrue(errs)
             joined = "\n".join(errs)
             # The graph still says T01; frontmatter says T1. Expect both an
             # equality-mismatch error AND a malformed-frontmatter-id error.
             self.assertIn("frontmatter id", joined)
-            self.assertIn("malformed frontmatter id 'FEAT-2026-0001/T1'", joined)
+            self.assertIn(f"malformed frontmatter id '{EXAMPLE_ID}/T1'", joined)
 
     def test_lowercase_closing_token_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             feature = copy_example_to(Path(tmpdir))
             mutate(feature / "PLAN.md",
-                   "id: FEAT-2026-0001/G1-RETRO",
-                   "id: FEAT-2026-0001/G1-retro")
+                   f"id: {EXAMPLE_ID}/G1-RETRO",
+                   f"id: {EXAMPLE_ID}/G1-retro")
             errs = lint_plan.lint(feature)
             self.assertTrue(errs)
             joined = "\n".join(errs)
@@ -203,8 +205,8 @@ class TestLintCliContract(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             feature = copy_example_to(Path(tmpdir))
             mutate(feature / "PLAN.md",
-                   "id: FEAT-2026-0001/T01",
-                   "id: FEAT-2026-0001/T1")
+                   f"id: {EXAMPLE_ID}/T01",
+                   f"id: {EXAMPLE_ID}/T1")
             proc = subprocess.run(
                 [sys.executable, str(LINT), str(feature)],
                 capture_output=True, text=True, check=False,
