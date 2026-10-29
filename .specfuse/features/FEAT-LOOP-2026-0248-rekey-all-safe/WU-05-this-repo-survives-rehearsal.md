@@ -11,7 +11,7 @@ re_arm_history:
     timestamp: 2026-10-29T17:04:06+00:00
     prior_status: blocked_human
     prior_attempts: 2
-    prior_cost_usd: 4.00
+    prior_cost_usd: 0.926254
     prior_duration_seconds: 5059.215
     reason: "Planning error, not the unit's work: the prescribed --include-prose scope included tests/, specfuse/, docs/ and plugins/, whose mentions are mostly fixtures and illustrative example IDs (78, then 32 failures in operator rehearsals), and the fixed produces list could not be known in advance. Scope narrowed to this repository's own history; produces removed; T06 added for the stale in-process validation."
   -
