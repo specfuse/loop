@@ -1,0 +1,1 @@
+- **FEAT-2026-0246/T01**: Added the terminal judge-editing stop. A done substantive unit on the last gate that declares a judge-surface path now halts the run before the close, auto or dispatched. All 52 tests in the touched and related modules pass (unsandboxed). That is the narrow tier plus the AC3 set and the registry/event tests.

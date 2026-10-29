@@ -10,8 +10,8 @@ structured per-class verdict. Mirrors the shape of `gate_eval.py`'s
 `evaluate_auto_close`: pure evaluation over files, a structured decision
 object, a formatter for the event trail, no side effects. Arming and closing
 are deliberately separate decisions with different inputs — this module does
-not fold into `gate_eval.py`, does not import from it, and does not import
-from `loop.py` (the dependency points the other way: `loop.py` will call
+not fold into `gate_eval.py` (it reads only the `NON_SUBSTANTIVE_TYPES`
+constant from it) and does not import from `loop.py` (the dependency points the other way: `loop.py` will call
 into this module, T04).
 
 The organizing principle: model-authored signals may only veto; only
@@ -38,6 +38,7 @@ from pathlib import Path
 from . import _miniyaml
 from .closing_requirements import gate_review_filename
 from .cost import wu_lifetime_cost_usd
+from .gate_eval import NON_SUBSTANTIVE_TYPES
 from .plan_baseline import load_baseline, load_plan_graph
 
 PREDICATE_VERSION = "v1"
@@ -626,6 +627,41 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
         feature_id=feature_id,
         gate_id=just_closed_gate,
         predicate_version=PREDICATE_VERSION,
+    )
+
+
+def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> ClassVerdict:
+    """Report which done substantive units of `gate_number` touch a judge surface.
+
+    Not a successor-arm class: it is absent from `CLASS_NAMES` and `would_arm`
+    never reads it. It is the terminal gate's counterpart of class 2 -- the arm
+    predicate looks at *drafted* units of the next gate; nothing arms after the
+    terminal gate, so this looks at the units that already ran and are about to
+    be closed over. Pure: reads PLAN.md and the gate's unit files only.
+    """
+    feature_dir = Path(feature_dir)
+    plan = load_plan_graph(feature_dir)
+    gate = next(
+        (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
+        None,
+    )
+    hits: list[str] = []
+    for ref in (gate.get("work_units", []) or []) if gate else []:
+        wu = _read_wu(feature_dir, ref)
+        if wu is None or wu["type"] in NON_SUBSTANTIVE_TYPES or wu["status"] != "done":
+            continue
+        for p in wu["produces"]:
+            if _matches_judge_path(p):
+                hits.append(f"{wu['id']} produces {p}")
+        if wu["produces_driver_helper"]:
+            hits.append(
+                f"{wu['id']} declares produces_driver_helper "
+                f"{wu['produces_driver_helper']!r}"
+            )
+    if hits:
+        return ClassVerdict("fired", "; ".join(hits))
+    return ClassVerdict(
+        "clean", "no done substantive unit touches judge-path surfaces"
     )
 
 

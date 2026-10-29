@@ -116,7 +116,7 @@ from .judge import (
     parse_judge_result,
     render_judge_prompt,
 )
-from .arm_eval import evaluate_arm_predicate
+from .arm_eval import evaluate_arm_predicate, evaluate_terminal_judge_editing
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .build_provenance import head_tree_hash
 from .cost import wu_lifetime_cost_usd
@@ -4469,6 +4469,72 @@ def halt_for_human_unit(
     )
     print(f"\n{message}")
     return 1
+
+
+HALT_REASON_JUDGE_EDITING_TERMINAL = "judge_editing_terminal"
+
+
+def stop_for_terminal_judge_edit(
+    wu: "WorkUnit",
+    backend: "Backend",
+    feature_dir: Path,
+    feature_id: str,
+    gate_number: int,
+    events_path: Path,
+) -> bool:
+    """Halt in front of the terminal close when a done unit edited a judge
+    surface (FEAT-2026-0246/T01). True means the close was stopped.
+
+    The one seat for both terminal-close paths: the in-loop auto-close branch
+    and the dispatched close both reach it, so a verdict the model authored over
+    its own judge-path edits cannot close the feature unreviewed. Evaluates
+    `arm_eval.evaluate_terminal_judge_editing` once and emits
+    `terminal_judge_editing_evaluated` on every terminal gate; only `fired`
+    stops. An evaluation failure is recorded on that event and does not stop,
+    the same posture as `build_arm_predicate_event`.
+
+    T03 replaces the one-line message with the six-part brief; T02 adds the
+    acknowledgement read ahead of the stop.
+    """
+    try:
+        verdict = evaluate_terminal_judge_editing(feature_dir, gate_number)
+    except Exception as exc:  # noqa: BLE001 - a raise is not a verdict
+        flush_events(events_path, [build_event(
+            "terminal_judge_editing_evaluated", feature_id, {
+                "gate": gate_number,
+                "status": "not_evaluable",
+                "evaluation_error": f"{type(exc).__name__}: {exc}",
+            })])
+        return False
+    evaluated = build_event(
+        "terminal_judge_editing_evaluated", feature_id, {
+            "gate": gate_number,
+            "status": verdict.status,
+            "reason": verdict.reason,
+        })
+    if verdict.status != "fired":
+        flush_events(events_path, [evaluated])
+        return False
+    hits = verdict.reason.split("; ")
+    message = (
+        f"Gate {gate_number} close stopped: a done unit edited a judge surface "
+        f"({verdict.reason}). Review those edits, then resume."
+    )
+    backend.set_wu(wu, "status", "blocked_human")
+    flush_events(events_path, [evaluated, build_event(
+        "human_escalation", wu.wu_id, {
+            "reason": HALT_REASON_JUDGE_EDITING_TERMINAL,
+            "gate": gate_number,
+            "hits": hits,
+            "message": message,
+        })])
+    commit_bookkeeping(
+        [wu.file, events_path],
+        f"chore(loop): {wu.wu_id} blocked (judge-editing terminal gate)"
+        f"\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return True
 
 
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
@@ -11949,6 +12015,15 @@ def run(
                             "override": True,
                         }
                     )])
+
+                # FEAT-2026-0246/T01 — judge-editing stop. One seat for both
+                # terminal-close paths below (auto-close and dispatched close).
+                if (not dry_run and wu.type == "close" and gate is gates[-1]
+                        and stop_for_terminal_judge_edit(
+                            wu, backend, feature_dir, feature_id, gate.number,
+                            events_path)):
+                    blocked = True
+                    continue
 
                 # FEAT-2026-0018/T11H — terminal auto-close branch (relocated from post-loop)
                 # Guard wu.verdict is None: only attempt auto-close for WUs that have

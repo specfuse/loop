@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 4.00
 produces:
   - tests/test_terminal_judge_editing_end_to_end.py
@@ -16,6 +16,12 @@ gate_set: code
 oracle_env: macos_local
 produces_driver_helper:
   - stop_for_terminal_judge_edit
+driver_version: 0.30.0
+started_at: 2026-10-29T11:56:33.750899+00:00
+duration_seconds: 184.655
+cost_usd: 1.071005
+input_tokens: 58
+output_tokens: 19157
 ---
 
 # T01 — walking skeleton: a terminal judge edit halts before the close
