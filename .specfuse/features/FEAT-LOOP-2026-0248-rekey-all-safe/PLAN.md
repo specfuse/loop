@@ -5,7 +5,7 @@ slug: rekey-all-safe
 branch: feat/FEAT-LOOP-2026-0248-rekey-all-safe
 roadmap_goal: After ids migrate --all --apply, a repository is valid — configuration and lookups resolve old IDs, only real structural paths are rewritten, prose inclusion is scoped, the tree is validated after apply, and this repository's own full suite passes a rehearsal of the rename
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 23.50
 ---
 

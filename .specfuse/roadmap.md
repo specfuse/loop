@@ -126,7 +126,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-2026-0224) |
 | FEAT-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-2026-0246) |
 | FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-2026-0247) |
-| FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | active | — | [→ detail](#feat-loop-2026-0248) |
+| FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1056,17 +1056,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
-
-<a id="feat-loop-2026-0248"></a>
-## FEAT-LOOP-2026-0248 — Make `ids migrate --all` safe on a real repository
-
-**Why.** A rehearsal of `ids migrate --all` with key `LOOP` on this repository (2026-10-29, throwaway worktree) re-keyed 109 features but left 44 of 4925 tests failing and broke real configuration. `agent-policy.yml`'s queue and `lint_plan`'s exemption table still name old IDs and do not consult the alias map. Fixture-only feature paths inside tests were rewritten as if they were structural. `--include-prose` is all-or-nothing, so this repository's own docs cannot be included without also rewriting mentions of another repository's features. Nothing validates the tree after `--apply`. And this repository's tests read real feature folders by their old paths.
-
-**Goal.** After `ids migrate --all --apply`, a repository is valid. Every lookup that names a feature (agent-policy queue validation, `lint_plan`'s exemption table, the done-feature-gates exclusions, LEARNINGS owner mapping) resolves old IDs through `.specfuse/id-aliases.yml`. Code, config and tests are rewritten only where an exact existing feature folder name appears, never fixture-only paths. `--include-prose` takes paths, and `--exclude-id` names foreign IDs to leave alone. `--apply` ends by running `lint_plan`, `lint_roadmap` and agent-policy validation, and exits non-zero on any error. This repository's tests resolve real feature folders by ID instead of hard-coded paths. Proven by re-running the rehearsal on this repository: `--all` with key `LOOP`, then the full suite green. Applying the rename to `main` stays a separate operator decision.
-
-**Benefits.** The full rename becomes something an operator can run on an existing multi-repository project without breaking configuration or tests. The alias map covers every place an old ID is looked up, not three of them. The operator's review shrinks from thousands of undifferentiated prose mentions to the foreign IDs that actually need a decision.
-
-**Status: active.**
 
 ## Notes
 
