@@ -5,7 +5,7 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01); the rest
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02); the rest
 are skipped naming their owner. A skip surviving to the close is a hollow oracle.
 """
 
@@ -122,9 +122,13 @@ class Clause2KeyedFeatureLints(unittest.TestCase):
         self._check(None, "FEAT-ACME-2026-0008")
 
 
-@unittest.skip("owned by FEAT-2026-0247/T02")
 class Clause3EverySiteAcceptsKeyedForm(unittest.TestCase):
-    pass
+    """The per-site cases live in tests/test_ids_call_sites.py; this ties them in."""
+
+    def test_call_site_suite_is_live(self):
+        from tests import test_ids_call_sites
+
+        self.assertTrue(test_ids_call_sites.CallSiteCases.SITES)
 
 
 @unittest.skip("owned by FEAT-2026-0247/T03")

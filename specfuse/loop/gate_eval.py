@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import _miniyaml
+from . import ids as _ids
 
 PREDICATE_VERSION = "v1"
 PER_WU_COST_RATIO_CEILING = 1.5
@@ -458,8 +459,16 @@ def _resolve_feature_dir(feature_id: str, repo_root: Path) -> "Path | None":
     partial: list[Path] = []
     for d in candidates:
         name = d.name
+        parsed = _ids.parse(name)
+        if parsed is not None:
+            # FEAT-[KEY-]YYYY-NNNN-slug: compare the ordinal and the slug
+            head = str(parsed)
+            nnnn = f"{parsed.ordinal:04d}"
+            slug = name[len(head) + 1:]
+            if nnnn == feature_id or slug == feature_id:
+                partial.append(d)
+            continue
         parts = name.split("-")
-        # FEAT-YYYY-NNNN-slug → parts[2] is the NNNN part
         if len(parts) >= 4:
             nnnn = parts[2]
             slug = "-".join(parts[3:])

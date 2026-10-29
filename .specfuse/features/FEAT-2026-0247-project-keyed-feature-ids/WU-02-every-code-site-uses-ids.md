@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
@@ -19,6 +19,15 @@ produces_driver_helper:
   - _FEATURE_ID_RE
   - _LEARNINGS_FEAT_ID_RE
   - _BARE_FEAT_REF_RE
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:16:55.012675+00:00
+duration_seconds: 93.208
+cost_usd: 0.416701
+input_tokens: 28
+output_tokens: 9421
 ---
 
 # T02 — every code site that parses a feature ID uses `ids`

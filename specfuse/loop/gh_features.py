@@ -13,9 +13,11 @@ import subprocess
 import sys
 from typing import Any, Optional
 
+from specfuse.loop import ids
+
 # Matches [INIT-YYYY-NNNN/FNN] or [FEAT-YYYY-NNNN] at the start of a title.
 _TITLE_RE = re.compile(
-    r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|FEAT-\d{4}-\d{4}))\]\s*(?P<summary>.*)$"
+    r"^\[(?P<id>(?:INIT-\d{4}-\d{4}/F\d{2}|" + ids.FEATURE_ID_PATTERN + r"))\]\s*(?P<summary>.*)$"
 )
 
 FEATURE_LABEL = "specfuse:feature"

@@ -33,6 +33,7 @@ import re
 from pathlib import Path
 
 from . import _miniyaml
+from . import ids as _ids
 from .lint_roadmap import roadmap_statuses
 
 __all__ = (
@@ -62,7 +63,7 @@ PROVIDER_VALUES = frozenset({"discord", "slack", "teams", "none"})
 
 REQUIRED_TOP_LEVEL_FIELDS = ("version", "queue", "rules", "budgets", "escalation")
 
-_FEAT_ID_RE = re.compile(r"^FEAT-\d{4}-\d{4}$")
+_FEAT_ID_RE = _ids.FEATURE_ID_RE
 
 _REQUIRED_BUDGET_FIELDS = ("max_tokens_per_run", "max_open_prs", "max_items_per_day")
 _REQUIRED_ESCALATION_FIELDS = ("webhook_env", "assignee", "quiet_hours", "sla_hours")
@@ -725,7 +726,7 @@ def _check_version(version: object) -> list[str]:
 
 def _check_queue(queue: object) -> list[str]:
     if not isinstance(queue, list):
-        return ["ERROR: 'queue' must be a list of FEAT-YYYY-NNNN strings"]
+        return ["ERROR: 'queue' must be a list of FEAT-YYYY-NNNN or FEAT-<KEY>-YYYY-NNNN strings"]
 
     findings: list[str] = []
     seen: set[str] = set()
@@ -733,7 +734,7 @@ def _check_queue(queue: object) -> list[str]:
         if not isinstance(entry, str) or not _FEAT_ID_RE.match(entry):
             findings.append(
                 f"ERROR: queue[{index}]: {entry!r} does not match "
-                f"FEAT-YYYY-NNNN"
+                f"FEAT-YYYY-NNNN or FEAT-<KEY>-YYYY-NNNN"
             )
             continue
         if entry in seen:
@@ -884,7 +885,7 @@ def _check_feature_overrides(overrides: object) -> list[str]:
         if not _FEAT_ID_RE.match(str(feat_id)):
             findings.append(
                 f"ERROR: rules.features.overrides: key {feat_id!r} does not "
-                f"match FEAT-YYYY-NNNN"
+                f"match FEAT-YYYY-NNNN or FEAT-<KEY>-YYYY-NNNN"
             )
         if value not in GATE_REVIEW_VALUES:
             findings.append(

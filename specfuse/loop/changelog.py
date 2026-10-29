@@ -29,6 +29,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from specfuse.loop import ids
+
 ENTRY_CLASSES = ("added", "changed", "fixed", "breaking")
 
 _UNRELEASED_HEADING_RE = re.compile(r"^##\s+\[Unreleased\]\s*$")
@@ -36,7 +38,9 @@ _RELEASED_HEADING_RE = re.compile(r"^##\s+\[(?P<version>[^\]]+)\]\s*-\s*(?P<date
 _ANY_H2_RE = re.compile(r"^##\s+")
 _CLASS_HEADING_RE = re.compile(r"^###\s+(?P<name>\S.*?)\s*$")
 _ENTRY_RE = re.compile(r"^-\s+(?P<summary>.+?)\s+\((?P<trace>[^()]+)\)\s*$")
-_TRACE_RE = re.compile(r"^(FEAT-\d{4}-\d{4}(?:/[A-Za-z0-9-]+)?|#\d+)$")
+_TRACE_RE = re.compile(
+    r"^(" + ids.FEATURE_ID_PATTERN + r"(?:/[A-Za-z0-9-]+)?|#\d+)$"
+)
 
 
 @dataclass
