@@ -1385,6 +1385,45 @@ def check_produces_shape(feature_dir: Path, gates: list) -> list[str]:
     return found
 
 
+def check_judge_edit_acknowledged(feature_dir: Path, gates: list) -> list[str]:
+    """ERROR when `judge_edit_acknowledged` is malformed or not on a close unit.
+
+    The operator-authored acknowledgement that clears a `judge_editing_terminal`
+    halt (FEAT-2026-0246/T02) needs a non-empty list of string `paths` and a
+    non-empty string `reason`; anywhere but a `close` unit it is never read.
+    """
+    found: list[str] = []
+    for gate in gates:
+        for entry in gate.get("work_units") or []:
+            wid, wfile = entry.get("id"), entry.get("file")
+            if not wid or not wfile:
+                continue
+            wpath = feature_dir / wfile
+            if not wpath.exists():
+                continue
+            wfm, _ = read_frontmatter(wpath)
+            if "judge_edit_acknowledged" not in wfm:
+                continue
+            raw = wfm["judge_edit_acknowledged"]
+            if wfm.get("type") != "close":
+                found.append(
+                    f"ERROR: {wfile}: {wid} sets `judge_edit_acknowledged` on a "
+                    f"{wfm.get('type', 'implementation')!r} unit; only a `close` "
+                    f"unit's acknowledgement is read."
+                )
+            paths = raw.get("paths") if isinstance(raw, dict) else None
+            reason = raw.get("reason") if isinstance(raw, dict) else None
+            if (not isinstance(paths, list) or not paths
+                    or not all(isinstance(p, str) and p.strip() for p in paths)
+                    or not isinstance(reason, str) or not reason.strip()):
+                found.append(
+                    f"ERROR: {wfile}: {wid} `judge_edit_acknowledged` must be a "
+                    f"mapping with a non-empty list of string `paths` and a "
+                    f"non-empty string `reason`."
+                )
+    return found
+
+
 def check_produces_boundary(feature_dir: Path, gates: list) -> list[str]:
     """ERROR when a WU's own `produces:` path (or `produces_driver_helper`
     surface) falls inside its own Do-not-touch section's paths.
@@ -2238,6 +2277,7 @@ def _lint_impl(feature_dir: Path) -> list[str]:
     check_produces_satisfiability(feature_dir, gates)
     lint_gate_proportionality(feature_dir, gates)
     errs.extend(check_produces_shape(feature_dir, gates))
+    errs.extend(check_judge_edit_acknowledged(feature_dir, gates))
     errs.extend(check_produces_boundary(feature_dir, gates))
     errs.extend(check_done_feature_gates(feature_dir, fm))
     errs.extend(check_decision_citations(feature_dir, fm, gates))

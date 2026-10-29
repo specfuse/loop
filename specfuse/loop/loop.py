@@ -116,7 +116,13 @@ from .judge import (
     parse_judge_result,
     render_judge_prompt,
 )
-from .arm_eval import evaluate_arm_predicate
+from .arm_eval import (
+    ACKNOWLEDGED_REASON_PREFIX,
+    evaluate_arm_predicate,
+    evaluate_terminal_judge_editing,
+    terminal_judge_edit_ack_keys,
+    terminal_judge_edit_acknowledgement,
+)
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .build_provenance import head_tree_hash
 from .cost import wu_lifetime_cost_usd
@@ -4179,6 +4185,10 @@ REPLAN_OPTION_SCOPE = {
         "escalate where it does"),
     "produces_shape_invalid": (False,
         "pre-dispatch frontmatter refusal; nothing was attempted"),
+    "judge_editing_terminal": (False,
+        "the gate's own units change the code or config that grades it, so "
+        "a model-authored verdict over those edits cannot be trusted to "
+        "close the feature unreviewed"),
     "spinning_reproduction_missing": (False,
         "a re-arm gate, not a failure; the operator is mid-decision already"),
     "prep_halted": (False,
@@ -4202,6 +4212,81 @@ def replan_option_applies(reason: str) -> bool:
     return scoped[0] if scoped is not None else False
 
 
+def _format_judge_editing_terminal_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_list: str,
+    hits: list,
+    resume_command: str,
+    ack_keys: "list | None" = None,
+) -> str:
+    """Six-part brief for the `judge_editing_terminal` halt (FEAT-2026-0246/T03).
+
+    Reached only through `format_spinout_escalation_brief`, so the framing,
+    headings and correlation marker stay shared with every per-unit halt. Plain
+    English first; the unit and path evidence is named, the clearing steps are
+    spelled out. `ack_keys` (T06) are the exact `paths` entries that clear
+    every hit -- `produces_driver_helper` included -- shown as a paste-ready
+    block whose `reason` stays a placeholder: the operator writes their own.
+    """
+    scope_why = REPLAN_OPTION_SCOPE["judge_editing_terminal"][1]
+    edits = "; ".join(hits) if hits else "(none recorded)"
+    ack_block = (
+        ["", "Paste into the frontmatter of the close unit, with your own reason:",
+         "", "```yaml", "judge_edit_acknowledged:", "  paths:"]
+        + [f"    - {key}" for key in ack_keys]
+        + ['  reason: "<why these edits are sound, in your own words>"', "```"]
+    ) if ack_keys else []
+    lines = [
+        f"ESCALATED — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is the last gate and its work is finished. Work "
+        f"units done: {done_list}. Nothing has been closed, flipped or "
+        f"archived yet.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        "One or more finished units changed files that the judge relies on to "
+        f"grade this feature. Unit and path: {edits}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        "Someone must decide whether those judge-surface edits are sound "
+        "before the feature closes, because the close verdict would otherwise "
+        "be written by the same model that made the edits.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        f"The safety catch fired as designed, nothing broke: {scope_why}. "
+        "It stops the close however the feature was started and whatever its "
+        "autonomy level.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        "1. **Acknowledge the edits** — review the paths above, then write "
+        f"`judge_edit_acknowledged` (the paths and your own reason) in the "
+        f"frontmatter of {wu.wu_id}, then run `/unblock-wu`. Pros: the close "
+        "proceeds and your reason is on the record. Cons: you must read the "
+        "edits first; the acknowledgement covers only the paths it names, so "
+        "a path added later stops the close again. A "
+        "`produces_driver_helper` hit is covered by that literal entry, not "
+        "by a file path.",
+        *ack_block,
+        "2. **Reject the edits** — fix or revert them in the producing units. "
+        "Pros: the judge stays independent. Cons: reopens finished work.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        "Option 1 once you have read the edits and they are sound; option 2 "
+        "if any of them weakens the check that grades this feature.",
+        "",
+        "Reply with the number of your choice, or prose if none fit:",
+        "1. Acknowledge the edits",
+        "2. Reject the edits",
+        "",
+        f"Resume after deciding:\n  {resume_command}",
+        "",
+        _escalation_correlation_marker(wu.wu_id),
+    ]
+    return "\n".join(lines)
+
+
 def format_spinout_escalation_brief(
     wu: "WorkUnit",
     gate_number: int,
@@ -4213,6 +4298,8 @@ def format_spinout_escalation_brief(
     replanned: bool,
     resume_command: str,
     insertion_refused: "dict | None" = None,
+    judge_hits: "list | None" = None,
+    judge_ack_keys: "list | None" = None,
 ) -> str:
     """Render the six-part operator brief for a spun-out unit (FEAT-2026-0104/T06).
 
@@ -4240,6 +4327,10 @@ def format_spinout_escalation_brief(
     """
     done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
     remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    if reason == "judge_editing_terminal":
+        return _format_judge_editing_terminal_brief(
+            wu, gate_number, done_list, judge_hits or [], resume_command,
+            judge_ack_keys or [])
     outcomes = ", ".join(
         f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
     ) or "(no attempt produced a recorded outcome)"
@@ -4402,6 +4493,8 @@ def escalate_unit(
     attempt_outcomes: list,
     replanned: bool = False,
     insertion_refused: "dict | None" = None,
+    judge_hits: "list | None" = None,
+    judge_ack_keys: "list | None" = None,
 ) -> str:
     """Render the six-part operator brief for ANY per-unit `blocked_human`
     escalation -- the single call every `human_escalation` site keyed on
@@ -4420,7 +4513,8 @@ def escalate_unit(
     return format_spinout_escalation_brief(
         wu, gate_number, done_wu_ids, remaining_wu_ids, reason,
         wu_max_attempts, attempt_outcomes, replanned, resume_command,
-        insertion_refused=insertion_refused,
+        insertion_refused=insertion_refused, judge_hits=judge_hits,
+        judge_ack_keys=judge_ack_keys,
     )
 
 
@@ -4469,6 +4563,88 @@ def halt_for_human_unit(
     )
     print(f"\n{message}")
     return 1
+
+
+HALT_REASON_JUDGE_EDITING_TERMINAL = "judge_editing_terminal"
+
+
+def stop_for_terminal_judge_edit(
+    wu: "WorkUnit",
+    backend: "Backend",
+    feature_dir: Path,
+    feature_id: str,
+    gate_number: int,
+    events_path: Path,
+    done_ids: "set | None" = None,
+) -> bool:
+    """Halt in front of the terminal close when a done unit edited a judge
+    surface (FEAT-2026-0246/T01). True means the close was stopped.
+
+    The one seat for both terminal-close paths: the in-loop auto-close branch
+    and the dispatched close both reach it, so a verdict the model authored over
+    its own judge-path edits cannot close the feature unreviewed. Evaluates
+    `arm_eval.evaluate_terminal_judge_editing` once and emits
+    `terminal_judge_editing_evaluated` on every terminal gate; only `fired`
+    stops. An evaluation failure is recorded on that event and does not stop,
+    the same posture as `build_arm_predicate_event`.
+
+    A clean verdict resting on the close unit's operator-authored
+    `judge_edit_acknowledged` field also emits
+    `terminal_judge_editing_acknowledged`. The halt message is the six-part
+    brief from `escalate_unit`.
+    """
+    try:
+        verdict = evaluate_terminal_judge_editing(feature_dir, gate_number)
+    except Exception as exc:  # noqa: BLE001 - a raise is not a verdict
+        flush_events(events_path, [build_event(
+            "terminal_judge_editing_evaluated", feature_id, {
+                "gate": gate_number,
+                "status": "not_evaluable",
+                "evaluation_error": f"{type(exc).__name__}: {exc}",
+            })])
+        return False
+    evaluated = build_event(
+        "terminal_judge_editing_evaluated", feature_id, {
+            "gate": gate_number,
+            "status": verdict.status,
+            "reason": verdict.reason,
+        })
+    if verdict.status != "fired":
+        events = [evaluated]
+        ack = (terminal_judge_edit_acknowledgement(feature_dir, gate_number)
+               if verdict.reason.startswith(ACKNOWLEDGED_REASON_PREFIX) else None)
+        if ack is not None:
+            events.append(build_event(
+                "terminal_judge_editing_acknowledged", feature_id, {
+                    "gate": gate_number,
+                    "close_unit": wu.wu_id,
+                    "paths": ack["paths"],
+                    "reason": ack["reason"],
+                }))
+        flush_events(events_path, events)
+        return False
+    hits = verdict.reason.split("; ")
+    message = escalate_unit(
+        wu, gate_number, sorted(done_ids or ()), [], HALT_REASON_JUDGE_EDITING_TERMINAL,
+        resume_command_for(feature_id), resolve_max_attempts(wu, load_verification()),
+        [], judge_hits=hits,
+        judge_ack_keys=terminal_judge_edit_ack_keys(feature_dir, gate_number),
+    )
+    backend.set_wu(wu, "status", "blocked_human")
+    flush_events(events_path, [evaluated, build_event(
+        "human_escalation", wu.wu_id, {
+            "reason": HALT_REASON_JUDGE_EDITING_TERMINAL,
+            "gate": gate_number,
+            "hits": hits,
+            "message": message,
+        })])
+    commit_bookkeeping(
+        [wu.file, events_path],
+        f"chore(loop): {wu.wu_id} blocked (judge-editing terminal gate)"
+        f"\n\nFeature: {feature_id}",
+    )
+    print(f"\n{message}")
+    return True
 
 
 def _should_report_budget_breach(plan: dict, gate: dict, feature_dir: Path) -> bool:
@@ -11949,6 +12125,15 @@ def run(
                             "override": True,
                         }
                     )])
+
+                # FEAT-2026-0246/T01 — judge-editing stop. One seat for both
+                # terminal-close paths below (auto-close and dispatched close).
+                if (not dry_run and wu.type == "close" and gate is gates[-1]
+                        and stop_for_terminal_judge_edit(
+                            wu, backend, feature_dir, feature_id, gate.number,
+                            events_path, done_ids)):
+                    blocked = True
+                    continue
 
                 # FEAT-2026-0018/T11H — terminal auto-close branch (relocated from post-loop)
                 # Guard wu.verdict is None: only attempt auto-close for WUs that have

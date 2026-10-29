@@ -167,15 +167,14 @@ state, the gate's diff, and the close's measurements — never the close's
 own retrospective, and it can lower a verdict but never raise one. That
 is what makes an auto-armed close trustworthy; without it, `auto` let
 the session that did the work grade the work. Say so in the
-recommendation line rather than asserting `auto` bare. Recommend
-`review` instead when a wrong arm is expensive to undo, or when the
-feature edits a judge surface (`arm_eval.JUDGE_PATHS`: the loop's own
-verdict modules, `.specfuse/verification.yml`, `.specfuse/rules/`, shipped
-rules and templates). Do not count on the `judge_editing` stop class to
-catch that: it reads only the units drafted for a *successor* gate, so it
-never sees what the terminal gate's own units change, and a single-gate
-feature is never checked at all (#3542). On those features `review` is
-the only checkpoint the change gets before the PR.
+recommendation line rather than asserting `auto` bare. A feature that
+edits a judge surface (`arm_eval.JUDGE_PATHS`: the loop's own verdict
+modules, `.specfuse/verification.yml`, `.specfuse/rules/`, shipped rules
+and templates) in its terminal gate still takes `auto`: the terminal
+gate's own judge-surface edits now halt before the close at every
+autonomy level, and the operator clears the stop by writing
+`judge_edit_acknowledged` on the close unit and running `/unblock-wu`.
+Recommend `review` only when a wrong arm is expensive to undo.
 
 **Ask about `judge_disabled` only when a criterion needs it.** Do not put
 it in the interview by default. Raise it as a question only when one of

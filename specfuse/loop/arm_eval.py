@@ -10,8 +10,8 @@ structured per-class verdict. Mirrors the shape of `gate_eval.py`'s
 `evaluate_auto_close`: pure evaluation over files, a structured decision
 object, a formatter for the event trail, no side effects. Arming and closing
 are deliberately separate decisions with different inputs — this module does
-not fold into `gate_eval.py`, does not import from it, and does not import
-from `loop.py` (the dependency points the other way: `loop.py` will call
+not fold into `gate_eval.py` (it reads only the `NON_SUBSTANTIVE_TYPES`
+constant from it) and does not import from `loop.py` (the dependency points the other way: `loop.py` will call
 into this module, T04).
 
 The organizing principle: model-authored signals may only veto; only
@@ -38,6 +38,7 @@ from pathlib import Path
 from . import _miniyaml
 from .closing_requirements import gate_review_filename
 from .cost import wu_lifetime_cost_usd
+from .gate_eval import NON_SUBSTANTIVE_TYPES
 from .plan_baseline import load_baseline, load_plan_graph
 
 PREDICATE_VERSION = "v1"
@@ -627,6 +628,114 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
         gate_id=just_closed_gate,
         predicate_version=PREDICATE_VERSION,
     )
+
+
+# Literal acknowledgement entry covering any `produces_driver_helper` hit.
+DRIVER_HELPER_ACK_KEY = "produces_driver_helper"
+# Reason prefix of a `clean` verdict that is clean only because of an acknowledgement.
+ACKNOWLEDGED_REASON_PREFIX = "acknowledged by operator: "
+
+
+def _terminal_judge_hits(
+    feature_dir: Path, gate_number: int
+) -> "tuple[list[tuple[str, str]], dict | None]":
+    """The judge-surface hits of `gate_number`'s done substantive units, each as
+    ``(acknowledgement key, rendered hit)``, plus the close unit's
+    acknowledgement (or None). Shared by the verdict and the brief's key list so
+    the two cannot disagree on what an acknowledgement must name."""
+    feature_dir = Path(feature_dir)
+    plan = load_plan_graph(feature_dir)
+    gate = next(
+        (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
+        None,
+    )
+    hits: list[tuple[str, str]] = []  # (acknowledgement key, rendered hit)
+    acknowledgement: "dict | None" = None
+    for ref in (gate.get("work_units", []) or []) if gate else []:
+        wu = _read_wu(feature_dir, ref)
+        if wu is None:
+            continue
+        if wu["type"] == "close" and acknowledgement is None:
+            acknowledgement = _read_judge_edit_acknowledgement(feature_dir / ref["file"])
+        if wu["type"] in NON_SUBSTANTIVE_TYPES or wu["status"] != "done":
+            continue
+        for p in wu["produces"]:
+            if _matches_judge_path(p):
+                hits.append((p, f"{wu['id']} produces {p}"))
+        if wu["produces_driver_helper"]:
+            hits.append((
+                DRIVER_HELPER_ACK_KEY,
+                f"{wu['id']} declares produces_driver_helper "
+                f"{wu['produces_driver_helper']!r}",
+            ))
+    return hits, acknowledgement
+
+
+def terminal_judge_edit_ack_keys(feature_dir: Path, gate_number: int) -> "list[str]":
+    """The sorted entries a `judge_edit_acknowledged.paths` list must contain to
+    cover every current hit of `gate_number`: each judge-surface path, plus
+    `DRIVER_HELPER_ACK_KEY` when any unit declares `produces_driver_helper`.
+    Pure; empty when nothing hits."""
+    hits, _ = _terminal_judge_hits(Path(feature_dir), gate_number)
+    return sorted({key for key, _ in hits})
+
+
+def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> ClassVerdict:
+    """Report which done substantive units of `gate_number` touch a judge surface.
+
+    Not a successor-arm class: it is absent from `CLASS_NAMES` and `would_arm`
+    never reads it. It is the terminal gate's counterpart of class 2 -- the arm
+    predicate looks at *drafted* units of the next gate; nothing arms after the
+    terminal gate, so this looks at the units that already ran and are about to
+    be closed over. Pure: reads PLAN.md and the gate's unit files only.
+    """
+    hits, acknowledgement = _terminal_judge_hits(feature_dir, gate_number)
+    if not hits:
+        return ClassVerdict(
+            "clean", "no done substantive unit touches judge-path surfaces"
+        )
+    covered = set(acknowledgement["paths"]) if acknowledgement else set()
+    uncovered = [text for key, text in hits if key not in covered]
+    if uncovered:
+        return ClassVerdict("fired", "; ".join(uncovered))
+    names = sorted({key for key, _ in hits})
+    return ClassVerdict("clean", f"{ACKNOWLEDGED_REASON_PREFIX}{', '.join(names)}")
+
+
+def _read_judge_edit_acknowledgement(close_file: Path) -> "dict | None":
+    """The operator-authored `judge_edit_acknowledged` field of a close unit, or
+    None when absent or malformed (a malformed field covers nothing; lint_plan
+    reports it). The driver never writes this field."""
+    fm, _ = _parse_frontmatter(close_file.read_text())
+    raw = fm.get("judge_edit_acknowledged")
+    if not isinstance(raw, dict):
+        return None
+    paths, reason = raw.get("paths"), raw.get("reason")
+    if (not isinstance(paths, list) or not paths
+            or not all(isinstance(p, str) for p in paths)
+            or not isinstance(reason, str) or not reason.strip()):
+        return None
+    return {"paths": paths, "reason": reason}
+
+
+def terminal_judge_edit_acknowledgement(
+    feature_dir: Path, gate_number: int
+) -> "dict | None":
+    """The acknowledgement on `gate_number`'s close unit (``{"paths", "reason"}``)
+    or None."""
+    feature_dir = Path(feature_dir)
+    plan = load_plan_graph(feature_dir)
+    gate = next(
+        (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
+        None,
+    )
+    for ref in (gate.get("work_units", []) or []) if gate else []:
+        wu = _read_wu(feature_dir, ref)
+        if wu is not None and wu["type"] == "close":
+            ack = _read_judge_edit_acknowledgement(feature_dir / ref["file"])
+            if ack is not None:
+                return ack
+    return None
 
 
 def _format_decision(decision: ArmDecision) -> str:

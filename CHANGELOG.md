@@ -26,6 +26,14 @@ Entries below cover only work landing from FEAT-2026-0064 onward.
 
 ## [Unreleased]
 
+### Added
+
+- **A terminal gate that edits a judge surface now halts before its close, at every autonomy level.** The `judge_editing` arm class reads only a successor gate's drafted units, so a terminal gate, and every single-gate feature, closed with no check on what its own units changed. Now, when a done substantive unit of the last gate declares a `produces:` path matching `arm_eval.JUDGE_PATHS`, or a non-empty `produces_driver_helper`, the driver stops before the close is dispatched or auto-closed: the close unit goes `blocked_human`, a `human_escalation` with reason `judge_editing_terminal` names each unit and path in the six-part brief, and no terminal flip fires. `autonomy_default` does not change this: `fire_terminal_flips` never read it, so `review` and `supervised` close exactly as `auto` does and add no checkpoint here. A feature with no such unit closes as before. To clear the stop, read the diff, write `judge_edit_acknowledged: {paths: [...], reason: "<your words>"}` into the close unit's frontmatter and run `/unblock-wu`. The brief prints the block with the exact entries; a `produces_driver_helper` hit is covered by the literal entry `produces_driver_helper`. The re-run proceeds to the close and records `terminal_judge_editing_acknowledged` with your reason. A judge path added after the acknowledgement re-fires the stop, naming only the new path. `specfuse lint` rejects a malformed `judge_edit_acknowledged` (missing or empty `reason`, empty or non-list `paths`, or the field on a non-close unit). The check reads declared `produces:` paths, not the gate's actual diff, and `pyproject.toml` matches whole-file, so a dependency bump fires it. (FEAT-2026-0246)
+
+### Changed
+
+- **Consumer projects now halt once when a terminal gate edits `.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/` or `pyproject.toml`.** The check uses the same `JUDGE_PATHS` as the arm class, and those five entries match in every repository, so this applies to projects that never had the driver source. A feature whose last gate declares one of them in a unit's `produces:` stops before its close with `judge_editing_terminal`; acknowledge it as in the entry above. The driver's own modules and data entries never match in a consumer repository. `/draft-feature`, `docs/methodology.md` and `docs/concepts/autonomy-stop-classes.md` no longer recommend `review` as the safeguard for a terminal-gate judge edit, since it adds none. (FEAT-2026-0246)
+
 ## [0.30.0+umbrella.0.15.0] - 2026-10-27
 
 ### Added
