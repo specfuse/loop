@@ -20,7 +20,7 @@
 
 ### T02#1
 
-- **criterion:** The clause-3 class: in a fixture repository with a real folder `FEAT-2026-0005-real`,
+- **criterion:** The clause-3 class: in a fixture repository with a real folder `FEAT-LOOP-2026-0005-real`,
 - **oracle:** python3 -m unittest tests.test_migrate_all_repo_stays_valid.Clause3RewriteClassification -b
 - **kind:** `narrow`
 - **state:** `pass`

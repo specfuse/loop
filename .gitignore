@@ -48,10 +48,10 @@ AGENTS.md
 .codex/
 
 # FEAT-2026-0020 gh-content audit dumps — contain private-org refs, must NOT be committed (would leak into public history)
-.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-issues.json
-.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-prs.json
-.specfuse/features/FEAT-2026-0020-public-readiness-prep/gh-redacted/
-.specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/
+.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/gh-issues.json
+.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/gh-prs.json
+.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/gh-redacted/
+.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/history-scrub/
 
 # Operator-private analyses (methodology reviews, cross-repo mining) kept
 # next to the code they describe. Never committed: they name other projects

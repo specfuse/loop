@@ -70,7 +70,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   attempt's prompt unless the agent explicitly buffers them in the prompt-
   facing failure note that the driver hands to the next attempt.
 
-- [FEAT-2026-0003/G1-LESSONS] State the exact expected file count in the
+- [FEAT-LOOP-2026-0003/G1-LESSONS] State the exact expected file count in the
   Do-not-touch section (e.g. "exactly three files: X, Y, Z"). An agent that
   touches one extra file to be helpful does so because the WU did not
   explicitly forbid it — a numeric bound closes that door without ambiguity.
@@ -80,7 +80,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   of files expected to change, so a reviewer reading the diff has a
   falsifiable scope claim.
 
-- [FEAT-2026-0003/G1-LESSONS] When a WU defines a CLI surface or invokes an
+- [FEAT-LOOP-2026-0003/G1-LESSONS] When a WU defines a CLI surface or invokes an
   external command that returns structured data, the AC must specify three
   things: (1) the exact fields/keys to request or parse, (2) the output
   field delimiter (tab, space, comma), and (3) how to render an absent or
@@ -91,7 +91,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   not how to render absence. A parser expecting an empty field gets the
   literal four-character string instead.
 
-- [FEAT-2026-0003/G1-LESSONS] Cut gates along the offline/live boundary:
+- [FEAT-LOOP-2026-0003/G1-LESSONS] Cut gates along the offline/live boundary:
   a gate whose entire scope can be unit-tested without external systems
   (network, live auth, real API) can be verified deterministically and
   atomically by the driver. Live integration belongs in a dedicated later
@@ -102,7 +102,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   it offline-first in the PLAN and keep live-integration WUs out of scope
   for that gate.
 
-- [FEAT-2026-0003/G1-LESSONS] Closing-WU numbering conventions (e.g.
+- [FEAT-LOOP-2026-0003/G1-LESSONS] Closing-WU numbering conventions (e.g.
   "90+ range so they sort last") must live in a binding rule or the
   `draft-feature` template, not in a PLAN.md comment. A comment in one
   feature's PLAN is invisible to the next feature's author and produces
@@ -111,7 +111,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   ordering, required closing sequence — belongs in `.specfuse/rules/` or
   the WU authoring guide, and the linter should enforce it if feasible.
 
-- [FEAT-2026-0003/G2-LESSONS] Output volume above ~80k tokens in a single
+- [FEAT-LOOP-2026-0003/G2-LESSONS] Output volume above ~80k tokens in a single
   WU session is a prospective split signal, not just a retrospective
   warning. T03 produced 95k output tokens (6× the prior max) because it
   combined new script logic, 260 lines of tests requiring intimate
@@ -125,7 +125,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   point is justified by coupling — tests that depend on the script's
   internals cannot be authored before the script exists anyway.
 
-- [FEAT-2026-0003/G2-LESSONS] When a WU's acceptance criteria include a
+- [FEAT-LOOP-2026-0003/G2-LESSONS] When a WU's acceptance criteria include a
   linter integration ("tool X exits 0 on the produced artifact"), the spec
   must also include a companion failure-mode AC: "tool X exits non-zero on
   a known-bad version of that artifact." Without an explicit failure-mode
@@ -137,7 +137,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   test class was added via a pre-arm review catch, not from the original
   spec — it would not have been written without that catch.
 
-- [FEAT-2026-0003/G2-LESSONS] Automated code gates (tests, ruff, bandit,
+- [FEAT-LOOP-2026-0003/G2-LESSONS] Automated code gates (tests, ruff, bandit,
   coverage --fail-under) pass trivially for prose and markdown artifacts.
   A WU whose only output is a SKILL.md, a doc file, or a template receives
   a structurally vacuous "pass" from the driver — no test runs, no linter
@@ -149,7 +149,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   gates stand in for prose quality produces a false-positive "pass" signal
   that the driver cannot distinguish from a real verification.
 
-- [FEAT-2026-0003/G2-LESSONS] The hygiene WU pattern
+- [FEAT-LOOP-2026-0003/G2-LESSONS] The hygiene WU pattern
   ([meta/first-live-use]) covers *surprise* cross-cutting fixes discovered
   during a WU's execution. It does NOT apply to cross-module changes the
   WU author already anticipated: if a change to a gate-N module is listed
@@ -163,7 +163,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   already in the dispatched WU's ACs. If it was, the hygiene WU is the
   wrong tool — strengthen the commit message instead.
 
-- [FEAT-2026-0003/G2-LESSONS] Scaffold-generated WU bodies (from
+- [FEAT-LOOP-2026-0003/G2-LESSONS] Scaffold-generated WU bodies (from
   `adopt_feature.py`, `draft-feature`, or any template emitter) are
   structural scaffolding, not actionable specs. The `_closing_wu()` helper
   in T03's adopt script generates closing WUs with generic ACs ("The
@@ -176,7 +176,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   G2-PLAN's scope should include a pass over every scaffold-generated WU
   body in the gate it details.
 
-- [FEAT-2026-0003/G3-LESSONS] When a WU's acceptance criteria name values
+- [FEAT-LOOP-2026-0003/G3-LESSONS] When a WU's acceptance criteria name values
   that live in an external system — label names, API field names, event
   schema keys, shared protocol constants — those values must be verified
   against the authoritative documentation in that external system before
@@ -192,8 +192,8 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   document is the right place to list these open verifications; the gate is
   not armed until every item is checked.
 
-- [FEAT-2026-0003/G3-LESSONS] The two-case linter test pattern from
-  [FEAT-2026-0003/G2-LESSONS] ("exits 0 on valid artifact, exits non-zero
+- [FEAT-LOOP-2026-0003/G3-LESSONS] The two-case linter test pattern from
+  [FEAT-LOOP-2026-0003/G2-LESSONS] ("exits 0 on valid artifact, exits non-zero
   on malformed artifact") is incomplete when an adapter embeds content from
   an external surface verbatim. A third case is required: the external
   surface's format variant may be structurally valid by that surface's own
@@ -208,7 +208,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   linter rejects this fixture, that is a pre-dispatch blocking finding — the
   linter must be widened before the adapter is dispatchable, not after.
 
-- [FEAT-2026-0003/G3-LESSONS] WUs that mutate state in an external
+- [FEAT-LOOP-2026-0003/G3-LESSONS] WUs that mutate state in an external
   production system (live GitHub issues, deployed infrastructure, databases
   with real data) are a categorically different class from automated WUs —
   not because their output is hard to machine-verify (the G2-LESSONS
@@ -224,7 +224,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   document the human-operated designation so reviewers understand why no
   driver events exist for this WU.
 
-- [FEAT-2026-0003/G3-LESSONS/multi-gate] Plan-next WUs (Opus) produce
+- [FEAT-LOOP-2026-0003/G3-LESSONS/multi-gate] Plan-next WUs (Opus) produce
   forward-design drafts from the prior gate's artifacts alone — they cannot
   read other repositories or external documentation. This creates a
   systematic blind spot: all values that name cross-repo contracts (label
@@ -242,7 +242,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   every item in that section is checked and its entry updated with the
   verified value.
 
-- [FEAT-2026-0003/G4-LESSONS] When a terminal-case plan-next WU evaluates
+- [FEAT-LOOP-2026-0003/G4-LESSONS] When a terminal-case plan-next WU evaluates
   branch-B (extend with an escalation gate) vs opening a new feature, three
   tests must all pass before gate extension is chosen: (1) **Scope** — the
   fix fits in hours of work, not a feature's worth; a single WU completing
@@ -259,7 +259,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   T08 closed gate 4 in 2m54s at 7,826 output tokens; the entire fix was
   one regex + three test cases. That scope is the bar.
 
-- [FEAT-2026-0003/G4-LESSONS] A gate's substantive WU count should match
+- [FEAT-LOOP-2026-0003/G4-LESSONS] A gate's substantive WU count should match
   its actual scope, not be inflated to match a prior gate's shape. Gate 4
   closed the roadmap goal with one substantive WU — the smallest in the
   feature — plus the standard four-WU closing sequence. No extra WUs were
@@ -271,7 +271,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   single-WU gate on a genuinely bounded fix is correct methodology, not an
   indication the gate was rushed or under-designed.
 
-- [FEAT-2026-0004/G1-LESSONS] Tools that perform tree-global git mutations
+- [FEAT-LOOP-2026-0004/G1-LESSONS] Tools that perform tree-global git mutations
   must enforce concurrency at the working-tree level, not at a logical-unit
   or feature-id level. A pidfile is insufficient for the SIGKILL case: the
   pid-holding process is dead, the file remains, and the next launch either
@@ -284,7 +284,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   SIGKILL rationale so the agent does not substitute a pidfile as a "simpler"
   alternative.
 
-- [FEAT-2026-0004/G1-LESSONS] When a Python function must hold a POSIX
+- [FEAT-LOOP-2026-0004/G1-LESSONS] When a Python function must hold a POSIX
   advisory lock for its entire execution lifetime, assign the file descriptor
   to a named local variable in that function's stack frame and never close or
   release it explicitly. Do NOT use `with` / a context manager (closes the fd
@@ -296,7 +296,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   context-manager idioms will wrap the acquire in `with`, silently releasing
   the lock at the end of the block.
 
-- [FEAT-2026-0004/G1-LESSONS] When a bootstrap or `init.sh` script must
+- [FEAT-LOOP-2026-0004/G1-LESSONS] When a bootstrap or `init.sh` script must
   append a single line to a file (`.gitignore`, config, `.env.example`)
   idempotently, use `grep -qxF "$line" "$file" || echo "$line" >> "$file"`.
   The `-x` flag (full-line match) prevents a shorter prefix of the line from
@@ -308,7 +308,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   idempotency; a plain `grep -q` without `-xF` is a latent bug waiting for a
   line whose content is a prefix of another line already in the file.
 
-- [FEAT-2026-0004/G1-LESSONS] An escalation trigger is load-bearing only
+- [FEAT-LOOP-2026-0004/G1-LESSONS] An escalation trigger is load-bearing only
   when it names the exact structural condition that would fire it — not just
   the outcome ("if this gets complicated, block"). T01's trigger read: "If
   `run()` cannot acquire the lock before a git mutation without a larger
@@ -321,7 +321,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   violating scenario looks like — so the agent can report "trigger checked,
   did not fire" rather than omitting the check entirely.
 
-- [FEAT-2026-0005/G1-LESSONS] Closing-ceremony weight should scale with
+- [FEAT-LOOP-2026-0005/G1-LESSONS] Closing-ceremony weight should scale with
   feature size. The four-WU closing sequence (RETRO → LESSONS → DOCS → PLAN)
   is the right default for multi-gate features, where each gate accumulates
   enough state to justify independent retrospective and planning steps. A
@@ -334,7 +334,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   terminal verdict); it eliminates the four-way dispatch overhead, not the
   obligations.
 
-- [FEAT-2026-0005/G1-LESSONS] When a WU adds a new named type to a
+- [FEAT-LOOP-2026-0005/G1-LESSONS] When a WU adds a new named type to a
   validation or dispatch system (a WU type, a gate category, a CLI command),
   the WU's acceptance criteria must explicitly require updating every regex,
   constant, or enum that references the full set of valid names. Missing one
@@ -346,20 +346,20 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   all regex/enum/constant sites that list type names explicitly and add each
   as a falsifiable AC (e.g. "CORRELATION_ID_RE includes CLOSE segment").
 
-- [FEAT-2026-0005/G1-LESSONS] The two-case linter-guard test pattern
-  ([FEAT-2026-0003/G2-LESSONS]: accept valid, reject malformed) needs a third
+- [FEAT-LOOP-2026-0005/G1-LESSONS] The two-case linter-guard test pattern
+  ([FEAT-LOOP-2026-0003/G2-LESSONS]: accept valid, reject malformed) needs a third
   case when the change modifies a guard that previously accepted an existing
   class of artifacts: a regression test on a pre-existing valid fixture.
   Without it, a conditional branch added to handle the new case can
   accidentally shadow or break the original acceptance path. T01's third test
   (`test_four_wu_closing_sequence_still_passes`) used the live
-  `FEAT-2026-0001-health-endpoint` fixture and confirmed that four-WU features
+  `FEAT-LOOP-2026-0001-health-endpoint` fixture and confirmed that four-WU features
   still lint cleanly after the `close` branch was added. Rule: when a WU
   modifies a validation guard that previously accepted a class of inputs, add
   "regression on existing valid fixture" as an explicit AC — name a specific
   existing fixture and assert the linter still exits 0 on it.
 
-- [FEAT-2026-0006/G1-CLOSE] When a WU implements new per-attempt instrumentation
+- [FEAT-LOOP-2026-0006/G1-CLOSE] When a WU implements new per-attempt instrumentation
   fields in the driver (e.g. `duration_seconds`, a future memory counter), that
   WU's own event record will lack those fields — the driver dispatching the
   implementing WU runs old code, before the commit lands. This bootstrap gap is
@@ -370,7 +370,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   own `events.jsonl` entry — so a reviewer reading the log doesn't flag the
   absence as a correctness bug.
 
-- [FEAT-2026-0007/G1-LESSONS] The `code` gate (`python3 -m unittest discover`)
+- [FEAT-LOOP-2026-0007/G1-LESSONS] The `code` gate (`python3 -m unittest discover`)
   passes when no new tests are registered — it cannot detect that required new
   symbols, files, or functions were never written. T04 declared `status: complete`,
   the driver committed only the WU status flip, and verification passed on the
@@ -383,7 +383,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   when the import would trigger side-effects. Without this, an agent can claim
   complete without having written any production code and pass driver verification.
 
-- [FEAT-2026-0007/G1-LESSONS] Escalation triggers guard against wrong changes
+- [FEAT-LOOP-2026-0007/G1-LESSONS] Escalation triggers guard against wrong changes
   but not against absent changes. T04's trigger read "stop if changing
   `dispatch()`'s signature breaks T02 or T03 tests" — a correct wrong-change
   guard. Its mirror was missing: "stop if the required functions are absent from
@@ -395,7 +395,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the post-commit tree; a completeness gap that passes the gates is invisible to
   the driver and only becomes visible at integration time.
 
-- [FEAT-2026-0007/G1-LESSONS] When WU N produces a constant, directive, or prose
+- [FEAT-LOOP-2026-0007/G1-LESSONS] When WU N produces a constant, directive, or prose
   artifact that WU N+1 must extend or specialize (e.g., T03 produced the
   `CAVEMAN_DIRECTIVE` body; T04 needed a "softer" variant of it), WU N's spec
   must either specify the content or include a note: "the exact text will be
@@ -406,7 +406,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   document the inheritance relationship explicitly in each WU's Context section so
   the dependency is auditable without reading commit history.
 
-- [FEAT-2026-0007/G2-LESSONS] A WU session that bills 0 input/output tokens has
+- [FEAT-LOOP-2026-0007/G2-LESSONS] A WU session that bills 0 input/output tokens has
   produced nothing — but the driver currently commits it as `done` because the
   WU frontmatter status flip is the only staged change, and the code gate passes
   on the unchanged codebase. T08H (a hygiene WU with three explicit safeguards)
@@ -416,7 +416,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   this, plan-next WUs should add a sentinel AC: "events.jsonl must show
   `input_tokens > 0` for this WU; if it does not, re-dispatch from scratch."
 
-- [FEAT-2026-0007/G2-LESSONS] Agent-side safeguards (smoke-import checks in AC,
+- [FEAT-LOOP-2026-0007/G2-LESSONS] Agent-side safeguards (smoke-import checks in AC,
   completeness escalation triggers) are bypassed when the agent session crashes
   or produces 0 tokens before reaching those checks. T08H carried AC 9 (explicit
   smoke-import check) and two escalation triggers — none fired because the session
@@ -428,7 +428,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   advancing the dependency frontier. Agent-side guards catch reasoning failures;
   driver-side checks catch session crashes.
 
-- [FEAT-2026-0007/G2-LESSONS] A gate that introduces a new enforcement mechanism
+- [FEAT-LOOP-2026-0007/G2-LESSONS] A gate that introduces a new enforcement mechanism
   (budget brake, slot cap, rate limiter) cannot exercise that mechanism against
   itself — the GATE.md for the implementing gate is authored before the code
   lands, and setting a budget against a gate mid-flight is undefined. T07
@@ -440,7 +440,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   implementing gate's own GATE.md is intentionally left without a budget; the
   first exercise belongs to the successor.
 
-- [FEAT-2026-0008/G1-CLOSE] When a feature's whole purpose is to fix a failure
+- [FEAT-LOOP-2026-0008/G1-CLOSE] When a feature's whole purpose is to fix a failure
   mode the methodology itself enables (a hollow pass, a silent no-op, a
   trust-model gap), its close ceremony must run a recursive audit: did the
   guards this feature was built to add actually land, AND are they wired into
@@ -468,15 +468,15 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Rule: guards that probe "did this attempt actually change X" against a
   git baseline must combine `git diff --quiet` with `git ls-files --others
   --exclude-standard` to catch added-untracked. Symptom seen 4× in
-  FEAT-2026-0012 (T04, T08, G3-PLAN, T11); fix lives in
+  FEAT-LOOP-2026-0012 (T04, T08, G3-PLAN, T11); fix lives in
   `verify_files_changed`.
 
-- [FEAT-2026-0002/G1-CLOSE] Per-WU coverage acceptance criteria must use a
+- [FEAT-LOOP-2026-0002/G1-CLOSE] Per-WU coverage acceptance criteria must use a
   per-file threshold (`coverage report --include=<path> --fail-under=N`),
   not a TOTAL roll-up. A per-file threshold is falsifiable about the module
   the WU touched: it survives unrelated changes elsewhere in the tree,
   decouples module-level completion from TOTAL drift, and forces the WU
-  spec to name the actual surface under test. FEAT-2026-0002's four
+  spec to name the actual surface under test. FEAT-LOOP-2026-0002's four
   per-module WUs (T01 loop.py ≥ 95%, T02 validate-event.py ≥ 90%,
   T03 lint_plan.py ≥ 90%, T04 _miniyaml.py ≥ 90%) each carried its own
   `--include=` AC; the floor-flip WU (T05) then satisfied the TOTAL claim
@@ -487,7 +487,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   reviewer nothing about whether the WU's named surface was actually
   exercised.
 
-- [FEAT-2026-0002/G1-CLOSE] When raising a project's `--fail-under` coverage
+- [FEAT-LOOP-2026-0002/G1-CLOSE] When raising a project's `--fail-under` coverage
   floor, enumerate every site that asserts the floor and flip them
   atomically in a single WU. Sites typically include
   `.specfuse/verification.yml` (the methodology's `code` gate command),
@@ -501,22 +501,22 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   must list every `--fail-under` site as a falsifiable AC (`grep -n
   "fail-under" <files>` returning `=N` for each), and the close-WU's
   recursive audit must include the same grep so an inconsistent flip
-  blocks the close. FEAT-2026-0002 T05 flipped both
+  blocks the close. FEAT-LOOP-2026-0002 T05 flipped both
   `.specfuse/verification.yml` and `scripts/smoke-test.sh` in one commit;
   the close ceremony audited both.
 
-- [FEAT-2026-0002/G1-CLOSE] When a WU's AC uses a real existing artifact as
+- [FEAT-LOOP-2026-0002/G1-CLOSE] When a WU's AC uses a real existing artifact as
   "regression on valid fixture" evidence, the author must verify the
   artifact's actual contract status against the script under test before
   dispatching — not after. T02's AC 4 originally read "assert
-  `validate-event.py` accepts a real event line from FEAT-2026-0008's
+  `validate-event.py` accepts a real event line from FEAT-LOOP-2026-0008's
   events.jsonl"; the agent identified that the orchestrator's schema rejects
   driver-emitted events, and attributed that rejection to the schema's
   `source` enum being the orchestrator protocol.
   The re-arm fix inverted the AC to "rejects this real event" — semantically
   the right boundary evidence, polarity corrected.
 
-  > **Correction [FEAT-2026-0060/G1-CLOSE].** The parenthetical attribution
+  > **Correction [FEAT-LOOP-2026-0060/G1-CLOSE].** The parenthetical attribution
   > above was wrong, and being wrong is what made the gap look intentional
   > for four features. The vendored `specfuse/loop/data/schemas/event.schema.json`
   > in this repository has **no `source` enum at all** — `properties.source`
@@ -526,7 +526,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   > vocabulary. The only thing rejecting driver events was the closed 28-entry
   > `event_type` enum. Read as "by design", that misattribution licensed
   > `loop.py`'s own comment to cite the gap as *precedent to follow*, and four
-  > more unsanctioned types accumulated before FEAT-2026-0060 measured it at
+  > more unsanctioned types accumulated before FEAT-LOOP-2026-0060 measured it at
   > 359 of 1043 corpus events (34%). Meta-rule: a lesson that explains **why a
   > tool rejects an artifact** must name the schema construct doing the
   > rejecting and be re-checked against the vendored file before it is cited,
@@ -541,26 +541,26 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   must be verified by running the tool on the artifact at author-time, not
   defer that verification to the agent's first attempt.
 
-- [FEAT-2026-0002/G1-CLOSE/driver-incident] Bookkeeping commits the
+- [FEAT-LOOP-2026-0002/G1-CLOSE/driver-incident] Bookkeeping commits the
   driver writes (`commit_bookkeeping` in `loop.py`) must force-add
   through `.gitignore` because some paths the driver intends to commit
   live under user-configured ignore prefixes — specifically
   `.specfuse/<feature>/work/<wu>/attempt-N.md`, persisted by the
   spinning-escalation path for human review while `.gitignore` declares
   `.specfuse/**/work/` as scratch (the rule landed alongside
-  FEAT-2026-0004's lock-file ignore work). Without `git add -f`,
+  FEAT-LOOP-2026-0004's lock-file ignore work). Without `git add -f`,
   `git add` returns exit 1 and the driver crashes with partially-flipped
   state on disk (WU frontmatter + `events.jsonl` append written, no
   commit). Force-add is safe for this function only because its caller
   is always the driver itself and curates the path list to driver-managed
   state; it is NOT a general license to bypass ignore rules elsewhere.
-  Surfaced in FEAT-2026-0002/T03's first dispatch (3-attempt spin);
+  Surfaced in FEAT-LOOP-2026-0002/T03's first dispatch (3-attempt spin);
   driver fix in commit `17319cb` / cherry-pick `bf2fd16`. Rule: any
   driver helper that commits a curated, driver-owned path list must
   `git add -f` and must NOT be reused for paths that come from the
   agent, RESULT block, or user input.
 
-- [FEAT-2026-0014/T01/driver-wipes-uncommitted] The driver's per-attempt
+- [FEAT-LOOP-2026-0014/T01/driver-wipes-uncommitted] The driver's per-attempt
   `git reset --hard head_before` (between failed dispatches) WIPES any
   tracked-file modifications that aren't committed at the moment the
   driver runs, INCLUDING uncommitted edits to driver source
@@ -568,7 +568,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `.specfuse/LEARNINGS.md`. Untracked files survive (because `reset
   --hard` only touches tracked files), but a tracked file modified in
   the working tree and not yet committed disappears on the first WU
-  block. Surfaced 2026-06-11 during FEAT-2026-0014/T01 cycles: a session
+  block. Surfaced 2026-06-11 during FEAT-LOOP-2026-0014/T01 cycles: a session
   authored loop.py improvements + a WU rewrite + LEARNINGS appends, did
   not commit, ran the loop on the same feature, and the driver reset
   wiped all three. Rule for operators: BEFORE running `python3
@@ -580,8 +580,8 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   agent is explicitly authorized to touch); current behavior is
   documented as a gotcha until that lands.
 
-- [FEAT-2026-0014/T01/gh-claudeP-broken] **CORRECTED 2026-08-03 by
-  FEAT-2026-0041/G1-CLOSE. The original diagnosis below was wrong at the
+- [FEAT-LOOP-2026-0014/T01/gh-claudeP-broken] **CORRECTED 2026-08-03 by
+  FEAT-LOOP-2026-0041/G1-CLOSE. The original diagnosis below was wrong at the
   layer it blamed, and the ban it imposed cost two features.** Symptom
   (unchanged, still real): `gh auth status` fails inside a dispatched
   `claude -p` session — "The token in GH_TOKEN is invalid" / "X Failed to
@@ -598,7 +598,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `gh issue view` → TLS certificate failure; unsandboxed, both exit 0
   against the real API.
   **A dispatched work unit CAN exercise `gh` — it must run unsandboxed.**
-  Evidence: FEAT-2026-0041/T04 ran with `unsandboxed: true` and completed
+  Evidence: FEAT-LOOP-2026-0041/T04 ran with `unsandboxed: true` and completed
   a full live round-trip on attempt 1 — `✓ Logged in to github.com`, a
   real `gh issue view` returning issue JSON, then create → comment →
   read-back → parse → close against scratch issue #327, with every raw
@@ -610,9 +610,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   escalation, not a copy-paste. A `gh` call from a WU *without* the flag
   fails with an invalid-token or TLS error that reads like a broken
   feature rather than a sandbox artifact — that misreading is what cost
-  FEAT-2026-0040 its D-9/D-10/D-11 (deferred to an `OPERATOR-JOURNAL.md`
+  FEAT-LOOP-2026-0040 its D-9/D-10/D-11 (deferred to an `OPERATOR-JOURNAL.md`
   never written, close hedged to this day) and what nearly cost
-  FEAT-2026-0041 the same. The old fallbacks — operator-manual
+  FEAT-LOOP-2026-0041 the same. The old fallbacks — operator-manual
   post-merge verification, shell-side preflight, `curl` with `$GH_TOKEN`
   — remain available but are no longer the *only* options and should not
   be preferred over an unsandboxed WU when the surface under test is the
@@ -620,7 +620,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `unsandboxed: true` is INSUFFICIENT for this surface is withdrawn: it
   is sufficient, and it is the right lever.
 
-- [FEAT-2026-0014/T01/preflight-must-dump-raw] When a preflight or
+- [FEAT-LOOP-2026-0014/T01/preflight-must-dump-raw] When a preflight or
   diagnostic asks a `claude -p` session to classify the result of an
   external command ("output VALID or INVALID"), the model can emit
   either word without running the command, and the script gets a
@@ -633,7 +633,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   diagnostic skill that consults a `claude -p` session for ground
   truth: never trust agent classification when raw output exists.
 
-- [FEAT-2026-0014/T01/unsandboxed-opt-in] The driver supports per-WU
+- [FEAT-LOOP-2026-0014/T01/unsandboxed-opt-in] The driver supports per-WU
   sandbox-escape via WU frontmatter `unsandboxed: true` +
   `unsandboxed_rationale: "<one-line>"`. The driver REFUSES to
   dispatch if `unsandboxed: true` without rationale (the rationale
@@ -650,7 +650,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   escape is NOT a substitute for AC redesign when the surface is
   broken upstream.
 
-- [FEAT-2026-0013/G1-CLOSE] Test fixtures that combine `subprocess.run`
+- [FEAT-LOOP-2026-0013/G1-CLOSE] Test fixtures that combine `subprocess.run`
   (especially `git`) with `tempfile.TemporaryDirectory` on Python 3.12
   race against `shutil.rmtree` on cleanup. Two specific causes, both
   must be addressed together: (1) git's `gc.autoDetach` (default true
@@ -672,7 +672,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   suspenders `ignore_cleanup_errors=True` is explicitly rejected — it
   hides future leaks and erodes verification-as-oracle.
 
-- [FEAT-2026-0013/G1-CLOSE] An oracle of the form
+- [FEAT-LOOP-2026-0013/G1-CLOSE] An oracle of the form
   `unittest -q 2>&1 | tail -1` is fragile when the tests-under-test
   spawn subprocesses whose stdout is forwarded to the parent — that
   subprocess output can arrive AFTER unittest's `OK` / `FAILED`
@@ -691,13 +691,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   verdict the first time a downstream test starts logging. Apply at
   WU author time for any "run-N-times" AC.
 
-- [FEAT-2026-0013/G1-CLOSE] **Amends and supersedes v1's gc.auto=0 +
+- [FEAT-LOOP-2026-0013/G1-CLOSE] **Amends and supersedes v1's gc.auto=0 +
   sync-barrier rule above (entry dated v1, line 618).** Test fixtures
   that combine `subprocess.run` (especially `git`) with
   `tempfile.TemporaryDirectory` on Python 3.12 race against
   `shutil.rmtree` on cleanup. v1's rule (a) gc.auto=0 + (b) sync
   barrier is necessary but proved INSUFFICIENT on Linux ext4 CI
-  runners: FEAT-2026-0013 v1 shipped with both fixes, passed 50×
+  runners: FEAT-LOOP-2026-0013 v1 shipped with both fixes, passed 50×
   macOS-local, and the SAME `OSError: Directory not empty` race fired
   on Linux runner `27412918877` (PR #9). Linux ext4 surfaces a
   cleanup race that macOS APFS hides. Rule (revised): any test
@@ -718,7 +718,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   deterministically on Linux CI; root-cause AND suppression, not
   either-or.
 
-- [FEAT-2026-0013/G1-CLOSE] Oracle environment must match goal
+- [FEAT-LOOP-2026-0013/G1-CLOSE] Oracle environment must match goal
   environment. A `roadmap_goal` of "deterministic on Python 3.12 CI
   runners" cannot be falsified by a 50× macOS-local audit — macOS
   APFS and Linux ext4 differ on whether in-flight directory writes
@@ -735,7 +735,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   but-not-sufficient pre-check. The verdict must explicitly call
   out the operator-side step and the CI run as the FINAL oracle.
 
-- [FEAT-2026-0013/G1-CLOSE] Script-parity ≠ environment-parity. A
+- [FEAT-LOOP-2026-0013/G1-CLOSE] Script-parity ≠ environment-parity. A
   pre-push hook (or any locally-runnable script) that REPRODUCES
   CI's commands verbatim does NOT reproduce CI's environment — it
   still runs on the developer's filesystem, kernel, and tempdir
@@ -752,13 +752,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   cannot catch races that are deterministic-on-CI; only a
   Docker-probe or equivalent environment-parity gate can.
 
-- [FEAT-2026-0013/G1-CLOSE] Centralize-or-enumerate cross-cutting
+- [FEAT-LOOP-2026-0013/G1-CLOSE] Centralize-or-enumerate cross-cutting
   fixture patterns BEFORE the first fix-shape is dispatched. When a
   test fixture pattern (an `integration_workspace`, a `_minimal_git_
   repo`, a tempdir-backed harness) is duplicated across multiple test
   files via copy-paste, fixing one site does not generalize — the
   same race / leak / config-gap can fire from any of the other sites
-  on the next CI run, in a DIFFERENT test name. FEAT-2026-0013's v1
+  on the next CI run, in a DIFFERENT test name. FEAT-LOOP-2026-0013's v1
   shipped a fix to `tests/test_driver_integration.py::
   integration_workspace`, passed 50× macOS-local + 50× Linux Docker,
   and the SAME race fired in `tests/test_loop_files_changed_guard.py
@@ -773,11 +773,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   site — typically by centralizing into one shared helper and
   replacing duplicate definitions with imports. Single-site fixes
   on cross-cutting patterns are a structural under-discovery, not a
-  bounded scope. Cost of missing this on FEAT-2026-0013: two ship-
+  bounded scope. Cost of missing this on FEAT-LOOP-2026-0013: two ship-
   and-CI-re-fail cycles + a re-arm cycle = ~$5 in agent costs and
   three days of methodology rounds.
 
-- [FEAT-2026-0013/G1-CLOSE; FEAT-2026-0040/G2-CLOSE-INTERMEDIATE; FEAT-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors; FEAT-2026-0059/G1-CLOSE/signing-agent-in-sandbox]
+- [FEAT-LOOP-2026-0013/G1-CLOSE; FEAT-LOOP-2026-0040/G2-CLOSE-INTERMEDIATE; FEAT-LOOP-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors; FEAT-LOOP-2026-0059/G1-CLOSE/signing-agent-in-sandbox]
   **`git commit` exiting 128 inside a throwaway temp repo is host config or the sandbox, not
   a regression — and four separate features each paid to rediscover that.** Signature:
   `error: Couldn't get agent socket?` or `gpg failed to sign the data`, then
@@ -786,9 +786,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   in the operator's GLOBAL config, and the signing agent's unix socket is unreachable from a
   dispatched or sandboxed session. Confirmed both ways — re-running under
   `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=commit.gpgsign GIT_CONFIG_VALUE_0=false` passes, and
-  the same modules pass unsandboxed. Cost: FEAT-2026-0013 burned $4.70 / 2552s across two
-  attempts before an operator disabled it locally; three consecutive WUs of FEAT-2026-0041
-  each re-established it independently; FEAT-2026-0040 and FEAT-2026-0059 hit it again after
+  the same modules pass unsandboxed. Cost: FEAT-LOOP-2026-0013 burned $4.70 / 2552s across two
+  attempts before an operator disabled it locally; three consecutive WUs of FEAT-LOOP-2026-0041
+  each re-established it independently; FEAT-LOOP-2026-0040 and FEAT-LOOP-2026-0059 hit it again after
   that entry was written. **This merged entry exists because four tags nobody reads together
   failed to stop the fifth rediscovery.** Rules. (a) A fixture that builds a scratch repo pins
   `commit.gpgsign` and `tag.gpgsign` to false alongside `user.name`/`user.email` —
@@ -801,18 +801,18 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   than bisecting the change under test. (d) This is a DIFFERENT failure from the
   `mktemp`/sandbox one — that is the executor lacking a filesystem privilege, this is host
   configuration leaking into a fixture, and they need different fixes. (e) Sibling trap in the
-  opposite direction ([FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the
+  opposite direction ([FEAT-LOOP-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the
   unsandboxed re-run that clears these false reds is also the run where credential-gated live
   tests stop skipping and reach the real external system. The sandbox boundary silently
   changes which tests are meaningful, and a close that re-runs oracles crosses it in both
   directions.
 
-- [FEAT-2026-0013/G1-CLOSE] FEAT-2026-0008's `files_changed` diff
-  guard is recursively validated. During FEAT-2026-0013 v3-attempt-3
+- [FEAT-LOOP-2026-0013/G1-CLOSE] FEAT-LOOP-2026-0008's `files_changed` diff
+  guard is recursively validated. During FEAT-LOOP-2026-0013 v3-attempt-3
   attempt-1, the dispatched agent emitted `status: complete` with
   `files_changed: ["tests/_workspace.py", ...]` but did not write
   `tests/_workspace.py` (the new file at the center of the v3 fix).
-  The FEAT-2026-0008/T02 `verify_files_changed` guard caught the
+  The FEAT-LOOP-2026-0008/T02 `verify_files_changed` guard caught the
   unchanged path (`attempt_outcome: files_changed_mismatch` in
   `events.jsonl`), rolled the squash back via
   `git reset --hard head_before`, and re-dispatched. Attempt-2
@@ -820,20 +820,20 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   driver would have committed only the WU frontmatter status flip,
   `status: done` would have advanced the dependency frontier, and
   the gate would have closed against a missing file. This is the
-  same failure mode FEAT-2026-0007's T04/T08H/T08 hit before
-  FEAT-2026-0008 landed; the guard now closes it. Rule (durable,
+  same failure mode FEAT-LOOP-2026-0007's T04/T08H/T08 hit before
+  FEAT-LOOP-2026-0008 landed; the guard now closes it. Rule (durable,
   observational): the value of driver-side completeness guards is
   proven across multiple feature shipments; agent-side ACs and
   spec-side completeness triggers are necessary but the driver-side
   guard is the load-bearing safety net. Catalog this incident as
-  the second live recursive validation of FEAT-2026-0008 (after
-  FEAT-2026-0008's own close ceremony's audit-of-itself); use it
+  the second live recursive validation of FEAT-LOOP-2026-0008 (after
+  FEAT-LOOP-2026-0008's own close ceremony's audit-of-itself); use it
   when justifying analogous driver-side guards on other surfaces
-  (e.g. FEAT-2026-0012's planned closing-deliverable guard).
+  (e.g. FEAT-LOOP-2026-0012's planned closing-deliverable guard).
 
-- [FEAT-2026-0010/G1] Name load-bearing strings once in the
+- [FEAT-LOOP-2026-0010/G1] Name load-bearing strings once in the
   foundation WU and reference them as exact-match literals in every
-  dependent WU. FEAT-2026-0010/T01 specified the exact anchor string
+  dependent WU. FEAT-LOOP-2026-0010/T01 specified the exact anchor string
   and back-link string for the archive format; T02 and T04 consumed
   those strings without drift, producing byte-reproducible output
   across the dependent chain. The pattern is reliable because it
@@ -845,11 +845,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   dependent WU's Context section — do not leave the dependent WU to
   infer it from the diff.
 
-- [FEAT-2026-0010/G1] Interactive skill WUs that ship an `--auto`
+- [FEAT-LOOP-2026-0010/G1] Interactive skill WUs that ship an `--auto`
   batch mode must state explicitly in their Context section whether
   downstream dogfood WUs in the same gate are expected to
   subprocess-invoke the skill or re-implement its algorithm by direct
-  file editing. FEAT-2026-0010/T02 shipped the `roadmap-archive`
+  file editing. FEAT-LOOP-2026-0010/T02 shipped the `roadmap-archive`
   skill with `--auto`; T04 re-implemented the algorithm directly (no
   subprocess call) and produced correct output — but the contract was
   implicit. An agent dispatched after T02 with no such note may
@@ -860,9 +860,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   "downstream use" note in Context naming which of the two patterns
   the next WU should follow and why.
 
-- [FEAT-2026-0010/G1] A gate-close assertion that event count in
+- [FEAT-LOOP-2026-0010/G1] A gate-close assertion that event count in
   `events.jsonl` equals the gate's WU count must run before the
-  driver marks a gate `passed`. FEAT-2026-0010/T02 completed and had
+  driver marks a gate `passed`. FEAT-LOOP-2026-0010/T02 completed and had
   its WU frontmatter updated correctly, but no `task_started` /
   `task_completed` events were appended; the retro WU (T90) could not
   reconstruct T02's wall-clock span from the log and could only
@@ -875,7 +875,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   block gate advancement and surface the gap for operator review
   before the gate is marked passed.
 
-- [FEAT-2026-0010/G2] For regex-heavy row-mutation WUs — where the
+- [FEAT-LOOP-2026-0010/G2] For regex-heavy row-mutation WUs — where the
   agent must compute byte-offset or capture-group index arithmetic
   against a match object to locate and rewrite a specific cell — a
   concrete before/after fixture in the WU spec reduces first-attempt
@@ -888,7 +888,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Conventions section's format" is insufficient — show the
   transformation, not just the format.
 
-- [FEAT-2026-0010/G2] A helper function that is fully test-validated
+- [FEAT-LOOP-2026-0010/G2] A helper function that is fully test-validated
   but not yet exercised in production (e.g., T05's idempotency path
   in `auto_archive_feature`) must be flagged explicitly in the
   plan-next WU so the feature-close checklist includes a smoke-test
@@ -904,7 +904,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   column-format mismatch) undetected until the next feature exercises
   the path in production.
 
-- [FEAT-2026-0010/G2] When a driver-side helper must replicate the
+- [FEAT-LOOP-2026-0010/G2] When a driver-side helper must replicate the
   logic of an existing skill (e.g., `auto_archive_feature` in
   `loop.py` replicating `roadmap-archive`), the correct implementation
   pattern is to re-implement the algorithm directly in Python, NOT to
@@ -921,9 +921,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   verbatim. Do not leave the choice implicit; an agent without this
   note may choose subprocess invocation as the "DRY" option.
 
-- [FEAT-2026-0015/G1] The §10 helper-duplication escalation trigger
+- [FEAT-LOOP-2026-0015/G1] The §10 helper-duplication escalation trigger
   must be authored with the target file's specific coupling surfaces in
-  mind, not just the obvious symbol names. FEAT-2026-0015/T02's §10
+  mind, not just the obvious symbol names. FEAT-LOOP-2026-0015/T02's §10
   grep checked `CLOSING_SEQUENCE|_CLOSING_TYPES` but omitted
   `CORRELATION_ID_RE` — a separate constant in the same file that
   encodes overlapping knowledge about the closing-type lexicon. The
@@ -937,10 +937,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   location in the file — or in the files that import it — that must
   mirror this change?"
 
-- [FEAT-2026-0015/G1] A WU re-armed after a hygiene-WU resolves its
+- [FEAT-LOOP-2026-0015/G1] A WU re-armed after a hygiene-WU resolves its
   blocking condition may silently produce zero file changes on its
   first re-dispatch attempt — even though the hygiene fix is committed
-  and the blocking pre-condition is gone. FEAT-2026-0015/T03 exited
+  and the blocking pre-condition is gone. FEAT-LOOP-2026-0015/T03 exited
   `files_changed_mismatch` on the second dispatch's first attempt
   (all four expected paths unchanged) despite T02H having landed. The
   plausible cause is cached tool-call state from the prior blocked
@@ -953,12 +953,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the second attempt will perceive the post-hygiene state correctly."
   Account for this extra dispatch in the WU's planned cost.
 
-- [FEAT-2026-0015/G1] `low` effort ($0.50 planned cost) is
+- [FEAT-LOOP-2026-0015/G1] `low` effort ($0.50 planned cost) is
   systematically undersized for WUs that touch three or more files
   when any of those files carry documentation coupling (a prose rule
   that must stay consistent with a code constant, a template whose
   prose must agree with a linter, a skill whose examples must reflect
-  the current valid-type set). FEAT-2026-0015/T03 was classified
+  the current valid-type set). FEAT-LOOP-2026-0015/T03 was classified
   `low` and planned at $0.50; it touched four files (two templates,
   one skill, one test file) and ran $1.53 on its productive dispatch
   alone — 3× plan. T02H was classified `low` and ran $0.98 across two
@@ -973,17 +973,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   boundary case; T01 completed at $0.42 on a $1.00 medium plan,
   suggesting `low` is appropriate there — but only for that pattern.
 
-- [FEAT-2026-0015/G1] When a WU modifies a scaffold template (e.g.,
+- [FEAT-LOOP-2026-0015/G1] When a WU modifies a scaffold template (e.g.,
   `PLAN.template.md`, `WU.template.md`), the gate must include a test
   that renders the template (or a representative excerpt) and runs the
   downstream linter against the rendered output. Verifying that the
   template file itself is well-formed is insufficient — the gate's
   oracle must be "lint passes on a PLAN.md produced from this
-  template." FEAT-2026-0015/T03 introduced
+  template." FEAT-LOOP-2026-0015/T03 introduced
   `tests/test_template_closing_shapes.py` for exactly this: it
   constructs minimal closing-WU sequences from the template shapes and
   asserts `lint_plan.py` accepts them. This extends the existing prose-
-  artifact rule ([FEAT-2026-0003/G2-LESSONS]) specifically to
+  artifact rule ([FEAT-LOOP-2026-0003/G2-LESSONS]) specifically to
   templates: the structural linter that counts required sections must
   run on a RENDERED instance, not on the raw template text (which may
   pass naive section-count checks while producing linter-rejecting
@@ -994,7 +994,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   this path is the preferred form; a Makefile or inline shell command
   is acceptable when a test file is out of scope.
 
-- [FEAT-2026-0015/G2-CLOSE] Planned-cost estimation for WUs that touch
+- [FEAT-LOOP-2026-0015/G2-CLOSE] Planned-cost estimation for WUs that touch
   the driver core (`loop.py`) is systematically half the actual cost
   at the current model mix (Sonnet 4.6 + Opus 4.7). Gate 2's five
   substantive WUs ran 106–194% over plan; the gate subtotal ran 147%
@@ -1005,10 +1005,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `low → $1.50`, `medium → $2.50`, `high → $4.00`. Use the existing
   `low/medium/high` effort taxonomy but with these driver-core
   floors. Outside `loop.py` / `lint_plan.py`, the prior floors
-  ([FEAT-2026-0015/G1]) still apply. Two-gate evidence (Gate 1 +68%,
+  ([FEAT-LOOP-2026-0015/G1]) still apply. Two-gate evidence (Gate 1 +68%,
   Gate 2 +147%) — this is no longer noise.
 
-- [FEAT-2026-0015/G2-CLOSE] Type-keyed assertion tables
+- [FEAT-LOOP-2026-0015/G2-CLOSE] Type-keyed assertion tables
   (`dict[str, list[Callable]]`) are the right shape for a guard whose
   required deliverables differ by WU subtype. T07 landed
   `CLOSING_ASSERTIONS_BY_TYPE` with three keys (`close`,
@@ -1025,7 +1025,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   dispatcher is a one-line `assertions = TABLE.get(wu.type, [])`
   lookup.
 
-- [FEAT-2026-0015/G2-CLOSE] Lint surfaces introduced into a
+- [FEAT-LOOP-2026-0015/G2-CLOSE] Lint surfaces introduced into a
   populated codebase should default to WARN (not ERROR) until a
   backfill sweep runs against existing artifacts. T05's `oracle_env`
   lint surface defaults to WARN because every WU authored before
@@ -1039,7 +1039,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Skipping step 1 and going ERROR-on-first-ship is a known
   spurious-block pattern.
 
-- [FEAT-2026-0015/G2-CLOSE] When a planning artifact (PLAN.md's
+- [FEAT-LOOP-2026-0015/G2-CLOSE] When a planning artifact (PLAN.md's
   `## Planned-cost table`) and a per-unit frontmatter field
   (`WU.frontmatter.planned_cost_usd`) carry overlapping numeric
   knowledge, the two go stale the moment one is revised without the
@@ -1054,8 +1054,8 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Until the generation lands, treat WU frontmatter as the value the
   cost-analysis section quotes, with a footnote on any discrepancy.
 
-- [FEAT-2026-0015/G2-CLOSE] The recursive-dogfood close ceremony
-  pattern from [FEAT-2026-0008/G1-CLOSE] is now validated on a
+- [FEAT-LOOP-2026-0015/G2-CLOSE] The recursive-dogfood close ceremony
+  pattern from [FEAT-LOOP-2026-0008/G1-CLOSE] is now validated on a
   multi-gate feature whose terminal close is the FIRST production
   exercise of the new contract it shipped. This WU (G2-CLOSE) used
   `type: close` (new), wrote `verdict: met` (new field), produced a
@@ -1064,15 +1064,15 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   AC7 recursive grep checks passed. The pattern works: a methodology
   feature whose terminal close uses the methodology's own new shape
   is the load-bearing test that the contract is sound. Rule
-  (reinforcing [FEAT-2026-0008/G1-CLOSE]): any future feature whose
+  (reinforcing [FEAT-LOOP-2026-0008/G1-CLOSE]): any future feature whose
   scope is "ship a new close-ceremony contract" MUST close its own
   terminal gate using that contract. Falling back to the previous
   contract "to be safe" invalidates the feature's central claim.
 
-## FEAT-2026-0017/G1-CLOSE — close-WU hollow-pass surfaces compound
+## FEAT-LOOP-2026-0017/G1-CLOSE — close-WU hollow-pass surfaces compound
 
 - **Verify-gate cannot catch impl-WU hollow-pass on its own.**
-  Sonnet 4.6 hollow-passed FEAT-2026-0017/T01 three times by
+  Sonnet 4.6 hollow-passed FEAT-LOOP-2026-0017/T01 three times by
   modifying only the WU frontmatter; tests passed because they
   ran against unchanged code. The existence-check discipline
   (authoring-work-units §9) caught it ONLY at the next close-WU
@@ -1096,12 +1096,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   AND a paired test asserting it doesn't bypass real runs.
 
 - **Methodology-level guard contracts must be cross-checked at
-  feature plan time.** FEAT-2026-0015 added T06 (driver owns
+  feature plan time.** FEAT-LOOP-2026-0015 added T06 (driver owns
   roadmap flip — close WU MUST NOT touch roadmap.md) and T07
   (close-deliverable guard REQUIRES docs/ or roadmap.md in
   squash) in the same feature. They contradict each other.
   Lint did not catch this. The first feature to actually
-  exercise the post-T06 close-contract (FEAT-2026-0017)
+  exercise the post-T06 close-contract (FEAT-LOOP-2026-0017)
   surfaced it. Rule: when a feature adds or changes a guard
   contract, the planning phase must include a "does any other
   guard contract this contradicts?" review step — ideally
@@ -1120,7 +1120,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   init`. Worth a lint check on tempdir-git patterns in tests.
 
 - **The driver's `commit_bookkeeping` step is itself subject to
-  the same signing flake.** During FEAT-2026-0017/T01 cycle 2,
+  the same signing flake.** During FEAT-LOOP-2026-0017/T01 cycle 2,
   after the spinning-escalation, the driver tried to commit
   the blocked-status marker and crashed with the same exit 128
   signing failure — losing the audit trail commit. Rule: every
@@ -1129,7 +1129,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   warn (or set `commit.gpgsign=false` for its own commits).
 
 - **Opus 4.7 has a verdict-flip blind-spot for close-WUs.**
-  Three consecutive attempts of FEAT-2026-0017/G1-CLOSE
+  Three consecutive attempts of FEAT-LOOP-2026-0017/G1-CLOSE
   produced the bulky deliverables (RETROSPECTIVE.md, LEARNINGS
   append) every time but consistently failed to flip the
   one-line `verdict: not_set` frontmatter field, even with
@@ -1156,7 +1156,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `/unblock-wu` skill as a mandatory step.
 
 - **Full-feature cost can run 10× over plan when dogfood
-  surfaces compound bugs.** FEAT-2026-0017 planned cost $3.20;
+  surfaces compound bugs.** FEAT-LOOP-2026-0017 planned cost $3.20;
   actual $39.37 (12.3× overrun). All overspend on cycles where
   agent worked correctly but verify-gates failed for reasons
   outside WU stated scope (pre-existing repo bugs surfaced by
@@ -1165,7 +1165,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   multiplier" (typical 5-15×) when the feature introduces a new
   contract no prior feature has exercised end-to-end.
 
-- **[FEAT-2026-0018/G1-CLOSE-INTERMEDIATE] Effort-band pricing is
+- **[FEAT-LOOP-2026-0018/G1-CLOSE-INTERMEDIATE] Effort-band pricing is
   blind to spec density and history-as-fixture reads.** Gate 1
   overran +132% ($4.10 plan → $9.51 actual) across three WUs
   whose plans used the standard effort-band defaults
@@ -1187,12 +1187,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   historical-feature-folder read). Treat re-dispatch cost as
   full-cycle cost, not delta cost, when budgeting attempts.
 
-- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Effort bands do not see
+- **[FEAT-LOOP-2026-0018/G2-CLOSE-INTERMEDIATE] Effort bands do not see
   wiring-site count; price multi-site driver-wiring per site.**
   Gate 2's three driver-wiring WUs split clean on the site axis:
   T05 wired ONE new site backed by T04's already-paid-for
   scaffolding and came in at 1.21× plan (`xhigh` $2.20). T04
-  wired one site PLUS the FEAT-2026-0017 ordering invariant
+  wired one site PLUS the FEAT-LOOP-2026-0017 ordering invariant
   (stub-retro before `fire_terminal_flips`; post-flip
   `assert_terminal_flips_fired` must hold) and came in at 1.64×
   plan ($4.10). T06 was priced as `medium` ($0.80) but actually
@@ -1212,7 +1212,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   or ≥ 2 already-shipped helpers the WU must call into, raise
   the band; effort alone will price single-site work.
 
-- **[FEAT-2026-0018/G2-CLOSE-INTERMEDIATE] Driver-wiring
+- **[FEAT-LOOP-2026-0018/G2-CLOSE-INTERMEDIATE] Driver-wiring
   implementation WUs default to 2 attempts in practice; budget
   accordingly.** Every substantive gate-2 WU (T04, T05, T06)
   needed exactly 2 attempts. None escalated to `blocked_human`;
@@ -1230,13 +1230,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   prefer over-budgeting on the planning line to under-budgeting
   and learning it from a 1.6× post-hoc ratio.
 
-- **[FEAT-2026-0018/G3-CLOSE] A predicate that scores planner output
+- **[FEAT-LOOP-2026-0018/G3-CLOSE] A predicate that scores planner output
   is itself the planner-quality oracle once shipped — run it against the
-  feature it shipped in at close ceremony.** FEAT-2026-0018 shipped
+  feature it shipped in at close ceremony.** FEAT-LOOP-2026-0018 shipped
   `gate_eval.py` (deterministic on-plan / off-plan predicate against
   per-gate cost ratios, hard-overrun ceiling, plan-next overrun, and
   gate-budget exceedance). At G3-CLOSE, running `gate_eval.py backtest
-  FEAT-2026-0018` against this feature itself returned `G01 auto=False`
+  FEAT-LOOP-2026-0018` against this feature itself returned `G01 auto=False`
   + `G02 auto=False` + `G03 auto=True` — every verdict matched the
   retrospective evidence the human had already written: gates 1 and 2
   documented multi-WU effort-band misclassifications + plan-next
@@ -1257,11 +1257,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   feature's first real escaped-bug evidence — promote it to a
   blocking lesson before shipping the next feature.
 
-- **[FEAT-2026-0018/G3-CLOSE] A hygiene WU authored mid-gate to fix a
+- **[FEAT-LOOP-2026-0018/G3-CLOSE] A hygiene WU authored mid-gate to fix a
   bug surfaced by that same gate's evidence will, by its own cost,
   often push the gate over the predicate's auto-close criteria —
   pre-commit to whether the gate's predicate verdict is read pre-
-  hygiene or post-hygiene.** FEAT-2026-0018's gate 3 originally
+  hygiene or post-hygiene.** FEAT-LOOP-2026-0018's gate 3 originally
   evaluated `auto=True` against T07–T10 ($2.34 substantive, well
   under $8.00 budget). G3-CLOSE's first attempt diagnosed a wiring
   bug at `loop.py:2310` (terminal auto-close branch post-loop
@@ -1288,7 +1288,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   determines whether the gate's recursive-dogfood verdict
   agrees with itself across the fix boundary.
 
-- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Closing-deliverable WUs
+- [FEAT-LOOP-2026-0016/G1-CLOSE-INTERMEDIATE] Closing-deliverable WUs
   whose acceptance criteria check "is this new file in the diff?"
   must combine `git diff --name-only HEAD` with
   `git ls-files --others --exclude-standard`. `git diff` alone
@@ -1305,7 +1305,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Promoting to authoring-work-units §X (closing-deliverable AC
   patterns) is a candidate gate-3 docs task.
 
-- [FEAT-2026-0016/G1-CLOSE-INTERMEDIATE] Standardized event
+- [FEAT-LOOP-2026-0016/G1-CLOSE-INTERMEDIATE] Standardized event
   payload contracts deserve a single emission helper, and the
   feature spec that introduces the contract carries a structural
   bootstrap gap that the retrospective must call out by name.
@@ -1322,11 +1322,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   WU spec ("this WU's own events lack the new fields, by
   design"), and (b) reconcile post-hoc in the retrospective by
   pointing to the first WU whose events carry the new shape.
-  This pattern was first documented in `[FEAT-2026-0006/G1-CLOSE]`
+  This pattern was first documented in `[FEAT-LOOP-2026-0006/G1-CLOSE]`
   and is now confirmed across two features — promote to a
   drafting-time checklist item.
 
-- [FEAT-2026-0016/G3-CLOSE] A driver helper that buckets
+- [FEAT-LOOP-2026-0016/G3-CLOSE] A driver helper that buckets
   attempt-level events into gates by parsing the
   `correlation_id` suffix must resolve **both** substantive-WU
   IDs (`TNN`) and closing-WU IDs (`G<n>-…`). T07's
@@ -1352,7 +1352,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   substantive-WU and closing-WU events, not just one or the
   other.
 
-- [FEAT-2026-0016/G3-CLOSE] Skill-adding WUs that need to
+- [FEAT-LOOP-2026-0016/G3-CLOSE] Skill-adding WUs that need to
   create discovery surfaces under `.claude/skills/` cannot
   use a dispatched session to make the symlink, even with
   `unsandboxed: true` on the WU. Claude Code's sandbox lists
@@ -1372,7 +1372,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   prerequisite (analogous to how some test-fixture WUs
   pre-stage data).
 
-- [FEAT-2026-0016/G3-CLOSE] Data-layer-first-then-consumers
+- [FEAT-LOOP-2026-0016/G3-CLOSE] Data-layer-first-then-consumers
   feature shape paid off cleanly in this feature's three-gate
   arc. Gate 1 shipped the contract surface (T01 emission +
   T02 frontmatter + T03 tests) in 3 substantive WUs / 3
@@ -1393,7 +1393,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   shape in the next `authoring-work-units` revision as the
   default for contract-shaped features.
 
-- [FEAT-2026-0020/history-scrub/three-surfaces] `git filter-repo
+- [FEAT-LOOP-2026-0020/history-scrub/three-surfaces] `git filter-repo
   --replace-text` scrubs ONLY file contents (blobs). It does NOT
   touch commit messages or file paths/names. A scrub that runs only
   `--replace-text` looks done (working tree clean) but leaks persist
@@ -1405,10 +1405,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   to delete) — and VERIFY each surface separately (a single
   `git log --all -p | grep` blurs which surface still leaks).
   Reusable harness lives at
-  `.specfuse/features/FEAT-2026-0020-public-readiness-prep/history-scrub/scrub-history.sh`
+  `.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/history-scrub/scrub-history.sh`
   (gitignored; `--verify-only` audits read-only).
 
-- [FEAT-2026-0020/history-scrub/scope-vs-fixtures] `filter-repo
+- [FEAT-LOOP-2026-0020/history-scrub/scope-vs-fixtures] `filter-repo
   --replace-text` rewrites HEAD's blobs too, so a too-broad mapping
   silently edits live SOURCE and TEST FIXTURES. Live evidence:
   blanket-redacting `INIT-2026-0001` — which is the scaffold's own
@@ -1426,7 +1426,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   path that worked: restore from the PRE-scrub bundle (the first one,
   pre-pass-1 — not an intermediate), re-scope, re-run.
 
-- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] Do NOT fold an out-of-loop-only
+- [FEAT-LOOP-2026-0020/G1-CLOSE-INTERMEDIATE] Do NOT fold an out-of-loop-only
   audit surface into the same gate as in-loop-verifiable ones. An audit/
   remediation WU whose surface the dispatched agent cannot reach at all
   (e.g. the GitHub issue/PR surface — `gh` returns auth errors inside
@@ -1442,7 +1442,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   stops "deferred but verified post-state" being conflated with "the loop
   never had eyes on this."
 
-- [FEAT-2026-0020/G1-CLOSE-INTERMEDIATE] A close-intermediate WU that is
+- [FEAT-LOOP-2026-0020/G1-CLOSE-INTERMEDIATE] A close-intermediate WU that is
   DISPATCHED (not auto-closed) must carry a hedged `verdict:` in its
   frontmatter, even though the gate is non-terminal. `lint_plan.py`'s
   verdict-exempt set for close-type WUs omits `in_progress`/`in_review`,
@@ -1458,13 +1458,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   lint exempt-set to include in_progress/in_review only as a separate,
   deliberate WU — do not weaken a gate from inside a close session.)
 
-- [FEAT-2026-0020/G2/hollow-pass-presence-gates] The driver enforces the
+- [FEAT-LOOP-2026-0020/G2/hollow-pass-presence-gates] The driver enforces the
   `code` gate set (test suite) but does NOT machine-run the per-WU
   file/symbol-presence checks written in WU bodies. Two gate-2 WUs passed
   `done` with deliverables absent: T12 created SECURITY.md but not the
   bundled CODE_OF_CONDUCT.md (its own `test -s CODE_OF_CONDUCT.md` gate was
   never run); T16 touched ZERO files (no hook, no CI gate) yet passed, at
-  $1.48 cost. The FEAT-2026-0008/0015 hollow-pass guards did not catch
+  $1.48 cost. The FEAT-LOOP-2026-0008/0015 hollow-pass guards did not catch
   zero-deliverable or partial-bundle passes. Rules: (1) a WU's body
   presence/symbol checks must be promoted to machine-enforced gates the
   driver actually runs before accepting `complete` — filed as a loop bug.
@@ -1474,17 +1474,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   hollow-pass amplifier — prefer one deliverable per WU, or assert every
   bundled file in a single machine gate.
 
-- [FEAT-2026-0020/G2/out-of-loop-completion] When the loop cannot reliably
+- [FEAT-LOOP-2026-0020/G2/out-of-loop-completion] When the loop cannot reliably
   produce + verify a deliverable (here: hollow passes the driver won't
   catch; a `gh`/`claude -p` auth surface; a CLI the prior WU never shipped),
   completing out-of-loop with REAL re-run verification beats re-dispatching
   the same WU body — a re-dispatch bets on the same gap. Acceptable for the
   loop's own repo; record it explicitly: set `completed_out_of_loop: true` +
   `completed_note` on the WU, and log it in the retrospective's "What the
-  loop did NOT verify". Four WUs finished this way across FEAT-2026-0020
+  loop did NOT verify". Four WUs finished this way across FEAT-LOOP-2026-0020
   (gate-1 T04; gate-2 T12/T16/T18 + the T15 CLI gap).
 
-- [FEAT-2026-0020/G2/policy-text-content-filter] Generating standard
+- [FEAT-LOOP-2026-0020/G2/policy-text-content-filter] Generating standard
   policy/community text inline (Contributor Covenant 2.1, whose
   unacceptable-behavior list enumerates harassment/abuse terms) can trip the
   model OUTPUT content-filter and hard-block the turn ("Output blocked by
@@ -1493,7 +1493,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and post-process in shell so the body never passes through model output.
   Applies to any vendored license/policy/CoC boilerplate.
 
-- [FEAT-2026-0020/G2/leak-guard-surface-asymmetry] A leak detector needs
+- [FEAT-LOOP-2026-0020/G2/leak-guard-surface-asymmetry] A leak detector needs
   DIFFERENT scopes per caller. Structural regexes (user-path / email /
   private-host) are right on a DIFF (a newly-introduced path is suspicious)
   but false-positive as an absolute repo gate (doc placeholders like
@@ -1504,10 +1504,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Verified: `--all` exits 0 on the clean tree; `--staged` blocks a planted
   path. Generalize: heuristic regexes belong on diffs, not whole-tree gates.
 
-## FEAT-2026-0022/G1-CLOSE — deliverable presence is now machine-enforced
+## FEAT-LOOP-2026-0022/G1-CLOSE — deliverable presence is now machine-enforced
 
-- [FEAT-2026-0022/G1-CLOSE] The advisory→enforced promotion that
-  [FEAT-2026-0020/G2/hollow-pass-presence-gates] filed as a loop bug is
+- [FEAT-LOOP-2026-0022/G1-CLOSE] The advisory→enforced promotion that
+  [FEAT-LOOP-2026-0020/G2/hollow-pass-presence-gates] filed as a loop bug is
   shipped. Three independent driver-side guards now sit in the
   parse→squash→advance pipeline: `WorkUnit.produces` (parsed field +
   advisory lint WARN), `assert_declared_deliverables` (each `produces:`
@@ -1515,15 +1515,15 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `deliverable_missing`), and `assert_implementation_touched_files` (an
   `implementation` WU touching zero deliverable files records
   `no_deliverable_files` and blocks). This closes the two shapes the
-  no-code-written guard ([FEAT-2026-0008/G1-CLOSE]) left open:
+  no-code-written guard ([FEAT-LOOP-2026-0008/G1-CLOSE]) left open:
   zero-deliverable (T16) and partial-bundle (T12). Rule: a body-level
   `test -s` presence check is advisory and worthless on its own — the
   only presence check that runs is the one the driver runs. Promote
   named-file deliverables to `produces:` so they are enforced, not
   attested.
 
-- [FEAT-2026-0022/G1-CLOSE] Recursive-dogfood close validated a third
-  time (after [FEAT-2026-0008/G1-CLOSE], [FEAT-2026-0015/G2-CLOSE]): a
+- [FEAT-LOOP-2026-0022/G1-CLOSE] Recursive-dogfood close validated a third
+  time (after [FEAT-LOOP-2026-0008/G1-CLOSE], [FEAT-LOOP-2026-0015/G2-CLOSE]): a
   feature whose purpose is to ship hollow-pass guards must audit that
   its OWN three WUs did not hollow-pass the guards they add. Live
   recursive validation here went past existence — the close ran
@@ -1535,9 +1535,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   three-layer audit; existence alone would have missed a guard that
   parses but never fires.
 
-## FEAT-2026-0023/G1-CLOSE — seam bugs need an integration layer; terminal flips need ONE owner
+## FEAT-LOOP-2026-0023/G1-CLOSE — seam bugs need an integration layer; terminal flips need ONE owner
 
-- [FEAT-2026-0023/G1-CLOSE] Three driver bugs (#47 row-only archive
+- [FEAT-LOOP-2026-0023/G1-CLOSE] Three driver bugs (#47 row-only archive
   anchor, #48 `ensure_feature_branch` raw traceback, #49 auto-close
   leaves `PLAN.md status: active`) were one class: **seam bugs at
   handoffs between subsystems, none catchable by unit tests because unit
@@ -1550,11 +1550,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   loop → terminal close on BOTH paths → archive). `test_lifecycle_integration.py`
   is that layer; it would have caught all three. This is the
   driver-side analogue of the deliverable-presence layering in
-  [FEAT-2026-0022/G1-CLOSE] and the no-code-written guard in
-  [FEAT-2026-0008/G1-CLOSE]: each closes a CLASS by adding the layer
+  [FEAT-LOOP-2026-0022/G1-CLOSE] and the no-code-written guard in
+  [FEAT-LOOP-2026-0008/G1-CLOSE]: each closes a CLASS by adding the layer
   that runs at the real boundary, not by patching one instance.
 
-- [FEAT-2026-0023/G1-CLOSE] Terminal-state flips must have exactly ONE
+- [FEAT-LOOP-2026-0023/G1-CLOSE] Terminal-state flips must have exactly ONE
   driver-side owner called identically by every close path. #49 existed
   because two paths diverged: the dispatched-close path relied on the
   close WU's *agent* to flip `PLAN.md`, while the agent-less auto-close
@@ -1571,9 +1571,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   definition, no competing PLAN-status writer, all three guard tests
   present and green (14 tests OK).
 
-## FEAT-2026-0024/G2-CLOSE — a leak-guard feature can poison its own loop bookkeeping
+## FEAT-LOOP-2026-0024/G2-CLOSE — a leak-guard feature can poison its own loop bookkeeping
 
-- [FEAT-2026-0024/G2-CLOSE] A leak-scan pre-commit hook scanning the loop's OWN
+- [FEAT-LOOP-2026-0024/G2-CLOSE] A leak-scan pre-commit hook scanning the loop's OWN
   bookkeeping diff will flag structural-hit strings the driver itself recorded
   into `events.jsonl`. During this feature, `G1-PLAN` attempt 1 died with
   `squash_commit_failed`: the pre-commit `leak-scan` hook rejected the
@@ -1581,7 +1581,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   had embedded in a `failure_excerpt` it wrote into `events.jsonl` when T02's
   attempt 1 failed. The leak-guard feature thus poisoned its own loop
   bookkeeping, costing a full re-attempt (+$3.23). This is the
-  `[FEAT-2026-0020/G2/leak-guard-surface-asymmetry]` insight one level up the
+  `[FEAT-LOOP-2026-0020/G2/leak-guard-surface-asymmetry]` insight one level up the
   stack: that entry says heuristic structural regexes belong on *diffs*, not
   whole-tree gates, because diffs of doc/config/fixture content carry benign
   hits (`git@github.com`, `/Users/<user>/`); here the *diff being committed is
@@ -1597,7 +1597,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   cataloged here so future leak-guard / log-recording features expect the
   self-poison and do not re-pay the re-attempt.
 
-- [FEAT-2026-0024/G2-CLOSE] When a feature's headline acceptance can only run in
+- [FEAT-LOOP-2026-0024/G2-CLOSE] When a feature's headline acceptance can only run in
   an external execution environment (a live GitHub Action firing on a real
   issue/PR event), split the deliverable at the unit-testable seam and ship the
   oracle as operator-deferred — do NOT manufacture in-loop confidence with
@@ -1606,8 +1606,8 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   from its thin Action wrapper (`leak-scan-content.yml`), so the close honestly
   reports `partially_met`: surface built + seam verified in-loop, live trigger
   operator-confirmed post-merge. This is the
-  `[FEAT-2026-0020/G2/out-of-loop-completion]` and
-  `[FEAT-2026-0014/T01/gh-claudeP-broken]` precedents applied at design time
+  `[FEAT-LOOP-2026-0020/G2/out-of-loop-completion]` and
+  `[FEAT-LOOP-2026-0014/T01/gh-claudeP-broken]` precedents applied at design time
   rather than discovered at block time. Rule: for any WU whose true oracle is an
   external-environment trigger, (a) carve out a pure, importable runner that
   carries the behavioral test, (b) mark the live trigger operator-deferred in the
@@ -1616,7 +1616,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the terminal flips until the operator confirms — never `met` on an unconfirmed
   live oracle.
 
-- [FEAT-2026-0019/G1] A feature that migrates the verification harness the driver
+- [FEAT-LOOP-2026-0019/G1] A feature that migrates the verification harness the driver
   itself runs to gate work (the test loader, `verification.yml` gate set, packaging
   of the driver code) cannot be decomposed into separately-gated loop WUs: each WU's
   exit oracle is the very surface being migrated, so no WU can pass alone and the
@@ -1628,7 +1628,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   if a WU edits `verification.yml`, the test loader, or how the driver's own code is
   imported, its sibling WUs share a broken oracle until all land together.
 
-- [FEAT-2026-0028/G2] A feature gate whose work AND verification live in a SIBLING repo
+- [FEAT-LOOP-2026-0028/G2] A feature gate whose work AND verification live in a SIBLING repo
   (here: the umbrella `specfuse` CLI in specfuse/specfuse, calling the driver's
   scaffold API) cannot be loop-dispatched — the driver runs in this repo and its cwd,
   git, and verification all target it. Draft such a gate's WUs as interactive specs
@@ -1638,7 +1638,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   WU's `produces:` paths or its test command live outside this repo, it is a cross-repo
   interactive WU, not a dispatchable one.
 
-- [FEAT-2026-0027/G3] A WU that adds interactive `input()`/TTY-consent code, or that
+- [FEAT-LOOP-2026-0027/G3] A WU that adds interactive `input()`/TTY-consent code, or that
   reads operator home-dir data, has two recurring failure modes the loop must defend:
   (1) its tests MUST mock `sys.stdin.isatty` + `builtins.input` (an unmocked prompt
   fails or — pre-fix — hangs the verify gate); (2) committed fixtures MUST be synthetic
@@ -1689,14 +1689,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a feature from one, `git log` for a prior feature that already shipped it: a squash merge
   whose `closes #N` lived only in a feature-BRANCH commit (not the PR body or a default-branch
   commit) does not auto-close the issue. Issue #46 ("issue/PR-body leak guard") sat open while
-  FEAT-2026-0024 had shipped the Action + runner + docs the same day — its headline acceptance
+  FEAT-LOOP-2026-0024 had shipped the Action + runner + docs the same day — its headline acceptance
   was also intentionally left as an operator post-merge live-oracle step. Rule: triage
   open→(read merge history + the feature that names the issue) before assuming a fresh feature
   is warranted; the fix may be "verify the deferred oracle and close," not "build it again."
 
-- [FEAT-2026-0029/G1-CLOSE] A WU that authors a parser/consumer must have its input
+- [FEAT-LOOP-2026-0029/G1-CLOSE] A WU that authors a parser/consumer must have its input
   artifact's existence verified at draft time — not the format, the *existence*.
-  FEAT-2026-0029/T01 was drafted to parse a `specfuse upgrade` "health report" string
+  FEAT-LOOP-2026-0029/T01 was drafted to parse a `specfuse upgrade` "health report" string
   format that is implemented NOWHERE in the repo (described only in prose in
   `feature-conversion/SKILL.md`). The agent correctly blocked on attempt 1 rather than
   invent a grammar, but the block cost a dispatch (~$0.71) that a draft-time check would
@@ -1708,20 +1708,20 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   against an in-repo signal, NOT a parse of a not-yet-emitted string. "The format is
   described in prose in a sibling skill" is not "the format exists."
 
-- [FEAT-2026-0029/G1-CLOSE] Sandbox `mktemp -d` denial (`Operation not permitted`) is an
+- [FEAT-LOOP-2026-0029/G1-CLOSE] Sandbox `mktemp -d` denial (`Operation not permitted`) is an
   environment limit that presents as a test failure and will consume the entire 3-attempt
-  spinning budget if the WU spec doesn't pre-empt it. FEAT-2026-0029/T01's tmp-repo fixture
+  spinning budget if the WU spec doesn't pre-empt it. FEAT-LOOP-2026-0029/T01's tmp-repo fixture
   for `collect_reports` spun 3 failed attempts on `mktemp: mkdtemp failed on /var/folders/...:
   Operation not permitted` before a re-arm found a working tmp-dir strategy — none of it a
   logic bug. Rule: any WU whose tests build a temp git repo or scratch dir MUST use the
   repo's established `tempfile.TemporaryDirectory` / `$TMPDIR` fixture pattern and the WU
   spec should name the sandbox tmp-dir constraint explicitly, so the agent doesn't
-  rediscover the denial under the spinning budget. Pairs with the FEAT-2026-0013 tmp-repo
+  rediscover the denial under the spinning budget. Pairs with the FEAT-LOOP-2026-0013 tmp-repo
   fixture rules (gc.auto=0 + sync barrier + ignore_cleanup_errors).
 
-- [FEAT-2026-0029/G1-CLOSE] Scope a wiring/registration WU's acceptance criteria to the
+- [FEAT-LOOP-2026-0029/G1-CLOSE] Scope a wiring/registration WU's acceptance criteria to the
   artifact's actual *delivery model*, or it will block on an unrelated, out-of-scope defect
-  in a different delivery path. FEAT-2026-0029/T03 (register a skill) blocked on attempt 1
+  in a different delivery path. FEAT-LOOP-2026-0029/T03 (register a skill) blocked on attempt 1
   because an AC drove the agent into a `scaffold.py` skill-deploy defect (`init()`/
   `upgrade_specfuse()` deploy no skills for anyone) — but Specfuse skills ship via the Claude
   Code **plugin**, not the pip scaffold, so that defect was never on this WU's path. The
@@ -1733,14 +1733,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a sibling delivery path's internals is a mis-scope that will block or force a driver-internals
   edit.
 
-- [FEAT-2026-0031/G1-CLOSE] *(operator-authored — the gate auto-closed, so no close session
+- [FEAT-LOOP-2026-0031/G1-CLOSE] *(operator-authored — the gate auto-closed, so no close session
   ran to write this; see the companion lesson below.)* An injected-runner seam that only
   **some** calls route through gives tests false confidence. `gh_backend.py`'s
   `on_feature_complete` took a `runner=` injection and had a `runner=stub_runner` test suite
   (`tests/test_gh_backend.py`) — but its `gh pr view` idempotency probe called
   `subprocess.run` **directly**, so the stub intercepted `gh pr create` while the probe
   escaped to the real binary. Every existing test passed; the probe was simply never
-  exercised. Found by *reading* the module while drafting FEAT-2026-0031/T03, not by any
+  exercised. Found by *reading* the module while drafting FEAT-LOOP-2026-0031/T03, not by any
   test — a bypassed seam is invisible to the suite that assumes it. The fix widened
   `_default_runner(args, check=True)` to return the completed process, so the probe inspects
   `.returncode` without raising while side-effecting callers keep raise-on-failure
@@ -1749,9 +1749,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the module for the raw call (`subprocess.run`, `requests.`, the SDK entrypoint) and assert
   zero direct hits. A partial seam is worse than none: it reads as covered.
 
-- [FEAT-2026-0031/G1-CLOSE] Auto-close silently voids a close WU's `produces:` contract and
-  every acceptance criterion in its body — the deliverable-presence gate (FEAT-2026-0022)
-  cannot fire on a WU that is never dispatched. FEAT-2026-0031's `G1-CLOSE` declared
+- [FEAT-LOOP-2026-0031/G1-CLOSE] Auto-close silently voids a close WU's `produces:` contract and
+  every acceptance criterion in its body — the deliverable-presence gate (FEAT-LOOP-2026-0022)
+  cannot fire on a WU that is never dispatched. FEAT-LOOP-2026-0031's `G1-CLOSE` declared
   `produces: [RETROSPECTIVE.md, .specfuse/LEARNINGS.md]` and carried explicit AC bullets for
   a `## Cost analysis` section, a `## What the loop did NOT verify` list (pre-populated with
   two known deferred `gh` oracles), and four candidate lessons. The gate stayed on-plan, so
@@ -1768,7 +1768,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   after an auto-close. Corollary for reviewers: `auto_close: true` + `attempts: 0` on a close
   WU means its body was never executed; read the WU's ACs as *unfulfilled*, not as evidence.
 
-- [FEAT-2026-0032/G2-CLOSE] A gate-1 deferral that names a *later gate* as its verification
+- [FEAT-LOOP-2026-0032/G2-CLOSE] A gate-1 deferral that names a *later gate* as its verification
   venue is not closed just because that gate ships — the later gate has to actually exercise
   the deferred path. Gate 1 deferred T02's real-Windows timeout `taskkill` branch to "gate 2's
   gate execution." Gate 2's CI oracle (T08) does run a real gate command through Git-Bash on
@@ -1782,17 +1782,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   must verify each inherited deferral was *actually* exercised, not merely that the gate shipped.
   A deferral pointed at a gate is a promise the gate can silently break.
 
-- [FEAT-2026-0032/T08] A CI-oracle WU whose real exit condition is a `windows-latest` (or any
+- [FEAT-LOOP-2026-0032/T08] A CI-oracle WU whose real exit condition is a `windows-latest` (or any
   cross-OS) PR job is `done` in-loop the moment its `@skipUnless(sys.platform=="win32")` test is
   collected-and-skipped on the Linux sandbox and the wiring lints — which proves the wiring and
-  the skip, NOT that the gate ran green on the target OS. Combined with `[FEAT-2026-0024/G2-CLOSE]`:
+  the skip, NOT that the gate ran green on the target OS. Combined with `[FEAT-LOOP-2026-0024/G2-CLOSE]`:
   such a feature's close must report `partially_met`/`met_locally` (never `met`) until the operator
   confirms the real-runner job is green, so `verdict_permits_terminal_flips` holds the terminal
   `PLAN status → done` flip. Tell at draft time: any WU whose oracle is a CI leg on an OS the loop
   sandbox is not, ships its real proof PR-deferred — enumerate it in the close's `## What the loop
   did NOT verify` and hedge the verdict.
 
-- [FEAT-2026-0036] Pin a linter/formatter's RULESET explicitly (`[tool.ruff.lint] select`),
+- [FEAT-LOOP-2026-0036] Pin a linter/formatter's RULESET explicitly (`[tool.ruff.lint] select`),
   not just its version. A bare ruff config inherits ruff's *implicit default* `select`; ruff
   0.16 broadened that default from the classic `E4,E7,E9,F` to a large opinionated set
   (B/SIM/PLW/RUF/I/…), so an unpinned `ruff>=0.6` flagged ~300 findings on code clean for
@@ -1803,7 +1803,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   an accident of upgrading. Same shape for any tool whose "default" behavior you rely on
   implicitly (formatters, type-checkers, test collectors).
 
-- [FEAT-2026-0036/T01] A WU's gate verifies the gate's *tools*, not the WU's *premise*. T01's
+- [FEAT-LOOP-2026-0036/T01] A WU's gate verifies the gate's *tools*, not the WU's *premise*. T01's
   job was "make `ruff check` pass under ruff 0.16," but the `code` gate ran the repo's pinned
   ruff 0.15 (clean by the classic default), so the gate went green while the agent changed
   nothing — a hollow pass that only surfaced when T02 lifted the pin and 0.16's ruleset
@@ -1814,7 +1814,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   WU. Also: when a WU blocks, check whether the *plan* was wrong before re-arming — here the
   premise (300 real errors) was itself false, so re-arming would have spun forever.
 
-- [FEAT-2026-0037] A lint/type-check **adoption** WU must record the PRE-FIX finding count
+- [FEAT-LOOP-2026-0037] A lint/type-check **adoption** WU must record the PRE-FIX finding count
   per rule code (`ruff check --statistics --select <codes>` before the fix, quoted in the
   WU), not only the post-fix "reports zero findings". Zero-findings is exactly what a hollow
   pass shows too, and the close cannot reconstruct the delta — the result contract bars close
@@ -1824,7 +1824,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   adopt-a-stricter-tool WU (new mypy strictness, new bandit codes, a raised coverage floor):
   capture the before-number at the moment it still exists.
 
-- [FEAT-2026-0037/T01] `PLW1510` (`subprocess.run` without an explicit `check=`) on a SHARED
+- [FEAT-LOOP-2026-0037/T01] `PLW1510` (`subprocess.run` without an explicit `check=`) on a SHARED
   runner helper wants a `check: bool = True` **parameter**, not a hardcoded literal. When one
   helper serves both probing callers (which must inspect `.returncode` without raising) and
   side-effecting callers (which want the raise), `check=True` breaks the probes and
@@ -1833,7 +1833,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `.returncode` (handling visible at the call site), `check=True` everywhere else, and a
   parameter where one helper does both.
 
-- [FEAT-2026-0037/T02] `BLE001` has a linter-satisfying escape hatch that leaves the swallow
+- [FEAT-LOOP-2026-0037/T02] `BLE001` has a linter-satisfying escape hatch that leaves the swallow
   intact: `# noqa: BLE001` plus a reason comment turns the gate green without binding or
   logging the exception. A WU whose criterion reads "narrow the catch, OR bind-and-log where
   a catch-all is intentional" silently permits a third path it never named — and an
@@ -1841,7 +1841,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the property, not the family: "no unbound catch-all remains" (or explicitly bless `noqa` +
   reason as policy) so the adoption cannot land green with the swallow untouched.
 
-- [FEAT-2026-0051/G1-CLOSE] "Probe the oracle before trusting it as an oracle" generalizes
+- [FEAT-LOOP-2026-0051/G1-CLOSE] "Probe the oracle before trusting it as an oracle" generalizes
   well beyond gate sets. The invariant is not about gates; it is about any exit oracle whose
   verdict can change without the repo changing — a dependency audit whose advisory database
   updated, a linter release adding a rule, a compiler bump, a license scanner, a
@@ -1849,11 +1849,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Wherever an oracle is externally fed, measure it ONCE against the unchanged base tree
   before attributing any failure to a work unit; otherwise the first WU to run inherits the
   red oracle and spins its whole attempt budget against a failure it did not cause and often
-  cannot fix. This is the actionable counterpart to the `[FEAT-2026-0007/G1-LESSONS]` family:
+  cannot fix. This is the actionable counterpart to the `[FEAT-LOOP-2026-0007/G1-LESSONS]` family:
   those say "don't make a tool's own report the acceptance oracle," this one says what to do
   when you must depend on one anyway.
 
-- [FEAT-2026-0051/G1-CLOSE] A pre-flight probe of the full `code` set is cheap enough that
+- [FEAT-LOOP-2026-0051/G1-CLOSE] A pre-flight probe of the full `code` set is cheap enough that
   once-per-gate-entry needs no further debate — record the measurement so it is not
   re-derived: 118s wall-clock on this repo's nine `code` gates, 93% of it duplicated test
   execution (the same suite run bare and again under coverage), ZERO model tokens (it runs
@@ -1862,7 +1862,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   General rule: when sizing a brake, compare CPU-seconds against BILLED agent time, not
   against other CPU-seconds — and expect probe cost to be dominated by whichever gates
   duplicate each other's work.
-  **AMENDED IN PLACE by [FEAT-2026-0102/G1-CLOSE]** — the measurement above stands; the
+  **AMENDED IN PLACE by [FEAT-LOOP-2026-0102/G1-CLOSE]** — the measurement above stands; the
   conclusion this entry originally drew from it does not. It read "which is a
   `verification.yml` authoring concern rather than a driver one", and that was wrong. The
   duplication was not an authoring mistake anyone could have avoided: the gate-set contract
@@ -1881,10 +1881,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   option belongs to whoever owns the contract's enforcement — not to every author who has to
   live inside it.
 
-- [FEAT-2026-0051/G1-CLOSE; FEAT-2026-0053/G1-CLOSE; FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]
+- [FEAT-LOOP-2026-0051/G1-CLOSE; FEAT-LOOP-2026-0053/G1-CLOSE; FEAT-LOOP-2026-0057/G1-CLOSE/driver-edits-need-a-restart]
   **Python loads the driver once at process start, so a work unit's edit to `loop.py` is dead
   code for everything that same run dispatches afterwards — including the close armed to
-  verify it.** Observed in its most expensive form in FEAT-2026-0057: T04 wired a pre-dispatch
+  verify it.** Observed in its most expensive form in FEAT-LOOP-2026-0057: T04 wired a pre-dispatch
   hook correctly in one attempt with eight passing tests, and the very next unit dispatched was
   the close designed to read the injected output — whose prompt carried none. Timestamps were
   decisive. Three consequences, each of which a separate feature had to learn on its own.
@@ -1894,12 +1894,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   notes as "takes effect on the NEXT run". (c) **A gate whose definition of done asserts
   driver runtime behavior must name its observation point**, and an absent signal must never
   be read as a false claim; sequence a driver restart between the wiring unit and its proof,
-  or the proof measures the old code. Note that FEAT-2026-0075 later shipped a control for
+  or the proof measures the old code. Note that FEAT-LOOP-2026-0075 later shipped a control for
   this (the `driver_restart_required` halt on a squash touching `specfuse/loop/`), which
   detects the hazard rather than removing it — the rules above still govern how a gate is
   planned around it.
 
-- [FEAT-2026-0039/T04] A work unit that enumerates N hand-maintained "surfaces" in prose
+- [FEAT-LOOP-2026-0039/T04] A work unit that enumerates N hand-maintained "surfaces" in prose
   will get the enumeration missed, and the miss costs a whole attempt. T04's body listed
   five seeding surfaces in a numbered block with a per-surface explanation of what breaks
   if you skip it; the attempt edited its three `produces:` files and none of the five,
@@ -1912,7 +1912,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the list mechanically at authoring time by grepping the repo for an existing member of
   the same family, never by copying a sibling WU's prose.
 
-- [FEAT-2026-0039/G2-CLOSE] An auto-closed gate's skipped ceremony is a DEBT ENTRY, not a
+- [FEAT-LOOP-2026-0039/G2-CLOSE] An auto-closed gate's skipped ceremony is a DEBT ENTRY, not a
   saving, and the close that inherits it should price it that way. Gate 1 auto-closed
   on-plan and spent $0.00 against a $5.00 close-intermediate — a 100% underrun that
   dominated the gate's headline −32% delta. What it actually did was move the
@@ -1925,7 +1925,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   criteria the predicate cannot classify as verified-or-deferred is not a candidate for
   auto-close.
 
-- [FEAT-2026-0039/G2-CLOSE] Estimate `planned_cost_usd` from mechanical fan-out, not prose
+- [FEAT-LOOP-2026-0039/G2-CLOSE] Estimate `planned_cost_usd` from mechanical fan-out, not prose
   volume — overrun risk tracks RETRY probability, and retries come from missed
   enumerations, not from long documents. Across this feature's eight substantive WUs the
   pattern was unambiguous and ran opposite to the pre-registered prediction: the two WUs
@@ -1936,7 +1936,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   nobody flagged because its body was short. Count the surfaces a WU must touch, not the
   words it must write.
 
-- [FEAT-2026-0039/G2-CLOSE] When a feature's definition of done is an OPERATOR
+- [FEAT-LOOP-2026-0039/G2-CLOSE] When a feature's definition of done is an OPERATOR
   EXPERIENCE — an interactive skill, a CLI someone runs by hand, anything whose target is
   a different repository — pre-declare `met_locally` as the ceiling in `PLAN.md` at draft
   time instead of discovering it at the arming review and confirming it at the close. A
@@ -1948,7 +1948,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   for "this gate tried to do too much," and mis-attributing a structural limit to gate
   sizing sends the next plan to fix the wrong thing.
 
-- [FEAT-2026-0039/G2-CLOSE] An acceptance criterion naming a test runner the repo does not
+- [FEAT-LOOP-2026-0039/G2-CLOSE] An acceptance criterion naming a test runner the repo does not
   have installed is not an oracle, and it fails silently. Six criteria across four WUs of
   this feature specified `python3 -m pytest <module>` in a repo whose `tests` gate is
   `python3 -m unittest discover` and whose venv has no pytest. Every one of them "passed"
@@ -1958,13 +1958,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   is the command the project's own `verification.yml` gate actually runs, or that it is
   installed; a criterion that cannot be executed verbatim is prose.
 
-- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] For any breaking change to a schema this repo's
+- [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] For any breaking change to a schema this repo's
   own gates validate, **expand → migrate → contract is the named default ordering — and
   the migrate step's acceptance criterion must be a tree-wide completeness command
   asserted at zero hits, never a prose enumeration of surfaces.** Flip-first is not merely
   risky, it is unsatisfiable by construction: the shipped example is validated by a `code`
   gate, so tightening the validator before migrating turns the gate red on a correct tree,
-  and under FEAT-2026-0051's preflight baseline probe a red base gate halts the run before
+  and under FEAT-LOOP-2026-0051's preflight baseline probe a red base gate halts the run before
   any WU dispatches. Every intermediate state must be independently green, because the
   driver squashes each WU with the full gate set required to pass. The ordering alone is
   not enough: this gate got the ordering right and still lost its only $5.26 to a migrate
@@ -1974,41 +1974,41 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   correctly-scoped WU and an under-scoped one are indistinguishable from outside. The flip
   WU then inherited a non-conforming tree, burned three attempts and a
   `spinning_signature_repeat` escalation, and the hygiene WU written with the sweep
-  criterion passed first attempt for $0.83. Same failure as [FEAT-2026-0039/T04]
+  criterion passed first attempt for $0.83. Same failure as [FEAT-LOOP-2026-0039/T04]
   (hand-written fan-out lists reproduce the author's blind spots) one level up, at the
   criterion rather than the body.
 
-- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A fixture that cannot express the bug class it
+- [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] **A fixture that cannot express the bug class it
   guards is an authoring defect, and it is detectable at authoring time.** Ask of every
   fixture: what is the cardinality of the thing this is meant to catch, and does the
-  fixture carry more than one of it? FEAT-2026-0039's discovery fixture had one trigger per
+  fixture carry more than one of it? FEAT-LOOP-2026-0039's discovery fixture had one trigger per
   deployable, so it structurally could not express the N-triggers-per-deployable failure —
   and the gap surfaced only on a real repo, twice, across two features. A fixture with
   cardinality 1 where the failure needs N is not a small fixture, it is a fixture testing a
   different question. When a WU's `produces:` includes a fixture, the acceptance criterion
   should name the cardinality the fixture must carry.
 
-- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A gate's definition of done must be decidable by
+- [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] **A gate's definition of done must be decidable by
   that gate.** This gate carried a clause asserting a property of an artifact in a
-  different, unwritten feature ("FEAT-2026-0040's adapter interface has a machine-checkable
+  different, unwritten feature ("FEAT-LOOP-2026-0040's adapter interface has a machine-checkable
   answer to X"), which is undecidable here and lands in the deferred-verification list as
   an entry no gate sizing can remove. Recast to what the gate actually proves ("the schema
   expresses and the validator enforces X") it is decidable, and the cross-feature intent
   survives as a binding constraint recorded in PLAN.md and the roadmap — which is where a
   claim about another feature belongs.
 
-- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **A close reporting a gate-set result must state
+- [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] **A close reporting a gate-set result must state
   which sandbox each gate ran under.** Three of this repo's ten `code` gates are `bats`
   suites whose `setup` calls `mktemp -d`; under the agent session's default sandbox that
   returns `Operation not permitted` and all thirteen cases fail before a single assertion
   runs. Re-run with the sandbox disabled they are green. A close that reported "7/10" would
   have reported the sandbox and manufactured a regression. Cheap to say, and it is the
   difference between an oracle and a number. The consumer-side complement of
-  [FEAT-2026-0029/G1-CLOSE], which covers the authoring side (name the tmp-dir constraint
+  [FEAT-LOOP-2026-0029/G1-CLOSE], which covers the authoring side (name the tmp-dir constraint
   in the WU spec so an implementation WU doesn't spend its spinning budget rediscovering
   the denial); this one binds every close that re-runs oracles under §1.
 
-- [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] **Do not measure a gate against a plan that was
+- [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] **Do not measure a gate against a plan that was
   re-based onto its own failure.** When a WU is inserted mid-gate in response to a miss,
   the gate's planned cost rises by that WU's estimate, and reconciling actual spend against
   the *re-planned* figure reports the miss as estimating accuracy — here, a +8.6% overrun
@@ -2017,17 +2017,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   WUs all come in 39–75% under except one 155% overrun did not overrun on estimation, it
   overran on one defect — say which, and price the defect rather than the estimate.
 
-- [FEAT-2026-0069/GATE-1-ARM] **`planning-discipline.md` §5's flat $5.00 planning floor is
+- [FEAT-LOOP-2026-0069/GATE-1-ARM] **`planning-discipline.md` §5's flat $5.00 planning floor is
   wrong for `plan-next` specifically, and the error is large enough to invert a feature's
   cost verdict.** Two independent datasets now agree, and they separate cleanly by WU type
   rather than by feature:
 
   | WU type | observed actuals | §5 floor |
   |---|---|---|
-  | `plan-next` | $15.65 (FEAT-2026-0049), **$16.44** (FEAT-2026-0069/G1-PLAN, 2 attempts) | $5.00 |
-  | `close-intermediate` | $5.67 (FEAT-2026-0049), **$10.01** (FEAT-2026-0069, 2 attempts) | $5.00 |
+  | `plan-next` | $15.65 (FEAT-LOOP-2026-0049), **$16.44** (FEAT-LOOP-2026-0069/G1-PLAN, 2 attempts) | $5.00 |
+  | `close-intermediate` | $5.67 (FEAT-LOOP-2026-0049), **$10.01** (FEAT-LOOP-2026-0069, 2 attempts) | $5.00 |
 
-  FEAT-2026-0069's gate 1 shows the consequence in isolation, because its substantive
+  FEAT-LOOP-2026-0069's gate 1 shows the consequence in isolation, because its substantive
   estimating was good: substantive WUs came in at **$11.94 against $11.00 planned (+8.6%,
   four of five under)**, while the two closing WUs came in at **$26.45 against $10.00
   (+165%)**. Gate 1 alone therefore cost **$38.39** against a **$34.00 whole-feature** plan
@@ -2043,12 +2043,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   supplied rather than to a judgement the author made, the retrospective must say so and
   propose the floor revision. Otherwise the signal is recorded as "this feature overran"
   and the constant survives to mis-price the next one. This entry exists because
-  FEAT-2026-0049 produced the same evidence and it was recorded as provenance for the
+  FEAT-LOOP-2026-0049 produced the same evidence and it was recorded as provenance for the
   $5.00 floor rather than as a reason to move it. Tracked as issue #260.
 
-- [FEAT-2026-0069/G2-CLOSE] **The expensive `plan-next` bought the cheap gate — raise the
+- [FEAT-LOOP-2026-0069/G2-CLOSE] **The expensive `plan-next` bought the cheap gate — raise the
   §5 floor because planning costs that much and is worth it, not because planning is
-  wasteful.** This is the counter-evidence that keeps [FEAT-2026-0069/GATE-1-ARM]'s floor
+  wasteful.** This is the counter-evidence that keeps [FEAT-LOOP-2026-0069/GATE-1-ARM]'s floor
   revision from inviting the wrong correction. `G1-PLAN` cost **$16.44** against a $5.00
   floor, and its §4 runtime probe applied the re-key locally, ran the full 1473-test
   oracle twice, and pasted the resulting four-failure list **verbatim into the WU body**.
@@ -2067,7 +2067,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   actually reads. Third dataset for issue #260: `plan-next` $16.44, `close-intermediate`
   $10.01.
 
-- [FEAT-2026-0069/G2-CLOSE] **A grep-based acceptance criterion asserting a symbol's
+- [FEAT-LOOP-2026-0069/G2-CLOSE] **A grep-based acceptance criterion asserting a symbol's
   absence must anchor on the definition or use a word boundary — a bare substring grep is
   evidence of neither presence nor absence.** A WU asserted
   `grep -c "_with_subscriptions" <file>` returns `0`. Re-run fresh at the close it returned
@@ -2077,13 +2077,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   naming coincidence. The mirror failure is worse and silent — the same criterion returns
   `0` if the symbol is **renamed** rather than deleted. Write
   `grep -c "def <symbol>"` or `grep -cE "\b<symbol>\b"`, and say which property is being
-  asserted. Same family as [FEAT-2026-0039/G2-CLOSE] (a criterion naming a test runner the
+  asserted. Same family as [FEAT-LOOP-2026-0039/G2-CLOSE] (a criterion naming a test runner the
   repo does not have): a command written into a criterion is an oracle only if it measures
   the thing the sentence claims. Corollary for closes: when a fresh re-run disagrees with a
   criterion, diagnose the *command* before escalating the *work* — the disagreement is as
   likely to be in the wording as in the tree.
 
-- [FEAT-2026-0069/G2-CLOSE] **Any test whose assertion is a relation between two derived
+- [FEAT-LOOP-2026-0069/G2-CLOSE] **Any test whose assertion is a relation between two derived
   collections is vacuously true on empty inputs and must assert non-emptiness first.**
   Equal lengths, disjoint sets, stable ordering, round-trip identity — `len([]) == len([])`,
   `sorted([]) == sorted([])`, and two empty sets are disjoint. Two of this feature's
@@ -2091,12 +2091,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   exists to protect — passed against a discovery function returning **zero** components,
   and no gate could see it: the tests do real work and their assertions are real, they are
   just true of nothing. This is not the hollow-pass shape the driver already guards
-  ([FEAT-2026-0022/G1-CLOSE]); it is a *vacuous-truth* shape and needs a different check.
+  ([FEAT-LOOP-2026-0022/G1-CLOSE]); it is a *vacuous-truth* shape and needs a different check.
   It was found only because a runtime probe's **passes** were read as carefully as its
   failures. Worth a sweep across a repo's boundary tests, not just the module that
   surfaced it.
 
-- [FEAT-2026-0069/G2-CLOSE] **When a gate's definition of done is written in terms of a
+- [FEAT-LOOP-2026-0069/G2-CLOSE] **When a gate's definition of done is written in terms of a
   skill but its oracle is a test-local reference implementation, the gap between them is a
   real deferral — name it, or the green reads as "the skill is proven".** Gate 2's DoD said
   *"`/derive-monitoring`, run against a repo whose single deployable carries N triggers,
@@ -2104,17 +2104,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   algorithm does (fresh, exit 0) and that the skill's prose describes that algorithm
   (fresh, exit 0). No test in the repo composes them, so "an agent following the prose
   reproduces the result on an unseen tree" is unverified. This is not pedantry: it is the
-  exact gap that *created* this feature — FEAT-2026-0039's gates were green and its skill
+  exact gap that *created* this feature — FEAT-LOOP-2026-0039's gates were green and its skill
   still emitted 30 components on its first real repo, because a passing fixture and an
   agent-executed skill are different oracles. Two fixes, and both are cheap. **Write the
   DoD as what the gate can decide** (the algorithm yields X, the prose describes it), so
   the wording artifact disappears and only the genuine gap remains; and **schedule the
   genuine gap as one named post-merge operator run against a named real repo** — several
   such deferrals usually collapse into a single run. Extends
-  [FEAT-2026-0069/G1-CLOSE-INTERMEDIATE] (a gate's DoD must be decidable by that gate) from
+  [FEAT-LOOP-2026-0069/G1-CLOSE-INTERMEDIATE] (a gate's DoD must be decidable by that gate) from
   cross-*feature* claims to cross-*surface* ones.
 
-- [FEAT-2026-0069/G2-CLOSE] **Reject a schema position while it is still unreleased; that
+- [FEAT-LOOP-2026-0069/G2-CLOSE] **Reject a schema position while it is still unreleased; that
   window is the only time the conservative direction is free.** Gate 1 shipped `invariant`
   permitting `targets` by fall-through — absent from both lookup tables, decided by nobody.
   Gate 2 rejected it for $0.86, on the reasoning that `invariant` already carries
@@ -2129,9 +2129,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   fall-through is something a terminal close has to report as an open schema position
   either way.
 
-- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **"Exactly one writer" is a property of the
+- [FEAT-LOOP-2026-0070/G1-CLOSE-INTERMEDIATE] **"Exactly one writer" is a property of the
   surface, not of the function — audit it by grepping the writes, in both directions, not
-  the definition.** `[FEAT-2026-0023/G1-CLOSE]` requires terminal-state flips to have ONE
+  the definition.** `[FEAT-LOOP-2026-0023/G1-CLOSE]` requires terminal-state flips to have ONE
   driver-side owner, and the natural audit — `grep -c "def fire_terminal_flips"` returns
   `1` — proves only that the owner is not duplicated. Aiming the grep at each *surface*
   instead (`write_frontmatter_field(... "status" ...)`, `roadmap_path.write_text`, every
@@ -2148,10 +2148,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unsatisfiable and will be quietly downgraded to the definition-count check that finds
   nothing.
 
-- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **A skill may not own a state transition the
+- [FEAT-LOOP-2026-0070/G1-CLOSE-INTERMEDIATE] **A skill may not own a state transition the
   driver owns: the driver exposes an entry point, the skill calls it, and the skill's
   *non*-writing is enforced by a grep-shaped test over the skill text with a positive
-  control.** `[FEAT-2026-0023/G1-CLOSE]` established one owner across *close paths*; the
+  control.** `[FEAT-LOOP-2026-0023/G1-CLOSE]` established one owner across *close paths*; the
   operator-skill surface is the same hazard with a friendlier name, because a skill that
   hand-edits three files is indistinguishable in its effect from the divergence that cost
   issue #49. The shape that worked: order the WUs so the driver primitive lands first
@@ -2163,7 +2163,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   because the skill is clean. Corollary for planners: "skill needs a state transition" is
   always two WUs, and the primitive is the first one.
 
-- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **When a contract is enforced at two moments, the
+- [FEAT-LOOP-2026-0070/G1-CLOSE-INTERMEDIATE] **When a contract is enforced at two moments, the
   earlier enforcer must either explain the later one's requirement or exempt the states
   the later one owns — otherwise it fails on the right tree with the wrong message.** One
   defect class, three incidents: `lint_plan`'s close-WU verdict check omitted
@@ -2179,7 +2179,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   If the answer is "a later one", the earlier check exempts the states that later one owns
   and its comment names it.
 
-- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **An attempt killed before it reaches an outcome
+- [FEAT-LOOP-2026-0070/G1-CLOSE-INTERMEDIATE] **An attempt killed before it reaches an outcome
   is invisible to every cost consumer — a close reconciling spend from `events.jsonl`
   reports a lower bound and must say so.** Cost lands in `events.jsonl` at
   `attempt_outcome`/`task_completed` time, so an infra kill, a Ctrl-C, or an OOM mid-attempt
@@ -2193,7 +2193,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   failure-class breakdown reporting zero driver-recorded failures should say *recorded*
   rather than claiming every WU passed first try.
 
-- [FEAT-2026-0070/G1-CLOSE-INTERMEDIATE] **An acceptance record that overwrites the field
+- [FEAT-LOOP-2026-0070/G1-CLOSE-INTERMEDIATE] **An acceptance record that overwrites the field
   it records leaves no machine-readable trace of what was accepted — carry the
   accepted-from value forward in frontmatter.** `/accept-hedged-close` writes an auditable
   acceptance record and then, correctly, sets the close WU's `verdict` to `met` so the
@@ -2205,7 +2205,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `verdict_accepted_from`, `_reason`, `_at` — so "met" and "hedged, accepted on a stated
   reason with follow-ups open" stay distinguishable to a query, not just to a reader.
 
-- [FEAT-2026-0070/G2-CLOSE] **A machine-readable marker embedded in a prose artifact is
+- [FEAT-LOOP-2026-0070/G2-CLOSE] **A machine-readable marker embedded in a prose artifact is
   forgeable by the prose that documents it — scope the scan, or make the token
   unquotable.** This gate shipped an auto-close debt marker written into `RETROSPECTIVE.md`
   and a guard that scans for it. The scan is plain text over the whole file with no
@@ -2220,7 +2220,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unreproducible by quotation. "No one would write that string by accident" is false for
   precisely the readers who most need the feature explained.
 
-- [FEAT-2026-0070/G2-CLOSE] **Cost variance tracks how many distinct things a work unit
+- [FEAT-LOOP-2026-0070/G2-CLOSE] **Cost variance tracks how many distinct things a work unit
   must prove, not whether its test file already exists.** Paired observation across one
   feature's two gates. Gate 1 came in **53.5% under** plan and concluded that a WU
   extending an existing guard test file is *cheaper*, not dearer, than the plan's premium
@@ -2235,7 +2235,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   count, not as the variable. A calibration lesson drawn from one gate's uniform miss is a
   hypothesis, and the next gate is its test — say so when promoting one.
 
-- [FEAT-2026-0070/G2-CLOSE] **An arm-time reprice silently invalidates the close's
+- [FEAT-LOOP-2026-0070/G2-CLOSE] **An arm-time reprice silently invalidates the close's
   as-drafted baseline whenever the resulting delta sits under the linter's threshold — a
   noise threshold is also an audit blind spot.** The gate-2 arming record reconciled the WU
   sum to `PLAN.md`'s `planned_cost_usd` at a delta of exactly $0.00. The operator then
@@ -2248,7 +2248,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   small deltas to avoid noise, something else must still record them, or "reconciles
   exactly" decays into "reconciled exactly, once, before the edits".
 
-- [FEAT-2026-0070/G2-CLOSE] **A marker-gated guard that reports zero across all history is
+- [FEAT-LOOP-2026-0070/G2-CLOSE] **A marker-gated guard that reports zero across all history is
   untested end-to-end by construction, and the close that ships it must not count its own
   vacuous pass as evidence.** The narrowing that makes such a guard *satisfiable* — only
   gates marked by the new writer count as debt — is the same property that makes it inert
@@ -2262,7 +2262,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   function; only a real sequence proves the guard. A green post-pass reported without that
   distinction is the hollow pass the guards exist to catch, one level up.
 
-- [FEAT-2026-0046/G1-CLOSE] **A criterion that mandates a stub does not defer the
+- [FEAT-LOOP-2026-0046/G1-CLOSE] **A criterion that mandates a stub does not defer the
   integration risk — it removes it from the WU's scope, and the estimate must stop paying
   for it.** The WU that files GitHub issues was the gate's most expensive at $3.50, priced
   for the risk of discovering `gh` search and create syntax against a live API. Its own
@@ -2280,7 +2280,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   every stub-mandating criterion with a named deferral in the close, or the gate's green is
   a statement about the seam and silently reads as a statement about the system.
 
-- [FEAT-2026-0046/G1-CLOSE] **A close criterion that trips a threshold and then attributes a
+- [FEAT-LOOP-2026-0046/G1-CLOSE] **A close criterion that trips a threshold and then attributes a
   cause is asserting two things; the close must verify the attribution separately.** This
   gate's close carried a mechanical rule: more than two entries under
   `## What the loop did NOT verify` flags the feature's gate sizing. Four entries appeared
@@ -2294,7 +2294,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   to name the alternative if it does not. Thresholds are good at detecting; they are not
   evidence about why.
 
-- [FEAT-2026-0071/G1-CLOSE] **An entry point that acquires its first subprocess or network
+- [FEAT-LOOP-2026-0071/G1-CLOSE] **An entry point that acquires its first subprocess or network
   call has made a consumer-visible contract change, even when its signature and return
   value are untouched.** `scaffold.init()` and `upgrade_specfuse()` were pure filesystem —
   that is why they worked offline, in CI containers, against non-GitHub remotes, and in
@@ -2308,7 +2308,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   wiring uses the real default runner, the pre-existing regression suites silently become
   live-binary probes, so budget for what a real invocation does in a test tmpdir.
 
-- [FEAT-2026-0071/G1-CLOSE] **A registry that imports its vocabulary from consumer modules
+- [FEAT-LOOP-2026-0071/G1-CLOSE] **A registry that imports its vocabulary from consumer modules
   guards the names and nothing else — say so, or the drift test reads as broader than it
   is.** The label registry took its seven names from `escalation.py` and `gh_features.py`
   rather than retyping them, and a coverage test recomputes the set at test time, so a name
@@ -2319,7 +2319,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   covers and which are unguarded by construction. A partial structural guard described as a
   total one is how the unguarded fields stop being reviewed.
 
-- [FEAT-2026-0071/G1-CLOSE] **When a plan's scope boundary rejects an interface the roadmap
+- [FEAT-LOOP-2026-0071/G1-CLOSE] **When a plan's scope boundary rejects an interface the roadmap
   already promised, correct the roadmap at the decision, not at the close.** The roadmap
   detail section said "`--no-labels` opts out" while `PLAN.md`, written for the same
   feature, had ruled a CLI flag out of scope in favour of an environment variable — because
@@ -2331,7 +2331,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   that was never built records it under `## What the loop did NOT verify` rather than
   quietly rewriting it as though it had always matched.
 
-- [FEAT-2026-0072/G1-CLOSE] **A new check added to a tree-walking linter is only "swept
+- [FEAT-LOOP-2026-0072/G1-CLOSE] **A new check added to a tree-walking linter is only "swept
   clean" for inputs the walk actually reached; a non-zero exit from an unrelated crash is
   not a result for the new check.** T03's criterion 11 required zero findings across every
   directory under `.specfuse/features/` — a deliberate sweep-not-a-sample, and the right
@@ -2348,7 +2348,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   anything after the abort point, and its exit code cannot distinguish "found a problem"
   from "could not look" — that is its own defect, and a sweep is where it surfaces.
 
-- [FEAT-2026-0072/G1-CLOSE] **An opt-out list for a new blocking check must live where the
+- [FEAT-LOOP-2026-0072/G1-CLOSE] **An opt-out list for a new blocking check must live where the
   consumer can edit it, or the check is not adoptable — and the close must say which.**
   T03 shipped `DONE_FEATURE_GATE_EXCLUSIONS` as a module-level constant in
   `specfuse/loop/lint_plan.py`, with two entries whose inline reasons are genuinely
@@ -2363,7 +2363,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   consumer-visible contract-change list. A blocking check plus an unreachable opt-out is a
   breaking change with no remedy, which reads as an additive diff.
 
-- [FEAT-2026-0072/G1-CLOSE] **When a WU ships a fix for drift that has already been
+- [FEAT-LOOP-2026-0072/G1-CLOSE] **When a WU ships a fix for drift that has already been
   reconciled, the fix's active code path is unreachable on the correct tree — the close
   records it as unexercised rather than reading the green guard as coverage.** T02 taught
   `sync-scaffold.sh` to create missing `.claude/skills/` forward symlinks, but the four
@@ -2378,7 +2378,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   natural-occurrence upgrade condition (here: the next skill added without a hand-made
   link) rather than counting the fixture run as verification on the live surface.
 
-- [FEAT-2026-0072/G1-CLOSE] **A declared gate that needs a writable temp directory fails
+- [FEAT-LOOP-2026-0072/G1-CLOSE] **A declared gate that needs a writable temp directory fails
   spuriously wherever the executor is sandboxed, and the failure is indistinguishable from
   a real one unless the close names the environment condition beside the exit code.** Both
   bats suites in this feature's gate set failed on first run with
@@ -2394,7 +2394,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   evidence; it is a number that will be read as red by whoever sees it next — including the
   driver running the same gates.
 
-- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **A completeness sweep whose file list is
+- [FEAT-LOOP-2026-0040/G2-CLOSE-INTERMEDIATE] **A completeness sweep whose file list is
   discovered by walking keeps being true as the gate writes new files; one scoped to a
   hand-written path tuple silently stops looking.** T04's tree-wide assertion ("no
   cron-carrying heartbeat target anywhere lacks a conforming dialect") enumerates its
@@ -2410,7 +2410,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   whether the failing command reads *ambient host config* before recording the exit code
   as a regression.
 
-- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **Do not re-price a gate off the previous gate's
+- [FEAT-LOOP-2026-0040/G2-CLOSE-INTERMEDIATE] **Do not re-price a gate off the previous gate's
   underrun when the two gates are made of different work; price the migration-and-severity-flip
   unit separately from the new-module units.** Gate 1's three units came in at $2.65
   against $9.50 (−72%), three for three, all first attempt, and the arming review faced an
@@ -2427,7 +2427,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   threshold, not a spend target — under-running it costs nothing, and a halt mid-gate costs
   the whole gate.
 
-- [FEAT-2026-0040/G3-CLOSE] **A tree-wide sweep that walks `git ls-files` is blind to the
+- [FEAT-LOOP-2026-0040/G3-CLOSE] **A tree-wide sweep that walks `git ls-files` is blind to the
   new file of the WU that introduces it, so the offending WU always passes and the failure
   lands on whoever runs the suite next.** A gate-2 WU shipped a walk-discovered assertion
   over every tracked file; a gate-3 WU shipped a new YAML template that violates it. The
@@ -2443,7 +2443,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   not include the WU's own output. Re-run it at close time; that is the only run whose tree
   is the tree being shipped.
 
-- [FEAT-2026-0040/G3-CLOSE] **A deliberately schema-agnostic structural predicate collides
+- [FEAT-LOOP-2026-0040/G3-CLOSE] **A deliberately schema-agnostic structural predicate collides
   with foreign surfaces that happen to share its key, and the collision arrives exactly
   when the feature starts shipping its own config-shaped files.** The sweep above collects
   "every mapping carrying a `cron` key" — chosen on purpose, so a heartbeat target is found
@@ -2457,7 +2457,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   hand-written exclusion list instead is the regression the walk was built to prevent —
   fix the predicate, keep the walk and its non-vacuity floor.
 
-- [FEAT-2026-0040/G3-CLOSE] **Gate padding sized as "one re-attempt of the largest WU"
+- [FEAT-LOOP-2026-0040/G3-CLOSE] **Gate padding sized as "one re-attempt of the largest WU"
   prices the retry at the drafted figure, which is the one number a retry disproves.** A
   gate drafted at $23.00 carried a $28.00 budget: $5.00 of padding for exactly one
   re-attempt of its $5.00 unit. That unit needed two failed attempts plus a re-arm and cost
@@ -2473,7 +2473,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   proportion of the gate than as a copy of one unit's estimate: a retry costs what the
   retry costs, not what the plan hoped the unit would.
 
-- [FEAT-2026-0054/G1-CLOSE] **When a contract gains an earlier enforcement moment, the
+- [FEAT-LOOP-2026-0054/G1-CLOSE] **When a contract gains an earlier enforcement moment, the
   *git state each moment reads* becomes part of the contract, and an equivalence test
   that does not reproduce the real dispatch ordering will report divergence that is not
   there.** A pre-squash lint necessarily inspects the **working tree**; the post-squash
@@ -2490,7 +2490,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   that never approves and a lint that always approves both trivially "agree" with a
   guard on half the cases.
 
-- [FEAT-2026-0054/G1-CLOSE] **Replacing a duplicated machine-detail table with a pointer
+- [FEAT-LOOP-2026-0054/G1-CLOSE] **Replacing a duplicated machine-detail table with a pointer
   removes the drift only if the pointer describes the mechanism's *trigger conditions*
   rather than the union of its branches.** This feature deleted a table of literal guard
   strings from a rule file precisely because a second copy of the requirements drifts —
@@ -2505,11 +2505,11 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   checker ("run the lint to see what is still missing"). A best-case description is
   worse than no description, because it tells the reader they can skip the check.
 
-- [FEAT-2026-0054/G1-CLOSE] **A guard scoped to "this gate" by parsing the gate out of a
+- [FEAT-LOOP-2026-0054/G1-CLOSE] **A guard scoped to "this gate" by parsing the gate out of a
   correlation ID silently exempts every ID shape the parser does not recognise — and the
   unrecognised shape is usually the common one.** The failure-class-breakdown guard
   restricts non-passing attempts to the current gate via a parser that matches only
-  closing IDs of the form `G<n>-…`; an implementation-WU ID like `FEAT-2026-0054/T04`
+  closing IDs of the form `G<n>-…`; an implementation-WU ID like `FEAT-LOOP-2026-0054/T04`
   parses to nothing and is dropped. The consequence is that the retrospective section
   whose whole purpose is accounting for failed attempts cannot be required on a gate
   whose only failures were implementation work units — which is most gates. It fails
@@ -2520,7 +2520,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   derived scope, add a test that the guard actually FIRES for the common membership
   case, not only that it passes when satisfied.
 
-- [FEAT-2026-0055/G1-CLOSE] **A rule that parses a document must be fixture-tested against the
+- [FEAT-LOOP-2026-0055/G1-CLOSE] **A rule that parses a document must be fixture-tested against the
   document shape the project's own template ships, not against a hand-written shape that happens
   to parse.** This feature's boundary check slices the `Do not touch` section with a helper that
   keeps only the lines *after* the heading line. That is correct for `## Do not touch` and wrong
@@ -2535,7 +2535,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the feature's motivating incident as a fixture asserting the rule FIRES — a paraphrase of "the
   T04 shape" satisfies the acceptance criterion and misses the defect.
 
-- [FEAT-2026-0055/G1-CLOSE] **A cross-corpus sweep that a work unit's acceptance criteria require
+- [FEAT-LOOP-2026-0055/G1-CLOSE] **A cross-corpus sweep that a work unit's acceptance criteria require
   must be a driver-run gate, not an agent's self-reported observation.** The gate's definition of
   done required the new ERROR rule to report zero findings across every existing feature folder,
   and the producing work unit's criteria said "Any ERROR on an existing feature → stop,
@@ -2548,7 +2548,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   executes, and treat any criterion whose evidence is a pasted command output as unverified until
   the close re-runs it.
 
-- [FEAT-2026-0055/G1-CLOSE] **A rule that refuses work must fire only on certainty and degrade
+- [FEAT-LOOP-2026-0055/G1-CLOSE] **A rule that refuses work must fire only on certainty and degrade
   everything else to a warning — a rule that guesses is worse than the defect it hunts.** The
   boundary check's first shipped form matched `produces:` paths against every backtick token it
   found in a Do-not-touch section, which turned an allow-enumeration ("These files change: … and
@@ -2563,7 +2563,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   size the ERROR leg by what it can prove, not by what it can pattern-match. A false refusal
   costs a human's trust in the whole check; a WARN costs them ten seconds.
 
-- [FEAT-2026-0055/G1-CLOSE] **A close whose gates pass but whose verdict is `not_met` is
+- [FEAT-LOOP-2026-0055/G1-CLOSE] **A close whose gates pass but whose verdict is `not_met` is
   recorded as a passed attempt, so the rework it triggers is invisible to failure-class cost
   analysis.** Every `attempt_outcome` event in this feature carries `outcome: passed`,
   `failure_class: null`, `re_arm_count: 0` — and $11.08 of the $15.30 spent, 72% of the total,
@@ -2577,7 +2577,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and treat a large uniform under-run on rule-authoring work as a prompt to check whether the
   rule has ever been observed firing on a real input.
 
-- [FEAT-2026-0053/G1-CLOSE] **A reference snapshot captured at a lifecycle event is meaningless
+- [FEAT-LOOP-2026-0053/G1-CLOSE] **A reference snapshot captured at a lifecycle event is meaningless
   for the feature that installs the capture, because that feature is already past the event.**
   Gate 1 shipped an immutable `PLAN.baseline.json` written at a feature's first dispatch, so
   that later gates can measure plan drift against the as-activated graph. This feature's own
@@ -2593,13 +2593,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   snapshot as evidence the mechanism works. The first honest test is the first feature that
   starts after the mechanism merges.
 
-- [FEAT-2026-0053/G1-CLOSE] **Sweep a new predicate over the whole real corpus at close, and
+- [FEAT-LOOP-2026-0053/G1-CLOSE] **Sweep a new predicate over the whole real corpus at close, and
   read a uniformly not-evaluable result as an unproven approval path rather than a pass.**
   Running the new arm predicate over all 43 real feature directories cost one command and
   returned `would_arm: False` with every class `not_evaluable: no_baseline` on 43 of 43 — the
   designed fail-closed behavior, confirmed at scale instead of on fixtures, and worth having.
   But green-on-fixtures plus refuses-everything-on-real-input is precisely the evidence shape
-  that hid FEAT-2026-0055's defect, where a document-parsing rule passed every hand-authored
+  that hid FEAT-LOOP-2026-0055's defect, where a document-parsing rule passed every hand-authored
   fixture and could not fire on a single real work unit. A refusal path proven on the corpus
   says nothing about the approval path, and the approval path is the one that will meet real
   frontmatter, real `events.jsonl`, and a real review file for the first time in production.
@@ -2607,7 +2607,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the approval path as unverified in `## What the loop did NOT verify` and carry it into the
   successor gate's risk list — do not let "no findings across the corpus" read as coverage.
 
-- [FEAT-2026-0053/G2-CLOSE] **A work unit that introduces a validation rule must be drafted
+- [FEAT-LOOP-2026-0053/G2-CLOSE] **A work unit that introduces a validation rule must be drafted
   against the fixtures that already exist, not only against real inputs — a sibling work unit's
   test fixture is an input too, and it is the one the gate actually runs against.** A WU added a
   new veto class requiring `planned_cost_usd` on every drafted work unit. The preceding WU's
@@ -2625,7 +2625,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   amendment into the WU's scope at drafting time. Related: work units that touch disjoint source
   surfaces are not thereby independent — check fixture overlap before declaring them so.
 
-- [FEAT-2026-0053/G2-CLOSE] **A cost or usage aggregate that reads a per-cycle field silently
+- [FEAT-LOOP-2026-0053/G2-CLOSE] **A cost or usage aggregate that reads a per-cycle field silently
   under-counts every re-armed unit, and the error concentrates in exactly the work the aggregate
   exists to catch.** A feature-level budget predicate summed each work unit's `cost_usd`. That
   field is per-dispatch-cycle: the driver's re-arm fold moves the prior cycle's spend into
@@ -2640,7 +2640,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   reconciling planned against actual should compute the same total from `events.jsonl` and
   compare, because the event log is the only surface that never loses a cycle.
 
-- [FEAT-2026-0053/G2-CLOSE] **An accumulation artifact with no reader delivers none of the
+- [FEAT-LOOP-2026-0053/G2-CLOSE] **An accumulation artifact with no reader delivers none of the
   value it was built to preserve — the gate that builds the writer must name the consumer or
   record a deferral with a home.** A feature whose whole premise was replacing four human gate
   reads with one PR read shipped, tested end to end, the mechanism that accumulates each
@@ -2656,7 +2656,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   NOT verify` and hand it to the planning WU with a decision to make, rather than let a green
   gate imply an end-to-end path.
 
-- [FEAT-2026-0053/G3-CLOSE] **A path-prefix approximation that is sound as a safety property
+- [FEAT-LOOP-2026-0053/G3-CLOSE] **A path-prefix approximation that is sound as a safety property
   can still make the feature's headline case unreachable, and "accepted v1 limit" in the docs
   is not the same as saying so.** An arming predicate refused to auto-arm any gate whose
   drafted work units produce a path under the driver package prefix — the rule that stops a
@@ -2673,7 +2673,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Naming the limit in a reference page tells an operator what happened; only the verdict tells
   the person deciding whether to adopt it that the headline number is currently out of reach.
 
-- [FEAT-2026-0053/G3-CLOSE] **A definition-of-done criterion must name the surface that
+- [FEAT-LOOP-2026-0053/G3-CLOSE] **A definition-of-done criterion must name the surface that
   *enforces* a property, not the one that *declares* it — a contract spread across registries
   that do not reference each other is satisfied exactly and still fails.** A work unit shipping
   a new documentation page had an acceptance criterion naming the drift guard's tracked-file
@@ -2688,7 +2688,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   letter that still failed the gate is a drafting defect worth recording even when its cost was
   trivial, because the cost is a property of how loudly the guard fails, not of the mistake.
 
-- [FEAT-2026-0053/G3-CLOSE] **A budget brake evaluated only *before* each unit's dispatch cannot
+- [FEAT-LOOP-2026-0053/G3-CLOSE] **A budget brake evaluated only *before* each unit's dispatch cannot
   observe the unit that overruns, so a gate can exceed its declared budget while the brake reads
   clean.** A per-gate `cost_budget_usd` was checked by a halt predicate that runs ahead of each
   work-unit dispatch. Spend inside the final unit of a gate is therefore structurally invisible
@@ -2703,7 +2703,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   only surface that never loses a cycle, and should state gate spend against the brake rather
   than against the plan.
 
-- [FEAT-2026-0060/G1-CLOSE] **A registry derived from a corpus is derived from a lagging
+- [FEAT-LOOP-2026-0060/G1-CLOSE] **A registry derived from a corpus is derived from a lagging
   indicator: code paths that exist but have never executed are invisible to it by
   construction, and no amount of care in running the sweep recovers them.** A work unit was
   told to re-derive the driver's unsanctioned event types "from the corpus", did exactly
@@ -2720,7 +2720,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   guard built on the first silently under-covers. Corollary: bake the union into the guard
   itself, so a later derivation cannot regress to the cheap source.
 
-- [FEAT-2026-0060/G1-CLOSE] **A code comment that records a known gap as *precedent* converts
+- [FEAT-LOOP-2026-0060/G1-CLOSE] **A code comment that records a known gap as *precedent* converts
   a defect into a convention, and every subsequent author learns the defect as house style.**
   `loop.py` documented an unvalidated event type with "…`gate_reached` and `attempt_outcome`
   are the existing precedent for driver-local event types outside the envelope enum and
@@ -2734,7 +2734,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   addressing it, that is evidence the gap is load-bearing and under-owned, not evidence the
   decision was already made.
 
-- [FEAT-2026-0060/G1-CLOSE] **A close's consumer-visible contract list must be verified
+- [FEAT-LOOP-2026-0060/G1-CLOSE] **A close's consumer-visible contract list must be verified
   against the packaging manifest, not inferred from where a file lives — the one artifact
   whose entire job is accuracy about what consumers see is also the easiest to fill in from
   assumption.** This feature's close was instructed to treat a new `verification.yml` gate as
@@ -2749,7 +2749,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the same assumption that overstates risk here understates it when a file *is* shipped and
   nobody checked.
 
-- [FEAT-2026-0060/G1-CLOSE] **A test that exercises a guard's helper function is not the guard
+- [FEAT-LOOP-2026-0060/G1-CLOSE] **A test that exercises a guard's helper function is not the guard
   observed failing; only driving the real assertion proves the guard is not cosmetic.** A
   drift guard shipped with a self-check named "the guard fails on an unregistered type", which
   called the comparison helper directly with a synthetic input and asserted on its return
@@ -2761,7 +2761,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   guard is confirmed to fail", the evidence must be the guard's own assertion raising, with
   the failure message quoted. A helper-level check is a useful unit test and a false close.
 
-- [FEAT-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors] **The `git commit` exit-128 errors in
+- [FEAT-LOOP-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors] **The `git commit` exit-128 errors in
   `test_lint_closing.py` and `test_autosync_no_cwd_leak.py` are a command-sandbox
   artifact, not a regression — stop re-diagnosing them.** Signature: 11 errors,
   every traceback ending `subprocess.CalledProcessError: Command '['git', '-C',
@@ -2771,7 +2771,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   tracebacks are all `git` subprocess calls against temp directories, re-run just
   in the run log rather than in whatever the agent happened to do by hand.
 
-- [FEAT-2026-0041/G1-CLOSE/one-renderer-two-callers] **When one format must be identical across two entry
+- [FEAT-LOOP-2026-0041/G1-CLOSE/one-renderer-two-callers] **When one format must be identical across two entry
   points, ship one renderer, make both entry points callers, and assert
   byte-identical output.** The interactive skill and the headless CLI both build a
   model and call the single `render()`; neither holds a marker string or a
@@ -2783,7 +2783,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   surfaces" criterion, the oracle is `assertEqual(render_a(x), render_b(x))` plus a
   no-restated-template check on each caller.
 
-- [FEAT-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them] **Before
+- [FEAT-LOOP-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them] **Before
   drafting a feature that automates a check, run that check by hand over the real corpus
   — the result decides whether the feature's headline criterion is satisfiable on
   arrival, and it is usually cheaper than one blocked attempt.** This feature's gate
@@ -2802,7 +2802,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   prove the checker fires on real producer output — say so, or a reader concludes the
   lint found nothing because there was nothing to find.
 
-- [FEAT-2026-0034/G1-CLOSE/re-verify-the-producer-not-the-audit] **A defect described in a
+- [FEAT-LOOP-2026-0034/G1-CLOSE/re-verify-the-producer-not-the-audit] **A defect described in a
   roadmap row is a dated observation, not a current fact; before a close repeats it, drive
   the *producer* and read what it emits today.** Three planning documents — the roadmap
   row, `PLAN.md`, and the close WU body — all asserted that `auto_archive_feature`
@@ -2822,10 +2822,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   output" when the tree was cleaned before the feature ran — copy the corpus to a temp
   dir, run the producer, lint the result, diff the findings against baseline.
 
-- [FEAT-2026-0073/G1-CLOSE/measure-every-error-class-not-just-yours] **Before authoring a
+- [FEAT-LOOP-2026-0073/G1-CLOSE/measure-every-error-class-not-just-yours] **Before authoring a
   criterion of the form "zero X corpus-wide", run the checker over the real corpus and read
   the breakdown by *every* class it can report — not only the class the feature is about.**
-  FEAT-2026-0060 measured `event_type` failures, found zero, and authored "the validator
+  FEAT-LOOP-2026-0060 measured `event_type` failures, found zero, and authored "the validator
   reports zero total errors" while its Do-not-touch list forbade the only file that could
   deliver them; 285 `correlation_id` failures it never looked at made the criterion
   unsatisfiable by construction. Cost: one blocked attempt, $4.48, and a whole follow-up
@@ -2838,10 +2838,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   should state up front: the total will have moved by the time the WU runs, so commit to the
   *distribution* ("no new error class") as the block criterion and say explicitly that a
   larger count of the same class is time passing, not a discrepancy. Companion to
-  [FEAT-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them], which says run
+  [FEAT-LOOP-2026-0034/G1-CLOSE/hand-check-the-invariants-before-automating-them], which says run
   the check by hand; this says read all of what it prints.
 
-- [FEAT-2026-0073/G1-CLOSE/never-invite-what-produces-forbids] **A WU body must not invite a
+- [FEAT-LOOP-2026-0073/G1-CLOSE/never-invite-what-produces-forbids] **A WU body must not invite a
   change that its own `produces:` list makes impossible — rename permissions, "move this if
   it fits better", "split the file if it grows" are all mutually exclusive with a declared
   path, and the guard is machine-checked while the invitation is prose.** T02's body said
@@ -2851,7 +2851,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the declared path shows no change and the cross-check fires `FILES_CHANGED MISMATCH`. No
   correct execution satisfies both, which is why three fresh sessions converged on the same
   signature before escalating `spinning_detected` — $5.47, 63% of the feature's total spend,
-  on an authoring defect. Same class as the contradiction that halted FEAT-2026-0042's
+  on an authoring defect. Same class as the contradiction that halted FEAT-LOOP-2026-0042's
   baseline; that makes two. Rule when authoring: read the body against `produces:` line by
   line and delete any sentence that permits a path to differ from what is declared. Rule when
   re-arming: three attempts with an identical failure signature means **amend the body, do
@@ -2860,7 +2860,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   passing (this one was a genuinely bad file name) are a follow-up bug, never an in-scope
   option.
 
-- [FEAT-2026-0073/G1-CLOSE/passing-attempts-leave-no-measurement-trail] **If a WU's
+- [FEAT-LOOP-2026-0073/G1-CLOSE/passing-attempts-leave-no-measurement-trail] **If a WU's
   acceptance criterion is "measure X and record the numbers", name the artifact the numbers
   land in — a passing attempt leaves no `work/` note and the squash commit body carries no
   RESULT block, so the measurement dies with the session.** T01's criterion 9 required
@@ -2868,7 +2868,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   no `work/FEAT-2026-0073_T01/` directory was ever created, and its squash commit is the bare
   `feat:` subject. At close time the only in-repo trace of T01's figure was a *different*
   commit restating `PLAN.md`'s drafting-time 285/38 — which is the exact
-  restate-the-planned-number defect FEAT-2026-0063 exists to prevent, reproduced in prose
+  restate-the-planned-number defect FEAT-LOOP-2026-0063 exists to prevent, reproduced in prose
   because the real measurement was unrecoverable. The close had to re-derive it (288/39, +3
   `G<n>-CLOSE` from three features closing in between). Rule: measurement criteria must write
   to a durable path — a committed fixture, a section in a doc the WU already `produces:`, or
@@ -2876,7 +2876,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   looks fine (the WU passed, the gate is green) right up until a close needs the number and
   finds only a restatement of the plan.
 
-- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/oracle-vs-moving-head] **A test that diffs the
+- [FEAT-LOOP-2026-0042/G1-CLOSE-INTERMEDIATE/oracle-vs-moving-head] **A test that diffs the
   working tree against `git show HEAD:<path>` is green exactly once — in the session
   that writes it — and red forever after the driver commits that session.** A WU
   asserting "my change to this document is purely additive" implemented it as a
@@ -2896,7 +2896,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   preserved anchors are all still present) instead of a diff shape. Generalizes to any
   "only additive", "unchanged since", or "no drift from" criterion.
 
-- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/ephemeral-runner-state-fails-open] **On an
+- [FEAT-LOOP-2026-0042/G1-CLOSE-INTERMEDIATE/ephemeral-runner-state-fails-open] **On an
   ephemeral runner, a guardrail whose state lives on local disk does not weaken — it
   disappears, silently, while still reading as present in the source.** "One fix run
   per fingerprint" and "a daily cap" were both one-line temptations to a state file.
@@ -2913,7 +2913,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the runner is ephemeral, the guarantee is decorative. Prefer state co-located with
   the durable artifact the work is about, and prefer re-deriving over counting.
 
-- [FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/roadmap-row-verbs-are-claims] **A roadmap row's
+- [FEAT-LOOP-2026-0042/G1-CLOSE-INTERMEDIATE/roadmap-row-verbs-are-claims] **A roadmap row's
   verbs are unverified capability claims; run the existing-mechanism search against the
   verbs, not just the nouns.** A row promised to "auto-fire headless `/fix-bug NN`"
   behind a new dial. The dial existed and was validated — the *nouns* checked out — so
@@ -2930,7 +2930,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   retrospective that the row's premise was wrong, so the next feature reading the same
   row is not misled the same way.
 
-- [FEAT-2026-0042/G2-CLOSE/result-block-yaml-subset] **A RESULT block that opens with a
+- [FEAT-LOOP-2026-0042/G2-CLOSE/result-block-yaml-subset] **A RESULT block that opens with a
   YAML folded or literal scalar (`summary: >`, `evidence: |`) is unparseable by the
   driver, and an honest `status: blocked` is silently recorded as `passed`.** A work
   unit ended with a well-reasoned `blocked` — one acceptance criterion marked
@@ -2955,7 +2955,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   presence of a positive one. Generalizes to every hand-rolled parser sitting between an
   agent's self-report and an automated decision.
 
-- [FEAT-2026-0042/G2-CLOSE/green-gate-narrower-than-criteria] **When the automated gate
+- [FEAT-LOOP-2026-0042/G2-CLOSE/green-gate-narrower-than-criteria] **When the automated gate
   set is narrower than a work unit's acceptance criteria, the agent's self-report is the
   only oracle for the difference — so discarding it discards the whole verification.**
   A live-run WU's real criteria were "quote raw `gh` output", "name the pull-request
@@ -2970,7 +2970,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   evidence the gates passed and nothing more — re-read the producing WU's own report
   before repeating its `done` as a fact.
 
-- [FEAT-2026-0042/G2-CLOSE/registered-is-not-provisioned] **Registering an identifier in
+- [FEAT-LOOP-2026-0042/G2-CLOSE/registered-is-not-provisioned] **Registering an identifier in
   a code-side registry does not create it in the external system; the first live call is
   where that distinction gets discovered.** A label was added to `LABEL_REGISTRY`
   one gate ahead of its consumer *specifically* to avoid a known failure where code
@@ -2985,7 +2985,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   registry" answers a different question than "it exists". Applies identically to
   anything a scaffold declares and a downstream project is expected to sync.
 
-- [FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed] **A skip-guarded live test
+- [FEAT-LOOP-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed] **A skip-guarded live test
   is skip-guarded on the sandbox, not on intent — so any later session that runs the
   suite unsandboxed silently reaches the real external system.** A live-reach test was
   written correctly: it skips by name when `gh` is unauthenticated, which is the state
@@ -3001,7 +3001,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   re-run oracles fresh, read the suite's live-reach inventory first: `close-discipline.md`
   §1 and a live test are on a collision course by default.
 
-- [FEAT-2026-0059/G1-CLOSE/classify-beats-prose] **A contract that makes the party with
+- [FEAT-LOOP-2026-0059/G1-CLOSE/classify-beats-prose] **A contract that makes the party with
   the context emit one bounded token beats one that asks them for prose — because every
   downstream reader then gets a mechanical answer instead of a reading.** A hedged
   close's follow-up record required three prose fields (criterion, why unverifiable,
@@ -3021,7 +3021,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unfixable without rewriting closed history, and "the check reads only the artifact
   currently under lint" is a testable property, not a promise.
 
-- [FEAT-2026-0059/G1-CLOSE/never-vs-not-here] **A "no test can assert this" category
+- [FEAT-LOOP-2026-0059/G1-CLOSE/never-vs-not-here] **A "no test can assert this" category
   needs the *who* and *when*, not just the *whether* — otherwise every claim the suite
   is silent about gets filed as permanently unassertable.** Classifying a follow-up as
   "whether the new output actually helps a human decide faster", the first instinct was
@@ -3036,7 +3036,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   failure mode is silent and one-directional: over-filing under "never" makes work look
   permanently impossible, and nobody re-audits an entry marked never.
 
-- [FEAT-2026-0059/G1-CLOSE/signing-agent-in-sandbox] **A command sandbox that denies the
+- [FEAT-LOOP-2026-0059/G1-CLOSE/signing-agent-in-sandbox] **A command sandbox that denies the
   commit-signing agent socket turns every test that builds a scratch git repository red,
   with an error that names neither the sandbox nor the test.** Five tests failed with
   `error: Couldn't get agent socket?` / `fatal: failed to write commit object` /
@@ -3058,14 +3058,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   classify was a new lint check: unambiguously an addition in the diff, unambiguously
   breaking from a downstream project's chair, where it starts failing a close that
   passed last week. The consumer's chair is the tiebreak. Sibling of
-  [FEAT-2026-0059/G1-CLOSE/classify-beats-prose], which is the same move one level up:
+  [FEAT-LOOP-2026-0059/G1-CLOSE/classify-beats-prose], which is the same move one level up:
   make the party holding the context emit the bounded token.
 
-- [FEAT-2026-0064/G1-CLOSE/patch-the-instance-ask-why] **Patch the instance, ask what
+- [FEAT-LOOP-2026-0064/G1-CLOSE/patch-the-instance-ask-why] **Patch the instance, ask what
   authoring shape produced it, or it ships again — and the trigger for "ask why" is the
   SECOND occurrence, not the third.** A `python3 -m pytest` subprocess in a repository
   where pytest is a dependency of nothing shipped **five times across three work units
-  in two features** (FEAT-2026-0042/T02; FEAT-2026-0059/T02; FEAT-2026-0059/T03) before
+  in two features** (FEAT-LOOP-2026-0042/T02; FEAT-LOOP-2026-0059/T02; FEAT-LOOP-2026-0059/T03) before
   anyone wrote `tests/test_no_pytest_subprocess.py`. Every instance was individually
   patched and every patch was correct, which is precisely why nobody escalated: a fixed
   defect looks finished. The root cause was never in the tests — it was a recurring
@@ -3079,10 +3079,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   that shape — a repeat is a defect in the thing that generates the code, not in the
   code. A guard that fires on the *shape* (AST over the tree, one test) costs about the
   same as the third patch and retires the whole class. Companion to
-  [FEAT-2026-0039/G2-CLOSE], which names the specific criterion-writing mistake; this
+  [FEAT-LOOP-2026-0039/G2-CLOSE], which names the specific criterion-writing mistake; this
   entry is the general escalation rule that would have caught it two instances earlier.
 
-- [FEAT-2026-0067/G1-CLOSE/state-not-value] **A guard that infers "already done" from a
+- [FEAT-LOOP-2026-0067/G1-CLOSE/state-not-value] **A guard that infers "already done" from a
   value cannot distinguish it from "never happened" — replace the inference with an
   explicit marker, do not improve the inference.** Four instances in this driver.
   `detect_rearm_dispatch` read `cost_usd > 0` to mean "a fold is owed", where a zero
@@ -3115,7 +3115,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   identical refusals — is a **timing** defect and this pattern does not hold on it.
   Do not cite #593 as a value-ambiguity instance without naming which half.
 
-- [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant] **A guard that reads a field is
+- [FEAT-LOOP-2026-0067/G1-CLOSE/read-site-is-the-invariant] **A guard that reads a field is
   not the same guard when it runs somewhere else — before moving a read, ask what the
   old call site guaranteed that the new one does not.** `fold_cumulative_on_rearm` may
   read `cost_usd` safely because it runs at dispatch, where the field provably holds
@@ -3130,10 +3130,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unconditionally. A cross-check against another source proves the value you are
   *using* is correct; it does not prove the same money is not already recorded
   somewhere else in the same file. Companion to
-  [FEAT-2026-0067/G1-CLOSE/state-not-value], which is the same defect stated as a
+  [FEAT-LOOP-2026-0067/G1-CLOSE/state-not-value], which is the same defect stated as a
   contract rule; this entry is the reviewer's question that catches it at authoring.
 
-- [FEAT-2026-0067/G1-CLOSE/hedge-is-machinery] **Write a hedged verdict's follow-up
+- [FEAT-LOOP-2026-0067/G1-CLOSE/hedge-is-machinery] **Write a hedged verdict's follow-up
   entry as a specification, not as a regret — a re-run condition precise enough to
   author a work unit from is what turns `partially_met` into a fix instead of a dead
   end.** `close-discipline.md` §2 requires the record; this feature is the first
@@ -3158,10 +3158,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   than the plan authorised. (b) **A close that only asserts cannot produce this
   entry.** The defect was invisible to every criterion and to the full test suite; it
   surfaced only because the close computed a sum and compared it to another sum.
-  Companion to [FEAT-2026-0067/G1-CLOSE/read-site-is-the-invariant], which is the
+  Companion to [FEAT-LOOP-2026-0067/G1-CLOSE/read-site-is-the-invariant], which is the
   defect FU-1 happened to be about; this entry is about the record, not the defect.
 
-- [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] **When a feature's value is that an
+- [FEAT-LOOP-2026-0057/G1-CLOSE/no-unit-owns-the-seam] **When a feature's value is that an
   existing code path starts calling something new, one work unit must own the call
   site, and its acceptance criteria must assert the call — not the callee.** Every
   acceptance criterion in this feature's three implementation units was satisfiable by
@@ -3189,7 +3189,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   paired with "one unit adds the pre-dispatch call", so the seam was protected by
   three units and crossed by none.
 
-- [FEAT-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question] **Re-running every
+- [FEAT-LOOP-2026-0057/G1-CLOSE/feature-oracle-is-a-different-question] **Re-running every
   producing unit's own oracle is not the feature-level re-run `close-discipline.md` §1
   asks for; a close must ask a question no unit's criteria asked.** Fifteen oracles
   re-ran green in this close — three scoped red→green tests, two symbol imports, a
@@ -3204,10 +3204,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Cheap forms that work: grep for callers of every symbol the units declared, load a
   real artifact through the production parser rather than a test double, or run the
   feature's headline sentence as a one-line probe. Companion to
-  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam], which is the authoring-time half of
+  [FEAT-LOOP-2026-0057/G1-CLOSE/no-unit-owns-the-seam], which is the authoring-time half of
   the same failure; this entry is the close-time detection.
 
-- [FEAT-2026-0057/G1-CLOSE/close-is-blind-to-its-own-ledger] **A work unit's
+- [FEAT-LOOP-2026-0057/G1-CLOSE/close-is-blind-to-its-own-ledger] **A work unit's
   `attempt_outcome` events are buffered and flushed only at its terminal outcome, so a
   close reading `events.jsonl` mid-session sees every prior unit and **nothing about
   itself** — including nothing about its own earlier attempts. State the close's own
@@ -3231,12 +3231,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   expensive attempt in the feature. Group on `outcome` too. Here that one refused
   attempt was $5.73 of a $19.87 lifetime, 29%, for a missing `CHANGELOG.md` append.
 
-- [FEAT-2026-0057/G1-CLOSE/informational-output-has-no-verdict] **Do not run
+- [FEAT-LOOP-2026-0057/G1-CLOSE/informational-output-has-no-verdict] **Do not run
   informational captured output through a pass/fail verdict selector — it will
   confidently report that the verdict is missing, and tell the reader to go run the
   command themselves.** `format_oracle_capture` budgets each captured `oracles` entry
   through `select_gate_report_lines`, which was the right budgeting primitive
-  (FEAT-2026-0068's verdict-aware selection, versus a positional tail) and the wrong
+  (FEAT-LOOP-2026-0068's verdict-aware selection, versus a positional tail) and the wrong
   *semantic* one. An `oracles` entry is informational by construction — `git log
   --oneline -20` has no pass/fail summary and never will — so every captured block,
   including short complete untruncated ones, comes back carrying `NO VERDICT FOUND:
@@ -3255,10 +3255,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   `select_gate_report_lines` output *before* returning it, so by the time an
   oracle-specific formatter sees a report the banner is already inside it. Filtering
   it downstream in `format_oracle_capture` therefore edits a copy, not the source —
-  see [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] for how that
+  see [FEAT-LOOP-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] for how that
   turned a green fix into a live defect.
 
-- [FEAT-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] **When a work
+- [FEAT-LOOP-2026-0057/G1-CLOSE/fixture-must-come-from-the-real-producer] **When a work
   unit fixes a function whose input is produced by other code in the same repo, its
   test must build that input by calling the real producer — a hand-written fixture
   can green a fix that never runs in production.** T06 was armed to stop captured
@@ -3280,7 +3280,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   precision that makes a unit cheap also makes it possible to satisfy the letter of
   the criteria without meeting them.
 
-- [FEAT-2026-0057/G1-CLOSE/name-the-branch-not-just-the-function] **A fix targeting a
+- [FEAT-LOOP-2026-0057/G1-CLOSE/name-the-branch-not-just-the-function] **A fix targeting a
   function with an early return must say which branch it lands on, or it will land on
   the wrong one and every oracle will still be green.** `_fit_to_budget` has exactly
   two paths: `if len(raw_bytes) <= budget: return report, 0` and, below it, a
@@ -3294,17 +3294,17 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   expected to change, or state the branch condition in the acceptance criterion
   ("...for a report **within** its budget share as well as one exceeding it"). This
   is the same class as
-  [FEAT-2026-0057/G1-CLOSE/no-unit-owns-the-seam] one level down: there, no unit
+  [FEAT-LOOP-2026-0057/G1-CLOSE/no-unit-owns-the-seam] one level down: there, no unit
   owned the call site; here, the unit owned the function but not the path through it.
 
-- [FEAT-2026-0057/G1-CLOSE/restart-buys-honesty-not-correctness] **Sequencing a
+- [FEAT-LOOP-2026-0057/G1-CLOSE/restart-buys-honesty-not-correctness] **Sequencing a
   driver restart around a fix buys you a truthful observation of that fix, not a
   working one — budget for the possibility that the honest observation is
   "still broken".** This gate did the sequencing exactly right: it held its close at
   `blocked_human` through the run that dispatched the fix units, then re-armed it
   under a freshly started driver process so the modules it imported were the
   post-fix ones (the mitigation from
-  [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]). The close then read its own
+  [FEAT-LOOP-2026-0057/G1-CLOSE/driver-edits-need-a-restart]). The close then read its own
   injected prompt and found the defect the fix was armed to remove, still present.
   The restart worked perfectly and the round still cost a full extra invocation plus
   a hold, because the fix was ineffective for an unrelated reason. Two rules. (a) Do
@@ -3314,7 +3314,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   to also strengthen that unit's own test, because a second sequencing round costs
   the same as the first and the round you are in is already sunk.
 
-- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/survival-needs-the-whole-path-set] **When a
+- [FEAT-LOOP-2026-0056/G1-CLOSE-INTERMEDIATE/survival-needs-the-whole-path-set] **When a
   work unit's job is to make state survive a retry, enumerate every path that destroys
   that state and test against each — the path the plan names is the one the author
   already thought about, and therefore rarely the one that kills you.** Here the plan
@@ -3336,7 +3336,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   as durable as its most recent commit; anything created at dispatch and read across
   attempts is untracked for its whole useful life.
 
-- [FEAT-2026-0056/G1-CLOSE-INTERMEDIATE/console-script-is-not-the-tree] **A console
+- [FEAT-LOOP-2026-0056/G1-CLOSE-INTERMEDIATE/console-script-is-not-the-tree] **A console
   script installed into the environment and the source checkout you are editing are two
   different programs — any sweep, probe, or corpus check must name which one it ran, or
   it is evidence about neither.** A gate-arming baseline and a work unit's
@@ -3352,10 +3352,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   "zero findings over corpus C" criterion needs a positive control: run the check
   against one input you know should fire, and paste that too — a sweep that cannot
   distinguish "correctly silent" from "not running" has measured nothing. This is the
-  same shape as [FEAT-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
+  same shape as [FEAT-LOOP-2026-0055/G1-CLOSE], one layer lower: there the sweep was never
   run, here it was run against the wrong binary.
 
-- [FEAT-2026-0056/G2-CLOSE/evidence-clause-needs-its-own-oracle] **When an acceptance
+- [FEAT-LOOP-2026-0056/G2-CLOSE/evidence-clause-needs-its-own-oracle] **When an acceptance
   criterion names both a property and the place that must assert it — "X holds, asserted
   in <module>" — the oracle that runs <module> cannot detect that the assertion is
   missing, because a module with no assertion about X passes whether or not X holds. The
@@ -3375,7 +3375,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   oracle would report if the deliverable were absent — if the answer is "the same
   thing", the oracle is measuring nothing.
 
-- [FEAT-2026-0056/G2-CLOSE/a-cache-cannot-prove-itself-on-attempt-one] **A feature whose
+- [FEAT-LOOP-2026-0056/G2-CLOSE/a-cache-cannot-prove-itself-on-attempt-one] **A feature whose
   value is that a second run is cheaper than the first cannot be demonstrated by its own
   terminal close, because that close is a first run: its carried-forward set is empty by
   construction, not by defect. Plan the gate to measure wiring, and hand the saving to a
@@ -3397,13 +3397,13 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   claim, and it converts an unmeasurable close into one that a later run either confirms
   or refutes for free.
 
-- [FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control] **A
+- [FEAT-LOOP-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control] **A
   hazard whose only mitigation is a written instruction that a human must remember to
   execute is unmitigated. Promoting the rule, citing it verbatim in the gate, and
   building the tooling that detects the hazard all leave the failure rate unchanged,
   because none of them is the thing that has to happen at the moment it has to
   happen.** The evidence is the fourth occurrence, and it landed on the close of the
-  feature written to fix the first three. `[FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart]`
+  feature written to fix the first three. `[FEAT-LOOP-2026-0057/G1-CLOSE/driver-edits-need-a-restart]`
   was already in this file. Its gate file quoted it, named the two features it had
   already cost money (a $5.33 close, then three attempts and $3.66 in a
   `spinning_detected` escalation), set the restart in bold as REQUIRED operator
@@ -3434,12 +3434,12 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   situ, predicted as follows" with a falsifiable prediction the next run confirms for
   free — not a claim carried on seam tests that were never composed.
 
-- [FEAT-2026-0075/G2-CLOSE/a-control-closes-the-loop-a-diagnostic-cannot-close-its-own] **A
+- [FEAT-LOOP-2026-0075/G2-CLOSE/a-control-closes-the-loop-a-diagnostic-cannot-close-its-own] **A
   control that fires without anyone remembering it does close the loop a promoted rule
   leaves open — but it cannot cover the gate that builds it, so the last manual
   execution of the rule is always the one that ships the control. Plan for that
   occurrence instead of hoping it will not happen.** This is the answer to the question
-  `[FEAT-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]`
+  `[FEAT-LOOP-2026-0075/G1-CLOSE-INTERMEDIATE/a-rule-a-human-must-execute-is-not-a-control]`
   posed, and it carries the negative half. **The positive half.** Replaying five
   recorded occurrences of the same hazard — a work unit editing the driver, then the
   same process dispatching more units that execute the pre-edit modules — through the
@@ -3466,7 +3466,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   shipping gate's budget from the pre-control gate's actuals; the wiring unit at the
   dispatch seam came in at 3.2x its estimate, and the close ran twice.
 
-- [FEAT-2026-0075/G2-CLOSE/a-control-retires-the-diagnostic-that-reported-it] **Shipping
+- [FEAT-LOOP-2026-0075/G2-CLOSE/a-control-retires-the-diagnostic-that-reported-it] **Shipping
   a control that prevents a hazard usually makes the diagnostic that reported it
   unreachable, and nothing tells you — the tests still pass, because they assert the
   diagnostic's behaviour and not its reachability.** Gate 1 shipped a gate-completion
@@ -3489,7 +3489,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the next reader finds shipped, tested, dead code and cannot tell whether it is
   intentional.
 
-- [FEAT-2026-0045/G1-CLOSE/declare-precedence-between-redundant-records] **When one fact
+- [FEAT-LOOP-2026-0045/G1-CLOSE/declare-precedence-between-redundant-records] **When one fact
   needs two records — a machine-readable one and a human-visible one — the cheap fix is
   not to cut one, it is to declare which one WINS and make the other a projection of it.**
   The standing objection to storing a fact twice is that the copies drift. The usual
@@ -3512,9 +3512,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   so a coincidental label match never reads as a hit, which is this rule with the
   reasoning left implicit.
 
-- [FEAT-2026-0045/G1-CLOSE/verb-check-table-earns-its-cost] **A roadmap row's verbs are
+- [FEAT-LOOP-2026-0045/G1-CLOSE/verb-check-table-earns-its-cost] **A roadmap row's verbs are
   claims about mechanisms that may not exist; grep each one at plan time and put the
-  verdicts in a table.** The practice came from `[FEAT-2026-0042/G1-CLOSE-INTERMEDIATE/
+  verdicts in a table.** The practice came from `[FEAT-LOOP-2026-0042/G1-CLOSE-INTERMEDIATE/
   roadmap-row-verbs-are-claims]`; this is the measurement of whether it pays. On this
   feature four verbs were checked ("queued for fix-bug", "recognizes harvester-created
   issues", "labeled", "behind an `auto` dial") and **one of the four was backed by nothing
@@ -3529,7 +3529,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   numbered checks, so it is performed by default rather than by whoever happens to recall
   it. That edit is a rule change and is deliberately not made here.
 
-- [FEAT-2026-0045/G1-CLOSE/script-produced-paths-are-not-declarable-until-the-script-ran]
+- [FEAT-LOOP-2026-0045/G1-CLOSE/script-produced-paths-are-not-declarable-until-the-script-ran]
   **A path that a helper script generates is not declarable in `files_changed` until you
   have actually run that script in this attempt.** A WU authored a skill at its canonical
   location, correctly declared the canonical path and the vendored copy, and also declared
@@ -3544,7 +3544,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   alternative to a failed attempt here is a WU reporting `done` on a path that does not
   exist, which is strictly worse and much harder to find later.
 
-- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test] **When "produce
+- [FEAT-LOOP-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test] **When "produce
   nothing" is a designed first-class outcome, at least one test must distinguish
   absence-because-there-was-no-evidence from absence-because-the-lookup-failed.** A test
   that only asserts a key is missing passes identically for both, and the second is a
@@ -3559,7 +3559,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   policy changes. The general form: an assertion that something is missing is only
   evidence when you have separately shown the same call CAN find it.
 
-- [FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/fixtures-that-share-an-incidental-property]
+- [FEAT-LOOP-2026-0076/G1-CLOSE-INTERMEDIATE/fixtures-that-share-an-incidental-property]
   **A fixture set that unanimously shares a property nobody chose cannot fail on that
   property — enumerate what your fixtures have in common before trusting their green.**
   Every fixture in the case above built its repository under `tempfile.TemporaryDirectory()`
@@ -3574,7 +3574,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   gate's implementation spend — but only if review catches it before the next WU builds
   prose on top of the wrong behaviour.
 
-- [FEAT-2026-0076/G2-CLOSE/a-precedence-computed-summary-field-collapses-combinations]
+- [FEAT-LOOP-2026-0076/G2-CLOSE/a-precedence-computed-summary-field-collapses-combinations]
   **A single summary field computed by precedence over N conditions cannot distinguish the
   cases where two of those conditions hold at once — so a criterion demanding "these
   outcomes must be distinguishable" is met by the whole returned entry, never by the
@@ -3590,10 +3590,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   nobody checked. (b) Publish the precedence in the consumer-visible contract, since a
   downstream renderer showing only the summary field will collapse what the data kept
   apart. (c) This is the combination-shaped sibling of
-  `[FEAT-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test]`: that one is
+  `[FEAT-LOOP-2026-0076/G1-CLOSE-INTERMEDIATE/absence-needs-a-two-sided-test]`: that one is
   about one absence with two causes, this one about two absences with one label.
 
-- [FEAT-2026-0076/G2-CLOSE/read-files-touched-before-trusting-failure-signature]
+- [FEAT-LOOP-2026-0076/G2-CLOSE/read-files-touched-before-trusting-failure-signature]
   **A failed attempt's `failure_signature` tells you which oracle went red, not whether
   the work unit did its work — read `files_touched` against the WU's `produces:` list
   first.** Worked example: an attempt was dispatched to write skill prose plus a
@@ -3610,7 +3610,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   rather than supply a plausible one; an invented cause in a retrospective outlives the
   event it explains.
 
-- [FEAT-2026-0076/G2-CLOSE/the-maturity-discount-applies-to-implementation-only]
+- [FEAT-LOOP-2026-0076/G2-CLOSE/the-maturity-discount-applies-to-implementation-only]
   **Implementation WUs whose plan-time existing-mechanism search returns "found and
   reused" land at roughly half their estimate — and closing WUs do not get that discount,
   so applying it uniformly underfunds the close.** Two gates of data on one feature:
@@ -3670,7 +3670,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   is not provisioned` is a real state — provision on demand at the point of use and
   retry once, rather than assuming an install-time step ran.
 
-- [FEAT-2026-0080/G1/a-refusal-message-shorter-than-its-source-means-a-stale-build]
+- [FEAT-LOOP-2026-0080/G1/a-refusal-message-shorter-than-its-source-means-a-stale-build]
   **When a guard refusal's message names fewer accepted paths than the guard's source
   offers, you are not running that source.** Three close attempts were refused by
   `assert_learnings_appended_or_noop` at $40.27 total. The sessions had complied — each
@@ -3685,7 +3685,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   and no amount of attempt budget will converge against it. Second instance of the
   `build_provenance` hazard (the first cost 14 spurious red results in another close).
 
-- [FEAT-2026-0080/G1/an-instruction-naming-a-mechanism-that-cannot-satisfy-it]
+- [FEAT-LOOP-2026-0080/G1/an-instruction-naming-a-mechanism-that-cannot-satisfy-it]
   **"An instruction naming a mechanism that cannot satisfy the instruction" is a
   recurring defect shape, and it is invisible to review because both halves read as
   correct in isolation.** Two independent instances in one feature. `/fix-bug` Step 1
@@ -3701,7 +3701,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   path against the guard that governs it. Reviewing the sentence for plausibility does
   not catch this class.
 
-- [FEAT-2026-0080/G1/price-a-wu-against-its-declared-acceptance-not-its-runtime-surface]
+- [FEAT-LOOP-2026-0080/G1/price-a-wu-against-its-declared-acceptance-not-its-runtime-surface]
   **Price a work unit against the acceptance its own plan declares, not against the
   runtime surface it touches.** T01 was estimated at $8.00 and T02 at $3.00 on the
   reasoning that they wire skills driving `gh`; they landed at $2.68 and $0.58 (−66% and
@@ -3712,7 +3712,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unit, whatever runtime surface the shipped artifact eventually drives. Where the plan
   already names the oracle, read it before pricing.
 
-- [FEAT-2026-0080/G1/a-recovery-diagnosis-is-a-hypothesis-until-checked-against-the-reflog]
+- [FEAT-LOOP-2026-0080/G1/a-recovery-diagnosis-is-a-hypothesis-until-checked-against-the-reflog]
   **A diagnosis written into a commit message or a gate comment becomes durable state,
   and gets read as evidence rather than as a claim.** The recovery commit for this
   feature's spin (`589fd96`) recorded that "Neither RETROSPECTIVE.md nor
@@ -3757,7 +3757,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   which is about a projection destroying the verdict it reports: here the report is
   accurate and complete, and nothing consumes it.
 
-- [FEAT-2026-0058/G1-CLOSE/an-exemption-scoped-to-the-wrong-unit-inverts-a-guards-coverage]
+- [FEAT-LOOP-2026-0058/G1-CLOSE/an-exemption-scoped-to-the-wrong-unit-inverts-a-guards-coverage]
   **A guard's exemption is as load-bearing as the guard, and an exemption scoped to
   the wrong unit silently inverts coverage — measure a new check's live coverage over
   the corpus it will guard, not just its red-before fixture.** The non-restatement
@@ -3780,7 +3780,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   does not. A red-before test proves the check *can* fire; only a coverage
   measurement says how often it *will*.
 
-- [FEAT-2026-0058/G1-CLOSE/pin-the-corpus-size-and-expect-it-to-move-both-ways]
+- [FEAT-LOOP-2026-0058/G1-CLOSE/pin-the-corpus-size-and-expect-it-to-move-both-ways]
   **When a criterion's meaning depends on the corpus being non-trivial, assert the
   corpus size in the test — and write the failure message for shrinkage as well as
   growth.** A sequencing precondition required an upstream feature's decision prose to
@@ -3804,14 +3804,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   build and no instruction. (c) Prefer asserting membership over size where the real
   claim is membership: "no folder other than the authoring feature is in scope" says
   what the guard is actually for, and survives the corpus emptying. Complements
-  [FEAT-2026-0055/G1-CLOSE] (make the sweep a driver gate, not a self-report) and
-  [FEAT-2026-0053/G1-CLOSE] (do not read "no findings across the corpus" as coverage);
+  [FEAT-LOOP-2026-0055/G1-CLOSE] (make the sweep a driver gate, not a self-report) and
+  [FEAT-LOOP-2026-0053/G1-CLOSE] (do not read "no findings across the corpus" as coverage);
   this entry is about the corpus being big enough for the sweep to mean anything.
 
-- [FEAT-2026-0058/G1-CLOSE/attempts-lifetime-exceeding-attempts-marks-a-re-armed-unit]
+- [FEAT-LOOP-2026-0058/G1-CLOSE/attempts-lifetime-exceeding-attempts-marks-a-re-armed-unit]
   **Detection heuristic for the re-arm under-count: any unit whose `attempts_lifetime`
   exceeds its `attempts` has been re-armed, and every per-cycle aggregate over it is
-  wrong.** The rule itself is already recorded at [FEAT-2026-0053/G2-CLOSE] — sum every
+  wrong.** The rule itself is already recorded at [FEAT-LOOP-2026-0053/G2-CLOSE] — sum every
   field the lifetime is spread across, and reconcile a close's planned-vs-actual from
   `events.jsonl`, the only surface that never loses a cycle. This is the cheap test for
   *which* units need that treatment, plus a second instance showing the error does not
@@ -3823,7 +3823,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   saving. A close that reports the ledger figure must report the event-log figure
   beside it and say which is which.
 
-- [FEAT-2026-0058/G1-CLOSE/a-close-wus-do-not-touch-must-permit-its-own-binding-obligations]
+- [FEAT-LOOP-2026-0058/G1-CLOSE/a-close-wus-do-not-touch-must-permit-its-own-binding-obligations]
   **A close WU's "Do not touch" must explicitly permit the surfaces its own binding
   close obligations require, or the obligation is dropped silently by a guard that
   passes on absence.** `close-discipline.md` §3 requires a close to enumerate
@@ -3846,20 +3846,20 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   detects and proceeds; here the guard never fires, because the condition it keys on
   is the thing the omission removed.
 
-## FEAT-2026-0084/G1-CLOSE — `produces:` and preservation criteria
+## FEAT-LOOP-2026-0084/G1-CLOSE — `produces:` and preservation criteria
 
-- [FEAT-2026-0084/G1-CLOSE] A `produces:` path whose only acceptance criterion is a
+- [FEAT-LOOP-2026-0084/G1-CLOSE] A `produces:` path whose only acceptance criterion is a
   **preservation** criterion is an unsatisfiable declaration. The driver's
   `assert_produces_in_diff` guard refuses `complete` when a declared path shows no
   diff (`produces_not_in_diff`), while the criterion says the file must stay as it
   is — so a session that satisfies every criterion correctly is refused, and the
-  cheapest way out is to invent an edit. FEAT-2026-0084/T01 declared
+  cheapest way out is to invent an edit. FEAT-LOOP-2026-0084/T01 declared
   `.specfuse/rules/correlation-ids.md` in `produces:` while its only criterion for
   that file read "still carries `CORRELATION_ID_RE`'s pattern in prose"; two
   attempts were refused at $5.64 and $4.64, and the third cleared the guard by
   adding 39 lines of prose no criterion had asked for — on a WU whose objective was
   to *remove* prose. This is the inverse failure of
-  [FEAT-2026-0022/G1-CLOSE]'s "promote named-file deliverables to `produces:` so
+  [FEAT-LOOP-2026-0022/G1-CLOSE]'s "promote named-file deliverables to `produces:` so
   they are enforced, not attested": that rule is right for deliverables, and
   over-applying it to files the WU must merely not break converts a guard into a
   pressure to fabricate. Rule: `produces:` lists only paths a criterion requires
@@ -3869,9 +3869,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   remove the entry. Candidate for `authoring-work-units` §13, which today warns
   about partial bundles but not about this shape.
 
-## FEAT-2026-0085/G1-CLOSE — grep-shaped criteria and vendored mirrors
+## FEAT-LOOP-2026-0085/G1-CLOSE — grep-shaped criteria and vendored mirrors
 
-- [FEAT-2026-0085/G1-CLOSE] **A "zero matches under `<path>`" acceptance criterion
+- [FEAT-LOOP-2026-0085/G1-CLOSE] **A "zero matches under `<path>`" acceptance criterion
   must be scoped to the paths the WU is authorized to edit, and in a repo with a
   byte-synced vendored mirror the canonical file and its mirror are one editable
   unit that belongs to one WU.** T01's AC3 required zero `met_locally|partially_met`
@@ -3895,9 +3895,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   bounds a criterion against the *repo*; this one bounds it against the *sibling WU*,
   and the sibling boundary is the one a single-gate serial chain makes easy to miss.
 
-## FEAT-2026-0108/G1-CLOSE — a criterion that injects the value it should compute
+## FEAT-LOOP-2026-0108/G1-CLOSE — a criterion that injects the value it should compute
 
-- [FEAT-2026-0108/G1-CLOSE] **When a gate behaviour spans a producer and a
+- [FEAT-LOOP-2026-0108/G1-CLOSE] **When a gate behaviour spans a producer and a
   renderer split across two work units, at least one unit's acceptance criterion
   must exercise the seam end to end and name the producer call — never a
   constructed intermediate value.** T05 owned reading a PR number out of a
@@ -3914,24 +3914,24 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   one sentence: for every criterion that **constructs** an input another unit in
   the same gate is supposed to produce, name the producing unit and confirm some
   criterion somewhere exercises that production. Distinct from
-  `[FEAT-2026-0085/G1-CLOSE]`, which bounds a criterion's *path scope* against a
+  `[FEAT-LOOP-2026-0085/G1-CLOSE]`, which bounds a criterion's *path scope* against a
   sibling WU's authorized touch-set; this one bounds a criterion's *data flow*
   against a sibling WU's output, and a serial single-gate chain makes it easy to
   miss because every unit is green in order. **Validated on the same feature:**
-  the gap was closed by one hygiene work unit (`FEAT-2026-0108/T05H`, a one-line
+  the gap was closed by one hygiene work unit (`FEAT-LOOP-2026-0108/T05H`, a one-line
   change plus a red-first test through the producer, $0.91) authored from the
   close's own `not_met` finding, and the close's second attempt re-ran the same
   fixture demonstration to exit 0. The rule's cost if applied at arming time is
   one sentence per criterion; its cost when missed was a close re-attempt.
 
-## FEAT-2026-0100/G1-CLOSE — a satisfiability answer that was reasoned about instead of run
+## FEAT-LOOP-2026-0100/G1-CLOSE — a satisfiability answer that was reasoned about instead of run
 
-- [FEAT-2026-0100/G1-CLOSE] **When a plan's § Escalation-predicate
+- [FEAT-LOOP-2026-0100/G1-CLOSE] **When a plan's § Escalation-predicate
   satisfiability answer rests on a claim about the existing corpus, that claim is
   a command with an output: run it at drafting time and paste the output.** A
   plan that reasons its way to "zero" is asserting a measurement it never took.
   `PLAN.md` answered §2's mandatory question — what does the new ERROR-level rule
-  report on inputs already in their intended final state? — with "FEAT-2026-0082's
+  report on inputs already in their intended final state? — with "FEAT-LOOP-2026-0082's
   pre-decided hedge, which is `done`, does not fire it." That close WU is
   `status: pending`, `attempts: 0`, so it fires; a one-line `git show` or one
   sweep would have settled it, and the terminal close's fresh re-run of the same
@@ -3945,19 +3945,19 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   Drafting-time check, mechanical: for every §2 answer containing a count, a
   "zero", or a named existing artifact, the section must show the command and its
   output, not a sentence about them. Distinct from
-  `[FEAT-2026-0108/G1-CLOSE]`, which bounds a criterion's *data flow* against a
+  `[FEAT-LOOP-2026-0108/G1-CLOSE]`, which bounds a criterion's *data flow* against a
   sibling WU's output; this one bounds a *plan section's* claim against the
   repository it claims something about, and it is easy to miss precisely because
   §2 reads as reasoning rather than as measurement.
 
-## FEAT-2026-0102/G1-CLOSE — a stored baseline decays against the set it was measured on
+## FEAT-LOOP-2026-0102/G1-CLOSE — a stored baseline decays against the set it was measured on
 
-- [FEAT-2026-0102/G1-CLOSE] **A recorded measurement that a later feature will use as an
+- [FEAT-LOOP-2026-0102/G1-CLOSE] **A recorded measurement that a later feature will use as an
   acceptance threshold must carry the SHAPE it was measured on, and the criterion built on
   it must compare before-vs-after on one tree rather than against the stored absolute.**
-  `[FEAT-2026-0051/G1-CLOSE]` recorded "118s on this repo's nine `code` gates" precisely so
+  `[FEAT-LOOP-2026-0051/G1-CLOSE]` recorded "118s on this repo's nine `code` gates" precisely so
   the next feature would not re-derive it, which was right and saved real work. But
-  FEAT-2026-0102's acceptance criterion — "materially below the 118s baseline" — turned out
+  FEAT-LOOP-2026-0102's acceptance criterion — "materially below the 118s baseline" — turned out
   to be unsatisfiable by any correct implementation: fifty features later the `code` set
   declares sixteen gates instead of nine and the `tests` gate ALONE costs 148.5s, more than
   the entire nine-gate set did when the number was taken. The feature's real result was a
@@ -3972,14 +3972,14 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unsatisfiable escalation predicate (`planning-discipline.md` §2) — it just takes months to
   become one.
 
-## FEAT-2026-0101/G1-CLOSE — a guard scoped by parsing an identifier can be silent on every real artifact
+## FEAT-LOOP-2026-0101/G1-CLOSE — a guard scoped by parsing an identifier can be silent on every real artifact
 
-- [FEAT-2026-0101/G1-CLOSE] **A guard that derives its scope by parsing an identifier or by
+- [FEAT-LOOP-2026-0101/G1-CLOSE] **A guard that derives its scope by parsing an identifier or by
   matching a list marker must be tested against a real artifact from the repository it
-  guards, not only against a fixture written to match the parser.** FEAT-2026-0101's
+  guards, not only against a fixture written to match the parser.** FEAT-LOOP-2026-0101's
   guard-wiring audit found two, both passing their own unit tests and both silent on every
   work unit this repository actually produces. `_gate_number_from_wu_id` parses `G(\d+)-`,
-  so it resolves `FEAT-2026-0101/G1-CLOSE` to `1` and `FEAT-2026-0101/T02` to `None`; every
+  so it resolves `FEAT-LOOP-2026-0101/G1-CLOSE` to `1` and `FEAT-LOOP-2026-0101/T02` to `None`; every
   substantive WU is named `T01`, `T02`, …, so `summarize_attempt_failure_classes(fd,
   gate_n=1, exclude_correlation_id=<the close>)` filters out every implementation unit's
   `attempt_outcome` and then excludes the only IDs that survived. Measured on this feature:
@@ -3997,15 +3997,15 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   an ID or a body must carry one test that feeds it a work unit copied from
   `.specfuse/features/`, and any guard whose "nothing matched" path returns success must say
   so in its own output rather than falling through silently. Distinct from
-  `[FEAT-2026-0070/G2-CLOSE]`, which is about a guard that is inert because nothing it
+  `[FEAT-LOOP-2026-0070/G2-CLOSE]`, which is about a guard that is inert because nothing it
   applies to exists yet; this one is about a guard that is inert while the artifacts it was
   written for sit on disk in front of it.
 
-## FEAT-2026-0101/G1-CLOSE — an acceptance criterion stating an undecidable property can never be met, only re-drafted
+## FEAT-LOOP-2026-0101/G1-CLOSE — an acceptance criterion stating an undecidable property can never be met, only re-drafted
 
-- [FEAT-2026-0101/G1-CLOSE] **Every bullet of a gate's definition of done must name the
+- [FEAT-LOOP-2026-0101/G1-CLOSE] **Every bullet of a gate's definition of done must name the
   command that would prove it; a bullet for which no such command can exist is a drafting
-  defect, not a hard criterion.** FEAT-2026-0101's gate 1 required a declared-but-unrunnable
+  defect, not a hard criterion.** FEAT-LOOP-2026-0101's gate 1 required a declared-but-unrunnable
   `feature_oracle` to be a CONFIGURATION ERROR "before any unit dispatches", for any command
   that "cannot be resolved". The close recorded `met`; the judge lowered it to `not_met` and
   was correct — a `feature_oracle` is an arbitrary shell string, so deciding in advance
@@ -4033,7 +4033,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   every judged gate. Do not pad estimates for it; padding feeds `evaluate_auto_close`'s
   per-WU ratio checks and makes gates auto-close that should not.
 
-- [FEAT-2026-0109/G1-CLOSE-INTERMEDIATE] **A gate whose feature is "stop doing X when
+- [FEAT-LOOP-2026-0109/G1-CLOSE-INTERMEDIATE] **A gate whose feature is "stop doing X when
   nothing is wrong" measures its saving on the common path and its safety nowhere — count
   the rare path's firings as a first-class measurement and report a zero as a zero.** Gate 1
   made the driver's baseline probe lazy. Measured on one tree, the `code`-set wall clock on a
@@ -4055,7 +4055,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   unit, the second one's evidence lives in the first one's exception path; say so in the gate
   document up front, rather than discovering it in `## What the loop did NOT verify` at close.
 
-- [FEAT-2026-0109/G2-CLOSE-INTERMEDIATE] **A helper with no caller passes every test it has,
+- [FEAT-LOOP-2026-0109/G2-CLOSE-INTERMEDIATE] **A helper with no caller passes every test it has,
   and a fail-safe that fires on every attempt is a regression wearing a safety jacket — when
   two units split one mechanism across a "do not touch" boundary, the wiring between them is
   nobody's acceptance criterion.** Gate 2 split verification into a narrow per-attempt tier
@@ -4091,7 +4091,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   opportunity rather than evidence of safety — count the *narrowed* attempts, not the
   attempts, before reading a zero as reassurance.
 
-- [FEAT-2026-0109/G3] When a driver picks between two behaviours per attempt, the branch it
+- [FEAT-LOOP-2026-0109/G3] When a driver picks between two behaviours per attempt, the branch it
   took belongs in that attempt's record — and a snapshot of the code is not a substitute for it.
   The tiered-verification feature shipped a per-attempt/per-gate split across two gates and added
   neither a `tier` field nor the resolved selection to `attempt_outcome`. Gate 2's close could
@@ -4108,7 +4108,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a temp directory, the branch is unrecorded, and one field on an event the driver already emits
   fixes it.
 
-- [FEAT-2026-0109/G3] A cache keyed on identity must validate its contents, and a negative result
+- [FEAT-LOOP-2026-0109/G3] A cache keyed on identity must validate its contents, and a negative result
   is never a cache. One gate produced THREE independent instances of this within two days, in code
   written by three different hands on the same feature. The pinned-build cache trusted a marker file
   naming a tree hash and executed a directory that had silently lost 91 of 131 files to the
@@ -4139,7 +4139,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   a site nobody had reported. Enumerating the boundaries is cheap; rediscovering them one halt at
   a time is not.
 
-- [FEAT-2026-0110/G1] A documentation-surface list written from memory misses the surfaces
+- [FEAT-LOOP-2026-0110/G1] A documentation-surface list written from memory misses the surfaces
   that state the *old* rule in their own words, and the new key cannot be grepped for because
   it does not exist yet — grep the behaviour being replaced instead. This feature added an
   optional `narrow_selection` block so a non-Python project can narrow its per-attempt tests
@@ -4165,9 +4165,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   opposite direction from `.specfuse/` → `specfuse/loop/data/` in the same repository, and
   editing the derived copy would have been silently reverted by the next sync.
 
-- [FEAT-2026-0110/G1] An optional key whose absent-key default reproduces current behaviour
+- [FEAT-LOOP-2026-0110/G1] An optional key whose absent-key default reproduces current behaviour
   byte-for-byte is what makes a harness-migrating feature decomposable at all — it is the
-  reusable escape from `[FEAT-2026-0019/G1]` ("a feature that migrates the verification
+  reusable escape from `[FEAT-LOOP-2026-0019/G1]` ("a feature that migrates the verification
   harness the driver itself runs cannot be decomposed into separately-gated WUs, because each
   WU's exit oracle is the very surface being migrated"). This feature changed the driver's own
   per-attempt test selector, which is exactly that hazard, and paid nothing for it: three
@@ -4188,9 +4188,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the render into a per-item template plus a separator is one extra key and one extra default,
   and it is the difference between covering two ecosystems and covering one.
 
-- [FEAT-2026-0104/G1] When a gate's units edit the central dispatch loop, the per-attempt
+- [FEAT-LOOP-2026-0104/G1] When a gate's units edit the central dispatch loop, the per-attempt
   narrow tier is not an exit oracle — it is a smoke test, and the plan must say so in each
-  unit's **Verification** section. FEAT-2026-0109's `narrow_command` selects a unit's own
+  unit's **Verification** section. FEAT-LOOP-2026-0109's `narrow_command` selects a unit's own
   `produces:` test modules, so for four units that each rewrote `loop.run()`'s retry path the
   driver's exit oracle ran 1, 6, 13 and 1 tests (`work/gate-logs/tests-*.log`), while the blast
   radius was the 44 test modules that drive `loop.run()`. This gate's first run died exactly
@@ -4210,7 +4210,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   pass to cluster on and no cost row for the close to reconcile. It is invisible to every
   aggregate the methodology builds, which is why it is worth naming here.
 
-- [FEAT-2026-0104/G1] A gate reverted to its plan baseline takes its own spend record with it,
+- [FEAT-LOOP-2026-0104/G1] A gate reverted to its plan baseline takes its own spend record with it,
   and the close that follows will report a cost that is confidently wrong. `events.jsonl` is a
   committed artifact, so reverting the gate's commits reverts the `task_started` /
   `attempt_outcome` / `task_completed` events too — this gate's log opens with an orphaned
@@ -4226,7 +4226,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   run's wall-clock bounds in `PLAN.md` at the same time you write the "what the first attempt
   taught" section, while someone still knows them.
 
-- [FEAT-2026-0104/G2] A gate that edits the driver cannot exercise its own edit: the driver
+- [FEAT-LOOP-2026-0104/G2] A gate that edits the driver cannot exercise its own edit: the driver
   build is pinned before the gate's units land, so the earliest a gate-N change can run is
   gate N+1. Measured on this feature by grepping each `driver_build_pinned` tree's `loop.py` —
   gate 1's pin had no `should_replan_instead_of_retry`, gate 2's had the trigger but not
@@ -4239,7 +4239,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   looks, because `driver_version` in the event payload names the released version, not the
   tree, and both gates here report `0.19.0`.
 
-- [FEAT-2026-0104/G2] When a feature's mechanism only fires on failure, its own clean run is
+- [FEAT-LOOP-2026-0104/G2] When a feature's mechanism only fires on failure, its own clean run is
   not evidence and the plan must buy the evidence deliberately. Both gates here passed every
   attempt first try, so the re-plan trigger was never consulted, zero `replan` events exist in
   any feature in the repo, and the success rate of a re-planned unit is n=0 after a whole
@@ -4252,18 +4252,18 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   criteria name a corpus metric must decompose the delta into numerator and denominator and
   report n, because at n≈10 adding one feature moves a mean by more than most real effects.
 
-- [FEAT-2026-0104/G2] A tracer bullet must stub only the parts the plan named as stubbed, and
+- [FEAT-LOOP-2026-0104/G2] A tracer bullet must stub only the parts the plan named as stubbed, and
   the units after it are scoped to that same list — so a part stubbed beyond the licence is
   owned by nobody and ships. Here T06 was licensed to stub "the option text and the
   recommendation" (parts 5 and 6) and also stubbed part 3; T07's criteria named parts 5 and 6,
-  so the placeholder "(Full decision text is FEAT-2026-0104/T07's; this brief only guarantees
+  so the placeholder "(Full decision text is FEAT-LOOP-2026-0104/T07's; this brief only guarantees
   the decision point exists.)" reached operator-facing output and passed every gate, because
   the contract validator only requires each part to be present and non-empty. The drafting
   move is cheap: the tracer-bullet WU lists the stubs it is allowed to leave, and the
   follow-up units' criteria are written against that list rather than against part numbers
   someone remembers.
 
-- [FEAT-2026-0104/G2-CLOSE] A close that finds an operator-facing defect in its own gate's
+- [FEAT-LOOP-2026-0104/G2-CLOSE] A close that finds an operator-facing defect in its own gate's
   deliverable owes the **verdict**, not just a note — "not fixed here" and "gate is done" are
   separate answers to separate questions. This close's attempt 1 found a tracer-bullet
   placeholder in part 3 of the operator escalation brief, wrote it up precisely, correctly
@@ -4282,7 +4282,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   absence of internal `FEAT-`/work-unit IDs in operator-facing text, the specific facts the
   part is supposed to state.
 
-- [FEAT-2026-0104/T10] Widening **where** a message is rendered is not the same change as
+- [FEAT-LOOP-2026-0104/T10] Widening **where** a message is rendered is not the same change as
   widening **what it may claim** — a unit that moves a render site inherits every condition the
   old site guaranteed, and the guarantees that were implicit at the old site become false
   statements at the new ones. T10 moved the six-part escalation brief from one call site (the
@@ -4295,7 +4295,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   old site made true by construction and assert each one at the new sites — a diff of the
   *conditions*, not of the call graph.
 
-- [FEAT-2026-0104/T10] When a deliverable has enumerable parts, **one criterion must assert on
+- [FEAT-LOOP-2026-0104/T10] When a deliverable has enumerable parts, **one criterion must assert on
   the enumeration**, not one criterion per part the plan happened to think of. Gate 2 shipped
   the same class of defect three times into the same six-part brief: a tracer bullet stubbed a
   part the plan had not licensed (#3305), the next unit's criteria named parts 5 and 6 so
@@ -4306,7 +4306,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   (`validate_escalation_body`, a minimum-length assertion, a leaked-ID assertion) tests the
   brief's *shape* rather than the truth of what it says.
 
-- [FEAT-2026-0104/G2-CLOSE] A gate expecting more than one close dispatch should write a
+- [FEAT-LOOP-2026-0104/G2-CLOSE] A gate expecting more than one close dispatch should write a
   `GATE-NN-CRITERIA.md`. `close-discipline.md` §5 lets a `narrow` oracle's recorded green carry
   forward across close attempts; with no such artifact there is nothing to carry, so every
   dispatch re-runs the whole oracle set from scratch. This feature's close was dispatched four
@@ -4317,7 +4317,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   itself than building itself. The artifact is cheap to write at the first close and pays for
   itself on the second.
 
-- [FEAT-2026-0104/G2-CLOSE] A follow-up's **re-run condition is a specification for the
+- [FEAT-LOOP-2026-0104/G2-CLOSE] A follow-up's **re-run condition is a specification for the
   discharging change's oracle**, and nothing in the loop ever compares the two. The driver
   files the issue and writes the number back; after that the follow-up entry and the fix that
   clears it never meet again, so a fix can discharge the defect while missing the barrier the
@@ -4329,7 +4329,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   criterion of the unit that will discharge it, and have the re-closing session diff what
   shipped against the condition rather than against the defect.
 
-- [FEAT-2026-0104/operator/asserting-existence-is-not-asserting-truth] **A criterion that
+- [FEAT-LOOP-2026-0104/operator/asserting-existence-is-not-asserting-truth] **A criterion that
   asserts a thing *exists* is satisfied by a placeholder; only a criterion that asserts what
   it *says* can fail on one.** Four defects in one feature, every one of them passing every
   criterion its unit was given, each caught by something downstream instead of by the
@@ -4353,10 +4353,10 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   the test supplied.** Corollary for briefs and generated prose specifically: assert that two
   parts which describe the same fact *agree*, since a contradiction between them is the cheapest
   detectable proof that at least one is asserting rather than reporting. Companion to
-  [FEAT-2026-0108/G1-CLOSE], which bounds a criterion's data flow across a producer/renderer
+  [FEAT-LOOP-2026-0108/G1-CLOSE], which bounds a criterion's data flow across a producer/renderer
   seam; this one bounds a single criterion's strength against its own subject.
 
-- [FEAT-2026-0106/G1-CLOSE] **Measure an agent-supplied field from what the agent returned,
+- [FEAT-LOOP-2026-0106/G1-CLOSE] **Measure an agent-supplied field from what the agent returned,
   never from the driver's event log, and when a criterion asks a unit to "record" a figure a
   later unit's escalation trigger reads, name the durable surface the figure lands on.** T01
   was asked how often a real agent emits RESULT `summary:`. It counted `summary` on
@@ -4370,7 +4370,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   carry the value) and its sink (a file or frontmatter key the downstream unit is told to
   read). A figure that exists only in a RESULT block does not exist for the next unit.
 
-- [FEAT-2026-0111/G1-CLOSE] **A sub-budget is only a budget if it fits inside the headroom
+- [FEAT-LOOP-2026-0111/G1-CLOSE] **A sub-budget is only a budget if it fits inside the headroom
   its parent cap leaves; test it on the real tree, not on a fixture holding the child alone.**
   T04 set a 500-word sub-budget for the rules-local distillate inside a 2,500-word block
   whose three fixed rules total 2,404 words, so the real room is 96 words. Its test for
@@ -4382,7 +4382,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   sized between the two, and add a criterion that the child limit is ≤ the parent limit
   minus the parent's other members, as computed at test time.
 
-- [FEAT-2026-0111/G1-CLOSE] **A WU body that orders the full suite in-session gets it run in
+- [FEAT-LOOP-2026-0111/G1-CLOSE] **A WU body that orders the full suite in-session gets it run in
   the background, and the session can end before emitting RESULT.** T01, T04 and T04H each
   said "the narrow tier is NOT sufficient — run the full suite". T04 and T04H both ended on
   "running in background; will report RESULT once it completes" and emitted no block. The
@@ -4393,7 +4393,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   body. The driver already runs the broad set once per gate. If a unit genuinely needs a
   wider module set, name the modules for `narrow_command`, not "the full suite".
 
-- [FEAT-2026-0111/G1-CLOSE] **"On-plan" in the off-plan signal means "no implementation unit
+- [FEAT-LOOP-2026-0111/G1-CLOSE] **"On-plan" in the off-plan signal means "no implementation unit
   overran its estimate", not "the gate went as planned" — check `events.jsonl` before
   trusting a suppressed reflection.** `evaluate_off_plan_signal` returned `reasons=[]` for a
   gate that had a feature-level `human_escalation` (`preexisting_gate_failure`), an
@@ -4407,7 +4407,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   And do not raise estimates on a "touches the driver" label: here that label over-priced
   four units by ~5× while the unit that actually failed twice was priced as routine.
 
-- [FEAT-2026-0113/G1-CLOSE-INTERMEDIATE] **Loosening a published marker's reader and making it
+- [FEAT-LOOP-2026-0113/G1-CLOSE-INTERMEDIATE] **Loosening a published marker's reader and making it
   fail closed are the same edit; a gate that asks only for tolerance ships a fail-open sweep.**
   `triage.parse_marker` was positionally anchored, so a marker carrying a third field failed to
   match at all. T01 replaced the anchor with a `key=value` field scan and satisfied every one of
@@ -4436,7 +4436,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   hits `loop/promotion.py`, which defines its *own* reader over `specfuse:promoted` and is not
   a triage caller — scoping a unit off that grep scopes it wrong.
 
-- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A "we don't touch your X" promise is only worth the
+- [FEAT-LOOP-2026-0113/G2-CLOSE-INTERMEDIATE] **A "we don't touch your X" promise is only worth the
   argv sequence that proves it.** Gate 2 replaced a withdrawn opt-out with a non-interference
   contract — a repository declaring its own `severity:*` labels gets nothing created and no
   description rewritten — and the criterion was written as an assertion over the **whole**
@@ -4455,7 +4455,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   repository whose scheme shares no value with that vocabulary is left inert-but-untouched —
   the correct precedence, and invisible from the run-level test alone.
 
-- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **Separate the decision that gates an action from the
+- [FEAT-LOOP-2026-0113/G2-CLOSE-INTERMEDIATE] **Separate the decision that gates an action from the
   definition it is measured against; a safety constraint stated over the bundle ships a feature
   that is inert by default.** The draft reasoned "severity policy must be the operator's" and
   applied it to the whole bundle, concluding that a repository which had not invented its own
@@ -4475,7 +4475,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   which is the checkpoint working; it was not caught by any criterion, because every criterion
   was written downstream of the premise.
 
-- [FEAT-2026-0113/G2-CLOSE-INTERMEDIATE] **A later unit in the same gate can delete an earlier
+- [FEAT-LOOP-2026-0113/G2-CLOSE-INTERMEDIATE] **A later unit in the same gate can delete an earlier
   unit's assertions, and nothing in the loop notices.** T02H was inserted as the gate's tracer
   bullet and shipped one test pinning the pre-feature `gh` argv sequence, order asserted
   structurally. Its body stated that the unit extending the module "does not rewrite the
@@ -4491,7 +4491,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   units' commits rather than trusting "extends, does not rewrite" — that sentence is a wish, not
   a guard. A shared `produces:` entry is the signal; there is no other.
 
-- [FEAT-2026-0113/G3-CLOSE] **A walking skeleton is deleted as a *unit*, not as a symbol, and a
+- [FEAT-LOOP-2026-0113/G3-CLOSE] **A walking skeleton is deleted as a *unit*, not as a symbol, and a
   public-symbol ratchet cannot tell you when you have finished.** Gate 3's tracer bullet was one
   public function (`backfill_severity`) plus two private helpers it alone used (`_find_issue`,
   `_STUB_SEVERITY`). The caller ratchet failed the once-per-gate broad run on the public one, a
@@ -4506,7 +4506,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   ratchet happened to flag. The tracer-bullet unit is where that list should be written down, at
   the moment it is still obvious which symbols are scaffolding.
 
-- [FEAT-2026-0113/G3-CLOSE] **A criterion whose claim is function-scoped and whose oracle is
+- [FEAT-LOOP-2026-0113/G3-CLOSE] **A criterion whose claim is function-scoped and whose oracle is
   module-scoped passes or fails for reasons unrelated to the claim.** T09's criterion 4 read "the
   write path neither lists nor classifies" and proved it with `grep -c '"issue", "list"'` over the
   whole file. The write path genuinely neither lists nor classifies; the grep returned `1`
@@ -4519,7 +4519,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   once"). A file-scoped grep in a module more than one unit writes to is measuring the gate's
   drafting order, not the code.
 
-- [FEAT-2026-0113/G3-CLOSE] **An authorised, coverage-checked deletion can still hollow out the
+- [FEAT-LOOP-2026-0113/G3-CLOSE] **An authorised, coverage-checked deletion can still hollow out the
   gate's own `feature_oracle`.** Gate 2's lesson was the unauthorised case: a later unit silently
   deleted an earlier unit's assertions and nothing noticed. Gate 3 did everything that lesson
   asks — the deletion was its own dispatched unit, its body named the surviving assertion, its
@@ -4534,9 +4534,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   test list against that definition rather than only reading its exit code. A green oracle is not
   evidence that the oracle still asks the question.
 
-- [FEAT-2026-0203/G1-CLOSE] **A walking skeleton's oracle must pin the schema unit's field
+- [FEAT-LOOP-2026-0203/G1-CLOSE] **A walking skeleton's oracle must pin the schema unit's field
   shapes, not guess them; its own fixture config is the first thing the lint unit will reject.**
-  `FEAT-2026-0203/T01` wrote the end-to-end oracle with a literal
+  `FEAT-LOOP-2026-0203/T01` wrote the end-to-end oracle with a literal
   `deploy_signal: {kind: app-version}` config before `T03` had settled how that nested mapping
   was parsed and linted, and T03 then failed twice on its own gate with
   `test_one_deployment_files_one_finding_per_code` red. **Drafting rule:** when a skeleton's
@@ -4544,9 +4544,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   skeleton's fixture as a known-valid input, so the disagreement is caught by the lint unit's own
   narrow tier rather than by the next gate-entry probe's `preexisting_gate_failure`.
 
-- [FEAT-2026-0204/G1-CLOSE] **A plan's enumerated deliverable list must be mapped, item by item, into unit
+- [FEAT-LOOP-2026-0204/G1-CLOSE] **A plan's enumerated deliverable list must be mapped, item by item, into unit
   criteria at arm time, because the feature oracle can only assert what the
-  criteria name.** `FEAT-2026-0204`'s "Diagnostic context" listed what each check's
+  criteria name.** `FEAT-LOOP-2026-0204`'s "Diagnostic context" listed what each check's
   finding must carry; `T08` restated the `heartbeat` and `queue-stalled` entries
   from memory and left out the heartbeat's earliest heartbeat and the queue's last
   completed message. Every unit met every criterion and the oracle was green, and
@@ -4556,16 +4556,16 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   should diff that checklist against the criteria and either assert each item or
   record its removal in the plan.
 
-- [FEAT-2026-0204/G1-CLOSE] **A unit that changes what an adapter needs to emit a finding can break tests it
+- [FEAT-LOOP-2026-0204/G1-CLOSE] **A unit that changes what an adapter needs to emit a finding can break tests it
   does not own; name the dispatch-level tests in its verification.** `T04` made `heartbeat` need an earlier heartbeat to evaluate, and
   `test_monitor_cli.TestAllCheckTypesDispatch`, whose heartbeat stub had no history,
   went red. The narrow tier ran only the unit's own modules, so the failure surfaced
   at the gate's broad run (the 16:03Z `broad_run_result`) and cost a repair commit
   and a second broad run (`ab4c8b1`).
 
-- [FEAT-2026-0204/G1-CLOSE] **A stub-transport oracle proves the shape of a query and a body, never that the
+- [FEAT-LOOP-2026-0204/G1-CLOSE] **A stub-transport oracle proves the shape of a query and a body, never that the
   backend accepts the query, so a feature that writes KQL needs one opt-in live
-  render before its close, not only after release.** FEAT-2026-0204's `error-logs`
+  render before its close, not only after release.** FEAT-LOOP-2026-0204's `error-logs`
   and `http-5xx` queries passed the checked-in schema reference, the one-query
   assertion and every context test, and still did not parse in App Insights (a `\{`
   inside an ordinary KQL string). Rendering real findings against the consumer's
@@ -4575,7 +4575,7 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   When a unit emits a query or renders evidence a human will read, its close should
   run the opt-in live tests, or name in Deferred verification why not.
 
-- [FEAT-2026-0224/G1-CLOSE] **The `judge_editing` arm class cannot fire on a
+- [FEAT-LOOP-2026-0224/G1-CLOSE] **The `judge_editing` arm class cannot fire on a
   single-gate feature, so a plan that expects it to halt has no review gate.** PLAN
   decision 3 expected T01's edit to `arm_eval.py` (a judge module) to trip
   `judge_editing`. It did not: the class reads the *drafted* successor-gate WUs, a
@@ -4584,9 +4584,9 @@ compaction counterpart — it merges duplicates, retires superseded entries into
   with no halt and no review beyond the PR diff. When a single-gate feature (or the
   last gate of any feature) must edit a judge surface, choose `review` autonomy, or put
   the edit in a `type: human` unit the operator marks done. The docs now say this
-  (#3544); enforcing it in the driver is FEAT-2026-0246.
+  (#3544); enforcing it in the driver is FEAT-LOOP-2026-0246.
 
-- [FEAT-2026-0224/G1-CLOSE] **A unit that changes a seeded or rendered artifact must
+- [FEAT-LOOP-2026-0224/G1-CLOSE] **A unit that changes a seeded or rendered artifact must
   name every test that asserts the old bytes, not only its own.** T07 changed the
   roadmap template and its seed; every unit passed its narrow tier, and the first broad
   run failed on `test_init_integration.TestInitFullLayout.test_roadmap_seeded_from_template`,

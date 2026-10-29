@@ -39,7 +39,7 @@ loop = load_loop()
 lint_plan = load_lint()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXAMPLE_FEATURE = REPO_ROOT / ".specfuse/features/FEAT-2026-0001-health-endpoint"
+EXAMPLE_FEATURE = REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0001-health-endpoint"
 
 _ORIGINAL_BODY = (
     "**Context.** Part of a feature that needs a rate limiter. Read "

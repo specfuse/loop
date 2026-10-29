@@ -20,7 +20,7 @@ isolated behind a seam (see the end of this file).
   LEARNINGS.md                # cross-feature durable lessons, appended each gate
   verification.yml            # this repo's gate commands                  (example: verification.yml.example)
   features/
-    FEAT-2026-0001-health-endpoint/        # one folder per feature
+    FEAT-LOOP-2026-0001-health-endpoint/        # one folder per feature
       PLAN.md                 # the task GRAPH: gate order, WU membership, dependency edges, feature status
       GATE-01.md              # gate status + definition of done + reflection notes
       GATE-02.md
@@ -62,7 +62,7 @@ pip install pyyaml
 # edit verification.yml so the `code` gates match your stack AND your branch protection
 ```
 
-Author a feature folder from the templates (the included `FEAT-2026-0001-health-endpoint`
+Author a feature folder from the templates (the included `FEAT-LOOP-2026-0001-health-endpoint`
 is a worked example you can copy and adapt), or adopt one from a GitHub `specfuse:feature`
 issue via the `/adopt-feature` skill or `python .specfuse/scripts/adopt_feature.py <repo>
 <issue-number>`. Then create the feature branch named in PLAN.md's frontmatter.
@@ -71,7 +71,7 @@ issue via the `/adopt-feature` skill or `python .specfuse/scripts/adopt_feature.
 
 1. **Validate** the feature's structure before running:
    ```bash
-   python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0001-health-endpoint
+   python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-LOOP-2026-0001-health-endpoint
    ```
 2. **Dry-run** to see the current gate walked, in dependency order, without dispatching:
    ```bash

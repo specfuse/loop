@@ -431,7 +431,7 @@ Every dispatched attempt emits exactly one `attempt_outcome` event to
 `outcome`, `failure_class`, `failure_signature`, `failure_excerpt`,
 `failing_tests`, `cost_usd`, `duration_seconds`, `attempt`, and
 `re_arm_count`. For the field-by-field schema see
-`.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/PLAN.md`
+`.specfuse/features/FEAT-LOOP-2026-0016-attempt-outcome-rearm-contract/PLAN.md`
 § "Event payload shape — `attempt_outcome` v1". The full payload is
 not restated here (one fact, one home).
 

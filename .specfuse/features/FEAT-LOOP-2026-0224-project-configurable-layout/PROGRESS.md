@@ -1,0 +1,11 @@
+- **FEAT-LOOP-2026-0224/T01**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T02**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T03**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T04**: attempt 2 outcome=spinning_signature_repeat
+- **FEAT-LOOP-2026-0224/T06**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T07**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0224/T07**: Previous attempt's edits stay in tree; verification already passed. No new edits. groom-backlog SKILL.md holds at HEAD: its only ADR mention is the specific FEAT-LOOP-2026-0011 blocker `ADR-0002`, not generic blocker-style wording.
+- **FEAT-LOOP-2026-0224/G1-CLOSE**: Wrote RETROSPECTIVE.md (measurements, DoD clause table, goldens integrity, cost analysis, deferred verification, contract changes), the CHANGELOG Unreleased Added and Changed entries, LEARNINGS-pending.md and the GATE-01-CRITERIA.md oracle records; feature_oracle and all 18 criterion oracles re-run green, closing lint passes.
+  - note: judge_editing cannot fire on a single-gate feature, so the arm_eval.py registry edit is reviewed only in the PR diff; the two post-merge checklist items (umbrella layout command, entries-style consumer) are the unverified remainder.

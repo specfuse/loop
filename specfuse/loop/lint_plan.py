@@ -62,12 +62,12 @@ VALID_GATE_STATUS = {"open", "awaiting_review", "passed"}
 # check_done_feature_gates below for a non-empty reason, and for pointing at
 # a directory that still exists (FEAT-2026-0072/T03).
 DONE_FEATURE_GATE_EXCLUSIONS = {
-    "FEAT-2026-0001-health-endpoint": (
+    "FEAT-LOOP-2026-0001-health-endpoint": (
         "bundled worked-example fixture — the self-demonstrating reference "
         "installation a target project copies via init.sh; a template never "
         "executed and never to be, so its gates stay open by design"
     ),
-    "FEAT-2026-0036-adopt-ruff-016": (
+    "FEAT-LOOP-2026-0036-adopt-ruff-016": (
         "executed directly as a config-only fix after a loop run on a flawed "
         "plan blocked — the close ceremony deliberately never ran, so GATE-01 "
         "stays open rather than asserting a ceremony that did not happen"

@@ -88,10 +88,10 @@ change is an escalation (name the module and case).
 **Known from the previous dispatch (do not re-diagnose):**
 
 - `ids.resolve` now follows an alias to a feature that exists only as a roadmap row (T08),
-  which fixes `FEAT-2026-0078`'s queue entry and `test_agent_policy_queue`'s live check.
+  which fixes `FEAT-LOOP-2026-0078`'s queue entry and `test_agent_policy_queue`'s live check.
 - `test_validate_event.TestValidateEventValid.test_driver_event_from_feat_0008_is_accepted`
   is a **test** fix, not a schema one: `.specfuse/schemas/event.schema.json` already
-  accepts keyed IDs. The test validates the real `FEAT-2026-0008` events against its own
+  accepts keyed IDs. The test validates the real `FEAT-LOOP-2026-0008` events against its own
   fixture schema (`_ENVELOPE_SCHEMA`, `correlation_id` pattern `^FEAT-\d{4}-\d{4}(/T\d{2})?$`
   at line ~62). Build that fixture pattern from `ids.FEATURE_ID_PATTERN`, or resolve the
   event file through `ids.resolve`, so it holds in both trees.

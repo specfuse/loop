@@ -118,7 +118,7 @@ this.
 
 ### 2. Push the branch
 
-- Read PLAN.md's `branch` field (e.g. `feat/FEAT-2026-0014-gha-node20-bump`).
+- Read PLAN.md's `branch` field (e.g. `feat/FEAT-LOOP-2026-0014-gha-node20-bump`).
 - Confirm `git branch --show-current` matches.
 - Confirm `git status --short` is clean (no uncommitted changes;
   the close ceremony's writes should already be committed by the

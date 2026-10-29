@@ -119,10 +119,10 @@ specfuse run                                     # the real run
 
 This repository is also a **self-demonstrating reference installation**: its own
 `.specfuse/` contains a worked example feature
-(`features/FEAT-2026-0001-health-endpoint/`). From the repo root you can run:
+(`features/FEAT-LOOP-2026-0001-health-endpoint/`). From the repo root you can run:
 
 ```bash
-python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-2026-0001-health-endpoint
+python .specfuse/scripts/lint_plan.py .specfuse/features/FEAT-LOOP-2026-0001-health-endpoint
 python .specfuse/scripts/loop.py --dry-run
 ```
 
@@ -147,7 +147,7 @@ specfuse-loop/
     ├── skills/verification/SKILL.md
     ├── scripts/{loop.py, lint_plan.py, gh_features.py, adopt_feature.py, gh_backend.py}
     ├── templates/{PLAN,GATE,WU}.template.md
-    └── features/FEAT-2026-0001-health-endpoint/   (the worked example)
+    └── features/FEAT-LOOP-2026-0001-health-endpoint/   (the worked example)
 ```
 
 `specfuse init` also ships the durable docs — `methodology.md`, `skills.md`, and

@@ -27,7 +27,7 @@ after a full rename the operator's configuration still validates, and `--apply` 
 whether the tree it left is valid. Tracer bullet: stubs are allowed here only.
 
 **Context.** `FEAT-LOOP-2026-0248/T01`. This unit **edits** `agent_policy.py` and `ids.py`
-(FEAT-2026-0247 created `ids.py`).
+(FEAT-LOOP-2026-0247 created `ids.py`).
 
 - `agent_policy`'s queue-against-roadmap check (the "has no row in roadmap.md" error and
   the done-feature WARN) resolves each queue entry with `ids.resolve` before looking up

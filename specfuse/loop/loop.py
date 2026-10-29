@@ -1164,7 +1164,7 @@ _FEATURE_ID_RE = _ids.FEATURE_ID_RE
 def _resolve_feature_dir(arg: str) -> Path:
     """Resolve *arg* to a feature directory.
 
-    Accepts the full folder name (`FEAT-2026-0039-monitoring-schema`) or the
+    Accepts the full folder name (`FEAT-LOOP-2026-0039-monitoring-schema`) or the
     bare correlation ID (`FEAT-2026-0039`). The ID is the identifier in the
     roadmap row, in PLAN.md frontmatter, in every WU id, in every correlation
     ID, and in commit subjects — the folder name is the one place it is *not*,

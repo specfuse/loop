@@ -79,10 +79,10 @@ CALIBRATION = {
 }
 
 _FEATURE_SLUG = {
-    "FEAT-2026-0013": "FEAT-2026-0013-ci-workspace-race-fix",
-    "FEAT-2026-0014": "FEAT-2026-0014-gha-node20-bump",
-    "FEAT-2026-0015": "FEAT-2026-0015-closing-ceremony-restructure",
-    "FEAT-2026-0017": "FEAT-2026-0017-wiring-race-guard",
+    "FEAT-2026-0013": "FEAT-LOOP-2026-0013-ci-workspace-race-fix",
+    "FEAT-2026-0014": "FEAT-LOOP-2026-0014-gha-node20-bump",
+    "FEAT-2026-0015": "FEAT-LOOP-2026-0015-closing-ceremony-restructure",
+    "FEAT-2026-0017": "FEAT-LOOP-2026-0017-wiring-race-guard",
 }
 
 
@@ -253,7 +253,7 @@ class TestResolveFeatureDir(unittest.TestCase):
         self.assertEqual(d.name, "my-special")
 
 
-_0017_DIR = FEATURES_DIR / "FEAT-2026-0017-wiring-race-guard"
+_0017_DIR = FEATURES_DIR / "FEAT-LOOP-2026-0017-wiring-race-guard"
 
 
 class TestMainCLI(unittest.TestCase):

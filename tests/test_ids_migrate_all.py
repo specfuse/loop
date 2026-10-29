@@ -16,7 +16,7 @@ from pathlib import Path
 from specfuse.loop import _filelock, ids, lint_plan, lint_roadmap
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE = REPO_ROOT / ".specfuse" / "features" / "FEAT-2026-0001-health-endpoint"
+FIXTURE = REPO_ROOT / ".specfuse" / "features" / "FEAT-LOOP-2026-0001-health-endpoint"
 
 ROADMAP = """# Roadmap
 

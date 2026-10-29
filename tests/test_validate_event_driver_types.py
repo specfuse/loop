@@ -30,7 +30,7 @@ import specfuse.loop.validate_event as ve
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REAL_DRIVER_LOG = (
     REPO_ROOT
-    / ".specfuse/features/FEAT-2026-0062-lifetime-cost-reads/events.jsonl"
+    / ".specfuse/features/FEAT-LOOP-2026-0062-lifetime-cost-reads/events.jsonl"
 )
 FEATURES_DIR = REPO_ROOT / ".specfuse/features"
 

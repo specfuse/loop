@@ -53,7 +53,7 @@ _TRACEBACK = '''FEAT-2026-0080's driver invocation failed: File "/x/bin/specfuse
              ~~~~^^
   File "/x/loop.py", line 1754, in ensure_feature_branch
     raise FeatureBranchError(
-specfuse.loop.loop.FeatureBranchError: branch 'feat/FEAT-2026-0080-answer-escalation' has diverged from 'main' — it carries commits 'main' does not.'''
+specfuse.loop.loop.FeatureBranchError: branch 'feat/FEAT-LOOP-2026-0080-answer-escalation' has diverged from 'main' — it carries commits 'main' does not.'''
 
 
 class TestTheTitleIsUsable(unittest.TestCase):

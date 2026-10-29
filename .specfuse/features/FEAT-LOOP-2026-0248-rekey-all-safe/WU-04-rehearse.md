@@ -27,7 +27,7 @@ output_tokens: 6748
 repository's own test suite, without touching the real tree.
 
 **Context.** `FEAT-LOOP-2026-0248/T04`. This unit **edits** `ids.py`, the oracle module and
-the methodology doc (adding to the "Renaming existing features" paragraph FEAT-2026-0247
+the methodology doc (adding to the "Renaming existing features" paragraph FEAT-LOOP-2026-0247
 wrote). Add `--rehearse` to `ids migrate` (both modes):
 
 - `git worktree add --detach <tmp> HEAD`, run the migration there with every other option
