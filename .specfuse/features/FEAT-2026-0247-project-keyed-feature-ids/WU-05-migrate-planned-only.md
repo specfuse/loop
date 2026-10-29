@@ -1,14 +1,23 @@
 ---
 id: FEAT-2026-0247/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/ids.py
   - tests/test_ids_migrate.py
   - tests/test_keyed_feature_ids_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:20:20.007808+00:00
+duration_seconds: 88.542
+cost_usd: 0.34512
+input_tokens: 24
+output_tokens: 9603
 ---
 
 # T05 — `ids migrate --planned-only` re-keys folderless planned rows

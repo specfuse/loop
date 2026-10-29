@@ -5,7 +5,7 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04); the rest
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04), clause 6 (T05); the rest
 are skipped naming their owner. A skip surviving to the close is a hollow oracle.
 """
 
@@ -160,9 +160,21 @@ class Clause5UnkeyedPlannedRowWarns(unittest.TestCase):
             self.assertEqual(lint_roadmap.lint_roadmap(root), [])
 
 
-@unittest.skip("owned by FEAT-2026-0247/T05")
 class Clause6MigratePlannedOnly(unittest.TestCase):
-    pass
+    def test_apply_rekeys_planned_row_and_lints_clean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_repo(tmp, key="ACME", feature_id="FEAT-2026-0008")
+            shutil.rmtree(root / ".specfuse" / "features" / f"FEAT-2026-0008-{SLUG}")
+            before = (root / ".specfuse" / "roadmap.md").read_text()
+            dry = _run(root, "specfuse.loop.ids", "migrate", "--planned-only")
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            self.assertEqual((root / ".specfuse" / "roadmap.md").read_text(), before)
+            r = _run(root, "specfuse.loop.ids", "migrate", "--planned-only", "--apply")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            text = (root / ".specfuse" / "roadmap.md").read_text()
+            self.assertIn("| FEAT-ACME-2026-0008 |", text)
+            self.assertNotIn("FEAT-2026-0008", text)
+            self.assertEqual(lint_roadmap.lint_roadmap(root), [])
 
 
 @unittest.skip("owned by FEAT-2026-0247/T07")
