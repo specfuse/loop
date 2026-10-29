@@ -20,7 +20,7 @@ sections inline in `roadmap.md`.
   ```
 
   Replace `yyyy` and `nnnn` with the feature's four-digit year and zero-padded
-  sequence number (e.g. `feat-2026-0003`). The anchor must appear on a line by
+  sequence number (e.g. `feat-loop-2026-0003`). The anchor must appear on a line by
   itself, immediately above the `## FEAT-YYYY-NNNN —` heading.
 
 - **Back-link form.** The corresponding `Detail` cell in the main roadmap table
@@ -59,10 +59,10 @@ sections inline in `roadmap.md`.
 - Run `python3 -m specfuse.loop.ids migrate --all --include-prose <paths> --rehearse`
   on `main`, review the report, then decide whether to `--apply` it.
 
-<a id="feat-2026-0247"></a>
-## FEAT-2026-0247 — Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`)
+<a id="feat-loop-2026-0247"></a>
+## FEAT-LOOP-2026-0247 — Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`)
 
-**Why.** Each repo numbers its own features, so in a project with several repos the same `FEAT-YYYY-NNNN` exists in more than one of them. FEAT-2026-0069 to 0071, for example, exist in two repos as unrelated features. Branch names, commit messages, `events.jsonl` and cross-repo references all carry the bare ID, and the bare ID does not say which repo it belongs to. Qualifying it by repo is only a convention, so references between projects are ambiguous and confusing.
+**Why.** Each repo numbers its own features, so in a project with several repos the same `FEAT-YYYY-NNNN` exists in more than one of them. FEAT-LOOP-2026-0069 to 0071, for example, exist in two repos as unrelated features. Branch names, commit messages, `events.jsonl` and cross-repo references all carry the bare ID, and the bare ID does not say which repo it belongs to. Qualifying it by repo is only a convention, so references between projects are ambiguous and confusing.
 
 **Goal.** Add an optional per-repo project key to feature IDs: `FEAT-<KEY>-YYYY-NNNN` (for example `FEAT-LOOP-2026-0248`). The key is set once in `.specfuse/` config and is 2–6 uppercase letters and digits, starting with a letter. Numbering stays per repo, with no central allocator. Gate 1: move the feature-ID pattern, now copied in about 9 places (`agent_policy`, `changelog`, `lint_plan`, `loop` (twice), `promotion`, `upgrade_merge_gate`, `gh_features`, `lint_roadmap`), into one `ids` module; also cover the event schemas and the `correlation-ids.md` grammar. Widen the pattern to accept an optional key, with no behaviour change. Gate 2: add a `project.key` config field. When it is set, `/roadmap-add` and `/draft-feature` emit keyed IDs, and the next number continues from the repo's highest number across both forms, so old and new IDs in one repo never share one. `lint_roadmap` warns on new unkeyed rows when a key is configured, and `specfuse upgrade` asks for the key. An optional `specfuse migrate-ids --planned-only` re-keys planned rows that have no folder yet. Existing IDs stay valid permanently; done and active features are never renamed, because their history in commits, PRs, issues and append-only `events.jsonl` cannot be rewritten. Out of scope: `INIT-` initiative IDs, which can take the same optional key later if separate orchestrators turn out to collide.
 
@@ -82,10 +82,10 @@ sections inline in `roadmap.md`.
   (moves, skips, ambiguous prose mentions) and confirm the alias map afterwards (only
   temporary-repository fixtures ran here).
 
-<a id="feat-2026-0246"></a>
-## FEAT-2026-0246 — `judge_editing` covers the terminal gate
+<a id="feat-loop-2026-0246"></a>
+## FEAT-LOOP-2026-0246 — `judge_editing` covers the terminal gate
 
-**Why.** The `judge_editing` arm stop class (`arm_eval.py`) is the check that keeps an `auto` feature from changing the machinery that grades it. It reads only the drafted units of a *successor* gate, so it never sees what a terminal gate's own units change, and it never checks a single-gate feature at all. The terminal close goes straight to the judge, and nothing on that path checks `arm_eval.JUDGE_PATHS`. FEAT-2026-0224's T01 edited `arm_eval.py` itself and closed `auto` with no human checkpoint (#3542). Its PR was the only review. The docs now state the limit and recommend `review` (#3544), but that leaves the safety property to whoever chooses the autonomy level. Of the 23 done `auto` features in this repository, 11 had units producing judge-surface paths.
+**Why.** The `judge_editing` arm stop class (`arm_eval.py`) is the check that keeps an `auto` feature from changing the machinery that grades it. It reads only the drafted units of a *successor* gate, so it never sees what a terminal gate's own units change, and it never checks a single-gate feature at all. The terminal close goes straight to the judge, and nothing on that path checks `arm_eval.JUDGE_PATHS`. FEAT-LOOP-2026-0224's T01 edited `arm_eval.py` itself and closed `auto` with no human checkpoint (#3542). Its PR was the only review. The docs now state the limit and recommend `review` (#3544), but that leaves the safety property to whoever chooses the autonomy level. Of the 23 done `auto` features in this repository, 11 had units producing judge-surface paths.
 
 **Goal.** A terminal gate whose own substantive units declare a `produces:` path matching `JUDGE_PATHS` (or `produces_driver_helper`) does not close hands-off at any autonomy level (drafting found `fire_terminal_flips` never reads `autonomy_default`, so `review` adds no terminal checkpoint either). It stops for human review before the terminal flips, with an event naming each unit and path. The check is pure and file-based, like the other arm classes. Projects without the driver source are affected only through `JUDGE_PATHS`' universal entries (`.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `pyproject.toml`); its module and data entries never match there. To be decided at draft time: where the stop sits (before the close dispatch, or before `fire_terminal_flips`), whether an operator can pre-acknowledge listed paths in `PLAN.md` so a deliberate, reviewed edit does not halt, how a stop is cleared, and the docs and `/draft-feature` wording once the class covers the terminal gate. Out of scope: assertion-semantics checks on existing tests (the class stays a path-surface check), and the bug lane's own judge-path guardrail, which already covers PRs.
 
@@ -100,8 +100,8 @@ sections inline in `roadmap.md`.
   `.specfuse/verification.yml`; confirm the halt names the unit and path, and that
   writing `judge_edit_acknowledged` plus `/unblock-wu` lets the close run.
 
-<a id="feat-2026-0224"></a>
-## FEAT-2026-0224 — Project-configurable layout (`.specfuse/layout.yml`)
+<a id="feat-loop-2026-0224"></a>
+## FEAT-LOOP-2026-0224 — Project-configurable layout (`.specfuse/layout.yml`)
 
 **Why.** Specfuse hardcodes where it reads and writes. `git grep -E 'docs/adr|docs/product/backlog|docs/product/INITIATIVE_BACKLOG\.md|api/docs/handoffs|api/docs/flows|docs/generated'` (excluding roadmaps, LEARNINGS, retrospectives, CHANGELOG and feature folders) finds about 95 lines: 21 in `loop` at HEAD, all `docs/adr`, and 74 in `authoring` at origin/main, all the other paths. A project organised differently cannot fix this locally, because `specfuse upgrade` and plugin updates restore the edited files and the edit is silently lost. In `loop` the whole problem is decisions. A project that records decisions as structured entries rather than ADR files is told by `block-feature` and five other skills that a blocker is "an ADR", gets ADR links built for it, and cannot use a fragment link at all: `lint_roadmap` checks each Blocked-by link with `(doc.path.parent / href).exists()`, so `decisions.md#D-0007` fails as a missing file.
 
@@ -123,16 +123,16 @@ sections inline in `roadmap.md`.
   entries, add a `layout.yml`, run `/block-feature` on one feature, and confirm the
   rendered link passes `roadmap-link-gate`.
 
-<a id="feat-2026-0205"></a>
-## FEAT-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
+<a id="feat-loop-2026-0205"></a>
+## FEAT-LOOP-2026-0205 — Monitoring: severity on the diagnosis, so findings can be prioritised
 
-**Why.** Monitoring findings deliberately skip triage: `list_untriaged` flags them `already_structured` and the triage provider skips them (FEAT-2026-0049), because their route to a fix is diagnose → autofix, gated on the diagnosis's `confidence` and `fix_scope`, not the bug lane's triage severity. Routing works without a severity, but a queue of findings is flat: nothing says which one matters most, and autofix's daily cap spends itself in arrival order.
+**Why.** Monitoring findings deliberately skip triage: `list_untriaged` flags them `already_structured` and the triage provider skips them (FEAT-LOOP-2026-0049), because their route to a fix is diagnose → autofix, gated on the diagnosis's `confidence` and `fix_scope`, not the bug lane's triage severity. Routing works without a severity, but a queue of findings is flat: nothing says which one matters most, and autofix's daily cap spends itself in arrival order.
 
-**Goal.** Add a `severity` field to the diagnosis contract (`specfuse/monitor/diagnosis.py`), assessed by the diagnosis session from the evidence FEAT-2026-0204 puts on the finding (endpoint, status, client abort or not, frequency, instances); project it as a label on the finding; and decide explicitly whether severity ever changes routing (e.g. autofix's daily cap favouring higher severities) and whether a finding may ever enter the bug lane, or stays on diagnose → autofix.
+**Goal.** Add a `severity` field to the diagnosis contract (`specfuse/monitor/diagnosis.py`), assessed by the diagnosis session from the evidence FEAT-LOOP-2026-0204 puts on the finding (endpoint, status, client abort or not, frequency, instances); project it as a label on the finding; and decide explicitly whether severity ever changes routing (e.g. autofix's daily cap favouring higher severities) and whether a finding may ever enter the bug lane, or stays on diagnose → autofix.
 
 **Scope boundary.** OUT: triaging findings through the human-issue triage path; changing autofix's confidence threshold or `fix_scope` rule.
 
-**Sequencing.** After FEAT-2026-0204: a severity judged from one line of evidence would be a guess.
+**Sequencing.** After FEAT-LOOP-2026-0204: a severity judged from one line of evidence would be a guess.
 
 **Status: done.**
 
@@ -142,8 +142,8 @@ sections inline in `roadmap.md`.
   the first consumer (by hand or `diagnose: auto`) and confirm the marker carries a
   severity, the issue gets one `severity:` label, and a second diagnosis replaces it.
 
-<a id="feat-2026-0204"></a>
-## FEAT-2026-0204 — Monitoring: findings a diagnosis can start from
+<a id="feat-loop-2026-0204"></a>
+## FEAT-LOOP-2026-0204 — Monitoring: findings a diagnosis can start from
 
 **Why.** The first real `specfuse monitor run` against a consumer's production workspace (the first consumer's backend, 0.28.1, 2026-10-17) filed 16 issues for 7 findings; after #3486's in-cycle dedupe, [#3496](https://github.com/specfuse/loop/issues/3496) records what remains. A closed finding is refiled as a new issue every run, losing its diagnosis, because the lookup lists open issues only. A weekly schedule whose only expected firing predates heartbeat emission files a guaranteed false `silent-schedule`. And every finding carries one line of evidence, so the three hand diagnoses run that day spent most of their effort re-querying App Insights for the endpoint, stack frame, dead-lettered message and host liveness the finding could have carried.
 
@@ -151,7 +151,7 @@ sections inline in `roadmap.md`.
 
 **Benefits.** Findings stop being refiled or falsely raised, and a diagnosis, by hand or `diagnose: auto`, starts from evidence instead of from KQL.
 
-**Scope boundary.** OUT: severity (FEAT-2026-0205); re-diagnosing a reopened finding (#3487); diagnosis triggered by `monitor run` (#3488); a component liveness check type; auto-closing anything.
+**Scope boundary.** OUT: severity (FEAT-LOOP-2026-0205); re-diagnosing a reopened finding (#3487); diagnosis triggered by `monitor run` (#3488); a component liveness check type; auto-closing anything.
 
 **Status: done.**
 
@@ -164,8 +164,8 @@ sections inline in `roadmap.md`.
   heartbeat; and a sample of finding bodies carries every section the Diagnostic context names for
   its check.
 
-<a id="feat-2026-0113"></a>
-## FEAT-2026-0113 — Triage assigns a severity, so `min_severity` routes instead of stranding
+<a id="feat-loop-2026-0113"></a>
+## FEAT-LOOP-2026-0113 — Triage assigns a severity, so `min_severity` routes instead of stranding
 
 **Why.** Triage classifies an issue into a category (`bug | feature | duplicate | question | wontfix`) and a confidence, and assesses no severity. Nothing else in the loop does either — `severity:*` is not in `labels.LABEL_REGISTRY`, and the triage marker carries `category` and `confidence` only.
 
@@ -187,16 +187,16 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
 
 **Status: done.**
 
-<a id="feat-2026-0203"></a>
-## FEAT-2026-0203 — Monitoring: deploy-correlated HTTP status regression check
+<a id="feat-loop-2026-0203"></a>
+## FEAT-LOOP-2026-0203 — Monitoring: deploy-correlated HTTP status regression check
 
-**Why.** A deployment that breaks auth configuration, role or scope mapping, routing or content negotiation produces a wave of 4xx responses, not 5xx, so `http-5xx` never fires and the regression ships silently (#248). A continuous 4xx-rate alert would cross the monitoring initiative's "no metrics" boundary, and FEAT-2026-0069 recorded that `invariant` is not the sanctioned route to rate-based detection. The operator's refinement on #248 resolves the tension: a server-fault 4xx spike indicates a backend regression only when it starts soon after a component deployment, so the check can be bounded to a post-deployment window and fire once per deployment -- a discrete artifact, not a metric.
+**Why.** A deployment that breaks auth configuration, role or scope mapping, routing or content negotiation produces a wave of 4xx responses, not 5xx, so `http-5xx` never fires and the regression ships silently (#248). A continuous 4xx-rate alert would cross the monitoring initiative's "no metrics" boundary, and FEAT-LOOP-2026-0069 recorded that `invariant` is not the sanctioned route to rate-based detection. The operator's refinement on #248 resolves the tension: a server-fault 4xx spike indicates a backend regression only when it starts soon after a component deployment, so the check can be bounded to a post-deployment window and fire once per deployment -- a discrete artifact, not a metric.
 
-**Goal.** A first-class `http-status-regression` check type in `monitoring.yml`: per component, a `deploy_signal` (`kind`: a CI-emitted annotation, a telemetry application-version change, or an operator-supplied marker query, resolved by the provider adapter), a `window_after_deploy`, and a `codes` list defaulting to the server-fault subset 401, 403, 405, 410, 412, 415, 428 (400, 404 and 409 excluded as legitimate client or business behaviour). It compares occurrences of each code in the window after a rollout with the comparable window before, and emits one finding per (component, status code, deployment), fingerprinted through FEAT-2026-0040's model with the deployment as part of the signature. `/derive-monitoring` proposes the check where a deployment signal is discoverable.
+**Goal.** A first-class `http-status-regression` check type in `monitoring.yml`: per component, a `deploy_signal` (`kind`: a CI-emitted annotation, a telemetry application-version change, or an operator-supplied marker query, resolved by the provider adapter), a `window_after_deploy`, and a `codes` list defaulting to the server-fault subset 401, 403, 405, 410, 412, 415, 428 (400, 404 and 409 excluded as legitimate client or business behaviour). It compares occurrences of each code in the window after a rollout with the comparable window before, and emits one finding per (component, status code, deployment), fingerprinted through FEAT-LOOP-2026-0040's model with the deployment as part of the signature. `/derive-monitoring` proposes the check where a deployment signal is discoverable.
 
 **Benefits.** Catches a regression class that ships silently today, without continuous rate alerting or noise from client-side 4xx spikes days after a deploy; keeps the discrete-artifact model intact instead of eroding `invariant` by precedent; ships the server-fault code subset as a shared documented default rather than a hand-written query per project.
 
-**Shape (drafted 2026-10-14).** One gate, five units: a walking skeleton, one shared duration grammar (which also discharges #295's `stall_after` lint, folded in by operator decision), schema and lint, the adapter's one-query regression rule (share of requests, 3× and at least 10, on a fully elapsed window), and `derive-monitoring` support with a version-stamping design rule. v1 accepts only the `app-version` deployment signal. Folder: `.specfuse/features/FEAT-2026-0203-http-status-regression/`.
+**Shape (drafted 2026-10-14).** One gate, five units: a walking skeleton, one shared duration grammar (which also discharges #295's `stall_after` lint, folded in by operator decision), schema and lint, the adapter's one-query regression rule (share of requests, 3× and at least 10, on a fully elapsed window), and `derive-monitoring` support with a version-stamping design rule. v1 accepts only the `app-version` deployment signal. Folder: `.specfuse/features/FEAT-LOOP-2026-0203-http-status-regression/`.
 
 **Scope boundary.** OUT: CI-annotation and marker-query signals, configurable thresholds, 5xx regressions, non-Azure providers, re-sighting after a closed finding, consumer adoption.
 
@@ -211,10 +211,10 @@ That was survivable while `rules.bugs.min_severity` was unread. It is not now. #
   its list, against a workspace whose component stamps `AppVersion`. No consumer does
   today, so this cannot be a pre-close human unit.
 
-<a id="feat-2026-0117"></a>
-## FEAT-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
+<a id="feat-loop-2026-0117"></a>
+## FEAT-LOOP-2026-0117 — A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed
 
-**Why.** Close cost per feature doubled after the review (median $6 to $14) and the judge is not why ($0.46 per close); the re-runs are. 64% of post-review features close a gate twice or more, 39% three or more, and every re-close re-measures every criterion (#3313: FEAT-2026-0104 spent $31.47 closing against $17 building). `close-discipline.md` §§1, 5 already permit carrying a `narrow` green forward and the artifact exists (`GATE-NN-CRITERIA.md`, seeded by the driver, filled by the close, partitioned by `build_reverification_worklist`); what breaks the chain is the re-arm, whose skeleton step resets every entry with `attempt > current` (#3279) regardless of kind, and the worklist never checks `proved_at_sha` against the tree.
+**Why.** Close cost per feature doubled after the review (median $6 to $14) and the judge is not why ($0.46 per close); the re-runs are. 64% of post-review features close a gate twice or more, 39% three or more, and every re-close re-measures every criterion (#3313: FEAT-LOOP-2026-0104 spent $31.47 closing against $17 building). `close-discipline.md` §§1, 5 already permit carrying a `narrow` green forward and the artifact exists (`GATE-NN-CRITERIA.md`, seeded by the driver, filled by the close, partitioned by `build_reverification_worklist`); what breaks the chain is the re-arm, whose skeleton step resets every entry with `attempt > current` (#3279) regardless of kind, and the worklist never checks `proved_at_sha` against the tree.
 
 **Goal.** A re-armed close keeps `narrow`/`pass` entries (`carried_from_attempt`), invalidates any whose driver-seeded `covers:` paths appear in the gate diff since `proved_at_sha`, re-measures broad entries and the `feature_oracle` as §1 binds, states `carried forward: N criteria, re-measured: M` in `## Measurements`, and shows the judge each carried entry with its sha. Kill switch `defaults.carry_forward_narrow_greens: false`.
 
@@ -237,8 +237,8 @@ Observable only across repositories and over time (`close-discipline.md` §2).
 - [ ] Any judge finding that names a carried criterion (a carried green that
       should have been re-measured).
 
-<a id="feat-2026-0116"></a>
-## FEAT-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
+<a id="feat-loop-2026-0116"></a>
+## FEAT-LOOP-2026-0116 — The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin
 
 **Why.** The spinning family is a third of human waits on driver >= 0.19 and 41% of post-escalation idle. #3414: two attempts, two different failing Maven tests, one signature, `"Tests"`, because the post-processed report prints `FAIL: Tests run: …` and the unittest regex takes the first word; $19.15 discarded, one attempt of budget unused. Package-qualified surefire lines miss the regex; pytest, vitest, dotnet and dart have no parser; the exhaustion escalation carries no signature at all (12 of 25 spinning escalations record `None`).
 
@@ -263,10 +263,10 @@ Observable only across repositories and over time (`close-discipline.md` §2).
 - [ ] Count spinning-family escalations whose payload lacks
       `failure_signature` (baseline: 12 of 25).
 
-<a id="feat-2026-0115"></a>
-## FEAT-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
+<a id="feat-loop-2026-0115"></a>
+## FEAT-LOOP-2026-0115 — A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human
 
-**Why.** Agent-reported blocks are 45% of human waits on driver >= 0.19 and 48% of the idle that follows an escalation. Thirty of thirty-four came from one consumer repository; seventeen from one feature whose QA unit carried the trigger "if a finding is a generator defect, record it and block: the fix is a new unit before T18". The session obeyed, ten times: it diagnosed, drafted the fix unit, and stopped, and each stop waited hours for a human to flip a draft to `pending`, re-arm, and restart. `REPLAN_OPTION_SCOPE` does not even offer re-planning for this reason. FEAT-2026-0104's re-plan turn is the wrong tool: it rewrites a body and may not author units.
+**Why.** Agent-reported blocks are 45% of human waits on driver >= 0.19 and 48% of the idle that follows an escalation. Thirty of thirty-four came from one consumer repository; seventeen from one feature whose QA unit carried the trigger "if a finding is a generator defect, record it and block: the fix is a new unit before T18". The session obeyed, ten times: it diagnosed, drafted the fix unit, and stopped, and each stop waited hours for a human to flip a draft to `pending`, re-arm, and restart. `REPLAN_OPTION_SCOPE` does not even offer re-planning for this reason. FEAT-LOOP-2026-0104's re-plan turn is the wrong tool: it rewrites a body and may not author units.
 
 **Goal.** A blocked RESULT may carry `blocked_next: {kind: fix_unit, file, id}` naming a drafted unit. Under `autonomy_default: auto`, the driver validates the draft with the plan-next draft lint and the arm predicate's stop classes (`judge_editing`, `decision_class_paths`, `drift_caps`, `missing_provenance`), inserts it ahead of the blocked unit, re-arms the blocked unit behind it, emits `fix_unit_inserted`, and continues. Two insertions per unit, the gate's `cost_budget_usd`, and any veto class refuse and fall back to today's escalation with the class named; under `review` the brief says the fix is drafted and one command arms it. `evaluate_auto_close` reads the event as off-plan, like `replan`.
 
@@ -290,8 +290,8 @@ Observable only across repositories and over time (`close-discipline.md` §2).
 - [ ] For every insertion, whether the terminal close or judge found the
       inserted unit's work wanting (a finding naming its id).
 
-<a id="feat-2026-0114"></a>
-## FEAT-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
+<a id="feat-loop-2026-0114"></a>
+## FEAT-LOOP-2026-0114 — Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning
 
 **Why.** `produces:` is written before anyone has seen the solution. When the solution lands elsewhere, `resolve_produces_refusal` refuses the pass with `produces_not_in_diff` and the unit has no way to say the plan named the wrong file. The 2026-09-26 impact assessment found this the single largest mechanical spinner after the review's changes: five of the six units since 2026-09-10 that failed three times with an identical signature failed on this guard, across two repositories. Attempt 1 did verified work; attempts 2 and 3 changed nothing; the operator edited `produces:` by hand; the re-arm passed on the identical tree. Two defects compound it: the produces site is the one guard that never records into `refusal_history`, so the deterministic-refusal short-circuit cannot end it after two; and the repair note names `produces_unchanged:` without showing its shape (used in zero of nine repair attempts).
 
@@ -317,8 +317,8 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 - [ ] Count `produces_amended` entries on passed events and, for each, whether
       the terminal close or judge cited the dropped path in a finding.
 
-<a id="feat-2026-0111"></a>
-## FEAT-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
+<a id="feat-loop-2026-0111"></a>
+## FEAT-LOOP-2026-0111 — Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path
 
 **Why.** `.specfuse/LEARNINGS.md` is append-only by contract: `assert_learnings_appended_or_noop` makes at least one added line the success signal of every close, with "nothing generalizes" as the only way out. That is an unbounded growth rule attached to a file no dispatched work unit reads. This repo carries 232 entries; a consumer measured its own at 219 entries / 5,497 lines / ~167k tokens after four months, with **91 of 219 never cited** by any later feature's PLAN, WU, GATE or RETROSPECTIVE. The planning surfaces that do load it (`/draft-feature`, `/pick-feature`) slice it; every implementation dispatch ignores it entirely.
 
@@ -328,12 +328,12 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Shape — not yet drafted.** #3272 carries six concrete suggestions and a consumer's shipped implementation (a 47-line `rules-local/learnings-distilled.md` in the binding block, `[reach N · $C · sources]` per line). Drafting should start from that issue, not from this row.
 
-**Provenance and one correction.** Split out of FEAT-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
+**Provenance and one correction.** Split out of FEAT-LOOP-2026-0106 at drafting on 2026-09-13: that row paired this with the ceremony half, the two halves move different metrics, and the ceremony half shipped alone. #3272's claim that `learnings_query.py` no longer ships is **stale** — both skills call the module form `python3 -m specfuse.loop.learnings_query`, which ships with the driver; the rest of the issue's measurements stand.
 
 **Status: done.**
 
-<a id="feat-2026-0106"></a>
-## FEAT-2026-0106 — Progress lines and a bounded LEARNINGS: retrospectives become optional
+<a id="feat-loop-2026-0106"></a>
+## FEAT-LOOP-2026-0106 — Progress lines and a bounded LEARNINGS: retrospectives become optional
 
 **Why.** 713 close, close-intermediate, plan-next, and legacy ceremony units cost 39% of all spend and 28% of agent hours. `LEARNINGS.md` holds 220-361 entries per repo, is loaded whole into planning, and is read by no implementation dispatch. External loops keep per-iteration notes to a few lines and prune.
 
@@ -343,10 +343,10 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Status: done.**
 
-<a id="feat-2026-0104"></a>
-## FEAT-2026-0104 — Re-plan after two failures instead of a third identical attempt
+<a id="feat-loop-2026-0104"></a>
+## FEAT-LOOP-2026-0104 — Re-plan after two failures instead of a third identical attempt
 
-**Why.** Retrying the same 100-line unit three times with the same context is the pattern the field warns against; FEAT-2026-0082/T04 took six dispatches and two carve-outs, and iac FEAT-2026-0039 spent $2.82 re-deriving a precondition its plan had already predicted. Spinning is a unit-shape problem, not a retry-count problem.
+**Why.** Retrying the same 100-line unit three times with the same context is the pattern the field warns against; FEAT-LOOP-2026-0082/T04 took six dispatches and two carve-outs, and iac FEAT-LOOP-2026-0039 spent $2.82 re-deriving a precondition its plan had already predicted. Spinning is a unit-shape problem, not a retry-count problem.
 
 **Goal.** After two failed attempts on a unit, the driver dispatches a planning turn that splits or re-scopes the unit (and may add a hygiene unit) rather than re-running the same prompt. After any `blocked_human`, the escalation brief offers a re-plan of the remaining gate as the default option.
 
@@ -356,8 +356,8 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Status: done.**
 
-<a id="feat-2026-0103"></a>
-## FEAT-2026-0103 — Keep the diff on guard failures: repair, do not restart
+<a id="feat-loop-2026-0103"></a>
+## FEAT-LOOP-2026-0103 — Keep the diff on guard failures: repair, do not restart
 
 **Why.** 323 attempts across the corpus, roughly $830 and 42 hours, failed on driver bookkeeping guards (`files_changed_mismatch`, `deliverable_missing`, `produces_not_in_diff`, `no_deliverable_files`) rather than on correctness, and every one was hard-reset and re-dispatched from scratch with only a truncated failure note. The agent never sees its own rejected diff.
 
@@ -367,46 +367,46 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Status: done.**
 
-<a id="feat-2026-0110"></a>
-## FEAT-2026-0110 — Language-aware narrow test selection
+<a id="feat-loop-2026-0110"></a>
+## FEAT-LOOP-2026-0110 — Language-aware narrow test selection
 
-**Why.** FEAT-2026-0109 gate 2 narrows the per-attempt `tests` gate to a unit's own test modules, but both halves of the selection are Python-and-`tests/`-shaped: only `produces:` entries starting with `tests/` are kept, and they are converted to dotted unittest module names. A Maven or Gradle project keeps tests under `src/test/java/`, a JS project under `__tests__/` — so the selection is always empty, the fail-safe fallback runs the full suite, and the tiering delivers nothing there. Measured in one Maven consumer: 8 to 11 minutes of driver-side verification per attempt, a third to a half of each attempt, across roughly 47 full-suite runs per feature (#3281).
+**Why.** FEAT-LOOP-2026-0109 gate 2 narrows the per-attempt `tests` gate to a unit's own test modules, but both halves of the selection are Python-and-`tests/`-shaped: only `produces:` entries starting with `tests/` are kept, and they are converted to dotted unittest module names. A Maven or Gradle project keeps tests under `src/test/java/`, a JS project under `__tests__/` — so the selection is always empty, the fail-safe fallback runs the full suite, and the tiering delivers nothing there. Measured in one Maven consumer: 8 to 11 minutes of driver-side verification per attempt, a third to a half of each attempt, across roughly 47 full-suite runs per feature (#3281).
 
 **Goal.** A project whose tests are not Python under `tests/` can narrow its per-attempt `tests` gate, instead of silently paying the full suite on every attempt.
 
 **Shape.** Four optional keys in a `code` gate's `narrow_selection` block, whose defaults reproduce today's behaviour byte-for-byte: `test_roots` (default `["tests/"]`), `format` (`python_module` | `path` | `class_name`), `item_template` (default `"{module}"`), and `separator` (default `" "`). The render is split in two because a separator alone covers Maven's `-Dtest=A,B` but cannot express Gradle's repeated `--tests A --tests B`. An empty or unresolvable selection still falls back to the gate's full `command` — fail safe, never open — and an unknown `format` is a `CONFIGURATION ERROR` naming the gate rather than a silent fallback.
 
-**Benefits.** The tiering FEAT-2026-0109 measured on this repo becomes available to consumers on other stacks, where the per-attempt cost is highest.
+**Benefits.** The tiering FEAT-LOOP-2026-0109 measured on this repo becomes available to consumers on other stacks, where the per-attempt cost is highest.
 
-**Scope boundary.** The changed-file half (`select_tests_for_changed_files`) stays disabled and `tests/`-shaped — nothing writes its map yet, so code keyed on the new roots there could not be exercised end to end; the contract for whoever enables it is recorded in the feature's PLAN.md. This repo's own `.specfuse/verification.yml` is not edited, which is what keeps every work unit's exit oracle intact (`[FEAT-2026-0019/G1]`). No consumer repository is edited, and the consumer wall-clock figure is not re-measured in-loop.
+**Scope boundary.** The changed-file half (`select_tests_for_changed_files`) stays disabled and `tests/`-shaped — nothing writes its map yet, so code keyed on the new roots there could not be exercised end to end; the contract for whoever enables it is recorded in the feature's PLAN.md. This repo's own `.specfuse/verification.yml` is not edited, which is what keeps every work unit's exit oracle intact (`[FEAT-LOOP-2026-0019/G1]`). No consumer repository is edited, and the consumer wall-clock figure is not re-measured in-loop.
 
 **Status: done.**
 
-<a id="feat-2026-0109"></a>
-## FEAT-2026-0109 — Tiered verification and a cached baseline probe
+<a id="feat-loop-2026-0109"></a>
+## FEAT-LOOP-2026-0109 — Tiered verification and a cached baseline probe
 
-**Why.** Split out of FEAT-2026-0102 when that feature was rescoped to the `needs:` gate-dependency mechanism alone. The remainder of the original framing still holds: every attempt re-runs the full gate suite on top of the agent's own work; every driver restart re-probes the baseline because the probe is keyed on the HEAD sha that every bookkeeping commit moves; and a unit that edits the driver halts the run for a restart. FEAT-2026-0102 removes the duplicated suite execution inside a pass, but not the per-attempt cost of running the whole set, and not the re-probe.
+**Why.** Split out of FEAT-LOOP-2026-0102 when that feature was rescoped to the `needs:` gate-dependency mechanism alone. The remainder of the original framing still holds: every attempt re-runs the full gate suite on top of the agent's own work; every driver restart re-probes the baseline because the probe is keyed on the HEAD sha that every bookkeeping commit moves; and a unit that edits the driver halts the run for a restart. FEAT-LOOP-2026-0102 removes the duplicated suite execution inside a pass, but not the per-attempt cost of running the whole set, and not the re-probe.
 
 **Goal.** Per attempt: the unit's declared tests, tests touching changed files, lint, and the feature oracle. Once per gate before the close: the full suite with coverage, bats, leak-scan, security. The gate-entry baseline probe becomes **lazy** (below). The driver runs from an installed copy so a unit editing `specfuse/loop/` does not halt the run.
 
-**The baseline probe becomes lazy, and that is the primary mechanism.** The probe's real job is **attribution** — telling "this WU broke it" from "it was already broken", which is why a red probe escalates `preexisting_gate_failure` instead of blaming a unit. That answer is not needed until something fails. So: skip the probe at gate entry, and when a WU's verification fails, run `probe_baseline` against the post-reset tree *then*, to attribute the failure before the attempt is counted. A green run never pays; a broken tree pays once, when the answer matters. Measured on the FEAT-2026-0101 run: five probes, roughly 15 minutes of wall clock, every one returning `failing: []` — the premium was paid on every gate entry and every restart against an event that did not occur once. Half of this already ships (`--no-baseline-probe`, and the `baseline_probe` key in `verification.yml`); the missing half is the retroactive attribution on failure.
+**The baseline probe becomes lazy, and that is the primary mechanism.** The probe's real job is **attribution** — telling "this WU broke it" from "it was already broken", which is why a red probe escalates `preexisting_gate_failure` instead of blaming a unit. That answer is not needed until something fails. So: skip the probe at gate entry, and when a WU's verification fails, run `probe_baseline` against the post-reset tree *then*, to attribute the failure before the attempt is counted. A green run never pays; a broken tree pays once, when the answer matters. Measured on the FEAT-LOOP-2026-0101 run: five probes, roughly 15 minutes of wall clock, every one returning `failing: []` — the premium was paid on every gate entry and every restart against an event that did not occur once. Half of this already ships (`--no-baseline-probe`, and the `baseline_probe` key in `verification.yml`); the missing half is the retroactive attribution on failure.
 
 **Tree-hash caching supports it rather than leading.** When the probe *does* run, key its record on the tree hash rather than the HEAD sha, because a bookkeeping commit moves the sha while leaving the code tree identical. This is what makes a resume at an unchanged tree free; it is no longer the headline, since a lazy probe mostly does not run at all.
 
-**A green CI result for a SHA is an optional fast path, not a replacement.** CI runs `scripts/smoke-test.sh`, which derives its gate list from `verification.yml` (#592), so a CI verdict really does cover the same gate set, and `gh` is already a driver dependency. It is worth using at feature start, where HEAD is usually a pushed, CI-validated merge commit. It cannot be the general answer, for two measured reasons. **Coverage:** every probe SHA on the FEAT-2026-0101 run was local-only — `ba8fab4`, `ba29587`, `f7e20c4`, `320456c`, 0 of 4 known to CI — because the probe runs at HEAD and HEAD after `--prepare`, a bookkeeping commit or a squash is never pushed; the restart case, which is the expensive one, has no CI result by construction. **Environment:** CI is Linux plus a Windows job while the driver here runs macOS, and the probe must predict whether *this* machine's gate run will be green, since that run is the WU's exit oracle. If it is adopted, the gate's `baseline:` block must record provenance (`source: ci:<run_id>` versus `source: local`), which it does not today — without it, a later escalation cannot distinguish "we measured this tree" from "we trusted a Linux run".
+**A green CI result for a SHA is an optional fast path, not a replacement.** CI runs `scripts/smoke-test.sh`, which derives its gate list from `verification.yml` (#592), so a CI verdict really does cover the same gate set, and `gh` is already a driver dependency. It is worth using at feature start, where HEAD is usually a pushed, CI-validated merge commit. It cannot be the general answer, for two measured reasons. **Coverage:** every probe SHA on the FEAT-LOOP-2026-0101 run was local-only — `ba8fab4`, `ba29587`, `f7e20c4`, `320456c`, 0 of 4 known to CI — because the probe runs at HEAD and HEAD after `--prepare`, a bookkeeping commit or a squash is never pushed; the restart case, which is the expensive one, has no CI result by construction. **Environment:** CI is Linux plus a Windows job while the driver here runs macOS, and the probe must predict whether *this* machine's gate run will be green, since that run is the WU's exit oracle. If it is adopted, the gate's `baseline:` block must record provenance (`source: ci:<run_id>` versus `source: local`), which it does not today — without it, a later escalation cannot distinguish "we measured this tree" from "we trusted a Linux run".
 
-**Benefits.** Attempt duration drops further on top of FEAT-2026-0102's saving; a green run stops paying ~3 minutes at every gate entry and every restart; self-hosting features stop paying a restart per unit.
+**Benefits.** Attempt duration drops further on top of FEAT-LOOP-2026-0102's saving; a green run stops paying ~3 minutes at every gate entry and every restart; self-hosting features stop paying a restart per unit.
 
 **Cost, stated plainly.** When the tree really is pre-broken, one agent dispatch is burned discovering it — roughly $1–4 and 15–25 minutes — and that agent may thrash on a failure it did not cause before failing. Bounded to one dispatch per gate if the retroactive probe fires on the first failure, and the driver's hard reset discards the thrash.
 
-**Depends on.** FEAT-2026-0101 (merged) supplies the feature oracle the per-attempt tier lists among its cheap gates. FEAT-2026-0102 (merged) removed the duplicated suite execution, so the per-gate tier is not re-deriving work `needs:` already deduplicates. Both prerequisites are satisfied. The installed-copy driver remains a packaging migration in its own right; [FEAT-2026-0019/G1] applies to it directly and argues for landing it atomically rather than as one unit among several — which is why it gets gate 3 to itself.
+**Depends on.** FEAT-LOOP-2026-0101 (merged) supplies the feature oracle the per-attempt tier lists among its cheap gates. FEAT-LOOP-2026-0102 (merged) removed the duplicated suite execution, so the per-gate tier is not re-deriving work `needs:` already deduplicates. Both prerequisites are satisfied. The installed-copy driver remains a packaging migration in its own right; [FEAT-LOOP-2026-0019/G1] applies to it directly and argues for landing it atomically rather than as one unit among several — which is why it gets gate 3 to itself.
 
 **Status: done.**
 
-<a id="feat-2026-0101"></a>
-## FEAT-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
+<a id="feat-loop-2026-0101"></a>
+## FEAT-LOOP-2026-0101 — Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check
 
-**Why.** Per-unit gates verify units; nothing forces the feature to work end to end. FEAT-2026-0050 shipped seven green units connected to nothing and needed FEAT-2026-0082 to wire them; nine hedged features across the corpus were green on fixtures and never given a real ride. Anthropic's harness, tracer bullets, and spec-kit all make the user-visible behaviour the thing that flips green.
+**Why.** Per-unit gates verify units; nothing forces the feature to work end to end. FEAT-LOOP-2026-0050 shipped seven green units connected to nothing and needed FEAT-LOOP-2026-0082 to wire them; nine hedged features across the corpus were green on fixtures and never given a real ride. Anthropic's harness, tracer bullets, and spec-kit all make the user-visible behaviour the thing that flips green.
 
 **Goal.** Every gate declares one `feature_oracle` command in its `GATE-NN.md` — the executable proof of that gate's definition of done, exercising the user-visible outcome end to end. It lives with the gate, not in `verification.yml`: a quality gate must be green at all times, while an oracle is required to start red and go green at the tracer bullet, and the DoD it proves is per-gate. Gate 1's oracle is authored at feature planning and its first implementation unit is the tracer bullet that makes it runnable (stubs allowed only there); every later gate's oracle is drafted by the prior gate's `plan-next`, which already anchors each gate to `roadmap_goal` — the feature-scoped intent stays prose in `PLAN.md`, the per-gate proof is executable. Every later unit's verification and the close re-run it; the gate's definition of done is the oracle, never a list of units. `/draft-feature` refuses to draft a gate without one.
 
@@ -414,23 +414,23 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Status: done.**
 
-<a id="feat-2026-0102"></a>
-## FEAT-2026-0102 — Gate dependencies: a gate declares `needs:` so shared work runs once per pass
+<a id="feat-loop-2026-0102"></a>
+## FEAT-LOOP-2026-0102 — Gate dependencies: a gate declares `needs:` so shared work runs once per pass
 
-**Why.** A gate set is a list of independent shell commands, and the loop gives an author no way to say "this gate's work is already done by that one." Where the `coverage` gate is "run the suite, then report coverage", the suite runs twice per pass. Measured here at gate entry: 118s across the `code` set, 93% of it duplicated test execution ([FEAT-2026-0051/G1-CLOSE]). Measured on `specfuse-generator` (4303 Java tests): 5:10 of an ~11-minute pass, paid again on every retry. This is not a misconfiguration — it falls out of the gate-set contract and the sound authoring rule that gate commands be self-contained, so every project with a test-derived coverage gate has it. Filed as specfuse/specfuse#162, downstream instance clabonte/generator#1713.
+**Why.** A gate set is a list of independent shell commands, and the loop gives an author no way to say "this gate's work is already done by that one." Where the `coverage` gate is "run the suite, then report coverage", the suite runs twice per pass. Measured here at gate entry: 118s across the `code` set, 93% of it duplicated test execution ([FEAT-LOOP-2026-0051/G1-CLOSE]). Measured on `specfuse-generator` (4303 Java tests): 5:10 of an ~11-minute pass, paid again on every retry. This is not a misconfiguration — it falls out of the gate-set contract and the sound authoring rule that gate commands be self-contained, so every project with a test-derived coverage gate has it. Filed as specfuse/specfuse#162, downstream instance clabonte/generator#1713.
 
 **Goal.** A gate may declare `needs: [<gate>]`. The runner orders the set topologically, skips a gate whose dependency failed (never passes it), and treats an unresolvable target or a cycle as a configuration error. A declaring gate may reuse its dependency's artifacts because the runner guarantees the dependency ran, clean, in the same invocation — moving the staleness discipline from a per-command convention to a runner invariant. `gate_commands.py` emits the same order so CI and the driver cannot disagree. `failure_class` and `failure_signature` stay distinguishable per gate, which is what spinning detection and `learnings-suggest` key on.
 
 **Benefits.** Removes the duplicate suite execution from every gate pass and every baseline probe, in this repo and in every target project with the same gate shape, without merging two gates into one failure class or dropping the stale-artifact guarantee.
 
-**Scope boundary.** Deliberately NOT in scope: tiered per-attempt vs per-gate gate sets, caching the baseline probe by tree hash, and running the driver from an installed copy — all FEAT-2026-0109. Also out: parallel gate execution (foreclosed by artifact reuse) and per-tool output parsing (`emits: [tests, coverage]`), which would make the driver toolchain-aware.
+**Scope boundary.** Deliberately NOT in scope: tiered per-attempt vs per-gate gate sets, caching the baseline probe by tree hash, and running the driver from an installed copy — all FEAT-LOOP-2026-0109. Also out: parallel gate execution (foreclosed by artifact reuse) and per-tool output parsing (`emits: [tests, coverage]`), which would make the driver toolchain-aware.
 
 **Status: done.**
 
-<a id="feat-2026-0100"></a>
-## FEAT-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
+<a id="feat-loop-2026-0100"></a>
+## FEAT-LOOP-2026-0100 — Separate judge session: a fresh evaluator decides the close verdict
 
-**Why.** The close unit is the same kind of session that did the work, and it writes the retrospective, the cost analysis, and the verdict in one sitting. Every surveyed external loop moves the verdict to a fresh evaluator or a deterministic check, because a model grading its own work skews positive. FEAT-2026-0085 made the verdict binary; nothing yet makes the grader independent.
+**Why.** The close unit is the same kind of session that did the work, and it writes the retrospective, the cost analysis, and the verdict in one sitting. Every surveyed external loop moves the verdict to a fresh evaluator or a deterministic check, because a model grading its own work skews positive. FEAT-LOOP-2026-0085 made the verdict binary; nothing yet makes the grader independent.
 
 **Goal.** A short, fresh session receives only the diff, the acceptance criteria, the gate output, and the feature oracle's output, and returns `met` or `not_met` with one line per failed criterion. The close unit writes the retrospective after that verdict exists and cannot change it. Auto-arm of later gates becomes the default once this judge stands between the work and the flip.
 
@@ -438,8 +438,8 @@ observation rather than an acceptance criterion (`close-discipline.md` §2).
 
 **Status: done.**
 
-<a id="feat-2026-0108"></a>
-## FEAT-2026-0108 — Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting
+<a id="feat-loop-2026-0108"></a>
+## FEAT-LOOP-2026-0108 — Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting
 
 **Why.** The 2026-09-02 unattended `specfuse agent` run over the generator
 repository attempted 78 items, merged 2, and escalated 72. Most escalations
@@ -462,16 +462,16 @@ foreground gates in headless `/fix-bug` and a policy-sized invocation
 timeout. T04 `ci_pending` reason and label. T05 the PR number carried from
 `/fix-bug`'s RESULT block. T06 escalations that read run state.
 
-**Scope boundary.** Out: parallel items (FEAT-2026-0105 owns fan-out), the
+**Scope boundary.** Out: parallel items (FEAT-LOOP-2026-0105 owns fan-out), the
 WU driver's own loop, guardrail semantics beyond naming the pending state,
 #3222 and #3223.
 
 **Status: done.**
 
-<a id="feat-2026-0085"></a>
-## FEAT-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
+<a id="feat-loop-2026-0085"></a>
+## FEAT-LOOP-2026-0085 — Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units
 
-**Sequencing.** After FEAT-2026-0084 (merged 2026-09-02), which reshaped
+**Sequencing.** After FEAT-LOOP-2026-0084 (merged 2026-09-02), which reshaped
 `WU.template.md` and the draft-feature skill that T05 edits and raised the
 single-gate threshold this five-unit feature relies on.
 
@@ -500,10 +500,10 @@ oracle, rewriting existing hedged closes, removing `--recheck-verdict`, and
 the `narrow` / `broad` per-criterion oracle kinds.
 
 **Status: done.** Second of the methodology-review features, sequenced
-after FEAT-2026-0084 (merged 2026-09-02); the judge and the feature oracle follow.
+after FEAT-LOOP-2026-0084 (merged 2026-09-02); the judge and the feature oracle follow.
 
-<a id="feat-2026-0084"></a>
-## FEAT-2026-0084 — Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8
+<a id="feat-loop-2026-0084"></a>
+## FEAT-LOOP-2026-0084 — Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8
 
 **Why.** A 2026-09-01 review of 273 features across 12 repositories found 48%
 of verdict-bearing features end hedged, that the share rose as ceremony
@@ -532,8 +532,8 @@ retrospective, auto-arm by default, and converting existing feature folders.
 **Status: done.** First of the methodology-review features; the verdict
 change follows it.
 
-<a id="feat-2026-0058"></a>
-## FEAT-2026-0058 — Feature decision registry + override lint
+<a id="feat-loop-2026-0058"></a>
+## FEAT-LOOP-2026-0058 — Feature decision registry + override lint
 
 **Why.** FEAT-2026-0066 hit three drift defects from decisions transcribed as prose between PLAN, GATE, and WU files: a four-row operator contract table transcribed as three rows (the dropped 404 row shipped as a defect and cost a gate), a false premise propagated into three files (T11 had to repair all three), and an ADR silently overriding a ratified operator decision — surfaced two gates later as a close blocker. The WU itself noted "there is no override registry in `.specfuse/` today". Vigilant prose is the only current defense against all three shapes.
 
@@ -543,8 +543,8 @@ change follows it.
 
 **Status: done.**
 
-<a id="feat-2026-0050"></a>
-## FEAT-2026-0050 — Async feature-drafting interview via question issues
+<a id="feat-loop-2026-0050"></a>
+## FEAT-LOOP-2026-0050 — Async feature-drafting interview via question issues
 
 **Why.** In agent v1, an undrafted queue-top feature escalates and waits for an interactive /draft-feature session — correct sequencing (planning is where human judgment adds most), but it becomes the throughput bottleneck once the agent outpaces operator session availability. The interview itself can move async without surrendering drafting quality.
 
@@ -554,25 +554,25 @@ change follows it.
 
 **Status: done.**
 
-<a id="feat-2026-0079"></a>
-## FEAT-2026-0079 — One owner for the roadmap-archive algorithm (skill/driver de-duplication)
+<a id="feat-loop-2026-0079"></a>
+## FEAT-LOOP-2026-0079 — One owner for the roadmap-archive algorithm (skill/driver de-duplication)
 
-**Why.** `auto_archive_feature` and the `/roadmap-archive` skill are two implementations of one algorithm — the driver's docstring says so outright ("Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver"). #1169 fixed the driver to reconcile a moved section's cross-references and its `**Status:**` marker; the skill was deliberately left alone to keep that PR inside bug scope, so the two now describe different behaviour for the same operation. The skill is the path a human takes, so an operator following its prose reproduces the pre-fix defect — on rows an unrelated feature owns, which is the part of #1169 that landed the failure on the wrong person. `[FEAT-2026-0010/G1]` records this exact pattern and closes by requiring the contract be stated explicitly; it also notes the two copies agreed only because the operation had no side effects on unrelated rows. Archiving now rewrites inbound links, so that condition no longer holds. Promoted from #1183 after the bug lane refused it three times: the resolution is a design choice spanning two vendored copies, not a bug-sized fix.
+**Why.** `auto_archive_feature` and the `/roadmap-archive` skill are two implementations of one algorithm — the driver's docstring says so outright ("Re-implement roadmap-archive single-feature algorithm (Steps 1–6) in-driver"). #1169 fixed the driver to reconcile a moved section's cross-references and its `**Status:**` marker; the skill was deliberately left alone to keep that PR inside bug scope, so the two now describe different behaviour for the same operation. The skill is the path a human takes, so an operator following its prose reproduces the pre-fix defect — on rows an unrelated feature owns, which is the part of #1169 that landed the failure on the wrong person. `[FEAT-LOOP-2026-0010/G1]` records this exact pattern and closes by requiring the contract be stated explicitly; it also notes the two copies agreed only because the operation had no side effects on unrelated rows. Archiving now rewrites inbound links, so that condition no longer holds. Promoted from #1183 after the bug lane refused it three times: the resolution is a design choice spanning two vendored copies, not a bug-sized fix.
 
 **Goal.** Pick one owner deliberately and implement it across both the canonical plugin skill and its vendored `.specfuse/skills/` copy. Two candidates to weigh with evidence rather than by preference: restate the reconciliation rules in the skill's own prose — a third copy of the algorithm, but `/roadmap-archive` keeps working on a tree with no driver installed — or have the skill invoke the driver's function and stop describing the mechanics, which removes the drift surface entirely at the cost of that independence. #1183 is explicit that either resolution is acceptable and that choosing one deliberately is the point.
 
-**Benefits.** One operation behaves one way regardless of which path an operator takes, so archiving by hand stops being able to reintroduce a defect the driver no longer has. Removes a drift surface rather than re-syncing it. And it settles a question that recurs whenever a skill and the driver implement the same thing — flagged once by `[FEAT-2026-0010/G1]` and never decided.
+**Benefits.** One operation behaves one way regardless of which path an operator takes, so archiving by hand stops being able to reintroduce a defect the driver no longer has. Removes a drift surface rather than re-syncing it. And it settles a question that recurs whenever a skill and the driver implement the same thing — flagged once by `[FEAT-LOOP-2026-0010/G1]` and never decided.
 
 **Status: done.**
 
-<a id="feat-2026-0080"></a>
-## FEAT-2026-0080 — Operator-answered escalations: guidance that survives into the next agent run
+<a id="feat-loop-2026-0080"></a>
+## FEAT-LOOP-2026-0080 — Operator-answered escalations: guidance that survives into the next agent run
 
 **Why.** `AnsweredEscalationProvider` parses the operator's chosen option off an escalation issue and posts an acknowledgment, but by its own docstring it "does not carry out the chosen option" and leaves `NEEDS_HUMAN_LABEL` in place "until whichever future provider executes the option removes it". That future provider does not exist: the only `--remove-label` calls in the tree are `state:ready` / `state:in-progress` in `gh_backend.py`, neither of which touches the human-owned labels. Meanwhile `BugsProvider.advertise` skips every issue carrying `needs-human` or `blocked-wu` (`_HUMAN_OWNED_LABELS`), so an answered escalation is acknowledged and then stays parked forever. Observed 2026-08-12: eight open `needs-human` issues, every one also `blocked-wu` — answering any of them changes nothing until a human edits its labels by hand. Worse, simply releasing the label would make the lane retry an *unchanged* problem and collect the same refusal, which is how several of those issues accumulated in the first place.
 
 **Goal.** One human-invoked skill, `/answer-escalation`, that reads a parked escalation, explains in plain English what stopped the agent, and offers four dispositions: hand off to the skill that owns the escalation's category, answer with guidance recorded as a marked issue comment, close as won't-fix, or skip. Every disposition except `skip` releases the `needs-human` / `blocked-wu` labels so the lane can act again; `skip` writes nothing at all. The skill triggers no fix and no retry — its product is guidance plus the unpark. Paired with it, `/fix-bug` is corrected to read the issue comments its Step 1 already claims to read, so that guidance reaches the retry rather than being written into a void. Agent-side autonomous execution of an answer is explicitly excluded, not deferred.
 
-**Benefits.** An operator check-in becomes "work the queue one issue at a time and leave a real answer" instead of hand-editing labels, and the next agent run starts better-informed rather than merely unblocked — the difference between repeating a refusal and resolving it. Formalizes a promotion path the operator already walks by hand: FEAT-2026-0079 was itself promoted from #1183 after the bug lane refused it three times. Also removes a permanent side effect nobody chose — because the label is never released today, `notify_sla` re-pings answered escalations forever.
+**Benefits.** An operator check-in becomes "work the queue one issue at a time and leave a real answer" instead of hand-editing labels, and the next agent run starts better-informed rather than merely unblocked — the difference between repeating a refusal and resolving it. Formalizes a promotion path the operator already walks by hand: FEAT-LOOP-2026-0079 was itself promoted from #1183 after the bug lane refused it three times. Also removes a permanent side effect nobody chose — because the label is never released today, `notify_sla` re-pings answered escalations forever.
 
 **What shipped (gate 1, terminal).** `/answer-escalation` exists in both the canonical and vendored skill trees, byte-identical, human-invoked only and refusing to run headless. It names all four dispositions, carries a routing entry for every value in `escalation.CATEGORY_LABELS`, documents the `<!-- specfuse:operator-guidance id=<correlation_id> -->` marker, fixes the write order at guidance-comment-first / label-release-second, makes `skip` inert, and states that it triggers no fix and no retry. `/fix-bug` Step 1 now names `gh issue view <issue-number> --comments`, so the guidance reaches the retry instead of being written into a void. **Agent-side autonomous execution of an answer was excluded, not deferred** — PLAN.md's D1 records this as a decision, not a remaining slice, and `AnsweredEscalationProvider` is untouched; a later reader should not log it as unfinished work from this feature.
 
@@ -580,8 +580,8 @@ change follows it.
 
 **Status: done.**
 
-<a id="feat-2026-0049"></a>
-## FEAT-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
+<a id="feat-loop-2026-0049"></a>
+## FEAT-LOOP-2026-0049 — specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch
 
 **Why.** The capstone: a script that drives the whole lifecycle of a specfuse-configured repo — monitoring findings, issue triage, bug fixing, prioritized feature advancement — as a thin conductor over the existing loop driver and skills (none of which it modifies), escalating whatever it cannot handle. The operator controls when and how long it runs, and therefore what it costs.
 
@@ -591,25 +591,25 @@ change follows it.
 
 **Shape.** Three gates. Gate 1 builds the conductor's stopping properties — its own `.specfuse/.agent.lock` (separate from the driver's, which `loop.run()` takes itself), item-boundary caps, PAUSE marker, one repo-state snapshot carrying the first real reader of `queue:` — and drains an empty provider registry. Gate 2 adds the four cheap action classes over already-shipped composition (`run_bug_lane`, `apply_triage`, `diagnose_cli`, `run_autofix`). Gate 3 adds feature advancement, invoking the driver as a subprocess and switching away on an `awaiting_review` halt. New code lives in a new `specfuse/agent/` package, deliberately outside `driver_edit`'s `specfuse/loop/` halt prefix.
 
-**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-2026-0050](#feat-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
+**Scope boundary.** Drafting stays human in v1 (a drafting-needed queue top escalates; async drafting is [FEAT-LOOP-2026-0050](#feat-loop-2026-0050)). No cron or event triggering. No agent database. No modification to any surface the agent drives, except a filename parameter on `_filelock.acquire_tree_lock`. Stale-lock detection and PID files are deliberately **not** built — the kernel's auto-release on process death makes them unnecessary, as `_filelock`'s docstring states.
 
-**Status: done.** Unblocked 2026-08-10: all four blockers (FEAT-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
+**Status: done.** Unblocked 2026-08-10: all four blockers (FEAT-LOOP-2026-0044, 0046, 0047, 0048) are `done` and merged. Drafted 2026-08-10 via `/draft-feature`; gate 1 is armed and dispatchable.
 
-<a id="feat-2026-0076"></a>
-## FEAT-2026-0076 — Policy-interview skill: derive-agent-policy
+<a id="feat-loop-2026-0076"></a>
+## FEAT-LOOP-2026-0076 — Policy-interview skill: derive-agent-policy
 
-**Why.** `.specfuse/agent-policy.yml` shipped with [FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) as the operator's declared policy — the file the agent reads *instead of guessing intent*. Every value in it is currently a default an agent chose: `wip_limit`, `gate_review`, the three budgets, `sla_hours`, and since [FEAT-2026-0047](roadmap-archive.md#feat-2026-0047) and issue #1418 also `provider`, `webhook_env`, `silence_hours`, and `test_paths`. `/groom-backlog` covers only the `queue:` key; `/triage-issues` merely reads one dial. Nothing has ever asked the operator for the rest, and the un-interviewed surface grows with each feature that adds a dial. Issue #1418 showed the cost of a wrong value: the bug lane's test-evidence guardrail failed closed and silently, reading as "the dial is on and nothing qualifies" rather than as a misconfiguration.
+**Why.** `.specfuse/agent-policy.yml` shipped with [FEAT-LOOP-2026-0044](roadmap-archive.md#feat-loop-2026-0044) as the operator's declared policy — the file the agent reads *instead of guessing intent*. Every value in it is currently a default an agent chose: `wip_limit`, `gate_review`, the three budgets, `sla_hours`, and since [FEAT-LOOP-2026-0047](roadmap-archive.md#feat-loop-2026-0047) and issue #1418 also `provider`, `webhook_env`, `silence_hours`, and `test_paths`. `/groom-backlog` covers only the `queue:` key; `/triage-issues` merely reads one dial. Nothing has ever asked the operator for the rest, and the un-interviewed surface grows with each feature that adds a dial. Issue #1418 showed the cost of a wrong value: the bug lane's test-evidence guardrail failed closed and silently, reading as "the dial is on and nothing qualifies" rather than as a misconfiguration.
 
 **Goal.** A `derive-agent-policy` skill, sibling to `derive-verification` and `derive-monitoring` and sharing their posture — evidence first, ask only what the repo cannot answer, draft and never auto-write, staged per-block accepts. It covers the blocks `/groom-backlog` does not: `rules`, `budgets`, `escalation`. Several values are derivable as *proposals* rather than questions — `max_tokens_per_run` and `max_items_per_day` have real history in `events.jsonl`, `max_open_prs` is readable from the repo, and `test_paths` is answered by the directory tree plus `verification.yml`'s gate commands. One constraint is load-bearing: the webhook prompt must collect an environment-variable **name** and never a pasted URL, or it hand-feeds the credential `validate_agent_policy` was built to refuse.
 
-**Benefits.** The file's premise becomes true — the agent stops guessing intent because the operator was actually asked. Closes the compounding gap that issues #1417, #1418 and the FEAT-2026-0047 acceptance all point at. And it completes the derive-* trio, so a project bootstrapping Specfuse has one interview per config surface, each with a single writer.
+**Benefits.** The file's premise becomes true — the agent stops guessing intent because the operator was actually asked. Closes the compounding gap that issues #1417, #1418 and the FEAT-LOOP-2026-0047 acceptance all point at. And it completes the derive-* trio, so a project bootstrapping Specfuse has one interview per config surface, each with a single writer.
 
 **Status: done.**
 
-<a id="feat-2026-0047"></a>
-## FEAT-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
+<a id="feat-loop-2026-0047"></a>
+## FEAT-LOOP-2026-0047 — Notify webhook (pluggable provider) + heartbeat-silence self-alert
 
-**Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
+**Why.** Escalations must push, not wait to be pulled — the vision explicitly requires the agent to reach out (Discord/Teams/Slack). Notify-only keeps it trivial: answers belong in the GH escalation issue (FEAT-LOOP-2026-0046), so no bot hosting, no reply parsing in chat, no provider lock-in. And a silent agent is itself a failure mode: a stalled or dead agent must announce itself.
 
 **Goal.** A webhook notifier in agent-policy.yml (`escalation.webhook`): on new/re-pinged needs-human issues, post a one-liner + link to the configured channel; provider = any incoming-webhook URL (Discord/Slack/Teams payload adapters, provider swap = URL change). SLA handling: unanswered escalation past the configured window re-pings once, then the item is parked and the queue continues. Heartbeat-silence self-alert: the agent records a last-run timestamp (repo-derivable); a scheduled check (or /attention on open) flags "agent has not run in M hours" — and where a schedule exists, fires the same webhook.
 
@@ -617,38 +617,38 @@ change follows it.
 
 **Status: done.**
 
-<a id="feat-2026-0048"></a>
-## FEAT-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
+<a id="feat-loop-2026-0048"></a>
+## FEAT-LOOP-2026-0048 — Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails
 
-**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
+**Why.** The agent's core autonomy promise: bugs handled end-to-end. Small test-first diffs are cheap to revert, so the risk asymmetry favors autonomy for bugs specifically — unlike features, where gate reviews stay human (per-feature `gate_review` dial, default human). This feature supersedes FEAT-LOOP-2026-0042's "human merge is the permanent floor" with "default floor + dial", recorded there.
 
-**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-2026-0045) or diagnosed monitoring finding (FEAT-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-2026-0046 contract instead of dying silently.
+**Goal.** Orchestrate the full bug lane headlessly: triaged bug issue (FEAT-LOOP-2026-0045) or diagnosed monitoring finding (FEAT-LOOP-2026-0041) → headless `/fix-bug` (1 bug = 1 branch = 1 PR, test-first; its large/complex refusal escalates to needs-human or feature promotion) → PR → on CI green, merge behind `bug_automerge: off|on` (default off). Even at `on`, merge requires ALL hardcoded guardrails: test-first evidence in the diff, full verification gates green in CI, diff under a configured size cap, zero touches to never-touch paths, the fix traced to a triaged issue or diagnosed finding, and a daily auto-merge cap. Any guardrail failure → PR waits for human with the reason labeled. Fix failures and refusals escalate via the FEAT-LOOP-2026-0046 contract instead of dying silently.
 
 **Benefits.** Autonomy where reversal is cheap: wake up to fixed-and-merged small bugs (dial on) or ready-to-merge green PRs (dial off), with the fence permanently in place either way — the dial opens the gate, never removes the guardrails.
 
 **Drafted 2026-08-09, ahead of its turn.** The feature folder exists and lints
 clean, drafted solo without an operator interview and **before
-[FEAT-2026-0044](roadmap-archive.md#feat-2026-0044) shipped the schema it builds on** — both on
+[FEAT-LOOP-2026-0044](roadmap-archive.md#feat-loop-2026-0044) shipped the schema it builds on** — both on
 operator instruction. Its `PLAN.md` records seven assumed decisions for veto at
 PR review, and its `T01` verifies the shipped schema against the assumed one and
 escalates on divergence rather than adapting silently. Dispatch only after 0044
 merges.
 
 **Status: done.** Unblocked 2026-08-10: both named blockers cleared —
-[FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) (machine-readable triage intake) and
-[FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) (escalation contract) are both `done`.
+[FEAT-LOOP-2026-0045](roadmap-archive.md#feat-loop-2026-0045) (machine-readable triage intake) and
+[FEAT-LOOP-2026-0046](roadmap-archive.md#feat-loop-2026-0046) (escalation contract) are both `done`.
 
-<a id="feat-2026-0044"></a>
-## FEAT-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
+<a id="feat-loop-2026-0044"></a>
+## FEAT-LOOP-2026-0044 — agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials)
 
-**Why.** The specfuse-agent (FEAT-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
+**Why.** The specfuse-agent (FEAT-LOOP-2026-0049) must know the operator's priorities ahead of time: priority is policy, not intelligence — the agent selects work *within* a declared policy and escalates ties, never guesses intent. That policy needs one auditable, versioned surface, plus a periodic ritual that keeps it fed as the backlog evolves.
 
 **Goal.** Ship (a) the `.specfuse/agent-policy.yml` schema + example: ordered `queue:` of FEAT-IDs (validated against the roadmap every agent run; drift escalates, never guessed around), class rules (`bugs: {preempt, min_severity, automerge}`, `features: {gate_review: human|auto per-feature override, wip_limit}`), budgets (`max_tokens_per_run`, `max_open_prs`, daily caps), and escalation config (webhook, `assignee`, quiet hours, SLA); (b) the `/groom-backlog` skill: reads roadmap planned set, open triaged issues, blocked chains, LEARNINGS, and the current queue; surfaces queue-hygiene findings (done entries to remove, blocked-upstream reorders, triaged feature-class issues not yet on the roadmap) and per-candidate trade-offs in the pick-feature style; proposes a new ordered queue and writes agent-policy.yml only on explicit accept. Empty queue = agent works bugs only and asks for priorities.
 
 **Benefits.** The operator's role shifts from per-decision operator to policy-setter: one file review changes agent behavior; a ten-minute periodic grooming session keeps the agent autonomous between check-ins. Every autonomy dial decided across the monitoring and agent initiatives gets its declared home.
 
 **Inherited handoff — one dial is already waiting for this file
-(`[FEAT-2026-0045/G1-CLOSE]`).** [FEAT-2026-0045](roadmap-archive.md#feat-2026-0045) shipped triage's `auto`
+(`[FEAT-LOOP-2026-0045/G1-CLOSE]`).** [FEAT-LOOP-2026-0045](roadmap-archive.md#feat-loop-2026-0045) shipped triage's `auto`
 dial as an explicit keyword argument, `apply_triage(runner, repo, decisions, *,
 auto=False)`, reading no configuration of any kind — deliberately, because
 `agent-policy.yml` is this feature's core deliverable and did not exist, and building a
@@ -660,7 +660,7 @@ fixed: under `auto=True` a decision whose confidence is not `high` is recorded a
 the value; do not redesign the semantics, and do not re-litigate where the dial lives. The
 `autofix` dial was already assessed as a precedent and rejected — it is per-*component* in
 `monitoring.yml`, and inbound issues are not components. See that feature's
-[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md).
+[RETROSPECTIVE](features/FEAT-LOOP-2026-0045-issue-triage/RETROSPECTIVE.md).
 
 **What shipped (gate 1, four work units).** `.specfuse/agent-policy.yml` and its
 example, with a structural validator
@@ -689,14 +689,14 @@ red on a correct tree the first time any queued feature completed.
 
 **Status: done.**
 
-<a id="feat-2026-0045"></a>
-## FEAT-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
+<a id="feat-loop-2026-0045"></a>
+## FEAT-LOOP-2026-0045 — issue-triage skill: categorize and route incoming GH issues (manual → auto dial)
 
 **Why.** Issues arrive from the monitoring harvester, the orchestrator, and third parties. Before anything can be fixed or planned, each needs categorizing (bug / feature request / question / duplicate / won't-fix) and routing (fix-bug, roadmap-add candidate, needs-human, close). Today that triage is implicit human work; the agent needs it as an explicit, dial-controlled step — and it is useful standalone long before the agent exists.
 
 **Goal.** A `/triage-issues` skill: scans untriaged issues (no triage label), proposes per-issue category + route with a one-paragraph rationale — bug → labeled and queued for fix-bug (severity assessed against the fix-bug small-scope contract; large/risky proposes feature promotion instead), feature → proposed roadmap-add draft, duplicate → linked and proposed close, question/unclear → needs-human. Interactive propose-and-confirm first; headless mode behind an `auto` dial applies only high-confidence categorizations and leaves the rest labeled for human triage. Fingerprint-aware: recognizes harvester-created issues (already structured) and skips re-categorizing them.
 
-**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
+**Benefits.** Every inbound issue lands in exactly one lane with an audit trail; the agent's bug pipeline (FEAT-LOOP-2026-0048) gets a clean, machine-readable intake; the human only sees the issues that genuinely need judgment.
 
 **Shape (drafted 2026-08-09).** Single gate, 3 substantive WUs + terminal close, $18.00
 planned. The seam is **module = mechanism, agent = judgment**: `specfuse/loop/triage.py`
@@ -706,11 +706,11 @@ at draft time — a triaged issue carries **both** an authoritative body marker
 (`<!-- specfuse:triage category=… confidence=… -->`) and a best-effort category label
 projected from it, marker-first and marker-wins; the `auto` dial is an **explicit
 argument** at the headless entry point rather than a config surface, because
-[FEAT-2026-0044](#feat-2026-0044) owns `agent-policy.yml` and does not exist yet; and
+[FEAT-LOOP-2026-0044](#feat-loop-2026-0044) owns `agent-policy.yml` and does not exist yet; and
 `duplicate` ships judgment-only with no detection mechanism.
 
 **Scope boundary — OUT.** Acting on a route (invoking `/fix-bug`, writing roadmap rows,
-closing duplicates — that is [FEAT-2026-0048](#feat-2026-0048) for bugs and the operator
+closing duplicates — that is [FEAT-LOOP-2026-0048](#feat-loop-2026-0048) for bugs and the operator
 otherwise); `.specfuse/agent-policy.yml` in any form; refactoring the five existing
 `gh issue list` call sites into a shared client; re-triaging an issue that already carries
 a marker.
@@ -721,7 +721,7 @@ following the skill's prose reproduces the module's routing on an unseen issue" 
 skill test binds prose to constants and proves drift-freedom, not correctness.
 
 **Delivered** (gate 1, terminal — see
-[RETROSPECTIVE](features/FEAT-2026-0045-issue-triage/RETROSPECTIVE.md)).
+[RETROSPECTIVE](features/FEAT-LOOP-2026-0045-issue-triage/RETROSPECTIVE.md)).
 `specfuse/loop/triage.py`: the closed `CATEGORIES` / `CONFIDENCES` tuples, the total
 category→route map behind `route_for`, the category→label projection behind `label_for`,
 the `render_marker` / `parse_marker` pair over
@@ -751,10 +751,10 @@ terminal flips through `--recheck-verdict`. D1 was discharged by a live triage r
 this repository's own issues before the acceptance; D2 (`inherent`) and D3 are carried
 forward in `RETROSPECTIVE.md`.
 
-<a id="feat-2026-0075"></a>
-## FEAT-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
+<a id="feat-loop-2026-0075"></a>
+## FEAT-LOOP-2026-0075 — Driver-editing work units cannot take effect in the process that dispatches them
 
-**Why.** Python caches modules in `sys.modules` at first import, so a work unit that edits the driver cannot change behaviour for any work unit the same driver process dispatches afterwards — including the close that judges it. This is not hypothetical and it is not cheap. FEAT-2026-0057 paid for it twice in one gate. Its T04 wired a pre-dispatch call site into `loop.py` at 13:58 UTC; the driver process had imported `loop.py` at 13:30, so the close dispatched one second later ran the pre-T04 function, received nothing, and could not make the observation that would have cleared its follow-up — a $5.33 close that closed `met_locally` for want of a restart. The second occurrence is one layer down: `execute_unit_attempt` imports `prerun_capture` at call time but calls it for **every** work unit, so the first dispatch of any process caches it. That round was deliberately split into two driver invocations to dodge the hazard, and the sequencing cost was paid for nothing because the fix it protected turned out to be defective for an unrelated reason. The methodology has no name for this and no guard against it; both times it was diagnosed after the money was spent. It is the self-hosting form of the harness-migration hazard `.specfuse/LEARNINGS.md` already warns about, and it will keep taxing every driver-editing feature until something detects or prevents it. Tracked as issue #757.
+**Why.** Python caches modules in `sys.modules` at first import, so a work unit that edits the driver cannot change behaviour for any work unit the same driver process dispatches afterwards — including the close that judges it. This is not hypothetical and it is not cheap. FEAT-LOOP-2026-0057 paid for it twice in one gate. Its T04 wired a pre-dispatch call site into `loop.py` at 13:58 UTC; the driver process had imported `loop.py` at 13:30, so the close dispatched one second later ran the pre-T04 function, received nothing, and could not make the observation that would have cleared its follow-up — a $5.33 close that closed `met_locally` for want of a restart. The second occurrence is one layer down: `execute_unit_attempt` imports `prerun_capture` at call time but calls it for **every** work unit, so the first dispatch of any process caches it. That round was deliberately split into two driver invocations to dodge the hazard, and the sequencing cost was paid for nothing because the fix it protected turned out to be defective for an unrelated reason. The methodology has no name for this and no guard against it; both times it was diagnosed after the money was spent. It is the self-hosting form of the harness-migration hazard `.specfuse/LEARNINGS.md` already warns about, and it will keep taxing every driver-editing feature until something detects or prevents it. Tracked as issue #757.
 
 **Goal.** Make the hazard visible or impossible rather than rediscovered. The design is genuinely open and should be settled in gate 1 rather than assumed here; at least three shapes are viable and they are not mutually exclusive. **Detect and warn** — at gate completion, if any work unit in the gate declared `produces:` naming a file under `specfuse/loop/`, print that later units in the same run executed against the pre-edit modules and that a fresh process is required before any close can verify the change; cheapest, and it converts a silent tax into a visible one. **Isolate the dispatch** — run each work-unit attempt in a subprocess so every attempt re-imports; strongest guarantee, largest blast radius, and it interacts with the driver's tree-reset and event-buffer bookkeeping in ways that need real design. **Refuse at arm time** — detect a driver-editing unit scheduled ahead of a close in the same gate and refuse to arm, forcing the two-invocation split the operator currently has to know to perform by hand. Whichever is chosen, the feature should also give the two-invocation pattern a sanctioned name: holding a close at `status: draft` does **not** work (the arm check rejects an entire gate containing any draft unit), and `blocked_human` is the only usable hold today, which reads as a failure in `/attention` and every other consumer.
 
@@ -762,8 +762,8 @@ forward in `RETROSPECTIVE.md`.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the operator accepted the hedge via `/accept-hedged-close` on 2026-08-08, carrying four follow-ups forward — the contract-change acknowledgment (discharged by the acceptance), gate 1's central claim (`externally-verifiable-later`), and two `routed-finding` entries left untracked at acceptance. **The benefit is built and tested but has never been observed:** `driver_staleness_detected` has fired zero times repo-wide, because gate 1's diagnostic never executed and gate 2's halt is not live in the process that shipped it. The re-run condition is the next driver-editing gate under a `T06`-carrying driver, which writes a durable event rather than a printed line. Cost **$45.55** against $32.00 planned; gate 2's budget was re-baselined $17.50 -> $31.00 by operator decision. Gate 1 shipped a diagnostic that never fired — occurrence four of the feature's own subject — and its first terminal close was itself occurrence five.
 
-<a id="feat-2026-0056"></a>
-## FEAT-2026-0056 — Per-criterion DoD state + incremental re-close
+<a id="feat-loop-2026-0056"></a>
+## FEAT-LOOP-2026-0056 — Per-criterion DoD state + incremental re-close
 
 **Why.** A close returning `not_met` triggers fix WUs and a re-dispatched close that re-verifies the entire DoD from scratch. FEAT-2026-0066 ran G2-CLOSE 3 times and G3-CLOSE across 5 attempts — $48.50 of close spend, each pass re-running the full 2200-test suite, full regen, and the real-SQL-Server scenario matrix, including criteria already proven green on prior attempts. Close attempts are the costliest attempt type portfolio-wide ($4.2 avg vs $3.5 implementation) and 4 of the 10 most expensive WUs are closes.
 
@@ -773,14 +773,14 @@ forward in `RETROSPECTIVE.md`.
 
 **Status: done.** Terminal close ran with verdict `met_locally`; the operator accepted the hedge via `/accept-hedged-close` on 2026-08-07, carrying three follow-ups forward — the contract-change acknowledgment (discharged by the acceptance itself), the `events.jsonl` assertion (discharged post-close at `04fbc80`, `T05#6` flipped to `pass`), and the red-before-green observation (`inherent`, never upgradeable). **The cost saving is built and wired end-to-end but remains unmeasured:** the terminal close was a first attempt, whose carry-forward set is empty by construction, so it skipped 0 of 44 criteria. The operator's accepted reason records that the next feature exercises the worklist on repeat closes, which is where the claim actually gets tested.
 
-<a id="feat-2026-0057"></a>
-## FEAT-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
+<a id="feat-loop-2026-0057"></a>
+## FEAT-LOOP-2026-0057 — Executable oracle contract for gates: scripted verification + environment prep
 
 **Why.** FEAT-2026-0066's closes hand-drove the same verification stack at least four times — consumer clone sync, regen, `dotnet build`, six real-SQL-Server scenarios, full generator suite — from prose instructions, at $8–12 per pass. A consumer clone that had drifted stale cost one entire close cycle: the environment-prep step (`git reset --hard origin/main` before a Hard Rule #2 proof) lived in agent memory and LEARNINGS prose, not in anything enforced. Deterministic work re-derived by a frontier model every attempt is the single biggest recurring close cost in generator-class repos.
 
 **Goal.** A work unit's environment prep and verification oracles run deterministically *before* its session starts, with the captured output as the agent's input — so a close interprets machine-produced evidence instead of re-deriving the same commands from prose every attempt. Two opt-in frontmatter keys, `prep:` (fail-fast, distinct halt class) and `oracles:` (capture-all, injected under a byte budget that preserves verdicts), both resolving against `verification.yml` set names. Target-project harness scripts (e.g. the generator's SQL Server scenario matrix) stay in the target repo; the loop ships the contract, dispatch, and capture.
 
-**Scope narrowed at draft time (2026-08-05).** The existing-mechanism search found most of the originally-framed goal already shipped: `verification.yml` sets are already named and ordered and readable by any name (`gate_commands.py`); `extra_gates` (`loop.py:212`, issue #62) already selects arbitrary sets per work unit; `_run_gate_set` (`loop.py:2753`) already executes and captures with timeout, process-group kill, and Windows routing; FEAT-2026-0068 already made capture verdict-aware. All of it runs at **exit** — `verify()` calls itself "the exit oracle" — so an agent needing results before writing a verdict still hand-drives, and a fail-fast prep step has nowhere to live. This feature therefore builds only the pre-dispatch timing hook and reuses the rest unchanged. **Dropped:** oracle declarations in GATE frontmatter (per-work-unit selection already exists — a second declaration surface would duplicate a working one). **Still out:** per-criterion binding, which remains FEAT-2026-0056's.
+**Scope narrowed at draft time (2026-08-05).** The existing-mechanism search found most of the originally-framed goal already shipped: `verification.yml` sets are already named and ordered and readable by any name (`gate_commands.py`); `extra_gates` (`loop.py:212`, issue #62) already selects arbitrary sets per work unit; `_run_gate_set` (`loop.py:2753`) already executes and captures with timeout, process-group kill, and Windows routing; FEAT-LOOP-2026-0068 already made capture verdict-aware. All of it runs at **exit** — `verify()` calls itself "the exit oracle" — so an agent needing results before writing a verdict still hand-drives, and a fail-fast prep step has nowhere to live. This feature therefore builds only the pre-dispatch timing hook and reuses the rest unchanged. **Dropped:** oracle declarations in GATE frontmatter (per-work-unit selection already exists — a second declaration surface would duplicate a working one). **Still out:** per-criterion binding, which remains FEAT-LOOP-2026-0056's.
 
 **Benefits.** Close attempts become script-run plus interpretation — cheaper, reproducible, and viable on a smaller model tier; environment-freshness lessons become enforced steps instead of prose that each new close may or may not recall; verification evidence gains a consistent, machine-captured form across features.
 
@@ -788,8 +788,8 @@ forward in `RETROSPECTIVE.md`.
 
 **Status: done.**
 
-<a id="feat-2026-0067"></a>
-## FEAT-2026-0067 — Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two
+<a id="feat-loop-2026-0067"></a>
+## FEAT-LOOP-2026-0067 — Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two
 
 **Why.** A re-armed work unit's prior-cycle spend lands in one of two different places depending on a condition nobody chose deliberately. `fold_cumulative_on_rearm` moves it into `cumulative_cost_usd` and zeroes `cost_usd`, but it runs only when `detect_rearm_dispatch` returns true — and that helper requires `cost_usd > 0` at dispatch time. When a re-arm path zeroes `cost_usd` before the driver next dispatches, detection fails, the fold never runs, and the spend survives only in `re_arm_history[].prior_cost_usd`. Both shapes exist in this repository right now:
 
@@ -800,13 +800,13 @@ WU-07 (FEAT-2026-0053)  cost=4.282  cum=—      priors=[5.01]    fold never ran
 WU-04 (FEAT-2026-0020)  cost=0.163  cum=—      priors=[0.163]   fold never ran
 ```
 
-[FEAT-2026-0062](roadmap-archive.md#feat-2026-0062) made the two cost *consumers* shape-independent, so nothing the driver decides is wrong today because of this. It deliberately scoped the fold itself OUT: fixing what gets **written** changes every future work unit's frontmatter, a different blast radius from fixing what gets **read**. That deferral was right for that feature and is not a reason to leave this permanently.
+[FEAT-LOOP-2026-0062](roadmap-archive.md#feat-loop-2026-0062) made the two cost *consumers* shape-independent, so nothing the driver decides is wrong today because of this. It deliberately scoped the fold itself OUT: fixing what gets **written** changes every future work unit's frontmatter, a different blast radius from fixing what gets **read**. That deferral was right for that feature and is not a reason to leave this permanently.
 
-What remains is a frontmatter contract that means two different things with no way to tell which. A reader — human or code — cannot distinguish "this unit was never re-armed" from "this unit was re-armed and the fold silently did not run", because both present as an absent `cumulative_cost_usd`. The divergence also guarantees that `cumulative_duration_seconds`, `cumulative_input_tokens`, and `cumulative_output_tokens` carry the identical split; no consumer gates on them yet, so it is invisible rather than absent. And `detect_rearm_dispatch`'s `cost_usd > 0` guard is itself the shape `LEARNINGS [FEAT-2026-0053/G2-CLOSE]` warns about — a guard inferring "already folded" from a zero it cannot distinguish from "never had a cost".
+What remains is a frontmatter contract that means two different things with no way to tell which. A reader — human or code — cannot distinguish "this unit was never re-armed" from "this unit was re-armed and the fold silently did not run", because both present as an absent `cumulative_cost_usd`. The divergence also guarantees that `cumulative_duration_seconds`, `cumulative_input_tokens`, and `cumulative_output_tokens` carry the identical split; no consumer gates on them yet, so it is invisible rather than absent. And `detect_rearm_dispatch`'s `cost_usd > 0` guard is itself the shape `LEARNINGS [FEAT-LOOP-2026-0053/G2-CLOSE]` warns about — a guard inferring "already folded" from a zero it cannot distinguish from "never had a cost".
 
-**Goal.** Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way. Two shapes are viable and the feature should choose one rather than splitting the difference. **Converge:** make the fold run on every re-arm regardless of the `cost_usd` value — replacing the value-inferred guard with an explicit signal such as a fold marker or a re-arm-cycle counter — so `cumulative_*` is always the lifetime accumulator and `re_arm_history[].prior_*` becomes a pure audit record. **Or admit two paths:** state in the frontmatter contract that prior spend lives in either place, and give readers one documented helper that resolves it — which is close to what FEAT-2026-0062 already shipped in `wu_lifetime_cost_usd`, and would mean promoting that function from a cost-specific reader to the contract's canonical accessor. Whichever is chosen, existing work units carrying the fold-never-ran shape must be handled explicitly — migrated, or left alone with the reason recorded — not silently outlived.
+**Goal.** Decide whether the frontmatter has one fold path or two, and make the code and the contract agree either way. Two shapes are viable and the feature should choose one rather than splitting the difference. **Converge:** make the fold run on every re-arm regardless of the `cost_usd` value — replacing the value-inferred guard with an explicit signal such as a fold marker or a re-arm-cycle counter — so `cumulative_*` is always the lifetime accumulator and `re_arm_history[].prior_*` becomes a pure audit record. **Or admit two paths:** state in the frontmatter contract that prior spend lives in either place, and give readers one documented helper that resolves it — which is close to what FEAT-LOOP-2026-0062 already shipped in `wu_lifetime_cost_usd`, and would mean promoting that function from a cost-specific reader to the contract's canonical accessor. Whichever is chosen, existing work units carrying the fold-never-ran shape must be handled explicitly — migrated, or left alone with the reason recorded — not silently outlived.
 
-**Benefits.** The frontmatter stops encoding a distinction nobody intended, so the next person to read `cumulative_cost_usd` is not misled the way FEAT-2026-0062's drafting was. The same fix covers the duration and token accumulators before a consumer starts gating on them and inherits the defect. And a value-inferred "already done" guard — a recurring source of defects in this driver — is removed rather than worked around.
+**Benefits.** The frontmatter stops encoding a distinction nobody intended, so the next person to read `cumulative_cost_usd` is not misled the way FEAT-LOOP-2026-0062's drafting was. The same fix covers the duration and token accumulators before a consumer starts gating on them and inherits the defect. And a value-inferred "already done" guard — a recurring source of defects in this driver — is removed rather than worked around.
 
 **Status: done.** Terminal close ran twice: `partially_met` on the first cycle, then `met` on the second after the hedge was fixed rather than accepted. Four implementation work units, all `done`, all passing first attempt at $5.95 against $11.50 planned; feature total $14.05 recorded against a $20.00 gate budget, excluding the second close cycle.
 
@@ -814,18 +814,18 @@ What remains is a frontmatter contract that means two different things with no w
 
 **The contract is verified by a production run of itself.** The close work unit was re-armed between its two cycles, so the driver's fold ran on `WU-90-gate-1-close.md` unattended: $8.102319, 953.536s, 140 input and 60331 output tokens moved into `cumulative_*`, the per-cycle fields reset, the marker stamped — matching the prior `attempt_outcome` event exactly. The changed path is proven on a real work unit in ordinary operation, not only on fixtures.
 
-**One defect found and fixed inside the feature.** The migration's fold-never-ran branch folded `re_arm_history[].prior_cost_usd` into `cumulative_cost_usd` without resetting `cost_usd` — right for a unit re-armed and re-dispatched, a double-count for one re-armed and never re-dispatched, which is WU-04 (FEAT-2026-0020), `completed_out_of_loop: true`. The first close found it by reconciling every re-armed WU against its own `events.jsonl`, could not repair it inside its own **Do not touch** boundary, and recorded FU-1 with an executable re-run condition. The operator armed **WU-04 (FEAT-2026-0067/T04)** against that text instead of accepting the hedge; it landed the one-branch fix with a regression test for the re-dispatched case, repaired the record, and passed first try at $1.38. The re-armed close re-ran the reconciliation: every re-armed WU's `cost_usd + cumulative_cost_usd` now equals its `attempt_outcome` sum. This is also the value-with-two-meanings defect class the feature exists to remove, reproduced by its own fix — the module docstring now carries the warning where the next offline reader of `cost_usd` would make the same mistake.
+**One defect found and fixed inside the feature.** The migration's fold-never-ran branch folded `re_arm_history[].prior_cost_usd` into `cumulative_cost_usd` without resetting `cost_usd` — right for a unit re-armed and re-dispatched, a double-count for one re-armed and never re-dispatched, which is WU-04 (FEAT-LOOP-2026-0020), `completed_out_of_loop: true`. The first close found it by reconciling every re-armed WU against its own `events.jsonl`, could not repair it inside its own **Do not touch** boundary, and recorded FU-1 with an executable re-run condition. The operator armed **WU-04 (FEAT-LOOP-2026-0067/T04)** against that text instead of accepting the hedge; it landed the one-branch fix with a regression test for the re-dispatched case, repaired the record, and passed first try at $1.38. The re-armed close re-ran the reconciliation: every re-armed WU's `cost_usd + cumulative_cost_usd` now equals its `attempt_outcome` sum. This is also the value-with-two-meanings defect class the feature exists to remove, reproduced by its own fix — the module docstring now carries the warning where the next offline reader of `cost_usd` would make the same mistake.
 
-**Known and deliberately not fixed.** WU-01 (FEAT-2026-0060)'s `cumulative_cost_usd` under-counts its lifetime by $9.23 — the old value guard's damage, frozen in a `done` record. `PLAN.md` scoped back-filling `done` features' cost records out before any work began, so this is a pre-existing condition rather than an unmet criterion, and a candidate for a future feature. No consumer reads it: `wu_lifetime_cost_usd` is events-first and only falls back to frontmatter for a WU with no `attempt_outcome` events at all.
+**Known and deliberately not fixed.** WU-01 (FEAT-LOOP-2026-0060)'s `cumulative_cost_usd` under-counts its lifetime by $9.23 — the old value guard's damage, frozen in a `done` record. `PLAN.md` scoped back-filling `done` features' cost records out before any work began, so this is a pre-existing condition rather than an unmet criterion, and a candidate for a future feature. No consumer reads it: `wu_lifetime_cost_usd` is events-first and only falls back to frontmatter for a WU with no `attempt_outcome` events at all.
 
 **Not verified here.** No downstream project has been migrated. `rearm_migration.py` ran against exactly one tree — this one — and every branch it handles beyond that tree's two real shapes is exercised only by fixtures. That distinction is not hypothetical: the one real shape its fixtures did not model is precisely the one it got wrong. A project that upgrades and never runs the migration is safe, because an absent marker reads as `0` and the next dispatch-time fold is correct regardless.
 
-<a id="feat-2026-0064"></a>
-## FEAT-2026-0064 — Release-notes document maintained as work lands, tied to versions and tags
+<a id="feat-loop-2026-0064"></a>
+## FEAT-LOOP-2026-0064 — Release-notes document maintained as work lands, tied to versions and tags
 
 **Why.** This repository has shipped eight tagged releases (`v0.4.0` through `v0.8.0`) and has no release-notes document of any kind — `find . -iname "CHANGELOG*"` returns nothing, and `grep -rniE "changelog|release.?note"` over `specfuse/`, `scripts/`, `.specfuse/skills/`, and `docs/` returns nothing outside mirrored package data. The only record of what a version changed is the git log and a list of PR titles. Someone running `pipx upgrade specfuse` cannot find out what moved, and more importantly cannot find out whether anything that moved will break them.
 
-The material already exists and is thrown away at release time. Every feature's close ceremony is *required* by `.specfuse/rules/close-discipline.md` §3 to enumerate consumer-visible contract changes or write the explicit `n/a` line; every feature carries a roadmap detail section and a `RETROSPECTIVE.md`; every bug is one branch and one PR by convention. The loop already produces a structured, human-written statement of user-facing impact for every unit of work it completes — and nothing collects it. [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) is the live example: its close enumerated a real behaviour change (a downstream project running `auto` begins halting for human arming where it previously armed silently) that reaches no user-facing document today and will surprise the first person it happens to.
+The material already exists and is thrown away at release time. Every feature's close ceremony is *required* by `.specfuse/rules/close-discipline.md` §3 to enumerate consumer-visible contract changes or write the explicit `n/a` line; every feature carries a roadmap detail section and a `RETROSPECTIVE.md`; every bug is one branch and one PR by convention. The loop already produces a structured, human-written statement of user-facing impact for every unit of work it completes — and nothing collects it. [FEAT-LOOP-2026-0061](roadmap-archive.md#feat-loop-2026-0061) is the live example: its close enumerated a real behaviour change (a downstream project running `auto` begins halting for human arming where it previously armed silently) that reaches no user-facing document today and will surprise the first person it happens to.
 
 The gap widens under autonomy. As more work lands via `auto` features and the bug pipeline, fewer changes pass under a human's eye at all, and the release note becomes the only place a consumer-visible change is stated in prose someone actually reads.
 
@@ -847,10 +847,10 @@ Two decisions to settle when this is drafted, both noted here so they are not di
 
 **Status: done.** Terminal close ran with verdict `met`, every acceptance criterion verified against a re-run oracle in the close's own session. The close's §3 enumeration — six items, two `breaking` (the required `--umbrella-version` flag and the new `close-k` check) — was appended to `CHANGELOG.md`'s `Unreleased` through `append_entry` rather than by hand, making this close the first entry ever written into the document the feature built. The retrospective reports what that was actually like: the thinking happened once and served both surfaces, the writing genuinely happened twice at two compression levels, and the order is what made the second one cheap. Three findings with no unmet criterion behind them — the missing scaffolded `CHANGELOG.md`, the unexercised bug path, and a release stamp that has never run for real — are recorded in the retrospective with where each gets checked.
 
-<a id="feat-2026-0059"></a>
-## FEAT-2026-0059 — Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking
+<a id="feat-loop-2026-0059"></a>
+## FEAT-LOOP-2026-0059 — Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking
 
-**Why.** First live run of `/accept-hedged-close` (FEAT-2026-0054, 2026-07-30) showed the operator-facing gap: the skill quotes the raw D-entry follow-up record and demands a one-line reason, but never answers the operator's actual questions — *why couldn't this close `met`, and what kind of reason is expected?* On 0054 the answer was derivable but buried: two entries were unclosable in-repo by construction (an operator-signature entry and a future-rate-in-other-repos entry) and two were findings routed to other owners — meaning `met_locally` was the structural ceiling and no rework alternative existed. The operator had to reverse-engineer that from four verbose entries. Routed findings also currently survive only as retrospective prose, with no tracking surface.
+**Why.** First live run of `/accept-hedged-close` (FEAT-LOOP-2026-0054, 2026-07-30) showed the operator-facing gap: the skill quotes the raw D-entry follow-up record and demands a one-line reason, but never answers the operator's actual questions — *why couldn't this close `met`, and what kind of reason is expected?* On 0054 the answer was derivable but buried: two entries were unclosable in-repo by construction (an operator-signature entry and a future-rate-in-other-repos entry) and two were findings routed to other owners — meaning `met_locally` was the structural ceiling and no rework alternative existed. The operator had to reverse-engineer that from four verbose entries. Routed findings also currently survive only as retrospective prose, with no tracking surface.
 
 **Goal.** (1) `close-discipline.md` §2's hedged-verdict record gains a required `kind:` per entry — `acceptance-discharged` / `externally-verifiable-later` / `routed-finding` — written by the close WU, which has the context. (2) `/accept-hedged-close` reads the classification and leads with a verdict-ceiling headline ("no in-repo rework can raise this verdict" vs "rework exists: <what>"), states the explicit alternative (accept now vs stay hedged until the named upgrade conditions, then recheck), and scaffolds the reason prompt from the classification while still requiring the operator's own words (`operator-escalation.md`'s never-author rule intact). (3) At acceptance, each `routed-finding` entry prompts for a tracking surface — existing issue/roadmap row, or offer `/roadmap-add` / `gh issue create` — so accepted follow-ups land in a queue instead of dying in prose.
 
@@ -858,14 +858,14 @@ Two decisions to settle when this is drafted, both noted here so they are not di
 
 **Gate 1 — shipped.** Three work units `done`, each on its first attempt, no escalations, **$6.12 against $9.50 planned (−35.6%)**. `close-discipline.md` §2 gains a required per-entry `kind:`; `closing_requirements.py` holds the four values and the one function that turns a set of kinds into a verdict ceiling; `lint_closing.py`'s `close-j` refuses a hedged close whose own record has an entry with no `kind:` or an unrecognised one. `/accept-hedged-close` reads the classification, prints the ceiling headline **before** any entry detail, scaffolds the reason prompt from that ceiling without pre-filling a word of it, and prompts each `routed-finding` entry for a tracking surface — non-blocking, so the skill stays single-confirm. Three oracles, all red on HEAD before their WU ran: `tests/test_hedged_kind_contract.py`, `tests/test_accept_hedged_close_headline.py`, `tests/test_routed_finding_tracking.py`.
 
-**Four kinds, not the three this row proposed.** `inherent` was added deliberately. [FEAT-2026-0042](roadmap-archive.md#feat-2026-0042)'s close had already invented the category in prose — *"Fix correctness — **Inherent.** Not deferred, not scheduled, not a gap. **Never.**"* — because the contract had no slot for it. Shipping three would force the next close to invent it again in different words, and leave a reader with no mechanical way to tell "nobody has done this yet" from "this can never be done". The ceiling rule is unaffected: only `externally-verifiable-later` implies rework exists; `inherent` collapses to the same ceiling as the other two, for a different reason.
+**Four kinds, not the three this row proposed.** `inherent` was added deliberately. [FEAT-LOOP-2026-0042](roadmap-archive.md#feat-loop-2026-0042)'s close had already invented the category in prose — *"Fix correctness — **Inherent.** Not deferred, not scheduled, not a gap. **Never.**"* — because the contract had no slot for it. Shipping three would force the next close to invent it again in different words, and leave a reader with no mechanical way to tell "nobody has done this yet" from "this can never be done". The ceiling rule is unaffected: only `externally-verifiable-later` implies rework exists; `inherent` collapses to the same ceiling as the other two, for a different reason.
 
-**The lint is scoped to the close under lint, and that is load-bearing.** Two hedged records already exist ([FEAT-2026-0041](roadmap-archive.md#feat-2026-0041), [FEAT-2026-0042](roadmap-archive.md#feat-2026-0042)) and neither carries `kind:`. A corpus sweep over `.specfuse/features/*/RETROSPECTIVE.md` would have been red on arrival and unfixable without rewriting closed features' history. `close-j` reads only the feature directory currently being linted; a test plants a malformed record in another feature and asserts it produces no finding.
+**The lint is scoped to the close under lint, and that is load-bearing.** Two hedged records already exist ([FEAT-LOOP-2026-0041](roadmap-archive.md#feat-loop-2026-0041), [FEAT-LOOP-2026-0042](roadmap-archive.md#feat-loop-2026-0042)) and neither carries `kind:`. A corpus sweep over `.specfuse/features/*/RETROSPECTIVE.md` would have been red on arrival and unfixable without rewriting closed features' history. `close-j` reads only the feature directory currently being linted; a test plants a malformed record in another feature and asserts it produces no finding.
 
-**Status: done** — terminal close ran with verdict `met_locally`; the operator accepted it, discharging both follow-ups' acknowledgment half. The two entries were classified under the contract this feature ships: the §3 consumer-visible contract-change list (`acceptance-discharged`, eight items), and whether the ceiling headline actually helps a human decide faster (`externally-verifiable-later`). **That second one was answered, and the answer was negative** — the operator's verdict on this feature's own headline was *"it didn't help much, perhaps because the feature itself is quite abstract"*. The record explicitly invited a plain "no" as better evidence than the tests supply, and this is the least favourable case available: the feature's own hedge is a rule contract, abstract by construction, where FEAT-2026-0042's was concrete. Re-evaluation on a concrete hedge is filed rather than left in prose. Enumeration and both entries are in the feature's `RETROSPECTIVE.md`.
+**Status: done** — terminal close ran with verdict `met_locally`; the operator accepted it, discharging both follow-ups' acknowledgment half. The two entries were classified under the contract this feature ships: the §3 consumer-visible contract-change list (`acceptance-discharged`, eight items), and whether the ceiling headline actually helps a human decide faster (`externally-verifiable-later`). **That second one was answered, and the answer was negative** — the operator's verdict on this feature's own headline was *"it didn't help much, perhaps because the feature itself is quite abstract"*. The record explicitly invited a plain "no" as better evidence than the tests supply, and this is the least favourable case available: the feature's own hedge is a rule contract, abstract by construction, where FEAT-LOOP-2026-0042's was concrete. Re-evaluation on a concrete hedge is filed rather than left in prose. Enumeration and both entries are in the feature's `RETROSPECTIVE.md`.
 
-<a id="feat-2026-0073"></a>
-## FEAT-2026-0073 — Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs
+<a id="feat-loop-2026-0073"></a>
+## FEAT-LOOP-2026-0073 — Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs
 
 **Why.** The vendored event envelope constrains `correlation_id` with
 
@@ -877,13 +877,13 @@ which accepts a substantive work unit (`/T01`) and nothing else. `.specfuse/rule
 
 Measured across the corpus: **279 failures in 36 of 45 feature folders**. The distribution is exactly what the gap predicts — `G1-CLOSE` 61, `G1-PLAN` 59, `G2-PLAN` 24, `G1-CLOSE-INTERMEDIATE` 20, `G2-CLOSE` 18, `G3-CLOSE` 13. This is not drift: the rules file and the schema have disagreed since closing units were given their own ID shape.
 
-Found by [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01, which escalated rather than proceed. That WU's registry work resolved cleanly — **zero `event_type` errors corpus-wide** — but its acceptance demanded zero *total* validator errors while its Do-not-touch list forbade the vendored schema, the only file that could deliver them. The two criteria contradicted each other and the work unit could not pass as written. The contradiction was authored, not discovered: FEAT-2026-0060's recon measured `event_type` failures only and never ran the validator's other checks, so its satisfiability answer was wrong. Cost of finding out: one blocked attempt, $4.48.
+Found by [FEAT-LOOP-2026-0060](roadmap-archive.md#feat-loop-2026-0060)/T01, which escalated rather than proceed. That WU's registry work resolved cleanly — **zero `event_type` errors corpus-wide** — but its acceptance demanded zero *total* validator errors while its Do-not-touch list forbade the vendored schema, the only file that could deliver them. The two criteria contradicted each other and the work unit could not pass as written. The contradiction was authored, not discovered: FEAT-LOOP-2026-0060's recon measured `event_type` failures only and never ran the validator's other checks, so its satisfiability answer was wrong. Cost of finding out: one blocked attempt, $4.48.
 
-**Goal.** Make the envelope accept the correlation-ID shapes the methodology documents, or move the driver's ID vocabulary somewhere this repository owns — and decide which, because the same question was answered for `event_type` and the answer may differ here. **Extend the vendored pattern** is simplest and arguably correct at the source, since the orchestrator has closing-sequence work units too and its own logs presumably carry the same IDs; but the file's `$id` points at another repository and its `$comment` is that repository's changelog, so the edit is a cross-repo change that a vendor sync will revert. **Override `correlation_id` in the driver-local registry** keeps ownership local and matches what FEAT-2026-0060 chose for `event_type`; but ID *format* is more plausibly a shared protocol concern than event vocabulary is, and forking it risks the two diverging in a way that breaks a consumer reading both logs. Whichever is chosen, `.specfuse/rules/correlation-ids.md` and the schema must end up stating the same contract, since the whole defect is that they do not.
+**Goal.** Make the envelope accept the correlation-ID shapes the methodology documents, or move the driver's ID vocabulary somewhere this repository owns — and decide which, because the same question was answered for `event_type` and the answer may differ here. **Extend the vendored pattern** is simplest and arguably correct at the source, since the orchestrator has closing-sequence work units too and its own logs presumably carry the same IDs; but the file's `$id` points at another repository and its `$comment` is that repository's changelog, so the edit is a cross-repo change that a vendor sync will revert. **Override `correlation_id` in the driver-local registry** keeps ownership local and matches what FEAT-LOOP-2026-0060 chose for `event_type`; but ID *format* is more plausibly a shared protocol concern than event vocabulary is, and forking it risks the two diverging in a way that breaks a consumer reading both logs. Whichever is chosen, `.specfuse/rules/correlation-ids.md` and the schema must end up stating the same contract, since the whole defect is that they do not.
 
-**Benefits.** The driver's event log validates end to end rather than in the `event_type` dimension alone — the state FEAT-2026-0060 was believed to reach and did not. Unblocks that feature's real-log verification gate, which cannot be green while 279 events fail on a field the gate has no opinion about. And it closes a documented-versus-enforced disagreement that has been silently true for every closing work unit this repository has ever run.
+**Benefits.** The driver's event log validates end to end rather than in the `event_type` dimension alone — the state FEAT-LOOP-2026-0060 was believed to reach and did not. Unblocks that feature's real-log verification gate, which cannot be green while 279 events fail on a field the gate has no opinion about. And it closes a documented-versus-enforced disagreement that has been silently true for every closing work unit this repository has ever run.
 
-**Status: done.** One gate, two implementation WUs, one terminal close. **The driver-local override was chosen**, extending the mechanism FEAT-2026-0060 built for `event_type` rather than editing the vendored pattern. The deciding evidence was inside the vendored file itself: its `$comment` — the orchestrator's changelog — *already records a prior upstream widening of this exact field*, which makes it a file with live upstream history, and an edit here a fork the next vendor sync reverts **silently**, reinstating every failure with no signal that anything regressed. The row's counter-argument stands and was answered rather than dismissed: ID format really is more plausibly a shared protocol concern than event vocabulary is, so the close **filed the upstream need** at [specfuse/orchestrator#81](https://github.com/specfuse/orchestrator/issues/81) — the override is a documented bridge, not a silent divergence, and the issue records that the driver-local `correlation_id` block should be retired in whichever vendor sync picks up the widened envelope.
+**Status: done.** One gate, two implementation WUs, one terminal close. **The driver-local override was chosen**, extending the mechanism FEAT-LOOP-2026-0060 built for `event_type` rather than editing the vendored pattern. The deciding evidence was inside the vendored file itself: its `$comment` — the orchestrator's changelog — *already records a prior upstream widening of this exact field*, which makes it a file with live upstream history, and an edit here a fork the next vendor sync reverts **silently**, reinstating every failure with no signal that anything regressed. The row's counter-argument stands and was answered rather than dismissed: ID format really is more plausibly a shared protocol concern than event vocabulary is, so the close **filed the upstream need** at [specfuse/orchestrator#81](https://github.com/specfuse/orchestrator/issues/81) — the override is a documented bridge, not a silent divergence, and the issue records that the driver-local `correlation_id` block should be retired in whichever vendor sync picks up the widened envelope.
 
 Shipped: a `correlation_id` block in `specfuse/loop/data/schemas/driver-event.schema.json` (`closing_names`, `hygiene_suffix_pattern`) read by a new `load_driver_correlation_patterns`, applied in `load_validator`'s existing deep-copy fall-through so the vendored file is never written — `git diff --exit-code specfuse/loop/data/schemas/event.schema.json` exits 0 against both the working tree and `main`. `.specfuse/rules/correlation-ids.md` was reconciled in the same WU, since the defect was the two surfaces disagreeing and widening one alone would have shifted that rather than closed it; a test enumerates the shapes from each and compares them mechanically. `.specfuse/scripts/event_type_gate.py` then widened from `event_type` errors to the whole envelope, and its stale scoping paragraph — plus the matching `verification.yml` comment claiming 279 correlation_id errors remain — went with the change. The gate keeps its name; renaming it is a follow-up bug.
 
@@ -891,12 +891,12 @@ Corrected count: the row's **279 in 36 of 45 folders** was a dated measurement. 
 
 Cost: **$12.10 of implementation spend against $7.50 planned**, of which **63% ($7.64) went to four non-passing attempts that all failed the same mechanical guard** — a `produces:` path showing no diff. Three of those were T02 spinning on an authoring defect (its body invited a rename its own `produces:` list forbade) and cost $5.47 before escalating; the amended body then passed first try at $1.65. Residual risk, recorded rather than resolved: nothing in this repository detects the local and upstream `correlation_id` definitions drifting apart. See `RETROSPECTIVE.md`.
 
-<a id="feat-2026-0034"></a>
-## FEAT-2026-0034 — Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness
+<a id="feat-loop-2026-0034"></a>
+## FEAT-LOOP-2026-0034 — Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness
 
 **Why.** The `blocked` feature status (shipped in loop 0.3.24) is only meaningful if a blocked feature actually names its unmet dependency — an ADR or an upstream FEAT — and links to it. Nothing enforces that today: `lint_plan` validates feature dirs, PLAN frontmatter, and the gate/WU graph, not the roadmap-table prose. So a row can sit at `status: blocked` with no `**Blocked by.**` block at all (silently collapsing the deliberate `blocked`-vs-`deferred` distinction — `deferred` is the no-named-blocker park), or with a link that has rotted: an ADR path that moved, or a `#feat-yyyy-nnnn` anchor whose target was archived.
 
-A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four distinct rot shapes and 19 instances, only some of which a resolution-only check would catch. (1) **Unresolvable refs** — 10 prose links to archived features still using the bare `#feat-…` form after the section moved to `roadmap-archive.md`, plus 5 in the archive pointing the other way at sections that live in `roadmap.md`; the rot is bidirectional, so a one-file linter misses half of it. (2) **Missing anchors** — `blocked` rows 0041 and 0047 whose Detail cells linked to sections that never carried an `<a id>`. (3) **Misattached anchors** — the anchor above the 0053 section read `feat-2026-0069`, so 0053's Detail cell was dead *and* 0069's ref silently landed on the wrong feature. (4) **Duplicate IDs across files** — `/roadmap-archive` dragged the preceding live feature's anchor along with each section it moved, leaving `feat-2026-0041` and `feat-2026-0047` defined in *both* files; those refs resolved cleanly to the wrong section, which is strictly worse than a dead link because nothing visibly breaks. Shapes 3 and 4 are the archiver misfiring on every run, so they recur until linted.
+A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four distinct rot shapes and 19 instances, only some of which a resolution-only check would catch. (1) **Unresolvable refs** — 10 prose links to archived features still using the bare `#feat-…` form after the section moved to `roadmap-archive.md`, plus 5 in the archive pointing the other way at sections that live in `roadmap.md`; the rot is bidirectional, so a one-file linter misses half of it. (2) **Missing anchors** — `blocked` rows 0041 and 0047 whose Detail cells linked to sections that never carried an `<a id>`. (3) **Misattached anchors** — the anchor above the 0053 section read `feat-loop-2026-0069`, so 0053's Detail cell was dead *and* 0069's ref silently landed on the wrong feature. (4) **Duplicate IDs across files** — `/roadmap-archive` dragged the preceding live feature's anchor along with each section it moved, leaving `feat-loop-2026-0041` and `feat-loop-2026-0047` defined in *both* files; those refs resolved cleanly to the wrong section, which is strictly worse than a dead link because nothing visibly breaks. Shapes 3 and 4 are the archiver misfiring on every run, so they recur until linted.
 
 **Goal.** A roadmap link-integrity lint pass (extend `lint_plan.py` or a sibling roadmap linter, wired into the same gate) reading `roadmap.md` and `roadmap-archive.md` as one link graph, checking four invariants. **Blocked-by presence and resolution** — every `blocked` row's detail section carries a `**Blocked by.**` block with at least one link; each link resolves (ADR path exists on disk or is a well-formed URL; a feature link points at a live `<a id="feat-…">` anchor in either file). Symmetrically WARN on a `**Blocked by.**` block attached to a non-`blocked` row. **Ref resolution, both directions** — every `#feat-…` ref in either file resolves against the anchor set of the file it names, with a bare `#…` resolving same-file; an ERROR names the correct cross-file form as the fix, since the mechanical repair is a prefix rewrite. **Anchor adjacency** — every `<a id="feat-YYYY-NNNN">` is immediately followed (blank lines allowed) by a `## FEAT-YYYY-NNNN` heading whose ID matches; an anchor followed by a different feature's heading, or by another anchor, is an ERROR. This is the check that catches shape 3 and the archiver's stray-anchor output. **Cross-file ID uniqueness** — no `feat-…` ID is defined in both files, and none twice within a file. Round out with a WARN for a row whose Detail cell is `—` while a detail section for that ID exists (the reverse of link rot: a live section nothing points at).
 
@@ -910,42 +910,42 @@ A 2026-07-30 manual audit of `roadmap.md` + `roadmap-archive.md` found four dist
 
 **Status: done.** Shipped as `specfuse/loop/lint_roadmap.py` + `.specfuse/scripts/roadmap_link_gate.py`, gated as `roadmap-link-gate`. Note for downstream projects: this gate is inherited on upgrade, so a project whose roadmap already carries ERROR-severity rot starts failing a gate it did not previously have.
 
-<a id="feat-2026-0042"></a>
-## FEAT-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
+<a id="feat-loop-2026-0042"></a>
+## FEAT-LOOP-2026-0042 — Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial
 
-**Why.** With detection (FEAT-2026-0040) and diagnosis (FEAT-2026-0041) in place, the remaining step to a self-healing repo is launching the existing fix-bug skill (1 bug = 1 branch = 1 PR, test-first) from a diagnosed finding — guarded, because a wrong diagnosis can produce a confidently-wrong PR and an incident storm can flood the repo.
+**Why.** With detection (FEAT-LOOP-2026-0040) and diagnosis (FEAT-LOOP-2026-0041) in place, the remaining step to a self-healing repo is launching the existing fix-bug skill (1 bug = 1 branch = 1 PR, test-first) from a diagnosed finding — guarded, because a wrong diagnosis can produce a confidently-wrong PR and an incident storm can flood the repo.
 
-**Goal.** Per-component `autofix: on|off` (default off). Auto-fire headless `/fix-bug NN` only when the diagnosis self-reports confident + `fix_scope: small`; `large`/`external` findings route to human triage or roadmap promotion instead. One fix run per fingerprint, daily auto-fix cap, and an "auto-fix attempted, failed" label so refusals and failures surface instead of dying silently. Human merge on a protected branch is the default floor; auto-merge is governed by the agent-level dial and hardcoded guardrails defined in FEAT-2026-0048 (supersession recorded 2026-07-25 — small test-first bug diffs are cheap to revert, so bugs may graduate to auto-merge; features never do here).
+**Goal.** Per-component `autofix: on|off` (default off). Auto-fire headless `/fix-bug NN` only when the diagnosis self-reports confident + `fix_scope: small`; `large`/`external` findings route to human triage or roadmap promotion instead. One fix run per fingerprint, daily auto-fix cap, and an "auto-fix attempted, failed" label so refusals and failures surface instead of dying silently. Human merge on a protected branch is the default floor; auto-merge is governed by the agent-level dial and hardcoded guardrails defined in FEAT-LOOP-2026-0048 (supersession recorded 2026-07-25 — small test-first bug diffs are cheap to revert, so bugs may graduate to auto-merge; features never do here).
 
 **Benefits.** Autonomy level 3: wake up to a ready test-first PR for known-small failures, on components that earned the dial. Guardrails (confidence gate, caps, failure labels) keep bad diagnoses and storms from eroding trust in the pipeline.
 
-**Built (reconciled at the terminal close, `FEAT-2026-0042/G2-CLOSE`, verdict `partially_met`).** Two gates. Gate 1 shipped the decision layer with no caller: `specfuse/monitor/autofix.py` (`decide()` over `FIRE`/`ROUTE_TO_HUMAN`/`DECLINE`, `CONFIDENCE_THRESHOLD = 0.8` as a module constant), `specfuse/monitor/autofix_state.py` (attempt state as a marker on the finding issue, `DAILY_CAP = 5` over a rolling 24h window, both failing closed), the `auto-fix-attempted-failed` label in `LABEL_REGISTRY`, and a headless mode for the `fix-bug` skill — which this row's goal assumed already existed and did not. Gate 2 shipped the firing path: `specfuse/monitor/autofix_invoke.py` (builds the headless invocation, classifies its result into `refused`/`could_not_proceed`/`completed`) and `specfuse/monitor/autofix_run.py` (read the diagnosis, decide, record the attempt **before** firing, invoke, label).
+**Built (reconciled at the terminal close, `FEAT-LOOP-2026-0042/G2-CLOSE`, verdict `partially_met`).** Two gates. Gate 1 shipped the decision layer with no caller: `specfuse/monitor/autofix.py` (`decide()` over `FIRE`/`ROUTE_TO_HUMAN`/`DECLINE`, `CONFIDENCE_THRESHOLD = 0.8` as a module constant), `specfuse/monitor/autofix_state.py` (attempt state as a marker on the finding issue, `DAILY_CAP = 5` over a rolling 24h window, both failing closed), the `auto-fix-attempted-failed` label in `LABEL_REGISTRY`, and a headless mode for the `fix-bug` skill — which this row's goal assumed already existed and did not. Gate 2 shipped the firing path: `specfuse/monitor/autofix_invoke.py` (builds the headless invocation, classifies its result into `refused`/`could_not_proceed`/`completed`) and `specfuse/monitor/autofix_run.py` (read the diagnosis, decide, record the attempt **before** firing, invoke, label).
 
 **Where the goal's phrasing is now true, and where it is not.** "Headless `/fix-bug NN`" is true: the mode exists and a real session was launched from a real diagnosed finding. "**Auto**-fire" is **not** true. The firing path lives behind its own entry point, `python3 -m specfuse.monitor.autofix_run`, deliberately *not* wired into the harvest cycle and not registered as a console script — so nothing fires on a schedule and a human or a later feature must call it. And the chain's last link is unobserved: the one live end-to-end run decided `FIRE`, recorded the attempt, launched the session, and returned `could_not_proceed`, so **no pull request has ever been produced by this path**. Fix correctness is an inherent, permanent non-guarantee, not deferred work. See `RETROSPECTIVE.md` for the raw evidence, the residue report, and the follow-up record naming what a re-armed live run would have to show to upgrade the verdict.
 
-**Status: done.** Two gates. Gate 1 shipped the decision layer, the GitHub-held rate-limit state and a headless `fix-bug` mode — all inert. Gate 2 made the dial live and fired it once for real. Closed `partially_met` and accepted by the operator: the single live fire returned `could_not_proceed` (the planted bug was too thin for `fix-bug` to reduce to a falsifying test), so the mechanism is proven end to end but **no pull request has yet been produced** — that follow-up is carried forward open. Auto-merge remains impossible here; FEAT-2026-0048 owns it.
+**Status: done.** Two gates. Gate 1 shipped the decision layer, the GitHub-held rate-limit state and a headless `fix-bug` mode — all inert. Gate 2 made the dial live and fired it once for real. Closed `partially_met` and accepted by the operator: the single live fire returned `could_not_proceed` (the planted bug was too thin for `fix-bug` to reduce to a falsifying test), so the mechanism is proven end to end but **no pull request has yet been produced** — that follow-up is carried forward open. Auto-merge remains impossible here; FEAT-LOOP-2026-0048 owns it.
 
-<a id="feat-2026-0041"></a>
-## FEAT-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
+<a id="feat-loop-2026-0041"></a>
+## FEAT-LOOP-2026-0041 — diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless)
 
 **Why.** A harvester finding carries the artifacts; the unique value of a repo-resident agent is joining them with source code to name the root cause ("DLQ message failed because OrderMapper.cs:142 throws on null DiscountCode") — the thing external monitoring can never do. Diagnosis must earn trust interactively before running unattended.
 
-**Goal.** A `/diagnose-issue NN` skill: pulls artifact section + correlation-ID-linked telemetry from the finding issue, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable `confidence` and `fix_scope: small|large|external` fields (the gate FEAT-2026-0042 consumes). Identical comment format from both entry points: interactive first, headless second. Redaction rules apply to diagnosis prose.
+**Goal.** A `/diagnose-issue NN` skill: pulls artifact section + correlation-ID-linked telemetry from the finding issue, reads the component source, and posts a structured diagnosis comment — root cause, evidence trail, candidate fix, plus machine-readable `confidence` and `fix_scope: small|large|external` fields (the gate FEAT-LOOP-2026-0042 consumes). Identical comment format from both entry points: interactive first, headless second. Redaction rules apply to diagnosis prose.
 
-**Scope narrowed at draft time (recorded in `PLAN.md`).** The auto-trigger — harvester firing diagnosis on new fingerprints, the per-component `diagnose: auto` dial, one diagnosis per fingerprint rather than per occurrence — was cut from this feature by operator decision and is now [FEAT-2026-0074](#feat-2026-0074). The seam is that the dial is a *scheduling* concern, not a *diagnosis* concern: FEAT-2026-0042 consumes only the output contract and does not care how the diagnosis came to be written, and building the auto-trigger first would have automated a diagnosis quality nobody had read yet.
+**Scope narrowed at draft time (recorded in `PLAN.md`).** The auto-trigger — harvester firing diagnosis on new fingerprints, the per-component `diagnose: auto` dial, one diagnosis per fingerprint rather than per occurrence — was cut from this feature by operator decision and is now [FEAT-LOOP-2026-0074](#feat-loop-2026-0074). The seam is that the dial is a *scheduling* concern, not a *diagnosis* concern: FEAT-LOOP-2026-0042 consumes only the output contract and does not care how the diagnosis came to be written, and building the auto-trigger first would have automated a diagnosis quality nobody had read yet.
 
-**Shipped.** `specfuse/monitor/diagnosis.py` (the `Diagnosis` model, `render`, `parse`, one `<!-- specfuse:diagnosis confidence=... fix_scope=... -->` marker; prose redacted at the render boundary via `redaction.redact_text`, promoted from module-private); the `/diagnose-issue` skill on all three surfaces; `specfuse/monitor/diagnose_cli.py` as the headless entry point, rendering exclusively through the same renderer with byte-identical output asserted; and a live `gh` round-trip — create, comment, read back, parse, close — verified against a real scratch issue rather than a stub, which refuted the `gh` ban in `LEARNINGS [FEAT-2026-0014/T01/gh-claudeP-broken]`. **Diagnosis correctness itself is not verified and cannot be in-loop**; the gate asserts format, contract, and round-trip fidelity only.
+**Shipped.** `specfuse/monitor/diagnosis.py` (the `Diagnosis` model, `render`, `parse`, one `<!-- specfuse:diagnosis confidence=... fix_scope=... -->` marker; prose redacted at the render boundary via `redaction.redact_text`, promoted from module-private); the `/diagnose-issue` skill on all three surfaces; `specfuse/monitor/diagnose_cli.py` as the headless entry point, rendering exclusively through the same renderer with byte-identical output asserted; and a live `gh` round-trip — create, comment, read back, parse, close — verified against a real scratch issue rather than a stub, which refuted the `gh` ban in `LEARNINGS [FEAT-LOOP-2026-0014/T01/gh-claudeP-broken]`. **Diagnosis correctness itself is not verified and cannot be in-loop**; the gate asserts format, contract, and round-trip fidelity only.
 
-**Benefits.** Autonomy level 2 groundwork: a finding can be turned into a structured, machine-readable diagnosis by hand or headlessly, in one format, so FEAT-2026-0042 has a contract to gate on. The per-component manual-to-auto dial (FEAT-2026-0074) then lets diagnosis quality be proven with a human watching before automation, component by component.
+**Benefits.** Autonomy level 2 groundwork: a finding can be turned into a structured, machine-readable diagnosis by hand or headlessly, in one format, so FEAT-LOOP-2026-0042 has a contract to gate on. The per-component manual-to-auto dial (FEAT-LOOP-2026-0074) then lets diagnosis quality be proven with a human watching before automation, component by component.
 
 **Status: done.**
 
-<a id="feat-2026-0063"></a>
-## FEAT-2026-0063 — Branch-observation sweep for the arm predicate
+<a id="feat-loop-2026-0063"></a>
+## FEAT-LOOP-2026-0063 — Branch-observation sweep for the arm predicate
 
-**Why.** [FEAT-2026-0061](roadmap-archive.md#feat-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. The same is true of `budget_projection`'s firing branch after [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062): no baselined feature has been over budget, so the branch that fix exists to correct has never fired on real input.
+**Why.** [FEAT-LOOP-2026-0061](roadmap-archive.md#feat-loop-2026-0061) widened `decision_class_paths` and added two `not_evaluable` triggers — a named-uncovered manifest, and a glob or directory in `produces:` the class cannot decide. Both are proven only on fixtures. The same is true of `budget_projection`'s firing branch after [FEAT-LOOP-2026-0062](roadmap-archive.md#feat-loop-2026-0062): no baselined feature has been over budget, so the branch that fix exists to correct has never fired on real input.
 
-**A correction, recorded because the original framing of this row was wrong and was nearly drafted against.** This row previously argued that a sweep of `evaluate_arm_predicate` across all 44 feature folders returned 42 `not_evaluable — no_baseline`, and concluded the predicate could not be verified against real input at all. That measurement is misleading. Those 42 features predate `write_baseline_if_absent`, which shipped with [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053); they are `done` and will never be dispatched again, so they will never carry a baseline. Sweeping them is asking the predicate about work that no longer exists, and `no_baseline` is the correct answer rather than blindness.
+**A correction, recorded because the original framing of this row was wrong and was nearly drafted against.** This row previously argued that a sweep of `evaluate_arm_predicate` across all 44 feature folders returned 42 `not_evaluable — no_baseline`, and concluded the predicate could not be verified against real input at all. That measurement is misleading. Those 42 features predate `write_baseline_if_absent`, which shipped with [FEAT-LOOP-2026-0053](roadmap-archive.md#feat-loop-2026-0053); they are `done` and will never be dispatched again, so they will never carry a baseline. Sweeping them is asking the predicate about work that no longer exists, and `no_baseline` is the correct answer rather than blindness.
 
 Restricted to the features that actually carry a `PLAN.baseline.json`, the picture inverts (re-measured 2026-08-03; the sample grows by one per baselined feature, so these figures are dated by construction):
 
@@ -960,7 +960,7 @@ FEAT-2026-0062  g1  arm=True   fired=-
 4 baselined features; class-verdict totals: 41 clean, 7 fired, 0 not_evaluable
 ```
 
-The **approval path is proven on real input** — `would_arm: True` on three real features with real frontmatter — and three classes fire on real input. `LEARNINGS [FEAT-2026-0053/G1-CLOSE]` warned that a refusal path proven on fixtures says nothing about the approval path; that warning has since been answered by the corpus itself, and this row should not keep citing it as open.
+The **approval path is proven on real input** — `would_arm: True` on three real features with real frontmatter — and three classes fire on real input. `LEARNINGS [FEAT-LOOP-2026-0053/G1-CLOSE]` warned that a refusal path proven on fixtures says nothing about the approval path; that warning has since been answered by the corpus itself, and this row should not keep citing it as open.
 
 **What actually remains — wider than this row previously stated.** A per-class sweep of which *branches* have been observed on real input, rather than which classes exist, gives:
 
@@ -975,26 +975,26 @@ retroactive_edits          clean, fired     NEVER not_evaluable
 open_questions_human_only  clean, fired     NEVER not_evaluable
 ```
 
-**Five of the eight stop classes have never fired on real input**, and `not_evaluable` has never been observed for *any* class — so the fail-closed path this row is named for is entirely unexercised outside fixtures. All firing evidence comes from a **single feature**, FEAT-2026-0053: the same three classes fire at each of its gates and nothing else has ever fired anywhere. This row previously named only two unverified branches (`decision_class_paths`' two `not_evaluable` triggers and `budget_projection`'s firing branch); the real figure is five never-fired classes plus eight never-`not_evaluable` ones. Scope the work to the measured list, not the remembered one.
+**Five of the eight stop classes have never fired on real input**, and `not_evaluable` has never been observed for *any* class — so the fail-closed path this row is named for is entirely unexercised outside fixtures. All firing evidence comes from a **single feature**, FEAT-LOOP-2026-0053: the same three classes fire at each of its gates and nothing else has ever fired anywhere. This row previously named only two unverified branches (`decision_class_paths`' two `not_evaluable` triggers and `budget_projection`'s firing branch); the real figure is five never-fired classes plus eight never-`not_evaluable` ones. Scope the work to the measured list, not the remembered one.
 
 Two caveats on the sample. It is **four features**, which is thin, though it grows by one per baselined feature with no work from us. And a sweep run over all feature folders reports false blindness by including the 42 that structurally cannot be evaluated, which is how this row acquired its original wrong premise in the first place.
 
-**Goal.** Make the sweep honest and standing rather than ad-hoc. Exclude baseline-less features so the sweep stops reporting `no_baseline` as though it were a finding. Record, per class and per branch, which have fired on real input and which have not, so "unverified" is a named list rather than an assumption — and so a branch that can never fire becomes visible as dead. Decide where that report lives permanently: a `verification.yml` gate the driver runs, or a close-ceremony criterion an agent reports. Prefer the gate — FEAT-2026-0055's close raised the same choice and flagged promoting its tree-wide sweep from a close-time criterion to a driver-run gate as an open follow-up, and this would be the second instance, which is when the pattern earns the tooling. The first `auto` ride against the Specfuse Generator remains the strongest single source of live input, but it is no longer a precondition for this row.
+**Goal.** Make the sweep honest and standing rather than ad-hoc. Exclude baseline-less features so the sweep stops reporting `no_baseline` as though it were a finding. Record, per class and per branch, which have fired on real input and which have not, so "unverified" is a named list rather than an assumption — and so a branch that can never fire becomes visible as dead. Decide where that report lives permanently: a `verification.yml` gate the driver runs, or a close-ceremony criterion an agent reports. Prefer the gate — FEAT-LOOP-2026-0055's close raised the same choice and flagged promoting its tree-wide sweep from a close-time criterion to a driver-run gate as an open follow-up, and this would be the second instance, which is when the pattern earns the tooling. The first `auto` ride against the Specfuse Generator remains the strongest single source of live input, but it is no longer a precondition for this row.
 
 **Benefits.** A sweep that reports only what it can actually evaluate, so its output is evidence instead of noise. A named list of never-fired branches, which is the honest form of "unverified" and the thing a human can act on. And the report becomes a mechanism rather than something a human runs by hand at wrap time — which is how the original mistaken figure survived long enough to reach this roadmap.
 
 **Status: done.** Pulled to `active` on 2026-08-02 and returned to `planned` the same day: drafting recon showed the 42-of-44 figure this row was built on was an artifact of sweeping features that predate baselines, and the operator chose to re-pick rather than draft against a corrected and much smaller premise.
 
-Re-measured 2026-08-03 before the second draft attempt, and the premise had drifted again: FEAT-2026-0060 shipped and carries a baseline, so the sample is four features rather than three (41 clean / 7 fired / 0 `not_evaluable`, `would_arm: True` on three). More materially, the per-*branch* sweep above shows the unverified surface is **five never-fired classes and eight never-`not_evaluable` ones**, not the two branches this row named. Both corrections are folded in above. That this row's figures went stale twice in two days is itself the argument for its Goal: a premise re-derived by hand at pick time is a premise that will be wrong again.
+Re-measured 2026-08-03 before the second draft attempt, and the premise had drifted again: FEAT-LOOP-2026-0060 shipped and carries a baseline, so the sample is four features rather than three (41 clean / 7 fired / 0 `not_evaluable`, `would_arm: True` on three). More materially, the per-*branch* sweep above shows the unverified surface is **five never-fired classes and eight never-`not_evaluable` ones**, not the two branches this row named. Both corrections are folded in above. That this row's figures went stale twice in two days is itself the argument for its Goal: a premise re-derived by hand at pick time is a premise that will be wrong again.
 
-<a id="feat-2026-0060"></a>
-## FEAT-2026-0060 — Driver-local event schema registry: sanction the three unsanctioned event types
+<a id="feat-loop-2026-0060"></a>
+## FEAT-LOOP-2026-0060 — Driver-local event schema registry: sanction the three unsanctioned event types
 
-**Why.** The loop driver emits `gate_reached` and `attempt_outcome` on every run, and FEAT-2026-0053/T04 adds `arm_predicate_evaluated`. None of the three appear in the envelope `event_type` enum in `specfuse/loop/data/schemas/event.schema.json` (a closed 28-entry list this repo does not own), and none have a per-type payload schema — `PER_TYPE_SCHEMA_DIR` holds four schemas, all core-orchestrator types vendored from another repo. The gap is invisible today only because the driver's emit path (`build_event` / `flush_events` in `loop.py`) never invokes the validator: `validate_event.py` is a standalone CLI. So every driver-emitted event is unvalidated in practice, and anyone who does run `validate_event.py` over a real `events.jsonl` gets failures on the driver's own output. FEAT-2026-0053/T04 blocked on discovering this and was unblocked by narrowing its scope, deliberately deferring the question rather than answering it inside a shadow-mode WU.
+**Why.** The loop driver emits `gate_reached` and `attempt_outcome` on every run, and FEAT-LOOP-2026-0053/T04 adds `arm_predicate_evaluated`. None of the three appear in the envelope `event_type` enum in `specfuse/loop/data/schemas/event.schema.json` (a closed 28-entry list this repo does not own), and none have a per-type payload schema — `PER_TYPE_SCHEMA_DIR` holds four schemas, all core-orchestrator types vendored from another repo. The gap is invisible today only because the driver's emit path (`build_event` / `flush_events` in `loop.py`) never invokes the validator: `validate_event.py` is a standalone CLI. So every driver-emitted event is unvalidated in practice, and anyone who does run `validate_event.py` over a real `events.jsonl` gets failures on the driver's own output. FEAT-LOOP-2026-0053/T04 blocked on discovering this and was unblocked by narrowing its scope, deliberately deferring the question rather than answering it inside a shadow-mode WU.
 
 **Goal.** Decide and implement where driver-local event schemas live, then bring all three types into conformance so `validate_event.py` passes over a real driver-produced `events.jsonl`. Two candidate shapes, to be chosen as part of this feature: (a) extend the vendored registry and envelope enum in the core repo, keeping one registry — correct but cross-repo; or (b) sanction an explicitly-named loop-local schema tier, with manifest entries in the scaffold sync script and its orphan-file test, leaving the core enum alone. Also decide whether emit-time validation should be wired into `build_event` / `flush_events`, or whether `validate_event.py` stays a CI/manual check — an unvalidated emit path is what let three types drift unnoticed.
 
-**Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
+**Benefits.** The driver's own event stream becomes machine-checkable, which every downstream consumer (`gate-status`, `learnings-suggest`, the harvester, FEAT-LOOP-2026-0053's shadow telemetry) implicitly assumes today. Removes a standing trap where a WU touching events discovers the gap mid-attempt and blocks, as T04 did at a cost of one wasted 210-second attempt.
 
 **What was actually built — and it was nine types, not the three this section's title names.** Gate 1 closed on 2026-08-03. Both candidate shapes in the Goal above were weighed and **(b) was chosen**: a driver-local registry, `specfuse/loop/data/schemas/driver-event.schema.json`, with an `$id` under `specfuse.dev/loop/` that does not claim the orchestrator namespace. The vendored `event.schema.json` was never edited — confirmed clean against `main` at close — because its `$id` points at another repository and its `$comment` is that repository's changelog, so any edit here would be reverted or silently diverged by the next vendor sync. Resolution is **fall-through, not duplication**: `validate_event.py` resolves an event's `event_type` against the vendored enum first and only falls through to the driver-local registry for types absent there, unioning the two on an in-memory deep copy. `task_started`, `task_completed`, and `human_escalation` were already sanctioned and are deliberately *not* duplicated into the new file. A missing or unreadable registry degrades to vendored-only validation rather than raising, matching `load_per_type_validator`'s additive contract.
 
@@ -1002,16 +1002,16 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Emit-time validation was declined, deliberately.** The Goal above left it open; the answer is no. Events are buffered and flushed at *outcome* time, so a raise inside `build_event` would destroy the audit record of the work unit that just ran — turning a schema nit into lost diagnostic data at the worst possible moment. The check moved to CI instead: a drift guard (`tests/test_driver_event_registry_covers_emitters.py`) that derives the emitted-type set at test time from call sites ∪ corpus and fails naming the offender, plus an `event-type-gate` in this repository's `.specfuse/verification.yml` running the validator over every `.specfuse/features/*/events.jsonl`. Both are repo-internal; the registry schema is the only part shipped into target scaffolds, and it is permissive, so no downstream build can go red from this feature.
 
-**Scoped out, on purpose.** Per-type payload schemas for the nine — the guard covers type *names* only, and payload shapes are unguarded by construction. And `correlation_id` conformance: **279 errors remain across 36 files** because the vendored pattern rejects the `G<n>-CLOSE` / `G<n>-PLAN` closing-sequence and `TNNH` hygiene ID shapes that `.specfuse/rules/correlation-ids.md` documents as valid. Fixing that means editing the vendored file this feature exists to avoid touching; it is filed as [FEAT-2026-0073](#feat-2026-0073) and is why the gate is scoped to `event_type` errors, to be widened once 0073 lands.
+**Scoped out, on purpose.** Per-type payload schemas for the nine — the guard covers type *names* only, and payload shapes are unguarded by construction. And `correlation_id` conformance: **279 errors remain across 36 files** because the vendored pattern rejects the `G<n>-CLOSE` / `G<n>-PLAN` closing-sequence and `TNNH` hygiene ID shapes that `.specfuse/rules/correlation-ids.md` documents as valid. Fixing that means editing the vendored file this feature exists to avoid touching; it is filed as [FEAT-LOOP-2026-0073](#feat-loop-2026-0073) and is why the gate is scoped to `event_type` errors, to be widened once 0073 lands.
 
 **Status: active — closed `met_locally`, awaiting operator acceptance.** All sixteen close criteria verified on fresh in-session oracle runs; the one hedge is the corpus-wide validator's *total* error count, which reads 279 rather than zero for the `correlation_id` reason above. `event_type` errors are zero, and this feature's own `events.jsonl` validates clean on every class — 12 of its 24 events are types that could not have validated before the feature landed. See `RETROSPECTIVE.md` for the follow-up record and the exact re-run condition that upgrades the verdict to `met`.
 
-**Filing-time status, kept for the record.** Pulled 2026-08-02 with the premise re-verified against the tree that day, not taken from this section's filing-time evidence: the envelope enum is still 28 entries, `gate_reached` / `attempt_outcome` / `arm_predicate_evaluated` are all absent from it, and the emit path still never invokes the validator. The gap is also now shaping design rather than merely sitting there — [FEAT-2026-0062](roadmap-archive.md#feat-2026-0062)/T03 was authored with an explicit constraint to reuse `human_escalation` with a new `reason` value rather than mint a fourth unsanctioned type.
+**Filing-time status, kept for the record.** Pulled 2026-08-02 with the premise re-verified against the tree that day, not taken from this section's filing-time evidence: the envelope enum is still 28 entries, `gate_reached` / `attempt_outcome` / `arm_predicate_evaluated` are all absent from it, and the emit path still never invokes the validator. The gap is also now shaping design rather than merely sitting there — [FEAT-LOOP-2026-0062](roadmap-archive.md#feat-loop-2026-0062)/T03 was authored with an explicit constraint to reuse `human_escalation` with a new `reason` value rather than mint a fourth unsanctioned type.
 
-<a id="feat-2026-0062"></a>
-## FEAT-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
+<a id="feat-loop-2026-0062"></a>
+## FEAT-LOOP-2026-0062 — Lifetime-cost reads for `budget_projection` and the per-gate brake
 
-**Why.** Two independent cost consumers read only a work unit's current-dispatch-cycle spend. `budget_projection`, the arm-predicate class that stops a feature heading past 2× its baseline, and `gate_spent_usd`, which drives the per-gate budget brake, both read frontmatter `cost_usd` and neither reads `cumulative_cost_usd` or `re_arm_history[].prior_cost_usd`. A re-arm resets `attempts` to `0` and folds prior spend into the cumulative fields, so **every re-armed work unit is invisible to both**. Measured on [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053) itself, recorded in its gate-2 Findings §1: the projection under-read by **$6.23** and the gate spend by **$5.01**. The bias is not random — it under-reports precisely the work units that have already failed and been retried, which are the ones most likely to be heading toward a budget breach. The brake has a second, separate blind spot found in the same feature: `_should_halt_for_budget` is evaluated *before* each dispatch, so an overrun inside the final work unit of a gate cannot be seen at all. Gate 2 closed **$4.94 over** its $31.50 brake without the brake firing.
+**Why.** Two independent cost consumers read only a work unit's current-dispatch-cycle spend. `budget_projection`, the arm-predicate class that stops a feature heading past 2× its baseline, and `gate_spent_usd`, which drives the per-gate budget brake, both read frontmatter `cost_usd` and neither reads `cumulative_cost_usd` or `re_arm_history[].prior_cost_usd`. A re-arm resets `attempts` to `0` and folds prior spend into the cumulative fields, so **every re-armed work unit is invisible to both**. Measured on [FEAT-LOOP-2026-0053](roadmap-archive.md#feat-loop-2026-0053) itself, recorded in its gate-2 Findings §1: the projection under-read by **$6.23** and the gate spend by **$5.01**. The bias is not random — it under-reports precisely the work units that have already failed and been retried, which are the ones most likely to be heading toward a budget breach. The brake has a second, separate blind spot found in the same feature: `_should_halt_for_budget` is evaluated *before* each dispatch, so an overrun inside the final work unit of a gate cannot be seen at all. Gate 2 closed **$4.94 over** its $31.50 brake without the brake firing.
 
 **Goal.** Make both consumers read lifetime spend — frontmatter `cumulative_cost_usd` plus the current cycle, or the `attempt_outcome` event sum from `events.jsonl`, which is the source of truth the close ceremony already treats as authoritative. Decide which is canonical and use it in both places rather than letting them diverge again. Separately, decide what the per-gate brake should do about a final-work-unit overrun: a post-dispatch check that reports the breach after the fact is honest and cheap; a projected-cost pre-check that refuses to dispatch a unit whose planned cost would breach is stricter and changes dispatch behaviour. State the choice, because "the brake did not fire" currently means two different things.
 
@@ -1019,10 +1019,10 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.**
 
-<a id="feat-2026-0061"></a>
-## FEAT-2026-0061 — Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths`
+<a id="feat-loop-2026-0061"></a>
+## FEAT-LOOP-2026-0061 — Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths`
 
-**Why.** `decision_class_paths` is one of the eight arm-predicate stop classes shipped by [FEAT-2026-0053](roadmap-archive.md#feat-2026-0053), and its job is to stop an `auto` feature before it adds a dependency without a human seeing it. It recognises exactly three manifest shapes: `_DEPENDENCY_MANIFEST_EXACT` matches `pyproject.toml` and `package.json`, and `_REQUIREMENTS_RE` matches `requirements*.txt`. Every other ecosystem is invisible. Found while scoping the first `auto` ride against the Specfuse Generator, which is a Maven repository: a work unit there adding a Java dependency to `pom.xml` arms without stopping, and the class reports `clean` while doing it — a false negative, not a gap the operator can see. `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `go.mod`, `Gemfile`, `*.csproj`, and `composer.json` are all in the same position. The class is at its least trustworthy exactly where its value is highest, because a repo whose manifests it cannot read is a repo where it silently never fires.
+**Why.** `decision_class_paths` is one of the eight arm-predicate stop classes shipped by [FEAT-LOOP-2026-0053](roadmap-archive.md#feat-loop-2026-0053), and its job is to stop an `auto` feature before it adds a dependency without a human seeing it. It recognises exactly three manifest shapes: `_DEPENDENCY_MANIFEST_EXACT` matches `pyproject.toml` and `package.json`, and `_REQUIREMENTS_RE` matches `requirements*.txt`. Every other ecosystem is invisible. Found while scoping the first `auto` ride against the Specfuse Generator, which is a Maven repository: a work unit there adding a Java dependency to `pom.xml` arms without stopping, and the class reports `clean` while doing it — a false negative, not a gap the operator can see. `build.gradle`, `build.gradle.kts`, `Cargo.toml`, `go.mod`, `Gemfile`, `*.csproj`, and `composer.json` are all in the same position. The class is at its least trustworthy exactly where its value is highest, because a repo whose manifests it cannot read is a repo where it silently never fires.
 
 **Goal.** Extend the manifest surface to the ecosystems Specfuse targets, with the recognition rules stated in one place rather than spread across two module-private constants and a regex. Decide as part of this feature whether coverage is a fixed list or a declared surface a target project can extend in `.specfuse/verification.yml` — the fixed list is simpler and cannot drift out of sync with a project's real build files; a declared surface handles the polyglot monorepo the fixed list will eventually meet. Whichever is chosen, an unrecognised-but-plausible manifest should be surfaced rather than silently passed: a class that cannot evaluate its input should report `not_evaluable`, which the predicate already treats as fail-closed, instead of `clean`. Add the coverage list to `docs/concepts/autonomy-stop-classes.md`, which currently documents the class without naming what it can and cannot see.
 
@@ -1030,8 +1030,8 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.** Single terminal gate, 2 substantive WUs plus close ($11.50 planned, $16.50 gate budget). Both chartered decisions were settled at draft time: coverage is a **fixed list** in `arm_eval.py`, not a declared surface in `.specfuse/verification.yml` — the predicate reads nothing outside `feature_dir` today and a config read would add a new failure mode to a class whose whole defect is reporting a status it cannot justify. `not_evaluable` gets **two triggers**: a named-uncovered manifest list whose every entry must justify why it is not simply covered (it may legitimately end up empty), and a glob or directory in `produces:` that the class cannot decide — the latter measured at 0 of 169 corpus entries, so it is fail-closed without being unsatisfiable.
 
-<a id="feat-2026-0053"></a>
-## FEAT-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
+<a id="feat-loop-2026-0053"></a>
+## FEAT-LOOP-2026-0053 — Autonomous feature mode (auto gate-arming with mechanical stop conditions)
 
 **Why.** The methodology's autonomy field (`auto` / `review` / `supervised`) is written to PLAN.md frontmatter and never read — zero consumers — so every feature stops at every gate boundary exactly like a `review` feature, and a four-gate feature costs four human touches regardless of how routine its gates are. Operator history across features shows those gate reviews are near-universal rubber-stamps whose accepted changes are additive (new work units at gate check, occasionally a new gate), so the per-gate checkpoint spends latency without buying review value; the operator's real read happens at PR review, and merge is always human.
 
@@ -1039,7 +1039,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** A four-gate feature drops from four human touches to one (the PR review, now fed by the accumulated doubt summaries); unattended runs progress overnight with blast radius bounded by construction — caps, revert tags, and hard floors on judge-editing and retroactive edits — rather than by judgment; shadow-mode telemetry replaces guesswork when tuning stop thresholds; and the declared-but-dead autonomy field finally does what the methodology has promised since it was specified.
 
-**Gate 1 — shipped, and it changes no arming behavior anywhere.** Four substantive work units `done`. `specfuse/loop/plan_baseline.py` writes an immutable `PLAN.baseline.json` snapshot of a feature's as-activated plan graph at first dispatch — write-once by construction, because a refreshable baseline is a drift detector that can be gamed by drifting. `specfuse/loop/arm_eval.py` is the predicate: pure, side-effect-free, mirroring `gate_eval.py`'s shape without sharing its code, returning a per-class verdict (fired / clean / not_evaluable, each with a reason) across seven classes — budget projection, judge-editing, decision-class paths, retroactive edits, drift caps, missing provenance, and open-questions/human-only — plus an overall `would_arm`. The three machine-readable plan-next contract fields (`open_questions`, `human_only`, `provenance`) are documented in both `WU.template.md` copies and covered by **warn-only** lint; the flip to blocking under `auto` is gate 2's, and it is a severity flip needing its own satisfiability answer and runtime probe. Wiring is passive: the driver evaluates and appends one `arm_predicate_evaluated` event at every `awaiting_review` flip, and its control flow after the append is verdict-independent — a predicate exception degrades to an `evaluation_error` payload rather than crashing a gate close. **The organizing principle held.** Only the two veto classes carry model-authored input, and both can only subtract; every approval input is a counter, a path, or a hardcoded constant. Substantive spend **$8.35 against $13.00 drafted (−35.8%)** — three first-attempt passes at roughly 45–48% of estimate, the third consecutive feature to under-run implementation by about a third (issue #260, no per-feature response). The one blocked attempt cost **$1.22**: T04 stopped on discovering that the per-type event-schema registry and the envelope `event_type` enum are both unowned by this repo, which is now **[FEAT-2026-0060](#feat-2026-0060)**; the operator narrowed T04's criteria to follow the existing `gate_reached` / `attempt_outcome` precedent rather than answer the registry question inside a shadow-mode work unit.
+**Gate 1 — shipped, and it changes no arming behavior anywhere.** Four substantive work units `done`. `specfuse/loop/plan_baseline.py` writes an immutable `PLAN.baseline.json` snapshot of a feature's as-activated plan graph at first dispatch — write-once by construction, because a refreshable baseline is a drift detector that can be gamed by drifting. `specfuse/loop/arm_eval.py` is the predicate: pure, side-effect-free, mirroring `gate_eval.py`'s shape without sharing its code, returning a per-class verdict (fired / clean / not_evaluable, each with a reason) across seven classes — budget projection, judge-editing, decision-class paths, retroactive edits, drift caps, missing provenance, and open-questions/human-only — plus an overall `would_arm`. The three machine-readable plan-next contract fields (`open_questions`, `human_only`, `provenance`) are documented in both `WU.template.md` copies and covered by **warn-only** lint; the flip to blocking under `auto` is gate 2's, and it is a severity flip needing its own satisfiability answer and runtime probe. Wiring is passive: the driver evaluates and appends one `arm_predicate_evaluated` event at every `awaiting_review` flip, and its control flow after the append is verdict-independent — a predicate exception degrades to an `evaluation_error` payload rather than crashing a gate close. **The organizing principle held.** Only the two veto classes carry model-authored input, and both can only subtract; every approval input is a counter, a path, or a hardcoded constant. Substantive spend **$8.35 against $13.00 drafted (−35.8%)** — three first-attempt passes at roughly 45–48% of estimate, the third consecutive feature to under-run implementation by about a third (issue #260, no per-feature response). The one blocked attempt cost **$1.22**: T04 stopped on discovering that the per-type event-schema registry and the envelope `event_type` enum are both unowned by this repo, which is now **[FEAT-LOOP-2026-0060](#feat-loop-2026-0060)**; the operator narrowed T04's criteria to follow the existing `gate_reached` / `attempt_outcome` precedent rather than answer the registry question inside a shadow-mode work unit.
 
 **Consumer-visible additions from gate 1, all additive.** Two new modules; three template-documented frontmatter fields; the new `arm_predicate_evaluated` event type on `events.jsonl` (deliberately outside the envelope enum and the per-type registry, matching existing driver-local precedent); and the new per-feature `PLAN.baseline.json` artifact, committed by the driver, which every Specfuse project on a driver at or past 0.7.1 will start seeing appear in its feature folders. Nothing was removed or renamed. Full enumeration and the deferred-verification list are in the feature's `RETROSPECTIVE.md`.
 
@@ -1047,7 +1047,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Gate 2 — shipped. `auto` is real.** Five substantive work units `done`. `specfuse/loop/arm_txn.py` is the pure arm transaction: one function returns the complete write set an arm consists of — every gate-`N+1` draft work unit flipping to `pending`, gate `N` flipping `awaiting_review → passed`, `events.jsonl`, and the accumulated `FEATURE-REVIEW.md` — plus the revert tag *name*; the module performs no git operation at all, which is what makes the one-commit guarantee testable. The driver now reads `autonomy_default` at the single flip site that can arm, tags `pre-arm/<feature-id>/gate-<N>` at the pre-arm HEAD, and carries every write into the one existing bookkeeping commit. **Escalation overrides autonomy by control flow, not by a check**: the two escalation flip sites `return` before the dial is ever consulted. `plan_next_lint` joins the predicate as the **eighth class and the third veto class**, taking the contract-field lint from warn-only to arm-blocking under `auto` only — the CLI is unchanged and every non-`auto` feature is unchanged. Each auto-arm appends the gate's verbatim `open_questions`, verbatim `## Doubt` prose, and per-class verdict to an append-only `FEATURE-REVIEW.md` inside that same commit, with the doubt prose still never an input to the predicate. And under `auto` a closing work unit that touches `.specfuse/LEARNINGS.md` fails a post-pass invariant (`learnings_not_staged`); lessons stage to a feature-local `LEARNINGS-pending.md` from a new shipped template, so **an unread gate cannot write a durable cross-feature rule**. 58 tests across seven suites, all green at close, including a run of the real `loop.run()` against a copy of this feature's own folder — real baseline, real frontmatter, real event log.
 
-**Consumer-visible changes from gate 2 — larger than gate 1's, and not purely additive.** Ten items, three of which need a deliberate read. **`CLASS_NAMES` goes 7 → 8 and `VETO_CLASSES` 2 → 3, so every `arm_predicate_evaluated` payload's `classes` map now carries eight keys instead of seven** — an existing payload that changed shape, not a new one beside it. The `pre-arm/<feature-id>/gate-<N>` tags are real repo objects created with `-f`, one per armed gate. And the bookkeeping commit message changes under `auto`, from `chore(loop): gate N awaiting_review` to `chore(loop): gate N auto-armed gate N+1 (tag …)`, which any existing grep over the bookkeeping trail will miss. Also new: the `gate_auto_armed` event type (this feature's **second** unregistered type, raising rather than flattening the cost of [FEAT-2026-0060](#feat-2026-0060)), the `FEATURE-REVIEW.md` and `LEARNINGS-pending.md` per-feature artifacts, the `LEARNINGS-pending.template.md` template shipped to every downstream project, the `close-e` / `close-intermediate-e` closing requirements, and `docs/dev/auto-arm-recovery.md`. Full enumeration in the feature's `RETROSPECTIVE.md`.
+**Consumer-visible changes from gate 2 — larger than gate 1's, and not purely additive.** Ten items, three of which need a deliberate read. **`CLASS_NAMES` goes 7 → 8 and `VETO_CLASSES` 2 → 3, so every `arm_predicate_evaluated` payload's `classes` map now carries eight keys instead of seven** — an existing payload that changed shape, not a new one beside it. The `pre-arm/<feature-id>/gate-<N>` tags are real repo objects created with `-f`, one per armed gate. And the bookkeeping commit message changes under `auto`, from `chore(loop): gate N awaiting_review` to `chore(loop): gate N auto-armed gate N+1 (tag …)`, which any existing grep over the bookkeeping trail will miss. Also new: the `gate_auto_armed` event type (this feature's **second** unregistered type, raising rather than flattening the cost of [FEAT-LOOP-2026-0060](#feat-loop-2026-0060)), the `FEATURE-REVIEW.md` and `LEARNINGS-pending.md` per-feature artifacts, the `LEARNINGS-pending.template.md` template shipped to every downstream project, the `close-e` / `close-intermediate-e` closing requirements, and `docs/dev/auto-arm-recovery.md`. Full enumeration in the feature's `RETROSPECTIVE.md`.
 
 **Gate 2 cost 58% more than drafted, and that reverses the pattern.** Substantive spend **$23.74 against $15.00 (+58.3%)**. One spin accounts for $5.01 — a new veto class firing on the *preceding* work unit's test fixture, surfacing as that unit's test failing under a whole-suite signature, in a file the new unit was forbidden to touch; three sessions chased it before the operator diagnosed the root cause and re-armed with the fixture amendment in scope. Strip it and the gate is still **+24.9%**, with two first-attempt passes landing 44% and 72% over. That is estimate error, not execution error, and it is the fourth data point on **issue #260** pointing the opposite way from the first three: gate 1's units were independent modules and ran a third under; gate 2's five all wire behavior into a live driver and into each other. **The rule should be scoped to independent-module work or it will underestimate every wiring gate.** Gate spend stands at 75.4% of `GATE-02.md`'s `cost_budget_usd: 31.50` with both closing units still to run.
 
@@ -1055,10 +1055,10 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Gate 2 deliberately did not prove** that any of it runs in production. No live arm happened — this feature runs `review` by decision, so the whole arm path is verified by tests and by no production ride. `plan_next_lint`'s *firing* path has never executed on a real feature folder (a sweep of all 43 returns 0 fired / 1 clean / 42 not-evaluable, the one clean being this feature, the only one with a baseline). The `LEARNINGS-pending.md` promotion procedure has never been performed by a human. And **`FEATURE-REVIEW.md` is written and never read**: a grep across every skill and shipped template returns zero references outside the module that writes it. Accumulation shipped; the last hop into the PR body is unbuilt and unowned — which on a feature whose premise is replacing four gate reads with one PR read is the checkpoint value silently not being delivered. `G2-PLAN` scopes it into gate 3 or records a deferral with a home.
 
-**Status: done.** Gates 1 and 2 closed; gate 3 (docs and methodology rewrite, migration guidance, plus whatever gate 2's retrospective surfaces) is drafted by `G2-PLAN` and armed by the human. This feature itself runs `autonomy_default: review` — per `[FEAT-2026-0007/G2-LESSONS]`, an enforcement mechanism cannot be exercised by the gate that builds it, so the first live `auto` ride belongs to a successor feature after this branch merges.
+**Status: done.** Gates 1 and 2 closed; gate 3 (docs and methodology rewrite, migration guidance, plus whatever gate 2's retrospective surfaces) is drafted by `G2-PLAN` and armed by the human. This feature itself runs `autonomy_default: review` — per `[FEAT-LOOP-2026-0007/G2-LESSONS]`, an enforcement mechanism cannot be exercised by the gate that builds it, so the first live `auto` ride belongs to a successor feature after this branch merges.
 
-<a id="feat-2026-0055"></a>
-## FEAT-2026-0055 — Arm-time WU contract lint: produces satisfiability + boundary consistency
+<a id="feat-loop-2026-0055"></a>
+## FEAT-LOOP-2026-0055 — Arm-time WU contract lint: produces satisfiability + boundary consistency
 
 **Why.** FEAT-2026-0066/T04 burned $11.43 across 3 attempts plus a human escalation on a `produces:` path already fully delivered by T03 — unsatisfiable by construction and detectable before dispatch. The same WU's Do-not-touch barred `src/main/**` while its acceptance criteria required an artifact only `src/main/**` could hold — a deadlock no lint catches today. And `assert_declared_deliverables` (literal paths only) vs `assert_produces_in_diff` (literal or fnmatch glob) have divergent path semantics that WU authors now document via folklore comment blocks in every feature (FEAT-2026-0065/T01 paid $10.43 learning it; 0066 re-quoted the warning verbatim). Portfolio cost of the produces/deliverable mismatch classes: ~$55.
 
@@ -1066,10 +1066,10 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** The `produces_not_in_diff` / `no_deliverable_files` / `deliverable_missing` waste class dies at arm time instead of after 3 burned attempts and an escalation; per-WU folklore comments explaining the dual-gate trap become deletable; arm-gate review gets a mechanical consistency report instead of relying on operator eyeballing.
 
-**Status: active — gate 1 close returned `met_locally` (2026-07-30), awaiting operator acknowledgment.** Attempt 1 of the close returned `not_met`: the ERROR leg was blind to the `**Do not touch.** <content>` bold-preamble form used by all 327 work-unit bodies in this repo, so the motivating FEAT-2026-0066/T04 deadlock armed clean, while the continuation lines it could read yielded 15 false ERRORs across 4 existing features. T05 fixed the extraction — `slice_wu_section` now returns label-line content for the bold form, and boundary patterns are prohibition-scoped with ambiguous matches degraded to WARN. Re-verified fresh at the second close: the deadlock fixture in the canonical body form ERRORs and names `assert_produces_in_diff`; the tree-wide sweep reports **zero ERRORs across 43 feature folders** (was 15), with 4 advisory produces-class WARNs on 2 features enumerated; the WARN leg and the unified literal/glob semantics for `assert_declared_deliverables` / `assert_produces_in_diff` hold with negative observations; full suite, ruff, bandit, and coverage all exit 0. Hedged rather than `met` on two counts, both with recorded upgrade conditions: the portfolio measure (zero produces-class refusals) is a measurement over a future generator-class feature's event log, and the consumer-visible contract changes await an operator's acknowledgment. Terminal flips stay withheld until then — next step is `/accept-hedged-close`. One open follow-up worth scheduling as real work: promote the tree-wide sweep from a close-time criterion an agent reports to a `verification.yml` gate the driver runs. Separately noted, not this feature's doing: `specfuse-lint` crashes on `FEAT-2026-0020-public-readiness-prep` with a `MiniYAMLError` on an HTML comment in a WU's frontmatter. Evidence and consumer-visible contract changes: `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/RETROSPECTIVE.md`.
+**Status: active — gate 1 close returned `met_locally` (2026-07-30), awaiting operator acknowledgment.** Attempt 1 of the close returned `not_met`: the ERROR leg was blind to the `**Do not touch.** <content>` bold-preamble form used by all 327 work-unit bodies in this repo, so the motivating FEAT-2026-0066/T04 deadlock armed clean, while the continuation lines it could read yielded 15 false ERRORs across 4 existing features. T05 fixed the extraction — `slice_wu_section` now returns label-line content for the bold form, and boundary patterns are prohibition-scoped with ambiguous matches degraded to WARN. Re-verified fresh at the second close: the deadlock fixture in the canonical body form ERRORs and names `assert_produces_in_diff`; the tree-wide sweep reports **zero ERRORs across 43 feature folders** (was 15), with 4 advisory produces-class WARNs on 2 features enumerated; the WARN leg and the unified literal/glob semantics for `assert_declared_deliverables` / `assert_produces_in_diff` hold with negative observations; full suite, ruff, bandit, and coverage all exit 0. Hedged rather than `met` on two counts, both with recorded upgrade conditions: the portfolio measure (zero produces-class refusals) is a measurement over a future generator-class feature's event log, and the consumer-visible contract changes await an operator's acknowledgment. Terminal flips stay withheld until then — next step is `/accept-hedged-close`. One open follow-up worth scheduling as real work: promote the tree-wide sweep from a close-time criterion an agent reports to a `verification.yml` gate the driver runs. Separately noted, not this feature's doing: `specfuse-lint` crashes on `FEAT-LOOP-2026-0020-public-readiness-prep` with a `MiniYAMLError` on an HTML comment in a WU's frontmatter. Evidence and consumer-visible contract changes: `.specfuse/features/FEAT-LOOP-2026-0055-arm-time-wu-contract-lint/RETROSPECTIVE.md`.
 
-<a id="feat-2026-0054"></a>
-## FEAT-2026-0054 — Close-ceremony skeleton + in-session closing lint
+<a id="feat-loop-2026-0054"></a>
+## FEAT-LOOP-2026-0054 — Close-ceremony skeleton + in-session closing lint
 
 **Why.** Portfolio telemetry (2026-07-30 review, 25 generator features + cross-repo data): 28% of all closing-WU spend is driver refusals. The `closing_deliverable_missing` class cost ~$42 and `assert_gate_review_exists` alone $53.11 across 15 refusals (issue #261). The guards check literal artifact shape (headings, frontmatter fields, file names) *after* the attempt, so a $4–10 verification pass is re-bought over a missing `### Failure-class breakdown` heading or a misnamed review file. Close-WU prompts now spend ~40% of their text restating guard strings defensively — machine contract leaking into prose, re-paid in tokens on every attempt.
 
@@ -1079,20 +1079,20 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **What shipped, where it differs from the goal above.** Delivered: `closing_requirements.py` (the registry both the post-squash guards and the new lint read), `specfuse-lint --closing`, dispatch-time skeleton pre-creation, and the `close-discipline.md` §4 / `WU.template.md` prose rewrite. Two deliberate departures from the drafted goal: (1) **no `verdict: TBD` placeholder** — `lint_plan` fails a dispatched close WU mid-flight on an invalid verdict value, so the skeleton leaves the field absent and the lint reports the absence as an actionable finding instead; (2) the `RETROSPECTIVE.md` stubs are **conditional, not exhaustive** — each section is written only when it is derivable from on-disk state at dispatch time, so a terminal close on a gate with no failures is pre-created nothing at all. `close-discipline.md` §4 currently describes the exhaustive version; correcting it is follow-up D3 in the retrospective.
 
-**Status: gate 1 closed `met_locally` on 2026-07-30.** All ten gate-1 acceptance criteria verified fresh in-session; the load-bearing *lint-approves ⇒ guards-pass* property was observed on nine fixture dispatch scenarios with zero divergence. Hedged on two items that no in-repo session can settle: the human acknowledgment close-discipline §3 requires for the consumer-visible contract-change list (D1), and the portfolio success measure — zero closing-format refusals — which verifies on the next generator feature (D2). Two defects found and escalated rather than patched, both inside the work unit's do-not-touch boundary: D3 above and D4 (the failure-class guard cannot fire on implementation-WU failures). The row status stays `active` because the terminal flip is verdict-gated and driver-owned; see `.specfuse/features/FEAT-2026-0054-close-ceremony-skeleton/RETROSPECTIVE.md`.
+**Status: gate 1 closed `met_locally` on 2026-07-30.** All ten gate-1 acceptance criteria verified fresh in-session; the load-bearing *lint-approves ⇒ guards-pass* property was observed on nine fixture dispatch scenarios with zero divergence. Hedged on two items that no in-repo session can settle: the human acknowledgment close-discipline §3 requires for the consumer-visible contract-change list (D1), and the portfolio success measure — zero closing-format refusals — which verifies on the next generator feature (D2). Two defects found and escalated rather than patched, both inside the work unit's do-not-touch boundary: D3 above and D4 (the failure-class guard cannot fire on implementation-WU failures). The row status stays `active` because the terminal flip is verdict-gated and driver-owned; see `.specfuse/features/FEAT-LOOP-2026-0054-close-ceremony-skeleton/RETROSPECTIVE.md`.
 
-<a id="feat-2026-0040"></a>
-## FEAT-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
+<a id="feat-loop-2026-0040"></a>
+## FEAT-LOOP-2026-0040 — Failure-artifact harvester CLI (detect + report; local and gh-actions runners)
 
 **Why.** Detection must be deterministic, cheap, and LLM-free: enumerate discrete failure artifacts (DLQ messages, error-log entries, 5xx traces, missed heartbeats, invariant violations) and report them as deduplicated GitHub issues. Laser focus on component misbehavior — not metrics or infra (that is Datadog's job) — catching functional issues before platform alerts fire.
 
-**Goal.** A CLI (`specfuse-monitor run [--component X] [--env Y] [--dry-run]`) implementing the FEAT-2026-0039 schema behind a provider-adapter interface (telemetry adapter + broker adapter, each normalizing to the neutral artifact model — core logic never sees provider types); v1 ships the Azure pair: Service Bus DLQ peek adapter and App Insights KQL adapters for the built-in check types; fingerprinting (component + failure class + signature, e.g. exception type + top app stack frame); context collection by correlation ID; redaction pass before any artifact text lands in an issue; issue lifecycle — search by `specfuse-monitor` label + fingerprint marker, create with diagnosis-ready artifact section, update occurrence count throttled, annotate "quiet for N runs — candidate for close" (humans close; no quiet-based auto-close ever). State principle: everything derivable from GitHub issues or safely losable — issues are the fingerprint registry; watermarks are best-effort per-host cache with lookback-window fallback; idempotency comes from fingerprint dedupe. Ships local runner mode plus the GH Actions workflow surface; all env access read-only.
+**Goal.** A CLI (`specfuse-monitor run [--component X] [--env Y] [--dry-run]`) implementing the FEAT-LOOP-2026-0039 schema behind a provider-adapter interface (telemetry adapter + broker adapter, each normalizing to the neutral artifact model — core logic never sees provider types); v1 ships the Azure pair: Service Bus DLQ peek adapter and App Insights KQL adapters for the built-in check types; fingerprinting (component + failure class + signature, e.g. exception type + top app stack frame); context collection by correlation ID; redaction pass before any artifact text lands in an issue; issue lifecycle — search by `specfuse-monitor` label + fingerprint marker, create with diagnosis-ready artifact section, update occurrence count throttled, annotate "quiet for N runs — candidate for close" (humans close; no quiet-based auto-close ever). State principle: everything derivable from GitHub issues or safely losable — issues are the fingerprint registry; watermarks are best-effort per-host cache with lookback-window fallback; idempotency comes from fingerprint dedupe. Ships local runner mode plus the GH Actions workflow surface; all env access read-only.
 
 **Benefits.** Autonomy level 1 (detect + report) live end to end: a poison message becomes one evidence-rich GitHub issue within a polling cycle, deduplicated across thousands of occurrences, feeding the existing fix-bug/roadmap triage loop. Deterministic detection keeps the alerting path auditable and free of LLM cost/flakiness.
 
-**Unblocked 2026-07-26.** [FEAT-2026-0069](roadmap.md#feat-2026-0069) landed the check-target axis and is `done`; [FEAT-2026-0039](roadmap.md#feat-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
+**Unblocked 2026-07-26.** [FEAT-LOOP-2026-0069](roadmap.md#feat-loop-2026-0069) landed the check-target axis and is `done`; [FEAT-LOOP-2026-0039](roadmap.md#feat-loop-2026-0039) shipped the schema before it. The contract this feature builds against is now settled and machine-checkable.
 
-**Binding constraint inherited from FEAT-2026-0069 — do not lose it.** **Fingerprints must include the target key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription attribution 0069 paid two gates for is destroyed at the last step. 0069's terminal close restates this as its own closing obligation; it is this feature's to honour.
+**Binding constraint inherited from FEAT-LOOP-2026-0069 — do not lose it.** **Fingerprints must include the target key.** Without it, 20 DLQ targets collapse into one issue and the per-subscription attribution 0069 paid two gates for is destroyed at the last step. 0069's terminal close restates this as its own closing obligation; it is this feature's to honour.
 
 **Two open schema questions this feature will be first to feel**, neither blocking: [#262](https://github.com/specfuse/loop/issues/262) — telemetry binds per environment, so components in one environment cannot resolve to different telemetry instances; and the cron-dialect ambiguity 0069's real-repo run surfaced — `cron` is opaque to the schema, and a heartbeat check computing "should this have fired?" cannot tell a 5-field expression from a 6-field one. Decide both when the adapter interface forces the question, not before.
 
@@ -1106,7 +1106,7 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Breaking change for consumers, gate 2.** A `heartbeat` target that carries `cron` must now also carry `dialect`. A downstream `monitoring.yml` with a cron-carrying heartbeat target lints clean today and will not after upgrade. Migration is mechanical: count the expression's whitespace-separated fields and add `dialect: standard-5` (5) or `dialect: seconds-first-6` (6); projects that generate the file can instead re-run `/derive-monitoring`, which now emits it from the discovered trigger registration. Cron-less heartbeat targets stay valid and `cron` itself remains optional, so the rule fires on no correct input.
 
-**Gate 3 — shipped, and this is where the parts met for the first time.** Four work units `done`, **$27.15 against $23.00 drafted** (gate budget $28.00). `T08` closed the last check type: a `queue-stalled` broker adapter reading queue depth **and** age-of-oldest, deciding staleness from age with depth as evidence — a deep queue that is draining is not stalled — with a `<integer><s|m|h|d>` threshold grammar that **refuses** unparseable values rather than guessing, and a target with no `stall_after` skipped with a recorded reason that reaches the run summary instead of being silently monitored by nobody. `T09` shipped `specfuse/monitor/issues.py`: find-or-create keyed on the fingerprint, reusing `escalation.py`'s injected-runner seam, its issue-number parse, and its HTML-comment marker convention — but **replacing** its `--search` finder, which FEAT-2026-0046's own retrospective records as unsafe for a deduplicating consumer because GitHub's index does not reliably tokenise HTML-comment content and a search returning nothing silently files a duplicate. The replacement filters client-side over an explicitly `--limit`ed listing and **raises** rather than reporting not-found when a full page comes back with no match, closing the same defect by its other route. Occurrence counts bump under a throttle, a quiet fingerprint is annotated, and **nothing ever closes an issue** — humans close, per the roadmap's own standing decision. `T10` shipped `specfuse-monitor run`: config load, enumeration on the 0069 target axis, registry-driven dispatch over opaque provider strings, telemetry through the `resolve_telemetry` seam, watermark fallback that degrades to a lookback window on a missing, unreadable, or corrupt cache instead of failing the run, and a summary naming what was skipped and why. `T11` shipped the two runner surfaces — the local runner and a GitHub Actions workflow that ships as a **template** under `specfuse/loop/data/`, deliberately not installed into this repo, with `permissions: {issues: write, contents: read}` and no literal secret — plus the `runner` dial, which now routes: a component belonging to another surface is named in the summary rather than silently unmonitored, and `in-cluster` is reported as unhandled-by-design with FEAT-2026-0043 named.
+**Gate 3 — shipped, and this is where the parts met for the first time.** Four work units `done`, **$27.15 against $23.00 drafted** (gate budget $28.00). `T08` closed the last check type: a `queue-stalled` broker adapter reading queue depth **and** age-of-oldest, deciding staleness from age with depth as evidence — a deep queue that is draining is not stalled — with a `<integer><s|m|h|d>` threshold grammar that **refuses** unparseable values rather than guessing, and a target with no `stall_after` skipped with a recorded reason that reaches the run summary instead of being silently monitored by nobody. `T09` shipped `specfuse/monitor/issues.py`: find-or-create keyed on the fingerprint, reusing `escalation.py`'s injected-runner seam, its issue-number parse, and its HTML-comment marker convention — but **replacing** its `--search` finder, which FEAT-LOOP-2026-0046's own retrospective records as unsafe for a deduplicating consumer because GitHub's index does not reliably tokenise HTML-comment content and a search returning nothing silently files a duplicate. The replacement filters client-side over an explicitly `--limit`ed listing and **raises** rather than reporting not-found when a full page comes back with no match, closing the same defect by its other route. Occurrence counts bump under a throttle, a quiet fingerprint is annotated, and **nothing ever closes an issue** — humans close, per the roadmap's own standing decision. `T10` shipped `specfuse-monitor run`: config load, enumeration on the 0069 target axis, registry-driven dispatch over opaque provider strings, telemetry through the `resolve_telemetry` seam, watermark fallback that degrades to a lookback window on a missing, unreadable, or corrupt cache instead of failing the run, and a summary naming what was skipped and why. `T11` shipped the two runner surfaces — the local runner and a GitHub Actions workflow that ships as a **template** under `specfuse/loop/data/`, deliberately not installed into this repo, with `permissions: {issues: write, contents: read}` and no literal secret — plus the `runner` dial, which now routes: a component belonging to another surface is named in the summary rather than silently unmonitored, and `in-cluster` is reported as unhandled-by-design with FEAT-LOOP-2026-0043 named.
 
 **The binding constraint was proven end to end, and that is the thing worth reporting.** One component, one `dlq` check, two targets whose findings differ *only* in their target coordinates: the composed cycle recorded **two `gh issue create` calls with two distinct fingerprints**, and a second harvest of the same two findings created nothing. Enumeration, fingerprinting, and the issue lifecycle — built across three gates and never run together until now — agree. That is proof of the composition against a stub runner, not proof of GitHub.
 
@@ -1114,39 +1114,39 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **One real defect found by the terminal close's fresh re-run, and left unfixed on purpose.** Gate 2's walk-discovered cron sweep now flags gate 3's shipped workflow template: the sweep collects every tracked mapping carrying a `cron` key, and a GitHub Actions `on.schedule` cron cannot carry the `dialect` the rule requires. Both units are correct by their own lights and the `tests` gate (and with it `coverage`, whose command chains on it) is **red at HEAD**. The introducing unit could not have caught it — the sweep walks `git ls-files` and its own template was untracked at verification time. The close reports it rather than patching a `done` unit's work; the fix is to scope the sweep's discovery, on a bug branch.
 
-**Unblocks.** **FEAT-2026-0038** (DLQ quarantine harvesting extends the peek-mode adapter this feature shipped), [FEAT-2026-0041](#feat-2026-0041) (diagnosis reads the finding/issue contract this feature defines), **FEAT-2026-0042** (autofix consumes diagnosed findings), and **FEAT-2026-0043** (the in-cluster runner is the third surface alongside the two shipped here). Each has a detail section below; only 0041 carries an explicit anchor today, so the other three are named rather than linked.
+**Unblocks.** **FEAT-LOOP-2026-0038** (DLQ quarantine harvesting extends the peek-mode adapter this feature shipped), [FEAT-LOOP-2026-0041](#feat-loop-2026-0041) (diagnosis reads the finding/issue contract this feature defines), **FEAT-LOOP-2026-0042** (autofix consumes diagnosed findings), and **FEAT-LOOP-2026-0043** (the in-cluster runner is the third surface alongside the two shipped here). Each has a detail section below; only 0041 carries an explicit anchor today, so the other three are named rather than linked.
 
 **Status: active — terminal close ran with verdict `partially_met`.** Hedged deliberately: the fourteen-item consumer-visible contract-change list (entry 1, the `dialect` requirement, is breaking) is **awaiting operator acknowledgment**; eleven deferred items await the two planned operator runs; and the cron-sweep defect above means two shipped acceptance criteria do not hold on the tree as it stands. `/accept-hedged-close` is the path once the acknowledgment is signed; the verdict upgrades toward `met` as the operator-journal entries land.
 
-<a id="feat-2026-0072"></a>
-## FEAT-2026-0072 — Structural-invariant guards: declared surfaces that nothing asserts on
+<a id="feat-loop-2026-0072"></a>
+## FEAT-LOOP-2026-0072 — Structural-invariant guards: declared surfaces that nothing asserts on
 
 **Why.** Three defects found in one day share a single shape: **a surface the repo declares, that nothing checks, drifting silently until something unrelated stumbles over it.** [#257](https://github.com/specfuse/loop/issues/257) — two bats suites existed and were wired to no gate; one had been red for weeks while CI stayed green. [#284](https://github.com/specfuse/loop/issues/284) — `CLAUDE.md` states that `.claude/skills/` holds forward symlinks so discovery finds skills, but nothing creates them; four skills sat invisible for seven weeks, including one shipped the same day. [#287](https://github.com/specfuse/loop/issues/287) — three `done` features carry a terminal gate that is not `passed`, and `lint_plan` has no check that a done feature's gates are closed. None was caught by a gate, because in each case the gate set did not know the invariant existed. #257 is fixed and its guard (`tests/test_bats_suites_gated.py`) is the working precedent this feature generalises.
 
 **Goal.** Ship the two missing guards, in the shape #257 proved: assert the invariant in both directions, and make the assertion itself falsifiable. (a) **Skill discovery** — every directory under `.specfuse/skills/` has a `.claude/skills/` entry symlinking to it, and something creates a missing one rather than leaving it to a human; `scripts/sync-scaffold.sh` is the natural owner since it already documents the contract it does not enforce. (b) **Done-feature gate consistency** — a feature at `status: done` has every gate `passed`, checked in `lint_plan`. Both ship with the reconciliation of the state already on disk: four symlinks (landed in [#285](https://github.com/specfuse/loop/pull/285)) and three stale gate files.
 
-**The two traps that make this less mechanical than it looks.** Both are recorded because the obvious implementation is wrong in each case. **The skill-symlink check cannot be symmetric:** seven entries in `.claude/skills/` point at `../../.agents/skills/` (local operator tooling, untracked), so `set(.specfuse/skills/*) == set(.claude/skills/*)` reports non-zero on a correct tree. The guard must assert the forward direction completely and filter the reverse to links resolving inside `.specfuse/skills/`. **The done-feature check must exclude `FEAT-2026-0001`:** it is `status: done` with both gates `open`, and that is correct — it is the bundled worked-example fixture, a template that ships to target projects and was never executed. A naive assertion fires on it, which is an unsatisfiable predicate under `planning-discipline.md` §2, and the likely "fix" is someone mutating the shipped fixture to satisfy a linter.
+**The two traps that make this less mechanical than it looks.** Both are recorded because the obvious implementation is wrong in each case. **The skill-symlink check cannot be symmetric:** seven entries in `.claude/skills/` point at `../../.agents/skills/` (local operator tooling, untracked), so `set(.specfuse/skills/*) == set(.claude/skills/*)` reports non-zero on a correct tree. The guard must assert the forward direction completely and filter the reverse to links resolving inside `.specfuse/skills/`. **The done-feature check must exclude `FEAT-LOOP-2026-0001`:** it is `status: done` with both gates `open`, and that is correct — it is the bundled worked-example fixture, a template that ships to target projects and was never executed. A naive assertion fires on it, which is an unsatisfiable predicate under `planning-discipline.md` §2, and the likely "fix" is someone mutating the shipped fixture to satisfy a linter.
 
 **Benefits.** The next skill added without a symlink, and the next feature closed without its gate flipped, fail a check on the first run instead of being discovered months later by accident. `/attention` stops reporting permanent false noise, which matters because an inbox that is always wrong trains its reader to ignore it. And the three incidents stop being three separate cleanups and become one enforced property: a declared surface is asserted on, or it is not declared.
 
-**What shipped** (gate 1, terminal — three work units, all first-try green). **[#284](https://github.com/specfuse/loop/issues/284) is resolved by T01 + T02**: `tests/test_skill_discovery_links.py` asserts the forward direction completely — every directory under `.specfuse/skills/` has a `.claude/skills/` entry that is a symlink resolving to it — and filters the reverse to links resolving inside `.specfuse/skills/`, so the seven operator-tooling entries pointing at `../../.agents/skills/` do not trip it. It carries an `_INTENTIONALLY_UNLINKED` mapping, empty as shipped, whose entries would each require a written reason and a live target. `scripts/sync-scaffold.sh` now creates any missing forward link instead of describing the contract in two comments and enforcing it in neither: existing entries are left byte-identical, entries resolving outside `.specfuse/skills/` are neither modified nor removed, and a second run creates nothing. It is covered by `tests/sync_scaffold_symlinks.bats`, registered as the `sync-scaffold-symlinks-bats` gate in `.specfuse/verification.yml` — a registration #257's guard required in the same work unit, which is the precedent check doing its job on this feature's own work. **[#287](https://github.com/specfuse/loop/issues/287) is resolved by T03**: `check_done_feature_gates` in `specfuse/loop/lint_plan.py` is a blocking error when a `status: done` feature has any `GATE-NN.md` that is not `status: passed` (`GATE-NN-REVIEW.md` artifacts are skipped by name), and it landed together with the reconciliation of the tree it ships into — `FEAT-2026-0007`/`GATE-02` and `FEAT-2026-0008`/`GATE-01` flipped `awaiting_review` → `passed` because both genuinely completed under closing machinery that predated the terminal flip.
+**What shipped** (gate 1, terminal — three work units, all first-try green). **[#284](https://github.com/specfuse/loop/issues/284) is resolved by T01 + T02**: `tests/test_skill_discovery_links.py` asserts the forward direction completely — every directory under `.specfuse/skills/` has a `.claude/skills/` entry that is a symlink resolving to it — and filters the reverse to links resolving inside `.specfuse/skills/`, so the seven operator-tooling entries pointing at `../../.agents/skills/` do not trip it. It carries an `_INTENTIONALLY_UNLINKED` mapping, empty as shipped, whose entries would each require a written reason and a live target. `scripts/sync-scaffold.sh` now creates any missing forward link instead of describing the contract in two comments and enforcing it in neither: existing entries are left byte-identical, entries resolving outside `.specfuse/skills/` are neither modified nor removed, and a second run creates nothing. It is covered by `tests/sync_scaffold_symlinks.bats`, registered as the `sync-scaffold-symlinks-bats` gate in `.specfuse/verification.yml` — a registration #257's guard required in the same work unit, which is the precedent check doing its job on this feature's own work. **[#287](https://github.com/specfuse/loop/issues/287) is resolved by T03**: `check_done_feature_gates` in `specfuse/loop/lint_plan.py` is a blocking error when a `status: done` feature has any `GATE-NN.md` that is not `status: passed` (`GATE-NN-REVIEW.md` artifacts are skipped by name), and it landed together with the reconciliation of the tree it ships into — `FEAT-LOOP-2026-0007`/`GATE-02` and `FEAT-LOOP-2026-0008`/`GATE-01` flipped `awaiting_review` → `passed` because both genuinely completed under closing machinery that predated the terminal flip.
 
-**How the two traps resolved.** The asymmetric-symlink trap held as written: the guard is forward-complete and reverse-filtered. The done-feature trap turned out to need **two** exclusions, not one — the drafted `FEAT-2026-0001-health-endpoint` (the bundled worked-example fixture, `done` with both gates `open` by design) and also `FEAT-2026-0036-adopt-ruff-016`, which was executed directly as a config-only fix after a loop run on a flawed plan blocked, so its close ceremony deliberately never ran and flipping its gate would assert a ceremony that did not happen. Both are excluded by ID with an inline reason. That mapping is currently a module-level constant in vendored driver source, so a downstream project cannot declare an exclusion of its own without patching a file the next upgrade overwrites — a known sharp edge recorded in the retrospective, not yet addressed.
+**How the two traps resolved.** The asymmetric-symlink trap held as written: the guard is forward-complete and reverse-filtered. The done-feature trap turned out to need **two** exclusions, not one — the drafted `FEAT-LOOP-2026-0001-health-endpoint` (the bundled worked-example fixture, `done` with both gates `open` by design) and also `FEAT-LOOP-2026-0036-adopt-ruff-016`, which was executed directly as a config-only fix after a loop run on a flawed plan blocked, so its close ceremony deliberately never ran and flipping its gate would assert a ceremony that did not happen. Both are excluded by ID with an inline reason. That mapping is currently a module-level constant in vendored driver source, so a downstream project cannot declare an exclusion of its own without patching a file the next upgrade overwrites — a known sharp edge recorded in the retrospective, not yet addressed.
 
 **Consumer note.** The new `lint_plan` error is blocking and repo-wide: a project that upgrades its scaffold while holding a `done` feature with an unclosed gate will start failing its plan-lint gate on the first run after upgrade, with no change of its own. The remedy is the reconciliation T03 performed — flip gates that genuinely completed, exclude by ID and written reason any whose close deliberately never ran.
 
 **Status: done.**
 
-<a id="feat-2026-0071"></a>
-## FEAT-2026-0071 — Label registry + provisioning on init/upgrade
+<a id="feat-loop-2026-0071"></a>
+## FEAT-LOOP-2026-0071 — Label registry + provisioning on init/upgrade
 
-**Why.** Specfuse ships code that queries GitHub labels it never creates. `gh_features.py:28` has run `gh issue list --label specfuse:feature` since FEAT-2026-0003, and [FEAT-2026-0046](roadmap-archive.md#feat-2026-0046) added six more (`needs-human` plus the five escalation categories) whose emitter fails outright on an unknown label — `gh issue create` rejects one. Seven labels, zero provisioning: every consumer repo has to be told to create them by hand, and 0046's own retrospective had to record that as a required operator step rather than something the tool does. Each new label repeats the gap, so the fix is a declared registry rather than a hardcoded list.
+**Why.** Specfuse ships code that queries GitHub labels it never creates. `gh_features.py:28` has run `gh issue list --label specfuse:feature` since FEAT-LOOP-2026-0003, and [FEAT-LOOP-2026-0046](roadmap-archive.md#feat-loop-2026-0046) added six more (`needs-human` plus the five escalation categories) whose emitter fails outright on an unknown label — `gh issue create` rejects one. Seven labels, zero provisioning: every consumer repo has to be told to create them by hand, and 0046's own retrospective had to record that as a required operator step rather than something the tool does. Each new label repeats the gap, so the fix is a declared registry rather than a hardcoded list.
 
 **Goal.** Ship (a) a single label registry — name, colour, description, and the consumer that reads it — as the one place a label is declared, with the seven current entries; and (b) provisioning on `specfuse init` and `specfuse upgrade` that creates any missing label and leaves existing ones untouched.
 
 **The constraint that shapes it.** `scaffold.py` has no subprocess, network, or `gh` call today: init and upgrade are pure filesystem, which is why they work offline, in CI containers, and against non-GitHub remotes. Provisioning must not change that contract. It is **best-effort and never fatal** — no `gh`, not authenticated, remote is not GitHub, not a git repo at all, or any per-label failure reports what it would have done and the command still exits zero. An upgrade must never fail because a label could not be created. Idempotent by construction: existing labels are skipped, never `--force`d over an operator's edited colour or description. The opt-out is the `SPECFUSE_NO_LABELS` environment variable plus a `no_labels=True` keyword argument — **not** a `--no-labels` CLI flag, which would need a coordinated umbrella release because `specfuse/cli.py` lives in the umbrella repository. A future umbrella change can add the flag reading the same variable.
 
-**Scope boundary.** `specfuse-monitor` is **out**: it appears only in [FEAT-2026-0040](#feat-2026-0040)'s framing, its harvester does not exist, and provisioning a label whose sole consumer is unbuilt repeats the `[FEAT-2026-0029/G1-CLOSE]` failure 0039 recorded — shipping a surface whose entry point is nonexistent. 0040 adds its own entry when it ships. Renaming `specfuse:feature` to match the kebab-case of the six newer labels is also out: the inconsistency is real, but a rename orphans issues already carrying the label in every consumer repo.
+**Scope boundary.** `specfuse-monitor` is **out**: it appears only in [FEAT-LOOP-2026-0040](#feat-loop-2026-0040)'s framing, its harvester does not exist, and provisioning a label whose sole consumer is unbuilt repeats the `[FEAT-LOOP-2026-0029/G1-CLOSE]` failure 0039 recorded — shipping a surface whose entry point is nonexistent. 0040 adds its own entry when it ships. Renaming `specfuse:feature` to match the kebab-case of the six newer labels is also out: the inconsistency is real, but a rename orphans issues already carrying the label in every consumer repo.
 
 **Benefits.** The escalation queue works on a fresh repo without a setup checklist, closing the operator step 0046 had to defer. `specfuse:feature` discovery stops depending on an undeclared label. And the next feature that needs a label adds one registry entry instead of rediscovering that nothing creates it.
 
@@ -1156,8 +1156,8 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.**
 
-<a id="feat-2026-0046"></a>
-## FEAT-2026-0046 — Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill
+<a id="feat-loop-2026-0046"></a>
+## FEAT-LOOP-2026-0046 — Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill
 
 **Why.** An autonomous agent is only trustworthy if what it cannot handle surfaces reliably, with enough context to act on in minutes. Escalations need one queue with an audit trail — GitHub issues, not chat threads — plus a fast local view. Useful immediately with today's manual loop (blocked WUs, awaiting_review gates, blocked features, stale PRs), before any agent exists.
 
@@ -1165,31 +1165,31 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Benefits.** One escalation queue, two views (GH native + rich local session); nothing the agent parks goes silent; the operator's check-in ritual becomes "open /attention, work top-down".
 
-**Delivered** (gate 1, terminal — see [RETROSPECTIVE](features/FEAT-2026-0046-escalation-contract/RETROSPECTIVE.md)). `specfuse/loop/escalation.py`: `NEEDS_HUMAN_LABEL`, the five-member `CATEGORY_LABELS` frozenset (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval), `render_escalation_body` producing the six-part body from `operator-escalation.md` plus a `Reply with a number` section and the `<!-- specfuse:escalation id=… -->` correlation marker, `validate_escalation_body` holding the renderer to that shape, and `emit_escalation` — idempotent per correlation ID via find-then-create over an injectable runner, mirroring `gh_backend.GitHubBackend`'s `_runner` seam. The `/attention` skill ships canonical at `plugins/specfuse/skills/attention/SKILL.md`, vendored byte-identically into `.specfuse/skills/`, sweeping blocked WUs, `awaiting_review` gates, `blocked` features and stale PRs into one priority-ordered view and delegating per-feature depth to `gate-status`. Its read-only claim is enforced by a grep guard with a positive control over both copies, not by prose. 21 tests across four new modules, plus the 4-test vendoring guard.
+**Delivered** (gate 1, terminal — see [RETROSPECTIVE](features/FEAT-LOOP-2026-0046-escalation-contract/RETROSPECTIVE.md)). `specfuse/loop/escalation.py`: `NEEDS_HUMAN_LABEL`, the five-member `CATEGORY_LABELS` frozenset (gate-review, blocked-wu, triage-question, drafting-needed, merge-approval), `render_escalation_body` producing the six-part body from `operator-escalation.md` plus a `Reply with a number` section and the `<!-- specfuse:escalation id=… -->` correlation marker, `validate_escalation_body` holding the renderer to that shape, and `emit_escalation` — idempotent per correlation ID via find-then-create over an injectable runner, mirroring `gh_backend.GitHubBackend`'s `_runner` seam. The `/attention` skill ships canonical at `plugins/specfuse/skills/attention/SKILL.md`, vendored byte-identically into `.specfuse/skills/`, sweeping blocked WUs, `awaiting_review` gates, `blocked` features and stale PRs into one priority-ordered view and delegating per-feature depth to `gate-status`. Its read-only claim is enforced by a grep guard with a positive control over both copies, not by prose. 21 tests across four new modules, plus the 4-test vendoring guard.
 
-**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-2026-0049](#feat-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-2026-0047](#feat-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
+**Deviations from the goal above, each deliberate.** Assignment is a single `assignee` parameter defaulting to `DEFAULT_ASSIGNEE`; the per-category assignee map is not built — no caller needed one, and the parameter is the seam that would carry it. Parsing an answered issue and closing it is [FEAT-LOOP-2026-0049](#feat-loop-2026-0049), which lists this contract as its blocker. Outbound notification is [FEAT-LOOP-2026-0047](#feat-loop-2026-0047). `emit_escalation` is invoked, never auto-fired: no call site exists in `loop.py`, asserted by a grep, per `[FEAT-LOOP-2026-0003/G3-LESSONS]` on live-mutation work inside the dispatch loop.
 
 **Operator step before first real use.** No work unit touched live GitHub — every `gh` interaction ran through an injected stub. Create the six labels in the target repository and run one real emission twice to confirm the create call and the idempotency search; the retrospective's `## What the loop did NOT verify` section carries the detail and the fallback if the marker search does not match.
 
 **Status: done.**
 
-<a id="feat-2026-0070"></a>
-## FEAT-2026-0070 — Terminal-flip contract: hedged-verdict acceptance, row-status breadth, auto-close debt
+<a id="feat-loop-2026-0070"></a>
+## FEAT-LOOP-2026-0070 — Terminal-flip contract: hedged-verdict acceptance, row-status breadth, auto-close debt
 
 **Why.** Three issues, one symptom: **a correctly-closed feature whose recorded state lies.** [#226](https://github.com/specfuse/loop/issues/226) — an `autonomy: auto` feature self-dispatches from a `planned` row, but `fire_terminal_flips` only handles `active -> done`, so the row never flips and the `roadmap_row_not_done` invariant escalates on a correct close. [#243](https://github.com/specfuse/loop/issues/243) — a close writing `verdict: met_locally` leaves every WU `done`, the gate `awaiting_review`, and PLAN + roadmap `active`, with no supported path to `done`; for some features `met_locally` is the ceiling by construction, not by accident, and `/wrap-feature` refuses them by hard rule. [#241](https://github.com/specfuse/loop/issues/241) — an auto-closed gate skips the per-criterion deferred-verification walk and nothing downstream is obliged to reconcile it. All three were observed on real closes in this repo.
 
-**Goal.** Gate 1 makes a correctly-closed feature reach `done` **through the driver** from every legitimate starting state: broaden the row flip to any non-`done` status (#226); add a driver-side primitive that re-evaluates a completed close WU's verdict and fires the flips when it now permits them; build `/accept-hedged-close` on that primitive so accepting a standing hedge leaves an auditable record instead of three hand-edits (#243); and land the pre-registered `lint_plan` verdict-exempt fix from `[FEAT-2026-0020/G1-CLOSE-INTERMEDIATE]`. Gate 2 makes an auto-closed gate's skipped ceremony a visible debt rather than a silent saving (#241), drafted by `plan-next` once the flip contract has settled.
+**Goal.** Gate 1 makes a correctly-closed feature reach `done` **through the driver** from every legitimate starting state: broaden the row flip to any non-`done` status (#226); add a driver-side primitive that re-evaluates a completed close WU's verdict and fires the flips when it now permits them; build `/accept-hedged-close` on that primitive so accepting a standing hedge leaves an auditable record instead of three hand-edits (#243); and land the pre-registered `lint_plan` verdict-exempt fix from `[FEAT-LOOP-2026-0020/G1-CLOSE-INTERMEDIATE]`. Gate 2 makes an auto-closed gate's skipped ceremony a visible debt rather than a silent saving (#241), drafted by `plan-next` once the flip contract has settled.
 
-**Benefits.** Terminal state stops being hand-edited — which happened twice in one session on FEAT-2026-0069 and left no record of why. The `autonomy: auto` path stops escalating on correct closes. And the honest hedged verdict stops being a dead end, so a feature whose ceiling is `met_locally` by construction can ship without either overstating its verdict or lying on the roadmap.
+**Benefits.** Terminal state stops being hand-edited — which happened twice in one session on FEAT-LOOP-2026-0069 and left no record of why. The `autonomy: auto` path stops escalating on correct closes. And the honest hedged verdict stops being a dead end, so a feature whose ceiling is `met_locally` by construction can ship without either overstating its verdict or lying on the roadmap.
 
-**The constraint that outranks everything else.** `[FEAT-2026-0023/G1-CLOSE]`: **terminal-state flips have exactly ONE driver-side owner, called identically by every close path** — issue #49 existed because two paths diverged. `/accept-hedged-close` must therefore call the driver primitive, never write the three surfaces itself. A WU that hand-writes a terminal surface has failed this feature even with every gate green, and both closes audit it explicitly.
+**The constraint that outranks everything else.** `[FEAT-LOOP-2026-0023/G1-CLOSE]`: **terminal-state flips have exactly ONE driver-side owner, called identically by every close path** — issue #49 existed because two paths diverged. `/accept-hedged-close` must therefore call the driver primitive, never write the three surfaces itself. A WU that hand-writes a terminal surface has failed this feature even with every gate green, and both closes audit it explicitly.
 
 **Held at drafting, deliberately not built.** #243's candidate 2, a roadmap status between `active` and `done` (`done_hedged`): a new status value is a contract every downstream project, every skill, and `lint_plan`'s row parser reads, and `done` carrying an open-follow-up count gets most of the benefit without a new enum member. And #243's candidate 3, pre-declaring the `met_locally` ceiling at draft time: real value, but it is prevention rather than repair and does not help the features already in the dead end — the natural follow-up feature if gate 1 lands cleanly.
 
-**Outcome.** Both gates shipped; all eight substantive work units passed on their first recorded attempt, across two gates and ten dispatched sessions. Terminal verdict **`met_locally`** — see `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/RETROSPECTIVE.md` § *Hedged follow-up record* for the seven-entry record and the exact condition that upgrades each one.
+**Outcome.** Both gates shipped; all eight substantive work units passed on their first recorded attempt, across two gates and ten dispatched sessions. Terminal verdict **`met_locally`** — see `.specfuse/features/FEAT-LOOP-2026-0070-terminal-flip-contract/RETROSPECTIVE.md` § *Hedged follow-up record* for the seven-entry record and the exact condition that upgrades each one.
 
 - **[#226](https://github.com/specfuse/loop/issues/226) — resolved.** `fire_terminal_flips` now replaces whatever non-`done` value the roadmap row's Status cell holds, instead of handling only the `active -> done` transition. An `autonomy: auto` feature that self-dispatched from a `planned` row reaches `done` rather than escalating `roadmap_row_not_done` on a correct close. Three tests, including a regression guard proving `active -> done` is bit-identical to before.
-- **[#243](https://github.com/specfuse/loop/issues/243) — resolved via candidate 1, with a second defect closed that the issue did not report.** `recheck_terminal_verdict(feature_dir, repo_root)` plus `--recheck-verdict FEATURE_ID` re-reads a *completed* close WU's verdict from disk and calls the existing `fire_terminal_flips` when it now permits the flips; `/accept-hedged-close` is the operator path built on top of it. The unreported defect: `fire_terminal_flips` runs at close-WU-*outcome* time, so a verdict legitimately upgraded after the close WU reached `done` was never re-read — which is what forced FEAT-2026-0069's three surfaces to be hand-flipped. **The constraint held:** the skill calls the primitive and writes no terminal surface, audited fresh at both closes.
+- **[#243](https://github.com/specfuse/loop/issues/243) — resolved via candidate 1, with a second defect closed that the issue did not report.** `recheck_terminal_verdict(feature_dir, repo_root)` plus `--recheck-verdict FEATURE_ID` re-reads a *completed* close WU's verdict from disk and calls the existing `fire_terminal_flips` when it now permits the flips; `/accept-hedged-close` is the operator path built on top of it. The unreported defect: `fire_terminal_flips` runs at close-WU-*outcome* time, so a verdict legitimately upgraded after the close WU reached `done` was never re-read — which is what forced FEAT-LOOP-2026-0069's three surfaces to be hand-flipped. **The constraint held:** the skill calls the primitive and writes no terminal surface, audited fresh at both closes.
 - **[#241](https://github.com/specfuse/loop/issues/241) — resolved via options 1 and 3.** Both auto-close stub writers now enumerate the gate's unwalked acceptance criteria as a concrete `deferred:` worklist and emit a machine-readable debt marker; the post-pass invariant `assert_autoclose_debt_reconciled` refuses a terminal close that ignores a marked predecessor's debt; and a `lint_plan` WARN predicts that refusal at arm time so the guard costs a lint line rather than a re-dispatch. The invariant is **marker-gated**: the obvious form fires on 6 of the 11 correctly-closed features that have auto-closed a gate, and was rejected at arming as unsatisfiable; the shipped form reports zero across all 36 features on disk, re-verified at the terminal close.
 
 **Still held — open, not closed by this feature.** Restated so that holding them does not read as resolving them. Both remain #243 candidates and both are the natural content of the flip-contract follow-up feature, alongside `/accept-hedged-close`'s laundered hedge (accepting a hedge overwrites `verdict: met_locally` with `met`, so an accepted hedge is byte-identical to a clean one — `verdict_accepted_from` / `_reason` / `_at` is the fix) and the missing `--recheck-verdict` CLI-level test:
@@ -1199,23 +1199,23 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.** — the terminal flips are withheld by design on a hedged verdict. `PLAN.md`, the gate, and this row stay un-flipped until an operator accepts the close through `/accept-hedged-close`, which is the path this feature shipped. The driver owns that flip; it is not hand-edited.
 
-<a id="feat-2026-0051"></a>
-## FEAT-2026-0051 — Pre-flight baseline gate probe + preexisting_gate_failure halt
+<a id="feat-loop-2026-0051"></a>
+## FEAT-LOOP-2026-0051 — Pre-flight baseline gate probe + preexisting_gate_failure halt
 
-**Why.** A `code`-set gate that is already red on the feature's base commit becomes every work unit's exit oracle, so each WU spins to `spinning_signature_repeat` / `spinning_detected` against a failure it did not cause and could not fix. A live run burned roughly $8 of attempt budget across two WUs — one of them a zero-dependency file — on a dependency-audit advisory published after the base tree was last green, with the lockfile byte-identical to the integration branch. This is the time-varying-oracle failure mode already recorded in LEARNINGS (`[FEAT-2026-0007/G1-CLOSE]`); dependency audits are the canonical case, but it generalizes to any externally-fed gate whose verdict changes without a code change.
+**Why.** A `code`-set gate that is already red on the feature's base commit becomes every work unit's exit oracle, so each WU spins to `spinning_signature_repeat` / `spinning_detected` against a failure it did not cause and could not fix. A live run burned roughly $8 of attempt budget across two WUs — one of them a zero-dependency file — on a dependency-audit advisory published after the base tree was last green, with the lockfile byte-identical to the integration branch. This is the time-varying-oracle failure mode already recorded in LEARNINGS (`[FEAT-LOOP-2026-0007/G1-CLOSE]`); dependency audits are the canonical case, but it generalizes to any externally-fed gate whose verdict changes without a code change.
 
 **Goal.** Run the `code` gate set once at gate entry, before the gate's first WU is dispatched, and record the failing gates plus their signatures as the gate's baseline in `GATE-NN.md` frontmatter. A non-empty baseline halts pre-dispatch under a new `preexisting_gate_failure` reason — distinct from the spinning escalations, which fire only after attempts are spent — with zero work units dispatched. The halt message states in plain language which gate is red, the exact failing signature, and the `git diff <integration-branch>...HEAD --stat` proof that the base tree is unchanged, so no WU caused it. The baseline is re-measured only when the tree moves, keeping resume cheap, and `--no-baseline-probe` (plus a `verification.yml` opt-out) restores today's behavior exactly — a switch that disables the probe, not a mute that suppresses any gate's verdict.
 
 **Benefits.** Repo-wide debt stops charging rent per work unit: one gate-set run replaces a full attempt budget burned per WU, and the operator gets the conclusion — pre-existing, not yours — in the first escalation instead of deriving it by hand after several spurious ones. Enforcement is untouched: every WU is still gated on the full set with unchanged pass/fail semantics.
 
-**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-2026-0052](roadmap.md#feat-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
+**Scope note.** The baseline-delta ratchet, the waiver that lets a feature proceed against a red baseline, and `gh` tracking-issue emission are deliberately deferred to [FEAT-LOOP-2026-0052](roadmap.md#feat-loop-2026-0052) — the ratchet rewrites the pass/fail semantics of the driver's own exit oracle, and the `gh` surface produces no in-loop evidence. Landing the brake first lets that work be designed against real baseline data. Filed from issue #234.
 
 **Status: done.**
 
-<a id="feat-2026-0037"></a>
-## FEAT-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
+<a id="feat-loop-2026-0037"></a>
+## FEAT-LOOP-2026-0037 — Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families)
 
-**Why.** FEAT-2026-0036 pinned the lint `select` to the classic `E4,E7,E9,F` to stop a version bump from silently changing the gate — the right move for stability, but it deliberately declined the ~300 findings ruff 0.16 now surfaces by default. Some of those families are genuinely valuable and worth adopting on purpose: `PLW1510` (`subprocess.run` without `check=` — a real correctness smell in a driver that shells out constantly), `RUF059` (unused unpacked bindings), `SIM117`/`SIM102` (nested-`with` / collapsible-`if`), `LOG015` (root-logger use), `B`/`S` (bugbear / security). This feature decides — deliberately, family by family — which to add, and does the fixes.
+**Why.** FEAT-LOOP-2026-0036 pinned the lint `select` to the classic `E4,E7,E9,F` to stop a version bump from silently changing the gate — the right move for stability, but it deliberately declined the ~300 findings ruff 0.16 now surfaces by default. Some of those families are genuinely valuable and worth adopting on purpose: `PLW1510` (`subprocess.run` without `check=` — a real correctness smell in a driver that shells out constantly), `RUF059` (unused unpacked bindings), `SIM117`/`SIM102` (nested-`with` / collapsible-`if`), `LOG015` (root-logger use), `B`/`S` (bugbear / security). This feature decides — deliberately, family by family — which to add, and does the fixes.
 
 **Goal.** Triage ruff 0.16's expanded default families against this codebase: for each, decide adopt / decline (with a one-line reason), add the adopted ones to `[tool.ruff.lint] select`, and fix the findings — the semantic ones (e.g. `subprocess check=`) reviewed individually, not blanket-autofixed. Land per-family or in small reviewable batches, not one 300-line sweep. Some findings are in `tests/` and low-stakes; prioritise the `specfuse/` driver and `.specfuse/scripts/` surfaces.
 
@@ -1223,8 +1223,8 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.**
 
-<a id="feat-2026-0032"></a>
-## FEAT-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
+<a id="feat-loop-2026-0032"></a>
+## FEAT-LOOP-2026-0032 — Non-WSL Windows execution (native driver + Git-Bash)
 
 **Why.** Loop requires WSL on Windows today. WSL is blocked on many corporate-managed devices and too heavy for non-technical users, excluding exactly the population that needs turnkey execution.
 
@@ -1234,8 +1234,8 @@ Re-measured 2026-08-03 before the second draft attempt, and the premise had drif
 
 **Status: done.**
 
-<a id="feat-2026-0031"></a>
-## FEAT-2026-0031 — Configurable integration branch
+<a id="feat-loop-2026-0031"></a>
+## FEAT-LOOP-2026-0031 — Configurable integration branch
 
 **Why.** A feature branch is cut from whatever HEAD happens to be — `ensure_feature_branch`
 runs a bare `git checkout -B <branch>` with no base ref — and the GH backend hardcodes
@@ -1261,8 +1261,8 @@ have checked out, which also closes the silent-wrong-base failure mode.
 
 **Status: done.**
 
-<a id="feat-2026-0025"></a>
-## FEAT-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
+<a id="feat-loop-2026-0025"></a>
+## FEAT-LOOP-2026-0025 — LEARNINGS curation + archival (bound planning-context growth)
 
 **Why.** `.specfuse/LEARNINGS.md` is append-only and loaded **whole** into
 planning context by `/draft-feature`, `/pick-feature`, `plan-next`, and
@@ -1272,7 +1272,7 @@ tokens (~4 entries/feature, growing unbounded). The driver enforces appends
 archival/compaction counterpart the way `roadmap.md` has `roadmap-archive.md` +
 `auto_archive_feature`, and `learnings-suggest` only ADDS candidates. Left
 unchecked this inflates every planning session's context cost and dilutes signal
-as superseded/duplicate rules accumulate. Surfaced reviewing FEAT-2026-0024
+as superseded/duplicate rules accumulate. Surfaced reviewing FEAT-LOOP-2026-0024
 (whose `LEARNINGS.template.md` split already separated portable methodology
 wisdom from this repo's feature-specific history).
 
@@ -1296,15 +1296,15 @@ methodology's feedback loop: today it can only grow, never compact.
 
 **Status: done.**
 
-<a id="feat-2026-0030"></a>
-## FEAT-2026-0030 — Driver-side sanitization of agent-authored text before events.jsonl staging
+<a id="feat-loop-2026-0030"></a>
+## FEAT-LOOP-2026-0030 — Driver-side sanitization of agent-authored text before events.jsonl staging
 
 **Why.** The loop driver writes agent-authored free-text (blocked reasons,
 failure notes) into `events.jsonl`, then stages and commits that audit trail. When
 the text happens to contain a token the repo's structural leak-scan flags — e.g. an
 absolute home-directory path (a `~`-expanded checkout location) the agent mentioned
 while explaining where it searched — the pre-commit hook rejects the bookkeeping commit and the gate halts
-mid-run. Observed live on FEAT-2026-0029/T01 (driver 0.3.6): the agent's
+mid-run. Observed live on FEAT-LOOP-2026-0029/T01 (driver 0.3.6): the agent's
 `blocked_reason` quoted a local checkout path, tripping `user-path` findings on
 `events.jsonl` lines 29-30. This is the same failure family as the now-closed #76
 (which redacted the leak hook's *own* FINDINGS text) and #73 (the general form),
@@ -1329,8 +1329,8 @@ staged events.jsonl passes `leak_scan.py --staged`).
 
 **Status: done.**
 
-<a id="feat-2026-0029"></a>
-## FEAT-2026-0029 — One-command Specfuse scaffold upgrade skill
+<a id="feat-loop-2026-0029"></a>
+## FEAT-LOOP-2026-0029 — One-command Specfuse scaffold upgrade skill
 
 **Why.** Upgrading a project's Specfuse scaffold today means a human hand-runs
 `specfuse upgrade` then repeats the same git choreography every time — branch off
@@ -1353,16 +1353,16 @@ logic.
 
 **Status: done.**
 
-<a id="feat-2026-0026"></a>
-## FEAT-2026-0026 — Scaffold-data in the pip package: `specfuse init` replaces init.sh
+<a id="feat-loop-2026-0026"></a>
+## FEAT-LOOP-2026-0026 — Scaffold-data in the pip package: `specfuse init` replaces init.sh
 
-**Why.** FEAT-2026-0019 shipped the pip driver (`specfuse-loop`), the `specfuse`
+**Why.** FEAT-LOOP-2026-0019 shipped the pip driver (`specfuse-loop`), the `specfuse`
 umbrella CLI, and the Claude Code plugin — but `specfuse init` cannot yet scaffold a
 new repo from pip alone: the scaffold data (`templates/`, `rules/`,
 `verification.yml.example`, `roadmap.template.md`, `LEARNINGS.template.md`) still lives
 in the loop repo and ships only via the bash `init.sh`. So `init.sh` remains the
 bootstrap and carries a v1.0 deprecation banner it cannot yet honor — v1.1 cannot
-delete it until pip-native scaffolding exists. Surfaced in FEAT-2026-0019's gate-4
+delete it until pip-native scaffolding exists. Surfaced in FEAT-LOOP-2026-0019's gate-4
 retrospective (terminal verdict's recommended follow-up).
 
 **Goal.** Ship the scaffold data inside the `specfuse-loop` (or `specfuse`) package and
@@ -1382,7 +1382,7 @@ fully replacing `init.sh`.
 **Benefits.** `init.sh`'s deprecation becomes real (v1.1 deletion unblocked). One
 delivery channel (pip) for both code and scaffold; offline/sandboxed installs work
 from the wheel; version-skew between scaffold and driver collapses to the package
-version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
+version. Closes the last gap between FEAT-LOOP-2026-0019's vision and what shipped.
 
 **Gate sketch (drafted at /draft-feature time).**
 - G1 — package the scaffold seed (templates, rules, examples, roadmap/LEARNINGS
@@ -1395,21 +1395,21 @@ version. Closes the last gap between FEAT-2026-0019's vision and what shipped.
   preserve user-authored, prune internal, stamp); deprecate then delete `init.sh`
   (v1.1).
 
-**Status: done.** Depends on FEAT-2026-0019 (the package + CLI it extends).
-Packaging/harness-coupled — per LEARNINGS `[FEAT-2026-0019/G1]`, expect to run this
+**Status: done.** Depends on FEAT-LOOP-2026-0019 (the package + CLI it extends).
+Packaging/harness-coupled — per LEARNINGS `[FEAT-LOOP-2026-0019/G1]`, expect to run this
 interactively (atomic), not per-WU loop dispatch.
 
-<a id="feat-2026-0024"></a>
-## FEAT-2026-0024 — Hashed denylist + issue/PR-body leak guard
+<a id="feat-loop-2026-0024"></a>
+## FEAT-LOOP-2026-0024 — Hashed denylist + issue/PR-body leak guard
 
-**Why.** Closes the two leak-guard surface gaps FEAT-2026-0020's review
+**Why.** Closes the two leak-guard surface gaps FEAT-LOOP-2026-0020's review
 surfaced (GitHub issues #45, #46), both rooted in LEARNINGS
-`[FEAT-2026-0020/G2/leak-guard-surface-asymmetry]`. (1) `leak_scan.py`'s
+`[FEAT-LOOP-2026-0020/G2/leak-guard-surface-asymmetry]`. (1) `leak_scan.py`'s
 denylist (`leak_denylist.txt`) is gitignored — committing the literals to a
 public repo would re-leak them — so in CI the `--all` gate enforces gitleaks
 secrets only, NOT org-name re-introduction. (2) The pre-commit hook scans git
 commits only; GitHub issue/PR titles, bodies, and comments are a separate
-public surface it can't see — exactly where the FEAT-2026-0020 leaks landed.
+public surface it can't see — exactly where the FEAT-LOOP-2026-0020 leaks landed.
 
 **Goal.** Two gates. Gate 1 (#45): a committed, salted-SHA-256 hashed denylist
 (`leak_denylist.hashes`) that CI loads, giving `scan_repo`/`--all` org-name
@@ -1438,8 +1438,8 @@ surface (plaintext present locally). `act`/Docker Action emulation in-loop
 gate 1's committed hashed denylist. `planned_cost_usd: 11.50` covers the five
 WUs that exist now; `plan-next` revises when gate 2's Action WUs are drafted.
 
-<a id="feat-2026-0023"></a>
-## FEAT-2026-0023 — Lifecycle integration test + consolidate terminal-state ownership
+<a id="feat-loop-2026-0023"></a>
+## FEAT-LOOP-2026-0023 — Lifecycle integration test + consolidate terminal-state ownership
 
 **Why.** Three driver bugs surfaced in a single session (2026-06-16), all of
 the same shape — **seam bugs at handoffs between subsystems**, none catchable
@@ -1496,24 +1496,24 @@ branches (#48 especially) if they're needed before this feature is pulled.
 terminal-ownership consolidation WU + closing ceremony. Pull before the next
 feature that exercises an untested close-path combination.
 
-<a id="feat-2026-0021"></a>
-## FEAT-2026-0021 — Ceremony proportionality + slim WU template
+<a id="feat-loop-2026-0021"></a>
+## FEAT-LOOP-2026-0021 — Ceremony proportionality + slim WU template
 
 _No inline detail section was recorded for this feature; stub written at archive time._
 
-<a id="feat-2026-0022"></a>
-## FEAT-2026-0022 — Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation
+<a id="feat-loop-2026-0022"></a>
+## FEAT-LOOP-2026-0022 — Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation
 
 **Goal.** The driver refuses to commit an implementation WU as `done` when a
 declared deliverable is absent or empty, or when the WU touched zero files —
-closing the zero/partial-deliverable hollow-pass class FEAT-2026-0008/0015 left
+closing the zero/partial-deliverable hollow-pass class FEAT-LOOP-2026-0008/0015 left
 open. Filed from GitHub issue #41 and LEARNINGS
-`[FEAT-2026-0020/G2/hollow-pass-presence-gates]` (T16 passed `done` touching
+`[FEAT-LOOP-2026-0020/G2/hollow-pass-presence-gates]` (T16 passed `done` touching
 zero files at ~$1.48; T12 created `SECURITY.md` but not the bundled
 `CODE_OF_CONDUCT.md`).
 
 **Shape.** Single terminal gate, three driver-side guards + `close`, mirroring
-FEAT-2026-0008. T01 adds the `produces:` WU frontmatter field (parse +
+FEAT-LOOP-2026-0008. T01 adds the `produces:` WU frontmatter field (parse +
 `WorkUnit.produces` + advisory lint WARN). T02 (`assert_declared_deliverables`)
 blocks a `complete` whose declared `produces:` path is absent or empty. T03
 (`assert_implementation_touched_files`) blocks an `implementation` WU whose
@@ -1523,8 +1523,8 @@ attempt touched zero deliverable files, independent of `produces:`.
 existing WUs, broadening the verification contract, cost levers.
 
 
-<a id="feat-2026-0003"></a>
-## FEAT-2026-0003 — GitHub feature-pick for the loop
+<a id="feat-loop-2026-0003"></a>
+## FEAT-LOOP-2026-0003 — GitHub feature-pick for the loop
 
 **Why.** Teach the loop to adopt a feature dispatched by the Specfuse
 Orchestrator — so an orchestrator can hand a feature to a component repo's loop
@@ -1570,13 +1570,13 @@ report-back, lint-clean grind — are proven live against `example-org/example-a
 `roadmap_goal` is met. See `RETROSPECTIVE.md §Feature-arc retrospective` and
 `SMOKE-INIT-2026-0001-F06.md`.
 
-<a id="feat-2026-0004"></a>
-## FEAT-2026-0004 — Single-driver working-tree lock
+<a id="feat-loop-2026-0004"></a>
+## FEAT-LOOP-2026-0004 — Single-driver working-tree lock
 
 **Why.** Two `loop.py` drivers sharing one working tree clobber each other: the
 driver's per-WU `git reset --hard` and `git checkout -B` are tree-global, so any
 interleaving corrupts WU state and mixes commits across units. Observed during the
-FEAT-2026-0003 dogfood: a sandboxed `ps` falsely reported the first driver as dead,
+FEAT-LOOP-2026-0003 dogfood: a sandboxed `ps` falsely reported the first driver as dead,
 a second was launched, and competing resets produced commits mixing multiple WUs'
 work plus contradictory WU statuses. True parallelism across features uses separate
 `git worktrees` — each worktree has its own working tree and therefore its own lock.
@@ -1595,8 +1595,8 @@ met in one attempt ($0.89, ~5 min). GATE-01 status: `passed`.
 
 **Status: done.** Single-gate feature; closing sequence in progress.
 
-<a id="feat-2026-0005"></a>
-## FEAT-2026-0005 — Combined close for single-gate features
+<a id="feat-loop-2026-0005"></a>
+## FEAT-LOOP-2026-0005 — Combined close for single-gate features
 
 **Why.** The four closing ceremonies (retrospective → lessons → docs → plan-next)
 cost four dispatches — including an Opus `plan-next` — even on a one-WU feature
@@ -1615,14 +1615,14 @@ the four-WU sequence (regression). All acceptance criteria met in one attempt
 ($1.23, ~7 min). GATE-01 status: `passed`.
 
 This feature itself closes with the four-WU sequence — the `close` type does not
-exist when this feature's driver loads `loop.py`. FEAT-2026-0006 is the first
+exist when this feature's driver loads `loop.py`. FEAT-LOOP-2026-0006 is the first
 feature to use the new `close` WU.
 
-**Status: done.** Single-gate feature. FEAT-2026-0006 is the first feature to use
+**Status: done.** Single-gate feature. FEAT-LOOP-2026-0006 is the first feature to use
 the new `close` WU.
 
-<a id="feat-2026-0006"></a>
-## FEAT-2026-0006 — WU execution-time tracking
+<a id="feat-loop-2026-0006"></a>
+## FEAT-LOOP-2026-0006 — WU execution-time tracking
 
 **Why.** The loop already captured cost per WU; wall-clock execution time was missing.
 Adding duration alongside cost gives operators a complete picture of WU weight (both
@@ -1638,7 +1638,7 @@ cumulative summing across a failed-then-passed sequence, frontmatter write, and
 `cost_tracking: false` independence. All acceptance criteria met in one attempt (~$1.00,
 ~5 min). GATE-01 status: `passed`.
 
-This feature is also the first live use of FEAT-2026-0005's `close` WU type —
+This feature is also the first live use of FEAT-LOOP-2026-0005's `close` WU type —
 closing in a single dispatch rather than the four-WU sequence. The combined close
 ceremony worked correctly.
 
@@ -1646,8 +1646,8 @@ ceremony worked correctly.
 execution time alongside the cost it already captures. See
 `RETROSPECTIVE.md §Feature-arc retrospective`.
 
-<a id="feat-2026-0007"></a>
-## FEAT-2026-0007 — Dispatch cost controls
+<a id="feat-loop-2026-0007"></a>
+## FEAT-LOOP-2026-0007 — Dispatch cost controls
 
 **Why.** Per-WU dispatch cost was growing with no lever to control it. Three
 mechanisms were missing: model-family aliasing (so WU specs don't pin model
@@ -1673,7 +1673,7 @@ verification passed, but no production code was written. Required symbols
 (`EFFORT_LADDER`, `effort_for_attempt`, `terseness_for_attempt`) are absent from
 `loop.py`. The `code` gate passed because no new tests were registered and existing
 tests make no assertion about absent functions. This failure mode is documented in
-`RETROSPECTIVE.md`; two `[FEAT-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`
+`RETROSPECTIVE.md`; two `[FEAT-LOOP-2026-0007/G1-LESSONS]` entries in `LEARNINGS.md`
 cover the completeness-guard and function-existence verification gaps. T04's
 implementation was deferred to Gate 2 (T08H).
 
@@ -1698,7 +1698,7 @@ frontmatter status flip, and `status: done` advanced the dependency frontier
 despite no symbols landing. After Gate 2: `EFFORT_LADDER`, `effort_for_attempt`,
 `terseness_for_attempt`, `cache_hit_rate`, and `gate_summary` are absent from
 `loop.py`. The retry escalation ladder and gate-level telemetry are undelivered.
-Two `[FEAT-2026-0007/G2-LESSONS]` entries in `LEARNINGS.md` cover the 0-token
+Two `[FEAT-LOOP-2026-0007/G2-LESSONS]` entries in `LEARNINGS.md` cover the 0-token
 session gap and the limit of agent-side safeguards.
 
 **Status: done.** Four `roadmap_goal` levers (model alias, effort tier, terseness,
@@ -1707,14 +1707,14 @@ T04 retry ladder and T08 telemetry deferred — three reland attempts (T04, T08H
 all silently no-op'd via the same 0-token-session failure path. The fix is
 driver-side (refuse-commit on 0 tokens / empty diff / failed smoke-import), not
 spec-side, so it belongs in a successor feature rather than a Gate 3. **Strongly
-recommended next feature: FEAT-2026-0008 "Driver completeness-guard."** See
+recommended next feature: FEAT-LOOP-2026-0008 "Driver completeness-guard."** See
 `RETROSPECTIVE.md §Feature-arc verdict` for the full terminal rationale and the
 G4-LESSONS three-test analysis.
 
-<a id="feat-2026-0008"></a>
-## FEAT-2026-0008 — Driver completeness-guard
+<a id="feat-loop-2026-0008"></a>
+## FEAT-LOOP-2026-0008 — Driver completeness-guard
 
-**Why.** FEAT-2026-0007 shipped four cost-control levers but T04 / T08H / T08
+**Why.** FEAT-LOOP-2026-0007 shipped four cost-control levers but T04 / T08H / T08
 all reported `status: done` while landing no production code (hollow passes,
 each via a 0-token session that the driver committed because the WU
 frontmatter status flip was the only staged change). Agent-side safeguards
@@ -1745,16 +1745,16 @@ All three landed in one attempt each (T01 $2.61 / T02 $1.75 / T03 $1.66,
 ~17 min total). GATE-01 status: `passed`.
 
 **Status: done.** `roadmap_goal` met — all three guards present in `loop.py`
-AND wired into the attempt loop in `run()`. Per the FEAT-2026-0007 verdict's
+AND wired into the attempt loop in `run()`. Per the FEAT-LOOP-2026-0007 verdict's
 mandatory recommendation, any one of the three would have caught T04/T08H/T08;
-all three together close the gap structurally. The deferred FEAT-2026-0007
+all three together close the gap structurally. The deferred FEAT-LOOP-2026-0007
 work (T04 retry escalation ladder, T08 telemetry) can now be relanded under
 FEAT-2026-0009 — a third silent-no-op is structurally impossible. See
 `RETROSPECTIVE.md §Feature-arc verdict` for the audit and the recursive
 close-ceremony check.
 
-<a id="feat-2026-0010"></a>
-## FEAT-2026-0010 — Roadmap restructure: add + archive
+<a id="feat-loop-2026-0010"></a>
+## FEAT-LOOP-2026-0010 — Roadmap restructure: add + archive
 
 **Why.** The roadmap file currently mixes detail sections for every
 feature — done, abandoned, planned, active — into one document. As
@@ -1771,7 +1771,7 @@ without losing history:
   and `active` features; move `done` and `abandoned` detail sections
   to a new `.specfuse/roadmap-archive.md` (table rows stay in the
   main file with a link to the archive anchor).
-- Migrate FEAT-2026-0003..0008's existing detail sections to the
+- Migrate FEAT-LOOP-2026-0003..0008's existing detail sections to the
   archive as the first dogfooding pass.
 - Ship a `roadmap-add` skill: interactive append of a new planned
   row + detail section, auto-picking the next FEAT-YYYY-NNNN ID,
@@ -1788,7 +1788,7 @@ without losing history:
 Make adding a planned entry a one-command operation, removing the
 friction that causes ad-hoc shorthand to leak into the table.
 Preserve full history in a file that's never loaded on the hot
-path. Foundation for FEAT-2026-0011, which adds new columns and
+path. Foundation for FEAT-LOOP-2026-0011, which adds new columns and
 scoring data the table can't carry while it's still hand-edited.
 
 **Verification.** `pick-feature` invoked against the restructured
@@ -1800,10 +1800,10 @@ the archive entry). Migration of 0003..0008 leaves the table
 unchanged in shape; archive contains 6 detail sections matching
 the originals byte-for-byte except for the new archive header.
 
-**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. **Gate 2 (passed).** Driver auto-archive hook shipped: `loop.py` now calls `auto_archive_feature` after flipping `PLAN.md` status to `complete`, automatically archiving the feature's roadmap detail section on feature close. Tests cover happy path, idempotency, and refusal. 1 WU (T05), 2 attempts, $2.05.
+**Status: active. Gate 1 (passed).** Gate 1 shipped: `roadmap-archive.md` created, `Detail` column added to the table, `roadmap-archive` skill shipped, `roadmap-add` skill shipped, FEAT-LOOP-2026-0003..0008 detail sections migrated to the archive. Main roadmap shed 223 lines (647 → 424); archive grew to 275 lines. **Gate 2 (passed).** Driver auto-archive hook shipped: `loop.py` now calls `auto_archive_feature` after flipping `PLAN.md` status to `complete`, automatically archiving the feature's roadmap detail section on feature close. Tests cover happy path, idempotency, and refusal. 1 WU (T05), 2 attempts, $2.05.
 
-<a id="feat-2026-0002"></a>
-## FEAT-2026-0002 — Driver run-loop test coverage
+<a id="feat-loop-2026-0002"></a>
+## FEAT-LOOP-2026-0002 — Driver run-loop test coverage
 
 **Why.** This repo's own `code` coverage gate ships at `--fail-under=35`,
 deliberately below the methodology's ≥ 90% default
@@ -1850,7 +1850,7 @@ toward 90. Specifically:
   added `jsonschema` to dev deps. Landed in 1 attempt post-re-arm.
 - **T03** — `tests/test_lint_plan_errors.py` raised `lint_plan.py` from
   79% to 99% by covering the 11 named error arms + a regression on the
-  bundled FEAT-2026-0001 fixture. First dispatch spun 3 attempts on a
+  bundled FEAT-LOOP-2026-0001 fixture. First dispatch spun 3 attempts on a
   ruff F401 (`import sys` unused); re-arm added pre-flight lint discipline.
   Landed in 1 attempt post-re-arm.
 - **T04** — `tests/test_miniyaml_negative.py` extended raised `_miniyaml.py`
@@ -1871,8 +1871,8 @@ GATE-01 status: `passed`.
 matches the methodology default (≥ 90%), with measured TOTAL at 97% and
 no module under 90%. See `RETROSPECTIVE.md §Feature-arc verdict`.
 
-<a id="feat-2026-0013"></a>
-## FEAT-2026-0013 — CI integration_workspace cleanup race fix
+<a id="feat-loop-2026-0013"></a>
+## FEAT-LOOP-2026-0013 — CI integration_workspace cleanup race fix
 
 **Why.** The repo's CI suite intermittently fails with
 `OSError: [Errno 39] Directory not empty: '/tmp/.../.git/objects'`
@@ -1933,13 +1933,13 @@ distinct line across 50 runs (driver stdout from an inner
 integration test, not unittest's verdict — see RETROSPECTIVE.md
 "Reading the output"); exit-code count confirmed PASS:50 FAIL:0.
 The race is eliminated locally; CI on a Py 3.12 runner is the
-field test (next PR run). Two `[FEAT-2026-0013/G1-CLOSE]` entries
+field test (next PR run). Two `[FEAT-LOOP-2026-0013/G1-CLOSE]` entries
 landed in LEARNINGS.md covering the gc.auto=0 + sync-barrier rule
 and the `tail -1` oracle fragility. See `RETROSPECTIVE.md
 §Feature-arc verdict`.
 
-<a id="feat-2026-0014"></a>
-## FEAT-2026-0014 — GitHub Actions Node.js 20 deprecation bump
+<a id="feat-loop-2026-0014"></a>
+## FEAT-LOOP-2026-0014 — GitHub Actions Node.js 20 deprecation bump
 
 **Why.** GitHub will force Node.js 20 actions to Node.js 24 on
 2026-06-16; Node 20 removed from runners 2026-09-16. CI's
@@ -1967,26 +1967,26 @@ operator's `gh` CLI auth state and burned 5 dispatches before the
 re-arm dropped the host-coupled checks. See
 `RETROSPECTIVE.md §Feature-arc verdict`.
 
-<a id="feat-2026-0012"></a>
-## FEAT-2026-0012 — Closing-WU deliverable guard
+<a id="feat-loop-2026-0012"></a>
+## FEAT-LOOP-2026-0012 — Closing-WU deliverable guard
 
-**Status: abandoned 2026-06-13 — folded into FEAT-2026-0015.** Scope
+**Status: abandoned 2026-06-13 — folded into FEAT-LOOP-2026-0015.** Scope
 preserved here for audit; implementation moved into 0015 to avoid
 building guards against a 4-WU taxonomy that 0015 then collapses.
-See FEAT-2026-0015 detail section's `## Subsumed scope` for the
+See FEAT-LOOP-2026-0015 detail section's `## Subsumed scope` for the
 hollow-pass guard work this feature originally proposed.
 
 ---
 
-**Why.** FEAT-2026-0008 closed the hollow-pass surface for
+**Why.** FEAT-LOOP-2026-0008 closed the hollow-pass surface for
 `type: implementation` WUs via three driver-side guards (zero-token,
 `files_changed` diff, smoke-import). Closing-sequence WUs
 (`plan-next`, `close`, `retrospective`, `lessons`, `docs`) have the
-same hollow-pass surface and none of the three FEAT-2026-0008 guards
+same hollow-pass surface and none of the three FEAT-LOOP-2026-0008 guards
 catch them:
 
 - Zero-token misses: the agent billed real tokens.
-- `files_changed` diff guard misses: per FEAT-2026-0008/T02, empty or
+- `files_changed` diff guard misses: per FEAT-LOOP-2026-0008/T02, empty or
   absent `files_changed` opts out, and closing WUs typically emit
   empty lists.
 - Smoke-import misses: closing WUs produce prose deliverables, not
@@ -2000,16 +2000,16 @@ never invoked `Write` / `Edit`: `GATE-NN-REVIEW.md` absent,
 `PLAN.md status: active` unchanged, roadmap row unchanged. The
 driver believed an honest RESULT block without confirmation.
 
-Also encountered locally during FEAT-2026-0002/G1-CLOSE: the close
+Also encountered locally during FEAT-LOOP-2026-0002/G1-CLOSE: the close
 agent correctly flipped PLAN.md status, roadmap row, and wrote
 RETROSPECTIVE.md — but only because the WU spec told it to. If the
 agent had emitted PASS without writing, the driver would have
-believed it and FEAT-2026-0002 would have closed hollow. The same
+believed it and FEAT-LOOP-2026-0002 would have closed hollow. The same
 gap blocks reliable auto-progression of the roadmap row on feature
 close (current behavior depends entirely on the close-agent
 following the WU AC).
 
-**Goal.** A driver-side guard, analogous in shape to FEAT-2026-0008's
+**Goal.** A driver-side guard, analogous in shape to FEAT-LOOP-2026-0008's
 three guards, that asserts type-keyed closing-deliverable existence
 between successful verify+squash and the status-flip-to-done.
 Type-keyed assertion table:
@@ -2025,7 +2025,7 @@ Type-keyed assertion table:
   in PLAN.md, (b) PLAN.md `status: done`, (c) roadmap row `done`.
 - `close` → RETROSPECTIVE.md exists + non-empty AND LEARNINGS.md
   diff AND PLAN.md `status: done` AND roadmap row `done`.
-- `implementation` → unchanged; FEAT-2026-0008's three guards
+- `implementation` → unchanged; FEAT-LOOP-2026-0008's three guards
   already cover.
 
 Failure rolls back via `git reset --hard head_before`, records an
@@ -2037,19 +2037,19 @@ in the attempt loop — three in a row escalate to `blocked_human`.
 covering negative case (agent emits PASS without writing the
 type-keyed deliverable, guard fires, attempt fails) and positive
 case (agent writes everything, guard passes). Recursive audit per
-LEARNINGS [FEAT-2026-0008/G1-CLOSE]: the close ceremony for this
+LEARNINGS [FEAT-LOOP-2026-0008/G1-CLOSE]: the close ceremony for this
 feature must run the new guard against itself — if any deliverable
 is missing, the close WU emits `status: blocked`, not `complete`.
 
-**Status: abandoned.** Independent of FEAT-2026-0010/0011. Detail the
+**Status: abandoned.** Independent of FEAT-LOOP-2026-0010/0011. Detail the
 first gate's WUs when ready to start. Single gate, one substantive
 WU (`closing-deliverable-guard`) + `close` ceremony — mirrors
-FEAT-2026-0008's shape.
+FEAT-LOOP-2026-0008's shape.
 
-<a id="feat-2026-0015"></a>
-## FEAT-2026-0015 — Closing-ceremony restructure + hollow-pass guard
+<a id="feat-loop-2026-0015"></a>
+## FEAT-LOOP-2026-0015 — Closing-ceremony restructure + hollow-pass guard
 
-**Subsumes FEAT-2026-0012** (filed 2026-06-12, abandoned 2026-06-13
+**Subsumes FEAT-LOOP-2026-0012** (filed 2026-06-12, abandoned 2026-06-13
 when this feature was scoped). 0012 proposed a driver-side closing-WU
 deliverable guard against the 4-WU taxonomy. That investment would be
 partially obsoleted by this feature's collapse of the taxonomy from
@@ -2060,7 +2060,7 @@ into this feature's `## Subsumed scope` section below.
 **Why.** The current 4-WU closing sequence (`retrospective → lessons →
 docs → plan-next`) consistently consumes ~50% of feature cost despite
 the inner three WUs (RETRO, LESSONS, DOCS) being summary+append work
-on overlapping context. Live evidence from FEAT-2026-0010:
+on overlapping context. Live evidence from FEAT-LOOP-2026-0010:
 
 - Gate 1 close: $3.17 of $6.15 (52%); cache-creation across 4 WUs
   ≈ 209k tokens (each fresh session re-bootstraps the same context).
@@ -2069,9 +2069,9 @@ on overlapping context. Live evidence from FEAT-2026-0010:
   empty diffs or `files_changed_mismatch` on the same file the close
   ceremony already touched.
 
-The single-gate `close` alternative (FEAT-2026-0005) proved a combined
-session works for terminal-of-single-gate: $0.83 on FEAT-2026-0014;
-$1.84 on FEAT-2026-0013 v3-a3. Multi-gate features have no equivalent
+The single-gate `close` alternative (FEAT-LOOP-2026-0005) proved a combined
+session works for terminal-of-single-gate: $0.83 on FEAT-LOOP-2026-0014;
+$1.84 on FEAT-LOOP-2026-0013 v3-a3. Multi-gate features have no equivalent
 shortcut today; their terminal gate also pays the full 4-WU tax even
 though no `plan-next` is needed (terminal = nothing to plan).
 
@@ -2079,7 +2079,7 @@ though no `plan-next` is needed (terminal = nothing to plan).
 
 - **Terminal gate (any feature, single- or multi-gate)**: single
   combined `close` WU. Folds retrospective + lessons + docs +
-  feature-arc verdict into one session. Extends FEAT-2026-0005's
+  feature-arc verdict into one session. Extends FEAT-LOOP-2026-0005's
   pattern from single-gate-only to any-feature-terminal-gate.
 - **Intermediate gate (multi-gate only)**: 2-WU close.
   `close-intermediate` (new type) folds RETRO + LESSONS + DOCS into
@@ -2115,7 +2115,7 @@ gate, 4 → 1 per terminal gate.
 - Single-gate's existing `close` alternative — already correct
   shape; just rename `close-terminal` for clarity or leave as-is.
 
-**Verification.** A dogfood feature (FEAT-2026-0016 or this feature
+**Verification.** A dogfood feature (FEAT-LOOP-2026-0016 or this feature
 itself) closed under the new contract shows: (a) terminal-gate cost
 ≤ $1 (matches G1-CLOSE precedent); (b) intermediate-gate close cost
 ≤ $1 (close-intermediate, no plan-next); (c) lint accepts the new
@@ -2123,11 +2123,11 @@ shapes and rejects the old (modulo grandfather). `tests/test_lint_*`
 updated.
 
 
-<a id="feat-2026-0017"></a>
+<a id="feat-loop-2026-0017"></a>
 
-## FEAT-2026-0017 — Close-WU wiring-race guard
+## FEAT-LOOP-2026-0017 — Close-WU wiring-race guard
 
-**Why.** FEAT-2026-0015/T06 shipped `fire_terminal_flips` driver-side
+**Why.** FEAT-LOOP-2026-0015/T06 shipped `fire_terminal_flips` driver-side
 + wired it into the close path. Wiring looked correct on inspection
 and on test (T06's own tests). The recursive dogfood (G2-CLOSE) ran
 clean, wrote `verdict: met` to its WU frontmatter, and the driver
@@ -2144,8 +2144,8 @@ returned False. `close_wu_for_terminal` stayed `None`.
 
 Race between WorkUnit-in-memory and agent's frontmatter write.
 
-None of today's hollow-pass guards (FEAT-2026-0008's three +
-FEAT-2026-0015/T07's four) caught this:
+None of today's hollow-pass guards (FEAT-LOOP-2026-0008's three +
+FEAT-LOOP-2026-0015/T07's four) caught this:
 
 - Zero-token guard: T06 ran productively.
 - `files_changed` guard: T06 listed `loop.py` + the test file; both
@@ -2191,15 +2191,15 @@ feature's branch:
 three bonus hollow-pass surfaces also closed; Opus 4.7
 verdict-flip blind-spot logged for deep-analysis. Full RETROSPECTIVE
 + cost analysis in
-`.specfuse/features/FEAT-2026-0017-wiring-race-guard/RETROSPECTIVE.md`.
+`.specfuse/features/FEAT-LOOP-2026-0017-wiring-race-guard/RETROSPECTIVE.md`.
 Actual cost $39.37 vs planned $3.20 — 12.3× overrun, all on
 dogfood-surfaced bug discovery cycles where the agent worked
 correctly but verify-gates failed for reasons outside WU scope.
 
-<a id="feat-2026-0016"></a>
-## FEAT-2026-0016 — Per-attempt outcome events + re-arm contract + audit trail
+<a id="feat-loop-2026-0016"></a>
+## FEAT-LOOP-2026-0016 — Per-attempt outcome events + re-arm contract + audit trail
 
-**Why.** FEAT-2026-0013 burned $13.50 across 5 dispatches (v1, v2,
+**Why.** FEAT-LOOP-2026-0013 burned $13.50 across 5 dispatches (v1, v2,
 v3-attempt-1, v3-attempt-2, v3-attempt-3) before the fix held. Each
 re-arm required the operator to manually compute cumulative
 `historical_cost_usd`, `historical_duration_seconds`, etc., and write
@@ -2212,10 +2212,10 @@ re-arm history is invisible to every other skill.
 Failure modes the gap surfaces:
 
 - Operator under-estimates feature cost because each /unblock-wu
-  resets `cost_usd: 0` and visible `attempts: 0`. FEAT-2026-0013's
+  resets `cost_usd: 0` and visible `attempts: 0`. FEAT-LOOP-2026-0013's
   $13.50 was only visible by manually summing five events.jsonl
   blocks plus three commit messages.
-- Re-arm rationale is captured in commit messages (FEAT-2026-0013
+- Re-arm rationale is captured in commit messages (FEAT-LOOP-2026-0013
   history) but not in frontmatter — so /gate-status can't surface
   "this is re-arm 3; prior reasons: gh-auth, gpg-config, scope-miss".
 - Methodology drift: the `historical_*` field naming was invented
@@ -2265,7 +2265,7 @@ Skill changes:
   abandon / skip stays as-is).
 - Driver auto-deciding when to abandon a WU after N re-arms
   (would be a separate retry-ceiling feature).
-- Cross-feature cost rollup — that belongs to FEAT-2026-0011
+- Cross-feature cost rollup — that belongs to FEAT-LOOP-2026-0011
   (scoring framework consumes per-feature cumulative cost).
 
 **Verification.** Recursive: dogfood this feature's own close
@@ -2273,18 +2273,18 @@ ceremony exercises the new frontmatter fields. Tests cover the
 driver's cumulative-fold logic, /unblock-wu's mandatory-rationale
 prompt, and /gate-status's re-arm surfacing.
 
-**Status: done.** Independent of FEAT-2026-0015. Can land
+**Status: done.** Independent of FEAT-LOOP-2026-0015. Can land
 in parallel. Probably small (one substantive WU for the driver
 fold-logic, one for /unblock-wu + /gate-status updates, one for
 WU template/lint changes).
 
-<a id="feat-2026-0074"></a>
-## FEAT-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
+<a id="feat-loop-2026-0074"></a>
+## FEAT-LOOP-2026-0074 — Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe
 
-**Why.** [FEAT-2026-0041](roadmap-archive.md#feat-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
+**Why.** [FEAT-LOOP-2026-0041](roadmap-archive.md#feat-loop-2026-0041) shipped diagnosis and both of its entry points, but nothing fires them: a finding is diagnosed only when a human types `/diagnose-issue NN`. The auto-trigger was cut from that feature by operator decision at draft time, on the reasoning that automating a diagnosis quality nobody has read yet is the wrong order — and the seam held, because the dial is a scheduling concern while the diagnosis contract FEAT-LOOP-2026-0042 consumes is not. That reasoning has an expiry: once diagnoses have been read on real findings and judged useful, the manual step is the only thing between detection and autonomy level 2, and it is the step that does not scale.
 
-**Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
+**Goal.** Three pieces, in the harvester rather than in `diagnosis.py`. (1) A per-component `diagnose: auto|manual` dial in `monitoring.yml`, defaulting to `manual`, so a component earns automation instead of inheriting it — the same manual-to-auto shape FEAT-LOOP-2026-0042's `autofix` dial uses, and the two should be recognisably siblings. (2) Harvester auto-trigger: when a finding issue is filed for a **new** fingerprint on an `auto` component, invoke the headless entry point (`specfuse.monitor.diagnose_cli`) and post the diagnosis. (3) Per-fingerprint dedupe: **one diagnosis per fingerprint, not per occurrence** — a flapping component must not accrue a diagnosis comment per firing, which is both a token-cost and a signal-to-noise failure. The dedupe key is the fingerprint already owned by `issues.py`'s embedded marker, so this reads existing state rather than inventing a second ledger. Whether an *updated* finding on a known fingerprint should ever re-diagnose (source changed since the last diagnosis? confidence was low?) is the open design question and should be answered explicitly rather than defaulted.
 
-**Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-2026-0042's autofix gate.
+**Benefits.** Autonomy level 2 in full: on opted-in components, issues arrive pre-diagnosed with no human in the loop, at bounded token cost because dedupe caps the spend per fingerprint. The dial keeps the blast radius per-component and reversible, so a component whose diagnoses read poorly goes back to `manual` without touching the pipeline. And it removes the last manual step between the harvester and FEAT-LOOP-2026-0042's autofix gate.
 
-**Status: abandoned 2026-10-16 — superseded by FEAT-2026-0049/T10.** All three pieces above already ship: the `diagnose: auto|manual` dial is in the schema and lint; `specfuse agent run`'s `findings-diagnose` provider (`specfuse/agent/providers/findings_diagnose.py`) diagnoses each open finding on an `auto` component through the same headless path; and one issue per fingerprint plus its `_already_diagnosed` skip give one diagnosis per fingerprint. The trigger lives in `agent run` rather than the harvester. What remains is tracked as issues: the re-diagnose policy (#3487) and diagnosis for findings filed by a scheduled `monitor run` without `agent run` (#3488). Operator decision, 2026-10-16.
+**Status: abandoned 2026-10-16 — superseded by FEAT-LOOP-2026-0049/T10.** All three pieces above already ship: the `diagnose: auto|manual` dial is in the schema and lint; `specfuse agent run`'s `findings-diagnose` provider (`specfuse/agent/providers/findings_diagnose.py`) diagnoses each open finding on an `auto` component through the same headless path; and one issue per fingerprint plus its `_already_diagnosed` skip give one diagnosis per fingerprint. The trigger lives in `agent run` rather than the harvester. What remains is tracked as issues: the re-diagnose policy (#3487) and diagnosis for findings filed by a scheduled `monitor run` without `agent run` (#3488). Operator decision, 2026-10-16.

@@ -31,13 +31,13 @@ fi
 
 echo "==> [scaffold] Linting bundled example feature"
 "$PYTHON" .specfuse/scripts/lint_plan.py \
-  .specfuse/features/FEAT-2026-0001-health-endpoint
+  .specfuse/features/FEAT-LOOP-2026-0001-health-endpoint
 
 echo "==> [scaffold] Dry-running the loop driver"
 # Pin --feature to the bundled example: this scaffold-integrity probe must
 # stay stable as new in-flight features land in .specfuse/features/. Without
 # the pin, every new `status: active` feature breaks CI on multi-active.
-"$PYTHON" .specfuse/scripts/loop.py --dry-run --feature FEAT-2026-0001-health-endpoint
+"$PYTHON" .specfuse/scripts/loop.py --dry-run --feature FEAT-LOOP-2026-0001-health-endpoint
 
 # --- 2. Methodology `code` gates ---
 # Derived from .specfuse/verification.yml, NOT copied from it (#592). The old

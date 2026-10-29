@@ -14,7 +14,7 @@ and `.specfuse/rules/*.md` are.
 
 ### Curated 2026-08-11
 
-- [FEAT-2026-0013/G1-CLOSE] Global git config can ambush WU
+- [FEAT-LOOP-2026-0013/G1-CLOSE] Global git config can ambush WU
   dispatch. A developer machine carrying `commit.gpgsign=true` +
   `gpg.format=ssh` GLOBALLY (the default for some setups) will
   fail any `git commit` inside a dispatched agent session when no
@@ -26,7 +26,7 @@ and `.specfuse/rules/*.md` are.
   burning a dispatch cycle. Recovery is an operator-side
   `git config --local commit.gpgsign false` (working-copy only;
   preserves the global setting for the operator's own commits).
-  FEAT-2026-0013 v3-attempts-1 and 2 burned $4.70 / 2552s on this
+  FEAT-LOOP-2026-0013 v3-attempts-1 and 2 burned $4.70 / 2552s on this
   block before the operator disabled it locally. Rule: every WU
   spec that requires `git commit` inside a temp-repo test fixture
   MUST also (a) set `commit.gpgSign=false` on the temp repo
@@ -40,7 +40,7 @@ and `.specfuse/rules/*.md` are.
   is a known dispatch-time foot-gun.
   _Retired: Merged into one entry carrying all 4 tags._
 
-- [FEAT-2026-0040/G2-CLOSE-INTERMEDIATE] **A test fixture that builds a throwaway git repo
+- [FEAT-LOOP-2026-0040/G2-CLOSE-INTERMEDIATE] **A test fixture that builds a throwaway git repo
   must pin every commit-affecting setting, not just identity — otherwise it inherits the
   host operator's global config and fails for reasons that have nothing to do with the
   code under test.** `tests/test_autosync_no_cwd_leak.py` sets `user.name` and `user.email`
@@ -58,7 +58,7 @@ and `.specfuse/rules/*.md` are.
   as a regression.
   _Retired: Merged into one entry carrying all 4 tags._
 
-- [FEAT-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors] **The `git commit` exit-128 errors in
+- [FEAT-LOOP-2026-0041/G1-CLOSE/sandbox-git-temp-repo-errors] **The `git commit` exit-128 errors in
   `test_lint_closing.py` and `test_autosync_no_cwd_leak.py` are a command-sandbox
   artifact, not a regression — stop re-diagnosing them.** Signature: 11 errors,
   every traceback ending `subprocess.CalledProcessError: Command '['git', '-C',
@@ -74,7 +74,7 @@ and `.specfuse/rules/*.md` are.
   sandboxed gate run.
   _Retired: Merged into one entry carrying all 4 tags._
 
-- [FEAT-2026-0059/G1-CLOSE/signing-agent-in-sandbox] **A command sandbox that denies the
+- [FEAT-LOOP-2026-0059/G1-CLOSE/signing-agent-in-sandbox] **A command sandbox that denies the
   commit-signing agent socket turns every test that builds a scratch git repository red,
   with an error that names neither the sandbox nor the test.** Five tests failed with
   `error: Couldn't get agent socket?` / `fatal: failed to write commit object` /
@@ -86,14 +86,14 @@ and `.specfuse/rules/*.md` are.
   dir) — a sandbox-caused failure reproduces there with zero test code involved, and the
   distinction between "the suite is red" and "the environment is red" is worth the ten
   seconds every time. Sibling trap, in the opposite direction
-  ([FEAT-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the unsandboxed re-run
+  ([FEAT-LOOP-2026-0042/G2-CLOSE/live-tests-fire-when-unsandboxed]): the unsandboxed re-run
   that fixes these false reds is also the run where credential-gated live tests stop
   skipping and reach the real external system. Both are the same underlying fact — the
   sandbox boundary silently changes which tests are meaningful — and a close that
   re-runs oracles crosses it in both directions.
   _Retired: Merged into one entry carrying all 4 tags._
 
-- [FEAT-2026-0051/G1-CLOSE] A driver change to dispatch control flow does NOT take effect for
+- [FEAT-LOOP-2026-0051/G1-CLOSE] A driver change to dispatch control flow does NOT take effect for
   the run that writes it: Python loads the driver module once at process start, and
   gate-entry code has already executed before the first WU is dispatched. This cuts both
   ways, so state it explicitly in any self-hosting hazard note. It defuses the hazard — a WU
@@ -104,7 +104,7 @@ and `.specfuse/rules/*.md` are.
   part of the acceptance evidence.
   _Retired: Merged into one entry carrying all 3 tags._
 
-- [FEAT-2026-0053/G1-CLOSE] **A work unit that wires new code into the driver cannot be
+- [FEAT-LOOP-2026-0053/G1-CLOSE] **A work unit that wires new code into the driver cannot be
   verified by the driver run that wired it — so a gate whose definition of done asserts driver
   runtime behavior must name its observation point, and an absent signal must never be read as
   a false claim.** The driver imports `loop.py` once at process start. Edits a work unit lands
@@ -122,7 +122,7 @@ and `.specfuse/rules/*.md` are.
   commit run this path? Only then is silence evidence.
   _Retired: Merged into one entry carrying all 3 tags._
 
-- [FEAT-2026-0057/G1-CLOSE/driver-edits-need-a-restart] **A work unit that edits the
+- [FEAT-LOOP-2026-0057/G1-CLOSE/driver-edits-need-a-restart] **A work unit that edits the
   driver has no effect on anything the same driver process dispatches afterwards —
   including the close work unit armed to verify it. Restart the driver between the
   wiring unit and its proof, or the proof measures the old code.** Observed here in

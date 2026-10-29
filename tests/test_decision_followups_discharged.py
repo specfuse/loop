@@ -147,7 +147,7 @@ class TestTheExemptionIsScopedToTheQuotation(unittest.TestCase):
 #: The feature that authored the DECISIONS.md format. A sweep whose only
 #: in-scope member is this folder has never seen producer output from a
 #: session other than the one that wrote the checker.
-AUTHORING_FEATURE = "FEAT-2026-0058-decision-registry"
+AUTHORING_FEATURE = "FEAT-LOOP-2026-0058-decision-registry"
 
 
 class TestTheSweepCorpusIsPinned(unittest.TestCase):
@@ -245,7 +245,7 @@ class TestTheDogfoodIsActuallyCovered(unittest.TestCase):
         # restates. Runs the real check over the real folder, not a fixture.
         from tests._loop_loader import REPO_ROOT
 
-        feat = REPO_ROOT / ".specfuse/features/FEAT-2026-0058-decision-registry"
+        feat = REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0058-decision-registry"
         errs = lint_plan.lint(feat)
 
         restatements = [e for e in errs if "reproduces decision" in e]

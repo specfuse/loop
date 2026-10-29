@@ -112,7 +112,7 @@ Two ways to create a feature folder under `.specfuse/features/`:
 - **By hand:** start from the bare templates in `.specfuse/templates/`
   (`PLAN`, `GATE`, `WU`) and fill in a small first feature. (The
   `specfuse/loop` source repo also carries a worked example,
-  `FEAT-2026-0001-health-endpoint`, if you want a complete reference to copy
+  `FEAT-LOOP-2026-0001-health-endpoint`, if you want a complete reference to copy
   from.)
 
 A feature folder holds:

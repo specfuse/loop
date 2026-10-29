@@ -1,0 +1,11 @@
+- **FEAT-LOOP-2026-0247/T01**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T02**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T03**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T04**: lint_roadmap now emits one warn per unkeyed `planned` row when `ids.key` is set, naming the ID, the key and `migrate --planned-only`; oracle Clause 5 is un-skipped.
+  - note: Repo-wide lint_roadmap still reports one pre-existing warn (FEAT-LOOP-2026-0011 Detail cell '—' with a section present). It is not from this change. The check reuses `_parse_table_rows` and `ids.parse`, so no second row parser exists.
+- **FEAT-LOOP-2026-0247/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T06**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T08**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T09**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/T10**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0247/G1-CLOSE**: attempt 1 outcome=passed

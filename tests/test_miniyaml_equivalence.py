@@ -27,7 +27,7 @@ from tests._loop_loader import load_miniyaml
 miniyaml = load_miniyaml()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXAMPLE = REPO_ROOT / ".specfuse/features/FEAT-2026-0001-health-endpoint"
+EXAMPLE = REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0001-health-endpoint"
 
 
 def frontmatter_of(path: Path) -> str:

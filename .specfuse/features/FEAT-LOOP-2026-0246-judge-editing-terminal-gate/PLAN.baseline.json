@@ -1,0 +1,39 @@
+{
+  "gates": [
+    {
+      "gate": 1,
+      "work_units": [
+        {
+          "goal": "T01 \u2014 walking skeleton: a terminal judge edit halts before the close",
+          "id": "FEAT-LOOP-2026-0246/T01",
+          "planned_cost_usd": 4.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T02 \u2014 an operator's acknowledgement clears the stop, and only for the paths it names",
+          "id": "FEAT-LOOP-2026-0246/T02",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T03 \u2014 every autonomy level, both close paths, and a six-part brief",
+          "id": "FEAT-LOOP-2026-0246/T03",
+          "planned_cost_usd": 3.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "T04 \u2014 the docs describe the terminal stop, and stop recommending `review` for it",
+          "id": "FEAT-LOOP-2026-0246/T04",
+          "planned_cost_usd": 2.0,
+          "type": "implementation"
+        },
+        {
+          "goal": "G1-CLOSE \u2014 terminal close",
+          "id": "FEAT-LOOP-2026-0246/G1-CLOSE",
+          "planned_cost_usd": 5.0,
+          "type": "close"
+        }
+      ]
+    }
+  ]
+}

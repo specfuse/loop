@@ -11,121 +11,121 @@ definitions and *feature* status; the PLAN owns the *graph*; GATE files own
 *gate* status; WU files own *work-unit* status. One fact, one home — the
 same split the Specfuse Orchestrator uses.
 
-`FEAT-2026-0001` is reserved as the **bundled worked-example fixture** under
-`.specfuse/features/FEAT-2026-0001-health-endpoint/`. It is not on this
+`FEAT-LOOP-2026-0001` is reserved as the **bundled worked-example fixture** under
+`.specfuse/features/FEAT-LOOP-2026-0001-health-endpoint/`. It is not on this
 repo's planned work; it ships as the self-demonstrating reference
 installation a target project copies via `init.sh`.
 
 | Feature ID     | Title                                       | Status   | Folder | Detail |
 |----------------|---------------------------------------------|----------|--------|--------|
-| FEAT-2026-0002 | Driver run-loop test coverage               | done     | `.specfuse/features/FEAT-2026-0002-driver-test-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0002) |
-| FEAT-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-2026-0003-github-feature-pick/` | [→ archive](roadmap-archive.md#feat-2026-0003) |
-| FEAT-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-2026-0004-driver-lock/` | [→ archive](roadmap-archive.md#feat-2026-0004) |
-| FEAT-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-2026-0005-combined-close/` | [→ archive](roadmap-archive.md#feat-2026-0005) |
-| FEAT-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-2026-0006-wu-duration/` | [→ archive](roadmap-archive.md#feat-2026-0006) |
-| FEAT-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-2026-0007-dispatch-cost-controls/` | [→ archive](roadmap-archive.md#feat-2026-0007) |
-| FEAT-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-2026-0008-driver-completeness-guard/` | [→ archive](roadmap-archive.md#feat-2026-0008) |
-| FEAT-2026-0010 | Roadmap restructure: add + archive          | done     | `.specfuse/features/FEAT-2026-0010-roadmap-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0010) |
-| FEAT-2026-0011 | Scoring framework for roadmap features      | blocked  | `.specfuse/features/FEAT-2026-0011-scoring-framework/` | — |
-| FEAT-2026-0012 | Closing-WU deliverable guard (folded into 0015) | abandoned | — | [→ archive](roadmap-archive.md#feat-2026-0012) |
-| FEAT-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-2026-0013) |
-| FEAT-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-2026-0014) |
-| FEAT-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-2026-0015) |
-| FEAT-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-2026-0016) |
-| FEAT-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-2026-0017) |
-| FEAT-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-2026-0018-auto-close-predicate/` | — |
-| FEAT-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | done | — | [→ detail](#feat-2026-0019) |
-| FEAT-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-2026-0020-public-readiness-prep/` | [→ detail](#feat-2026-0020) |
-| FEAT-2026-0021 | Ceremony proportionality + slim WU template | done | `.specfuse/features/FEAT-2026-0021-ceremony-proportionality/` | [→ archive](roadmap-archive.md#feat-2026-0021) |
-| FEAT-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-2026-0022) |
-| FEAT-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-2026-0023) |
-| FEAT-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-2026-0024) |
-| FEAT-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | done | — | [→ archive](roadmap-archive.md#feat-2026-0025) |
-| FEAT-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-2026-0026) |
-| FEAT-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | [→ detail](#feat-2026-0027) |
-| FEAT-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | [→ detail](#feat-2026-0028) |
-| FEAT-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0029) |
-| FEAT-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-2026-0030) |
-| FEAT-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-2026-0031) |
-| FEAT-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-2026-0032) |
-| FEAT-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | [→ detail](#feat-2026-0033) |
-| FEAT-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | done | — | [→ archive](roadmap-archive.md#feat-2026-0034) |
-| FEAT-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-2026-0035) |
-| FEAT-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-2026-0036-adopt-ruff-016/` | [→ detail](#feat-2026-0036) |
-| FEAT-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-2026-0037) |
-| FEAT-2026-0038 | DLQ quarantine harvest mode (per-component) | planned | — | [→ detail](#feat-2026-0038) |
-| FEAT-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-2026-0039-monitoring-schema/` | [→ detail](#feat-2026-0039) |
-| FEAT-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-2026-0040) |
-| FEAT-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-2026-0041) |
-| FEAT-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-2026-0042) |
-| FEAT-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-2026-0043) |
-| FEAT-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | done | `.specfuse/features/FEAT-2026-0044-agent-policy-schema/` | [→ archive](roadmap-archive.md#feat-2026-0044) |
-| FEAT-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-2026-0045) |
-| FEAT-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-2026-0046) |
-| FEAT-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-2026-0047) |
-| FEAT-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-2026-0048) |
-| FEAT-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-2026-0049) |
-| FEAT-2026-0050 | Async feature-drafting interview via question issues | done | `.specfuse/features/FEAT-2026-0050-async-drafting-interview/` | [→ archive](roadmap-archive.md#feat-2026-0050) |
-| FEAT-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-2026-0051) |
-| FEAT-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | `.specfuse/features/FEAT-2026-0052-baseline-delta-ratchet/` | [→ detail](#feat-2026-0052) |
-| FEAT-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-2026-0053) |
-| FEAT-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-2026-0054) |
-| FEAT-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-2026-0055) |
-| FEAT-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-2026-0056) |
-| FEAT-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-2026-0057) |
-| FEAT-2026-0058 | Feature decision registry + override lint | done  | `.specfuse/features/FEAT-2026-0058-decision-registry/` | [→ archive](roadmap-archive.md#feat-2026-0058) |
-| FEAT-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-2026-0059) |
-| FEAT-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-2026-0060) |
-| FEAT-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-2026-0061) |
-| FEAT-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-2026-0062) |
-| FEAT-2026-0063 | Branch-observation sweep for the arm predicate | done | — | [→ archive](roadmap-archive.md#feat-2026-0063) |
-| FEAT-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | done | — | [→ archive](roadmap-archive.md#feat-2026-0064) |
-| FEAT-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | done | `.specfuse/features/FEAT-2026-0067-rearm-fold-divergence/` | [→ archive](roadmap-archive.md#feat-2026-0067) |
-| FEAT-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-2026-0068) |
-| FEAT-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-2026-0069-monitoring-check-targets/` | [→ detail](#feat-2026-0069) |
-| FEAT-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-2026-0070) |
-| FEAT-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-2026-0071) |
-| FEAT-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-2026-0072) |
-| FEAT-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-2026-0073) |
-| FEAT-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | abandoned | — | [→ archive](roadmap-archive.md#feat-2026-0074) |
-| FEAT-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-2026-0075) |
-| FEAT-2026-0076 | Policy-interview skill: derive-agent-policy | done | — | [→ archive](roadmap-archive.md#feat-2026-0076) |
-| FEAT-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-2026-0077) |
-| FEAT-2026-0078 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-2026-0078) |
-| FEAT-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-2026-0079) |
-| FEAT-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-2026-0080) |
-| FEAT-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | `.specfuse/features/FEAT-2026-0081-feature-id-collision-prevention/` | [→ detail](#feat-2026-0081) |
-| FEAT-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-2026-0082-async-drafting-wiring/` | [→ detail](#feat-2026-0082) |
-| FEAT-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-2026-0084) |
-| FEAT-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-2026-0085) |
-| FEAT-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-2026-0100) |
-| FEAT-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-2026-0101) |
-| FEAT-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-2026-0102) |
-| FEAT-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-2026-0103) |
-| FEAT-2026-0104 | Re-plan after two failures instead of a third identical attempt | done | — | [→ archive](roadmap-archive.md#feat-2026-0104) |
-| FEAT-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-2026-0105) |
-| FEAT-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | done | — | [→ archive](roadmap-archive.md#feat-2026-0106) |
-| FEAT-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-2026-0107) |
-| FEAT-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-2026-0108) |
-| FEAT-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-2026-0109) |
-| FEAT-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-2026-0110) |
-| FEAT-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-2026-0111) |
-| FEAT-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-2026-0112) |
-| FEAT-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | done | — | [→ archive](roadmap-archive.md#feat-2026-0113) |
-| FEAT-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-2026-0114) |
-| FEAT-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-2026-0115) |
-| FEAT-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-2026-0116) |
-| FEAT-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-2026-0117) |
-| FEAT-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-2026-0200) |
-| FEAT-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-2026-0201) |
-| FEAT-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-2026-0202) |
-| FEAT-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-2026-0203) |
-| FEAT-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-2026-0204) |
-| FEAT-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | done | `.specfuse/features/FEAT-2026-0205-diagnosis-severity/` | [→ archive](roadmap-archive.md#feat-2026-0205) |
-| FEAT-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-2026-0223) |
-| FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-2026-0224) |
-| FEAT-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-2026-0246) |
-| FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-2026-0247) |
+| FEAT-LOOP-2026-0002 | Driver run-loop test coverage               | done     | `.specfuse/features/FEAT-LOOP-2026-0002-driver-test-coverage/` | [→ archive](roadmap-archive.md#feat-loop-2026-0002) |
+| FEAT-LOOP-2026-0003 | GitHub feature-pick for the loop            | done     | `.specfuse/features/FEAT-LOOP-2026-0003-github-feature-pick/` | [→ archive](roadmap-archive.md#feat-loop-2026-0003) |
+| FEAT-LOOP-2026-0004 | Single-driver working-tree lock             | done     | `.specfuse/features/FEAT-LOOP-2026-0004-driver-lock/` | [→ archive](roadmap-archive.md#feat-loop-2026-0004) |
+| FEAT-LOOP-2026-0005 | Combined close for single-gate features     | done     | `.specfuse/features/FEAT-LOOP-2026-0005-combined-close/` | [→ archive](roadmap-archive.md#feat-loop-2026-0005) |
+| FEAT-LOOP-2026-0006 | WU execution-time tracking                  | done     | `.specfuse/features/FEAT-LOOP-2026-0006-wu-duration/` | [→ archive](roadmap-archive.md#feat-loop-2026-0006) |
+| FEAT-LOOP-2026-0007 | Dispatch cost controls                      | done     | `.specfuse/features/FEAT-LOOP-2026-0007-dispatch-cost-controls/` | [→ archive](roadmap-archive.md#feat-loop-2026-0007) |
+| FEAT-LOOP-2026-0008 | Driver completeness-guard                   | done     | `.specfuse/features/FEAT-LOOP-2026-0008-driver-completeness-guard/` | [→ archive](roadmap-archive.md#feat-loop-2026-0008) |
+| FEAT-LOOP-2026-0010 | Roadmap restructure: add + archive          | done     | `.specfuse/features/FEAT-LOOP-2026-0010-roadmap-restructure/` | [→ archive](roadmap-archive.md#feat-loop-2026-0010) |
+| FEAT-LOOP-2026-0011 | Scoring framework for roadmap features      | blocked  | `.specfuse/features/FEAT-LOOP-2026-0011-scoring-framework/` | — |
+| FEAT-LOOP-2026-0012 | Closing-WU deliverable guard (folded into 0015) | abandoned | — | [→ archive](roadmap-archive.md#feat-loop-2026-0012) |
+| FEAT-LOOP-2026-0013 | CI integration_workspace cleanup race fix   | done     | `.specfuse/features/FEAT-LOOP-2026-0013-ci-workspace-race-fix/` | [→ archive](roadmap-archive.md#feat-loop-2026-0013) |
+| FEAT-LOOP-2026-0014 | GitHub Actions Node.js 20 deprecation bump  | done     | `.specfuse/features/FEAT-LOOP-2026-0014-gha-node20-bump/` | [→ archive](roadmap-archive.md#feat-loop-2026-0014) |
+| FEAT-LOOP-2026-0015 | Closing-ceremony restructure + hollow-pass guard | done     | `.specfuse/features/FEAT-LOOP-2026-0015-closing-ceremony-restructure/` | [→ archive](roadmap-archive.md#feat-loop-2026-0015) |
+| FEAT-LOOP-2026-0016 | Per-attempt outcome events + re-arm contract + audit trail | done     | `.specfuse/features/FEAT-LOOP-2026-0016-attempt-outcome-rearm-contract/` | [→ archive](roadmap-archive.md#feat-loop-2026-0016) |
+| FEAT-LOOP-2026-0017 | Close-WU wiring-race guard                  | done     | `.specfuse/features/FEAT-LOOP-2026-0017-wiring-race-guard/` | [→ archive](roadmap-archive.md#feat-loop-2026-0017) |
+| FEAT-LOOP-2026-0018 | Deterministic gate-close predicate + auto-close path | done     | `.specfuse/features/FEAT-LOOP-2026-0018-auto-close-predicate/` | — |
+| FEAT-LOOP-2026-0019 | Distribution: PyPi-installable driver + Claude Code plugin marketplace | done | — | [→ detail](#feat-loop-2026-0019) |
+| FEAT-LOOP-2026-0020 | Public-readiness prep: secrets audit + OSS hygiene before visibility flip | done | `.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/` | [→ detail](#feat-loop-2026-0020) |
+| FEAT-LOOP-2026-0021 | Ceremony proportionality + slim WU template | done | `.specfuse/features/FEAT-LOOP-2026-0021-ceremony-proportionality/` | [→ archive](roadmap-archive.md#feat-loop-2026-0021) |
+| FEAT-LOOP-2026-0022 | Deliverable-presence gate: machine-enforce per-WU `produces:` + empty-files escalation | done | `.specfuse/features/FEAT-LOOP-2026-0022-deliverable-presence-gate/` | [→ archive](roadmap-archive.md#feat-loop-2026-0022) |
+| FEAT-LOOP-2026-0023 | Lifecycle integration test + consolidate terminal-state ownership | done | `.specfuse/features/FEAT-LOOP-2026-0023-lifecycle-integration-test/` | [→ archive](roadmap-archive.md#feat-loop-2026-0023) |
+| FEAT-LOOP-2026-0024 | Hashed denylist + issue/PR-body leak guard | done | `.specfuse/features/FEAT-LOOP-2026-0024-hashed-denylist-leak-guard/` | [→ archive](roadmap-archive.md#feat-loop-2026-0024) |
+| FEAT-LOOP-2026-0025 | LEARNINGS curation + archival (bound planning-context growth) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0025) |
+| FEAT-LOOP-2026-0026 | Scaffold-data in the pip package: `specfuse init` replaces init.sh | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0026) |
+| FEAT-LOOP-2026-0027 | Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run | done | — | [→ detail](#feat-loop-2026-0027) |
+| FEAT-LOOP-2026-0028 | Umbrella CLI → scaffold-API wiring + docs in the pip seed | done | — | [→ detail](#feat-loop-2026-0028) |
+| FEAT-LOOP-2026-0029 | One-command Specfuse scaffold upgrade skill | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0029) |
+| FEAT-LOOP-2026-0030 | Driver-side sanitization of agent-authored text before events.jsonl staging | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0030) |
+| FEAT-LOOP-2026-0031 | Configurable integration branch | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0031) |
+| FEAT-LOOP-2026-0032 | Non-WSL Windows execution (native driver + Git-Bash) | done | `.specfuse/features/FEAT-LOOP-2026-0032-windows-native/` | [→ archive](roadmap-archive.md#feat-loop-2026-0032) |
+| FEAT-LOOP-2026-0033 | Sub-repo component scoping: multiple components in one repo | deferred | — | [→ detail](#feat-loop-2026-0033) |
+| FEAT-LOOP-2026-0034 | Roadmap link-integrity lint: resolvable Blocked-by links, anchor adjacency, cross-file ID uniqueness | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0034) |
+| FEAT-LOOP-2026-0035 | Guided draft-feature interview: one decision at a time, pros/cons + recommendation | done | — | [→ detail](#feat-loop-2026-0035) |
+| FEAT-LOOP-2026-0036 | Pin ruff's lint ruleset explicitly; lift the <0.16 version pin | done | `.specfuse/features/FEAT-LOOP-2026-0036-adopt-ruff-016/` | [→ detail](#feat-loop-2026-0036) |
+| FEAT-LOOP-2026-0037 | Evaluate adopting ruff 0.16's expanded default ruleset (opt-in the valuable families) | done | `.specfuse/features/FEAT-LOOP-2026-0037-ruff-correctness-rules/` | [→ archive](roadmap-archive.md#feat-loop-2026-0037) |
+| FEAT-LOOP-2026-0038 | DLQ quarantine harvest mode (per-component) | planned | — | [→ detail](#feat-loop-2026-0038) |
+| FEAT-LOOP-2026-0039 | Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap) | done | `.specfuse/features/FEAT-LOOP-2026-0039-monitoring-schema/` | [→ detail](#feat-loop-2026-0039) |
+| FEAT-LOOP-2026-0040 | Failure-artifact harvester CLI (detect + report; local and gh-actions runners) | done | `.specfuse/features/FEAT-LOOP-2026-0040-failure-artifact-harvester/` | [→ archive](roadmap-archive.md#feat-loop-2026-0040) |
+| FEAT-LOOP-2026-0041 | diagnose-issue skill: root-cause diagnosis of harvester findings (manual + headless) | done | `.specfuse/features/FEAT-LOOP-2026-0041-diagnose-issue-skill/` | [→ archive](roadmap-archive.md#feat-loop-2026-0041) |
+| FEAT-LOOP-2026-0042 | Autofix wiring: headless fix-bug from diagnosed findings behind per-component dial | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0042) |
+| FEAT-LOOP-2026-0043 | In-cluster monitor runner: AKS CronJob surface for the harvester | planned | — | [→ detail](#feat-loop-2026-0043) |
+| FEAT-LOOP-2026-0044 | agent-policy.yml schema + groom-backlog skill (priority queue, rules, dials) | done | `.specfuse/features/FEAT-LOOP-2026-0044-agent-policy-schema/` | [→ archive](roadmap-archive.md#feat-loop-2026-0044) |
+| FEAT-LOOP-2026-0045 | issue-triage skill: categorize and route incoming GH issues (manual → auto dial) | done | `.specfuse/features/FEAT-LOOP-2026-0045-issue-triage/` | [→ archive](roadmap-archive.md#feat-loop-2026-0045) |
+| FEAT-LOOP-2026-0046 | Escalation contract: needs-human issues (assigned, structured) + /attention inbox skill | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0046) |
+| FEAT-LOOP-2026-0047 | Notify webhook (pluggable provider) + heartbeat-silence self-alert | done | `.specfuse/features/FEAT-LOOP-2026-0047-notify-webhook/` | [→ archive](roadmap-archive.md#feat-loop-2026-0047) |
+| FEAT-LOOP-2026-0048 | Autonomous bug pipeline: triage → fix → PR with auto-merge dial + hardcoded guardrails | done | `.specfuse/features/FEAT-LOOP-2026-0048-autonomous-bug-pipeline/` | [→ archive](roadmap-archive.md#feat-loop-2026-0048) |
+| FEAT-LOOP-2026-0049 | specfuse-agent runner: run-to-drain queue execution with lock, caps, pause-and-switch | done | `.specfuse/features/FEAT-LOOP-2026-0049-specfuse-agent-runner/` | [→ archive](roadmap-archive.md#feat-loop-2026-0049) |
+| FEAT-LOOP-2026-0050 | Async feature-drafting interview via question issues | done | `.specfuse/features/FEAT-LOOP-2026-0050-async-drafting-interview/` | [→ archive](roadmap-archive.md#feat-loop-2026-0050) |
+| FEAT-LOOP-2026-0051 | Pre-flight baseline gate probe + preexisting_gate_failure halt | done | `.specfuse/features/FEAT-LOOP-2026-0051-preflight-baseline-gate-probe/` | [→ archive](roadmap-archive.md#feat-loop-2026-0051) |
+| FEAT-LOOP-2026-0052 | Baseline-delta ratchet, waiver, and tracking-issue emission | planned | `.specfuse/features/FEAT-LOOP-2026-0052-baseline-delta-ratchet/` | [→ detail](#feat-loop-2026-0052) |
+| FEAT-LOOP-2026-0053 | Autonomous feature mode (auto gate-arming with mechanical stop conditions) | done | `.specfuse/features/FEAT-LOOP-2026-0053-auto-mode/` | [→ archive](roadmap-archive.md#feat-loop-2026-0053) |
+| FEAT-LOOP-2026-0054 | Close-ceremony skeleton + in-session closing lint | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0054) |
+| FEAT-LOOP-2026-0055 | Arm-time WU contract lint: produces satisfiability + boundary consistency | done | `.specfuse/features/FEAT-LOOP-2026-0055-arm-time-wu-contract-lint/` | [→ archive](roadmap-archive.md#feat-loop-2026-0055) |
+| FEAT-LOOP-2026-0056 | Per-criterion DoD state + incremental re-close | done | `.specfuse/features/FEAT-LOOP-2026-0056-per-criterion-dod-state/` | [→ archive](roadmap-archive.md#feat-loop-2026-0056) |
+| FEAT-LOOP-2026-0057 | Executable oracle contract for gates: scripted verification + environment prep | done | `.specfuse/features/FEAT-LOOP-2026-0057-executable-oracle-contract/` | [→ archive](roadmap-archive.md#feat-loop-2026-0057) |
+| FEAT-LOOP-2026-0058 | Feature decision registry + override lint | done  | `.specfuse/features/FEAT-LOOP-2026-0058-decision-registry/` | [→ archive](roadmap-archive.md#feat-loop-2026-0058) |
+| FEAT-LOOP-2026-0059 | Hedged-close ergonomics: classified follow-ups, verdict-ceiling headline, routed-finding tracking | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0059) |
+| FEAT-LOOP-2026-0060 | Driver-local event schema registry: sanction the three unsanctioned event types | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0060) |
+| FEAT-LOOP-2026-0061 | Dependency-manifest coverage for non-Python ecosystems in `decision_class_paths` | done | `.specfuse/features/FEAT-LOOP-2026-0061-dependency-manifest-coverage/` | [→ archive](roadmap-archive.md#feat-loop-2026-0061) |
+| FEAT-LOOP-2026-0062 | Lifetime-cost reads for `budget_projection` and the per-gate brake | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0062) |
+| FEAT-LOOP-2026-0063 | Branch-observation sweep for the arm predicate | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0063) |
+| FEAT-LOOP-2026-0064 | Release-notes document maintained as work lands, tied to versions and tags | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0064) |
+| FEAT-LOOP-2026-0067 | Re-arm fold divergence: one cost-fold path, or a frontmatter contract that admits two | done | `.specfuse/features/FEAT-LOOP-2026-0067-rearm-fold-divergence/` | [→ archive](roadmap-archive.md#feat-loop-2026-0067) |
+| FEAT-LOOP-2026-0068 | Gate failure reports must contain the failure: verdict-aware output tail | done | — | [→ detail](#feat-loop-2026-0068) |
+| FEAT-LOOP-2026-0069 | monitoring.yml check targets + queue-stalled check type | done | `.specfuse/features/FEAT-LOOP-2026-0069-monitoring-check-targets/` | [→ detail](#feat-loop-2026-0069) |
+| FEAT-LOOP-2026-0070 | Terminal-flip contract — hedged-verdict acceptance, row-status breadth, auto-close debt | done | `.specfuse/features/FEAT-LOOP-2026-0070-terminal-flip-contract/` | [→ archive](roadmap-archive.md#feat-loop-2026-0070) |
+| FEAT-LOOP-2026-0071 | Label registry + provisioning on init/upgrade (best-effort, never fatal) | done | `.specfuse/features/FEAT-LOOP-2026-0071-label-provisioning/` | [→ archive](roadmap-archive.md#feat-loop-2026-0071) |
+| FEAT-LOOP-2026-0072 | Structural-invariant guards: declared surfaces that nothing asserts on | done | `.specfuse/features/FEAT-LOOP-2026-0072-structural-invariant-guards/` | [→ archive](roadmap-archive.md#feat-loop-2026-0072) |
+| FEAT-LOOP-2026-0073 | Envelope `correlation_id` pattern rejects closing-sequence and hygiene work-unit IDs | done | `.specfuse/features/FEAT-LOOP-2026-0073-correlation-id-envelope/` | [→ archive](roadmap-archive.md#feat-loop-2026-0073) |
+| FEAT-LOOP-2026-0074 | Diagnosis auto-trigger: per-component `diagnose: auto` dial, harvester firing on new fingerprints, per-fingerprint dedupe | abandoned | — | [→ archive](roadmap-archive.md#feat-loop-2026-0074) |
+| FEAT-LOOP-2026-0075 | Driver-editing work units cannot take effect in the process that dispatches them | done | `.specfuse/features/FEAT-LOOP-2026-0075-driver-edit-staleness/` | [→ archive](roadmap-archive.md#feat-loop-2026-0075) |
+| FEAT-LOOP-2026-0076 | Policy-interview skill: derive-agent-policy | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0076) |
+| FEAT-LOOP-2026-0077 | Provenance-recorded policy values: know who chose a value, not just what it is | planned | — | [→ detail](#feat-loop-2026-0077) |
+| FEAT-LOOP-2026-0078 | Declarable in-place produces overlap: `produces_incremental` field, documented and validated | planned | — | [→ detail](#feat-loop-2026-0078) |
+| FEAT-LOOP-2026-0079 | One owner for the roadmap-archive algorithm (skill/driver de-duplication) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0079) |
+| FEAT-LOOP-2026-0080 | Operator-answered escalations: guidance that survives into the next agent run | done | `.specfuse/features/FEAT-LOOP-2026-0080-answer-escalation/` | [→ archive](roadmap-archive.md#feat-loop-2026-0080) |
+| FEAT-LOOP-2026-0081 | Feature-ID collision prevention and cheap renumbering | planned | `.specfuse/features/FEAT-LOOP-2026-0081-feature-id-collision-prevention/` | [→ detail](#feat-loop-2026-0081) |
+| FEAT-LOOP-2026-0082 | Wire the async drafting interview end to end | planned | `.specfuse/features/FEAT-LOOP-2026-0082-async-drafting-wiring/` | [→ detail](#feat-loop-2026-0082) |
+| FEAT-LOOP-2026-0084 | Methodology diet, week 1: prune rules, shrink work units, lint unobservable criteria, single gate to 8 | done | `.specfuse/features/FEAT-LOOP-2026-0084-methodology-diet-week-1/` | [→ archive](roadmap-archive.md#feat-loop-2026-0084) |
+| FEAT-LOOP-2026-0085 | Binary verdict: met or not_met, follow-ups become tracked issues, human steps become units | done | `.specfuse/features/FEAT-LOOP-2026-0085-binary-verdict/` | [→ archive](roadmap-archive.md#feat-loop-2026-0085) |
+| FEAT-LOOP-2026-0100 | Separate judge session: a fresh evaluator decides the close verdict | done | `.specfuse/features/FEAT-LOOP-2026-0100-separate-judge-session/` | [→ archive](roadmap-archive.md#feat-loop-2026-0100) |
+| FEAT-LOOP-2026-0101 | Feature oracle and walking skeleton: the gate's definition of done is one end-to-end check | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0101) |
+| FEAT-LOOP-2026-0102 | Gate dependencies: a gate declares `needs:` so shared work runs once per pass | done | `.specfuse/features/FEAT-LOOP-2026-0102-gate-needs-dependencies/` | [→ archive](roadmap-archive.md#feat-loop-2026-0102) |
+| FEAT-LOOP-2026-0103 | Keep the diff on guard failures: repair, do not restart | done | `.specfuse/features/FEAT-LOOP-2026-0103-keep-diff-on-guard-refusal/` | [→ archive](roadmap-archive.md#feat-loop-2026-0103) |
+| FEAT-LOOP-2026-0104 | Re-plan after two failures instead of a third identical attempt | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0104) |
+| FEAT-LOOP-2026-0105 | Parallel dispatch of the ready frontier | planned | — | [→ detail](#feat-loop-2026-0105) |
+| FEAT-LOOP-2026-0106 | Progress lines and a bounded LEARNINGS: retrospectives become optional | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0106) |
+| FEAT-LOOP-2026-0107 | Single-session mode for small features | planned | — | [→ detail](#feat-loop-2026-0107) |
+| FEAT-LOOP-2026-0108 | Agent lane run hygiene: one worktree per item, foreground gates, honest CI and PR state, real cost accounting | done | `.specfuse/features/FEAT-LOOP-2026-0108-agent-lane-run-hygiene/` | [→ archive](roadmap-archive.md#feat-loop-2026-0108) |
+| FEAT-LOOP-2026-0109 | Tiered verification and a cached baseline probe | done | `.specfuse/features/FEAT-LOOP-2026-0109-tiered-verification/` | [→ archive](roadmap-archive.md#feat-loop-2026-0109) |
+| FEAT-LOOP-2026-0110 | Language-aware narrow test selection | done | `.specfuse/features/FEAT-LOOP-2026-0110-language-aware-narrow-selection/` | [→ archive](roadmap-archive.md#feat-loop-2026-0110) |
+| FEAT-LOOP-2026-0111 | Bounded LEARNINGS: separate rule from evidence, weight by reach and cost, put the distilled set on the dispatch path | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0111) |
+| FEAT-LOOP-2026-0112 | The binding-block word cap: decide what a dispatched session's 2,500 words are spent on | planned | — | [→ detail](#feat-loop-2026-0112) |
+| FEAT-LOOP-2026-0113 | Triage assigns a severity, so `min_severity` routes instead of stranding | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0113) |
+| FEAT-LOOP-2026-0114 | Amend `produces:` at the guard: a verified attempt renegotiates its declaration instead of spinning | done | `.specfuse/features/FEAT-LOOP-2026-0114-produces-amendable-at-the-guard/` | [→ archive](roadmap-archive.md#feat-loop-2026-0114) |
+| FEAT-LOOP-2026-0115 | A block that names its fix unit continues the gate: the driver inserts the draft instead of waiting for a human | done | `.specfuse/features/FEAT-LOOP-2026-0115-blocked-with-a-fix-unit-continues/` | [→ archive](roadmap-archive.md#feat-loop-2026-0115) |
+| FEAT-LOOP-2026-0116 | The failure signature names the failing test, so a fixed-then-different failure is progress, not a spin | done | `.specfuse/features/FEAT-LOOP-2026-0116-failure-signature-names-the-test/` | [→ archive](roadmap-archive.md#feat-loop-2026-0116) |
+| FEAT-LOOP-2026-0117 | A re-close measures only what failed: narrow greens survive a re-arm unless the tree they proved changed | done | `.specfuse/features/FEAT-LOOP-2026-0117-re-close-measures-only-what-failed/` | [→ archive](roadmap-archive.md#feat-loop-2026-0117) |
+| FEAT-LOOP-2026-0200 | Bug lane: detect merge conflicts and branch items from current main | planned | — | [→ detail](#feat-loop-2026-0200) |
+| FEAT-LOOP-2026-0201 | Every shipped feature leaves a CHANGELOG trace | planned | — | [→ detail](#feat-loop-2026-0201) |
+| FEAT-LOOP-2026-0202 | Bug lane: skip issues that are fixed and awaiting verification | planned | — | [→ detail](#feat-loop-2026-0202) |
+| FEAT-LOOP-2026-0203 | Monitoring: deploy-correlated HTTP status regression check | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0203) |
+| FEAT-LOOP-2026-0204 | Monitoring: findings a diagnosis can start from (reopen, not refile; heartbeat grace; per-check diagnostic context) | done | `.specfuse/features/FEAT-LOOP-2026-0204-actionable-findings/` | [→ archive](roadmap-archive.md#feat-loop-2026-0204) |
+| FEAT-LOOP-2026-0205 | Monitoring: severity on the diagnosis, so findings can be prioritised | done | `.specfuse/features/FEAT-LOOP-2026-0205-diagnosis-severity/` | [→ archive](roadmap-archive.md#feat-loop-2026-0205) |
+| FEAT-LOOP-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-loop-2026-0223) |
+| FEAT-LOOP-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-LOOP-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-loop-2026-0224) |
+| FEAT-LOOP-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-LOOP-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-loop-2026-0246) |
+| FEAT-LOOP-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0247) |
 | FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
@@ -140,7 +140,7 @@ links to it.
 A `blocked` feature's detail section carries a `**Blocked by.**` block — blank
 line above it, one linked blocker per clause:
 
-**Blocked by.** [ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval; [FEAT-2026-0011](#feat-2026-0011) — scoring data must land first.
+**Blocked by.** [ADR-0007: event-schema versioning](../docs/adr/0007-event-schema-versioning.md) — awaiting approval; [FEAT-LOOP-2026-0011](#feat-loop-2026-0011) — scoring data must land first.
 
 Each blocker is a Markdown link: an ADR points at its `.md` file (kept under
 `docs/adr/` by convention, so from `.specfuse/roadmap.md` the link is
@@ -148,8 +148,8 @@ Each blocker is a Markdown link: an ADR points at its `.md` file (kept under
 feature's roadmap anchor (`#feat-yyyy-nnnn`). When every blocker clears, a human
 flips `blocked` → `active` (or `planned`) and removes the `**Blocked by.**` block.
 
-<a id="feat-2026-0011"></a>
-## FEAT-2026-0011 — Scoring framework for roadmap features
+<a id="feat-loop-2026-0011"></a>
+## FEAT-LOOP-2026-0011 — Scoring framework for roadmap features
 
 **Why.** Today the roadmap has no scoring signal — `pick-feature`
 ranks by recency and gut feel. Christian's "Feature Prioritization
@@ -229,7 +229,7 @@ later, across the orchestrator's component repos. Audit trail when
 estimates change. Foundation for the orchestrator to aggregate
 features across component repos under one product-level weight set.
 
-**Verification.** Compute Feature Scores for FEAT-2026-0010 and a
+**Verification.** Compute Feature Scores for FEAT-LOOP-2026-0010 and a
 backfilled set of past features; manually validate the ranking
 matches Christian's intuitive ordering for at least one historical
 quarter. `roadmap-estimate` blocks re-rating `active` features
@@ -241,13 +241,13 @@ estimates' grounding (revision log captures the change).
 **Blocked by.** [ADR-0002: ratify the roadmap feature-scoring model](../docs/adr/0002-ratify-roadmap-feature-scoring-model.md) — Proposed; the scoring formula + criteria schema must be accepted before the artifacts are built, or estimates captured under a later-changed rubric are invalidated.
 
 **Status: blocked.** Design dependency ADR-0002 is unaccepted; build is held
-until it lands. (FEAT-2026-0010, the earlier prerequisite, is `done`.) Clear with
-`/block-feature FEAT-2026-0011 --unblock` once ADR-0002 is Accepted.
+until it lands. (FEAT-LOOP-2026-0010, the earlier prerequisite, is `done`.) Clear with
+`/block-feature FEAT-LOOP-2026-0011 --unblock` once ADR-0002 is Accepted.
 
 ## Verdict-state ↔ PLAN.md coupling
 
 Today the close ceremony flips PLAN.md `done` regardless of verdict
-hedging. FEAT-2026-0013 v1 close emitted **"Met locally;
+hedging. FEAT-LOOP-2026-0013 v1 close emitted **"Met locally;
 field-confirmation pending operator action"** AND flipped PLAN.md to
 done — then CI failed and the operator had to reverse-flip 4 surfaces
 to re-arm.
@@ -273,13 +273,13 @@ Implementation:
   flips. Other values keep state in close-pending limbo until
   operator confirms field-side oracle (typically via `/wrap-feature`
   step 4 or a dedicated `/confirm-verdict` skill, future).
-- The recursive close audit (FEAT-2026-0008 pattern) runs on the
+- The recursive close audit (FEAT-LOOP-2026-0008 pattern) runs on the
   guard itself: this feature's own close MUST exercise the verdict-
   coupling check.
 
 ## Oracle environment-parity declaration
 
-LEARNINGS `[FEAT-2026-0013/G1-CLOSE/oracle-environment]` already
+LEARNINGS `[FEAT-LOOP-2026-0013/G1-CLOSE/oracle-environment]` already
 states the durable rule but does not enforce it. New WU contract:
 
 - Every Acceptance Criterion that uses a verifying oracle (test loop,
@@ -288,7 +288,7 @@ states the durable rule but does not enforce it. New WU contract:
   linux_docker | github_actions_ci | <named>`.
 - Close ceremony refuses `verdict: met` if any load-bearing AC's
   declared `oracle_env` does not match the goal's target
-  environment. FEAT-2026-0013's `roadmap_goal` named "Python 3.12 CI
+  environment. FEAT-LOOP-2026-0013's `roadmap_goal` named "Python 3.12 CI
   runners"; a macOS-local oracle would have been rejected at close
   time, forcing the Linux Docker probe before the verdict could
   upgrade.
@@ -300,7 +300,7 @@ states the durable rule but does not enforce it. New WU contract:
 Today there is no convention for capturing a feature-level cost
 estimate up front. `/wrap-feature` §2 plan-adherence read
 acknowledges the gap ("Cost spent vs initial estimate if one was
-recorded"). FEAT-2026-0011 plans a coarse Budget bucket for scoring,
+recorded"). FEAT-LOOP-2026-0011 plans a coarse Budget bucket for scoring,
 but that's a prioritization input, not a close-time delta baseline.
 
 Capture planned cost at TWO levels — WU and feature:
@@ -324,7 +324,7 @@ Close-WU spec change (folds into the new `close` and
   gate-section equivalent). For each WU in scope, quote
   `planned_cost_usd`, compute actual from events.jsonl (sum
   cost_usd across all this WU's attempts including re-arms via
-  cumulative fields per FEAT-2026-0016), report delta %. Then
+  cumulative fields per FEAT-LOOP-2026-0016), report delta %. Then
   aggregate to gate total. Then aggregate to feature total
   (terminal close only). Variance > 50% on any unit requires a
   one-paragraph rationale citing the cause (oracle env mismatch,
@@ -357,9 +357,9 @@ Today the closing surfaces are split between close ceremony and
 | Roadmap row status | wrap-feature (manual flip) | close |
 | Auto-archive call | wrap-feature (manual) OR driver's gate-is-None hook (chicken-and-egg) | close |
 
-Live evidence: FEAT-2026-0010, 0013, 0014 all had `roadmap row = active`
+Live evidence: FEAT-LOOP-2026-0010, 0013, 0014 all had `roadmap row = active`
 after PLAN.md `done`. /wrap-feature step 1 surfaced the drift every
-time. FEAT-2026-0010's auto-archive hook (T05) didn't fire on itself
+time. FEAT-LOOP-2026-0010's auto-archive hook (T05) didn't fire on itself
 because gate-is-None requires the gate cosmetic flip, which happens at
 wrap. Move ALL terminal flips into close → drift becomes impossible
 + auto-archive fires cleanly on every feature including its own.
@@ -367,7 +367,7 @@ wrap. Move ALL terminal flips into close → drift becomes impossible
 /wrap-feature shrinks to: read RETRO recap, push branch, open PR,
 merge advisory, next pick. No state flips.
 
-## Subsumed scope (from FEAT-2026-0012)
+## Subsumed scope (from FEAT-LOOP-2026-0012)
 
 Hollow-pass guard against the NEW closing-WU taxonomy:
 
@@ -382,7 +382,7 @@ Hollow-pass guard against the NEW closing-WU taxonomy:
 - **`plan-next` (intermediate-gate, unchanged)** → guard asserts:
   GATE-(N+1)-REVIEW.md exists + non-empty; next gate's `work_units`
   drafted in PLAN.md OR PLAN.md `done` OR roadmap row `done`.
-- **`implementation`** → unchanged; FEAT-2026-0008's three guards
+- **`implementation`** → unchanged; FEAT-LOOP-2026-0008's three guards
   already cover.
 
 Driver-side: in `loop.py::run()`, between successful verify+squash
@@ -392,7 +392,7 @@ rolls back via `git reset --hard head_before`, records an
 naming the failed assertion, counts as a verification failure in the
 attempt loop (3-in-a-row → `blocked_human`).
 
-Recursive close audit (per LEARNINGS `[FEAT-2026-0008/G1-CLOSE]`):
+Recursive close audit (per LEARNINGS `[FEAT-LOOP-2026-0008/G1-CLOSE]`):
 this feature's own close ceremony MUST run the new guard against
 itself.
 
@@ -403,8 +403,8 @@ templates + lint, one substantive WU to ship the type-keyed guard
 table + tests, then closing ceremony (using the new contract for
 recursive dogfood).
 
-<a id="feat-2026-0019"></a>
-## FEAT-2026-0019 — Distribution: PyPi-installable driver + Claude Code plugin marketplace
+<a id="feat-loop-2026-0019"></a>
+## FEAT-LOOP-2026-0019 — Distribution: PyPi-installable driver + Claude Code plugin marketplace
 
 **Why.** Two distribution gaps, one feature.
 
@@ -529,11 +529,11 @@ package + green test suite via `pip install -e .`; (2) GitHub Actions
 publish path + first tagged release; (3) Claude Code plugin + marketplace
 PR; (4) bridge command + deprecation of `init.sh` v1.0. Each gate
 independently shippable.
-<a id="feat-2026-0020"></a>
-## FEAT-2026-0020 — Public-readiness prep: secrets audit + OSS hygiene before visibility flip
+<a id="feat-loop-2026-0020"></a>
+## FEAT-LOOP-2026-0020 — Public-readiness prep: secrets audit + OSS hygiene before visibility flip
 
 **Why.** The `specfuse/loop` GitHub repo is currently private. The
-FEAT-2026-0019 distribution plan ships a public PyPi wheel whose
+FEAT-LOOP-2026-0019 distribution plan ships a public PyPi wheel whose
 contents are public source; that's coherent only if the GitHub repo
 also goes public (no privacy is preserved by keeping it private once
 the wheel is on PyPi, and Claude Code marketplace Part B of 0019 likely
@@ -585,7 +585,7 @@ public-facing hygiene files + the visibility-flip checklist.
   `.specfuse/rules/`, `.specfuse/templates/` carries the Apache-2.0
   header. Spot checks already show most do; this is the mechanical
   confirm.
-- **Audit report** — `.specfuse/features/FEAT-2026-0020-public-readiness-prep/AUDIT.md`
+- **Audit report** — `.specfuse/features/FEAT-LOOP-2026-0020-public-readiness-prep/AUDIT.md`
   enumerates every finding + triage decision + the fix commit hash
   (or "no action — false positive"). This file becomes the gate-1
   RETRO evidence + ships with the repo so the public-facing audit
@@ -598,7 +598,7 @@ public-facing hygiene files + the visibility-flip checklist.
   driver + Claude Code skills that run features through gates with
   cost-bounded retries"). Quickstart: `pip install specfuse` (once
   0019 lands) or current `init.sh`. Link to the worked-example
-  fixture in `.specfuse/features/FEAT-2026-0001-health-endpoint/`.
+  fixture in `.specfuse/features/FEAT-LOOP-2026-0001-health-endpoint/`.
 - `CONTRIBUTING.md` — how external contributors file issues, propose
   PRs, run tests (`python3 -m unittest discover -s tests -t .`), and
   the methodology-dogfood expectation: bug fixes via `/fix-bug`,
@@ -644,7 +644,7 @@ or sensitive content in a non-takedown-friendly channel. Don't.
   flip-blocker.
 - Renaming or rebranding — if the name needs a change, do it
   before 0020 starts.
-- Anything from FEAT-2026-0019 (distribution surfaces) — that's its
+- Anything from FEAT-LOOP-2026-0019 (distribution surfaces) — that's its
   own feature.
 - Closed-source private-index path (devpi / CodeArtifact). Out of
   scope because we're going public; if the public path is wrong,
@@ -656,10 +656,10 @@ class (secret scan, PR sweep, personal-refs grep, cross-pollination,
 license headers) + closing ceremony; gate 2 = one substantive WU per
 hygiene-file class + the flip-checklist WU + closing ceremony.
 
-<a id="feat-2026-0027"></a>
-## FEAT-2026-0027 — Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run
+<a id="feat-loop-2026-0027"></a>
+## FEAT-LOOP-2026-0027 — Self-provisioning driver: auto-sync `.specfuse/` + plugin config on run
 
-**Why.** Even with FEAT-2026-0026, adopting/upgrading a project is still manual:
+**Why.** Even with FEAT-LOOP-2026-0026, adopting/upgrading a project is still manual:
 the user runs `specfuse init`/`upgrade` and separately installs the Claude plugin.
 The leverage is to make a plain `specfuse-loop` run self-provision the project to the
 installed driver's version — create the scaffold if absent, upgrade it if older
@@ -691,10 +691,10 @@ installed driver's version — create the scaffold if absent, upgrade it if olde
 toggles). G2 `.claude` plugin-config writing + version-drift warning. G3
 `specfuse doctor` + first-run prompt.
 
-**Legacy migration (added from FEAT-2026-0026's gate-3 review).** A repo scaffolded by
+**Legacy migration (added from FEAT-LOOP-2026-0026's gate-3 review).** A repo scaffolded by
 the old `init.sh` carries `.specfuse/scripts/` (vendored driver) and `.specfuse/skills/`
 (relative symlinks) that the pip-native model replaces with the package + plugin.
-FEAT-2026-0026's `specfuse upgrade` deliberately **leaves these intact** (deleting
+FEAT-LOOP-2026-0026's `specfuse upgrade` deliberately **leaves these intact** (deleting
 user-adjacent dirs is a migration-semantics call). This feature owns the migration:
 `specfuse init --migrate` (or an upgrade flag) that detects the legacy layout and prunes
 the vendored `scripts/` + skill symlinks once the plugin is wired — opt-in, never silent.
@@ -704,23 +704,23 @@ installed version automatically and safely; the never-downgrade rule protects pr
 configured by a newer specfuse; the plugin provisions without manual `/plugin`
 commands; legacy init.sh repos migrate cleanly to pip-native.
 
-**Status: done.** Depends on FEAT-2026-0026 (needs package scaffold data +
-in-process init/upgrade) and FEAT-2026-0028 (the umbrella CLI must call the scaffold
+**Status: done.** Depends on FEAT-LOOP-2026-0026 (needs package scaffold data +
+in-process init/upgrade) and FEAT-LOOP-2026-0028 (the umbrella CLI must call the scaffold
 API before auto-sync can drive it). Also packaging/harness-coupled — expect interactive.
 
-<a id="feat-2026-0028"></a>
-## FEAT-2026-0028 — Umbrella CLI → scaffold-API wiring + docs in the pip seed
+<a id="feat-loop-2026-0028"></a>
+## FEAT-LOOP-2026-0028 — Umbrella CLI → scaffold-API wiring + docs in the pip seed
 
-**Why.** FEAT-2026-0026 shipped `specfuse.loop.scaffold` (`init_specfuse`,
+**Why.** FEAT-LOOP-2026-0026 shipped `specfuse.loop.scaffold` (`init_specfuse`,
 `upgrade_specfuse`, `wire_claude`, `init`) and made `init.sh` a thin shim delegating to
 `specfuse init`/`upgrade`. But the umbrella `specfuse` CLI's `init`/`upgrade` subcommands
-still print curl-bash / pip-only guidance (FEAT-2026-0019's stubs) — they do **not** call
+still print curl-bash / pip-only guidance (FEAT-LOOP-2026-0019's stubs) — they do **not** call
 the new scaffold API. So `specfuse init`/`upgrade` and the init.sh shim do not actually
-scaffold end-to-end yet. Surfaced as the required follow-up in FEAT-2026-0026's gate-3
+scaffold end-to-end yet. Surfaced as the required follow-up in FEAT-LOOP-2026-0026's gate-3
 review (the terminal gate auto-closed, so it was captured in PR #68, not the stub
 retrospective). This **gates real adoption** — including the first external IaC project test.
 
-Also: FEAT-2026-0026's package seed ships `templates/`, `rules/`, examples, `VERSION` —
+Also: FEAT-LOOP-2026-0026's package seed ships `templates/`, `rules/`, examples, `VERSION` —
 but **no `docs/`**, whereas `init.sh` ships the methodology docs via `deploy_docs`. A
 pip-scaffolded repo is missing `.specfuse/docs/`. Close the parity gap in the same feature.
 
@@ -731,17 +731,17 @@ pip-scaffolded repo is missing `.specfuse/docs/`. Close the parity gap in the sa
 - Add `docs/` (methodology + concepts, the `deploy_docs` set) to the pip seed so
   `specfuse init`/`upgrade` lay down `.specfuse/docs/`; extend the drift guard.
 - Release coordination: depends on a published `specfuse-loop` carrying `scaffold.py`
-  (FEAT-2026-0026 merged → released), then a `specfuse` umbrella release.
+  (FEAT-LOOP-2026-0026 merged → released), then a `specfuse` umbrella release.
 
 **Benefits.** `specfuse init`/`upgrade` and the init.sh shim actually scaffold from pip
 end-to-end — the last gap before `init.sh` can be deleted (v1.1) and before
-FEAT-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adoption test.
+FEAT-LOOP-2026-0027's auto-sync has a working CLI to lean on. Unblocks the IaC adoption test.
 
-**Status: done.** Depends on FEAT-2026-0026 (the scaffold API) being released to PyPI.
+**Status: done.** Depends on FEAT-LOOP-2026-0026 (the scaffold API) being released to PyPI.
 Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
-<a id="feat-2026-0033"></a>
-## FEAT-2026-0033 — Sub-repo component scoping: multiple components in one repo
+<a id="feat-loop-2026-0033"></a>
+## FEAT-LOOP-2026-0033 — Sub-repo component scoping: multiple components in one repo
 
 **Why.** The loop assumes component == repo: `.specfuse/` is resolved as `Path(".specfuse")` relative to cwd (`specfuse/loop/loop.py:61-64`), gate commands run with no `cwd=` (`loop.py:1764`), there is one tree lock, one roadmap, and one verification surface per repo. Real projects put multiple shippable deliverables in one repo — a phone app and a kiosk/tablet app sharing generated Flutter libraries, delivered as separate store apps from the same git tree. Today the only way to model that is to flatten every deliverable into a single repo-root-scoped component, so a kiosk-only feature also runs the phone app's gates. Slow, not wrong — but it degrades as deliverables and gate runtimes grow, and it gives ownership/release-cadence-diverged deliverables no independent surface.
 
@@ -759,8 +759,8 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: deferred.** Parked pending a real trigger (above). Resumable — flip to `active` when a trigger fires; design gate first (the sketch is not yet a committed contract).
 
-<a id="feat-2026-0035"></a>
-## FEAT-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
+<a id="feat-loop-2026-0035"></a>
+## FEAT-LOOP-2026-0035 — Guided draft-feature interview: one decision at a time, pros/cons + recommendation
 
 **Why.** `draft-feature` Step 3 asks a **single batched round** of hat questions — a wall of questions that suits an expert who already knows every answer but overwhelms the newcomers the methodology most needs to onboard, and it hands the driver weakly-validated answers (a batch is skimmed, not deliberated). Onboarding friction and driver alignment both suffer. The improvement: walk the user through the framing decisions **one at a time**, and for each *decision* question present the options with prose pros/cons and a recommendation so they choose well — the shape `/pick-feature` already uses, extended per-question.
 
@@ -773,19 +773,19 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: done.** Shipped in draft-feature v0.2 (#228).
 
-<a id="feat-2026-0036"></a>
-## FEAT-2026-0036 — Pin ruff's lint ruleset explicitly; lift the <0.16 version pin
+<a id="feat-loop-2026-0036"></a>
+## FEAT-LOOP-2026-0036 — Pin ruff's lint ruleset explicitly; lift the <0.16 version pin
 
 **Why.** CI's lint gate broke on ruff 0.16 with ~300 findings on code clean for months. Investigation (this feature) reframed the original premise: they were **not** 300 real errors, and not import-ordering. ruff 0.16 **changed its implicit default `select`** from the classic `E4,E7,E9,F` to a large opinionated set (B/SIM/PLW/RUF/I/…). The repo's `[tool.ruff]` config selected nothing, so it inherited 0.16's new default overnight — the gate expanded purely from a version bump, no code involved. The emergency `ruff>=0.6,<0.16` pin froze the version to dodge it.
 
 **What was done.** Pin the ruleset **explicitly** and version-independently — `[tool.ruff.lint] select = ["E4","E7","E9","F"]`, the classic default the repo was always clean under — then lift the version pin (`ruff>=0.6`). Under ruff 0.16 with the explicit select the gate is clean (`All checks passed!`) and the full suite is unchanged (1295 OK). **No source code changed** — the original "fix ~300 errors across the test files" plan was based on a false premise and was abandoned; the real fix is two lines of config. Executed directly after a loop run on the flawed plan blocked (see LEARNINGS: the run surfaced a hollow-pass and a gate/tool-version-skew lesson).
 
-**Benefits.** The gate is now immune to ruff redefining its defaults again — the intent is written down, not inherited. The version pin is gone, so ruff tracks current. Deliberately adopting 0.16's broader rule families (many are genuinely good) is decoupled into its own opt-in decision (see FEAT-2026-0037) rather than being forced by a bump.
+**Benefits.** The gate is now immune to ruff redefining its defaults again — the intent is written down, not inherited. The version pin is gone, so ruff tracks current. Deliberately adopting 0.16's broader rule families (many are genuinely good) is decoupled into its own opt-in decision (see FEAT-LOOP-2026-0037) rather than being forced by a bump.
 
 **Status: done.** Config-only fix (`pyproject.toml` explicit select + version unpin); no code change.
 
-<a id="feat-2026-0038"></a>
-## FEAT-2026-0038 — DLQ quarantine harvest mode (per-component)
+<a id="feat-loop-2026-0038"></a>
+## FEAT-LOOP-2026-0038 — DLQ quarantine harvest mode (per-component)
 
 **Why.** Peek-only DLQ harvesting (monitoring v1) leaves messages in the DLQ: TTL can expire evidence, DLQ depth loses signal value, and replay-after-fix stays manual. Quarantine mode (receive + archive to blob storage) preserves evidence durably and makes replay mechanical, enabling autonomy level 4 (replay-verify-close).
 
@@ -795,29 +795,29 @@ Cross-repo (loop seed/docs + umbrella `cli.py`) — expect interactive.
 
 **Status: planned.**
 
-<a id="feat-2026-0039"></a>
-## FEAT-2026-0039 — Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap)
+<a id="feat-loop-2026-0039"></a>
+## FEAT-LOOP-2026-0039 — Monitoring schema + derive-monitoring skill (discovery, diagnosability audit, bootstrap)
 
 **Why.** Specfuse-configured repos should be self-healing: every deployable component (web API, message worker, timer worker) proactively watched for functional failures — DLQ messages, error logs, 5xx, missed timer runs, broken business invariants — with findings reported as GitHub issues that feed the existing triage loop (fix-bug or roadmap). The foundation is a declarative `.specfuse/monitoring.yml` (the post-deploy counterpart of `verification.yml`) and a skill that derives it from repo evidence, because hand-authoring per-component checks and auditing diagnosability is mechanical work the repo itself can mostly answer.
 
 **Goal.** Ship (a) the monitoring.yml schema + example: `environments`, `components` with per-component trust dials (`runner: local|gh-actions|in-cluster`, `diagnose: manual|auto`, `autofix: off|on`), check types `dlq` (harvest_mode peek|quarantine), `error-logs`, `http-5xx`, `heartbeat`, and custom `invariant` (user KQL + `fingerprint_by`); (b) a design-for-diagnosis rule (correlation IDs, structured logging, cloud_RoleName per component, DLQ error-context capture); (c) the `derive-monitoring` skill mirroring derive-verification's posture (evidence first, ask only what code cannot answer, draft never auto-write) that discovers components, interviews for invariants and environment coordinates, audits each component against the design-for-diagnosis rule with gap findings, and drafts monitoring.yml + runner bootstrap files (GH Actions workflow, gitignored `monitoring.local.yml` example, read-only secrets checklist) with staged per-file accepts. Provider-agnostic by design, exactly as verification.yml is language-agnostic: check types are neutral concepts, environments carry typed provider bindings (`telemetry.provider`, `broker.provider`), and adapters normalize into a neutral artifact model (OTel semantic conventions; `trace_id` as the correlation spine). Azure adapters ship first: Service Bus + App Insights (operation_Id maps to the spine).
 
-**Benefits.** Turnkey bootstrap: interview ends, user reviews drafted files, first local `--dry-run` is minutes away. The diagnosability audit ensures components are born diagnosable — the property that lets a repo-resident agent outperform external monitoring at root-cause. Schema decided up front keeps the harvester (FEAT-2026-0040) and later autonomy stages purely additive.
+**Benefits.** Turnkey bootstrap: interview ends, user reviews drafted files, first local `--dry-run` is minutes away. The diagnosability audit ensures components are born diagnosable — the property that lets a repo-resident agent outperform external monitoring at root-cause. Schema decided up front keeps the harvester (FEAT-LOOP-2026-0040) and later autonomy stages purely additive.
 
 **Scope narrowed at drafting (see the feature's `PLAN.md`).** Deliverable (c)'s
-GitHub Actions runner workflow moved to [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040): that
+GitHub Actions runner workflow moved to [FEAT-LOOP-2026-0040](roadmap-archive.md#feat-loop-2026-0040): that
 workflow invokes the harvester CLI, which does not exist until 0040, and shipping a
-template whose entry point is a nonexistent binary is the `[FEAT-2026-0029/G1-CLOSE]`
+template whose entry point is a nonexistent binary is the `[FEAT-LOOP-2026-0029/G1-CLOSE]`
 failure verbatim. The local-runner bootstrap artifacts still ship here. Added at
 drafting: a committed structural validator for the schema, so 0040 inherits a
 machine-checkable contract rather than prose.
 
 **Status: done.**
 
-<a id="feat-2026-0043"></a>
-## FEAT-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
+<a id="feat-loop-2026-0043"></a>
+## FEAT-LOOP-2026-0043 — In-cluster monitor runner: AKS CronJob surface for the harvester
 
-**Why.** The harvester CLI is host-agnostic by design (FEAT-2026-0040 ships local + gh-actions surfaces), but orgs whose policy forbids external runners touching environments — or who want workload identity instead of exported secrets and tighter schedules than GH Actions cron honors — need an in-cluster surface.
+**Why.** The harvester CLI is host-agnostic by design (FEAT-LOOP-2026-0040 ships local + gh-actions surfaces), but orgs whose policy forbids external runners touching environments — or who want workload identity instead of exported secrets and tighter schedules than GH Actions cron honors — need an in-cluster surface.
 
 **Goal.** Container image build for the harvester CLI, a CronJob manifest template, Azure workload-identity setup docs (read-only Service Bus Listen + App Insights access, GH token for issue writes), and derive-monitoring drafting support for `runner: in-cluster` components. Same CLI, same monitoring.yml, same issue contract — only the launch surface differs.
 
@@ -825,29 +825,29 @@ machine-checkable contract rather than prose.
 
 **Status: planned.**
 
-<a id="feat-2026-0052"></a>
-## FEAT-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
+<a id="feat-loop-2026-0052"></a>
+## FEAT-LOOP-2026-0052 — Baseline-delta ratchet, waiver, and tracking-issue emission
 
-**Why.** [FEAT-2026-0051](roadmap-archive.md#feat-2026-0051) stops the bleeding — a gate already red on the base tree halts before any work unit is dispatched — but leaves the operator only two exits: fix the repo-wide debt first, or defer the feature. Neither is right when the debt is real, externally-caused, and slow to resolve (an unpatched transitive advisory with no upstream fix yet), because the feature is then held hostage by a failure it did not cause and cannot repair. The missing third exit is "proceed, with everything the baseline already had held constant and everything new still enforced."
+**Why.** [FEAT-LOOP-2026-0051](roadmap-archive.md#feat-loop-2026-0051) stops the bleeding — a gate already red on the base tree halts before any work unit is dispatched — but leaves the operator only two exits: fix the repo-wide debt first, or defer the feature. Neither is right when the debt is real, externally-caused, and slow to resolve (an unpatched transitive advisory with no upstream fix yet), because the feature is then held hostage by a failure it did not cause and cannot repair. The missing third exit is "proceed, with everything the baseline already had held constant and everything new still enforced."
 
 **Goal.** Three additions on top of 0051's recorded baseline. First, the **baseline-delta ratchet**: during a gate, a WU fails only on failures beyond the recorded baseline set, so pre-existing debt stops blocking while anything a WU newly introduces still fails normally — the same shape as the coverage floor, and deliberately chosen over a per-gate mute, which would also hide a genuine vulnerability a WU legitimately introduces. Second, the **waiver**: an operator-set flag that activates the ratchet for a gate, survives driver resume, and is visible in the gate review — turning 0051's halt into a decision point rather than a dead end. Third, **tracking-issue emission**: the escalation carries a fully-formed issue body plus the `gh issue create` command, auto-creating the issue only when `gh auth status` passes and printing the command for the operator otherwise, so a waived baseline is always tracked rather than silently accepted.
 
 **Benefits.** A feature blocked on externally-caused debt can proceed without anyone weakening a gate: the debt is held constant, tracked in an issue, and visible in the gate review, while every newly-introduced failure still fails. Designed against real baseline records produced by 0051 rather than speculatively, and sequenced after it so the oracle-semantics change lands behind a shipped, proven brake.
 
-**Shape — drafted, single gate, four substantive work units.** The ratchet subtracts at the outcome layer (`execute_unit_attempt`), leaving `verify()`'s `(ok, report)` contract — every WU's exit oracle in every downstream project — byte-identical, which is the constraint FEAT-2026-0051/T01 was told to block on rather than breach. The waiver is set by a `--waive-baseline` flag but *stored* as a `waiver:` block in the gate's frontmatter, so it survives driver resume, and it is **pinned to the baseline sha and the exact failing set it covers**: a failure appearing later is not waived and the gate halts again. Tracking-issue emission reuses the shipped find-then-create seam in `specfuse/loop/escalation.py` rather than rebuilding it, but files under a new `waived-baseline` label rather than `needs-human` — a waived baseline parks nothing, and filing it as an escalation would misreport a running feature as blocked in the `/attention` inbox.
+**Shape — drafted, single gate, four substantive work units.** The ratchet subtracts at the outcome layer (`execute_unit_attempt`), leaving `verify()`'s `(ok, report)` contract — every WU's exit oracle in every downstream project — byte-identical, which is the constraint FEAT-LOOP-2026-0051/T01 was told to block on rather than breach. The waiver is set by a `--waive-baseline` flag but *stored* as a `waiver:` block in the gate's frontmatter, so it survives driver resume, and it is **pinned to the baseline sha and the exact failing set it covers**: a failure appearing later is not waived and the gate halts again. Tracking-issue emission reuses the shipped find-then-create seam in `specfuse/loop/escalation.py` rather than rebuilding it, but files under a new `waived-baseline` label rather than `needs-human` — a waived baseline parks nothing, and filing it as an escalation would misreport a running feature as blocked in the `/attention` inbox.
 
-**Scope boundary — recorded decisions, deliberately not built.** A per-gate mute (issue #234 rejected it, and subtracting a recorded set is the answer to why). Project-wide or cross-feature waivers, which need expiry, ownership, and a review cadence and are a much larger shape. Waiver expiry, since the sha-and-set pinning already forces a re-decision whenever the failing set changes. The `doc` and `plannext` gate sets, inheriting 0051's `code`-only boundary. And FEAT-2026-0051's own `no_gate_marker` message follow-up, which is a real defect but would hide inside an unrelated diff here.
+**Scope boundary — recorded decisions, deliberately not built.** A per-gate mute (issue #234 rejected it, and subtracting a recorded set is the answer to why). Project-wide or cross-feature waivers, which need expiry, ownership, and a review cadence and are a much larger shape. Waiver expiry, since the sha-and-set pinning already forces a re-decision whenever the failing set changes. The `doc` and `plannext` gate sets, inheriting 0051's `code`-only boundary. And FEAT-LOOP-2026-0051's own `no_gate_marker` message follow-up, which is a real defect but would hide inside an unrelated diff here.
 
 **Status: planned.**
 
-<a id="feat-2026-0069"></a>
-## FEAT-2026-0069 — monitoring.yml check targets + queue-stalled check type
+<a id="feat-loop-2026-0069"></a>
+## FEAT-LOOP-2026-0069 — monitoring.yml check targets + queue-stalled check type
 
-**Why.** The first real-repo run of `/derive-monitoring` ([FEAT-2026-0039](#feat-2026-0039) gate 2's FU-1, against a downstream .NET backend with one HTTP API plus one functions host carrying 20 queue-topic subscriptions and 10 timer triggers) found that `monitoring.yml` conflates two axes. `component` is asked to be both the unit of deployment and attribution (role name, trust dials, redeploy boundary) *and* the unit of failure-artifact enumeration (what findings are counted per). Those coincide only when a deployable carries exactly one trigger. On the observed host they diverge 30-to-2: one `dlq` check covers 20 unrelated subscriptions with no per-subscription attribution, and one `heartbeat` covers 10 timers, so a single silent timer among ten is invisible to any config the schema can express. Making each trigger its own component does not fix it — `cloud_RoleName` is per-process, so 30 components would each carry the same `error-logs`/`heartbeat` query (30 duplicate findings per exception) and the design-for-diagnosis property "per-component role name matches `monitoring.yml` `name`" becomes unsatisfiable by construction. This is exactly the class of gap 0039 shipped a schema early in order to surface, and it must be settled before [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040) builds adapters against the contract.
+**Why.** The first real-repo run of `/derive-monitoring` ([FEAT-LOOP-2026-0039](#feat-loop-2026-0039) gate 2's FU-1, against a downstream .NET backend with one HTTP API plus one functions host carrying 20 queue-topic subscriptions and 10 timer triggers) found that `monitoring.yml` conflates two axes. `component` is asked to be both the unit of deployment and attribution (role name, trust dials, redeploy boundary) *and* the unit of failure-artifact enumeration (what findings are counted per). Those coincide only when a deployable carries exactly one trigger. On the observed host they diverge 30-to-2: one `dlq` check covers 20 unrelated subscriptions with no per-subscription attribution, and one `heartbeat` covers 10 timers, so a single silent timer among ten is invisible to any config the schema can express. Making each trigger its own component does not fix it — `cloud_RoleName` is per-process, so 30 components would each carry the same `error-logs`/`heartbeat` query (30 duplicate findings per exception) and the design-for-diagnosis property "per-component role name matches `monitoring.yml` `name`" becomes unsatisfiable by construction. This is exactly the class of gap 0039 shipped a schema early in order to surface, and it must be settled before [FEAT-LOOP-2026-0040](roadmap-archive.md#feat-loop-2026-0040) builds adapters against the contract.
 
 **Goal.** Separate the axes. Component stays the deployment and attribution unit; checks gain a `targets` list that is the enumeration unit — `dlq` targets carry `subscription` (what the harvester queries) plus `function` (what a human diagnoses by), `heartbeat` targets carry a name plus optional cron and IANA timezone, and `error-logs`/`http-5xx` reject targets because they are role-name keyed and genuinely component-scoped. Gate 1 lands the schema, the structural validation, the migration of every shipped YAML surface, the contract flip that makes `targets` required on `dlq`, and the `queue-stalled` check type (issue #247 — a wedged consumer produces no dead-lettered message, no missed heartbeat, and no error log, and `invariant` cannot see it because queue depth is a broker coordinate a telemetry query cannot reach). Gate 2 re-keys component discovery onto *deployment* evidence (Helm chart, compose service, Dockerfile) with trigger registrations demoted to evidence of a component's type, adds the fixture whose single deployable carries N triggers, and generates target lists mechanically.
 
-**Benefits.** Per-subscription DLQ attribution and per-schedule heartbeat become expressible, so a dead-lettered message on one of 20 subscriptions is a distinct finding rather than one undifferentiated bucket. FEAT-2026-0040's adapter interface gets a machine-checkable answer to "do I enumerate per component or per target" before any adapter exists. And the sequencing keeps its promise from 0039: the schema absorbs the correction, so the harvester stays purely additive.
+**Benefits.** Per-subscription DLQ attribution and per-schedule heartbeat become expressible, so a dead-lettered message on one of 20 subscriptions is a distinct finding rather than one undifferentiated bucket. FEAT-LOOP-2026-0040's adapter interface gets a machine-checkable answer to "do I enumerate per component or per target" before any adapter exists. And the sequencing keeps its promise from 0039: the schema absorbs the correction, so the harvester stays purely additive.
 
 **Ordering.** Issue #246 (`_ENV_VAR_NAME_RE` rejects the `Section__Key` env-var spelling) lands **first**, as a standalone bug fix — it touches the same validator this feature rewrites, and the reverse order would rebase a bug branch onto a substantially changed file.
 
@@ -857,7 +857,7 @@ machine-checkable contract rather than prose.
 
 **Gate 1 deliberately did not prove** that `/derive-monitoring` emits 1 component with N targets for a deployable carrying N triggers. The schema can now express the right answer; discovery still cannot produce it — `discover_components` keys on trigger attributes and returns one component per trigger. That is gate 2, along with the fixture whose single deployable carries N triggers and the claim (confirmed only against a repo outside this tree) that every target coordinate is mechanically extractable.
 
-**Gate 2 — shipped.** Four work units `done`, each on its first attempt, no escalations, **$4.43 against $12.00 planned**. `discover_components` is re-keyed onto *deployment* evidence: a component exists because a deployment artifact names it within a `scope_prefix`, and a trigger registration is evidence of that deployable's type and the source of its target list — never a component in its own right. `http_serving` and `message_consuming` are now derived from matched triggers instead of hand-declared, and the emitted record carries `subscriptions` and `schedules`. `suggest_checks` fans `schedules` into per-schedule `heartbeat` targets, closing the last half of the motivating defect — a single silent timer among several is now expressible. A third fixture stack (one deployable, **3** subscriptions and **2** schedules) makes the definition of done a test: `TestOneDeployableManyTriggers` asserts one component, 3 `dlq` targets, 2 `heartbeat` targets, and zero validator findings on the rendered YAML. The `derive-monitoring` skill's Step 1, Seams table, and `PROMPT.md` were rewritten to match, canonical copy first and propagated by `scripts/sync-scaffold.sh`. `invariant`'s accidental permissive `targets` fall-through became a decision — **rejected**, because `fingerprint_by` is already that check type's enumeration key and permitting both would hand FEAT-2026-0040's fingerprint model two competing keys.
+**Gate 2 — shipped.** Four work units `done`, each on its first attempt, no escalations, **$4.43 against $12.00 planned**. `discover_components` is re-keyed onto *deployment* evidence: a component exists because a deployment artifact names it within a `scope_prefix`, and a trigger registration is evidence of that deployable's type and the source of its target list — never a component in its own right. `http_serving` and `message_consuming` are now derived from matched triggers instead of hand-declared, and the emitted record carries `subscriptions` and `schedules`. `suggest_checks` fans `schedules` into per-schedule `heartbeat` targets, closing the last half of the motivating defect — a single silent timer among several is now expressible. A third fixture stack (one deployable, **3** subscriptions and **2** schedules) makes the definition of done a test: `TestOneDeployableManyTriggers` asserts one component, 3 `dlq` targets, 2 `heartbeat` targets, and zero validator findings on the rendered YAML. The `derive-monitoring` skill's Step 1, Seams table, and `PROMPT.md` were rewritten to match, canonical copy first and propagated by `scripts/sync-scaffold.sh`. `invariant`'s accidental permissive `targets` fall-through became a decision — **rejected**, because `fingerprint_by` is already that check type's enumeration key and permitting both would hand FEAT-LOOP-2026-0040's fingerprint model two competing keys.
 
 **Outcome: the defect is fixed.** `/derive-monitoring` run against a repo whose single deployable carries N triggers now emits **1 component with N targets**, not N components — the 30-to-2 divergence that motivated the feature. Per-subscription DLQ attribution and per-schedule heartbeat are expressible in the schema, enforced by the validator, and produced by discovery.
 
@@ -865,16 +865,16 @@ machine-checkable contract rather than prose.
 
 **Issue #247 — resolved by this feature** (gate 1, `T04`). *"add a `queue-stalled` check type — a wedged consumer is invisible to `dlq`, `heartbeat`, and `invariant` alike."* `queue-stalled` is in `CHECK_TYPES`, carries `targets` **required from birth**, and is exercised by the shipped example and the docs table. Close #247 on merge.
 
-**Carry-over from #245, and it is the one thing that can silently undo this feature.** The issue's claim that every target coordinate is *mechanically extractable from real code* is confirmed only against a repo outside this tree; a fixture authored inside gate 2 is evidence the algorithm fans a trigger table into a target list, not evidence that real repositories are shaped that way. Verifying it needs **one post-merge operator run of `/derive-monitoring` against a real repo whose single deployable carries ≥3 subscriptions and ≥2 schedules** — the same operator step FEAT-2026-0039 recorded for its own skill. That one run also discharges the second deferral (that the *skill*, executed end-to-end by an agent, reproduces what the reference implementation is tested to do). Both are enumerated with exact re-run conditions in the feature's `RETROSPECTIVE.md` § *Hedged follow-up record*.
+**Carry-over from #245, and it is the one thing that can silently undo this feature.** The issue's claim that every target coordinate is *mechanically extractable from real code* is confirmed only against a repo outside this tree; a fixture authored inside gate 2 is evidence the algorithm fans a trigger table into a target list, not evidence that real repositories are shaped that way. Verifying it needs **one post-merge operator run of `/derive-monitoring` against a real repo whose single deployable carries ≥3 subscriptions and ≥2 schedules** — the same operator step FEAT-LOOP-2026-0039 recorded for its own skill. That one run also discharges the second deferral (that the *skill*, executed end-to-end by an agent, reproduces what the reference implementation is tested to do). Both are enumerated with exact re-run conditions in the feature's `RETROSPECTIVE.md` § *Hedged follow-up record*.
 
 **Costs, honestly.** Feature actual **$42.82** against `PLAN.md`'s as-drafted **$34.00** (+25.9%), excluding the terminal close. The plan was never re-baselined, deliberately. The variance does not blend: all nine implementation WUs came in **$16.37 against $25.00 (−34.5%)**, while the two gate-1 closing WUs came in **$26.45 against $10.00 (+164.5%)** — a floor `planning-discipline.md` §5 supplied, not a judgement any author made. Third feature to pay for it; tracked as **issue #260** with the two concrete file targets (§5 itself and `WU.template.md`'s comment quoting it) named in the retrospective's `## Planning-floor revision`. Gate 1's one real defect — a migrate criterion scoped to a sample rather than a sweep — cost $5.26.
 
-**Note for [FEAT-2026-0040](roadmap-archive.md#feat-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
+**Note for [FEAT-LOOP-2026-0040](roadmap-archive.md#feat-loop-2026-0040), restated.** **Fingerprints must include the target key.** Enumeration runs over `check["targets"]` when present and over the component otherwise, and a finding derived from a target must fingerprint on that target's coordinates (`subscription` + `function` for `dlq`, `name` for `heartbeat`) — not only the component name. `invariant` is the deliberate exception: `targets` is rejected there, so 0040 reads `fingerprint_by` for `invariant` and `targets` for everything else. Without this, 20 DLQ targets collapse into one issue with every gate green, and the attribution this feature paid two gates for is lost at the last step.
 
-**Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
+**Status: done.** Terminal close ran with verdict `met_locally`; the consumer-visible contract-change list (15 items across both gates; items 1, 3, and 11 breaking, including the `patterns` table contract) was acknowledged by the operator at the terminal review checkpoint, and FU-1 and FU-3 were then discharged post-close by running `/derive-monitoring` against the downstream .NET backend that originated the feature — **33 trigger registrations resolved to 2 components**, every target coordinate extracted mechanically, drafted config validating clean. Verdict upgraded to `met`. FU-2 stays open by design: it asserts about FEAT-LOOP-2026-0040's adapter interface and is 0040's acceptance criterion, not this feature's.
 
-<a id="feat-2026-0068"></a>
-## FEAT-2026-0068 — Gate failure reports must contain the failure: verdict-aware output tail
+<a id="feat-loop-2026-0068"></a>
+## FEAT-LOOP-2026-0068 — Gate failure reports must contain the failure: verdict-aware output tail
 
 **Why.** When a verification gate fails, the driver shows the agent the last 15 lines of the command's output (`_run_gate_set`, `loop.py:2707`). For this repository's `tests` and `coverage` gates that window reliably contains no verdict and no failure — it contains the tail of an unrelated fixture feature's driver run.
 
@@ -882,7 +882,7 @@ The cause is buffering, not stream selection. `stderr` is already merged into `s
 
 Reproduced on a **passing** run: `python3 -m unittest discover -s tests -v` merged to one stream exits 0, and `tail -15 | grep -cE '^(OK|FAILED)'` returns **0**. The window instead ends on `Gate 1 complete (retro, lessons, docs, plan-next); terminal gate but PLAN.md not yet 'done'` — output from `FEAT-2026-9301`, a test fixture, which appears 14 times in a single run. The same holds on a failing run, which is what makes it expensive.
 
-Measured cost, [FEAT-2026-0060](roadmap-archive.md#feat-2026-0060)/T01: two attempts, 1350 seconds, **$5.31**, escalated `spinning_signature_repeat` — with **no artifact and no diagnosis**. Both attempts genuinely failed, and both were shown the identical uninformative tail, which is also precisely why their failure signatures matched and the spinning guard fired. The `git reset --hard` between attempts then destroyed the evidence, so what actually broke is now unrecoverable. A failure report that does not contain the failure converts a one-attempt fix into a spin, and the spinning guard cannot tell the difference.
+Measured cost, [FEAT-LOOP-2026-0060](roadmap-archive.md#feat-loop-2026-0060)/T01: two attempts, 1350 seconds, **$5.31**, escalated `spinning_signature_repeat` — with **no artifact and no diagnosis**. Both attempts genuinely failed, and both were shown the identical uninformative tail, which is also precisely why their failure signatures matched and the spinning guard fired. The `git reset --hard` between attempts then destroyed the evidence, so what actually broke is now unrecoverable. A failure report that does not contain the failure converts a one-attempt fix into a spin, and the spinning guard cannot tell the difference.
 
 **Goal.** Guarantee that a gate's FAIL report contains the evidence a reader needs to act. Decide the mechanism as part of the feature; two shapes are viable and they compose. **Verdict-aware selection** — scan the captured output for a recognisable verdict or failure marker (`^FAILED`, `^OK`, `^ERROR:`, `^FAIL:`, a non-zero-exit summary line) and pin those lines into the report regardless of where they fall, rather than taking a positional tail. **Window escalation** — when the tail contains no recognisable verdict, widen it or state plainly that the verdict was not found, so "no diagnosis available" is visible rather than disguised as fifteen lines of unrelated text. Whichever is chosen, the timeout path at `loop.py:2729` takes the same treatment; it has the identical positional-tail shape with a 10-line window.
 
@@ -890,14 +890,14 @@ Consider also whether test suites that emit driver output on stdout should be qu
 
 **Benefits.** An agent that fails a gate is told why, so the common case becomes a corrected second attempt rather than an identical one. Removes a systematic driver of `spinning_signature_repeat`: two attempts shown the same uninformative tail produce the same signature by construction, so the guard fires on a reporting defect and reads as a work-unit defect. And an operator reading a blocked WU's attempt notes sees the failure instead of a fixture feature's gate ceremony.
 
-**Status: done.** Executed directly as a bug fix rather than dispatched through the loop — one function, test-first, one branch, one PR, on the same footing as FEAT-2026-0036. Dispatching it would have meant running a work unit whose own gate report carried the defect being fixed.
+**Status: done.** Executed directly as a bug fix rather than dispatched through the loop — one function, test-first, one branch, one PR, on the same footing as FEAT-LOOP-2026-0036. Dispatching it would have meant running a work unit whose own gate report carried the defect being fixed.
 
 Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the normal path (15-line window) and the timeout path (10-line window), which carried the identical positional-tail shape. Both mechanisms the row left open were taken, since they compose — verdict lines found before the tail are pinned above it with an explicit `... (N line(s) elided) ...` marker, and output with no recognisable verdict anywhere gets an explicit `NO VERDICT FOUND` note rather than presenting unrelated trailing output as the failure. Twelve tests in `tests/test_gate_report_verdict.py`, red before the change. Verified against the real captured output that motivated the row: the report now opens `Ran 2007 tests in 84.286s` / `OK (skipped=3)` / `... (4564 line(s) elided) ...` where it previously opened on a fixture feature's gate ceremony.
 
-<a id="feat-2026-0078"></a>
-## FEAT-2026-0078 — Declarable in-place produces overlap: `produces_incremental` field, documented and validated
+<a id="feat-loop-2026-0078"></a>
+## FEAT-LOOP-2026-0078 — Declarable in-place produces overlap: `produces_incremental` field, documented and validated
 
-**Why.** `check_produces_satisfiability` WARNs when a dispatchable WU declares a `produces:` path an earlier `done` WU already delivered, and tells the author to "state the incremental edit this WU makes to it in the body". **The check reads only WU frontmatter and never opens the body**, so that resolution can never fire — the WARN is permanent on a correctly-authored WU, and the only action that silences it is dropping the `produces:` path. Dropping it is usually the *wrong* fix: `produces:` feeds the driver's presence and in-diff guards, so understating it weakens a real contract to silence advisory noise. Reported as [#1041](https://github.com/specfuse/loop/issues/1041) and observed repeatedly in FEAT-2026-0049, where T05 legitimately edited a file T04 created and carried the WARN through four gates.
+**Why.** `check_produces_satisfiability` WARNs when a dispatchable WU declares a `produces:` path an earlier `done` WU already delivered, and tells the author to "state the incremental edit this WU makes to it in the body". **The check reads only WU frontmatter and never opens the body**, so that resolution can never fire — the WARN is permanent on a correctly-authored WU, and the only action that silences it is dropping the `produces:` path. Dropping it is usually the *wrong* fix: `produces:` feeds the driver's presence and in-diff guards, so understating it weakens a real contract to silence advisory noise. Reported as [#1041](https://github.com/specfuse/loop/issues/1041) and observed repeatedly in FEAT-LOOP-2026-0049, where T05 legitimately edited a file T04 created and carried the WARN through four gates.
 
 **Goal.** An optional `produces_incremental:` frontmatter list naming paths this WU deliberately edits in place, which `check_produces_satisfiability` reads and exempts — a resolution the check can actually observe. Shipped as one coherent change with the three things a new frontmatter field needs and a bug fix would skip: the field's entry in `WU.template.md`'s frontmatter notes, its mention in `/authoring-work-units` beside §13's `produces:` guidance, and schema validation so a typo is a lint error rather than a silently-ignored key. The WARN message names the field as a resolution alongside dropping the path.
 
@@ -907,10 +907,10 @@ Shipped `select_gate_report_lines` (`loop.py`), wired into both tail sites: the 
 
 **Status: planned.**
 
-<a id="feat-2026-0077"></a>
-## FEAT-2026-0077 — Provenance-recorded policy values: know who chose a value, not just what it is
+<a id="feat-loop-2026-0077"></a>
+## FEAT-LOOP-2026-0077 — Provenance-recorded policy values: know who chose a value, not just what it is
 
-**Why.** [FEAT-2026-0076](roadmap-archive.md#feat-2026-0076)'s review mode has to answer "did anyone actually
+**Why.** [FEAT-LOOP-2026-0076](roadmap-archive.md#feat-loop-2026-0076)'s review mode has to answer "did anyone actually
 choose this value, or is it the shipped default nobody looked at?" It answers by **comparing
 against the shipped baseline**, which is cheap, needs no schema change, and is deliberately
 lossy in one direction: an operator who *deliberately* chooses a value equal to the shipped
@@ -924,26 +924,26 @@ direction stops being harmless.
 
 **Goal.** Record provenance when a policy value is written, so review can distinguish
 "operator chose this" from "this is the shipped default" without inference. The shape is a
-schema change to `.specfuse/agent-policy.yml` — deliberately out of FEAT-2026-0076's scope
+schema change to `.specfuse/agent-policy.yml` — deliberately out of FEAT-LOOP-2026-0076's scope
 boundary, which is why this is a separate feature rather than a widening of that one. It
 must also answer what happens to files written before provenance existed, since every
 consumer project's file is one: an absent provenance record has to degrade to the
 comparison heuristic rather than to a wrong answer.
 
 **Benefits.** Review stops hedging on the one question it exists to answer. The caveat
-FEAT-2026-0076 attaches to every baseline-match ("this may never have been decided") becomes
+FEAT-LOOP-2026-0076 attaches to every baseline-match ("this may never have been decided") becomes
 unnecessary where a provenance record exists. And the ordering is deliberate — a cheap
 mechanism shipped first and replaced by the accurate one costs a migration; the reverse
 ordering costs a schema migration before anyone knows whether the precision is worth it.
 
-**Status: planned.** Filed at FEAT-2026-0076's gate-2 arming review by operator decision
+**Status: planned.** Filed at FEAT-LOOP-2026-0076's gate-2 arming review by operator decision
 (open question 2). Not urgent: it becomes worth building when a real repository's policy file
-carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
+carries tuned values, which is the case FEAT-LOOP-2026-0076's sample did not contain.
 
-<a id="feat-2026-0081"></a>
-## FEAT-2026-0081 — Feature-ID collision prevention and cheap renumbering
+<a id="feat-loop-2026-0081"></a>
+## FEAT-LOOP-2026-0081 — Feature-ID collision prevention and cheap renumbering
 
-**Why.** Two features were drafted three minutes apart in different worktrees of the same repo and both took `FEAT-2026-0093`. One merged; the other was renumbered *after its gate had closed* — folder, `PLAN.md` frontmatter, every WU `id`, retrospective, staged lessons, criteria file, generated docs, two roadmap rows, the archive anchor, the branch, and a closed-and-reopened PR, by hand, where getting it wrong is silent. The next-ID scan is a point-in-time read and cannot close that window: the colliding PR was created *after* the draft ran, so no query shape would have caught it. #1644 investigated the scan's GitHub query and found it sound (`FEAT-<YYYY>-` matches; the reported zero-result prefix is a query the skill never issues), and the contamination defect it surfaced instead was fixed separately as #1872 — leaving the race itself, and the cost of recovering from it, unaddressed. Filing this feature is what #1644 was closed in favour of. The ambiguity is live, not historical: picking this very ID required an operator ruling on `FEAT-2026-0098`, which appears only in merged PR #1843's title with no roadmap row and no folder, its work having actually landed as `FEAT-2026-0078`.
+**Why.** Two features were drafted three minutes apart in different worktrees of the same repo and both took `FEAT-2026-0093`. One merged; the other was renumbered *after its gate had closed* — folder, `PLAN.md` frontmatter, every WU `id`, retrospective, staged lessons, criteria file, generated docs, two roadmap rows, the archive anchor, the branch, and a closed-and-reopened PR, by hand, where getting it wrong is silent. The next-ID scan is a point-in-time read and cannot close that window: the colliding PR was created *after* the draft ran, so no query shape would have caught it. #1644 investigated the scan's GitHub query and found it sound (`FEAT-<YYYY>-` matches; the reported zero-result prefix is a query the skill never issues), and the contamination defect it surfaced instead was fixed separately as #1872 — leaving the race itself, and the cost of recovering from it, unaddressed. Filing this feature is what #1644 was closed in favour of. The ambiguity is live, not historical: picking this very ID required an operator ruling on `FEAT-2026-0098`, which appears only in merged PR #1843's title with no roadmap row and no folder, its work having actually landed as `FEAT-LOOP-2026-0078`.
 
 **Goal.** Make an ID collision cheap to prevent and cheap to recover from, along three independent lines, each shippable alone: narrow the race window by re-running the next-ID scan immediately before `/draft-feature` writes the feature folder, rather than only at step 1; catch a collision at the next lint rather than at merge, by making a `feature_id` claimed by a *different* slug anywhere in `roadmap.md` an error — which also resolves the title-only-claim ambiguity above mechanically; and make renumbering a command (`specfuse renumber <old> <new>`) instead of a careful manual sweep. **`events.jsonl` and `PLAN.baseline.json` must keep the old ID** under any renumbering: they are the driver's record of what actually ran, and the run really did execute under the old correlation ID. Rewriting a log to match a later rename falsifies history to tidy a name; the retrospective should carry a note so a future reader correlating events knows what to expect.
 
@@ -951,31 +951,31 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Shape — drafted, two gates.** Gate 1 is prevention: the four-source next-ID scan extracted from skill prose into a tested function (it exists only as markdown today, so every caller re-derives it), a new ERROR in `lint_roadmap.py` when one `feature_id` is claimed by two different slugs across `roadmap.md`, `roadmap-archive.md`, folder names, or `PLAN.md` frontmatter, and `/draft-feature` calling the scan a second time immediately before it writes the folder. Gate 2 is recovery — the renumbering command — and is deliberately left for gate 1's `plan-next` to draft, because the list of ID-bearing surfaces the sweep must rewrite is an *output* of gate 1's collision check rather than something to guess in advance.
 
-**Correction to the "Why" above, found while drafting.** The claim that the lint check "also resolves the title-only-claim ambiguity mechanically" does not hold. The `FEAT-2026-0098` case cited exists only in merged PR #1843's title, with no roadmap row and no folder, and no in-tree check reaches it — that case belongs to the scan, which reads GitHub, not to the linter. Recorded rather than inherited, per `[FEAT-2026-0034/G1-CLOSE/re-verify-the-producer-not-the-audit]`.
+**Correction to the "Why" above, found while drafting.** The claim that the lint check "also resolves the title-only-claim ambiguity mechanically" does not hold. The `FEAT-2026-0098` case cited exists only in merged PR #1843's title, with no roadmap row and no folder, and no in-tree check reaches it — that case belongs to the scan, which reads GitHub, not to the linter. Recorded rather than inherited, per `[FEAT-LOOP-2026-0034/G1-CLOSE/re-verify-the-producer-not-the-audit]`.
 
-**Scope boundary — recorded decisions, deliberately not built.** `specfuse renumber` as an umbrella subcommand: `DELEGATED_COMMANDS` is a hardcoded dict in the umbrella package, so this repo ships `specfuse-renumber` as a flat console script that works standalone, and the one-line delegation entry is a cross-repo follow-up. GitHub as a source for the *lint* check, since a network call inside a `code`-set gate makes the gate flaky and FEAT-2026-0034's lesson is that a gate red for dismissible reasons gets ignored. And repairing existing violations — a draft-time probe found none: 78 roadmap rows with no duplicate ID, 68 IDs across all four sources with zero slug disagreement, so the ERROR is armable with no cleanup work unit.
+**Scope boundary — recorded decisions, deliberately not built.** `specfuse renumber` as an umbrella subcommand: `DELEGATED_COMMANDS` is a hardcoded dict in the umbrella package, so this repo ships `specfuse-renumber` as a flat console script that works standalone, and the one-line delegation entry is a cross-repo follow-up. GitHub as a source for the *lint* check, since a network call inside a `code`-set gate makes the gate flaky and FEAT-LOOP-2026-0034's lesson is that a gate red for dismissible reasons gets ignored. And repairing existing violations — a draft-time probe found none: 78 roadmap rows with no duplicate ID, 68 IDs across all four sources with zero slug disagreement, so the ERROR is armable with no cleanup work unit.
 
 **Status: planned.** Carried forward from #1644, which was closed as not-reproducing on its own headline claim; this row preserves the follow-up work that report identified and its author explicitly deferred.
 
-<a id="feat-2026-0082"></a>
-## FEAT-2026-0082 — Wire the async drafting interview end to end
+<a id="feat-loop-2026-0082"></a>
+## FEAT-LOOP-2026-0082 — Wire the async drafting interview end to end
 
-**Why.** FEAT-2026-0050 built the async drafting interview — question-set builder, issue renderer, reply parser, D1 answer gate, headless drafting invocation, provider dispatch branch — and closed `partially_met` because none of it is reachable. Two seams were never assigned to any work unit: no production code calls `render_question_issue`, so no question issue is ever posted; and `default_providers` constructs `FeatureProvider` without an `answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real run and `needs_drafting` escalates exactly as it did before. Neither gate's Definition of Done named either seam, so every unit passed first try and the bottleneck the feature was filed for is untouched. The operator accepted the hedge on 2026-08-17 with the reason "This will have to be tested with a real feature"; this row is the work that makes that test possible.
+**Why.** FEAT-LOOP-2026-0050 built the async drafting interview — question-set builder, issue renderer, reply parser, D1 answer gate, headless drafting invocation, provider dispatch branch — and closed `partially_met` because none of it is reachable. Two seams were never assigned to any work unit: no production code calls `render_question_issue`, so no question issue is ever posted; and `default_providers` constructs `FeatureProvider` without an `answer_gate`, so `_dispatch_drafting` takes the fallback branch on every real run and `needs_drafting` escalates exactly as it did before. Neither gate's Definition of Done named either seam, so every unit passed first try and the bottleneck the feature was filed for is untouched. The operator accepted the hedge on 2026-08-17 with the reason "This will have to be tested with a real feature"; this row is the work that makes that test possible.
 
 **Goal.** A `specfuse-agent` run over a `queue:` holding one undrafted `planned` feature posts a real `drafting-needed` question issue, and a later run reads the operator's reply from that issue's comments and produces a drafted feature folder — with the run's `events.jsonl` showing `needs_drafting` resolving to a completed drafting dispatch rather than an escalation. At least one gate's Definition of Done asserts that end-to-end outcome, so the plan cannot pass green while the pieces stay disconnected. Gate-1 review of the drafted folder stays human; the drafted folder still lands `status: planned` and unarmed.
 
-**Benefits.** Discharges both carried-forward follow-ups on FEAT-2026-0050 and upgrades its verdict from `partially_met` to `met`. Removes the escalate-and-wait bottleneck the earlier feature was funded for — measured 2026-08-15, four `planned` queue entries produced four `drafting-needed` escalations and zero units of work. And it produces the evidence `GATE-01.md`'s arming discipline asked for and never got: one real operator reply, whose verbatim text validates (or corrects) a parser every reply shape in FEAT-2026-0050 was designed against without a human ever touching it.
+**Benefits.** Discharges both carried-forward follow-ups on FEAT-LOOP-2026-0050 and upgrades its verdict from `partially_met` to `met`. Removes the escalate-and-wait bottleneck the earlier feature was funded for — measured 2026-08-15, four `planned` queue entries produced four `drafting-needed` escalations and zero units of work. And it produces the evidence `GATE-01.md`'s arming discipline asked for and never got: one real operator reply, whose verbatim text validates (or corrects) a parser every reply shape in FEAT-LOOP-2026-0050 was designed against without a human ever touching it.
 
 **Shape — drafted, single gate, four substantive work units.** T01 adds `escalation.emit_issue_with_body`, an idempotent emitter taking a body the caller already rendered — the shape both seams need and the one `emit_escalation` cannot provide, since it renders its own. T02 gives `render_question_issue` its missing production caller and makes the posted question issue *replace* the `drafting-needed` escalation rather than accompany it, since it already composes over `render_escalation_body` and is the strictly more useful inbox item. T03 supplies the `answer_gate` argument `default_providers` never passed — the parameter already exists at `feature.py:79`, so this is an argument, not a restructure. T04 runs the whole path live against real `gh` and records it, because 0050 shipped seven units green in isolation and this feature's oracle has to be the outcome.
 
-**The gate's definition of done is the outcome, not the units** — a `specfuse-agent` run over a queue holding one undrafted `planned` feature posts a real question issue, a later run reads a reply and produces a drafted folder, and `events.jsonl` shows `needs_drafting` resolving to a completed drafting dispatch rather than an escalation. That is FEAT-2026-0050's own re-run condition, verbatim. 0050's gates defined done in terms of their work units, which is how seven green units delivered something its retrospective calls "connected to nothing."
+**The gate's definition of done is the outcome, not the units** — a `specfuse-agent` run over a queue holding one undrafted `planned` feature posts a real question issue, a later run reads a reply and produces a drafted folder, and `events.jsonl` shows `needs_drafting` resolving to a completed drafting dispatch rather than an escalation. That is FEAT-LOOP-2026-0050's own re-run condition, verbatim. 0050's gates defined done in terms of their work units, which is how seven green units delivered something its retrospective calls "connected to nothing."
 
 **Scope boundary — recorded decisions, deliberately not built.** 0050's *second* carried-forward follow-up ("one real operator reply, verbatim, fed to `parse_reply_answers`") stays open: it needs a human to type something, and an agent replying to its own question issue and recording that as an operator reply would manufacture evidence that reads as verified rather than as absent. T04's reply is scripted and the close is forbidden to claim otherwise. Also out: the question set, D1's semantics and `parse_reply_answers`' grammar, all of which ship unchanged — this feature connects them rather than redesigning them; human gate-1 review of any folder it drafts; and the `blocked`/`unreadable` dispositions, which keep escalating as they do today.
 
-**Status: planned.** Successor to FEAT-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
+**Status: planned.** Successor to FEAT-LOOP-2026-0050; the seams and the exact re-run condition are enumerated in that feature's `RETROSPECTIVE.md` § Hedged-verdict follow-up record.
 
-<a id="feat-2026-0105"></a>
-## FEAT-2026-0105 — Parallel dispatch of the ready frontier
+<a id="feat-loop-2026-0105"></a>
+## FEAT-LOOP-2026-0105 — Parallel dispatch of the ready frontier
 
 **Why.** Dispatch is strictly serial: `ready()` computes the frontier of units whose dependencies are met and then walks it one at a time (`loop.py` comment: "sequential v1; the frontier is independent, fan-out later"). Most gates have two to four independent units waiting on each other for no reason. The C-compiler write-up ran 16 agents with lock files.
 
@@ -985,8 +985,8 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.**
 
-<a id="feat-2026-0107"></a>
-## FEAT-2026-0107 — Single-session mode for small features
+<a id="feat-loop-2026-0107"></a>
+## FEAT-LOOP-2026-0107 — Single-session mode for small features
 
 **Why.** Small single-gate features already cost about 35 minutes and $9, most of it fixed per-unit overhead: a cold `claude -p` start, the full gate suite, a squash, and a driver restart per unit. Interactive prompting wins for a three-unit feature and will keep winning while every unit pays that tax.
 
@@ -996,25 +996,25 @@ carries tuned values, which is the case FEAT-2026-0076's sample did not contain.
 
 **Status: planned.**
 
-<a id="feat-2026-0112"></a>
-## FEAT-2026-0112 — The binding-block word cap: decide what a dispatched session's 2,500 words are spent on
+<a id="feat-loop-2026-0112"></a>
+## FEAT-LOOP-2026-0112 — The binding-block word cap: decide what a dispatched session's 2,500 words are spent on
 
-**Why.** FEAT-2026-0111 built the machinery to put distilled rules on the dispatch path and then measured that there is no room for them. With the three binding rules trimmed as far as that feature took them, the **effective room for anything new is 96 words** against the 2,500-word cap; `propose_distilled_learnings(word_cap=96)` proposes **0 of 244** entries, and at 500 it proposes 3. The 500-word sub-budget stated in `LEARNINGS_DISTILLED_WORD_CAP`, `docs/methodology.md` and `.specfuse/rules-local/README.md` is unreachable — every distillate from 97 to 500 words fails the total cap first (#3316).
+**Why.** FEAT-LOOP-2026-0111 built the machinery to put distilled rules on the dispatch path and then measured that there is no room for them. With the three binding rules trimmed as far as that feature took them, the **effective room for anything new is 96 words** against the 2,500-word cap; `propose_distilled_learnings(word_cap=96)` proposes **0 of 244** entries, and at 500 it proposes 3. The 500-word sub-budget stated in `LEARNINGS_DISTILLED_WORD_CAP`, `docs/methodology.md` and `.specfuse/rules-local/README.md` is unreachable — every distillate from 97 to 500 words fails the total cap first (#3316).
 
 So the question is no longer "how do we distil lessons" — that is built and loop-local. It is **what a dispatched session's 2,500 words should be spent on**, and nothing has ever answered it deliberately: the current allocation is three rules that happen to fill the budget, two of which are core-owned.
 
-**Goal.** Decide and record the allocation. That means answering, with evidence rather than preference: whether 2,500 is still the right number (it was set because a 7,213-word block was measured being read past — FEAT-2026-0084/T01); whether all of `result-contract`, `never-touch` and `security-boundaries` earn their current share; and what share, if any, a distilled-lessons file should hold. Whatever is decided becomes a stated allocation the lint enforces per file, not a single total that whoever edits last gets to fill.
+**Goal.** Decide and record the allocation. That means answering, with evidence rather than preference: whether 2,500 is still the right number (it was set because a 7,213-word block was measured being read past — FEAT-LOOP-2026-0084/T01); whether all of `result-contract`, `never-touch` and `security-boundaries` earn their current share; and what share, if any, a distilled-lessons file should hold. Whatever is decided becomes a stated allocation the lint enforces per file, not a single total that whoever edits last gets to fill.
 
-**Benefits.** The dispatch path stops being allocated by accident. FEAT-2026-0111's weights, accept step and lint become usable the moment a share exists for them; today they are correct and idle.
+**Benefits.** The dispatch path stops being allocated by accident. FEAT-LOOP-2026-0111's weights, accept step and lint become usable the moment a share exists for them; today they are correct and idle.
 
-**Shape — not drafted.** Two pieces of prior art to start from, not re-derive: #3316 carries the measurement, and FEAT-2026-0111's `PLAN.md` records why the trim stopped where it did. Note that 137 of the 170 words FEAT-2026-0111 trimmed came from `never-touch.md` and `security-boundaries.md`, which are **vendored from `specfuse/methodology/`** — the loop repo cannot decide their content alone, and the #581 baseline guard will halt a future core sync on them by design.
+**Shape — not drafted.** Two pieces of prior art to start from, not re-derive: #3316 carries the measurement, and FEAT-LOOP-2026-0111's `PLAN.md` records why the trim stopped where it did. Note that 137 of the 170 words FEAT-LOOP-2026-0111 trimmed came from `never-touch.md` and `security-boundaries.md`, which are **vendored from `specfuse/methodology/`** — the loop repo cannot decide their content alone, and the #581 baseline guard will halt a future core sync on them by design.
 
-**Scope boundary — deliberately out.** Distillation mechanics: the weights, the accept step and the lint all shipped in FEAT-2026-0111 and are not to be rebuilt. `LEARNINGS.md`'s own append contract.
+**Scope boundary — deliberately out.** Distillation mechanics: the weights, the accept step and the lint all shipped in FEAT-LOOP-2026-0111 and are not to be rebuilt. `LEARNINGS.md`'s own append contract.
 
 **Status: planned.**
 
-<a id="feat-2026-0200"></a>
-## FEAT-2026-0200 — Bug lane: detect merge conflicts and branch items from current main
+<a id="feat-loop-2026-0200"></a>
+## FEAT-LOOP-2026-0200 — Bug lane: detect merge conflicts and branch items from current main
 
 **Why.** A bug-lane PR that conflicts with `main` gets no CI at all, and the lane can only call that pending; every item branches from the run-start SHA, so after the first merge each PR touching an append-only file (`CHANGELOG.md`) conflicts (#3445).
 
@@ -1024,8 +1024,8 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Status: planned.**
 
-<a id="feat-2026-0201"></a>
-## FEAT-2026-0201 — Every shipped feature leaves a CHANGELOG trace
+<a id="feat-loop-2026-0201"></a>
+## FEAT-LOOP-2026-0201 — Every shipped feature leaves a CHANGELOG trace
 
 **Why.** A terminal gate that auto-closes never ran close-k, so generator FEAT-2026-0199 shipped in 0.14.0 with no CHANGELOG entry (#3448). The bug fix (#3454) stops a terminal gate auto-closing without an Unreleased entry, but that costs every feature with no consumer-visible change a close dispatch, close-k still passes when the consumer-visible section is absent, and nothing checks at release time.
 
@@ -1035,8 +1035,8 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Status: planned.**
 
-<a id="feat-2026-0202"></a>
-## FEAT-2026-0202 — Bug lane: skip issues that are fixed and awaiting verification
+<a id="feat-loop-2026-0202"></a>
+## FEAT-LOOP-2026-0202 — Bug lane: skip issues that are fixed and awaiting verification
 
 **Why.** Issues are selected with `--state open` and only `needs-human` and `blocked-wu` are excluded, so an issue a merged PR moved to the repository's own resolved/QA status (`status:resolved` on clabonte/generator) is triaged as a bug again and listed as "newly triaged as bug and not dispatched — re-run to fix them"; a re-run would dispatch an already-fixed issue. Selection also checks only *open* PRs, so an issue fixed by a merged `refs #N` PR that left it open is dispatched again (#3447 point 3; the superseded-PR half shipped as a bug fix). Related: #1583, which has no triage category for "already delivered".
 
@@ -1046,8 +1046,8 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Status: planned.**
 
-<a id="feat-2026-0223"></a>
-## FEAT-2026-0223 — Dollar-denominated run spend cap
+<a id="feat-loop-2026-0223"></a>
+## FEAT-LOOP-2026-0223 — Dollar-denominated run spend cap
 
 **Why.** `budgets.max_tokens_per_run` is the agent run's only spend cap, and operators derive its value from a dollar figure at an assumed tokens-per-dollar rate (clabonte/generator: p90 $9.45 at 200k tokens/$ = 2,835,000). Tokens are a poor proxy for dollars: cache reads cost roughly a tenth of uncached input, so the same token count can mean very different spend depending on the cache mix. #3522's interim fix (PR #3524) counts all four usage token fields so the cap binds at all, but it now binds stricter than the dollar figure it came from and needs recalibrating whenever the cache mix shifts.
 

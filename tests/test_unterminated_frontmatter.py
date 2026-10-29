@@ -126,7 +126,7 @@ class TestRealFolderIsEvaluable(unittest.TestCase):
     def test_feat_0020_lints(self):
         feat = (
             Path(__file__).resolve().parents[1]
-            / ".specfuse" / "features" / "FEAT-2026-0020-public-readiness-prep"
+            / ".specfuse" / "features" / "FEAT-LOOP-2026-0020-public-readiness-prep"
         )
         if not feat.is_dir():
             self.skipTest("feature folder not present")

@@ -134,7 +134,7 @@ class TestDoneFeatureGates(unittest.TestCase):
 
     def test_excluded_feature_is_not_reported(self):
         errs = lint_plan.check_done_feature_gates(
-            FEATURES_DIR / "FEAT-2026-0001-health-endpoint", {"status": "done"}
+            FEATURES_DIR / "FEAT-LOOP-2026-0001-health-endpoint", {"status": "done"}
         )
         self.assertEqual(errs, [])
 

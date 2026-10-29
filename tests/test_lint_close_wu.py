@@ -24,7 +24,7 @@ from tests._loop_loader import load_lint
 lint_plan = load_lint()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-EXAMPLE_FEATURE = REPO_ROOT / ".specfuse/features/FEAT-2026-0001-health-endpoint"
+EXAMPLE_FEATURE = REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0001-health-endpoint"
 
 
 def _write_plan(feature_dir: Path, gates_yaml: str) -> None:

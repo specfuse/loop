@@ -226,7 +226,7 @@ class TestOverrideSignoff(unittest.TestCase):
 class TestRealTreeCleanUnderThisCheck(unittest.TestCase):
 
     def test_this_feature_lints_clean(self):
-        feat = REPO_ROOT / ".specfuse/features/FEAT-2026-0058-decision-registry"
+        feat = REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0058-decision-registry"
         fm, _ = lint_plan.read_frontmatter(feat / "PLAN.md")
         errs = lint_plan.check_decision_override_signoff(feat, fm)
         self.assertEqual(errs, [], f"errs={errs}")

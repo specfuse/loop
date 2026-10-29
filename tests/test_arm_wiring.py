@@ -33,7 +33,7 @@ loop = load_loop()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 REAL_FEATURE_DIR = (
-    REPO_ROOT / ".specfuse/features/FEAT-2026-0053-auto-mode"
+    REPO_ROOT / ".specfuse/features/FEAT-LOOP-2026-0053-auto-mode"
 )
 
 GATE2_WU_FILES = (
@@ -184,7 +184,7 @@ def _copy_real_feature(root: Path, autonomy: str) -> Path:
     to do with arming. A fixture built from a live artifact has to rewind every
     field the code under test reads, or it silently expires.
     """
-    dest = root / ".specfuse/features/FEAT-2026-0053-auto-mode"
+    dest = root / ".specfuse/features/FEAT-LOOP-2026-0053-auto-mode"
     shutil.copytree(REAL_FEATURE_DIR, dest)
 
     plan = dest / "PLAN.md"

@@ -11,20 +11,20 @@ planned_cost_usd: 23.50
 
 # Plan: Make ids migrate --all safe on a real repository
 
-FEAT-2026-0247 shipped `python3 -m specfuse.loop.ids migrate --all`. A rehearsal on this
+FEAT-LOOP-2026-0247 shipped `python3 -m specfuse.loop.ids migrate --all`. A rehearsal on this
 repository (2026-10-29, key `LOOP`, throwaway worktree, nothing applied to the real tree)
 re-keyed 109 features, moved 93 folders and edited 1222 files, then left 44 of 4925 tests
 failing (21 failures, 23 errors). Grouped:
 
 1. **Configuration and code keyed by an old ID do not follow.** `.specfuse/agent-policy.yml`'s
-   queue names `FEAT-2026-0082`, and `agent_policy` validation errors with "has no row in
+   queue names `FEAT-LOOP-2026-0082`, and `agent_policy` validation errors with "has no row in
    roadmap.md" because it never consults `.specfuse/id-aliases.yml`.
    `lint_plan.DONE_FEATURE_GATE_EXCLUSIONS` is keyed by old folder names, so two done
    features lose their exemption and fail `lint_plan`.
 2. **Fixture-only paths are rewritten as structural.** `ids.py`'s rule treats any text after
    `features/` as structural (`ids.py:361`), so `tests/test_deliverable_presence_gate.py`'s
-   expected `.specfuse/features/FEAT-2026-0028-green-path` was re-keyed while the fixture
-   that creates the folder was not. The real folder is `FEAT-2026-0028-umbrella-cli-wiring`.
+   expected `.specfuse/features/FEAT-LOOP-2026-0028-green-path` was re-keyed while the fixture
+   that creates the folder was not. The real folder is `FEAT-LOOP-2026-0028-umbrella-cli-wiring`.
 3. **`--include-prose` is all-or-nothing.** 7760 mentions were flagged (4719 in feature
    folders, 1388 in tests, 635 in code, 411 in LEARNINGS). An operator cannot include this
    repository's own docs without also rewriting any mention of another repository's feature.
@@ -45,7 +45,7 @@ applied on that instruction and surfaced in the session report.
 1. **Fix in the tool, not by hand-editing this repository.** Every gap is closed in
    `ids.py` or the lookups, so any consumer repository gets the same safety.
 2. **Old-ID lookups go through `ids.resolve`**, the one-hop alias resolver T09 of
-   FEAT-2026-0247 added; no second alias reader.
+   FEAT-LOOP-2026-0247 added; no second alias reader.
 3. **Structural means a real folder.** Inside code, config and tests, a
    `features/<ID>-<slug>` path or a bare `<ID>-<slug>` string is rewritten only when that
    exact folder exists in the repository. Everything else stays prose.
@@ -151,8 +151,8 @@ gates:
 
 ## Notes
 
-- LEARNINGS `[FEAT-2026-0247/G1-CLOSE]` (pending promotion): a unit adding a public helper
+- LEARNINGS `[FEAT-LOOP-2026-0247/G1-CLOSE]` (pending promotion): a unit adding a public helper
   must give it a non-test caller and keep the module classified; T04's `--rehearse` helper
   is called from the CLI.
-- LEARNINGS `[FEAT-2026-0101/G1-CLOSE]`: guards scoped by parsing must be tested against
+- LEARNINGS `[FEAT-LOOP-2026-0101/G1-CLOSE]`: guards scoped by parsing must be tested against
   this repository's real artifacts — T05 is exactly that, at full scale.

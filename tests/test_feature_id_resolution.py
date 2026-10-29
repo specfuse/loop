@@ -9,7 +9,7 @@
 correlation ID alone did not resolve:
 
     loop.py --feature FEAT-2026-0039                  -> No PLAN.md under ...
-    loop.py --feature FEAT-2026-0039-monitoring-schema -> works
+    loop.py --feature FEAT-LOOP-2026-0039-monitoring-schema -> works
 
 The FEAT-ID is the identifier in the roadmap row, in PLAN.md frontmatter, in
 every WU id, in every correlation ID, and in commit subjects. The folder name is
@@ -32,7 +32,7 @@ from specfuse.loop import ids, loop  # noqa: E402
 # The folder literal is rewritten by a re-key (it names a real feature); a bare
 # ID literal is not, so derive the bare ID from the folder name in whichever
 # shape the tree holds.
-FOLDER = "FEAT-2026-0039-monitoring-schema"
+FOLDER = "FEAT-LOOP-2026-0039-monitoring-schema"
 BARE_ID = str(ids.parse(FOLDER))
 
 
