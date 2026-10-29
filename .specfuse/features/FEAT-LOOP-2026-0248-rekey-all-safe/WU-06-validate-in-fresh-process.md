@@ -1,14 +1,23 @@
 ---
 id: FEAT-LOOP-2026-0248/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 provenance: "Operator-session rehearsal on 2026-10-29 (after T05 blocked): `ids migrate --all --include-prose '.specfuse/**' 'specfuse/**' 'docs/**' 'plugins/**' --rehearse` reported 'migration failed (exit 1)' with lint_plan ERRORs for FEAT-LOOP-2026-0001-health-endpoint and FEAT-LOOP-2026-0036-adopt-ruff-016 although specfuse/** was rewritten in the worktree. ids._validate_tree (ids.py:511) imports agent_policy, lint_plan and lint_roadmap into the running process, so a rehearsal validates the renamed copy with the real checkout's pre-rename DONE_FEATURE_GATE_EXCLUSIONS."
 produces:
   - specfuse/loop/ids.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T17:04:12.901570+00:00
+duration_seconds: 95.252
+cost_usd: 0.293477
+input_tokens: 20
+output_tokens: 6793
 ---
 
 # T06 — post-apply validation runs the renamed tree's own code

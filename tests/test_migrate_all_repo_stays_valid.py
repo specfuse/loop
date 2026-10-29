@@ -4,12 +4,13 @@
 #
 """Feature oracle for FEAT-LOOP-2026-0248 gate 1 — `ids migrate --all` keeps a repo valid."""
 
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-from specfuse.loop import agent_policy
+from specfuse.loop import agent_policy, ids
 from tests.test_ids_migrate_all import _git, _make, _run
 
 _REAL = Path(__file__).resolve().parent.parent / ".specfuse" / "agent-policy.yml"
@@ -74,6 +75,49 @@ class Clause2ApplyValidatesResult(unittest.TestCase):
             self.assertIn("ERROR", out)
             self.assertIn("FEAT-ACME-2026-0042-live", out)
             self.assertIn("git checkout -- . && git clean -fd .specfuse/features", out)
+
+
+class Clause6ValidatesWithOwnCode(unittest.TestCase):
+    """The tree's own `lint_plan` table, not the running process's, judges the result."""
+
+    def _fixture(self, tmp):
+        root = _make(tmp)
+        shutil.copytree(
+            _REAL.parent.parent / "specfuse", root / "specfuse",
+            ignore=shutil.ignore_patterns("__pycache__"),
+        )
+        table = root / "specfuse" / "loop" / "lint_plan.py"
+        table.write_text(table.read_text().replace(
+            "DONE_FEATURE_GATE_EXCLUSIONS = {",
+            'DONE_FEATURE_GATE_EXCLUSIONS = {\n    "FEAT-2026-0042-live": "fixture keeps its gate open",',
+            1,
+        ))
+        plan = root / ".specfuse" / "features" / "FEAT-2026-0042-live" / "PLAN.md"
+        plan.write_text(plan.read_text().replace("status: active", "status: done", 1))
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "own code table")
+        return root
+
+    def test_in_process_linter_would_report_stale_entry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            _run(root, "--apply")
+            stale = ids._validate_tree_here(root)
+            self.assertTrue(any("not 'passed'" in e for e in stale), stale)
+
+    def test_apply_validates_with_the_trees_own_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--apply")
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("validated", out)
+
+    def test_rehearse_validates_with_the_trees_own_table(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--rehearse", "--rehearse-command", "true")
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("migration validated", out)
 
 
 class Clause3RewriteClassification(unittest.TestCase):

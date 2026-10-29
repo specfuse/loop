@@ -508,7 +508,7 @@ def resolve(repo_root, feature_id, err=None) -> str:
     return target
 
 
-def _validate_tree(root: Path) -> list:
+def _validate_tree_here(root: Path) -> list:
     """ERROR lines from lint_plan, lint_roadmap and agent-policy validation, in-process."""
     from specfuse.loop import agent_policy, lint_plan, lint_roadmap
 
@@ -531,6 +531,29 @@ def _validate_tree(root: Path) -> list:
             if e.startswith("ERROR")
         )
     return errors
+
+
+def _validate_tree(root: Path) -> list:
+    """ERROR lines judged by *root*'s own linters, run in a fresh interpreter.
+
+    The renamed tree may carry code tables keyed by feature folder names; modules
+    already imported here belong to another checkout and would judge it by the
+    old names.
+    """
+    import os
+
+    root = Path(root).resolve()
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(root)
+    r = subprocess.run(
+        [sys.executable, "-m", "specfuse.loop.ids", "--repo", str(root), "validate"],
+        cwd=root, env=env, capture_output=True, text=True, check=False,
+    )
+    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("ERROR")]
+    if r.returncode != 0 and not lines:
+        tail = (r.stderr.strip().splitlines() or ["no output"])[-1]
+        lines = [f"ERROR: validation process exited {r.returncode}: {tail}"]
+    return lines
 
 
 def _append_aliases(root: Path, renames) -> None:
@@ -723,6 +746,7 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     nextp = sub.add_parser("next", help="print the next free feature ID")
     nextp.add_argument("--year", type=int, default=None)
+    sub.add_parser("validate", help="lint the tree with its own linters; print ERROR lines")
     mig = sub.add_parser("migrate", help="re-key folderless planned roadmap rows")
     which = mig.add_mutually_exclusive_group(required=True)
     which.add_argument("--planned-only", action="store_true")
@@ -748,6 +772,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.command == "next":
         print(next_id(args.repo, args.year))
+    elif args.command == "validate":
+        errors = _validate_tree_here(Path(args.repo))
+        for e in errors:
+            print(e)
+        return 1 if errors else 0
     elif args.command == "migrate":
         prose = args.include_prose
         if prose is not None and not prose:
