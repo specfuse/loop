@@ -1,8 +1,20 @@
 ---
 id: FEAT-2026-0247/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
+judge_edit_acknowledged:
+  paths:
+    - produces_driver_helper
+    - specfuse/loop/agent_policy.py
+    - specfuse/loop/arm_eval.py
+    - specfuse/loop/data/schemas/driver-event.schema.json
+    - specfuse/loop/gate_eval.py
+    - specfuse/loop/ids.py
+    - specfuse/loop/lint_plan.py
+    - specfuse/loop/loop.py
+    - specfuse/loop/upgrade_merge_gate.py
+  reason: "Reviewed the diff; pattern swaps and alias lookup, no guard weakened"
 planned_cost_usd: 5.00
 auto_close_disabled: true
 ---
