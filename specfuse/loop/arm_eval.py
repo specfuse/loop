@@ -630,6 +630,12 @@ def evaluate_arm_predicate(feature_dir: Path, just_closed_gate: int) -> ArmDecis
     )
 
 
+# Literal acknowledgement entry covering any `produces_driver_helper` hit.
+DRIVER_HELPER_ACK_KEY = "produces_driver_helper"
+# Reason prefix of a `clean` verdict that is clean only because of an acknowledgement.
+ACKNOWLEDGED_REASON_PREFIX = "acknowledged by operator: "
+
+
 def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> ClassVerdict:
     """Report which done substantive units of `gate_number` touch a judge surface.
 
@@ -645,24 +651,71 @@ def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> Clas
         (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
         None,
     )
-    hits: list[str] = []
+    hits: list[tuple[str, str]] = []  # (acknowledgement key, rendered hit)
+    acknowledgement: "dict | None" = None
     for ref in (gate.get("work_units", []) or []) if gate else []:
         wu = _read_wu(feature_dir, ref)
-        if wu is None or wu["type"] in NON_SUBSTANTIVE_TYPES or wu["status"] != "done":
+        if wu is None:
+            continue
+        if wu["type"] == "close" and acknowledgement is None:
+            acknowledgement = _read_judge_edit_acknowledgement(feature_dir / ref["file"])
+        if wu["type"] in NON_SUBSTANTIVE_TYPES or wu["status"] != "done":
             continue
         for p in wu["produces"]:
             if _matches_judge_path(p):
-                hits.append(f"{wu['id']} produces {p}")
+                hits.append((p, f"{wu['id']} produces {p}"))
         if wu["produces_driver_helper"]:
-            hits.append(
+            hits.append((
+                DRIVER_HELPER_ACK_KEY,
                 f"{wu['id']} declares produces_driver_helper "
-                f"{wu['produces_driver_helper']!r}"
-            )
-    if hits:
-        return ClassVerdict("fired", "; ".join(hits))
-    return ClassVerdict(
-        "clean", "no done substantive unit touches judge-path surfaces"
+                f"{wu['produces_driver_helper']!r}",
+            ))
+    if not hits:
+        return ClassVerdict(
+            "clean", "no done substantive unit touches judge-path surfaces"
+        )
+    covered = set(acknowledgement["paths"]) if acknowledgement else set()
+    uncovered = [text for key, text in hits if key not in covered]
+    if uncovered:
+        return ClassVerdict("fired", "; ".join(uncovered))
+    names = sorted({key for key, _ in hits})
+    return ClassVerdict("clean", f"{ACKNOWLEDGED_REASON_PREFIX}{', '.join(names)}")
+
+
+def _read_judge_edit_acknowledgement(close_file: Path) -> "dict | None":
+    """The operator-authored `judge_edit_acknowledged` field of a close unit, or
+    None when absent or malformed (a malformed field covers nothing; lint_plan
+    reports it). The driver never writes this field."""
+    fm, _ = _parse_frontmatter(close_file.read_text())
+    raw = fm.get("judge_edit_acknowledged")
+    if not isinstance(raw, dict):
+        return None
+    paths, reason = raw.get("paths"), raw.get("reason")
+    if (not isinstance(paths, list) or not paths
+            or not all(isinstance(p, str) for p in paths)
+            or not isinstance(reason, str) or not reason.strip()):
+        return None
+    return {"paths": paths, "reason": reason}
+
+
+def terminal_judge_edit_acknowledgement(
+    feature_dir: Path, gate_number: int
+) -> "dict | None":
+    """The acknowledgement on `gate_number`'s close unit (``{"paths", "reason"}``)
+    or None."""
+    feature_dir = Path(feature_dir)
+    plan = load_plan_graph(feature_dir)
+    gate = next(
+        (g for g in plan.get("gates", []) or [] if g.get("gate") == gate_number),
+        None,
     )
+    for ref in (gate.get("work_units", []) or []) if gate else []:
+        wu = _read_wu(feature_dir, ref)
+        if wu is not None and wu["type"] == "close":
+            ack = _read_judge_edit_acknowledgement(feature_dir / ref["file"])
+            if ack is not None:
+                return ack
+    return None
 
 
 def _format_decision(decision: ArmDecision) -> str:

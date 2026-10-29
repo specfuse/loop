@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/arm_eval.py
@@ -17,6 +17,12 @@ effort: medium
 gate_set: code
 produces_driver_helper:
   - stop_for_terminal_judge_edit
+driver_version: 0.30.0
+started_at: 2026-10-29T11:59:38.899399+00:00
+duration_seconds: 115.861
+cost_usd: 0.404041
+input_tokens: 22
+output_tokens: 11035
 ---
 
 # T02 — an operator's acknowledgement clears the stop, and only for the paths it names

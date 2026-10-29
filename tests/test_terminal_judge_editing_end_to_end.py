@@ -146,14 +146,70 @@ class CleanFeatureClosesUnchanged(_Base):
             self.assertEqual(verdicts[0]["payload"].get("status"), "clean")
 
 
-@unittest.skip("owned by FEAT-2026-0246/T02")
-class AcknowledgedStopProceeds(unittest.TestCase):
-    pass
+def _acknowledge(root: Path, fdir: Path, paths: "list[str]", reason: str) -> None:
+    """What the operator does: author the field, then `/unblock-wu` flips the
+    close unit back to pending."""
+    close = fdir / "WU-G1-CLOSE.md"
+    text = close.read_text().replace("status: blocked_human", "status: pending", 1)
+    text = text.replace(
+        "status: pending\n",
+        "status: pending\njudge_edit_acknowledged:\n"
+        f"  paths: [{', '.join(paths)}]\n  reason: \"{reason}\"\n", 1)
+    close.write_text(text)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "ack"], check=True)
 
 
-@unittest.skip("owned by FEAT-2026-0246/T02")
-class NewPathRefires(unittest.TestCase):
-    pass
+class AcknowledgedStopProceeds(_Base):
+    def test_rerun_dispatches_close_and_records_reason(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py")
+            self._stub_agent()
+            self.assertNotEqual(loop.run(None, dry_run=False), 0)
+            _acknowledge(root, fdir, ["specfuse/loop/arm_eval.py"], "reviewed by hand")
+
+            rc = loop.run(None, dry_run=False)
+
+            self.assertEqual(rc, 0)
+            self.assertIn(f"{FEATURE_ID}/G1-CLOSE", self.dispatched)
+            events = _read_events(fdir / "events.jsonl")
+            acks = [e for e in events
+                    if e["event_type"] == "terminal_judge_editing_acknowledged"]
+            self.assertEqual(len(acks), 1)
+            self.assertEqual(acks[0]["payload"]["reason"], "reviewed by hand")
+            self.assertEqual(acks[0]["payload"]["paths"], ["specfuse/loop/arm_eval.py"])
+            self.assertEqual(acks[0]["payload"]["close_unit"], f"{FEATURE_ID}/G1-CLOSE")
+
+
+class NewPathRefires(_Base):
+    def test_added_judge_path_halts_naming_only_the_new_path(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py")
+            self._stub_agent()
+            self.assertNotEqual(loop.run(None, dry_run=False), 0)
+            _acknowledge(root, fdir, ["specfuse/loop/arm_eval.py"], "reviewed by hand")
+            wu = fdir / "WU-T01.md"
+            wu.write_text(wu.read_text().replace(
+                "  - specfuse/loop/arm_eval.py\n",
+                "  - specfuse/loop/arm_eval.py\n  - specfuse/loop/judge.py\n", 1))
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "new path"],
+                           check=True)
+            self.dispatched.clear()
+
+            rc = loop.run(None, dry_run=False)
+
+            self.assertNotEqual(rc, 0)
+            self.assertNotIn(f"{FEATURE_ID}/G1-CLOSE", self.dispatched)
+            events = _read_events(fdir / "events.jsonl")
+            esc = [e for e in events if e["event_type"] == "human_escalation"
+                   and e["payload"].get("reason") == "judge_editing_terminal"]
+            self.assertEqual(len(esc), 2)
+            blob = str(esc[-1]["payload"]["hits"])
+            self.assertIn("specfuse/loop/judge.py", blob)
+            self.assertNotIn("arm_eval.py", blob)
 
 
 @unittest.skip("owned by FEAT-2026-0246/T03")

@@ -118,6 +118,43 @@ class TerminalJudgeEditingTest(unittest.TestCase):
         self._single_gate(produces=["specfuse/loop/arm_eval.py"])
         self.assertEqual(evaluate_terminal_judge_editing(self.feature, 9).status, "clean")
 
+    def _acked(self, paths, **wu_kwargs):
+        _plan(self.feature, [(1, [(self.t01, "WU-01.md"), (self.close, "WU-90.md")])])
+        _wu(self.feature, "WU-01.md", self.t01, **wu_kwargs)
+        _wu(self.feature, "WU-90.md", self.close, type_="close", status="pending")
+        wu90 = self.feature / "WU-90.md"
+        wu90.write_text(wu90.read_text().replace(
+            "status: pending\n",
+            "status: pending\njudge_edit_acknowledged:\n"
+            f"  paths: [{', '.join(paths)}]\n  reason: \"seen\"\n", 1))
+        return evaluate_terminal_judge_editing(self.feature, 1)
+
+    def test_full_coverage_is_clean(self):
+        v = self._acked(["specfuse/loop/arm_eval.py"],
+                        produces=["specfuse/loop/arm_eval.py"])
+        self.assertEqual(v.status, "clean")
+        self.assertIn("specfuse/loop/arm_eval.py", v.reason)
+
+    def test_partial_coverage_fires_naming_only_uncovered(self):
+        v = self._acked(["specfuse/loop/arm_eval.py"],
+                        produces=["specfuse/loop/arm_eval.py", "specfuse/loop/judge.py"])
+        self.assertEqual(v.status, "fired")
+        self.assertIn("specfuse/loop/judge.py", v.reason)
+        self.assertNotIn("arm_eval.py", v.reason)
+
+    def test_driver_helper_hit_covered_by_literal_entry(self):
+        v = self._acked(["produces_driver_helper"],
+                        produces=["docs/x.md"], helper=["specfuse/loop/helper.py"])
+        self.assertEqual(v.status, "clean")
+        v = self._acked(["specfuse/loop/helper.py"],
+                        produces=["docs/x.md"], helper=["specfuse/loop/helper.py"])
+        self.assertEqual(v.status, "fired")
+
+    def test_acknowledgement_without_hits_is_clean_and_unacknowledged(self):
+        v = self._acked(["specfuse/loop/arm_eval.py"], produces=["docs/x.md"])
+        self.assertEqual(v.status, "clean")
+        self.assertFalse(v.reason.startswith(arm_eval.ACKNOWLEDGED_REASON_PREFIX))
+
     def test_not_a_successor_arm_class(self):
         self.assertNotIn("terminal_judge_editing", arm_eval.CLASS_NAMES)
 

@@ -116,7 +116,12 @@ from .judge import (
     parse_judge_result,
     render_judge_prompt,
 )
-from .arm_eval import evaluate_arm_predicate, evaluate_terminal_judge_editing
+from .arm_eval import (
+    ACKNOWLEDGED_REASON_PREFIX,
+    evaluate_arm_predicate,
+    evaluate_terminal_judge_editing,
+    terminal_judge_edit_acknowledgement,
+)
 from .arm_txn import apply_arm_transaction, plan_arm_transaction
 from .build_provenance import head_tree_hash
 from .cost import wu_lifetime_cost_usd
@@ -4493,8 +4498,10 @@ def stop_for_terminal_judge_edit(
     stops. An evaluation failure is recorded on that event and does not stop,
     the same posture as `build_arm_predicate_event`.
 
-    T03 replaces the one-line message with the six-part brief; T02 adds the
-    acknowledgement read ahead of the stop.
+    A clean verdict resting on the close unit's operator-authored
+    `judge_edit_acknowledged` field also emits
+    `terminal_judge_editing_acknowledged`. T03 replaces the one-line message
+    with the six-part brief.
     """
     try:
         verdict = evaluate_terminal_judge_editing(feature_dir, gate_number)
@@ -4513,7 +4520,18 @@ def stop_for_terminal_judge_edit(
             "reason": verdict.reason,
         })
     if verdict.status != "fired":
-        flush_events(events_path, [evaluated])
+        events = [evaluated]
+        ack = (terminal_judge_edit_acknowledgement(feature_dir, gate_number)
+               if verdict.reason.startswith(ACKNOWLEDGED_REASON_PREFIX) else None)
+        if ack is not None:
+            events.append(build_event(
+                "terminal_judge_editing_acknowledged", feature_id, {
+                    "gate": gate_number,
+                    "close_unit": wu.wu_id,
+                    "paths": ack["paths"],
+                    "reason": ack["reason"],
+                }))
+        flush_events(events_path, events)
         return False
     hits = verdict.reason.split("; ")
     message = (
