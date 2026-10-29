@@ -1,8 +1,19 @@
 ---
 gate: 1
-status: open
+status: awaiting_review
 feature_oracle: "python3 -m unittest tests.test_keyed_feature_ids_end_to_end -v -b"
 cost_budget_usd: 30.00
+broad_run:
+  tree: 054923b0bea95ba720a9a42a693f4da9e9ea960f:1a491e59f645ae69f7a291810e4df3ccf0cde2ec:27968248a450a842ccd187b7dce0fb0ded934866:452dd9cf3ec63b136f069bb87773a0ca70fcdb44:4acc6dfc5e8cece358c167d876515eba4a39a500:54069afa85d0e2f632d4b6c38a9dd16af893c659:5ff66b6e4d8a264f23709ea60706111a4c59ed11:6dd6c8d6e05565b4d72ac742014b0b59baf2a9d9:834d9d9c16094a386cd9b5a6f9ced9a3a9b4e7fb:97bcab1bc7244262cec901f46035f51dfdd07278:9b3386cac79ef7bbd03df4b421ab7dc4a900d9d6:bbd1aea514612d76722a18c7aece7c767cf1a076:c23b62e87f1ae3890c6f9e3d8c7ca7ec9225ed81:caffe2d63ceacde448842a91bc7a12c206a67523:d033ecaa5f19f2adc264c6fb5faf9753a1c3f9ad:e22fb8aa46642577521545b94c1c195c991fea00:e3b0de29b81a6c8e0abeacb3898519b98014b9ef:fa2f4f88657587b6e3b560977858810846b1d366
+  ran_at: 2026-10-29T14:04:39.974183+00:00
+  ok: false
+  failing:
+    - gate: tests
+      failure_class: tests
+      failure_signature: "(failures=4,"
+    - gate: coverage
+      failure_class: other
+      failure_signature: "no_gate_marker"
 ---
 
 # Gate 1 — a keyed feature works end to end; an unkeyed repo is unchanged
