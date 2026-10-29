@@ -133,10 +133,13 @@ gates:
       - id: FEAT-2026-0246/T04
         file: WU-04-docs.md
         depends_on: [FEAT-2026-0246/T02]
+      - id: FEAT-2026-0246/T05
+        file: WU-05-patch-restore-order.md
+        depends_on: [FEAT-2026-0246/T03]
       # --- closing sequence: single terminal close (single-gate feature) ---
       - id: FEAT-2026-0246/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0246/T01, FEAT-2026-0246/T02, FEAT-2026-0246/T03, FEAT-2026-0246/T04]
+        depends_on: [FEAT-2026-0246/T01, FEAT-2026-0246/T02, FEAT-2026-0246/T03, FEAT-2026-0246/T04, FEAT-2026-0246/T05]
 ```
 
 ## Scope boundary

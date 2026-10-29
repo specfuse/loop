@@ -1,6 +1,6 @@
 ---
 gate: 1
-status: awaiting_review
+status: open
 feature_oracle: "python3 -m unittest tests.test_terminal_judge_editing_end_to_end -v -b"
 cost_budget_usd: 20.00
 broad_run:
