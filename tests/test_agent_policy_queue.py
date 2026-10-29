@@ -12,6 +12,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from specfuse.loop import ids
 from specfuse.loop.agent_policy import load_policy, validate_agent_policy
 from specfuse.loop.lint_roadmap import roadmap_statuses
 
@@ -77,8 +78,9 @@ class TestLoadPolicy(unittest.TestCase):
 class TestRoadmapStatuses(unittest.TestCase):
     def test_known_statuses_against_real_roadmap(self):
         statuses = roadmap_statuses(REPO_ROOT)
-        self.assertEqual(statuses.get("FEAT-2026-0002"), "done")
-        self.assertEqual(statuses.get("FEAT-2026-0011"), "blocked")
+        # Roadmap rows are keyed by whichever ID shape the tree holds.
+        self.assertEqual(statuses.get(ids.resolve(REPO_ROOT, "FEAT-2026-0002")), "done")
+        self.assertEqual(statuses.get(ids.resolve(REPO_ROOT, "FEAT-2026-0011")), "blocked")
 
     def test_absent_roadmap_returns_empty_dict(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,0 +1,18 @@
+- **FEAT-LOOP-2026-0248/T01**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T02**: `_rewrite_line` treats `<old ID>-<slug>` as structural only when `.specfuse/features/<old ID>-<slug>` exists. This holds with or without a leading `features/`. Other `features/<ID>-…` is prose. Clause-3 test un-skipped.
+- **FEAT-LOOP-2026-0248/T02**: _rewrite_line treats <old ID>-<slug> as structural only when .specfuse/features/<old ID>-<slug> exists, with or without a leading features/. Clause-3 test un-skipped. Added test_structural_only_when_folder_exists to tests/test_ids_migrate_all.py. Narrow tests pass (15 ran, OK, 2 skipped for T03).
+- **FEAT-LOOP-2026-0248/T03**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T03**: `--include-prose` takes optional paths, `--exclude-id` is repeatable and validated, dry run ends with a per-directory prose count, and clause-4 oracle tests are un-skipped.
+- **FEAT-LOOP-2026-0248/T03**: `--include-prose` takes optional paths, `--exclude-id` is repeatable and validated, dry run ends with a per-directory prose count, and clause-4 oracle tests are un-skipped.
+- **FEAT-LOOP-2026-0248/T03**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: Edits to four test modules pass on the unrenamed tree, but the rehearsal still fails (43 failures, 1 error) in modules outside produces:.
+- **FEAT-LOOP-2026-0248/T06**: _validate_tree now spawns sys.executable -m specfuse.loop.ids validate with cwd and PYTHONPATH set to the target tree. The in-process logic is kept as _validate_tree_here, which backs the new `validate` subcommand. ERROR line format is unchanged. --apply and --rehearse both go through migrate_all, so both use the fresh process. A non-zero exit with no ERROR lines becomes one ERROR line, "validation process exited N: <last stderr line>".
+- **FEAT-LOOP-2026-0248/T05**: Rehearsal command refused to run; no files changed.
+- **FEAT-LOOP-2026-0248/T07**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: Fixed 8 test modules so they pass on the unrenamed tree and in the rehearsal; two failures remain that need `specfuse/` changes (schema pattern and folderless-row alias).
+  - note: `ids.resolve` needs the alias target to resolve for a roadmap row with no feature folder (`FEAT-2026-0078`); the event schema pattern needs to accept keyed IDs. Both are in `specfuse/` and `.specfuse/schemas/`, outside T05.
+- **FEAT-LOOP-2026-0248/T08**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/G1-CLOSE**: Re-measured the gate fresh and wrote the close deliverables. The feature oracle passes, the rehearsal of this repository's rename exits 0, and `lint_plan.py --closing` reports CLOSING-READY.
+  - note: The rename is not applied to main. The operator still has to rehearse on main and choose the `--exclude-id` set. The rehearsal prints no `Ran N tests` line, so there is no test count to quote.

@@ -27,7 +27,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from specfuse.loop import loop  # noqa: E402
+from specfuse.loop import ids, loop  # noqa: E402
+
+# The folder literal is rewritten by a re-key (it names a real feature); a bare
+# ID literal is not, so derive the bare ID from the folder name in whichever
+# shape the tree holds.
+FOLDER = "FEAT-2026-0039-monitoring-schema"
+BARE_ID = str(ids.parse(FOLDER))
 
 
 class TestFeatureIdResolution(unittest.TestCase):
@@ -49,7 +55,7 @@ class TestFeatureIdResolution(unittest.TestCase):
     def _write_plan(self, name: str, status: str = "active") -> Path:
         fdir = self._features_dir / name
         fdir.mkdir(parents=True)
-        feature_id = "-".join(name.split("-")[:3])
+        feature_id = str(ids.parse(name))
         (fdir / "PLAN.md").write_text(
             f"---\nfeature_id: {feature_id}\nstatus: {status}\n---\n\n# Plan\n"
         )
@@ -59,14 +65,14 @@ class TestFeatureIdResolution(unittest.TestCase):
 
     def test_bare_feature_id_resolves(self):
         """#244: the correlation ID alone must resolve to its folder."""
-        expected = self._write_plan("FEAT-2026-0039-monitoring-schema")
-        self.assertEqual(loop.find_feature("FEAT-2026-0039"), expected)
+        expected = self._write_plan(FOLDER)
+        self.assertEqual(loop.find_feature(BARE_ID), expected)
 
     def test_full_folder_name_still_resolves(self):
         """The existing spelling must keep working — this is additive."""
-        expected = self._write_plan("FEAT-2026-0039-monitoring-schema")
+        expected = self._write_plan(FOLDER)
         self.assertEqual(
-            loop.find_feature("FEAT-2026-0039-monitoring-schema"), expected
+            loop.find_feature(FOLDER), expected
         )
 
     # --- boundaries -------------------------------------------------------
@@ -77,14 +83,14 @@ class TestFeatureIdResolution(unittest.TestCase):
         Cannot happen with well-formed IDs, but a half-renamed or duplicated
         folder is exactly when a silent wrong pick would be most expensive.
         """
-        self._write_plan("FEAT-2026-0039-monitoring-schema")
-        self._write_plan("FEAT-2026-0039-monitoring-schema-old")
+        self._write_plan(FOLDER)
+        self._write_plan(FOLDER + "-old")
         with self.assertRaises(SystemExit) as ctx:
-            loop.find_feature("FEAT-2026-0039")
+            loop.find_feature(BARE_ID)
         msg = str(ctx.exception)
         self.assertIn("ambiguous", msg.lower())
-        self.assertIn("FEAT-2026-0039-monitoring-schema", msg)
-        self.assertIn("FEAT-2026-0039-monitoring-schema-old", msg)
+        self.assertIn(FOLDER, msg)
+        self.assertIn(FOLDER + "-old", msg)
 
     def test_unknown_id_names_the_available_features(self):
         """The old error named only the path it failed to find.
@@ -92,12 +98,12 @@ class TestFeatureIdResolution(unittest.TestCase):
         An operator who mistyped an ID learns nothing from that; listing what
         exists turns a dead end into a correction.
         """
-        self._write_plan("FEAT-2026-0039-monitoring-schema")
+        self._write_plan(FOLDER)
         with self.assertRaises(SystemExit) as ctx:
             loop.find_feature("FEAT-2026-9999")
         msg = str(ctx.exception)
         self.assertIn("FEAT-2026-9999", msg)
-        self.assertIn("FEAT-2026-0039-monitoring-schema", msg)
+        self.assertIn(FOLDER, msg)
 
     def test_partial_non_id_prefix_does_not_resolve(self):
         """Prefix matching is anchored to the FEAT-ID, not arbitrary strings.
@@ -105,21 +111,21 @@ class TestFeatureIdResolution(unittest.TestCase):
         `--feature monitoring` must not resolve, or a typo could dispatch a
         feature the operator never named.
         """
-        self._write_plan("FEAT-2026-0039-monitoring-schema")
+        self._write_plan(FOLDER)
         with self.assertRaises(SystemExit):
             loop.find_feature("monitoring")
 
     def test_explicit_path_argument_is_unchanged(self):
         """A dot-prefixed arg is a literal path and bypasses ID resolution."""
-        fdir = self._write_plan("FEAT-2026-0039-monitoring-schema")
+        fdir = self._write_plan(FOLDER)
         rel = os.path.relpath(fdir, self.root)
         self.assertEqual(loop.find_feature(f"./{rel}"), Path(f"./{rel}"))
 
     def test_deferred_feature_still_refused_via_bare_id(self):
         """The #183 deferred guard must not be bypassed by the new path."""
-        self._write_plan("FEAT-2026-0039-monitoring-schema", status="deferred")
+        self._write_plan(FOLDER, status="deferred")
         with self.assertRaises(SystemExit) as ctx:
-            loop.find_feature("FEAT-2026-0039")
+            loop.find_feature(BARE_ID)
         self.assertIn("deferred", str(ctx.exception).lower())
 
 

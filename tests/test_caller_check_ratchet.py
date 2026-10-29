@@ -41,7 +41,6 @@ BASELINE = {
     "collect_reports",
     "diff_edits_driver",
     "doctor",
-    "lint_roadmap",
     "list_promoted",
     "migrate_legacy",
     "ratified_after_override",

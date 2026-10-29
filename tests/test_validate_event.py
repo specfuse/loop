@@ -28,12 +28,24 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from specfuse.loop import ids as _ids
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = REPO_ROOT / ".specfuse/scripts/validate-event.py"
-FEAT_0008_EVENTS = (
-    REPO_ROOT
-    / ".specfuse/features/FEAT-2026-0008-driver-completeness-guard/events.jsonl"
-)
+
+
+def _feat_0008_events() -> Path:
+    """The real FEAT-2026-0008 events file, whichever ID shape the tree holds."""
+    feature_id = _ids.resolve(REPO_ROOT, "FEAT-2026-0008")
+    return (
+        REPO_ROOT
+        / ".specfuse/features"
+        / f"{feature_id}-driver-completeness-guard"
+        / "events.jsonl"
+    )
+
+
+FEAT_0008_EVENTS = _feat_0008_events()
 
 # ── Bundled schemas ────────────────────────────────────────────────────────────
 # Mirrors the vendored event schema (specfuse/loop/data/schemas/event.schema.json,
@@ -59,7 +71,7 @@ _ENVELOPE_SCHEMA: dict = {
         },
         "correlation_id": {
             "type": "string",
-            "pattern": r"^FEAT-\d{4}-\d{4}(/T\d{2})?$",
+            "pattern": r"^" + _ids.FEATURE_ID_PATTERN + r"(/T\d{2})?$",
         },
         "event_type": {
             "type": "string",

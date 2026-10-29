@@ -150,9 +150,11 @@ class TestAssumedSurfaces(unittest.TestCase):
     def test_validate_agent_policy_signature(self) -> None:
         sig = inspect.signature(validate_agent_policy)
         params = list(sig.parameters.values())
-        self.assertEqual(len(params), 1)
-        self.assertEqual(params[0].name, "path")
+        # `repo_root` (policy resolves old IDs, FEAT-LOOP-2026-0248/T01) is an
+        # optional second parameter; `path` stays first and optional.
+        self.assertEqual([p.name for p in params], ["path", "repo_root"])
         self.assertIsNone(params[0].default)
+        self.assertIsNone(params[1].default)
 
     def test_validate_agent_policy_findings_are_prefixed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -645,7 +645,7 @@ def resolve_severity_aliases(path: "str | Path | None" = None) -> dict:
     return resolved
 
 
-def validate_agent_policy(path: str | Path | None = None) -> list[str]:
+def validate_agent_policy(path: str | Path | None = None, repo_root: str | Path | None = None) -> list[str]:
     """Validate *path* (default ``.specfuse/agent-policy.yml``); return findings.
 
     Empty list means valid. A missing file, a parse failure, and a non-mapping
@@ -685,12 +685,12 @@ def validate_agent_policy(path: str | Path | None = None) -> list[str]:
         findings.extend(_check_escalation(parsed["escalation"]))
 
     if "queue" in parsed and isinstance(parsed["queue"], list):
-        findings.extend(_check_queue_against_roadmap(parsed["queue"]))
+        findings.extend(_check_queue_against_roadmap(parsed["queue"], repo_root))
 
     return findings
 
 
-def _check_queue_against_roadmap(queue: list) -> list[str]:
+def _check_queue_against_roadmap(queue: list, repo_root: "str | Path | None" = None) -> list[str]:
     """Cross-check queue entries against roadmap.md's FEAT-ID status.
 
     ERROR when a queue entry has no roadmap row at all (unresolvable, a
@@ -700,15 +700,18 @@ def _check_queue_against_roadmap(queue: list) -> list[str]:
     per the roadmap's own status legend. Skipped without error when
     roadmap.md is absent, so a policy file may exist before a roadmap does.
     """
-    statuses = roadmap_statuses()
+    statuses = roadmap_statuses(repo_root)
     if not statuses:
         return []
+    root = Path(repo_root) if repo_root is not None else Path.cwd()
 
     findings: list[str] = []
     for entry in queue:
         if not isinstance(entry, str) or not _FEAT_ID_RE.match(entry):
             continue
         status = statuses.get(entry)
+        if status is None:
+            status = statuses.get(_ids.resolve(root, entry))
         if status is None:
             findings.append(f"ERROR: queue: {entry!r} has no row in roadmap.md")
         elif status in _DONE_OR_ABANDONED:

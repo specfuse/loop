@@ -126,6 +126,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-2026-0224) |
 | FEAT-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-2026-0246) |
 | FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-2026-0247) |
+| FEAT-LOOP-2026-0248 | Make `ids migrate --all` safe on a real repository | done | — | [→ archive](roadmap-archive.md#feat-loop-2026-0248) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it

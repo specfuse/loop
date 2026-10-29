@@ -13,13 +13,15 @@ Standalone like `layout.py`: must not import the driver.
 
     python3 -m specfuse.loop.ids [--repo DIR] next [--year YYYY]
     python3 -m specfuse.loop.ids [--repo DIR] migrate --planned-only [--apply]
-    python3 -m specfuse.loop.ids [--repo DIR] migrate --all [--apply] [--include-prose]
+    python3 -m specfuse.loop.ids [--repo DIR] migrate --all [--apply] [--include-prose [PATH ...]]
+        [--exclude-id ID ...]
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import fnmatch
 import re
 import subprocess
 import sys
@@ -137,6 +139,13 @@ def _roadmap_rows(repo_root: Path):
 def _has_folder(repo_root: Path, feature_id: str) -> bool:
     features = repo_root / ".specfuse" / "features"
     return features.is_dir() and any(features.glob(f"{feature_id}-*"))
+
+
+def _exists(repo_root: Path, feature_id: str) -> bool:
+    """A folder under features/ or a row in either roadmap file."""
+    return _has_folder(repo_root, feature_id) or any(
+        fid == feature_id for fid, _ in _roadmap_rows(repo_root)
+    )
 
 
 def plan_migration(repo_root, key: str) -> MigrationPlan:
@@ -342,13 +351,17 @@ def _unreleased_span(lines):
     return (start, len(lines)) if start is not None else None
 
 
-def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
-    """Rewrite `old` -> `new` in one line; ambiguous prose matches are recorded."""
+def _rewrite_line(line, old, new, structural, anchors, events, prose, where, folders=()):
+    """Rewrite `old` -> `new` in one line; ambiguous prose matches are recorded.
+
+    An exact existing folder name (`folders`) is structural wherever it appears,
+    with or without a leading `features/`; any other `<old>-<slug>` is prose.
+    """
     rel, no, plan = where
 
     def replace(repl, is_structural):
         def sub(m):
-            if is_structural(m.string, m.start()) or prose:
+            if is_structural(m.string, m.start(), m.end()) or prose:
                 plan.counts.setdefault(rel, {}).setdefault(old, 0)
                 plan.counts[rel][old] += 1
                 return repl
@@ -357,12 +370,16 @@ def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
 
         return sub
 
-    def upper(text, start):
-        if structural or text[:start].endswith("features/"):
+    def upper(text, start, end):
+        if structural:
             return True
+        rest = text[start:]
+        for name in folders:
+            if rest.startswith(name) and not re.match(r"[\w-]", rest[len(name):][:1]):
+                return True
         return events and bool(re.search(r'"correlation_id"\s*:\s*"$', text[:start]))
 
-    def lower(text, start):  # anchors and `#feat-` refs
+    def lower(text, start, end):  # anchors and `#feat-` refs
         return anchors and (text[:start].endswith("#") or text[:start].endswith('id="'))
 
     tail = _ALL_BOUNDARY
@@ -372,7 +389,7 @@ def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
     )
 
 
-def _rewrite_file(rel, text, renames, include_prose, plan):
+def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
     """Rewrite one file; structural matches always, prose only with include_prose."""
     name = Path(rel).name
     is_md = name.endswith(".md")
@@ -408,22 +425,43 @@ def _rewrite_file(rel, text, renames, include_prose, plan):
                 events=is_events,
                 prose=include_prose and not fenced,
                 where=(rel, no + 1, plan),
+                folders=[f for f in folders if f.startswith(old + "-")],
             )
         out.append(line)
     return "".join(out)
 
 
-def plan_migrate_all(root, key: str, include_prose: bool = False) -> AllPlan:
+def _prose_scope(include_prose):
+    """Predicate rel -> bool: True/False for all/none, a list of paths or globs to scope."""
+    if include_prose is True or not include_prose:
+        return lambda rel: bool(include_prose)
+    patterns = [p.strip("/") if not any(c in p for c in "*?[") else p for p in include_prose]
+    return lambda rel: any(
+        fnmatch.fnmatchcase(rel, p) or rel.startswith(p.rstrip("/") + "/") for p in patterns
+    )
+
+
+def plan_migrate_all(
+    root, key: str, include_prose=False, exclude_ids=()
+) -> AllPlan:
     root = Path(root)
     renames, skipped = _own_unkeyed_ids(root, key)
+    excluded = set(exclude_ids)
+    if excluded:
+        skipped = skipped + [
+            (old, "excluded by operator") for old, _ in renames if old in excluded
+        ]
+        renames = [(o, n) for o, n in renames if o not in excluded]
+    in_scope = _prose_scope(include_prose)
     plan = AllPlan(renames, skipped, [], {}, {}, [], [])
     if not renames:
         return plan
+    features = root / ".specfuse" / "features"
+    folders = sorted(p.name for p in features.iterdir() if p.is_dir()) if features.is_dir() else []
     for rel, text in _tracked_text_files(root):
-        new_text = _rewrite_file(rel, text, renames, include_prose, plan)
+        new_text = _rewrite_file(rel, text, renames, in_scope(rel), plan, folders)
         if new_text != text:
             plan.files[rel] = new_text
-    features = root / ".specfuse" / "features"
     if features.is_dir():
         for old, new in renames:
             for folder in sorted(features.glob(f"{old}-*")):
@@ -456,25 +494,73 @@ def read_aliases(repo_root) -> dict:
 
 
 def resolve(repo_root, feature_id, err=None) -> str:
-    """The ID itself when it has a folder, else its alias target (one hop).
+    """The ID itself when it has a folder or roadmap row, else its alias target (one hop).
 
-    No alias map, no alias entry, or an alias whose target has no folder all
-    return *feature_id* unchanged; the last case is reported on *err*
+    No alias map, no alias entry, or an alias whose target has neither a
+    folder nor a roadmap row all return *feature_id* unchanged; the last case is reported on *err*
     (default stderr) rather than followed into an error.
     """
-    if not isinstance(feature_id, str) or _has_folder(Path(repo_root), feature_id):
+    if not isinstance(feature_id, str) or _exists(Path(repo_root), feature_id):
         return feature_id
     target = read_aliases(repo_root).get(feature_id)
     if target is None:
         return feature_id
-    if not _has_folder(Path(repo_root), target):
+    if not _exists(Path(repo_root), target):
         print(
             f"WARNING: {ALIASES_FILE} maps {feature_id} to {target}, "
-            f"which has no feature folder",
+            f"which has no feature folder or roadmap row",
             file=err or sys.stderr,
         )
         return feature_id
     return target
+
+
+def _validate_tree_here(root: Path) -> list:
+    """ERROR lines from lint_plan, lint_roadmap and agent-policy validation, in-process."""
+    from specfuse.loop import agent_policy, lint_plan, lint_roadmap
+
+    errors = []
+    features = root / ".specfuse" / "features"
+    if features.is_dir():
+        for folder in sorted(p for p in features.iterdir() if p.is_dir()):
+            errors.extend(
+                f"ERROR: {folder.name}: {e}"
+                for e in lint_plan.lint(folder)
+                if not e.startswith("WARN")
+            )
+    for f in lint_roadmap.lint_roadmap(root):
+        if f.severity == lint_roadmap.SEVERITY_ERROR:
+            errors.append(f"ERROR: {f.file}:{f.line}: {f.message}")
+    policy = root / ".specfuse" / "agent-policy.yml"
+    if policy.is_file():
+        errors.extend(
+            e for e in agent_policy.validate_agent_policy(policy, repo_root=root)
+            if e.startswith("ERROR")
+        )
+    return errors
+
+
+def _validate_tree(root: Path) -> list:
+    """ERROR lines judged by *root*'s own linters, run in a fresh interpreter.
+
+    The renamed tree may carry code tables keyed by feature folder names; modules
+    already imported here belong to another checkout and would judge it by the
+    old names.
+    """
+    import os
+
+    root = Path(root).resolve()
+    env = dict(os.environ)
+    env["PYTHONPATH"] = str(root)
+    r = subprocess.run(
+        [sys.executable, "-m", "specfuse.loop.ids", "--repo", str(root), "validate"],
+        cwd=root, env=env, capture_output=True, text=True, check=False,
+    )
+    lines = [ln for ln in r.stdout.splitlines() if ln.startswith("ERROR")]
+    if r.returncode != 0 and not lines:
+        tail = (r.stderr.strip().splitlines() or ["no output"])[-1]
+        lines = [f"ERROR: validation process exited {r.returncode}: {tail}"]
+    return lines
 
 
 def _append_aliases(root: Path, renames) -> None:
@@ -488,7 +574,9 @@ def _append_aliases(root: Path, renames) -> None:
         path.write_text(existing + add, encoding="utf-8")
 
 
-def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out=None) -> int:
+def migrate_all(
+    repo_root, apply: bool = False, include_prose=False, out=None, exclude_ids=()
+) -> int:
     from specfuse.loop import layout
 
     out = out or sys.stdout
@@ -513,7 +601,7 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
             )
             return 2
     try:
-        plan = plan_migrate_all(root, key, include_prose)
+        plan = plan_migrate_all(root, key, include_prose, exclude_ids)
         print(f"{'apply' if apply else 'dry run'}: key {key}", file=out)
         for old, new in plan.renames:
             print(f"  rekey  {old} -> {new}", file=out)
@@ -532,6 +620,13 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
                 f"{'left unchanged' if apply else 'rewritten only with --include-prose'})",
                 file=out,
             )
+        if plan.ambiguous:
+            tops = {}
+            for rel, _, _ in plan.ambiguous:
+                top = rel.split("/", 1)[0] if "/" in rel else "."
+                tops[top] = tops.get(top, 0) + 1
+            summary = ", ".join(f"{t}: {n}" for t, n in sorted(tops.items()))
+            print(f"  prose mentions remaining by top-level directory: {summary}", file=out)
         if not plan.renames:
             print("nothing to do", file=out)
             return 0
@@ -553,10 +648,153 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
             )
         _append_aliases(root, plan.renames)
         print(f"re-keyed {len(plan.renames)} feature(s); alias map .specfuse/{ALIASES_FILE}", file=out)
+        errors = _validate_tree(root)
+        for e in errors:
+            print(e, file=out)
+        if errors:
+            print(
+                f"ids migrate: {len(errors)} error(s) after rename; the tree is under git, "
+                "`git checkout -- . && git clean -fd .specfuse/features` undoes the rename",
+                file=out,
+            )
+            return 1
+        print("validated: lint_plan, lint_roadmap, agent-policy clean", file=out)
         return 0
     finally:
         if lock is not None:
             lock.close()
+
+
+def _failing_lines(output: str) -> list:
+    """unittest `FAIL:`/`ERROR:` and pytest `FAILED` lines, else the last 20 lines."""
+    lines = output.splitlines()
+    found = [
+        ln for ln in lines
+        if ln.startswith(("FAIL:", "ERROR:", "FAILED "))
+    ]
+    return found or lines[-20:]
+
+
+def _snapshot_working_tree(root: Path, wt: Path, out) -> tuple:
+    """Copy *root*'s uncommitted state into worktree *wt* and commit it there; (modified, untracked)."""
+    import shutil
+
+    def git(*a, cwd=root, **kw):
+        return subprocess.run(["git", *a], cwd=cwd, capture_output=True, check=False, **kw)
+
+    diff = git("diff", "HEAD", "--binary")
+    if diff.returncode != 0:
+        raise RuntimeError(f"git diff HEAD failed: {diff.stderr.decode(errors='replace').strip()}")
+    names = git("diff", "HEAD", "--name-only", "-z").stdout.decode().split("\0")
+    names = [n for n in names if n]
+    if diff.stdout:
+        ap = git("apply", "--binary", "--whitespace=nowarn", "-", cwd=wt, input=diff.stdout)
+        if ap.returncode != 0:
+            print("rehearse: git apply failed; copying modified files instead", file=out)
+            subprocess.run(["git", "checkout", "-q", "--", "."], cwd=wt, capture_output=True, check=False)
+            for n in names:
+                src = root / n
+                if not src.exists() and not src.is_symlink():
+                    raise RuntimeError(
+                        f"cannot represent deleted tracked file {n!r} without git apply"
+                    )
+                dst = wt / n
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if dst.exists() or dst.is_symlink():
+                    dst.unlink()
+                shutil.copy2(src, dst, follow_symlinks=False)
+    others = git("ls-files", "--others", "--exclude-standard", "-z")
+    untracked = [n for n in others.stdout.decode().split("\0") if n]
+    for n in untracked:
+        src = root / n
+        dst = wt / n
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst, follow_symlinks=False)
+    if names or untracked:
+        for cmd in (
+            ["add", "-A"],
+            ["-c", "user.name=rehearsal", "-c", "user.email=rehearsal@localhost",
+             "commit", "-q", "--no-verify", "-m", "rehearsal snapshot"],
+        ):
+            r = git(*cmd, cwd=wt)
+            if r.returncode != 0:
+                raise RuntimeError(f"git {cmd[-1]} failed in rehearsal: {r.stderr.decode(errors='replace').strip()}")
+    return len(names), len(untracked)
+
+
+def rehearse(repo_root, run_migration, command=None, out=None) -> int:
+    """Run *run_migration(worktree_root)* on a throwaway snapshot of the working tree, then a test command.
+
+    The snapshot is HEAD plus the real tree's uncommitted and untracked changes, committed on a
+    detached HEAD inside the worktree only. Never writes to the real tree; the worktree is
+    always removed.
+    """
+    import os
+    import shutil
+    import tempfile
+
+    out = out or sys.stdout
+    root = Path(repo_root).resolve()
+    if command is None:
+        from specfuse.loop import gate_commands
+
+        gates = dict(gate_commands.iter_code_gates(root / ".specfuse" / "verification.yml"))
+        command = gates.get("tests")
+        if not command:
+            print(
+                "ids migrate: no `tests` gate in .specfuse/verification.yml; "
+                "pass --rehearse-command",
+                file=sys.stderr,
+            )
+            return 2
+    tmp = Path(tempfile.mkdtemp(prefix="ids-rehearse-"))
+    wt = tmp / "tree"
+    added = False
+    try:
+        r = subprocess.run(
+            ["git", "worktree", "add", "--detach", str(wt), "HEAD"],
+            cwd=root, capture_output=True, text=True, check=False,
+        )
+        if r.returncode != 0:
+            print(f"ids migrate: git worktree add failed: {r.stderr.strip()}", file=sys.stderr)
+            return 2
+        added = True
+        try:
+            modified, untracked = _snapshot_working_tree(root, wt, out)
+        except RuntimeError as exc:
+            print(f"ids migrate: {exc}", file=sys.stderr)
+            return 2
+        state = (
+            "HEAD alone" if not (modified or untracked)
+            else f"HEAD plus {modified} modified and {untracked} untracked file(s)"
+        )
+        print(f"rehearse: migrating a throwaway copy of {state} at {wt}", file=out)
+        code = run_migration(wt)
+        print(f"rehearse: migration {'validated' if code == 0 else f'failed (exit {code})'}", file=out)
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(wt)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
+        )
+        print(f"rehearse: running `{command}`", file=out)
+        t = subprocess.run(  # nosec B602 - command is operator-declared config
+            command, shell=True, cwd=wt, env=env,
+            capture_output=True, text=True, check=False,
+        )
+        print(f"rehearse: command exit status {t.returncode}", file=out)
+        if t.returncode != 0:
+            for ln in _failing_lines(t.stdout + "\n" + t.stderr):
+                print(f"  {ln}", file=out)
+        ok = code == 0 and t.returncode == 0
+        print(f"rehearse: {'passed' if ok else 'FAILED'}; real tree untouched", file=out)
+        return 0 if ok else 1
+    finally:
+        if added:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(wt)],
+                cwd=root, capture_output=True, check=False,
+            )
+            subprocess.run(["git", "worktree", "prune"], cwd=root, capture_output=True, check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def main(argv=None) -> int:
@@ -567,23 +805,69 @@ def main(argv=None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     nextp = sub.add_parser("next", help="print the next free feature ID")
     nextp.add_argument("--year", type=int, default=None)
+    sub.add_parser("validate", help="lint the tree with its own linters; print ERROR lines")
     mig = sub.add_parser("migrate", help="re-key folderless planned roadmap rows")
     which = mig.add_mutually_exclusive_group(required=True)
     which.add_argument("--planned-only", action="store_true")
     which.add_argument("--all", action="store_true", help="re-key every feature of this repository")
     mig.add_argument("--apply", action="store_true", help="write the changes (default: dry run)")
     mig.add_argument(
-        "--include-prose", action="store_true",
-        help="with --all --apply, also rewrite ambiguous prose mentions",
+        "--include-prose", nargs="*", default=None, metavar="PATH",
+        help="with --all, also rewrite ambiguous prose mentions: in all files when bare, "
+        "else only in the given repo-relative paths or globs",
+    )
+    mig.add_argument(
+        "--exclude-id", action="append", default=[], metavar="ID",
+        help="with --all, leave this old ID untouched everywhere (repeatable)",
+    )
+    mig.add_argument(
+        "--rehearse", action="store_true",
+        help="apply the rename on a throwaway snapshot of the working tree and run the tests gate there",
+    )
+    mig.add_argument(
+        "--rehearse-command", default=None, metavar="CMD",
+        help="with --rehearse, run CMD instead of the tests gate command",
     )
     args = parser.parse_args(argv)
     if args.command == "next":
         print(next_id(args.repo, args.year))
+    elif args.command == "validate":
+        errors = _validate_tree_here(Path(args.repo))
+        for e in errors:
+            print(e)
+        return 1 if errors else 0
     elif args.command == "migrate":
+        prose = args.include_prose
+        if prose is not None and not prose:
+            prose = True
+        if args.rehearse_command is not None and not args.rehearse:
+            parser.error("--rehearse-command requires --rehearse")
         if args.all:
-            return migrate_all(args.repo, apply=args.apply, include_prose=args.include_prose)
-        if args.include_prose:
+            for value in args.exclude_id:
+                if not FEATURE_ID_RE.match(value):
+                    print(f"ids migrate: invalid --exclude-id value: {value!r}", file=sys.stderr)
+                    return 2
+            if args.rehearse:
+                return rehearse(
+                    args.repo,
+                    lambda wt: migrate_all(
+                        wt, apply=True, include_prose=prose or False,
+                        exclude_ids=args.exclude_id,
+                    ),
+                    args.rehearse_command,
+                )
+            return migrate_all(
+                args.repo, apply=args.apply, include_prose=prose or False,
+                exclude_ids=args.exclude_id,
+            )
+        if prose is not None:
             parser.error("--include-prose requires --all")
+        if args.exclude_id:
+            parser.error("--exclude-id requires --all")
+        if args.rehearse:
+            return rehearse(
+                args.repo, lambda wt: migrate(wt, apply=True), args.rehearse_command
+            )
         return migrate(args.repo, apply=args.apply)
     return 0
 

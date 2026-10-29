@@ -12,7 +12,7 @@ from pathlib import Path
 from specfuse.loop import ids, layout
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-_LEGACY = re.compile(r"FEAT-\d{4}-\d{4}")  # reference grammar under test
+_LEGACY = re.compile(r"FEAT-(?:[A-Z][A-Z0-9]{1,5}-)?\d{4}-\d{4}")  # reference grammar under test: either shape
 
 
 def _repo(tmp, rows=(), key=None, plans=()):

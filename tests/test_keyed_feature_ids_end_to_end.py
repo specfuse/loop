@@ -17,10 +17,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from specfuse.loop import lint_plan, lint_roadmap
+from specfuse.loop import ids, lint_plan, lint_roadmap
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURE = REPO_ROOT / ".specfuse" / "features" / "FEAT-2026-0001-health-endpoint"
+FIXTURE_ID = ids.resolve(REPO_ROOT, "FEAT-2026-0001")
+FIXTURE = REPO_ROOT / ".specfuse" / "features" / f"{FIXTURE_ID}-health-endpoint"
 SLUG = "health-endpoint"
 
 
@@ -59,7 +60,7 @@ def make_repo(tmp, *, key=None, legacy_through=7, feature_id=None):
         folder = spec / "features" / f"{feature_id}-{SLUG}"
         shutil.copytree(FIXTURE, folder)
         for path in folder.rglob("*.md"):
-            text = path.read_text().replace("FEAT-2026-0001", feature_id)
+            text = path.read_text().replace(FIXTURE_ID, feature_id)
             if path.name == "PLAN.md":
                 text = text.replace("status: done", "status: active")
             if path.name.startswith("GATE-"):
