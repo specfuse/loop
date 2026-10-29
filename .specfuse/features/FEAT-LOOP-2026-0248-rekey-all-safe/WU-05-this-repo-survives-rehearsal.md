@@ -1,7 +1,7 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 re_arm_count: 1
 re_arm_history:
@@ -15,10 +15,10 @@ re_arm_history:
 oracle_env: macos_local
 planned_cost_usd: 4.00
 max_attempts: 3
-duration_seconds: 5059.215
-cost_usd: 0.926254
-input_tokens: 70
-output_tokens: 19495
+duration_seconds: 22.023
+cost_usd: 0.118917
+input_tokens: 10
+output_tokens: 1215
 ---
 
 # T05 — this repository's full suite passes a rehearsal of the rename
