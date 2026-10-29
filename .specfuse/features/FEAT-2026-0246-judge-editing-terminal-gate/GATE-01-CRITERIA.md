@@ -81,3 +81,21 @@
 - **criterion:** `grep -rn "the only checkpoint the change gets" docs plugins .specfuse/skills specfuse/loop/data`
 - **state:** `unverified`
 - **covers:** plugins/specfuse/skills/draft-feature/SKILL.md, .specfuse/skills/draft-feature/SKILL.md, docs/methodology.md, specfuse/loop/data/docs/methodology.md, docs/concepts/autonomy-stop-classes.md, specfuse/loop/data/docs/concepts/autonomy-stop-classes.md, tests/test_judge_editing_terminal_docs.py, tests/test_terminal_judge_editing_end_to_end.py
+
+### T05#1
+
+- **criterion:** The new regression test fails on the current tree and passes after the fix.
+- **state:** `unverified`
+- **covers:** tests/test_terminal_judge_editing_end_to_end.py
+
+### T05#2
+
+- **criterion:** `python3 -m unittest tests.test_terminal_judge_editing_end_to_end.EveryAutonomyLevelStops tests.test_verify_empty_gate_set tests.test_timeout_kill_portable tests.test_tiered_verification_e2e -b`
+- **state:** `unverified`
+- **covers:** tests/test_terminal_judge_editing_end_to_end.py
+
+### T05#3
+
+- **criterion:** `python3 -m unittest tests.test_terminal_judge_editing_end_to_end -v -b` (the
+- **state:** `unverified`
+- **covers:** tests/test_terminal_judge_editing_end_to_end.py
