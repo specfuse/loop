@@ -1,8 +1,16 @@
 ---
 id: FEAT-2026-0246/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
+judge_edit_acknowledged:
+  paths:
+    - produces_driver_helper
+    - specfuse/loop/arm_eval.py
+    - specfuse/loop/data/schemas/driver-event.schema.json
+    - specfuse/loop/lint_plan.py
+    - specfuse/loop/loop.py
+  reason: "Reviewed the diff; additive stop, no existing guard weakened"
 planned_cost_usd: 5.00
 model: sonnet
 effort: high
