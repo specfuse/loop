@@ -1,8 +1,9 @@
 ---
 id: FEAT-2026-0247/T07
 type: human
-status: blocked_human
+status: done
 attempts: 0
+evidence: "Core PR specfuse/specfuse#232 (https://github.com/specfuse/specfuse/pull/232) merged as 073bcda: optional KEY- after FEAT- in methodology/rules/correlation-ids.md (shapes, combined regex, next-ID rule) and in schemas/event.schema.json, events/spec_validated, events/spec_issue_resolved, events/spec_issue_routed; INIT- unchanged. Core CI green after adding KNOWN_DIVERGENCES / KNOWN_SCAFFOLD_DIVERGENCES waivers (loop and orchestrator copies; each names what clears it) and keyed cases in TestCorrelationIdWideningIsAdditive. Vendored with scripts/sync-scaffold.sh (commit c1e3c3a; re-sync against merged core main reports no change). Oracle clause-7 class un-skipped and passing; it reads the vendored schema files directly because tests.test_validate_event sets SPECFUSE_SCHEMA_ROOT to a fixture process-wide. tests.test_validate_event, test_scaffold_data_in_sync, the oracle, test_ids and test_ids_call_sites: 100 tests OK in one process. Executed by the operator's Claude session at the operator's instruction."
 planned_cost_usd: 0.50
 ---
 

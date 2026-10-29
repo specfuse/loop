@@ -23,12 +23,14 @@ core-owned grammar is widened and vendored.
 3. A `## Cost analysis` reconciles every unit against `planned_cost_usd` and
    `events.jsonl`, including T07's operator wait.
 4. "What the loop did NOT verify" names, at minimum: key uniqueness across repos (by
-   convention only), a real second repository adopting a key (post-merge checklist), and
-   the lexical name-sort sites (PLAN Known limits) — each with where it actually gets
+   convention only), a real second repository adopting a key (post-merge checklist), the
+   lexical name-sort sites (PLAN Known limits), and a real full rename of an existing
+   repository with `--all` (only temporary-repository fixtures ran) — each with where it actually gets
    checked.
 5. `CHANGELOG.md`'s Unreleased section carries the user-visible change: the optional
-   `ids.key`, the keyed form, `ids next`, `ids migrate --planned-only`, and that nothing
-   changes for a repo without a key.
+   `ids.key`, the keyed form, `ids next`, `ids migrate --planned-only`, the opt-in
+   `ids migrate --all` full rename with its alias map, and that nothing changes for a repo
+   without a key.
 6. `specfuse lint --closing` exits 0 before this unit reports `complete`.
 
 **Do not touch.** Source files under `specfuse/` other than docs. Other features. This

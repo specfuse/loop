@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0247-project-keyed-feature-ids
 roadmap_goal: A repo that sets an optional project key allocates feature IDs of the form FEAT-<KEY>-YYYY-NNNN that every loop surface accepts, while repos without a key, and every existing ID, behave exactly as today
 autonomy_default: auto
 status: active
-planned_cost_usd: 20.50
+planned_cost_usd: 25.50
 ---
 
 # Plan: Project-keyed feature IDs (FEAT-<KEY>-YYYY-NNNN)
@@ -61,6 +61,16 @@ confirmed in that single accept.
 9. **Core-owned grammar as a human unit (T07)**, placed last so every loop-side unit
    runs first. The operator opens the methodology-core PR and vendors it with
    `scripts/sync-scaffold.sh`.
+
+10. **Full rename added mid-gate (2026-10-29, *operator*).** After T07 the operator
+    asked for a helper that renames every existing feature in a repository, accepting
+    that git history stays on the old IDs, and said "add T08". T08 adds
+    `ids migrate --all` (reviewed dry run; own IDs only; released CHANGELOG sections,
+    a running driver and a dirty tree refused; ambiguous prose mentions listed and
+    rewritten only with `--include-prose`; writes `.specfuse/id-aliases.yml`). T09
+    makes the `--feature`, `gate_eval` and `gh_features` lookups resolve old IDs
+    through that map. This supersedes decision 4's "never renamed" for operators who
+    opt in; nothing renames by default.
 
 ## Scope boundary
 
@@ -125,10 +135,16 @@ gates:
       - id: FEAT-2026-0247/T07
         file: WU-07-core-grammar-and-schemas.md
         depends_on: [FEAT-2026-0247/T02, FEAT-2026-0247/T05, FEAT-2026-0247/T06]
+      - id: FEAT-2026-0247/T08
+        file: WU-08-migrate-all.md
+        depends_on: [FEAT-2026-0247/T05]
+      - id: FEAT-2026-0247/T09
+        file: WU-09-aliases-resolve-old-ids.md
+        depends_on: [FEAT-2026-0247/T08]
       # --- closing sequence: single terminal close (single-gate feature) ---
       - id: FEAT-2026-0247/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0247/T01, FEAT-2026-0247/T02, FEAT-2026-0247/T03, FEAT-2026-0247/T04, FEAT-2026-0247/T05, FEAT-2026-0247/T06, FEAT-2026-0247/T07]
+        depends_on: [FEAT-2026-0247/T01, FEAT-2026-0247/T02, FEAT-2026-0247/T03, FEAT-2026-0247/T04, FEAT-2026-0247/T05, FEAT-2026-0247/T06, FEAT-2026-0247/T07, FEAT-2026-0247/T08, FEAT-2026-0247/T09]
 ```
 
 ## Post-merge checklist

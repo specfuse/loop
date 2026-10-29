@@ -2,7 +2,7 @@
 gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_keyed_feature_ids_end_to_end -v -b"
-cost_budget_usd: 25.00
+cost_budget_usd: 30.00
 ---
 
 # Gate 1 — a keyed feature works end to end; an unkeyed repo is unchanged
@@ -29,8 +29,13 @@ cost_budget_usd: 25.00
    correlation-ID grammar (core change, T07).
 8. A repository without `ids.key` behaves byte-identically to HEAD on every surface
    above.
+9. `ids migrate --all` (added 2026-10-29) renames every feature the repository owns
+   after a reviewed dry run, leaves released CHANGELOG entries and foreign prose
+   mentions alone unless asked, and old IDs still resolve through
+   `.specfuse/id-aliases.yml` at the `--feature`, `gate_eval` and `gh_features`
+   lookups.
 
-The `feature_oracle` proves 1–8 end to end. It is red on the current tree (the module
+The `feature_oracle` proves 1–9 end to end (clause 9 added with T08/T09). It is red on the current tree (the module
 does not exist); `FEAT-2026-0247/T01` is the walking skeleton that creates it and turns
 clauses 1, 2 and 8 green, with every other class `unittest.skip` naming its owner
 (T02–T05, T07). A skip surviving to the close is a hollow oracle.
