@@ -10,3 +10,5 @@
 - **FEAT-LOOP-2026-0248/T06**: _validate_tree now spawns sys.executable -m specfuse.loop.ids validate with cwd and PYTHONPATH set to the target tree. The in-process logic is kept as _validate_tree_here, which backs the new `validate` subcommand. ERROR line format is unchanged. --apply and --rehearse both go through migrate_all, so both use the fresh process. A non-zero exit with no ERROR lines becomes one ERROR line, "validation process exited N: <last stderr line>".
 - **FEAT-LOOP-2026-0248/T05**: Rehearsal command refused to run; no files changed.
 - **FEAT-LOOP-2026-0248/T07**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: Fixed 8 test modules so they pass on the unrenamed tree and in the rehearsal; two failures remain that need `specfuse/` changes (schema pattern and folderless-row alias).
+  - note: `ids.resolve` needs the alias target to resolve for a roadmap row with no feature folder (`FEAT-2026-0078`); the event schema pattern needs to accept keyed IDs. Both are in `specfuse/` and `.specfuse/schemas/`, outside T05.
