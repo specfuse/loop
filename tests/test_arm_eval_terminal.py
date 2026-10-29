@@ -155,6 +155,34 @@ class TerminalJudgeEditingTest(unittest.TestCase):
         self.assertEqual(v.status, "clean")
         self.assertFalse(v.reason.startswith(arm_eval.ACKNOWLEDGED_REASON_PREFIX))
 
+    def test_ack_keys_name_paths_and_the_driver_helper_entry(self):
+        _plan(self.feature, [(1, [(self.t01, "WU-01.md"), (f"{FEATURE_ID}/T02", "WU-02.md"),
+                                  (self.close, "WU-90.md")])])
+        _wu(self.feature, "WU-01.md", self.t01,
+            produces=["specfuse/loop/arm_eval.py", "docs/x.md"],
+            helper=["specfuse/loop/helper.py"])
+        _wu(self.feature, "WU-02.md", f"{FEATURE_ID}/T02",
+            produces=["specfuse/loop/arm_eval.py"], helper=["specfuse/loop/other.py"])
+        _wu(self.feature, "WU-90.md", self.close, type_="close", status="pending")
+        keys = arm_eval.terminal_judge_edit_ack_keys(self.feature, 1)
+        self.assertEqual(keys, ["produces_driver_helper", "specfuse/loop/arm_eval.py"])
+
+    def test_acknowledging_exactly_the_ack_keys_is_clean(self):
+        _plan(self.feature, [(1, [(self.t01, "WU-01.md"), (self.close, "WU-90.md")])])
+        _wu(self.feature, "WU-01.md", self.t01,
+            produces=["specfuse/loop/arm_eval.py"], helper=["specfuse/loop/helper.py"])
+        _wu(self.feature, "WU-90.md", self.close, type_="close", status="pending")
+        keys = arm_eval.terminal_judge_edit_ack_keys(self.feature, 1)
+        v = self._acked(keys, produces=["specfuse/loop/arm_eval.py"],
+                        helper=["specfuse/loop/helper.py"])
+        self.assertEqual(v.status, "clean")
+
+    def test_ack_keys_empty_without_hits(self):
+        _plan(self.feature, [(1, [(self.t01, "WU-01.md"), (self.close, "WU-90.md")])])
+        _wu(self.feature, "WU-01.md", self.t01, produces=["docs/x.md"])
+        _wu(self.feature, "WU-90.md", self.close, type_="close", status="pending")
+        self.assertEqual(arm_eval.terminal_judge_edit_ack_keys(self.feature, 1), [])
+
     def test_not_a_successor_arm_class(self):
         self.assertNotIn("terminal_judge_editing", arm_eval.CLASS_NAMES)
 

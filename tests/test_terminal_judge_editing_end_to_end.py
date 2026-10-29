@@ -39,7 +39,8 @@ SLUG = "terminal-judge"
 
 
 def _scaffold(root: Path, *, produces: str, auto_close_disabled: bool = False,
-              autonomy: str = "auto", unit_status: str = "done") -> Path:
+              autonomy: str = "auto", unit_status: str = "done",
+              helper: "str | None" = None) -> Path:
     """Single-gate feature whose one implementation unit is already done and
     declares ``produces: [<produces>]``."""
     fdir = _scaffold_feature(
@@ -52,7 +53,9 @@ def _scaffold(root: Path, *, produces: str, auto_close_disabled: bool = False,
     (fdir / "WU-T01.md").write_text(
         f"---\nid: {FEATURE_ID}/T01\ntype: implementation\n"
         f"model: claude-haiku-4-5-20251001\nstatus: {unit_status}\nattempts: 0\n"
-        f"produces:\n  - {produces}\n---\n\n# T01\n\n"
+        f"produces:\n  - {produces}\n"
+        + (f"produces_driver_helper:\n  - {helper}\n" if helper else "")
+        + "---\n\n# T01\n\n"
         "**Context.** test\n\n**Acceptance criteria.** test\n\n"
         "**Do not touch.** test\n\n**Verification.** test\n\n"
         "**Escalation triggers.** test\n")
@@ -299,6 +302,25 @@ class BriefHasSixParts(_Base):
             self.assertIn("judge_edit_acknowledged", msg)
             self.assertIn("/unblock-wu", msg)
             self.assertIn("change the code or config that grades it", msg)
+
+
+class BriefShowsThePasteReadyAcknowledgement(_Base):
+    def test_driver_helper_hit_names_the_literal_entry(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py",
+                             helper="stop_for_terminal_judge_edit")
+            self._stub_agent()
+            loop.run(None, dry_run=False)
+
+            events = _read_events(fdir / "events.jsonl")
+            msg = next(e for e in events if e["event_type"] == "human_escalation"
+                       and e["payload"].get("reason") == "judge_editing_terminal"
+                       )["payload"]["message"]
+            block = msg[msg.index("judge_edit_acknowledged:"):]
+            self.assertIn("    - produces_driver_helper", block)
+            self.assertIn("    - specfuse/loop/arm_eval.py", block)
+            self.assertIn("reason: \"<", block)
 
 
 class DocsNoLongerRecommendReview(unittest.TestCase):

@@ -3,3 +3,4 @@
 - **FEAT-2026-0246/T03**: attempt 1 outcome=passed
 - **FEAT-2026-0246/T04**: attempt 1 outcome=passed
 - **FEAT-2026-0246/T05**: attempt 1 outcome=passed
+- **FEAT-2026-0246/T06**: Executed in the operator's Claude session at the operator's request ("fix it here"), not dispatched by the driver. The halt brief now shows a paste-ready `judge_edit_acknowledged` block listing the exact entries, `produces_driver_helper` included, from the new pure `arm_eval.terminal_judge_edit_ack_keys`. Red first (4 new tests errored), then green: 43 tests across the narrow-tier modules plus `tests.test_lifecycle_integration`, 31 across the escalation-brief modules; ruff clean.

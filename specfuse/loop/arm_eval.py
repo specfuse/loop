@@ -636,15 +636,13 @@ DRIVER_HELPER_ACK_KEY = "produces_driver_helper"
 ACKNOWLEDGED_REASON_PREFIX = "acknowledged by operator: "
 
 
-def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> ClassVerdict:
-    """Report which done substantive units of `gate_number` touch a judge surface.
-
-    Not a successor-arm class: it is absent from `CLASS_NAMES` and `would_arm`
-    never reads it. It is the terminal gate's counterpart of class 2 -- the arm
-    predicate looks at *drafted* units of the next gate; nothing arms after the
-    terminal gate, so this looks at the units that already ran and are about to
-    be closed over. Pure: reads PLAN.md and the gate's unit files only.
-    """
+def _terminal_judge_hits(
+    feature_dir: Path, gate_number: int
+) -> "tuple[list[tuple[str, str]], dict | None]":
+    """The judge-surface hits of `gate_number`'s done substantive units, each as
+    ``(acknowledgement key, rendered hit)``, plus the close unit's
+    acknowledgement (or None). Shared by the verdict and the brief's key list so
+    the two cannot disagree on what an acknowledgement must name."""
     feature_dir = Path(feature_dir)
     plan = load_plan_graph(feature_dir)
     gate = next(
@@ -670,6 +668,28 @@ def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> Clas
                 f"{wu['id']} declares produces_driver_helper "
                 f"{wu['produces_driver_helper']!r}",
             ))
+    return hits, acknowledgement
+
+
+def terminal_judge_edit_ack_keys(feature_dir: Path, gate_number: int) -> "list[str]":
+    """The sorted entries a `judge_edit_acknowledged.paths` list must contain to
+    cover every current hit of `gate_number`: each judge-surface path, plus
+    `DRIVER_HELPER_ACK_KEY` when any unit declares `produces_driver_helper`.
+    Pure; empty when nothing hits."""
+    hits, _ = _terminal_judge_hits(Path(feature_dir), gate_number)
+    return sorted({key for key, _ in hits})
+
+
+def evaluate_terminal_judge_editing(feature_dir: Path, gate_number: int) -> ClassVerdict:
+    """Report which done substantive units of `gate_number` touch a judge surface.
+
+    Not a successor-arm class: it is absent from `CLASS_NAMES` and `would_arm`
+    never reads it. It is the terminal gate's counterpart of class 2 -- the arm
+    predicate looks at *drafted* units of the next gate; nothing arms after the
+    terminal gate, so this looks at the units that already ran and are about to
+    be closed over. Pure: reads PLAN.md and the gate's unit files only.
+    """
+    hits, acknowledgement = _terminal_judge_hits(feature_dir, gate_number)
     if not hits:
         return ClassVerdict(
             "clean", "no done substantive unit touches judge-path surfaces"
