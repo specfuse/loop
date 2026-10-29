@@ -70,7 +70,7 @@ class _Base(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self._cwd)
-        for name, original in self._patches:
+        for name, original in reversed(self._patches):
             setattr(loop, name, original)
 
     def _patch(self, name, replacement):
@@ -87,6 +87,18 @@ class _Base(unittest.TestCase):
         self._patch(
             "run_judge_session",
             lambda prompt, *, timeout=None: ("```result\nverdict: met\n```", None))
+
+
+class PatchRestoresOriginals(_Base):
+    def test_repeated_stub_agent_restores_real_functions(self):
+        names = ("verify", "dispatch", "run_judge_session")
+        originals = {n: getattr(loop, n) for n in names}
+        self._stub_agent()
+        self._stub_agent()
+        self._stub_agent()
+        self.tearDown()
+        for n in names:
+            self.assertIs(getattr(loop, n), originals[n], n)
 
 
 class FiresOnSingleGateJudgeEdit(_Base):

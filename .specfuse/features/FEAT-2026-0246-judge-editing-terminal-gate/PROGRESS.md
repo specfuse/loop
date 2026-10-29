@@ -2,3 +2,4 @@
 - **FEAT-2026-0246/T02**: Operator acknowledgement via `judge_edit_acknowledged` now clears a `judge_editing_terminal` halt, but only for the paths it names. Narrow tier passes: 25 tests across the three modules, ruff clean, and lint of the feature folder exits 0.
 - **FEAT-2026-0246/T03**: attempt 1 outcome=passed
 - **FEAT-2026-0246/T04**: attempt 1 outcome=passed
+- **FEAT-2026-0246/T05**: attempt 1 outcome=passed

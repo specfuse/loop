@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/T05
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 1.00
 provenance: "Gate 1's broad run failed twice (events.jsonl human_escalation reason broad_run_gate_failure at 12:11:28 and 12:26:57) on the identical 14 tests in test_verify_empty_gate_set, test_tiered_verification_e2e and test_timeout_kill_portable. Operator diagnosis: EveryAutonomyLevelStops calls _stub_agent() once per autonomy level, and _Base.tearDown restores self._patches in forward order, so the last setattr leaves loop.verify stubbed to (True, '(stub)') for the rest of the suite. Reproduced: that class followed by the two failing modules in one process gives FAILED (failures=9); a single-stub class gives OK. Added by the operator after the halt."
 produces:
@@ -11,6 +11,12 @@ model: sonnet
 effort: low
 gate_set: code
 oracle_env: macos_local
+driver_version: 0.30.0
+started_at: 2026-10-29T12:32:16.771266+00:00
+duration_seconds: 45.265
+cost_usd: 0.133686
+input_tokens: 12
+output_tokens: 1953
 ---
 
 # T05 — the oracle's patch helper restores the driver it found
