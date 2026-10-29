@@ -1,7 +1,7 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: pending
+status: blocked_human
 attempts: 0
 oracle_env: macos_local
 planned_cost_usd: 4.00
@@ -18,6 +18,10 @@ produces:
   - tests/test_lint_close_wu.py
   - tests/test_validate_event.py
   - tests/test_gh_features.py
+duration_seconds: 5059.215
+cost_usd: 0.926254
+input_tokens: 70
+output_tokens: 19495
 ---
 
 # T05 — this repository's full suite passes a rehearsal of the rename

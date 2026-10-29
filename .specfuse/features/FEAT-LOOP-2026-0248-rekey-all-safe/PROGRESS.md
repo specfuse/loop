@@ -6,3 +6,4 @@
 - **FEAT-LOOP-2026-0248/T03**: `--include-prose` takes optional paths, `--exclude-id` is repeatable and validated, dry run ends with a per-directory prose count, and clause-4 oracle tests are un-skipped.
 - **FEAT-LOOP-2026-0248/T03**: attempt 1 outcome=passed
 - **FEAT-LOOP-2026-0248/T04**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T05**: Edits to four test modules pass on the unrenamed tree, but the rehearsal still fails (43 failures, 1 error) in modules outside produces:.
