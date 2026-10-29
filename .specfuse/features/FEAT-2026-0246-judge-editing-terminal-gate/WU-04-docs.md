@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 2.00
 produces:
   - plugins/specfuse/skills/draft-feature/SKILL.md
@@ -16,6 +16,12 @@ produces:
 model: sonnet
 effort: medium
 gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T12:04:10.576389+00:00
+duration_seconds: 117.853
+cost_usd: 0.290164
+input_tokens: 24
+output_tokens: 6601
 ---
 
 # T04 — the docs describe the terminal stop, and stop recommending `review` for it

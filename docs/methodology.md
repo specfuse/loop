@@ -796,11 +796,13 @@ single flip site. What changed is what an armed gate is armed *on*. Before the
 judge, an `auto` feature let the session that did the work write the verdict
 that advanced the feature; now a fresh evaluator that never sees that session's
 prose writes it, and can only lower it. The `judge_editing` stop class vetoes
-arming a successor gate whose drafted units would edit a judge surface. It
-does **not** cover the terminal gate's own units, so a single-gate feature,
-or the last gate of any feature, that edits the loop's verdict machinery
-reaches its close with no human checkpoint under `auto` (#3542). Choose
-`review` for such a feature.
+arming a successor gate whose drafted units would edit a judge surface. The
+terminal gate has no successor, so a separate check covers it: when a done
+substantive unit of the last gate declares a judge-surface path, the driver
+halts before the close, at every autonomy level, and the operator clears the
+stop by writing `judge_edit_acknowledged` on the close unit and running
+`/unblock-wu`. `review` adds no terminal checkpoint; choose it only when a
+wrong arm is expensive to undo.
 
 Tighten to `review` when the judge cannot do its job — a feature whose criteria
 are not judgeable from the evidence bundle (see `judge_disabled` in §3), or one

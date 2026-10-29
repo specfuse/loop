@@ -289,9 +289,15 @@ class BriefHasSixParts(_Base):
             self.assertIn("change the code or config that grades it", msg)
 
 
-@unittest.skip("owned by FEAT-2026-0246/T04")
 class DocsNoLongerRecommendReview(unittest.TestCase):
-    pass
+    def test_docs_name_the_terminal_stop_not_review(self):
+        from tests import test_judge_editing_terminal_docs as docs
+
+        for rel in docs.SURFACES:
+            with self.subTest(surface=rel):
+                flat = docs._flat((docs.REPO / rel).read_text())
+                self.assertIn("judge_edit_acknowledged", flat)
+                self.assertNotIn("the only checkpoint the change gets", flat)
 
 
 if __name__ == "__main__":
