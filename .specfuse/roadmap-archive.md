@@ -43,6 +43,24 @@ sections inline in `roadmap.md`.
   point; T02 (`roadmap-archive` skill) and T04 (migration) append after it.
 
 <!-- Archived sections appended below -->
+<a id="feat-2026-0246"></a>
+## FEAT-2026-0246 — `judge_editing` covers the terminal gate
+
+**Why.** The `judge_editing` arm stop class (`arm_eval.py`) is the check that keeps an `auto` feature from changing the machinery that grades it. It reads only the drafted units of a *successor* gate, so it never sees what a terminal gate's own units change, and it never checks a single-gate feature at all. The terminal close goes straight to the judge, and nothing on that path checks `arm_eval.JUDGE_PATHS`. FEAT-2026-0224's T01 edited `arm_eval.py` itself and closed `auto` with no human checkpoint (#3542). Its PR was the only review. The docs now state the limit and recommend `review` (#3544), but that leaves the safety property to whoever chooses the autonomy level. Of the 23 done `auto` features in this repository, 11 had units producing judge-surface paths.
+
+**Goal.** A terminal gate whose own substantive units declare a `produces:` path matching `JUDGE_PATHS` (or `produces_driver_helper`) does not close hands-off at any autonomy level (drafting found `fire_terminal_flips` never reads `autonomy_default`, so `review` adds no terminal checkpoint either). It stops for human review before the terminal flips, with an event naming each unit and path. The check is pure and file-based, like the other arm classes. Projects without the driver source are affected only through `JUDGE_PATHS`' universal entries (`.specfuse/verification.yml`, `.specfuse/hooks/`, `.specfuse/rules/`, `.github/workflows/`, `pyproject.toml`); its module and data entries never match there. To be decided at draft time: where the stop sits (before the close dispatch, or before `fire_terminal_flips`), whether an operator can pre-acknowledge listed paths in `PLAN.md` so a deliberate, reviewed edit does not halt, how a stop is cleared, and the docs and `/draft-feature` wording once the class covers the terminal gate. Out of scope: assertion-semantics checks on existing tests (the class stays a path-surface check), and the bug lane's own judge-path guardrail, which already covers PRs.
+
+**Benefits.** The judge can no longer grade a change to itself unattended, whatever autonomy a planner picks. The guarantee the methodology describes holds for single-gate features, which ceremony proportionality makes the common case. The docs' `review` recommendation becomes a convenience rather than the only safeguard.
+
+**Status: done.**
+
+**Post-merge checklist.**
+
+- **One consumer-repo halt.** After a loop release containing this feature, run one
+  feature in a consumer repository whose terminal gate edits `.github/workflows/` or
+  `.specfuse/verification.yml`; confirm the halt names the unit and path, and that
+  writing `judge_edit_acknowledged` plus `/unblock-wu` lets the close run.
+
 <a id="feat-2026-0224"></a>
 ## FEAT-2026-0224 — Project-configurable layout (`.specfuse/layout.yml`)
 

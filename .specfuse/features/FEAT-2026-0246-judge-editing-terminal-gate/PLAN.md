@@ -5,7 +5,7 @@ slug: judge-editing-terminal-gate
 branch: feat/FEAT-2026-0246-judge-editing-terminal-gate
 roadmap_goal: A terminal gate whose own substantive units produce a judge-surface path does not close unattended at any autonomy level; it stops for human review before the close, with an event naming each unit and path
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 17.00
 ---
 
