@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0248/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 judge_edit_acknowledged:
   paths:
     - specfuse/loop/agent_policy.py
@@ -12,6 +12,16 @@ unsandboxed: true
 unsandboxed_rationale: "Acceptance criterion 2 re-runs T05's --rehearse, which adds and removes a git worktree and runs the full suite in it; inside the sandbox that produced about 160 false errors in T05's dispatch. Same rationale as T05."
 planned_cost_usd: 5.00
 auto_close_disabled: true
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.30.0
+started_at: 2026-10-29T19:57:52.322427+00:00
+verdict: met
+duration_seconds: 764.922
+cost_usd: 1.080722
+input_tokens: 54
+output_tokens: 26443
 ---
 
 # G1-CLOSE — terminal close

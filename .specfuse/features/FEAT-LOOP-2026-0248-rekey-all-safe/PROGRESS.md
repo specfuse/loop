@@ -14,3 +14,5 @@
   - note: `ids.resolve` needs the alias target to resolve for a roadmap row with no feature folder (`FEAT-2026-0078`); the event schema pattern needs to accept keyed IDs. Both are in `specfuse/` and `.specfuse/schemas/`, outside T05.
 - **FEAT-LOOP-2026-0248/T08**: attempt 1 outcome=passed
 - **FEAT-LOOP-2026-0248/T05**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/G1-CLOSE**: Re-measured the gate fresh and wrote the close deliverables. The feature oracle passes, the rehearsal of this repository's rename exits 0, and `lint_plan.py --closing` reports CLOSING-READY.
+  - note: The rename is not applied to main. The operator still has to rehearse on main and choose the `--exclude-id` set. The rehearsal prints no `Ran N tests` line, so there is no test count to quote.
