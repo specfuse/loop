@@ -1,9 +1,11 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
-re_arm_count: 2
+unsandboxed: true
+unsandboxed_rationale: "--rehearse runs git worktree add/remove and the full test suite in a temp worktree; inside the sandbox the previous dispatch saw about 160 false errors (git, build-dependency network fetch) that vanished unsandboxed. Memory/LEARNINGS: run the suite unsandboxed."
+re_arm_count: 3
 re_arm_history:
   -
     timestamp: 2026-10-29T17:04:06+00:00
@@ -19,6 +21,13 @@ re_arm_history:
     prior_cost_usd: 0.118917
     prior_duration_seconds: 5059.215
     reason: "Blocked correctly: --rehearse refused the driver's own bookkeeping as a dirty tree and rehearsed HEAD, not the unit's uncommitted edits. T07 makes it rehearse the working tree; re-armed behind T07 (operator: 'go ahead, add T07 and re-arm T05')."
+  -
+    timestamp: 2026-10-29T18:42:44+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 1.374982
+    prior_duration_seconds: 5059.215
+    reason: "Escalation 1 was real (ids.resolve ignored folderless alias targets) and is fixed by T08. Escalation 2 was a misdiagnosis: the vendored schema already accepts keyed IDs; test_validate_event validates real events against its own fixture schema hard-coding ^FEAT-\\d{4}-\\d{4}, which is a test assumption in scope. Re-armed behind T08, unsandboxed (operator chose option A)."
 oracle_env: macos_local
 planned_cost_usd: 4.00
 max_attempts: 3
@@ -64,6 +73,21 @@ every ID accepts either shape via `ids.parse`; a golden or sentinel the rename
 legitimately rewrites is matched in whichever form the tree holds. Each fixed test must
 still pass on the unrenamed tree. Never edit `specfuse/`; a failure that needs a code
 change is an escalation (name the module and case).
+
+**Known from the previous dispatch (do not re-diagnose):**
+
+- `ids.resolve` now follows an alias to a feature that exists only as a roadmap row (T08),
+  which fixes `FEAT-2026-0078`'s queue entry and `test_agent_policy_queue`'s live check.
+- `test_validate_event.TestValidateEventValid.test_driver_event_from_feat_0008_is_accepted`
+  is a **test** fix, not a schema one: `.specfuse/schemas/event.schema.json` already
+  accepts keyed IDs. The test validates the real `FEAT-2026-0008` events against its own
+  fixture schema (`_ENVELOPE_SCHEMA`, `correlation_id` pattern `^FEAT-\d{4}-\d{4}(/T\d{2})?$`
+  at line ~62). Build that fixture pattern from `ids.FEATURE_ID_PATTERN`, or resolve the
+  event file through `ids.resolve`, so it holds in both trees.
+- This dispatch is unsandboxed; rehearsals take about 10 minutes each. Run them in the
+  background and keep working while they run.
+- Record in your RESULT `notes` every test you edited and why, so a later re-arm does not
+  start from zero.
 
 **Acceptance criteria.**
 

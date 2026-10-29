@@ -2,7 +2,7 @@
 gate: 1
 status: open
 feature_oracle: "python3 -m unittest tests.test_migrate_all_repo_stays_valid -v -b"
-cost_budget_usd: 24.00
+cost_budget_usd: 28.00
 ---
 
 # Gate 1 — a full rename leaves a repository valid, and can be rehearsed first
