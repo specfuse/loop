@@ -125,7 +125,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-2026-0223) |
 | FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-2026-0224) |
 | FEAT-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-2026-0246) |
-| FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | planned | — | [→ detail](#feat-2026-0247) |
+| FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | active | — | [→ detail](#feat-2026-0247) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1065,7 +1065,7 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 
 **Benefits.** An ID says which repo it belongs to, so references between repos are unambiguous without a convention. No shared counter is needed, so it works offline. Existing projects change nothing. One shared pattern stops the 9 copies from drifting apart.
 
-**Status: planned.**
+**Status: active.**
 
 ## Notes
 
