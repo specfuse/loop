@@ -4,6 +4,7 @@
 #
 """Feature oracle for FEAT-LOOP-2026-0248 gate 1 — `ids migrate --all` keeps a repo valid."""
 
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -172,10 +173,62 @@ class Clause4ProseScoping(unittest.TestCase):
             self.assertNotEqual(code, 0)
 
 
-@unittest.skip("T04 owns --rehearse")
+def _tracked_hash(root):
+    import hashlib
+
+    names = subprocess.run(
+        ["git", "ls-files"], cwd=root, capture_output=True, text=True, check=True
+    ).stdout.splitlines()
+    h = hashlib.sha256()
+    for n in sorted(names):
+        h.update(n.encode())
+        h.update((root / n).read_bytes())
+    return h.hexdigest()
+
+
+def _state(root):
+    def git(*a):
+        return subprocess.run(
+            ["git", *a], cwd=root, capture_output=True, text=True, check=True
+        ).stdout
+
+    return git("status", "--porcelain"), _tracked_hash(root), git("worktree", "list")
+
+
 class Clause5Rehearse(unittest.TestCase):
-    def test_pending(self):
-        pass
+    PASS = (
+        "python3 -c \"import pathlib,sys; "
+        "sys.exit(0 if list(pathlib.Path('.specfuse/features').glob('FEAT-ACME-2026-0042-*')) else 1)\""
+    )
+    FAIL = "python3 -c \"import sys; print('FAIL: test_x (m.C)'); sys.exit(1)\""
+
+    def test_passing_command_exits_zero_and_leaves_real_tree(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            before = _state(root)
+            code, out, err = _run(root, "--rehearse", "--rehearse-command", self.PASS)
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("exit status 0", out)
+            self.assertEqual(_state(root), before)
+            self.assertEqual(len(before[2].splitlines()), 1)
+
+    def test_failing_command_exits_nonzero_and_reports_lines(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            before = _state(root)
+            code, out, err = _run(root, "--rehearse", "--rehearse-command", self.FAIL)
+            self.assertNotEqual(code, 0)
+            self.assertIn("FAIL: test_x (m.C)", out)
+            self.assertEqual(_state(root), before)
+
+    def test_dirty_tree_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            roadmap = root / ".specfuse" / "roadmap.md"
+            roadmap.write_text(roadmap.read_text() + "\n")
+            code, _, err = _run(root, "--rehearse", "--rehearse-command", self.PASS)
+            self.assertEqual(code, 2)
+            self.assertIn("uncommitted", err)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 ---
 id: FEAT-LOOP-2026-0248/T04
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 produces:
@@ -10,6 +10,15 @@ produces:
   - tests/test_migrate_all_repo_stays_valid.py
   - docs/methodology.md
   - specfuse/loop/data/docs/methodology.md
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T15:17:59.652409+00:00
+duration_seconds: 120.643
+cost_usd: 0.30746
+input_tokens: 22
+output_tokens: 6748
 ---
 
 # T04 — `--rehearse`: prove a rename on a throwaway copy before applying it

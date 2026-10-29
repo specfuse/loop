@@ -635,6 +635,86 @@ def migrate_all(
             lock.close()
 
 
+def _failing_lines(output: str) -> list:
+    """unittest `FAIL:`/`ERROR:` and pytest `FAILED` lines, else the last 20 lines."""
+    lines = output.splitlines()
+    found = [
+        ln for ln in lines
+        if ln.startswith(("FAIL:", "ERROR:", "FAILED "))
+    ]
+    return found or lines[-20:]
+
+
+def rehearse(repo_root, run_migration, command=None, out=None) -> int:
+    """Run *run_migration(worktree_root)* on a throwaway worktree of HEAD, then a test command.
+
+    Never writes to the real tree; the worktree is always removed.
+    """
+    import os
+    import shutil
+    import tempfile
+
+    out = out or sys.stdout
+    root = Path(repo_root).resolve()
+    if _dirty(root):
+        print(
+            "ids migrate: working tree has uncommitted changes; commit or stash first",
+            file=sys.stderr,
+        )
+        return 2
+    if command is None:
+        from specfuse.loop import gate_commands
+
+        gates = dict(gate_commands.iter_code_gates(root / ".specfuse" / "verification.yml"))
+        command = gates.get("tests")
+        if not command:
+            print(
+                "ids migrate: no `tests` gate in .specfuse/verification.yml; "
+                "pass --rehearse-command",
+                file=sys.stderr,
+            )
+            return 2
+    tmp = Path(tempfile.mkdtemp(prefix="ids-rehearse-"))
+    wt = tmp / "tree"
+    added = False
+    try:
+        r = subprocess.run(
+            ["git", "worktree", "add", "--detach", str(wt), "HEAD"],
+            cwd=root, capture_output=True, text=True, check=False,
+        )
+        if r.returncode != 0:
+            print(f"ids migrate: git worktree add failed: {r.stderr.strip()}", file=sys.stderr)
+            return 2
+        added = True
+        print(f"rehearse: migrating a throwaway copy of HEAD at {wt}", file=out)
+        code = run_migration(wt)
+        print(f"rehearse: migration {'validated' if code == 0 else f'failed (exit {code})'}", file=out)
+        env = dict(os.environ)
+        env["PYTHONPATH"] = os.pathsep.join(
+            [str(wt)] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else [])
+        )
+        print(f"rehearse: running `{command}`", file=out)
+        t = subprocess.run(  # nosec B602 - command is operator-declared config
+            command, shell=True, cwd=wt, env=env,
+            capture_output=True, text=True, check=False,
+        )
+        print(f"rehearse: command exit status {t.returncode}", file=out)
+        if t.returncode != 0:
+            for ln in _failing_lines(t.stdout + "\n" + t.stderr):
+                print(f"  {ln}", file=out)
+        ok = code == 0 and t.returncode == 0
+        print(f"rehearse: {'passed' if ok else 'FAILED'}; real tree untouched", file=out)
+        return 0 if ok else 1
+    finally:
+        if added:
+            subprocess.run(
+                ["git", "worktree", "remove", "--force", str(wt)],
+                cwd=root, capture_output=True, check=False,
+            )
+            subprocess.run(["git", "worktree", "prune"], cwd=root, capture_output=True, check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="specfuse.loop.ids", description="Allocate and parse feature IDs."
@@ -657,6 +737,14 @@ def main(argv=None) -> int:
         "--exclude-id", action="append", default=[], metavar="ID",
         help="with --all, leave this old ID untouched everywhere (repeatable)",
     )
+    mig.add_argument(
+        "--rehearse", action="store_true",
+        help="apply the rename on a throwaway worktree of HEAD and run the tests gate there",
+    )
+    mig.add_argument(
+        "--rehearse-command", default=None, metavar="CMD",
+        help="with --rehearse, run CMD instead of the tests gate command",
+    )
     args = parser.parse_args(argv)
     if args.command == "next":
         print(next_id(args.repo, args.year))
@@ -664,11 +752,22 @@ def main(argv=None) -> int:
         prose = args.include_prose
         if prose is not None and not prose:
             prose = True
+        if args.rehearse_command is not None and not args.rehearse:
+            parser.error("--rehearse-command requires --rehearse")
         if args.all:
             for value in args.exclude_id:
                 if not FEATURE_ID_RE.match(value):
                     print(f"ids migrate: invalid --exclude-id value: {value!r}", file=sys.stderr)
                     return 2
+            if args.rehearse:
+                return rehearse(
+                    args.repo,
+                    lambda wt: migrate_all(
+                        wt, apply=True, include_prose=prose or False,
+                        exclude_ids=args.exclude_id,
+                    ),
+                    args.rehearse_command,
+                )
             return migrate_all(
                 args.repo, apply=args.apply, include_prose=prose or False,
                 exclude_ids=args.exclude_id,
@@ -677,6 +776,10 @@ def main(argv=None) -> int:
             parser.error("--include-prose requires --all")
         if args.exclude_id:
             parser.error("--exclude-id requires --all")
+        if args.rehearse:
+            return rehearse(
+                args.repo, lambda wt: migrate(wt, apply=True), args.rehearse_command
+            )
         return migrate(args.repo, apply=args.apply)
     return 0
 

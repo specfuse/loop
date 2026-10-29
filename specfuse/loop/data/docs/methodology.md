@@ -69,6 +69,10 @@ IDs. The loop resolves an old ID through the alias map (one hop) wherever an
 operator types one: `--feature`, `gate_eval`, and `[FEAT-…]` issue titles. Prose
 mentions are listed for review (`--include-prose` rewrites them) rather than
 rewritten silently.
+`--rehearse` proves a rename first: it applies it (with post-apply validation) on a
+throwaway worktree of `HEAD`, runs the `tests` gate command there (or
+`--rehearse-command`), reports the failing tests, and removes the worktree; the real
+tree is never written and must have no uncommitted tracked changes.
 
 The correlation ID threads the entire lifecycle — it appears in the feature
 folder name, the WU file, every event-log entry, the branch, the commit trailer

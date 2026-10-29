@@ -5,3 +5,4 @@
 - **FEAT-LOOP-2026-0248/T03**: `--include-prose` takes optional paths, `--exclude-id` is repeatable and validated, dry run ends with a per-directory prose count, and clause-4 oracle tests are un-skipped.
 - **FEAT-LOOP-2026-0248/T03**: `--include-prose` takes optional paths, `--exclude-id` is repeatable and validated, dry run ends with a per-directory prose count, and clause-4 oracle tests are un-skipped.
 - **FEAT-LOOP-2026-0248/T03**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T04**: attempt 1 outcome=passed
