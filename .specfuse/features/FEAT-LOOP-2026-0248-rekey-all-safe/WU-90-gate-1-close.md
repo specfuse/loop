@@ -18,7 +18,7 @@ suite passes a rehearsal of its rename with key `LOOP`.
 1. `RETROSPECTIVE.md` records, per Definition-of-done clause in `GATE-01.md`, what was
    proven and by which test, and that no `unittest.skip` survives in
    `tests/test_migrate_all_repo_stays_valid.py`.
-2. Measured, not restated: re-run T05's rehearsal command and quote its validation result
+2. Measured, not restated: re-run T05's rehearsal command (its narrowed prose scope) and quote its validation result
    and test summary line; record its exit status.
 3. A `## Cost analysis` reconciles every unit against `planned_cost_usd` and
    `events.jsonl`.

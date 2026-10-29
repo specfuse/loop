@@ -6,7 +6,7 @@ branch: feat/FEAT-LOOP-2026-0248-rekey-all-safe
 roadmap_goal: After ids migrate --all --apply, a repository is valid — configuration and lookups resolve old IDs, only real structural paths are rewritten, prose inclusion is scoped, the tree is validated after apply, and this repository's own full suite passes a rehearsal of the rename
 autonomy_default: auto
 status: active
-planned_cost_usd: 19.50
+planned_cost_usd: 21.00
 ---
 
 # Plan: Make ids migrate --all safe on a real repository
@@ -67,6 +67,14 @@ applied on that instruction and surfaced in the session report.
 8. **Applying the rename to this repository's `main` is out of scope** — a separate
    operator decision after this merges.
 
+9. **Re-plan after T05 blocked (2026-10-29).** Two operator rehearsals showed (a) the
+   prescribed prose scope rewrote fixtures and illustrative example IDs in `tests/`,
+   `specfuse/`, `docs/` and `plugins/` (78 and 32 failures, vendored core files changed),
+   and (b) `_validate_tree` validated a rehearsal with the real checkout's modules. T06 runs
+   validation in a fresh process on the target tree; T05's prose scope is narrowed to this
+   repository's own history (feature folders, roadmap, archive, LEARNINGS) and it no longer
+   declares a fixed `produces:` list.
+
 ## Scope boundary
 
 Out: applying `--all` to `main`; detecting automatically which prose mention cites another
@@ -108,13 +116,16 @@ gates:
       - id: FEAT-LOOP-2026-0248/T04
         file: WU-04-rehearse.md
         depends_on: [FEAT-LOOP-2026-0248/T03]
+      - id: FEAT-LOOP-2026-0248/T06
+        file: WU-06-validate-in-fresh-process.md
+        depends_on: [FEAT-LOOP-2026-0248/T04]
       - id: FEAT-LOOP-2026-0248/T05
         file: WU-05-this-repo-survives-rehearsal.md
-        depends_on: [FEAT-LOOP-2026-0248/T04]
+        depends_on: [FEAT-LOOP-2026-0248/T06]
       # --- closing sequence: single terminal close (single-gate feature) ---
       - id: FEAT-LOOP-2026-0248/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-LOOP-2026-0248/T01, FEAT-LOOP-2026-0248/T02, FEAT-LOOP-2026-0248/T03, FEAT-LOOP-2026-0248/T04, FEAT-LOOP-2026-0248/T05]
+        depends_on: [FEAT-LOOP-2026-0248/T01, FEAT-LOOP-2026-0248/T02, FEAT-LOOP-2026-0248/T03, FEAT-LOOP-2026-0248/T04, FEAT-LOOP-2026-0248/T05, FEAT-LOOP-2026-0248/T06]
 ```
 
 ## Post-merge checklist

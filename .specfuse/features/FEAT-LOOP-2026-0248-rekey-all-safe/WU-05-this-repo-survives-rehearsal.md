@@ -1,23 +1,20 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-10-29T17:04:06+00:00
+    prior_status: blocked_human
+    prior_attempts: 2
+    prior_cost_usd: 4.00
+    prior_duration_seconds: 5059.215
+    reason: "Planning error, not the unit's work: the prescribed --include-prose scope included tests/, specfuse/, docs/ and plugins/, whose mentions are mostly fixtures and illustrative example IDs (78, then 32 failures in operator rehearsals), and the fixed produces list could not be known in advance. Scope narrowed to this repository's own history; produces removed; T06 added for the stale in-process validation."
 oracle_env: macos_local
 planned_cost_usd: 4.00
 max_attempts: 3
-produces:
-  - tests/test_ids.py
-  - tests/test_ids_call_sites.py
-  - tests/test_keyed_feature_ids_end_to_end.py
-  - tests/test_agent_policy_queue.py
-  - tests/test_done_feature_gates.py
-  - tests/test_learnings_weights.py
-  - tests/test_lint_correlation_id.py
-  - tests/test_lint_plan_errors.py
-  - tests/test_lint_close_wu.py
-  - tests/test_validate_event.py
-  - tests/test_gh_features.py
 duration_seconds: 5059.215
 cost_usd: 0.926254
 input_tokens: 70
@@ -29,30 +26,35 @@ output_tokens: 19495
 **Objective.** The rehearsal from 2026-10-29 is re-run with the fixed tool and comes back
 green: with key `LOOP`, this repository can be fully renamed without a failing test.
 
-**Context.** `FEAT-LOOP-2026-0248/T05`. This unit **edits** existing test modules only.
-Run, from the repository root:
+**Context.** `FEAT-LOOP-2026-0248/T05`. This unit **edits** existing test modules only;
+which ones is discovered by the rehearsal, so it declares no `produces:`. Run, from the
+repository root:
 
 ```
-python3 -m specfuse.loop.ids migrate --all --include-prose '.specfuse/**' 'tests/**' 'specfuse/**' 'docs/**' 'plugins/**' --rehearse
+python3 -m specfuse.loop.ids migrate --all --include-prose '.specfuse/features/**' '.specfuse/roadmap.md' '.specfuse/roadmap-archive.md' '.specfuse/LEARNINGS*.md' --rehearse
 ```
 
-`ids.key: LOOP` is set in `.specfuse/layout.yml` on this branch. The 2026-10-29 rehearsal
-failed 44 tests in: `test_deliverable_presence_gate`, `test_empty_files_escalation` (fixture
-paths; expected fixed by T02), `test_ids_migrate_all`, `test_keyed_feature_ids_end_to_end`,
-`test_ids`, `test_ids_call_sites`, `test_agent_policy_queue`, `test_done_feature_gates`,
-`test_learnings_weights`, `test_lint_correlation_id`, `test_lint_plan_errors`,
-`test_lint_close_wu`, `test_validate_event`, `test_gh_features`.
+`ids.key: LOOP` is set in `.specfuse/layout.yml` on this branch. The prose scope is this
+repository's own history only. `tests/`, `specfuse/`, `docs/` and `plugins/` are left
+out on purpose: their mentions are fixtures and illustrative example IDs that happen to
+share numbers with real features (two operator rehearsals that included them failed 78
+and 32 tests, and rewrote vendored core files). Real feature folder names in those
+trees are still rewritten by T02's structural rule.
 
-For each test still failing in the rehearsal, fix the **assumption**, not the assertion: a
-test that reads a real feature folder by a hard-coded legacy path resolves it through
+Operator rehearsals with the wider scope failed in, among others: `test_ids` (RealCorpus),
+`test_ids_call_sites`, `test_keyed_feature_ids_end_to_end`, `test_agent_policy_queue`,
+`test_feature_id_resolution`, `test_gate_eval_calibration`, `test_gh_features`,
+`test_lint_correlation_id`, `test_validate_event`, `test_monitoring_bootstrap_artifacts`,
+`test_layout_no_layout_goldens`. Re-run with the scope above first; fix only what still
+fails.
+
+For each failing test, fix the **assumption**, not the assertion: a test that reads a real
+feature folder, roadmap row or event by a hard-coded legacy ID resolves it through
 `ids.resolve` or by ordinal; a real-corpus test that asserts the legacy pattern extracts
-every ID accepts either shape via `ids.parse`; a sentinel string the rename legitimately
-rewrites is matched in whichever form the tree holds. Each fixed test must still pass on
-the unrenamed tree.
-
-`produces:` lists every module the 2026-10-29 rehearsal flagged; T02–T04 may already have
-fixed some. For each listed module the rehearsal no longer flags, leave it unedited and name
-it under `produces_unchanged:` in the RESULT block with "rehearsal passes without an edit".
+every ID accepts either shape via `ids.parse`; a golden or sentinel the rename
+legitimately rewrites is matched in whichever form the tree holds. Each fixed test must
+still pass on the unrenamed tree. Never edit `specfuse/`; a failure that needs a code
+change is an escalation (name the module and case).
 
 **Acceptance criteria.**
 
