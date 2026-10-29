@@ -1,13 +1,21 @@
 ---
 id: FEAT-LOOP-2026-0248/T03
 type: implementation
-status: blocked_human
-attempts: 2
+status: pending
+attempts: 0
+re_arm_count: 1
+re_arm_history:
+  -
+    timestamp: 2026-10-29T15:16:31+00:00
+    prior_status: blocked_human
+    prior_attempts: 2
+    prior_cost_usd: 0.376264
+    prior_duration_seconds: 88.399
+    reason: "Authoring error, not the unit's work: produces declared tests/test_ids_migrate_all.py, which T03 only has to keep passing (AC2), so produces_not_in_diff refused twice. Path removed from produces."
 oracle_env: macos_local
 planned_cost_usd: 2.00
 produces:
   - specfuse/loop/ids.py
-  - tests/test_ids_migrate_all.py
   - tests/test_migrate_all_repo_stays_valid.py
 model: sonnet
 effort: medium
@@ -26,7 +34,7 @@ escalation_reason: deterministic_refusal_repeat
 **Objective.** An operator can include this repository's own docs, tests and code in the
 rename while leaving alone every mention of an ID that another repository also uses.
 
-**Context.** `FEAT-LOOP-2026-0248/T03`. This unit **edits** `ids.py` and two test modules.
+**Context.** `FEAT-LOOP-2026-0248/T03`. This unit **edits** `ids.py` and the oracle module; `tests/test_ids_migrate_all.py` must keep passing but need not change.
 
 - `--include-prose` with no value keeps today's meaning (all prose). With one or more
   values (paths or shell globs relative to the repository root, matched against

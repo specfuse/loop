@@ -46,6 +46,10 @@ every ID accepts either shape via `ids.parse`; a sentinel string the rename legi
 rewrites is matched in whichever form the tree holds. Each fixed test must still pass on
 the unrenamed tree.
 
+`produces:` lists every module the 2026-10-29 rehearsal flagged; T02–T04 may already have
+fixed some. For each listed module the rehearsal no longer flags, leave it unedited and name
+it under `produces_unchanged:` in the RESULT block with "rehearsal passes without an edit".
+
 **Acceptance criteria.**
 
 1. The command above exits zero, and its output (validation result plus the test
