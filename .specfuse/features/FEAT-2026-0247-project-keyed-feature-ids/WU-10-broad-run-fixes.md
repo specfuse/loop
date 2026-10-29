@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T10
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.00
 provenance: "Gate 1's broad run at 2026-10-29T14:04:39 (events.jsonl human_escalation reason broad_run_gate_failure; gate log tests-20261029T140401776445Z.log) failed 4 tests, all deterministic consequences of this feature, none environmental: test_layout_no_layout_goldens' two GOLDEN_TEMPLATE_SHA256 checks (T06 intentionally changed .specfuse/roadmap.template.md's Notes), test_judge_path_registry.test_no_module_is_unclassified ('ids.py' in neither JUDGE_MODULES nor NON_JUDGE_MODULES), and test_caller_check_ratchet ('anchor' and 'sort_key' in specfuse/loop/ids.py have no caller outside tests/). Diagnosed in the operator's session; added under the operator's standing instruction to bring the feature to completion."
@@ -11,6 +11,15 @@ produces:
   - specfuse/loop/ids.py
   - tests/test_layout_no_layout_goldens.py
   - tests/test_ids.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T14:05:49.104566+00:00
+duration_seconds: 35.717
+cost_usd: 0.133118
+input_tokens: 8
+output_tokens: 1951
 ---
 
 # T10 — fix the three registry and golden checks the broad run caught

@@ -65,14 +65,6 @@ def anchor(feature_id) -> str:
     return str(feature_id).lower()
 
 
-def sort_key(feature_id):
-    """Order by year, then ordinal, then key (legacy before keyed on a tie)."""
-    parsed = feature_id if isinstance(feature_id, FeatureId) else parse(feature_id)
-    if parsed is None:
-        return (0, 0, "")
-    return (parsed.year, parsed.ordinal, parsed.key or "")
-
-
 def _existing_ids(repo_root: Path):
     specfuse = repo_root / ".specfuse"
     for name in ROADMAP_FILES:
@@ -189,7 +181,7 @@ def _rewrite(text: str, candidates, filename: str):
             out.append(line)
             continue
         for old, new in candidates:
-            old_l = old.lower()
+            old_l = anchor(old)
             if in_fence:
                 if old in line or old_l in line:
                     unplaced.append((filename, no, old))
@@ -205,9 +197,9 @@ def _rewrite(text: str, candidates, filename: str):
                     (r"^(##\s+)" + re.escape(old) + _ID_BOUNDARY, r"\g<1>" + new),
                     (
                         r'(<a\s+id=")' + re.escape(old_l) + r'(")',
-                        r"\g<1>" + new.lower() + r"\g<2>",
+                        r"\g<1>" + anchor(new) + r"\g<2>",
                     ),
-                    (r"(#)" + re.escape(old_l) + _ID_BOUNDARY, r"\g<1>" + new.lower()),
+                    (r"(#)" + re.escape(old_l) + _ID_BOUNDARY, r"\g<1>" + anchor(new)),
                 )
                 for pattern, repl in subs:
                     part = re.sub(pattern, repl, part)
@@ -376,7 +368,7 @@ def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
     tail = _ALL_BOUNDARY
     line = re.sub(r"(?<!\w)" + re.escape(old) + tail, replace(new, upper), line)
     return re.sub(
-        r"(?<!\w)" + re.escape(old.lower()) + tail, replace(new.lower(), lower), line
+        r"(?<!\w)" + re.escape(anchor(old)) + tail, replace(anchor(new), lower), line
     )
 
 

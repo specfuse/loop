@@ -52,10 +52,6 @@ class Parse(unittest.TestCase):
         self.assertTrue(ids.FEATURE_ID_RE.match("FEAT-2026-0008"))
         self.assertFalse(ids.FEATURE_ID_RE.match("FEAT-2026-0008-slug"))
 
-    def test_sort_key(self):
-        order = sorted(["FEAT-ACME-2026-0009", "FEAT-2026-0010", "FEAT-2025-0099"], key=ids.sort_key)
-        self.assertEqual(order, ["FEAT-2025-0099", "FEAT-ACME-2026-0009", "FEAT-2026-0010"])
-
 
 class RealCorpus(unittest.TestCase):
     def test_every_feature_folder(self):
