@@ -5,7 +5,7 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04), clause 6 (T05), clause 7 (T07); none
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04), clause 6 (T05), clause 7 (T07), clause 9 (T08); none
 is skipped. A skip surviving to the close is a hollow oracle.
 """
 
@@ -175,6 +175,43 @@ class Clause6MigratePlannedOnly(unittest.TestCase):
             self.assertIn("| FEAT-ACME-2026-0008 |", text)
             self.assertNotIn("FEAT-2026-0008", text)
             self.assertEqual(lint_roadmap.lint_roadmap(root), [])
+
+
+class Clause9MigrateAll(unittest.TestCase):
+    def _repo(self, tmp):
+        root = make_repo(tmp, key="ACME", feature_id="FEAT-2026-0008")
+        (root / "NOTES.md").write_text("Partner repo has FEAT-2026-0008 too.\n")
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+        subprocess.run(
+            ["git", "-C", str(root), "-c", "user.name=T", "-c", "user.email=t@example.com",
+             "commit", "-q", "-m", "init"], check=True,
+        )
+        return root
+
+    def test_dry_run_reports_and_apply_renames(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._repo(tmp)
+            dry = _run(root, "specfuse.loop.ids", "migrate", "--all")
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            self.assertIn("NOTES.md:1: FEAT-2026-0008", dry.stdout)
+            self.assertTrue((root / ".specfuse" / "features" / f"FEAT-2026-0008-{SLUG}").is_dir())
+            r = _run(root, "specfuse.loop.ids", "migrate", "--all", "--apply")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            new = "FEAT-ACME-2026-0008"
+            self.assertTrue((root / ".specfuse" / "features" / f"{new}-{SLUG}").is_dir())
+            self.assertIn("FEAT-2026-0008: " + new,
+                          (root / ".specfuse" / "id-aliases.yml").read_text())
+            self.assertIn("FEAT-2026-0008", (root / "NOTES.md").read_text())
+            plan, roadmap = lint_errors(root, new)
+            self.assertEqual((plan, roadmap), ([], []))
+            again = _run(root, "specfuse.loop.ids", "migrate", "--all", "--apply")
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertIn("nothing to do", again.stdout)
+
+    def test_refuses_without_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_repo(tmp, feature_id="FEAT-2026-0008")
+            self.assertNotEqual(_run(root, "specfuse.loop.ids", "migrate", "--all").returncode, 0)
 
 
 class Clause7KeyedCorrelationIdValidatesAgainstEnvelope(unittest.TestCase):

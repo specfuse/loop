@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 3.00
 provenance: "Operator request on 2026-10-29, after T07: 'Can we provide a helper script that would allow to rename all the existing features in all the documents in a given repository knowing that the git history would still be wrong?' The operator accepted the proposed design (an --all mode of T05's migrate, reviewed dry run, alias map, own-IDs-only, released CHANGELOG sections and a running driver refused) with 'add T08'."
@@ -10,6 +10,15 @@ produces:
   - specfuse/loop/ids.py
   - tests/test_ids_migrate_all.py
   - tests/test_keyed_feature_ids_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:54:21.439249+00:00
+duration_seconds: 160.758
+cost_usd: 0.622449
+input_tokens: 32
+output_tokens: 19482
 ---
 
 # T08 — `ids migrate --all` re-keys every feature of the repository

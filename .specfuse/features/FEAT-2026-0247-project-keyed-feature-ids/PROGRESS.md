@@ -5,3 +5,4 @@
   - note: Repo-wide lint_roadmap still reports one pre-existing warn (FEAT-2026-0011 Detail cell '—' with a section present). It is not from this change. The check reuses `_parse_table_rows` and `ids.parse`, so no second row parser exists.
 - **FEAT-2026-0247/T05**: attempt 1 outcome=passed
 - **FEAT-2026-0247/T06**: attempt 1 outcome=passed
+- **FEAT-2026-0247/T08**: attempt 1 outcome=passed
