@@ -1,9 +1,9 @@
 ---
 id: FEAT-LOOP-2026-0248/T05
 type: implementation
-status: blocked_human
+status: pending
 attempts: 0
-re_arm_count: 1
+re_arm_count: 2
 re_arm_history:
   -
     timestamp: 2026-10-29T17:04:06+00:00
@@ -12,6 +12,13 @@ re_arm_history:
     prior_cost_usd: 4.00
     prior_duration_seconds: 5059.215
     reason: "Planning error, not the unit's work: the prescribed --include-prose scope included tests/, specfuse/, docs/ and plugins/, whose mentions are mostly fixtures and illustrative example IDs (78, then 32 failures in operator rehearsals), and the fixed produces list could not be known in advance. Scope narrowed to this repository's own history; produces removed; T06 added for the stale in-process validation."
+  -
+    timestamp: 2026-10-29T17:32:06+00:00
+    prior_status: blocked_human
+    prior_attempts: 1
+    prior_cost_usd: 0.118917
+    prior_duration_seconds: 5059.215
+    reason: "Blocked correctly: --rehearse refused the driver's own bookkeeping as a dirty tree and rehearsed HEAD, not the unit's uncommitted edits. T07 makes it rehearse the working tree; re-armed behind T07 (operator: 'go ahead, add T07 and re-arm T05')."
 oracle_env: macos_local
 planned_cost_usd: 4.00
 max_attempts: 3
@@ -34,7 +41,9 @@ repository root:
 python3 -m specfuse.loop.ids migrate --all --include-prose '.specfuse/features/**' '.specfuse/roadmap.md' '.specfuse/roadmap-archive.md' '.specfuse/LEARNINGS*.md' --rehearse
 ```
 
-`ids.key: LOOP` is set in `.specfuse/layout.yml` on this branch. The prose scope is this
+`ids.key: LOOP` is set in `.specfuse/layout.yml` on this branch. After T07, `--rehearse`
+snapshots the working tree, so your uncommitted test edits are in each rehearsal and the
+driver's bookkeeping files do not block it; do not write your own copy script. The prose scope is this
 repository's own history only. `tests/`, `specfuse/`, `docs/` and `plugins/` are left
 out on purpose: their mentions are fixtures and illustrative example IDs that happen to
 share numbers with real features (two operator rehearsals that included them failed 78

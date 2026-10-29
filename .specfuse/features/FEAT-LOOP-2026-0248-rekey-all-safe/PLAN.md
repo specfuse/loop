@@ -6,7 +6,7 @@ branch: feat/FEAT-LOOP-2026-0248-rekey-all-safe
 roadmap_goal: After ids migrate --all --apply, a repository is valid — configuration and lookups resolve old IDs, only real structural paths are rewritten, prose inclusion is scoped, the tree is validated after apply, and this repository's own full suite passes a rehearsal of the rename
 autonomy_default: auto
 status: active
-planned_cost_usd: 21.00
+planned_cost_usd: 22.50
 ---
 
 # Plan: Make ids migrate --all safe on a real repository
@@ -75,6 +75,11 @@ applied on that instruction and surfaced in the session report.
    repository's own history (feature folders, roadmap, archive, LEARNINGS) and it no longer
    declares a fixed `produces:` list.
 
+10. **T07 added (2026-10-29, *operator*: "go ahead, add T07 and re-arm T05").** T05's
+    re-armed attempt was refused in 22s: `--rehearse` refused the driver's own bookkeeping
+    as a dirty tree and rehearsed `HEAD`, never a unit's uncommitted edits. T07 snapshots
+    the working tree instead; T05 is re-armed behind it.
+
 ## Scope boundary
 
 Out: applying `--all` to `main`; detecting automatically which prose mention cites another
@@ -119,13 +124,16 @@ gates:
       - id: FEAT-LOOP-2026-0248/T06
         file: WU-06-validate-in-fresh-process.md
         depends_on: [FEAT-LOOP-2026-0248/T04]
+      - id: FEAT-LOOP-2026-0248/T07
+        file: WU-07-rehearse-the-working-tree.md
+        depends_on: [FEAT-LOOP-2026-0248/T06]
       - id: FEAT-LOOP-2026-0248/T05
         file: WU-05-this-repo-survives-rehearsal.md
-        depends_on: [FEAT-LOOP-2026-0248/T06]
+        depends_on: [FEAT-LOOP-2026-0248/T07]
       # --- closing sequence: single terminal close (single-gate feature) ---
       - id: FEAT-LOOP-2026-0248/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-LOOP-2026-0248/T01, FEAT-LOOP-2026-0248/T02, FEAT-LOOP-2026-0248/T03, FEAT-LOOP-2026-0248/T04, FEAT-LOOP-2026-0248/T05, FEAT-LOOP-2026-0248/T06]
+        depends_on: [FEAT-LOOP-2026-0248/T01, FEAT-LOOP-2026-0248/T02, FEAT-LOOP-2026-0248/T03, FEAT-LOOP-2026-0248/T04, FEAT-LOOP-2026-0248/T05, FEAT-LOOP-2026-0248/T06, FEAT-LOOP-2026-0248/T07]
 ```
 
 ## Post-merge checklist
