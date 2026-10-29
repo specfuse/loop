@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 judge_edit_acknowledged:
   paths:
     - produces_driver_helper
@@ -16,6 +16,13 @@ model: sonnet
 effort: high
 gate_set: plannext
 auto_close_disabled: true
+driver_version: 0.30.0
+started_at: 2026-10-29T12:50:49.764839+00:00
+verdict: met
+duration_seconds: 271.986
+cost_usd: 1.070608
+input_tokens: 46
+output_tokens: 25137
 ---
 
 # G1-CLOSE — terminal close

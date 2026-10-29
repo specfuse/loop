@@ -4,3 +4,5 @@
 - **FEAT-2026-0246/T04**: attempt 1 outcome=passed
 - **FEAT-2026-0246/T05**: attempt 1 outcome=passed
 - **FEAT-2026-0246/T06**: Executed in the operator's Claude session at the operator's request ("fix it here"), not dispatched by the driver. The halt brief now shows a paste-ready `judge_edit_acknowledged` block listing the exact entries, `produces_driver_helper` included, from the new pure `arm_eval.terminal_judge_edit_ack_keys`. Red first (4 new tests errored), then green: 43 tests across the narrow-tier modules plus `tests.test_lifecycle_integration`, 31 across the escalation-brief modules; ruff clean.
+- **FEAT-2026-0246/G1-CLOSE**: Terminal close for FEAT-2026-0246. Re-ran the feature oracle and all 20 per-criterion oracles fresh and wrote RETROSPECTIVE.md, the CHANGELOG entry, the criteria record and staged learnings. `lint --closing` exits 0 on the working-tree build.
+  - note: T06 ran in the operator's session, so it has no cost event and its spend is not in the cost analysis. The consumer-repo halt on a universal judge path is unobserved; it is the PLAN post-merge checklist item.
