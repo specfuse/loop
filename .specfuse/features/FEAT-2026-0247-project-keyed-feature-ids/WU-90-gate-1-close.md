@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/G1-CLOSE
 type: close
-status: pending
-attempts: 0
+status: done
+attempts: 1
 judge_edit_acknowledged:
   paths:
     - produces_driver_helper
@@ -17,6 +17,16 @@ judge_edit_acknowledged:
   reason: "Reviewed the diff; pattern swaps and alias lookup, no guard weakened"
 planned_cost_usd: 5.00
 auto_close_disabled: true
+model: sonnet
+effort: high
+gate_set: plannext
+driver_version: 0.30.0
+started_at: 2026-10-29T14:22:47.716783+00:00
+verdict: met
+duration_seconds: 346.199
+cost_usd: 1.672041
+input_tokens: 94
+output_tokens: 36753
 ---
 
 # G1-CLOSE — terminal close

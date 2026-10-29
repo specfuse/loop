@@ -8,3 +8,4 @@
 - **FEAT-2026-0247/T08**: attempt 1 outcome=passed
 - **FEAT-2026-0247/T09**: attempt 1 outcome=passed
 - **FEAT-2026-0247/T10**: attempt 1 outcome=passed
+- **FEAT-2026-0247/G1-CLOSE**: attempt 1 outcome=passed

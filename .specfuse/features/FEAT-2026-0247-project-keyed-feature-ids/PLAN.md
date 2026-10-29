@@ -155,6 +155,12 @@ gates:
 - Decide this repository's own key (for example `LOOP`) and set `ids.key` in
   `.specfuse/layout.yml`; the next `/roadmap-add` then allocates a keyed ID.
 - In each other repo of a multi-repo project, pick a distinct key and set it the same way.
+- Run the first keyed feature through the loop in a real repository and confirm the branch
+  name, commit subjects, `events.jsonl` correlation IDs and the roadmap/archive flips all
+  carry the keyed ID (only temporary-repository fixtures and `--dry-run` ran here).
+- Before running `ids migrate --all --apply` on a real repository, read its dry run
+  (moves, skips, ambiguous prose mentions) and confirm the alias map afterwards (only
+  temporary-repository fixtures ran here).
 
 ## Notes
 
