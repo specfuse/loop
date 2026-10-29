@@ -1,1 +1,3 @@
 - **FEAT-LOOP-2026-0248/T01**: attempt 1 outcome=passed
+- **FEAT-LOOP-2026-0248/T02**: `_rewrite_line` treats `<old ID>-<slug>` as structural only when `.specfuse/features/<old ID>-<slug>` exists. This holds with or without a leading `features/`. Other `features/<ID>-…` is prose. Clause-3 test un-skipped.
+- **FEAT-LOOP-2026-0248/T02**: _rewrite_line treats <old ID>-<slug> as structural only when .specfuse/features/<old ID>-<slug> exists, with or without a leading features/. Clause-3 test un-skipped. Added test_structural_only_when_folder_exists to tests/test_ids_migrate_all.py. Narrow tests pass (15 ran, OK, 2 skipped for T03).

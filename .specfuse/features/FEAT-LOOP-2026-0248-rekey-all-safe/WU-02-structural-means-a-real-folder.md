@@ -1,14 +1,23 @@
 ---
 id: FEAT-LOOP-2026-0248/T02
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 2
 oracle_env: macos_local
 planned_cost_usd: 2.50
 produces:
   - specfuse/loop/ids.py
   - tests/test_ids_migrate_all.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T15:13:15.820935+00:00
+duration_seconds: 73.164
+cost_usd: 0.335791
+input_tokens: 22
+output_tokens: 4891
 ---
 
 # T02 — structural means a folder that exists

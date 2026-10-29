@@ -342,13 +342,17 @@ def _unreleased_span(lines):
     return (start, len(lines)) if start is not None else None
 
 
-def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
-    """Rewrite `old` -> `new` in one line; ambiguous prose matches are recorded."""
+def _rewrite_line(line, old, new, structural, anchors, events, prose, where, folders=()):
+    """Rewrite `old` -> `new` in one line; ambiguous prose matches are recorded.
+
+    An exact existing folder name (`folders`) is structural wherever it appears,
+    with or without a leading `features/`; any other `<old>-<slug>` is prose.
+    """
     rel, no, plan = where
 
     def replace(repl, is_structural):
         def sub(m):
-            if is_structural(m.string, m.start()) or prose:
+            if is_structural(m.string, m.start(), m.end()) or prose:
                 plan.counts.setdefault(rel, {}).setdefault(old, 0)
                 plan.counts[rel][old] += 1
                 return repl
@@ -357,12 +361,16 @@ def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
 
         return sub
 
-    def upper(text, start):
-        if structural or text[:start].endswith("features/"):
+    def upper(text, start, end):
+        if structural:
             return True
+        rest = text[start:]
+        for name in folders:
+            if rest.startswith(name) and not re.match(r"[\w-]", rest[len(name):][:1]):
+                return True
         return events and bool(re.search(r'"correlation_id"\s*:\s*"$', text[:start]))
 
-    def lower(text, start):  # anchors and `#feat-` refs
+    def lower(text, start, end):  # anchors and `#feat-` refs
         return anchors and (text[:start].endswith("#") or text[:start].endswith('id="'))
 
     tail = _ALL_BOUNDARY
@@ -372,7 +380,7 @@ def _rewrite_line(line, old, new, structural, anchors, events, prose, where):
     )
 
 
-def _rewrite_file(rel, text, renames, include_prose, plan):
+def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
     """Rewrite one file; structural matches always, prose only with include_prose."""
     name = Path(rel).name
     is_md = name.endswith(".md")
@@ -408,6 +416,7 @@ def _rewrite_file(rel, text, renames, include_prose, plan):
                 events=is_events,
                 prose=include_prose and not fenced,
                 where=(rel, no + 1, plan),
+                folders=[f for f in folders if f.startswith(old + "-")],
             )
         out.append(line)
     return "".join(out)
@@ -419,11 +428,12 @@ def plan_migrate_all(root, key: str, include_prose: bool = False) -> AllPlan:
     plan = AllPlan(renames, skipped, [], {}, {}, [], [])
     if not renames:
         return plan
+    features = root / ".specfuse" / "features"
+    folders = sorted(p.name for p in features.iterdir() if p.is_dir()) if features.is_dir() else []
     for rel, text in _tracked_text_files(root):
-        new_text = _rewrite_file(rel, text, renames, include_prose, plan)
+        new_text = _rewrite_file(rel, text, renames, include_prose, plan, folders)
         if new_text != text:
             plan.files[rel] = new_text
-    features = root / ".specfuse" / "features"
     if features.is_dir():
         for old, new in renames:
             for folder in sorted(features.glob(f"{old}-*")):

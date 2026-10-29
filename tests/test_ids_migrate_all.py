@@ -183,6 +183,28 @@ class MigrateAll(unittest.TestCase):
             self.assertIn("new thing (FEAT-ACME-2026-0042)", changelog)
             self.assertIn("(FEAT-2026-0007)", changelog)
 
+    def test_structural_only_when_folder_exists(self):
+        # T02: `<ID>-<slug>` is structural only when .specfuse/features/<ID>-<slug>
+        # exists; a `features/<ID>-fixture` path with no such folder is prose.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            (root / "tests").mkdir()
+            (root / "tests" / "test_x.py").write_text(
+                'A = ".specfuse/features/FEAT-2026-0042-fixture"\n'
+                'B = "FEAT-2026-0042-fixture"\n'
+                'C = {"FEAT-2026-0042-live": 1}\n'
+                'D = ".specfuse/features/FEAT-2026-0042-live"\n'
+            )
+            _git(root, "add", "-A")
+            _git(root, "commit", "-q", "-m", "fixture")
+            code, _, err = _run(root, "--apply")
+            self.assertEqual(code, 0, err)
+            text = (root / "tests" / "test_x.py").read_text()
+            self.assertIn('A = ".specfuse/features/FEAT-2026-0042-fixture"', text)
+            self.assertIn('B = "FEAT-2026-0042-fixture"', text)
+            self.assertIn('{"FEAT-ACME-2026-0042-live": 1}', text)
+            self.assertIn('D = ".specfuse/features/FEAT-ACME-2026-0042-live"', text)
+
     def test_refuses_without_key(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = _make(tmp, key=None)

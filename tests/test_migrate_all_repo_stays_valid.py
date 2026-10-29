@@ -75,10 +75,39 @@ class Clause2ApplyValidatesResult(unittest.TestCase):
             self.assertIn("git checkout -- . && git clean -fd .specfuse/features", out)
 
 
-@unittest.skip("T02 owns rewrite classification")
 class Clause3RewriteClassification(unittest.TestCase):
-    def test_pending(self):
-        pass
+    def _fixture(self, tmp):
+        root = _make(tmp)
+        real = root / ".specfuse" / "features" / "FEAT-2026-0005-real"
+        real.mkdir()
+        (real / "PLAN.md").write_text("placeholder\n")
+        (root / "tests").mkdir()
+        (root / "tests" / "test_x.py").write_text(
+            'FIX = ".specfuse/features/FEAT-2026-0005-fixture"\n'
+            'BARE = "FEAT-2026-0005-fixture"\n'
+            'D = {"FEAT-2026-0005-real": 1}\n'
+            'P = ".specfuse/features/FEAT-2026-0005-real"\n'
+        )
+        roadmap = root / ".specfuse" / "roadmap.md"
+        roadmap.write_text(
+            roadmap.read_text().replace(
+                "| FEAT-2026-0071 | Other | planned |",
+                "| FEAT-2026-0005 | Real | planned |",
+            ).replace("FEAT-2026-0071", "FEAT-2026-0005")
+        )
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "fixture")
+        return root
+
+    def test_only_existing_folder_names_are_structural(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--apply")
+            text = (root / "tests" / "test_x.py").read_text()
+            self.assertIn('".specfuse/features/FEAT-2026-0005-fixture"', text)
+            self.assertIn('BARE = "FEAT-2026-0005-fixture"', text)
+            self.assertIn('{"FEAT-ACME-2026-0005-real": 1}', text)
+            self.assertIn('".specfuse/features/FEAT-ACME-2026-0005-real"', text)
 
 
 @unittest.skip("T03 owns prose scoping")
