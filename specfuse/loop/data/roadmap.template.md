@@ -46,7 +46,10 @@ flips `blocked` → `active` (or `planned`) and removes the `**Blocked by.**` bl
 
 ## Notes
 
-- Correlation IDs are allocated here, sequentially per year: `FEAT-YYYY-NNNN`. Work
+- Correlation IDs are allocated here, sequentially per year per repo: `FEAT-YYYY-NNNN`,
+  or `FEAT-<KEY>-YYYY-NNNN` when `ids.key` is set in `.specfuse/layout.yml` (numbering
+  continues from the highest ordinal of either form; legacy IDs are never renamed;
+  `ids migrate --planned-only` re-keys folderless planned rows). Work
   units take `FEAT-YYYY-NNNN/TNN`. The same scheme threads commits (trailer
   `Feature: FEAT-YYYY-NNNN/TNN`), the per-feature event log, and — at fold-in —
   GitHub issues across repos.

@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T06
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 2.00
 produces:
@@ -15,6 +15,15 @@ produces:
   - specfuse/loop/data/roadmap.template.md
   - specfuse/loop/data/schemas/driver-event.schema.json
   - tests/test_keyed_feature_ids_docs.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:21:48.922993+00:00
+duration_seconds: 57.07
+cost_usd: 0.220176
+input_tokens: 16
+output_tokens: 4609
 ---
 
 # T06 — the docs explain the key, how to choose it, and grandfathering

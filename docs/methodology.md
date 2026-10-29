@@ -34,7 +34,8 @@ on both surfaces.
     decision or dependency. The absence of a named blocker is the entire
     difference from `blocked`.
 - **Feature** — a spec-driven *or directly-authored* unit of value, identified by
-  a correlation ID `FEAT-YYYY-NNNN`. A feature owns an ordered list of gates.
+  a correlation ID `FEAT-YYYY-NNNN` (or `FEAT-<KEY>-YYYY-NNNN` when the repo sets
+  `ids.key`; see *Project key* below). A feature owns an ordered list of gates.
 - **Gate** — a milestone partition of a feature: an ordered batch of substantive
   work units followed by a mandatory closing sequence and a human review-and-arm
   checkpoint. Gates are numbered within a feature.
@@ -48,6 +49,16 @@ on both surfaces.
   A WU is crafted to be completed in one focused agent session.
   It carries its own prompt and is the contract between the planner and the
   executor.
+
+**Project key.** A repo may set an optional `ids.key` in `.specfuse/layout.yml`.
+With a key set, new features are allocated as `FEAT-<KEY>-YYYY-NNNN`, and the
+folder anchor uses the lower-cased key (`FEAT-<key>-YYYY-NNNN-slug`). Numbering
+stays per repo and continues from the highest ordinal of either form. Legacy
+unkeyed IDs are permanent: existing IDs are never renamed. The one exception to
+leaving old rows alone is `ids migrate --planned-only`, which re-keys folderless
+planned roadmap rows. Pick a short key distinct across the repos of one project;
+uniqueness is by convention, not enforced. No prompt asks for the key; it is read
+from `layout.yml`. The ID shape lives in `specfuse.loop.ids`.
 
 The correlation ID threads the entire lifecycle — it appears in the feature
 folder name, the WU file, every event-log entry, the branch, the commit trailer
