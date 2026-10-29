@@ -1,8 +1,15 @@
 ---
 id: FEAT-LOOP-2026-0248/G1-CLOSE
 type: close
-status: blocked_human
+status: pending
 attempts: 0
+judge_edit_acknowledged:
+  paths:
+    - specfuse/loop/agent_policy.py
+    - specfuse/loop/ids.py
+  reason: "Reviewed the diff; policy resolves aliases, ids additive, no guard weakened"
+unsandboxed: true
+unsandboxed_rationale: "Acceptance criterion 2 re-runs T05's --rehearse, which adds and removes a git worktree and runs the full suite in it; inside the sandbox that produced about 160 false errors in T05's dispatch. Same rationale as T05."
 planned_cost_usd: 5.00
 auto_close_disabled: true
 ---
