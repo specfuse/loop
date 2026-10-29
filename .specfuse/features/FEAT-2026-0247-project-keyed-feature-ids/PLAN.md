@@ -5,7 +5,7 @@ slug: project-keyed-feature-ids
 branch: feat/FEAT-2026-0247-project-keyed-feature-ids
 roadmap_goal: A repo that sets an optional project key allocates feature IDs of the form FEAT-<KEY>-YYYY-NNNN that every loop surface accepts, while repos without a key, and every existing ID, behave exactly as today
 autonomy_default: auto
-status: active
+status: done
 planned_cost_usd: 26.50
 ---
 

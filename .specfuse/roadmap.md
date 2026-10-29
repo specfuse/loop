@@ -125,7 +125,7 @@ installation a target project copies via `init.sh`.
 | FEAT-2026-0223 | Dollar-denominated run spend cap | planned | — | [→ detail](#feat-2026-0223) |
 | FEAT-2026-0224 | Project-configurable layout (`.specfuse/layout.yml`) | done | `.specfuse/features/FEAT-2026-0224-project-configurable-layout/` | [→ archive](roadmap-archive.md#feat-2026-0224) |
 | FEAT-2026-0246 | `judge_editing` covers the terminal gate | done | `.specfuse/features/FEAT-2026-0246-judge-editing-terminal-gate/` | [→ archive](roadmap-archive.md#feat-2026-0246) |
-| FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | active | — | [→ detail](#feat-2026-0247) |
+| FEAT-2026-0247 | Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`) | done | — | [→ archive](roadmap-archive.md#feat-2026-0247) |
 
 Status: `planned` → `active` → `done` (or `abandoned`). `deferred` = parked
 by choice pending an external decision/dependency; resumable (a human flips it
@@ -1055,17 +1055,6 @@ So the question is no longer "how do we distil lessons" — that is built and lo
 **Benefits.** The cap is expressed in the unit operators reason about, the summary and the cap agree on one number, and no recalibration is needed when caching behaviour changes. Related: #3522, PR #3524.
 
 **Status: planned.**
-
-<a id="feat-2026-0247"></a>
-## FEAT-2026-0247 — Project-keyed feature IDs (`FEAT-<KEY>-YYYY-NNNN`)
-
-**Why.** Each repo numbers its own features, so in a project with several repos the same `FEAT-YYYY-NNNN` exists in more than one of them. FEAT-2026-0069 to 0071, for example, exist in two repos as unrelated features. Branch names, commit messages, `events.jsonl` and cross-repo references all carry the bare ID, and the bare ID does not say which repo it belongs to. Qualifying it by repo is only a convention, so references between projects are ambiguous and confusing.
-
-**Goal.** Add an optional per-repo project key to feature IDs: `FEAT-<KEY>-YYYY-NNNN` (for example `FEAT-LOOP-2026-0248`). The key is set once in `.specfuse/` config and is 2–6 uppercase letters and digits, starting with a letter. Numbering stays per repo, with no central allocator. Gate 1: move the feature-ID pattern, now copied in about 9 places (`agent_policy`, `changelog`, `lint_plan`, `loop` (twice), `promotion`, `upgrade_merge_gate`, `gh_features`, `lint_roadmap`), into one `ids` module; also cover the event schemas and the `correlation-ids.md` grammar. Widen the pattern to accept an optional key, with no behaviour change. Gate 2: add a `project.key` config field. When it is set, `/roadmap-add` and `/draft-feature` emit keyed IDs, and the next number continues from the repo's highest number across both forms, so old and new IDs in one repo never share one. `lint_roadmap` warns on new unkeyed rows when a key is configured, and `specfuse upgrade` asks for the key. An optional `specfuse migrate-ids --planned-only` re-keys planned rows that have no folder yet. Existing IDs stay valid permanently; done and active features are never renamed, because their history in commits, PRs, issues and append-only `events.jsonl` cannot be rewritten. Out of scope: `INIT-` initiative IDs, which can take the same optional key later if separate orchestrators turn out to collide.
-
-**Benefits.** An ID says which repo it belongs to, so references between repos are unambiguous without a convention. No shared counter is needed, so it works offline. Existing projects change nothing. One shared pattern stops the 9 copies from drifting apart.
-
-**Status: active.**
 
 ## Notes
 
