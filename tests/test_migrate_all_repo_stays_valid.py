@@ -110,10 +110,66 @@ class Clause3RewriteClassification(unittest.TestCase):
             self.assertIn('".specfuse/features/FEAT-ACME-2026-0005-real"', text)
 
 
-@unittest.skip("T03 owns prose scoping")
 class Clause4ProseScoping(unittest.TestCase):
-    def test_pending(self):
-        pass
+    def _fixture(self, tmp):
+        root = _make(tmp)
+        for d in ("docs", "tests"):
+            (root / d).mkdir()
+            (root / d / "n.md").write_text("see FEAT-2026-0042 here\n")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-q", "-m", "prose")
+        return root
+
+    def test_path_scopes_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--apply", "--include-prose", "docs")
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("FEAT-ACME-2026-0042", (root / "docs" / "n.md").read_text())
+            self.assertIn("FEAT-2026-0042", (root / "tests" / "n.md").read_text())
+            self.assertNotIn("ACME", (root / "tests" / "n.md").read_text())
+
+    def test_bare_flag_rewrites_all_prose(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--apply", "--include-prose")
+            self.assertEqual(code, 0, out + err)
+            for d in ("docs", "tests"):
+                self.assertIn("FEAT-ACME-2026-0042", (root / d / "n.md").read_text())
+
+    def test_dry_run_counts_remaining_prose_by_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, _ = _run(root, "--include-prose", "docs")
+            self.assertEqual(code, 0)
+            self.assertIn("tests: 1", out)
+            self.assertNotIn("docs: 1", out)
+
+    def test_exclude_id_leaves_everything_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(
+                root, "--apply", "--include-prose", "--exclude-id", "FEAT-2026-0042"
+            )
+            self.assertEqual(code, 0, out + err)
+            self.assertTrue((root / ".specfuse/features/FEAT-2026-0042-live").is_dir())
+            self.assertIn("FEAT-2026-0042", (root / "docs" / "n.md").read_text())
+            self.assertNotIn("FEAT-ACME-2026-0042", (root / ".specfuse/roadmap.md").read_text())
+            aliases = (root / ".specfuse" / "id-aliases.yml").read_text()
+            self.assertNotIn("FEAT-2026-0042", aliases)
+            self.assertIn("FEAT-2026-0071", aliases)
+
+    def test_exclude_id_dry_run_lists_skip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            _, out, _ = _run(root, "--exclude-id", "FEAT-2026-0042")
+            self.assertIn("excluded by operator", out)
+
+    def test_invalid_exclude_id_exits_nonzero(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, _, _ = _run(root, "--exclude-id", "nonsense")
+            self.assertNotEqual(code, 0)
 
 
 @unittest.skip("T04 owns --rehearse")

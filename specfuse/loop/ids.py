@@ -13,13 +13,15 @@ Standalone like `layout.py`: must not import the driver.
 
     python3 -m specfuse.loop.ids [--repo DIR] next [--year YYYY]
     python3 -m specfuse.loop.ids [--repo DIR] migrate --planned-only [--apply]
-    python3 -m specfuse.loop.ids [--repo DIR] migrate --all [--apply] [--include-prose]
+    python3 -m specfuse.loop.ids [--repo DIR] migrate --all [--apply] [--include-prose [PATH ...]]
+        [--exclude-id ID ...]
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import fnmatch
 import re
 import subprocess
 import sys
@@ -422,16 +424,35 @@ def _rewrite_file(rel, text, renames, include_prose, plan, folders=()):
     return "".join(out)
 
 
-def plan_migrate_all(root, key: str, include_prose: bool = False) -> AllPlan:
+def _prose_scope(include_prose):
+    """Predicate rel -> bool: True/False for all/none, a list of paths or globs to scope."""
+    if include_prose is True or not include_prose:
+        return lambda rel: bool(include_prose)
+    patterns = [p.strip("/") if not any(c in p for c in "*?[") else p for p in include_prose]
+    return lambda rel: any(
+        fnmatch.fnmatchcase(rel, p) or rel.startswith(p.rstrip("/") + "/") for p in patterns
+    )
+
+
+def plan_migrate_all(
+    root, key: str, include_prose=False, exclude_ids=()
+) -> AllPlan:
     root = Path(root)
     renames, skipped = _own_unkeyed_ids(root, key)
+    excluded = set(exclude_ids)
+    if excluded:
+        skipped = skipped + [
+            (old, "excluded by operator") for old, _ in renames if old in excluded
+        ]
+        renames = [(o, n) for o, n in renames if o not in excluded]
+    in_scope = _prose_scope(include_prose)
     plan = AllPlan(renames, skipped, [], {}, {}, [], [])
     if not renames:
         return plan
     features = root / ".specfuse" / "features"
     folders = sorted(p.name for p in features.iterdir() if p.is_dir()) if features.is_dir() else []
     for rel, text in _tracked_text_files(root):
-        new_text = _rewrite_file(rel, text, renames, include_prose, plan, folders)
+        new_text = _rewrite_file(rel, text, renames, in_scope(rel), plan, folders)
         if new_text != text:
             plan.files[rel] = new_text
     if features.is_dir():
@@ -523,7 +544,9 @@ def _append_aliases(root: Path, renames) -> None:
         path.write_text(existing + add, encoding="utf-8")
 
 
-def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out=None) -> int:
+def migrate_all(
+    repo_root, apply: bool = False, include_prose=False, out=None, exclude_ids=()
+) -> int:
     from specfuse.loop import layout
 
     out = out or sys.stdout
@@ -548,7 +571,7 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
             )
             return 2
     try:
-        plan = plan_migrate_all(root, key, include_prose)
+        plan = plan_migrate_all(root, key, include_prose, exclude_ids)
         print(f"{'apply' if apply else 'dry run'}: key {key}", file=out)
         for old, new in plan.renames:
             print(f"  rekey  {old} -> {new}", file=out)
@@ -567,6 +590,13 @@ def migrate_all(repo_root, apply: bool = False, include_prose: bool = False, out
                 f"{'left unchanged' if apply else 'rewritten only with --include-prose'})",
                 file=out,
             )
+        if plan.ambiguous:
+            tops = {}
+            for rel, _, _ in plan.ambiguous:
+                top = rel.split("/", 1)[0] if "/" in rel else "."
+                tops[top] = tops.get(top, 0) + 1
+            summary = ", ".join(f"{t}: {n}" for t, n in sorted(tops.items()))
+            print(f"  prose mentions remaining by top-level directory: {summary}", file=out)
         if not plan.renames:
             print("nothing to do", file=out)
             return 0
@@ -619,17 +649,34 @@ def main(argv=None) -> int:
     which.add_argument("--all", action="store_true", help="re-key every feature of this repository")
     mig.add_argument("--apply", action="store_true", help="write the changes (default: dry run)")
     mig.add_argument(
-        "--include-prose", action="store_true",
-        help="with --all --apply, also rewrite ambiguous prose mentions",
+        "--include-prose", nargs="*", default=None, metavar="PATH",
+        help="with --all, also rewrite ambiguous prose mentions: in all files when bare, "
+        "else only in the given repo-relative paths or globs",
+    )
+    mig.add_argument(
+        "--exclude-id", action="append", default=[], metavar="ID",
+        help="with --all, leave this old ID untouched everywhere (repeatable)",
     )
     args = parser.parse_args(argv)
     if args.command == "next":
         print(next_id(args.repo, args.year))
     elif args.command == "migrate":
+        prose = args.include_prose
+        if prose is not None and not prose:
+            prose = True
         if args.all:
-            return migrate_all(args.repo, apply=args.apply, include_prose=args.include_prose)
-        if args.include_prose:
+            for value in args.exclude_id:
+                if not FEATURE_ID_RE.match(value):
+                    print(f"ids migrate: invalid --exclude-id value: {value!r}", file=sys.stderr)
+                    return 2
+            return migrate_all(
+                args.repo, apply=args.apply, include_prose=prose or False,
+                exclude_ids=args.exclude_id,
+            )
+        if prose is not None:
             parser.error("--include-prose requires --all")
+        if args.exclude_id:
+            parser.error("--exclude-id requires --all")
         return migrate(args.repo, apply=args.apply)
     return 0
 
