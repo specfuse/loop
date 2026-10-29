@@ -24,7 +24,7 @@
     "correlation_id": {
       "type": "string",
       "description": "Correlation ID at any level of the unit hierarchy (docs/naming-convention.md): initiative INIT-YYYY-NNNN, dispatched feature INIT-YYYY-NNNN/FNN, work unit INIT-YYYY-NNNN/FNN/<task-id>; or the legacy/component-local feature FEAT-YYYY-NNNN and task FEAT-YYYY-NNNN/<task-id>. The task-id segment carries all three documented work-unit shapes: substantive TNN, hygiene TNNH[N...] (the target unit's ordinal, a literal H, and an optional ordinal), and closing-sequence G<n>-<NAME> where <NAME> is RETRO, LESSONS, DOCS, PLAN, CLOSE-INTERMEDIATE, or CLOSE. Existing FEAT- entries validate unchanged.",
-      "pattern": "^(FEAT|INIT)-\\d{4}-\\d{4}(/F\\d{2})?(/(T\\d{2}(H\\d*)?|G\\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?$"
+      "pattern": "^(FEAT-(?:[A-Z][A-Z0-9]{1,5}-)?|INIT-)\\d{4}-\\d{4}(/F\\d{2})?(/(T\\d{2}(H\\d*)?|G\\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?$"
     },
     "event_type": {
       "type": "string",

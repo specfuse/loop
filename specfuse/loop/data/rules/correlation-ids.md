@@ -24,6 +24,16 @@ Two namespaces, four canonical shapes:
   - `YYYY` is the four-digit calendar year in which the feature was created.
   - `NNNN` is a zero-padded four-digit ordinal, unique within that year's roadmap.
   - Example: `FEAT-2026-0042`.
+- **Keyed feature-level (optional):** `FEAT-<KEY>-YYYY-NNNN`
+  - `KEY` is a per-repository project key: an uppercase letter followed by one to
+    five uppercase letters or digits (`[A-Z][A-Z0-9]{1,5}`). A repository opts in by
+    setting it once (in the loop, `ids.key` in `.specfuse/layout.yml`); without a key,
+    IDs keep the unkeyed shape above.
+  - The key makes an ID say which repository it belongs to, so the same ordinal in
+    two repositories of one project no longer collides. Numbering stays per
+    repository: the ordinal continues from the highest `NNNN` of either shape.
+  - Unkeyed IDs that already exist stay valid permanently and are never renamed.
+  - Example: `FEAT-ACME-2026-0042`; anchor `feat-acme-2026-0042`.
 - **Task-level:** `FEAT-YYYY-NNNN/<task-id>`
   - The feature-level ID, a literal `/`, then the task identifier.
   - Substantive units use `TNN` — `T` followed by a zero-padded two-digit ordinal,
@@ -66,7 +76,7 @@ Collisions between the two namespaces are structurally impossible.
 The combined pattern accepted across all shapes is:
 
 ```
-^(FEAT-\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$
+^(FEAT-(?:[A-Z][A-Z0-9]{1,5}-)?\d{4}-\d{4}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?|INIT-\d{4}-\d{4}/F\d{2}(/(T\d{2}(H\d*)?|G\d+-(RETRO|LESSONS|DOCS|PLAN|CLOSE-INTERMEDIATE|CLOSE)))?)$
 ```
 
 A string that does not match is malformed.
@@ -123,7 +133,9 @@ that materially describes the work, err toward including the ID.
 ## Generating the next ID
 
 **Feature-level.** The next ordinal for year `YYYY` is one greater than the largest
-`NNNN` that currently appears in `.specfuse/features/FEAT-YYYY-*/`. If no feature
+`NNNN` that currently appears in `.specfuse/features/FEAT-YYYY-*/` or, in a keyed
+repository, `.specfuse/features/FEAT-<KEY>-YYYY-*/` (both shapes count). A keyed
+repository emits the keyed shape. If no feature
 for `YYYY` exists yet, start at `0001`. Padding is always four digits: `0001`,
 `0042`, `1234`. Year rollover does not continue the previous year's counter — each
 year starts fresh at `0001`.

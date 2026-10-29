@@ -5,8 +5,8 @@
 """Feature oracle for FEAT-2026-0247 gate 1 — a keyed feature works end to end.
 
 One class per Definition-of-done clause in GATE-01.md, driven through the real
-modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04), clause 6 (T05); the rest
-are skipped naming their owner. A skip surviving to the close is a hollow oracle.
+modules in a temporary repository. Clauses 1, 2 and 8 are live (T01), clause 3 (T02), clause 4 (T03), clause 5 (T04), clause 6 (T05), clause 7 (T07); none
+is skipped. A skip surviving to the close is a hollow oracle.
 """
 
 import os
@@ -177,9 +177,54 @@ class Clause6MigratePlannedOnly(unittest.TestCase):
             self.assertEqual(lint_roadmap.lint_roadmap(root), [])
 
 
-@unittest.skip("owned by FEAT-2026-0247/T07")
 class Clause7KeyedCorrelationIdValidatesAgainstEnvelope(unittest.TestCase):
-    pass
+    """The vendored envelope (methodology core, specfuse/specfuse#232) and the
+    loop's one pattern agree on the keyed form."""
+
+    # Read the vendored schema files directly: tests.test_validate_event points
+    # SPECFUSE_SCHEMA_ROOT at a fixture for the whole process at import time, so
+    # going through validate_event's module state here would test that fixture.
+    SCHEMAS = ("specfuse/loop/data/schemas", ".specfuse/schemas")
+
+    def _patterns(self):
+        import json
+        import re
+
+        repo = Path(__file__).resolve().parent.parent
+        for root in self.SCHEMAS:
+            schema = json.loads((repo / root / "event.schema.json").read_text())
+            yield root, re.compile(schema["properties"]["correlation_id"]["pattern"])
+
+    def _correlation_errors(self, correlation_id):
+        return [root for root, pat in self._patterns() if not pat.match(correlation_id)]
+
+    def test_keyed_ids_validate(self):
+        for cid in ("FEAT-ACME-2026-0008", "FEAT-ACME-2026-0008/T01",
+                    "FEAT-ACME-2026-0008/T02H", "FEAT-ACME-2026-0008/G1-CLOSE"):
+            with self.subTest(cid=cid):
+                self.assertEqual(self._correlation_errors(cid), [])
+
+    def test_legacy_and_orchestrated_ids_still_validate(self):
+        for cid in ("FEAT-2026-0008", "FEAT-2026-0008/T01", "INIT-2026-0001/F06/T01"):
+            with self.subTest(cid=cid):
+                self.assertEqual(self._correlation_errors(cid), [])
+
+    def test_malformed_keys_are_rejected(self):
+        for cid in ("FEAT-acme-2026-0008", "FEAT-A-2026-0008",
+                    "FEAT-TOOLONG-2026-0008", "FEAT-1ABC-2026-0008",
+                    "INIT-ACME-2026-0001/F01"):
+            with self.subTest(cid=cid):
+                self.assertNotEqual(self._correlation_errors(cid), [])
+
+    def test_vendored_grammar_embeds_the_shared_pattern(self):
+        from specfuse.loop import ids
+
+        repo = Path(__file__).resolve().parent.parent
+        for rel in (".specfuse/rules/correlation-ids.md",
+                    "specfuse/loop/data/rules/correlation-ids.md"):
+            with self.subTest(rule=rel):
+                self.assertIn(f"^({ids.FEATURE_ID_PATTERN}(/(T",
+                              (repo / rel).read_text())
 
 
 class Clause8UnkeyedRepoIsUnchanged(unittest.TestCase):
