@@ -38,7 +38,8 @@ FEATURE_ID = "FEAT-2026-9101"
 SLUG = "terminal-judge"
 
 
-def _scaffold(root: Path, *, produces: str, auto_close_disabled: bool = False) -> Path:
+def _scaffold(root: Path, *, produces: str, auto_close_disabled: bool = False,
+              autonomy: str = "auto", unit_status: str = "done") -> Path:
     """Single-gate feature whose one implementation unit is already done and
     declares ``produces: [<produces>]``."""
     fdir = _scaffold_feature(
@@ -47,10 +48,10 @@ def _scaffold(root: Path, *, produces: str, auto_close_disabled: bool = False) -
         auto_close_disabled=auto_close_disabled, commit=False)
     plan = fdir / "PLAN.md"
     plan.write_text(plan.read_text().replace(
-        "status: active\n", "status: active\nautonomy_default: auto\n", 1))
+        "status: active\n", f"status: active\nautonomy_default: {autonomy}\n", 1))
     (fdir / "WU-T01.md").write_text(
         f"---\nid: {FEATURE_ID}/T01\ntype: implementation\n"
-        "model: claude-haiku-4-5-20251001\nstatus: done\nattempts: 1\n"
+        f"model: claude-haiku-4-5-20251001\nstatus: {unit_status}\nattempts: 0\n"
         f"produces:\n  - {produces}\n---\n\n# T01\n\n"
         "**Context.** test\n\n**Acceptance criteria.** test\n\n"
         "**Do not touch.** test\n\n**Verification.** test\n\n"
@@ -212,19 +213,80 @@ class NewPathRefires(_Base):
             self.assertNotIn("arm_eval.py", blob)
 
 
-@unittest.skip("owned by FEAT-2026-0246/T03")
-class EveryAutonomyLevelStops(unittest.TestCase):
-    pass
+class EveryAutonomyLevelStops(_Base):
+    def test_each_level_halts_without_a_terminal_flip(self):
+        for level in ("auto", "review", "supervised"):
+            with self.subTest(autonomy=level), integration_workspace() as root:
+                os.chdir(root)
+                self.dispatched.clear()
+                fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py",
+                                 autonomy=level)
+                self._stub_agent()
+
+                rc = loop.run(None, dry_run=False)
+
+                self.assertNotEqual(rc, 0)
+                events = _read_events(fdir / "events.jsonl")
+                esc = [e for e in events if e["event_type"] == "human_escalation"
+                       and e["payload"].get("reason") == "judge_editing_terminal"]
+                self.assertEqual(len(esc), 1)
+                self.assertNotEqual(_read_frontmatter(fdir / "PLAN.md").get("status"), "done")
+                self.assertEqual(_roadmap_row_status(root, FEATURE_ID), "active")
+                self.assertNotIn(f"{FEATURE_ID}/G1-CLOSE", self.dispatched)
 
 
-@unittest.skip("owned by FEAT-2026-0246/T03")
-class AutoClosePathStops(unittest.TestCase):
-    pass
+class AutoClosePathStops(_Base):
+    def test_halts_before_any_auto_close_decision(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py")
+            self._stub_agent()
+
+            rc = loop.run(None, dry_run=False)
+
+            self.assertNotEqual(rc, 0)
+            events = _read_events(fdir / "events.jsonl")
+            self.assertFalse([e for e in events if e["event_type"] == "auto_close_decision"])
+            self.assertTrue([e for e in events if e["event_type"] == "human_escalation"
+                             and e["payload"].get("reason") == "judge_editing_terminal"])
+
+    def test_positive_control_without_judge_path_auto_closes(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="src/feature.py", unit_status="pending")
+            self._stub_agent()
+
+            rc = loop.run(None, dry_run=False)
+
+            self.assertEqual(rc, 0)
+            events = _read_events(fdir / "events.jsonl")
+            self.assertTrue([e for e in events if e["event_type"] == "auto_close_decision"
+                             and e["payload"].get("auto") is True])
 
 
-@unittest.skip("owned by FEAT-2026-0246/T03")
-class BriefHasSixParts(unittest.TestCase):
-    pass
+class BriefHasSixParts(_Base):
+    def test_message_is_the_six_part_brief(self):
+        with integration_workspace() as root:
+            os.chdir(root)
+            fdir = _scaffold(root, produces="specfuse/loop/arm_eval.py")
+            self._stub_agent()
+            loop.run(None, dry_run=False)
+
+            events = _read_events(fdir / "events.jsonl")
+            msg = next(e for e in events if e["event_type"] == "human_escalation"
+                       and e["payload"].get("reason") == "judge_editing_terminal"
+                       )["payload"]["message"]
+
+            positions = [msg.index(f"## {h}") for h in loop.ESCALATION_PART_HEADINGS]
+            self.assertEqual(positions, sorted(positions))
+            self.assertLess(positions[-1], msg.index("specfuse:escalation id="))
+            self.assertEqual(loop.escalation.validate_escalation_body(msg)
+                             if hasattr(loop, "escalation") else [], [])
+            self.assertIn(f"{FEATURE_ID}/T01", msg)
+            self.assertIn("specfuse/loop/arm_eval.py", msg)
+            self.assertIn("judge_edit_acknowledged", msg)
+            self.assertIn("/unblock-wu", msg)
+            self.assertIn("change the code or config that grades it", msg)
 
 
 @unittest.skip("owned by FEAT-2026-0246/T04")

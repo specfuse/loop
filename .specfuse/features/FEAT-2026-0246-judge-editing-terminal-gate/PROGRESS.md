@@ -1,2 +1,3 @@
 - **FEAT-2026-0246/T01**: Added the terminal judge-editing stop. A done substantive unit on the last gate that declares a judge-surface path now halts the run before the close, auto or dispatched. All 52 tests in the touched and related modules pass (unsandboxed). That is the narrow tier plus the AC3 set and the registry/event tests.
 - **FEAT-2026-0246/T02**: Operator acknowledgement via `judge_edit_acknowledged` now clears a `judge_editing_terminal` halt, but only for the paths it names. Narrow tier passes: 25 tests across the three modules, ruff clean, and lint of the feature folder exits 0.
+- **FEAT-2026-0246/T03**: attempt 1 outcome=passed

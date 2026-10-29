@@ -4184,6 +4184,10 @@ REPLAN_OPTION_SCOPE = {
         "escalate where it does"),
     "produces_shape_invalid": (False,
         "pre-dispatch frontmatter refusal; nothing was attempted"),
+    "judge_editing_terminal": (False,
+        "the gate's own units change the code or config that grades it, so "
+        "a model-authored verdict over those edits cannot be trusted to "
+        "close the feature unreviewed"),
     "spinning_reproduction_missing": (False,
         "a re-arm gate, not a failure; the operator is mid-decision already"),
     "prep_halted": (False,
@@ -4207,6 +4211,69 @@ def replan_option_applies(reason: str) -> bool:
     return scoped[0] if scoped is not None else False
 
 
+def _format_judge_editing_terminal_brief(
+    wu: "WorkUnit",
+    gate_number: int,
+    done_list: str,
+    hits: list,
+    resume_command: str,
+) -> str:
+    """Six-part brief for the `judge_editing_terminal` halt (FEAT-2026-0246/T03).
+
+    Reached only through `format_spinout_escalation_brief`, so the framing,
+    headings and correlation marker stay shared with every per-unit halt. Plain
+    English first; the unit and path evidence is named, the clearing steps are
+    spelled out.
+    """
+    scope_why = REPLAN_OPTION_SCOPE["judge_editing_terminal"][1]
+    edits = "; ".join(hits) if hits else "(none recorded)"
+    lines = [
+        f"ESCALATED — {wu.wu_id} ({wu.title})",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[0]}",
+        f"Gate {gate_number} is the last gate and its work is finished. Work "
+        f"units done: {done_list}. Nothing has been closed, flipped or "
+        f"archived yet.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[1]}",
+        "One or more finished units changed files that the judge relies on to "
+        f"grade this feature. Unit and path: {edits}.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[2]}",
+        "Someone must decide whether those judge-surface edits are sound "
+        "before the feature closes, because the close verdict would otherwise "
+        "be written by the same model that made the edits.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[3]}",
+        f"The safety catch fired as designed, nothing broke: {scope_why}. "
+        "It stops the close however the feature was started and whatever its "
+        "autonomy level.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[4]}",
+        "1. **Acknowledge the edits** — review the paths above, then write "
+        f"`judge_edit_acknowledged` (the paths and your own reason) in the "
+        f"frontmatter of {wu.wu_id}, then run `/unblock-wu`. Pros: the close "
+        "proceeds and your reason is on the record. Cons: you must read the "
+        "edits first; the acknowledgement covers only the paths it names, so "
+        "a path added later stops the close again.",
+        "2. **Reject the edits** — fix or revert them in the producing units. "
+        "Pros: the judge stays independent. Cons: reopens finished work.",
+        "",
+        f"## {ESCALATION_PART_HEADINGS[5]}",
+        "Option 1 once you have read the edits and they are sound; option 2 "
+        "if any of them weakens the check that grades this feature.",
+        "",
+        "Reply with the number of your choice, or prose if none fit:",
+        "1. Acknowledge the edits",
+        "2. Reject the edits",
+        "",
+        f"Resume after deciding:\n  {resume_command}",
+        "",
+        _escalation_correlation_marker(wu.wu_id),
+    ]
+    return "\n".join(lines)
+
+
 def format_spinout_escalation_brief(
     wu: "WorkUnit",
     gate_number: int,
@@ -4218,6 +4285,7 @@ def format_spinout_escalation_brief(
     replanned: bool,
     resume_command: str,
     insertion_refused: "dict | None" = None,
+    judge_hits: "list | None" = None,
 ) -> str:
     """Render the six-part operator brief for a spun-out unit (FEAT-2026-0104/T06).
 
@@ -4245,6 +4313,9 @@ def format_spinout_escalation_brief(
     """
     done_list = ", ".join(done_wu_ids) if done_wu_ids else "(none yet)"
     remaining = ", ".join(remaining_wu_ids) if remaining_wu_ids else "(none)"
+    if reason == "judge_editing_terminal":
+        return _format_judge_editing_terminal_brief(
+            wu, gate_number, done_list, judge_hits or [], resume_command)
     outcomes = ", ".join(
         f"attempt {i}: {o}" for i, o in enumerate(attempt_outcomes, start=1)
     ) or "(no attempt produced a recorded outcome)"
@@ -4407,6 +4478,7 @@ def escalate_unit(
     attempt_outcomes: list,
     replanned: bool = False,
     insertion_refused: "dict | None" = None,
+    judge_hits: "list | None" = None,
 ) -> str:
     """Render the six-part operator brief for ANY per-unit `blocked_human`
     escalation -- the single call every `human_escalation` site keyed on
@@ -4425,7 +4497,7 @@ def escalate_unit(
     return format_spinout_escalation_brief(
         wu, gate_number, done_wu_ids, remaining_wu_ids, reason,
         wu_max_attempts, attempt_outcomes, replanned, resume_command,
-        insertion_refused=insertion_refused,
+        insertion_refused=insertion_refused, judge_hits=judge_hits,
     )
 
 
@@ -4486,6 +4558,7 @@ def stop_for_terminal_judge_edit(
     feature_id: str,
     gate_number: int,
     events_path: Path,
+    done_ids: "set | None" = None,
 ) -> bool:
     """Halt in front of the terminal close when a done unit edited a judge
     surface (FEAT-2026-0246/T01). True means the close was stopped.
@@ -4500,8 +4573,8 @@ def stop_for_terminal_judge_edit(
 
     A clean verdict resting on the close unit's operator-authored
     `judge_edit_acknowledged` field also emits
-    `terminal_judge_editing_acknowledged`. T03 replaces the one-line message
-    with the six-part brief.
+    `terminal_judge_editing_acknowledged`. The halt message is the six-part
+    brief from `escalate_unit`.
     """
     try:
         verdict = evaluate_terminal_judge_editing(feature_dir, gate_number)
@@ -4534,9 +4607,10 @@ def stop_for_terminal_judge_edit(
         flush_events(events_path, events)
         return False
     hits = verdict.reason.split("; ")
-    message = (
-        f"Gate {gate_number} close stopped: a done unit edited a judge surface "
-        f"({verdict.reason}). Review those edits, then resume."
+    message = escalate_unit(
+        wu, gate_number, sorted(done_ids or ()), [], HALT_REASON_JUDGE_EDITING_TERMINAL,
+        resume_command_for(feature_id), resolve_max_attempts(wu, load_verification()),
+        [], judge_hits=hits,
     )
     backend.set_wu(wu, "status", "blocked_human")
     flush_events(events_path, [evaluated, build_event(
@@ -12039,7 +12113,7 @@ def run(
                 if (not dry_run and wu.type == "close" and gate is gates[-1]
                         and stop_for_terminal_judge_edit(
                             wu, backend, feature_dir, feature_id, gate.number,
-                            events_path)):
+                            events_path, done_ids)):
                     blocked = True
                     continue
 

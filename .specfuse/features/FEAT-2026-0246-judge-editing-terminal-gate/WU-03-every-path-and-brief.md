@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0246/T03
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 planned_cost_usd: 3.00
 produces:
   - specfuse/loop/loop.py
@@ -13,6 +13,12 @@ gate_set: code
 oracle_env: macos_local
 produces_driver_helper:
   - escalate_unit
+driver_version: 0.30.0
+started_at: 2026-10-29T12:01:35.096200+00:00
+duration_seconds: 154.844
+cost_usd: 0.521442
+input_tokens: 38
+output_tokens: 10188
 ---
 
 # T03 — every autonomy level, both close paths, and a six-part brief
