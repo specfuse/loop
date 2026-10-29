@@ -46,6 +46,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 
+from specfuse.loop import ids as _ids
 from specfuse.loop import layout as _layout
 
 SEVERITY_ERROR = "error"
@@ -54,11 +55,14 @@ SEVERITY_WARN = "warn"
 ROADMAP_FILENAME = "roadmap.md"
 ARCHIVE_FILENAME = "roadmap-archive.md"
 
-_ANCHOR_RE = re.compile(r'<a\s+id="(feat-\d{4}-\d{4})"\s*>\s*</a>', re.IGNORECASE)
-_HEADING_RE = re.compile(r'^##\s+(FEAT-\d{4}-\d{4})\b', re.IGNORECASE)
-_ROW_RE = re.compile(r'^\|\s*(FEAT-\d{4}-\d{4})\s*\|')
+_ANCHOR_PATTERN = _ids.FEATURE_ID_PATTERN.lower()
+_ANCHOR_RE = re.compile(r'<a\s+id="(' + _ANCHOR_PATTERN + r')"\s*>\s*</a>', re.IGNORECASE)
+_HEADING_RE = re.compile(r'^##\s+(' + _ids.FEATURE_ID_PATTERN + r')\b', re.IGNORECASE)
+_ROW_RE = re.compile(r'^\|\s*(' + _ids.FEATURE_ID_PATTERN + r')\s*\|')
 _LINK_RE = re.compile(r'\[[^\]]*\]\(([^)]+)\)')
-_REF_RE = re.compile(r'^(roadmap\.md|roadmap-archive\.md)?#(feat-\d{4}-\d{4})$', re.IGNORECASE)
+_REF_RE = re.compile(
+    r'^(roadmap\.md|roadmap-archive\.md)?#(' + _ANCHOR_PATTERN + r')$', re.IGNORECASE
+)
 _BLOCKED_BY_RE = re.compile(r'^\*\*Blocked by\.\*\*\s*(.*)$')
 _ORPHAN_DETAIL_CELLS = {"—", "-", ""}
 # A detail section's status marker. Trailing prose on the same line is common

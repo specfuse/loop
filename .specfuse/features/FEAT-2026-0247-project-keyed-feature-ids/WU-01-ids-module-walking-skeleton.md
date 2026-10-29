@@ -1,8 +1,8 @@
 ---
 id: FEAT-2026-0247/T01
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 4.00
 produces:
@@ -12,6 +12,15 @@ produces:
   - specfuse/loop/lint_roadmap.py
   - tests/test_ids.py
   - tests/test_keyed_feature_ids_end_to_end.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T13:14:28.542707+00:00
+duration_seconds: 146.131
+cost_usd: 0.705571
+input_tokens: 42
+output_tokens: 17274
 ---
 
 # T01 — walking skeleton: one ID module, a configured key, and a keyed feature that lints
