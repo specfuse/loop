@@ -6,7 +6,7 @@ branch: feat/FEAT-2026-0247-project-keyed-feature-ids
 roadmap_goal: A repo that sets an optional project key allocates feature IDs of the form FEAT-<KEY>-YYYY-NNNN that every loop surface accepts, while repos without a key, and every existing ID, behave exactly as today
 autonomy_default: auto
 status: active
-planned_cost_usd: 25.50
+planned_cost_usd: 26.50
 ---
 
 # Plan: Project-keyed feature IDs (FEAT-<KEY>-YYYY-NNNN)
@@ -141,10 +141,13 @@ gates:
       - id: FEAT-2026-0247/T09
         file: WU-09-aliases-resolve-old-ids.md
         depends_on: [FEAT-2026-0247/T08]
+      - id: FEAT-2026-0247/T10
+        file: WU-10-broad-run-fixes.md
+        depends_on: [FEAT-2026-0247/T09]
       # --- closing sequence: single terminal close (single-gate feature) ---
       - id: FEAT-2026-0247/G1-CLOSE
         file: WU-90-gate-1-close.md
-        depends_on: [FEAT-2026-0247/T01, FEAT-2026-0247/T02, FEAT-2026-0247/T03, FEAT-2026-0247/T04, FEAT-2026-0247/T05, FEAT-2026-0247/T06, FEAT-2026-0247/T07, FEAT-2026-0247/T08, FEAT-2026-0247/T09]
+        depends_on: [FEAT-2026-0247/T01, FEAT-2026-0247/T02, FEAT-2026-0247/T03, FEAT-2026-0247/T04, FEAT-2026-0247/T05, FEAT-2026-0247/T06, FEAT-2026-0247/T07, FEAT-2026-0247/T08, FEAT-2026-0247/T09, FEAT-2026-0247/T10]
 ```
 
 ## Post-merge checklist
