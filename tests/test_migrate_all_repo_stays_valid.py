@@ -265,14 +265,35 @@ class Clause5Rehearse(unittest.TestCase):
             self.assertIn("FAIL: test_x (m.C)", out)
             self.assertEqual(_state(root), before)
 
-    def test_dirty_tree_is_refused(self):
+    def test_dirty_tree_is_rehearsed_not_refused(self):
+        import os
+
         with tempfile.TemporaryDirectory() as tmp:
             root = _make(tmp)
             roadmap = root / ".specfuse" / "roadmap.md"
-            roadmap.write_text(roadmap.read_text() + "\n")
-            code, _, err = _run(root, "--rehearse", "--rehearse-command", self.PASS)
-            self.assertEqual(code, 2)
-            self.assertIn("uncommitted", err)
+            roadmap.write_text(roadmap.read_text() + "\nDIRTY-EDIT\n")
+            (root / "new_untracked.txt").write_text("fresh\n")
+            before = _state(root)
+            branches = subprocess.run(
+                ["git", "branch", "--list"], cwd=root, capture_output=True, text=True, check=True
+            ).stdout
+            cmd = (
+                "python3 -c \"import pathlib,sys; "
+                "r=pathlib.Path('.specfuse/roadmap.md').read_text(); "
+                "sys.exit(0 if 'DIRTY-EDIT' in r and "
+                "pathlib.Path('new_untracked.txt').read_text()=='fresh\\n' else 1)\""
+            )
+            code, out, err = _run(root, "--rehearse", "--rehearse-command", cmd)
+            self.assertEqual(code, 0, out + err)
+            self.assertIn("1 modified and 1 untracked", out)
+            self.assertEqual(_state(root), before)
+            self.assertEqual(
+                subprocess.run(
+                    ["git", "branch", "--list"], cwd=root, capture_output=True, text=True, check=True
+                ).stdout,
+                branches,
+            )
+            self.assertEqual(os.listdir(root / ".git" / "worktrees") if (root / ".git" / "worktrees").exists() else [], [])
 
 
 if __name__ == "__main__":

@@ -9,3 +9,4 @@
 - **FEAT-LOOP-2026-0248/T05**: Edits to four test modules pass on the unrenamed tree, but the rehearsal still fails (43 failures, 1 error) in modules outside produces:.
 - **FEAT-LOOP-2026-0248/T06**: _validate_tree now spawns sys.executable -m specfuse.loop.ids validate with cwd and PYTHONPATH set to the target tree. The in-process logic is kept as _validate_tree_here, which backs the new `validate` subcommand. ERROR line format is unchanged. --apply and --rehearse both go through migrate_all, so both use the fresh process. A non-zero exit with no ERROR lines becomes one ERROR line, "validation process exited N: <last stderr line>".
 - **FEAT-LOOP-2026-0248/T05**: Rehearsal command refused to run; no files changed.
+- **FEAT-LOOP-2026-0248/T07**: attempt 1 outcome=passed

@@ -668,10 +668,59 @@ def _failing_lines(output: str) -> list:
     return found or lines[-20:]
 
 
-def rehearse(repo_root, run_migration, command=None, out=None) -> int:
-    """Run *run_migration(worktree_root)* on a throwaway worktree of HEAD, then a test command.
+def _snapshot_working_tree(root: Path, wt: Path, out) -> tuple:
+    """Copy *root*'s uncommitted state into worktree *wt* and commit it there; (modified, untracked)."""
+    import shutil
 
-    Never writes to the real tree; the worktree is always removed.
+    def git(*a, cwd=root, **kw):
+        return subprocess.run(["git", *a], cwd=cwd, capture_output=True, check=False, **kw)
+
+    diff = git("diff", "HEAD", "--binary")
+    if diff.returncode != 0:
+        raise RuntimeError(f"git diff HEAD failed: {diff.stderr.decode(errors='replace').strip()}")
+    names = git("diff", "HEAD", "--name-only", "-z").stdout.decode().split("\0")
+    names = [n for n in names if n]
+    if diff.stdout:
+        ap = git("apply", "--binary", "--whitespace=nowarn", "-", cwd=wt, input=diff.stdout)
+        if ap.returncode != 0:
+            print("rehearse: git apply failed; copying modified files instead", file=out)
+            subprocess.run(["git", "checkout", "-q", "--", "."], cwd=wt, capture_output=True, check=False)
+            for n in names:
+                src = root / n
+                if not src.exists() and not src.is_symlink():
+                    raise RuntimeError(
+                        f"cannot represent deleted tracked file {n!r} without git apply"
+                    )
+                dst = wt / n
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                if dst.exists() or dst.is_symlink():
+                    dst.unlink()
+                shutil.copy2(src, dst, follow_symlinks=False)
+    others = git("ls-files", "--others", "--exclude-standard", "-z")
+    untracked = [n for n in others.stdout.decode().split("\0") if n]
+    for n in untracked:
+        src = root / n
+        dst = wt / n
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst, follow_symlinks=False)
+    if names or untracked:
+        for cmd in (
+            ["add", "-A"],
+            ["-c", "user.name=rehearsal", "-c", "user.email=rehearsal@localhost",
+             "commit", "-q", "--no-verify", "-m", "rehearsal snapshot"],
+        ):
+            r = git(*cmd, cwd=wt)
+            if r.returncode != 0:
+                raise RuntimeError(f"git {cmd[-1]} failed in rehearsal: {r.stderr.decode(errors='replace').strip()}")
+    return len(names), len(untracked)
+
+
+def rehearse(repo_root, run_migration, command=None, out=None) -> int:
+    """Run *run_migration(worktree_root)* on a throwaway snapshot of the working tree, then a test command.
+
+    The snapshot is HEAD plus the real tree's uncommitted and untracked changes, committed on a
+    detached HEAD inside the worktree only. Never writes to the real tree; the worktree is
+    always removed.
     """
     import os
     import shutil
@@ -679,12 +728,6 @@ def rehearse(repo_root, run_migration, command=None, out=None) -> int:
 
     out = out or sys.stdout
     root = Path(repo_root).resolve()
-    if _dirty(root):
-        print(
-            "ids migrate: working tree has uncommitted changes; commit or stash first",
-            file=sys.stderr,
-        )
-        return 2
     if command is None:
         from specfuse.loop import gate_commands
 
@@ -709,7 +752,16 @@ def rehearse(repo_root, run_migration, command=None, out=None) -> int:
             print(f"ids migrate: git worktree add failed: {r.stderr.strip()}", file=sys.stderr)
             return 2
         added = True
-        print(f"rehearse: migrating a throwaway copy of HEAD at {wt}", file=out)
+        try:
+            modified, untracked = _snapshot_working_tree(root, wt, out)
+        except RuntimeError as exc:
+            print(f"ids migrate: {exc}", file=sys.stderr)
+            return 2
+        state = (
+            "HEAD alone" if not (modified or untracked)
+            else f"HEAD plus {modified} modified and {untracked} untracked file(s)"
+        )
+        print(f"rehearse: migrating a throwaway copy of {state} at {wt}", file=out)
         code = run_migration(wt)
         print(f"rehearse: migration {'validated' if code == 0 else f'failed (exit {code})'}", file=out)
         env = dict(os.environ)
@@ -763,7 +815,7 @@ def main(argv=None) -> int:
     )
     mig.add_argument(
         "--rehearse", action="store_true",
-        help="apply the rename on a throwaway worktree of HEAD and run the tests gate there",
+        help="apply the rename on a throwaway snapshot of the working tree and run the tests gate there",
     )
     mig.add_argument(
         "--rehearse-command", default=None, metavar="CMD",

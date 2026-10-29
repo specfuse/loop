@@ -1,14 +1,23 @@
 ---
 id: FEAT-LOOP-2026-0248/T07
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.50
 provenance: "T05's re-armed attempt (events.jsonl human_escalation agent_reported_blocked, 2026-10-29 ~13:06) was refused in 22s: --rehearse refuses a dirty tree (ids.py:682), and during any driver dispatch the driver's own WU frontmatter and events.jsonl are modified, so it can never run inside a unit. It also rehearses HEAD (ids.py:705), so a unit's own uncommitted edits are never in the rehearsal; T05's first attempt worked around both with a private copy script. Operator approved adding this unit ('go ahead, add T07 and re-arm T05')."
 produces:
   - specfuse/loop/ids.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T17:32:11.783099+00:00
+duration_seconds: 128.215
+cost_usd: 0.24295
+input_tokens: 20
+output_tokens: 5048
 ---
 
 # T07 — `--rehearse` rehearses the working tree as it is, not `HEAD`
