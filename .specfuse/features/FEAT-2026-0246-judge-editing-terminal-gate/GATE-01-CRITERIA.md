@@ -99,3 +99,21 @@
 - **criterion:** `python3 -m unittest tests.test_terminal_judge_editing_end_to_end -v -b` (the
 - **state:** `unverified`
 - **covers:** tests/test_terminal_judge_editing_end_to_end.py
+
+### T06#1
+
+- **criterion:** `tests/test_arm_eval_terminal.py`: the keys for a fixture with a judge-path
+- **state:** `unverified`
+- **covers:** specfuse/loop/arm_eval.py, specfuse/loop/loop.py, tests/test_arm_eval_terminal.py, tests/test_terminal_judge_editing_end_to_end.py
+
+### T06#2
+
+- **criterion:** `tests/test_terminal_judge_editing_end_to_end.py`: the halt message for a
+- **state:** `unverified`
+- **covers:** specfuse/loop/arm_eval.py, specfuse/loop/loop.py, tests/test_arm_eval_terminal.py, tests/test_terminal_judge_editing_end_to_end.py
+
+### T06#3
+
+- **criterion:** The `feature_oracle` and `tests.test_lifecycle_integration` still pass.
+- **state:** `unverified`
+- **covers:** specfuse/loop/arm_eval.py, specfuse/loop/loop.py, tests/test_arm_eval_terminal.py, tests/test_terminal_judge_editing_end_to_end.py
