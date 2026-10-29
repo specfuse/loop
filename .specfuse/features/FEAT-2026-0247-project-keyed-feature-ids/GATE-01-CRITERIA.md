@@ -161,3 +161,15 @@
 - **criterion:** `python3 -m unittest tests.test_lifecycle_integration tests.test_keyed_feature_ids_docs tests.test_scaffold_data_in_sync -b`
 - **state:** `unverified`
 - **covers:** specfuse/loop/ids.py, specfuse/loop/loop.py, specfuse/loop/gate_eval.py, specfuse/loop/gh_features.py, docs/methodology.md, specfuse/loop/data/docs/methodology.md, tests/test_ids_aliases.py, tests/test_keyed_feature_ids_end_to_end.py
+
+### T10#1
+
+- **criterion:** `python3 -m unittest tests.test_judge_path_registry tests.test_caller_check_ratchet tests.test_layout_no_layout_goldens -b`
+- **state:** `unverified`
+- **covers:** specfuse/loop/arm_eval.py, specfuse/loop/ids.py, tests/test_layout_no_layout_goldens.py, tests/test_ids.py
+
+### T10#2
+
+- **criterion:** `python3 -m unittest tests.test_ids tests.test_ids_migrate tests.test_ids_migrate_all tests.test_keyed_feature_ids_end_to_end -b`
+- **state:** `unverified`
+- **covers:** specfuse/loop/arm_eval.py, specfuse/loop/ids.py, tests/test_layout_no_layout_goldens.py, tests/test_ids.py
