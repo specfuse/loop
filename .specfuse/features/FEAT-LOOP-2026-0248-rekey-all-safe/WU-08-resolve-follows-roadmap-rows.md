@@ -1,14 +1,23 @@
 ---
 id: FEAT-LOOP-2026-0248/T08
 type: implementation
-status: pending
-attempts: 0
+status: done
+attempts: 1
 oracle_env: macos_local
 planned_cost_usd: 1.00
 provenance: "T05's third dispatch (blocked after 3077s, events.jsonl human_escalation agent_reported_blocked, 2026-10-29) found: FEAT-2026-0078 is a planned roadmap row with no feature folder and is queued in .specfuse/agent-policy.yml; the rename re-keys the row and writes an alias, but ids.resolve (ids.py:489) follows an alias only when its target has a folder, so it returns the legacy ID and post-rename validation reports `queue: 'FEAT-2026-0078' has no row in roadmap.md`. Operator chose option A: a code unit for resolve, then re-arm T05 through the driver."
 produces:
   - specfuse/loop/ids.py
   - tests/test_migrate_all_repo_stays_valid.py
+model: sonnet
+effort: medium
+gate_set: code
+driver_version: 0.30.0
+started_at: 2026-10-29T18:42:53.420917+00:00
+duration_seconds: 79.598
+cost_usd: 0.232904
+input_tokens: 20
+output_tokens: 4454
 ---
 
 # T08 — an alias resolves to a feature that exists only as a roadmap row

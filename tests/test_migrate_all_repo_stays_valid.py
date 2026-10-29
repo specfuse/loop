@@ -4,6 +4,7 @@
 #
 """Feature oracle for FEAT-LOOP-2026-0248 gate 1 — `ids migrate --all` keeps a repo valid."""
 
+import io
 import shutil
 import subprocess
 import tempfile
@@ -215,6 +216,42 @@ class Clause4ProseScoping(unittest.TestCase):
             root = self._fixture(tmp)
             code, _, _ = _run(root, "--exclude-id", "nonsense")
             self.assertNotEqual(code, 0)
+
+
+class Clause7AliasFollowsRoadmapRow(unittest.TestCase):
+    ROW = "| FEAT-2026-0099 | Later | planned | — | [→ detail](#feat-2026-0099) |\n"
+
+    def _fixture(self, tmp):
+        root = _make(tmp)
+        road = root / ".specfuse" / "roadmap.md"
+        text = road.read_text().replace(
+            "\n<a id=\"feat-2026-0042\">", self.ROW + "\n<a id=\"feat-2026-0042\">", 1
+        )
+        road.write_text(
+            text + '\n<a id="feat-2026-0099"></a>\n## FEAT-2026-0099 — Later\n\nBody.\n'
+        )
+        _commit_policy(root, _policy("FEAT-2026-0099"))
+        return root
+
+    def test_folderless_planned_row_queue_stays_valid(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._fixture(tmp)
+            code, out, err = _run(root, "--apply")
+            self.assertEqual(code, 0, out + err)
+            findings = agent_policy.validate_agent_policy(
+                root / ".specfuse" / "agent-policy.yml", repo_root=root
+            )
+            self.assertEqual([f for f in findings if f.startswith("ERROR")], [])
+
+    def test_alias_target_with_neither_folder_nor_row_warns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = _make(tmp)
+            (root / ".specfuse" / "id-aliases.yml").write_text(
+                "FEAT-2026-0098: FEAT-ACME-2026-0098\n"
+            )
+            err = io.StringIO()
+            self.assertEqual(ids.resolve(root, "FEAT-2026-0098", err=err), "FEAT-2026-0098")
+            self.assertIn("WARNING", err.getvalue())
 
 
 def _tracked_hash(root):

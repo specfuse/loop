@@ -141,6 +141,13 @@ def _has_folder(repo_root: Path, feature_id: str) -> bool:
     return features.is_dir() and any(features.glob(f"{feature_id}-*"))
 
 
+def _exists(repo_root: Path, feature_id: str) -> bool:
+    """A folder under features/ or a row in either roadmap file."""
+    return _has_folder(repo_root, feature_id) or any(
+        fid == feature_id for fid, _ in _roadmap_rows(repo_root)
+    )
+
+
 def plan_migration(repo_root, key: str) -> MigrationPlan:
     root = Path(repo_root)
     rows = list(_roadmap_rows(root))
@@ -487,21 +494,21 @@ def read_aliases(repo_root) -> dict:
 
 
 def resolve(repo_root, feature_id, err=None) -> str:
-    """The ID itself when it has a folder, else its alias target (one hop).
+    """The ID itself when it has a folder or roadmap row, else its alias target (one hop).
 
-    No alias map, no alias entry, or an alias whose target has no folder all
-    return *feature_id* unchanged; the last case is reported on *err*
+    No alias map, no alias entry, or an alias whose target has neither a
+    folder nor a roadmap row all return *feature_id* unchanged; the last case is reported on *err*
     (default stderr) rather than followed into an error.
     """
-    if not isinstance(feature_id, str) or _has_folder(Path(repo_root), feature_id):
+    if not isinstance(feature_id, str) or _exists(Path(repo_root), feature_id):
         return feature_id
     target = read_aliases(repo_root).get(feature_id)
     if target is None:
         return feature_id
-    if not _has_folder(Path(repo_root), target):
+    if not _exists(Path(repo_root), target):
         print(
             f"WARNING: {ALIASES_FILE} maps {feature_id} to {target}, "
-            f"which has no feature folder",
+            f"which has no feature folder or roadmap row",
             file=err or sys.stderr,
         )
         return feature_id
